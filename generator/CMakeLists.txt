@@ -4,11 +4,11 @@ project(idlparser VERSION 0.1.0)
 include(CTest)
 enable_testing()
 
-add_executable(enclave_marshalling_generator 
-enclave_marshalling_generator.cpp
+add_executable(in_zone_synchronous_generator 
+in_zone_synchronous_generator.cpp
 main.cpp)
 
-target_link_libraries(enclave_marshalling_generator 
+target_link_libraries(in_zone_synchronous_generator 
 PUBLIC 
 ast_parser
 macro_parser 
@@ -16,7 +16,7 @@ utils
 
 clipp::clipp
 fmt::fmt)
-set_property(TARGET enclave_marshalling_generator PROPERTY COMPILE_PDB_NAME enclave_marshalling_generator)
+set_property(TARGET in_zone_synchronous_generator PROPERTY COMPILE_PDB_NAME in_zone_synchronous_generator)
 
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})
 set(CPACK_PROJECT_VERSION ${PROJECT_VERSION})

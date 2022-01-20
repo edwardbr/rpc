@@ -6,19 +6,16 @@
 
 #include <clipp.h>
 
-#include "function_timer.h"
-
 #include "commonfuncs.h"
 #include "macro_parser.h"
 
 #include <coreclasses.h>
 
-#include "enclave_marshalling_generator.h"
+#include "in_zone_synchronous_generator.h"
 
 using namespace std;
 
 
-xt::function_timer* p_timer = NULL;
 std::stringstream verboseStream;
 
 namespace javascript_json{	namespace json	{		extern string namespace_name;	}}
@@ -176,7 +173,7 @@ int main(const int argc, char* argv[])
 
 		//do the generation to the ostrstreams
 		{
-			enclave_marshalling_generator::host_ecall::write_files(objects, header_stream, proxy_stream, stub_stream, namespaces, headerPath);
+			enclave_marshaller::in_zone_synchronous_generator::write_files(objects, header_stream, proxy_stream, stub_stream, namespaces, headerPath);
 
 			header_stream << ends;
 			proxy_stream << ends;
