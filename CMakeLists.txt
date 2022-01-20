@@ -16,7 +16,5 @@ project(idlparser VERSION 0.1.0)
 include(CTest)
 enable_testing()
 
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
-
 add_subdirectory(submodules)
 add_subdirectory(generator)
