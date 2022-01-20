@@ -42,7 +42,7 @@ int main(const int argc, char* argv[])
         clipp::required("-s", "--stub").doc("the generated stub relative filename") & clipp::value("stub",stubPath),
 		clipp::repeatable(clipp::option("-p", "--path") & clipp::value("path",include_paths)).doc("locations of include files used by the idl"),
 		clipp::option("-n","--namespace").doc("namespace of the generated interface") & clipp::value("namespace",namespaces),
-		clipp::option("--dump_preprocessor_output_and_die").set(dump_preprocessor_output_and_die).doc("dump preprocessor output and die"),
+		clipp::option("-d","--dump_preprocessor_output_and_die").set(dump_preprocessor_output_and_die).doc("dump preprocessor output and die"),
 		clipp::repeatable(clipp::option("-D") & clipp::value("define",defines)).doc("macro define"),
 		clipp::any_other(wrong_elements)
     );
@@ -152,7 +152,8 @@ int main(const int argc, char* argv[])
 		auto stub_path = std::filesystem::path(output_path) / "src" / stubPath;
 
 		std::filesystem::create_directories(header_path.parent_path());
-		std::filesystem::create_directories(header_path.parent_path());
+		std::filesystem::create_directories(proxy_path.parent_path());
+		std::filesystem::create_directories(stub_path.parent_path());
 
 		//read the original data and close the files afterwards
 		{

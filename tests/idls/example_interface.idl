@@ -1,0 +1,53 @@
+#include <string>
+
+struct something_complicated
+{
+    int int_val;
+    std::string string_val;
+};
+
+struct something_more_complicated
+{
+    std::vector<something_complicated> vector_val;
+    std::map<std::string, something_complicated> map_val;    
+};
+
+library example
+{
+    interface i_foo
+    {
+        int do_something_in_val(int val); //marshal by value
+        int do_something_in_ref([in]int& val); //marshal by reference
+        int do_something_in_ref([in, by_value]const int& val); //marshal by value - implictly const
+        int do_something_in_ptr([in]int* val); //marshal by reference
+        int do_something_out_ref([out]int& val);//marshal by value
+        int do_something_out_ptr_ref([out]int*& val);//marshal by reference can be null, cannot be enclave memory addresses if to be readable
+
+        int give_interface([in]i_foo& val);//never be null
+        int give_interface([in]i_foo* val);//can be null
+        int recieve_interface([out]remote_shared_ptr<i_foo>& val);//can be null
+
+        int give_something_complicated_val([in]const something_complicated val); //marshal by value
+        int give_something_complicated_ref([in]const something_complicated& val); //marshal by reference
+        int give_something_complicated_ref_val([in,by_value]const something_complicated& val); //marshal by value - implictly const
+        int give_something_complicated_ptr([in]const something_complicated* val); //marshal by reference
+        int recieve_something_complicated_ref([out]something_complicated& val); //marshal by value
+        int recieve_something_complicated_ptr([out]something_complicated*& val); //marshal by reference
+
+        int give_something_more_complicated_val([in]const something_more_complicated val);//marshal by value
+        int give_something_more_complicated_ref([in]const something_more_complicated& val); //marshal by reference
+        int give_something_more_complicated_ref_val([in,by_value]const something_more_complicated& val); //marshal by value - implictly const
+        int give_something_more_complicated_ptr([in]const something_more_complicated* val); //marshal by reference
+        int recieve_something_more_complicated_ref([out]something_more_complicated& val);//marshal by value
+        int recieve_something_more_complicated_ptr([out]something_more_complicated*& val); //marshal by reference
+
+        int do_multi_val(int val1, int val2); //marshal by value
+        int do_multi_complicated_val(const something_more_complicated val1, const something_more_complicated val2);//marshal by value
+    };
+
+    interface i_bar
+    {
+        int do_something_else(int val);
+    };
+    error_code create_foo(remote_shared_ptr<i_foo>& target);
+};
