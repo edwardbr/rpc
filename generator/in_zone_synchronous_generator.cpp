@@ -290,7 +290,7 @@ namespace enclave_marshaller
                     proxy("const yas::shared_buffer in_;");
                 }
 
-                proxy("for(int i = 0;i < in_.size;i++){{std::cout << in_.data.get() + i;}} std::cout << \"\\n\";");
+                //proxy("for(int i = 0;i < in_.size;i++){{std::cout << in_.data.get() + i;}} std::cout << \"\\n\";");
                 
                 proxy("yas::shared_buffer out_;");
                 proxy("int ret = marshaller_.send(object_id_, {}::id, {}, in_, out_);", m_ob.name, function_count);
