@@ -18,6 +18,7 @@ template<class T>class remote_shared_ptr
 	T* the_interface = nullptr;
 	public:
 	remote_shared_ptr(){}
+	remote_shared_ptr(T* interface) : the_interface(interface){}
 	remote_shared_ptr<i_unknown>& as_i_unknown()
 	{
 		return *(remote_shared_ptr<i_unknown>*)(this);
@@ -36,7 +37,14 @@ class i_marshaller : public i_unknown
 {
 	public:
 	virtual error_code send(uint64_t object_id, uint64_t interface_id, uint64_t method_id, const yas::shared_buffer& in, yas::shared_buffer& out) = 0;
-	virtual error_code try_cast(i_unknown& from, uint64_t interface_id, remote_shared_ptr<i_unknown>& to);
+	virtual error_code try_cast(i_unknown& from, uint64_t interface_id, remote_shared_ptr<i_unknown>& to) = 0;
+};
+
+class i_marshaller_impl : public i_marshaller
+{
+	public:
+	error_code send(uint64_t object_id, uint64_t interface_id, uint64_t method_id, const yas::shared_buffer& in, yas::shared_buffer& out) override;
+	error_code try_cast(i_unknown& from, uint64_t interface_id, remote_shared_ptr<i_unknown>& to) override;
 };
 
 //a handler for new threads, this function needs to be thread safe!

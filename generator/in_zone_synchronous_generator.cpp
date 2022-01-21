@@ -19,7 +19,7 @@ namespace enclave_marshaller
                 m_ob.name);
         };
 
-        bool is_in_call(bool from_host, const Library& lib, const std::string& name, const std::string& type, const std::list<std::string>& attributes, bool& is_interface, std::string& marshall_as)
+        bool is_in_call(bool from_host, const Library& lib, const std::string& name, const std::string& type, const std::list<std::string>& attributes, bool& is_interface, std::string& marshall_as, std::string& demarshall_declaration, std::string& param_cast)
         {
             auto in = std::find(attributes.begin(), attributes.end(), "in") != attributes.end();
             auto out = std::find(attributes.begin(), attributes.end(), "out") != attributes.end();
@@ -42,23 +42,43 @@ namespace enclave_marshaller
                 }
             }
 
-            if(referenceModifiers.empty() || byval || referenceModifiers == "*&")
+            if(referenceModifiers.empty())
             {
                 marshall_as = name;
+                demarshall_declaration = fmt::format("{} {}", type, name);
+                param_cast = name;
+            }
+            else if(referenceModifiers == "*&")
+            {
+                marshall_as = name;
+                demarshall_declaration = fmt::format("uint64_t {}", type_name, name);
+                param_cast = fmt::format("({}*){}", type_name, name);
             }
             else if(referenceModifiers == "*")
             {
-                marshall_as = fmt::format("(uint64_t){}", name);
+                marshall_as = fmt::format("(uint64_t) {}", name);
+                demarshall_declaration = fmt::format("uint64_t {}", name);
+                param_cast = fmt::format("({}*){}", type_name, name);
             }
             else if(referenceModifiers == "&")
             {
-                if(from_host == false)
+                if(byval)
+                {
+                    marshall_as = name;
+                    demarshall_declaration = fmt::format("{} {}", type_name, name);
+                    param_cast = name;
+                }
+                else if(from_host == false)
                 {
                     std::cerr << "passing data by reference from a non host zone is not allowed\n";
                     throw "passing data by reference from a non host zone is not allowed\n";
                 }
-
-                marshall_as = fmt::format("(uint64_t)&{}", name);
+                else
+                {
+                    marshall_as = fmt::format("(uint64_t)&{}", name);
+                    demarshall_declaration = fmt::format("uint64_t {}", name);
+                    param_cast = fmt::format("*({}*){}", type_name, name);
+                }
             }
             else
             {
@@ -68,7 +88,7 @@ namespace enclave_marshaller
             return true;
         }
 
-        bool is_out_call(bool from_host, const Library& lib, const std::string& name, const std::string& type, const std::list<std::string>& attributes, bool& is_interface, std::string& marshall_as)
+        bool is_out_call(bool from_host, const Library& lib, const std::string& name, const std::string& type, const std::list<std::string>& attributes, bool& is_interface, std::string& marshall_as, std::string& demarshall_declaration, std::string& param_cast, std::string& out_serialise_cast)
         {
             auto in = std::find(attributes.begin(), attributes.end(), "in") != attributes.end();
             auto out = std::find(attributes.begin(), attributes.end(), "out") != attributes.end();
@@ -92,8 +112,8 @@ namespace enclave_marshaller
 
             if(referenceModifiers.empty())
             {
-                std::cerr << fmt::format("out parameters require data to be sent by pointer or reference if from the host {} {} is not supported", type, name);
-                throw fmt::format("out parameters require data to be sent by pointer or reference if from the host {} {} is not supported", type, name);
+                std::cerr << fmt::format("out parameters require data to be sent by pointer {} {} is not supported", type, name);
+                throw fmt::format("out parameters require data to be sent by pointer {} {} is not supported", type, name);
             }
 
             is_interface = false;
@@ -108,11 +128,15 @@ namespace enclave_marshaller
 
             if(referenceModifiers == "&") //implicitly by value
             {
-                marshall_as = name;
+                std::cerr << fmt::format("out reference parameters are not supported {} {}", type, name);
+                throw fmt::format("out reference parameters are not supported {} {} is not supported", type, name);
             }
             else if(byval && referenceModifiers == "*")
             {
                 marshall_as = fmt::format("*{}", name);
+                demarshall_declaration = fmt::format("uint64_t {}", name);
+                param_cast = fmt::format("({}*){}", type_name, name);
+                out_serialise_cast = name;
             }
 
             else if(referenceModifiers == "*")
@@ -125,10 +149,16 @@ namespace enclave_marshaller
             else if(by_pointer && referenceModifiers == "**")
             {
                 marshall_as = fmt::format("(uint64_t)*{}", name);
+                demarshall_declaration = fmt::format("uint64_t {}", name);
+                param_cast = fmt::format("({}*){}", type_name, name);
+                out_serialise_cast = name;
             }
             else if(by_pointer && referenceModifiers == "*&")
             {
                 marshall_as = fmt::format("(uint64_t){}", name);
+                demarshall_declaration = fmt::format("{}* {}", type_name, name);
+                param_cast = name;
+                out_serialise_cast = fmt::format("(uint64_t) {}", name);
             }
             else
             {
@@ -163,7 +193,7 @@ namespace enclave_marshaller
 			proxy("");
 
 
-            stub("class {}_stub : public i_marshaller", m_ob.name);
+            stub("class {}_stub : public i_marshaller_impl", m_ob.name);
 			stub("{{");
             stub("remote_shared_ptr<{}> target_;", m_ob.name);
 			stub("public:");
@@ -214,28 +244,27 @@ namespace enclave_marshaller
                 proxy("{{");
 
                 bool has_inparams = false;
+
                 for(auto& parameter : function.parameters)
                 {
                     bool is_interface = false;
                     std::string marshall_as;
-                    if(!is_in_call(from_host, lib, parameter.name, parameter.type, parameter.m_attributes, is_interface, marshall_as))
-                        continue;
-
-                    has_inparams = true;
-                    break;
+                    std::string demarshall_declaration;
+                    std::string param_cast;
+                    std::string out_serialise_cast;
+                    if(is_in_call(from_host, lib, parameter.name, parameter.type, parameter.m_attributes, is_interface, marshall_as, demarshall_declaration, param_cast))
+                        has_inparams = true;
+                    else
+                        is_out_call(from_host, lib, parameter.name, parameter.type, parameter.m_attributes, is_interface, marshall_as, demarshall_declaration, param_cast, out_serialise_cast);
+                    stub("{};", demarshall_declaration);
                 }
 
-                proxy("yas::mem_ostream os_in;");
                 if(has_inparams)
                 {
-                    proxy("const auto in_ = yas::save<yas::mem|yas::json>(YAS_OBJECT_NVP(");
+                    proxy("const auto in_ = yas::save<yas::mem|yas::binary>(YAS_OBJECT_NVP(");
                     proxy("  \"in\"");
 
-                    for(auto& parameter : function.parameters)
-                    {
-                        stub("{} {};", parameter.type, parameter.name);
-                    }
-                    stub("yas::load<yas::mem|yas::json>(in, YAS_OBJECT_NVP(");
+                    stub("yas::load<yas::mem|yas::binary>(in, YAS_OBJECT_NVP(");
                     stub("  \"in\"");
 
                     int count = 0;
@@ -243,11 +272,14 @@ namespace enclave_marshaller
                     {
                         bool is_interface = false;
                         std::string marshall_as;
-                        if(!is_in_call(from_host, lib, parameter.name, parameter.type, parameter.m_attributes, is_interface, marshall_as))
+                        std::string demarshall_declaration;
+                        std::string param_cast;
+                        if(!is_in_call(from_host, lib, parameter.name, parameter.type, parameter.m_attributes, is_interface, marshall_as, demarshall_declaration, param_cast))
                             continue;
 
-                        proxy("  ,(\"_{}\", {})", count++, marshall_as);
-                        stub("  ,(\"_{}\", {})", count++, marshall_as);
+                        proxy("  ,(\"_{}\", {})", count, marshall_as);
+                        stub("  ,(\"_{}\", {})", count, parameter.name);
+                        count++;
                     }
                     
                     proxy("  ));");
@@ -257,6 +289,8 @@ namespace enclave_marshaller
                 {
                     proxy("const yas::shared_buffer in_;");
                 }
+
+                proxy("for(int i = 0;i < in_.size;i++){{std::cout << in_.data.get() + i;}} std::cout << \"\\n\";");
                 
                 proxy("yas::shared_buffer out_;");
                 proxy("int ret = marshaller_.send(object_id_, {}::id, {}, in_, out_);", m_ob.name, function_count);
@@ -272,12 +306,19 @@ namespace enclave_marshaller
                     bool has_param = false;
                     for(auto& parameter : function.parameters)
                     {
+                        bool is_interface = false;
+                        std::string marshall_as;
+                        std::string demarshall_declaration;
+                        std::string param_cast;
+                        std::string out_serialise_cast;
+                        if(!is_in_call(from_host, lib, parameter.name, parameter.type, parameter.m_attributes, is_interface, marshall_as, demarshall_declaration, param_cast))                        
+                            is_out_call(from_host, lib, parameter.name, parameter.type, parameter.m_attributes, is_interface, marshall_as, demarshall_declaration, param_cast, out_serialise_cast);
                         if(has_param)
                         {
                             stub.raw(",");
                         }
                         has_param = true;
-                        stub.raw("{}", parameter.name);
+                        stub.raw("{}", param_cast);
                     }
                 }
                 stub.raw(");\n");
@@ -286,11 +327,11 @@ namespace enclave_marshaller
                 stub("");
 
                 int count = 0;
-                proxy("yas::load<yas::mem|yas::json>(out_, YAS_OBJECT_NVP(");
+                proxy("yas::load<yas::mem|yas::binary>(out_, YAS_OBJECT_NVP(");
                 proxy("  \"out\"");
                 proxy("  ,(\"_{}\", ret)", count);
 
-                stub("out = yas::save<yas::mem|yas::json>(YAS_OBJECT_NVP(");
+                stub("out = yas::save<yas::mem|yas::binary>(YAS_OBJECT_NVP(");
                 stub("  \"out\"");
                 stub("  ,(\"_{}\", ret)", count);
 
@@ -299,11 +340,14 @@ namespace enclave_marshaller
                     count++;
                     bool is_interface = false;
                     std::string marshall_as;
-                    if(!is_out_call(from_host, lib, parameter.name, parameter.type, parameter.m_attributes, is_interface, marshall_as))
+                    std::string demarshall_declaration;
+                    std::string param_cast;
+                    std::string out_serialise_cast;
+                    if(!is_out_call(from_host, lib, parameter.name, parameter.type, parameter.m_attributes, is_interface, marshall_as, demarshall_declaration, param_cast, out_serialise_cast))
                         continue;
 
                     proxy("  ,(\"_{}\", {})", count, marshall_as);
-                    stub("  ,(\"_{}\", {})", count, parameter.name);
+                    stub("  ,(\"_{}\", {})", count, out_serialise_cast);
                 }
                 proxy("  ));");
                 proxy("return ret;");
@@ -487,7 +531,7 @@ namespace enclave_marshaller
                     proxy("}}");
                 }
             }	
-            header("");
+            /*header("");
             header("//static functions passed to global functions in the target zone");
             for(auto& function : m_ob.functions)
             {
@@ -514,7 +558,7 @@ namespace enclave_marshaller
                 proxy.raw(")\n");
                 proxy("{{");
                 proxy("}}");
-            }            
+            }     */       
             header("}};");
             header("#endif //_IN_ENCLAVE");
         };
