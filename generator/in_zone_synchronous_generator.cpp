@@ -1,4 +1,3 @@
-
 #include <type_traits>
 #include <algorithm>
 #include "coreclasses.h"
@@ -52,8 +51,7 @@ namespace enclave_marshaller
             stub("  target_(target),", m_ob.name);
             stub("  {{}}");
 			stub("");
-            stub("error_code send(int object_id, int interface_id, int method_id, const std::vector<uint8_t>& in, std::vector<uint8_t>& out) override");
-            stub("{{");
+            stub("error_code send(int object_id, int interface_id, int method_id, const yas::shared_buffer& in, yas::shared_buffer& out) override");
             stub("{{");
 
             int function_count = 1;
@@ -65,7 +63,7 @@ namespace enclave_marshaller
                 header.print_tabs();
                 proxy.print_tabs();
                 header.raw("virtual {} {}(", function.returnType, function.name);
-                proxy.raw("virtual {} {}_proxy::{} override (", function.returnType, m_ob.name, function.name);
+                proxy.raw("virtual {} {}_proxy::{} (", function.returnType, m_ob.name, function.name);
                 bool has_parameter = false;
                 for(auto& parameter : function.parameters)
                 {
@@ -79,13 +77,10 @@ namespace enclave_marshaller
                     proxy.raw("{} {}",parameter.type, parameter.name);
                 }
                 header.raw(") = 0;\n");
-                proxy.raw(")\n");
+                proxy.raw(") override\n");
                 proxy("{{");
 
-                proxy("const auto in_ =  = yas::save<yas::mem|yas::json>(YAS_OBJECT_NVP(");
-                proxy("  \"in\"");
-
-                int count = 0;
+                bool has_inparams = false;
                 for(auto& parameter : function.parameters)
                 {
                     auto in_it = std::find(parameter.m_attributes.begin(), parameter.m_attributes.end(), "in");
@@ -94,22 +89,42 @@ namespace enclave_marshaller
                     if(out_it != parameter.m_attributes.end() && in_it == parameter.m_attributes.end())
                         continue;
 
-                    proxy("  ,(\"_{}\", {})", count++, parameter.name);
+                    has_inparams = true;
+                    break;
+                }
+
+                if(has_inparams)
+                {
+                    proxy("const auto in_ = yas::save<yas::mem|yas::json>(YAS_OBJECT_NVP(");
+                    proxy("  \"in\"");
+
+                    int count = 0;
+                    for(auto& parameter : function.parameters)
+                    {
+                        auto in_it = std::find(parameter.m_attributes.begin(), parameter.m_attributes.end(), "in");
+                        auto out_it = std::find(parameter.m_attributes.begin(), parameter.m_attributes.end(), "out");
+                        auto byval_it = std::find(parameter.m_attributes.begin(), parameter.m_attributes.end(), "by_value");
+                        if(out_it != parameter.m_attributes.end() && in_it == parameter.m_attributes.end())
+                            continue;
+
+                        proxy("  ,(\"_{}\", {})", count++, parameter.name);
+                    }
+                    
+                    proxy("  ));");
+                }
+                else
+                {
+                    proxy("const yas::shared_buffer in_;");
                 }
                 
-                proxy("  ));");
-                
-                proxy("std::vector<uint8_t> out_;");
+                proxy("yas::shared_buffer out_;");
                 proxy("int ret = marshaller_.send(object_id_, {}::id, {}, in_, out_);", m_ob.name, function_count);
                 proxy("if(ret)");
                 proxy("{{");
                 proxy("return ret;");
                 proxy("}}");
 
-                proxy("yas::load<yas::mem|yas::json>(out_, YAS_OBJECT_NVP(");
-                proxy("  \"out\"");
-
-                count = 0;
+                bool has_out_params = false;
                 for(auto& parameter : function.parameters)
                 {
                     auto in_it = std::find(parameter.m_attributes.begin(), parameter.m_attributes.end(), "in");
@@ -117,10 +132,27 @@ namespace enclave_marshaller
                     if(out_it == parameter.m_attributes.end() && in_it != parameter.m_attributes.end())
                         continue;
 
-                    proxy("  ,(\"_{}\", {})", count++, parameter.name);
+                    has_out_params = true;
+                    break;
                 }
-                proxy("  ));");
 
+                if(has_out_params)
+                {
+                    proxy("yas::load<yas::mem|yas::json>(out_, YAS_OBJECT_NVP(");
+                    proxy("  \"out\"");
+
+                    int count = 0;
+                    for(auto& parameter : function.parameters)
+                    {
+                        auto in_it = std::find(parameter.m_attributes.begin(), parameter.m_attributes.end(), "in");
+                        auto out_it = std::find(parameter.m_attributes.begin(), parameter.m_attributes.end(), "out");
+                        if(out_it == parameter.m_attributes.end() && in_it != parameter.m_attributes.end())
+                            continue;
+
+                        proxy("  ,(\"_{}\", {})", count++, parameter.name);
+                    }
+                    proxy("  ));");
+                }
                 proxy("return ret;");
                 proxy("}}");
                 proxy("");
@@ -264,18 +296,18 @@ namespace enclave_marshaller
             header("{}();", m_ob.name);
             header("~{}();", m_ob.name);
             header("");
-            header("error_code load(std::string& dll_file_name);");
-            header("");
+            //header("error_code load(std::string& dll_file_name);");
+            //header("");
             header("error_code assign_marshaller(const std::shared_ptr<i_marshaller>& marshaller)");
             header("{{");
             header("marshaller_ = marshaller;");
             header("}}");
             header("");
 
-            proxy("error_code {}::load(std::string& dll_file_name);", m_ob.name);
+            /*proxy("error_code {}::load(std::string& dll_file_name);", m_ob.name);
             proxy("{{");
             proxy("}}");
-            proxy("");
+            proxy("");*/
 
             header("//polymorphic helper functions");
             for(auto& name : m_ob.m_ownedClasses)
@@ -288,9 +320,9 @@ namespace enclave_marshaller
                 if(obj->type == ObjectTypeInterface)
                 {
                     header("error_code query_interface(i_unknown& from, remote_shared_ptr<{}>& to) override;", obj->name);
-                    proxy("error_code {}::query_interface(i_unknown& from, remote_shared_ptr<{}>& to) override;", m_ob.name, obj->name);
+                    proxy("error_code {}::query_interface(i_unknown& from, remote_shared_ptr<{}>& to)", m_ob.name, obj->name);
                     proxy("{{");
-                    proxy("return marshaller_->try_cast(from, to);", obj->name);
+                    proxy("return marshaller_->try_cast(from, {}::id, to.as_i_unknown());", obj->name);
                     proxy("}}");
                 }
             }	
@@ -333,73 +365,20 @@ namespace enclave_marshaller
             writer proxy(pos);
             writer stub(sos);
 
+            header("#pragma once");
+            header("");
+            header("#include <marshaller/marshaller.h>");
             header("#include <memory>");
             header("#include <vector>");
             header("#include <map>");
             header("#include <string>");
             header("");
-            header("using error_code = int;");
-            header("");
 
-            header("//a shared pointer that works accross enclaves");
-            header("template<class T>class remote_shared_ptr{{}};");
-            header("");
-
-            header("//a weak pointer that works accross enclaves");
-            header("template<class T>class remote_weak_ptr{{}};");
-            header("");
-
-            header("class enclave_info;");
-            header("");            
-
-            header("//the base interface to all interfaces");
-            header("class i_unknown{{}};");
-            header("");           
-
-            header("//the used for marshalling data between zones");
-            header("class i_marshaller : public i_unknown");
-            header("{{");
-            header("virtual send(int object_id, int interface_id, int method_id, const std::vector<uint8_t>& in, std::vector<uint8_t>& out) = 0;");
-            header("}};");
-            header("");
-            
-
-            header("//a handler for new threads, this function needs to be thread safe!");
-            header("class i_thread_target : public i_unknown");
-            header("{{");
-            header("virtual error_code thread_started(std::string& thread_name) = 0;");
-            header("}};");
-            header("");
-
-            header("//a message channel between zones (a pair of spsc queues behind an executor) not thread safe!");
-            header("class i_message_channel : public i_unknown{{}};");            
-            header("");
-
-            header("//a handler for new threads, this function needs to be thread safe!");
-            header("class i_message_target : public i_unknown");
-            header("{{");
-            header("//Set up a link with another zone");
-            header("virtual error_code add_peer_channel(std::string link_name, i_message_channel& channel) = 0;");
-            header("//This will be called if the other zone goes down");
-            header("virtual error_code remove_peer_channel(std::string link_name) = 0;");
-            header("}};");
-            header("");
-
-            header("//logical security environment");
-            header("class i_zone : public i_unknown");
-            header("{{");
-            header("//this runs until the thread dies, this will also setup a connection with the message pump");
-            header("void start_thread(i_thread_target& target, std::string thread_name);");
-            header("");
-
-            header("//this is to allow messaging between enclaves this will create an i_message_channel");
-            header("error_code create_message_link(i_message_target& target, i_zone& other_zone, std::string link_name);");
-            header("}};");
-            header("");
-
+  			proxy("#include <yas/serialize.hpp>");
   			proxy("#include \"{}\"", header_filename);
             proxy("");
 
+  			stub("#include <yas/serialize.hpp>");
   			stub("#include \"{}\"", header_filename);
             stub("");
 
