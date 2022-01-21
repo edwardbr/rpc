@@ -1,6 +1,8 @@
 #include <type_traits>
 #include <algorithm>
 #include "coreclasses.h"
+#include "cpp_parser.h"
+
 #include "writer.h"
 
 #include "in_zone_synchronous_generator.h"
@@ -17,7 +19,126 @@ namespace enclave_marshaller
                 m_ob.name);
         };
 
-        void write_interface(const Library& lib, const ClassObject& m_ob, writer& header, writer& proxy, writer& stub, int id)
+        bool is_in_call(bool from_host, const Library& lib, const std::string& name, const std::string& type, const std::list<std::string>& attributes, bool& is_interface, std::string& marshall_as)
+        {
+            auto in = std::find(attributes.begin(), attributes.end(), "in") != attributes.end();
+            auto out = std::find(attributes.begin(), attributes.end(), "out") != attributes.end();
+            auto byval = std::find(attributes.begin(), attributes.end(), "by_value") != attributes.end();
+
+            if(out && !in)
+                return false;
+
+            std::string type_name = type;
+            std::string referenceModifiers;
+            stripReferenceModifiers(type_name, referenceModifiers);
+
+            is_interface = false;
+            for(auto it = lib.m_classes.begin(); it != lib.m_classes.end(); it++)
+            {
+                if((*it)->name == type_name)
+                {
+                    is_interface = true;
+                    break;
+                }
+            }
+
+            if(referenceModifiers.empty() || byval || referenceModifiers == "*&")
+            {
+                marshall_as = name;
+            }
+            else if(referenceModifiers == "*")
+            {
+                marshall_as = fmt::format("(uint64_t){}", name);
+            }
+            else if(referenceModifiers == "&")
+            {
+                if(from_host == false)
+                {
+                    std::cerr << "passing data by reference from a non host zone is not allowed\n";
+                    throw "passing data by reference from a non host zone is not allowed\n";
+                }
+
+                marshall_as = fmt::format("(uint64_t)&{}", name);
+            }
+            else
+            {
+                std::cerr << fmt::format("passing data by {} as in {} {} is not supported", referenceModifiers, type, name);
+                throw fmt::format("passing data by {} as in {} {} is not supported", referenceModifiers, type, name);
+            }
+            return true;
+        }
+
+        bool is_out_call(bool from_host, const Library& lib, const std::string& name, const std::string& type, const std::list<std::string>& attributes, bool& is_interface, std::string& marshall_as)
+        {
+            auto in = std::find(attributes.begin(), attributes.end(), "in") != attributes.end();
+            auto out = std::find(attributes.begin(), attributes.end(), "out") != attributes.end();
+            auto by_pointer = std::find(attributes.begin(), attributes.end(), "by_pointer") != attributes.end();
+            auto byval = std::find(attributes.begin(), attributes.end(), "by_value") != attributes.end();
+
+            if(!out)
+                return false;
+
+            if(by_pointer && byval)
+            {
+                std::cerr << fmt::format("specifying by_pointer and by_value is not supported");
+                throw fmt::format("specifying by_pointer and by_value is not supported");
+            }
+            if(!byval)
+                by_pointer = true;
+
+            std::string type_name = type;
+            std::string referenceModifiers;
+            stripReferenceModifiers(type_name, referenceModifiers);
+
+            if(referenceModifiers.empty())
+            {
+                std::cerr << fmt::format("out parameters require data to be sent by pointer or reference if from the host {} {} is not supported", type, name);
+                throw fmt::format("out parameters require data to be sent by pointer or reference if from the host {} {} is not supported", type, name);
+            }
+
+            is_interface = false;
+            for(auto it = lib.m_classes.begin(); it != lib.m_classes.end(); it++)
+            {
+                if((*it)->name == type_name)
+                {
+                    is_interface = true;
+                    break;
+                }
+            }
+
+            if(referenceModifiers == "&") //implicitly by value
+            {
+                marshall_as = name;
+            }
+            else if(byval && referenceModifiers == "*")
+            {
+                marshall_as = fmt::format("*{}", name);
+            }
+
+            else if(referenceModifiers == "*")
+            {
+                std::cerr << "passing [out] by_pointer data by * will not work use a ** or *&\n";
+                throw "passing [out] by_pointer data by * will not work use a ** or *&\n";
+            }
+
+            //by pointer
+            else if(by_pointer && referenceModifiers == "**")
+            {
+                marshall_as = fmt::format("(uint64_t)*{}", name);
+            }
+            else if(by_pointer && referenceModifiers == "*&")
+            {
+                marshall_as = fmt::format("(uint64_t){}", name);
+            }
+            else
+            {
+                std::cerr << fmt::format("passing data by {} as out parameter {} {} is not supported", referenceModifiers, type, name);
+                throw fmt::format("passing data by {} as out parameter {} {} is not supported", referenceModifiers, type, name);
+            }
+            return true;
+        }
+
+        void write_interface(bool from_host, const Library& lib, const ClassObject& m_ob, writer& header, writer& proxy, writer& stub, int id)
         {
             header("class {}{}{} : public i_unknown", 
                 m_ob.name, 
@@ -25,7 +146,7 @@ namespace enclave_marshaller
                 m_ob.parentName);
 			header("{{");
 			header("public:");
-			header("static constexpr int id = {};", id);
+			header("static constexpr uint64_t id = {};", id);
 
             proxy("class {}_proxy : public {}", 
                 m_ob.name, 
@@ -48,10 +169,13 @@ namespace enclave_marshaller
 			stub("public:");
 			stub("");
             stub("{}_stub(remote_shared_ptr<{}>& target) : ", m_ob.name, m_ob.name);
-            stub("  target_(target),", m_ob.name);
+            stub("  target_(target)", m_ob.name);
             stub("  {{}}");
 			stub("");
-            stub("error_code send(int object_id, int interface_id, int method_id, const yas::shared_buffer& in, yas::shared_buffer& out) override");
+            stub("error_code send(uint64_t object_id, uint64_t interface_id, uint64_t method_id, const yas::shared_buffer& in, yas::shared_buffer& out) override");
+            stub("{{");
+
+            stub("switch(interface_id)");
             stub("{{");
 
             int function_count = 1;
@@ -60,6 +184,9 @@ namespace enclave_marshaller
                 if(function.type != FunctionTypeMethod)
                     continue;
                 
+                stub("case {}:", function_count);
+                stub("{{");
+
                 header.print_tabs();
                 proxy.print_tabs();
                 header.raw("virtual {} {}(", function.returnType, function.name);
@@ -73,8 +200,14 @@ namespace enclave_marshaller
                         proxy.raw(", ");
                     }
                     has_parameter = true;
-                    header.raw("{} {}",parameter.type, parameter.name);
-                    proxy.raw("{} {}",parameter.type, parameter.name);
+                    std::string modifier;
+                    for(auto it = parameter.m_attributes.begin(); it != parameter.m_attributes.end(); it++)
+                    {
+                        if(*it == "const")
+                            modifier = "const " + modifier;
+                    }
+                    header.raw("{}{} {}",modifier, parameter.type, parameter.name);
+                    proxy.raw("{}{} {}",modifier, parameter.type, parameter.name);
                 }
                 header.raw(") = 0;\n");
                 proxy.raw(") override\n");
@@ -83,34 +216,42 @@ namespace enclave_marshaller
                 bool has_inparams = false;
                 for(auto& parameter : function.parameters)
                 {
-                    auto in_it = std::find(parameter.m_attributes.begin(), parameter.m_attributes.end(), "in");
-                    auto out_it = std::find(parameter.m_attributes.begin(), parameter.m_attributes.end(), "out");
-                    auto byval_it = std::find(parameter.m_attributes.begin(), parameter.m_attributes.end(), "by_value");
-                    if(out_it != parameter.m_attributes.end() && in_it == parameter.m_attributes.end())
+                    bool is_interface = false;
+                    std::string marshall_as;
+                    if(!is_in_call(from_host, lib, parameter.name, parameter.type, parameter.m_attributes, is_interface, marshall_as))
                         continue;
 
                     has_inparams = true;
                     break;
                 }
 
+                proxy("yas::mem_ostream os_in;");
                 if(has_inparams)
                 {
                     proxy("const auto in_ = yas::save<yas::mem|yas::json>(YAS_OBJECT_NVP(");
                     proxy("  \"in\"");
 
+                    for(auto& parameter : function.parameters)
+                    {
+                        stub("{} {};", parameter.type, parameter.name);
+                    }
+                    stub("yas::load<yas::mem|yas::json>(in, YAS_OBJECT_NVP(");
+                    stub("  \"in\"");
+
                     int count = 0;
                     for(auto& parameter : function.parameters)
                     {
-                        auto in_it = std::find(parameter.m_attributes.begin(), parameter.m_attributes.end(), "in");
-                        auto out_it = std::find(parameter.m_attributes.begin(), parameter.m_attributes.end(), "out");
-                        auto byval_it = std::find(parameter.m_attributes.begin(), parameter.m_attributes.end(), "by_value");
-                        if(out_it != parameter.m_attributes.end() && in_it == parameter.m_attributes.end())
+                        bool is_interface = false;
+                        std::string marshall_as;
+                        if(!is_in_call(from_host, lib, parameter.name, parameter.type, parameter.m_attributes, is_interface, marshall_as))
                             continue;
 
-                        proxy("  ,(\"_{}\", {})", count++, parameter.name);
+                        proxy("  ,(\"_{}\", {})", count++, marshall_as);
+                        stub("  ,(\"_{}\", {})", count++, marshall_as);
                     }
                     
                     proxy("  ));");
+                    stub("  ));");
                 }
                 else
                 {
@@ -124,41 +265,60 @@ namespace enclave_marshaller
                 proxy("return ret;");
                 proxy("}}");
 
-                bool has_out_params = false;
-                for(auto& parameter : function.parameters)
+                stub.print_tabs();
+                stub.raw("error_code ret = target_->{}(", function.name);
+
                 {
-                    auto in_it = std::find(parameter.m_attributes.begin(), parameter.m_attributes.end(), "in");
-                    auto out_it = std::find(parameter.m_attributes.begin(), parameter.m_attributes.end(), "out");
-                    if(out_it == parameter.m_attributes.end() && in_it != parameter.m_attributes.end())
-                        continue;
-
-                    has_out_params = true;
-                    break;
-                }
-
-                if(has_out_params)
-                {
-                    proxy("yas::load<yas::mem|yas::json>(out_, YAS_OBJECT_NVP(");
-                    proxy("  \"out\"");
-
-                    int count = 0;
+                    bool has_param = false;
                     for(auto& parameter : function.parameters)
                     {
-                        auto in_it = std::find(parameter.m_attributes.begin(), parameter.m_attributes.end(), "in");
-                        auto out_it = std::find(parameter.m_attributes.begin(), parameter.m_attributes.end(), "out");
-                        if(out_it == parameter.m_attributes.end() && in_it != parameter.m_attributes.end())
-                            continue;
-
-                        proxy("  ,(\"_{}\", {})", count++, parameter.name);
+                        if(has_param)
+                        {
+                            stub.raw(",");
+                        }
+                        has_param = true;
+                        stub.raw("{}", parameter.name);
                     }
-                    proxy("  ));");
                 }
+                stub.raw(");\n");
+                stub("if(ret)");
+                stub("  return ret;");
+                stub("");
+
+                int count = 0;
+                proxy("yas::load<yas::mem|yas::json>(out_, YAS_OBJECT_NVP(");
+                proxy("  \"out\"");
+                proxy("  ,(\"_{}\", ret)", count);
+
+                stub("out = yas::save<yas::mem|yas::json>(YAS_OBJECT_NVP(");
+                stub("  \"out\"");
+                stub("  ,(\"_{}\", ret)", count);
+
+                for(auto& parameter : function.parameters)
+                {
+                    count++;
+                    bool is_interface = false;
+                    std::string marshall_as;
+                    if(!is_out_call(from_host, lib, parameter.name, parameter.type, parameter.m_attributes, is_interface, marshall_as))
+                        continue;
+
+                    proxy("  ,(\"_{}\", {})", count, marshall_as);
+                    stub("  ,(\"_{}\", {})", count, parameter.name);
+                }
+                proxy("  ));");
                 proxy("return ret;");
                 proxy("}}");
                 proxy("");
+                
+                stub("  ));");
+                stub("return ret;");
 
                 function_count++;
+                stub("}}");
+                stub("break;");
             }
+            
+            stub("}};");
 
             header("}};");            
             header("");
@@ -166,8 +326,9 @@ namespace enclave_marshaller
             proxy("}};");            
             proxy("");
 
+            stub("return 0;"); 
             stub("}}");
-            stub("}};");            
+            stub("}};");                
             stub("");
         };
 
@@ -200,7 +361,7 @@ namespace enclave_marshaller
             {
                 header("  ,(\"_{}\", {})", count++, field.name);
             }
-            header(")");
+            header(");");
 
             header("}}");
 			
@@ -208,7 +369,7 @@ namespace enclave_marshaller
             header("}};");
         };
 
-        void write_library(const Library& lib, const ClassObject& m_ob, writer& header, writer& proxy, writer& stub)
+        void write_library(bool from_host, const Library& lib, const ClassObject& m_ob, writer& header, writer& proxy, writer& stub)
         {
             for(auto& name : m_ob.m_ownedClasses)
             {
@@ -233,7 +394,7 @@ namespace enclave_marshaller
                         continue;
                     }
                     if(obj->type == ObjectTypeInterface)
-                        write_interface(lib, *obj, header, proxy, stub, id++);
+                        write_interface(from_host, lib, *obj, header, proxy, stub, id++);
                 }
             }
 
@@ -359,7 +520,7 @@ namespace enclave_marshaller
         };
 
         //entry point
-        void write_files(const Library& lib, std::ostream& hos, std::ostream& pos, std::ostream& sos, const std::vector<std::string>& namespaces, const std::string& header_filename)
+        void write_files(bool from_host, const Library& lib, std::ostream& hos, std::ostream& pos, std::ostream& sos, const std::vector<std::string>& namespaces, const std::string& header_filename)
         {
             writer header(hos);
             writer proxy(pos);
@@ -374,11 +535,17 @@ namespace enclave_marshaller
             header("#include <string>");
             header("");
 
-  			proxy("#include <yas/serialize.hpp>");
+  			proxy("#include <yas/mem_streams.hpp>");
+  			proxy("#include <yas/binary_iarchive.hpp>");
+  			proxy("#include <yas/binary_oarchive.hpp>");
+  			proxy("#include <yas/std_types.hpp>");
   			proxy("#include \"{}\"", header_filename);
             proxy("");
 
-  			stub("#include <yas/serialize.hpp>");
+  			stub("#include <yas/mem_streams.hpp>");
+  			stub("#include <yas/binary_iarchive.hpp>");
+  			stub("#include <yas/binary_oarchive.hpp>");
+  			proxy("#include <yas/std_types.hpp>");
   			stub("#include \"{}\"", header_filename);
             stub("");
 
@@ -413,7 +580,7 @@ namespace enclave_marshaller
                     continue;
                 }
                 if(obj->type == ObjectLibrary)
-                    write_library(lib, *obj, header, proxy, stub);
+                    write_library(from_host, lib, *obj, header, proxy, stub);
             }
 
             for(auto& ns : namespaces)

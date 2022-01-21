@@ -174,7 +174,7 @@ int main(const int argc, char* argv[])
 
 		//do the generation to the ostrstreams
 		{
-			enclave_marshaller::in_zone_synchronous_generator::write_files(objects, header_stream, proxy_stream, stub_stream, namespaces, headerPath);
+			enclave_marshaller::in_zone_synchronous_generator::write_files(true, objects, header_stream, proxy_stream, stub_stream, namespaces, headerPath);
 
 			header_stream << ends;
 			proxy_stream << ends;

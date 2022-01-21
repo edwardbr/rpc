@@ -15,10 +15,16 @@ class i_unknown{};
 //a shared pointer that works accross enclaves
 template<class T>class remote_shared_ptr
 {
+	T* the_interface = nullptr;
 	public:
+	remote_shared_ptr(){}
 	remote_shared_ptr<i_unknown>& as_i_unknown()
 	{
 		return *(remote_shared_ptr<i_unknown>*)(this);
+	}
+	T* operator->()
+	{
+		return the_interface;
 	}
 };
 
@@ -29,8 +35,8 @@ template<class T>class remote_weak_ptr{};
 class i_marshaller : public i_unknown
 {
 	public:
-	virtual error_code send(int object_id, int interface_id, int method_id, const yas::shared_buffer& in, yas::shared_buffer& out) = 0;
-	virtual error_code try_cast(i_unknown& from, int interface_id, remote_shared_ptr<i_unknown>& to);
+	virtual error_code send(uint64_t object_id, uint64_t interface_id, uint64_t method_id, const yas::shared_buffer& in, yas::shared_buffer& out) = 0;
+	virtual error_code try_cast(i_unknown& from, uint64_t interface_id, remote_shared_ptr<i_unknown>& to);
 };
 
 //a handler for new threads, this function needs to be thread safe!
