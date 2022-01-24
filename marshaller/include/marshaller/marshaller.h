@@ -22,7 +22,7 @@ template<class T>class remote_shared_ptr
 	T* the_interface = nullptr;
 public:
 	remote_shared_ptr(){}
-	remote_shared_ptr(T* interface) : the_interface(interface){}
+	remote_shared_ptr(T* iface) : the_interface(iface){}
 	remote_shared_ptr<i_unknown>& as_i_unknown()
 	{
 		return *(remote_shared_ptr<i_unknown>*)(this);

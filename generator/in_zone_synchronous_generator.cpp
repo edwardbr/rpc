@@ -171,9 +171,9 @@ namespace enclave_marshaller
             else if(by_pointer && referenceModifiers == "**")
             {
                 proxy_marshall_as = name;
-                stub_demarshall_declaration = fmt::format("uint64_t {}", name);
-                stub_param_cast = fmt::format("&({}*){}", type_name, name);
-                stub_out_serialise_cast = name;
+                stub_demarshall_declaration = fmt::format("{}* {} = nullptr", type_name, name);
+                stub_param_cast = fmt::format("&{}", name);
+                stub_out_serialise_cast = fmt::format("(uint64_t) {}", name);
                 stub_value_return = fmt::format("*{} = ({}*){}_;", name, type_name, name);
             }
             else if(by_pointer && referenceModifiers == "*&")

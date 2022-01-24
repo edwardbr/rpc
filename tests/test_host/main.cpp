@@ -1,5 +1,14 @@
 #include <iostream>
 
+#include <sgx_urts.h>
+#include <sgx_quote.h>
+#include <sgx_uae_service.h>
+//#include <sgx_tae_service.h>
+#include <sgx_capable.h>
+#include <sgx_uae_service.h>
+#include <sgx_eid.h>
+#include "untrusted/enclave_marshal_test_u.h"
+
 #include <example/example.h>
 #include <example_proxy.cpp>
 #include <example_stub.cpp>
@@ -111,9 +120,9 @@ error_code i_marshaller_impl::try_cast(i_unknown& from, uint64_t interface_id, r
     return 1;
 }
 
-#define ASSERT(x)                                                                                                      \
-    if (!(x))                                                                                                          \
-    std::cerr << "bad test " #x
+void test();
+
+#define ASSERT(x) if (x) std::cerr << "bad test " #x "\n"
 
 int main()
 {
@@ -207,4 +216,24 @@ int main()
 		val2.map_val["22"]=something_complicated{33,"22"};
         ASSERT(foo.do_multi_complicated_val(val1, val2));
     }
+
+    test();
+}
+
+
+void test()
+{
+    sgx_launch_token_t token = { 0 };
+    int updated = 0;
+    sgx_enclave_id_t eid = 0;
+
+    sgx_status_t ret = sgx_create_enclavea("C:/Dev/experiments/enclave_marshaller/build/output/debug/marshal_test_enclave.dll", 1, &token, &updated, &eid, NULL);
+
+    ASSERT(ret == SGX_SUCCESS);
+    printf("Enclave created %d.\n", (int)eid);
+
+	//ret = logger_test_enclave_init(eid, &retval, &context, &session, &session_hmac);
+
+
+    sgx_destroy_enclave(eid);
 }

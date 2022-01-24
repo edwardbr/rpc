@@ -38,7 +38,7 @@ function(EnclaveMarshaller
   endforeach()
   separate_arguments(PATHS_PARAMS WINDOWS_COMMAND "${PATHS_PARAMS}")
 
-  message("  add_custom_command(
+#[[  message("  add_custom_command(
     OUTPUT ${output_path}/${header}  ${output_path}/${proxy} ${output_path}/${stub}
     COMMAND ${ENCLAVE_MARSHALLER} 
       --idl ${idl} 
@@ -48,7 +48,7 @@ function(EnclaveMarshaller
       --stub ${stub}
       ${PATHS_PARAMS}
       --namespace ${namespace}
-    DEPENDS ${dependencies} ${idl})")
+    DEPENDS ${dependencies} ${idl})")]]
 
   add_custom_command(
     OUTPUT ${output_path}/${header}  ${output_path}/${proxy} ${output_path}/${stub}

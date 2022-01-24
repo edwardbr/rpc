@@ -10,3 +10,6 @@
 [submodule "submodules/idlparser"]
 	path = submodules/idlparser
 	url = https://github.com/edwardbr/idlparser.git
+[submodule "submodules/googletest"]
+	path = submodules/googletest
+	url = https://github.com/google/googletest.git

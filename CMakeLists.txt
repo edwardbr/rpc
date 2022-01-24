@@ -14,10 +14,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 include(FindEnclaveMarshaller)
 
-project(idlparser VERSION 0.1.0)
+project(enclave_marshaller VERSION 0.1.0)
 
-include(CTest)
-enable_testing()
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmakeconfigs")
+include(DependancyPrimer)
 
 add_subdirectory(submodules)
 add_subdirectory(generator)
