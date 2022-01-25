@@ -9,111 +9,14 @@
 #include <sgx_eid.h>
 #include "untrusted/enclave_marshal_test_u.h"
 
+#include "../common/foo_impl.h"
+#include "../common/tests.h"
+
 #include <example/example.h>
 #include <example_proxy.cpp>
 #include <example_stub.cpp>
 
-using namespace secretarium::marshalled_foo;
-
-class foo : public i_foo
-{
-    int do_something_in_val(int val)
-    {
-        std::cout << "got " << val << "\n";
-        return 0;
-    }
-    int do_something_in_ref(const int& val) 
-	{
-        std::cout << "got " << val << "\n";
-        return 0;
-    }
-    int do_something_in_by_val_ref(const int& val) 
-	{
-        std::cout << "got " << val << "\n";
-        return 0;
-    }
-    int do_something_in_ptr(int* val) 
-	{
-        std::cout << "got " << *val << "\n";
-        return 0;
-    }
-	int do_something_out_ref(int& val)
-	{
-		val = 33;
-        return 0;
-	};
-    int do_something_out_ptr_ref(int*& val)
-    {
-        val = new int(33);
-        return 0;
-    }
-    int do_something_out_ptr_ptr(int** val)
-    {
-        *val = new int(33);
-        return 0;
-    }
-    int give_something_complicated_val(const something_complicated val) 
-	{
-        std::cout << "got " << val.int_val << "\n";
-        return 0;
-    }
-    int give_something_complicated_ref(const something_complicated& val) 
-	{
-        std::cout << "got " << val.int_val << "\n";
-        return 0;
-    }
-    int give_something_complicated_ref_val(const something_complicated& val) 
-	{
-        std::cout << "got " << val.int_val << "\n";
-        return 0;
-    }
-    int give_something_complicated_ptr(const something_complicated* val) 
-	{
-        std::cout << "got " << val->int_val << "\n";
-        return 0;
-    }
-    int recieve_something_complicated_ptr(something_complicated*& val) 
-	{
-        val = new something_complicated{33,"22"};
-        return 0;
-    }
-    int give_something_more_complicated_val(const something_more_complicated val) 
-	{
-        std::cout << "got " << val.map_val.begin()->first << "\n";
-        return 0;
-    }
-    int give_something_more_complicated_ref(const something_more_complicated& val) 
-	{
-        std::cout << "got " << val.map_val.begin()->first << "\n";
-        return 0;
-    }
-    int give_something_more_complicated_ref_val(const something_more_complicated& val) 
-	{
-        std::cout << "got " << val.map_val.begin()->first << "\n";
-        return 0;
-    }
-    int give_something_more_complicated_ptr(const something_more_complicated* val) 
-	{
-        std::cout << "got " << val->map_val.begin()->first << "\n";
-        return 0;
-    }
-    int recieve_something_more_complicated_ptr(something_more_complicated*& val) 
-	{
-        val = new something_more_complicated();
-		val->map_val["22"]=something_complicated{33,"22"};
-        return 0;
-    }
-    int do_multi_val(int val1, int val2) 
-	{
-        std::cout << "got " << val1 << "\n";
-        return 0;
-	}
-    int do_multi_complicated_val(const something_more_complicated val1, const something_more_complicated val2)
-	{
-        std::cout << "got " << val1.map_val.begin()->first << "\n";
-        return 0;
-	}
-};
+using namespace marshalled_tests;
 
 error_code i_marshaller_impl::send(uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_, const char* in_buf_, size_t out_size_, char* out_buf_)
 {
@@ -127,116 +30,6 @@ error_code i_marshaller_impl::try_cast(i_unknown& from, uint64_t interface_id, r
 {
     return 1;
 }
-
-void error(int x)
-{
-    if (x) 
-        std::cerr << "bad test " << x << "\n";
-}
-
-#define ASSERT(x) error(x)
-
-
-void standard_tests(i_foo& foo, bool enclave)
-{
-    error_code ret = 0;
-    {
-        ASSERT(foo.do_something_in_val(33));
-    }
-    {
-        int val = 33;
-        ASSERT(foo.do_something_in_ref(val));
-    }
-    {
-        int val = 33;
-        ASSERT(foo.do_something_in_by_val_ref(val));
-    }
-    {
-        int val = 33;
-        ASSERT(foo.do_something_in_ptr(&val));
-    }
-    {
-        int val = 0;
-        ASSERT(foo.do_something_out_ref(val));
-    }
-    if(!enclave)
-    {
-        int* val = nullptr;
-        ASSERT(foo.do_something_out_ptr_ref(val));
-        delete val;
-    }
-    if(!enclave)
-    {
-        int* val = nullptr;
-        ASSERT(foo.do_something_out_ptr_ptr(&val));
-        delete val;
-    }
-    {
-        something_complicated val{33,"22"};
-        ASSERT(foo.give_something_complicated_val(val));
-    }
-    {
-        something_complicated val{33,"22"};
-        ASSERT(foo.give_something_complicated_ref(val));
-    }
-    {
-        something_complicated val{33,"22"};
-        ASSERT(foo.give_something_complicated_ref_val(val));
-    }
-    {
-        something_complicated val{33,"22"};
-        ASSERT(foo.give_something_complicated_ptr(&val));
-    }
-    if(!enclave)
-    {
-        something_complicated* val = nullptr;
-        ASSERT(foo.recieve_something_complicated_ptr(val));
-		std::cout << "got " << val->int_val << "\n";
-        delete val;
-    }
-    {
-        something_more_complicated val;
-		val.map_val["22"]=something_complicated{33,"22"};
-        ASSERT(foo.give_something_more_complicated_val(val));
-    }
-    if(!enclave)
-    {
-        something_more_complicated val;
-		val.map_val["22"]=something_complicated{33,"22"};
-        ASSERT(foo.give_something_more_complicated_ref(val));
-    }
-    {
-        something_more_complicated val;
-		val.map_val["22"]=something_complicated{33,"22"};
-        ASSERT(foo.give_something_more_complicated_ref_val(val));
-    }
-    if(!enclave)
-    {
-        something_more_complicated val;
-		val.map_val["22"]=something_complicated{33,"22"};
-        ASSERT(foo.give_something_more_complicated_ptr(&val));
-    }
-    if(!enclave)
-    {
-        something_more_complicated* val = nullptr;
-        ASSERT(foo.recieve_something_more_complicated_ptr(val));
-		std::cout << "got " << val->map_val.begin()->first << "\n";
-        delete val;
-    }
-    {
-        int val1 = 1;
-        int val2 = 2;
-        ASSERT(foo.do_multi_val(val1, val2));
-    }
-    {
-        something_more_complicated val1;
-        something_more_complicated val2;
-		val1.map_val["22"]=something_complicated{33,"22"};
-		val2.map_val["22"]=something_complicated{33,"22"};
-        ASSERT(foo.do_multi_complicated_val(val1, val2));
-    }
-}
-
 
 int main()
 {
@@ -261,7 +54,7 @@ int main()
         err_code = ex.load();
         ASSERT(err_code);
 
-        /*remote_shared_ptr<secretarium::marshalled_foo::i_foo> target;
+        /*remote_shared_ptr<marshalled_tests::i_foo> target;
         err_code = ex.create_foo(target);
         if(!err_code)
             std::cout << "aggggggg!";*/

@@ -1,5 +1,3 @@
-# Copyright 2021 Secretarium Ltd <contact@secretarium.org>
-
 cmake_minimum_required(VERSION 3.12)
 
 EnclaveMarshaller(
@@ -9,7 +7,7 @@ EnclaveMarshaller(
     example/example.h
     example_proxy.cpp
     example_stub.cpp
-    secretarium::marshalled_foo
+    marshalled_tests
     include_paths
         ${CMAKE_SOURCE_DIR}/submodules/idlparser/defines
         .

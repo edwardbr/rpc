@@ -1,5 +1,3 @@
-# Copyright 2021 Secretarium Ltd <contact@secretarium.org>
-
 cmake_minimum_required(VERSION 3.12)
 
 host_edl_library(

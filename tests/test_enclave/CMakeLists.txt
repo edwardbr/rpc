@@ -20,7 +20,7 @@ if(${BUILD_ENCLAVE})
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
     "$<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/generated/include>"
     "$<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/generated/src>"
-    "$<INSTALL_INTERFACE:include/secretarium>"
+    "$<INSTALL_INTERFACE:include/marshalled_tests>"
   PRIVATE 
     ${ENCLAVE_LIBCXX_INCLUDES})
     
