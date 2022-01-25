@@ -18,16 +18,19 @@ if(${BUILD_ENCLAVE})
   target_include_directories(marshal_test_enclave 
   PUBLIC 
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+    "$<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/generated/include>"
+    "$<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/generated/src>"
     "$<INSTALL_INTERFACE:include/secretarium>"
   PRIVATE 
-    ${ENCLAVE_LIBCXX_INCLUDES}
-    ${CMAKE_SOURCE_DIR}/3rdparty/include)
+    ${ENCLAVE_LIBCXX_INCLUDES})
     
   target_compile_options(marshal_test_enclave PRIVATE ${ENCLAVE_COMPILE_OPTIONS})
   target_link_options(marshal_test_enclave PRIVATE ${ENCLAVE_LINK_OPTIONS})
 
+
   target_link_libraries(marshal_test_enclave 
-  PUBLIC 
+  PUBLIC
+    marshaller_enclave
     marshal_test_edl_enclave    
 
     ${SGX_ENCLAVE_LIBS}

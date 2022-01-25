@@ -37,6 +37,11 @@ class foo : public i_foo
         std::cout << "got " << *val << "\n";
         return 0;
     }
+	int do_something_out_ref(int& val)
+	{
+		val = 33;
+        return 0;
+	};
     int do_something_out_ptr_ref(int*& val)
     {
         val = new int(33);
@@ -110,26 +115,32 @@ class foo : public i_foo
 	}
 };
 
-error_code i_marshaller_impl::send(uint64_t object_id, uint64_t interface_id, uint64_t method_id,
-                                   const yas::shared_buffer& in, yas::shared_buffer& out)
+error_code i_marshaller_impl::send(uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_, const char* in_buf_, size_t out_size_, char* out_buf_)
 {
-    return 1;
+    error_code err_code = 0;
+    sgx_status_t status = call(eid_, &err_code, object_id, interface_id, method_id, in_size_, in_buf_, out_size_, out_buf_);
+    if(status)
+        err_code = -1;
+    return err_code;
 }
 error_code i_marshaller_impl::try_cast(i_unknown& from, uint64_t interface_id, remote_shared_ptr<i_unknown>& to)
 {
     return 1;
 }
 
-void test();
+void enclave_test();
 
-#define ASSERT(x) if (x) std::cerr << "bad test " #x "\n"
-
-int main()
+void error(int x)
 {
-    i_foo_stub stub(remote_shared_ptr<i_foo>(new foo()));
-    i_foo_proxy proxy(stub, 0);
-    i_foo& foo = proxy;
+    if (x) 
+        std::cerr << "bad test " << x << "\n";
+}
 
+#define ASSERT(x) error(x)
+
+
+void standard_tests(i_foo& foo, bool enclave)
+{
     error_code ret = 0;
     {
         ASSERT(foo.do_something_in_val(33));
@@ -147,10 +158,16 @@ int main()
         ASSERT(foo.do_something_in_ptr(&val));
     }
     {
+        int val = 0;
+        ASSERT(foo.do_something_out_ref(val));
+    }
+    if(!enclave)
+    {
         int* val = nullptr;
         ASSERT(foo.do_something_out_ptr_ref(val));
         delete val;
     }
+    if(!enclave)
     {
         int* val = nullptr;
         ASSERT(foo.do_something_out_ptr_ptr(&val));
@@ -172,6 +189,7 @@ int main()
         something_complicated val{33,"22"};
         ASSERT(foo.give_something_complicated_ptr(&val));
     }
+    if(!enclave)
     {
         something_complicated* val = nullptr;
         ASSERT(foo.recieve_something_complicated_ptr(val));
@@ -183,6 +201,7 @@ int main()
 		val.map_val["22"]=something_complicated{33,"22"};
         ASSERT(foo.give_something_more_complicated_val(val));
     }
+    if(!enclave)
     {
         something_more_complicated val;
 		val.map_val["22"]=something_complicated{33,"22"};
@@ -193,11 +212,13 @@ int main()
 		val.map_val["22"]=something_complicated{33,"22"};
         ASSERT(foo.give_something_more_complicated_ref_val(val));
     }
+    if(!enclave)
     {
         something_more_complicated val;
 		val.map_val["22"]=something_complicated{33,"22"};
         ASSERT(foo.give_something_more_complicated_ptr(&val));
     }
+    if(!enclave)
     {
         something_more_complicated* val = nullptr;
         ASSERT(foo.recieve_something_more_complicated_ptr(val));
@@ -216,24 +237,41 @@ int main()
 		val2.map_val["22"]=something_complicated{33,"22"};
         ASSERT(foo.do_multi_complicated_val(val1, val2));
     }
-
-    test();
 }
 
 
-void test()
+int main()
 {
-    sgx_launch_token_t token = { 0 };
-    int updated = 0;
-    sgx_enclave_id_t eid = 0;
+    i_foo_stub stub(remote_shared_ptr<i_foo>(new foo()));
+    i_foo_proxy proxy(stub, 0);
+    i_foo& foo = proxy;
 
-    sgx_status_t ret = sgx_create_enclavea("C:/Dev/experiments/enclave_marshaller/build/output/debug/marshal_test_enclave.dll", 1, &token, &updated, &eid, NULL);
+    standard_tests(foo, false);
+    enclave_test();
+    return 0;
+}
 
-    ASSERT(ret == SGX_SUCCESS);
-    printf("Enclave created %d.\n", (int)eid);
+void enclave_test()
+{
+    error_code err_code = 0;
+    example ex("C:/Dev/experiments/enclave_marshaller/build/output/debug/marshal_test_enclave.signed.dll");
+    err_code = ex.load();
+    ASSERT(err_code);
 
-	//ret = logger_test_enclave_init(eid, &retval, &context, &session, &session_hmac);
+    /*remote_shared_ptr<secretarium::marshalled_foo::i_foo> target;
+    err_code = ex.create_foo(target);
+    if(!err_code)
+        std::cout << "aggggggg!";*/
 
 
-    sgx_destroy_enclave(eid);
+    i_foo_proxy proxy(ex, 1);
+    standard_tests(proxy, true);
+}
+
+extern "C"
+{
+    void log_str(const char* str, size_t sz)
+    {
+        puts(str);
+    }
 }

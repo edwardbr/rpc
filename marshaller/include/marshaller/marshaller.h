@@ -40,14 +40,15 @@ template<class T>class remote_weak_ptr{};
 class i_marshaller : public i_unknown
 {
 public:
-	virtual error_code send(uint64_t object_id, uint64_t interface_id, uint64_t method_id, const yas::shared_buffer& in, yas::shared_buffer& out) = 0;
+	virtual error_code send(uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_, const char* in_buf_, size_t out_size_, char* out_buf_) = 0;
 	virtual error_code try_cast(i_unknown& from, uint64_t interface_id, remote_shared_ptr<i_unknown>& to) = 0;
 };
 
 class i_marshaller_impl : public i_marshaller
 {
 public:
-	error_code send(uint64_t object_id, uint64_t interface_id, uint64_t method_id, const yas::shared_buffer& in, yas::shared_buffer& out) override;
+	uint64_t eid_ = 0;
+	error_code send(uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_, const char* in_buf_, size_t out_size_, char* out_buf_) override;
 	error_code try_cast(i_unknown& from, uint64_t interface_id, remote_shared_ptr<i_unknown>& to) override;
 };
 

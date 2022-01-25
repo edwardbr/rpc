@@ -1,14 +1,25 @@
 enclave {
-	from "sgx_tstdc.edl" import sgx_oc_cpuidex;
+    from "sgx_tstdc.edl" import 
+	sgx_thread_wait_untrusted_event_ocall, 
+	sgx_thread_set_untrusted_event_ocall, 
+	sgx_thread_setwait_untrusted_events_ocall, 
+	sgx_thread_set_multiple_untrusted_events_ocall, 
+	sgx_oc_cpuidex;
+
+    struct zone_config
+    {
+        int foo;
+    };
+
     trusted {
 		/* define ECALLs here. */
-		public int enclave_marshal_test_init([user_check]void** zone_config, [out]void** zone);		
-		public void enclave_marshal_test_destroy(
-			[user_check] void* zone);
+		public int enclave_marshal_test_init([user_check]zone_config* config);		
+		public void enclave_marshal_test_destroy();
 
-        public int test([user_check] void** data_in, [user_check] void** data_out);
+        public int call(uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t sz_int, [user_check] const char* data_in, size_t sz_out, [user_check] char* data_out);
     };
 
     untrusted {
+        void log_str([in, size=sz] const char* str, size_t sz);
     };
 };
