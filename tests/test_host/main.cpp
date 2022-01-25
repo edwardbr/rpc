@@ -128,8 +128,6 @@ error_code i_marshaller_impl::try_cast(i_unknown& from, uint64_t interface_id, r
     return 1;
 }
 
-void enclave_test();
-
 void error(int x)
 {
     if (x) 
@@ -242,32 +240,41 @@ void standard_tests(i_foo& foo, bool enclave)
 
 int main()
 {
-    i_foo_stub stub(remote_shared_ptr<i_foo>(new foo()));
-    i_foo_proxy proxy(stub, 0);
-    i_foo& foo = proxy;
+    //conventional c++ object on stack
+    {
+        foo f;
+        standard_tests(f, false);
+    }
 
-    standard_tests(foo, false);
-    enclave_test();
+    //an inprocess marshalling of an object
+    {
+        i_foo_stub stub(remote_shared_ptr<i_foo>(new foo()));
+        i_foo_proxy proxy(stub, 0);
+        i_foo& foo = proxy;
+        standard_tests(foo, false);
+    }
+
+    //an enclave marshalling of an object
+    {
+        error_code err_code = 0;
+        example ex("C:/Dev/experiments/enclave_marshaller/build/output/debug/marshal_test_enclave.signed.dll");
+        err_code = ex.load();
+        ASSERT(err_code);
+
+        /*remote_shared_ptr<secretarium::marshalled_foo::i_foo> target;
+        err_code = ex.create_foo(target);
+        if(!err_code)
+            std::cout << "aggggggg!";*/
+
+
+        //work in progress create_foo should be passing back an instance of foo
+        i_foo_proxy proxy(ex, 1);
+        standard_tests(proxy, true);
+    }
     return 0;
 }
 
-void enclave_test()
-{
-    error_code err_code = 0;
-    example ex("C:/Dev/experiments/enclave_marshaller/build/output/debug/marshal_test_enclave.signed.dll");
-    err_code = ex.load();
-    ASSERT(err_code);
-
-    /*remote_shared_ptr<secretarium::marshalled_foo::i_foo> target;
-    err_code = ex.create_foo(target);
-    if(!err_code)
-        std::cout << "aggggggg!";*/
-
-
-    i_foo_proxy proxy(ex, 1);
-    standard_tests(proxy, true);
-}
-
+//an ocall for logging the test
 extern "C"
 {
     void log_str(const char* str, size_t sz)
