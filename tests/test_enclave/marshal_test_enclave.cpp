@@ -28,10 +28,10 @@ using namespace marshalled_tests;
 class example : public i_example
 {
 	public:
-	error_code create_foo(remote_shared_ptr<i_foo>& target) override
+	/*error_code create_foo(remote_shared_ptr<i_foo>& target) override
 	{
 		return 0;
-	}
+	}*/
 };
 
 error_code i_marshaller_impl::send(uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_, const char* in_buf_, size_t out_size_, char* out_buf_)
