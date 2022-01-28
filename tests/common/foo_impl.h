@@ -66,6 +66,11 @@ namespace marshalled_tests
             log(std::string("got ") + std::to_string(val->int_val));
             return 0;
         }
+        int recieve_something_complicated_ref(something_complicated& val)
+        {
+            val = something_complicated{33,"22"};
+            return 0;
+        }
         int recieve_something_complicated_ptr(something_complicated*& val) 
         {
             val = new something_complicated{33,"22"};
@@ -89,6 +94,11 @@ namespace marshalled_tests
         int give_something_more_complicated_ptr(const something_more_complicated* val) 
         {
             log(std::string("got ") + val->map_val.begin()->first);
+            return 0;
+        }
+        int recieve_something_more_complicated_ref(something_more_complicated& val)
+        {
+            val.map_val["22"]=something_complicated{33,"22"};
             return 0;
         }
         int recieve_something_more_complicated_ptr(something_more_complicated*& val) 

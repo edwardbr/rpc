@@ -52,7 +52,7 @@ namespace enclave_marshaller
 
             template<param_type type>
             std::string render(print_type option, bool from_host, const Library& lib, const std::string& name,
-                               bool is_in, bool is_out, bool is_const, const std::string& object_type) const
+                               bool is_in, bool is_out, bool is_const, const std::string& object_type, uint64_t& count) const
             {
                 assert(false);
             }
@@ -61,14 +61,8 @@ namespace enclave_marshaller
         template<>
         std::string renderer::render<renderer::BY_VALUE>(print_type option, bool from_host, const Library& lib,
                                                          const std::string& name, bool is_in, bool is_out,
-                                                         bool is_const, const std::string& object_type) const
+                                                         bool is_const, const std::string& object_type, uint64_t& count) const
         {
-            if (is_out)
-            {
-                std::cerr << "BY_VALUE does not support out vals\n";
-                throw "BY_VALUE does not support out vals\n";
-            }
-
             switch (option)
             {
             case PROXY_MARSHALL_IN:
@@ -81,6 +75,8 @@ namespace enclave_marshaller
                 return fmt::format("{}_", name);
             case STUB_PARAM_CAST:
                 return fmt::format("{}_", name);
+            case STUB_MARSHALL_OUT:
+                return fmt::format("{}_", name);
             default:
                 return "";
             }
@@ -89,7 +85,7 @@ namespace enclave_marshaller
         template<>
         std::string renderer::render<renderer::REFERANCE>(print_type option, bool from_host, const Library& lib,
                                                           const std::string& name, bool is_in, bool is_out,
-                                                          bool is_const, const std::string& object_type) const
+                                                          bool is_const, const std::string& object_type, uint64_t& count) const
         {
             if (is_out)
             {
@@ -117,7 +113,7 @@ namespace enclave_marshaller
         template<>
         std::string renderer::render<renderer::COPY>(print_type option, bool from_host, const Library& lib,
                                                      const std::string& name, bool is_in, bool is_out, bool is_const,
-                                                     const std::string& object_type) const
+                                                     const std::string& object_type, uint64_t& count) const
         {
             switch (option)
             {
@@ -140,7 +136,7 @@ namespace enclave_marshaller
         template<>
         std::string renderer::render<renderer::MOVE>(print_type option, bool from_host, const Library& lib,
                                                      const std::string& name, bool is_in, bool is_out, bool is_const,
-                                                     const std::string& object_type) const
+                                                     const std::string& object_type, uint64_t& count) const
         {
             if (is_out)
             {
@@ -174,7 +170,7 @@ namespace enclave_marshaller
         template<>
         std::string renderer::render<renderer::POINTER>(print_type option, bool from_host, const Library& lib,
                                                         const std::string& name, bool is_in, bool is_out, bool is_const,
-                                                        const std::string& object_type) const
+                                                        const std::string& object_type, uint64_t& count) const
         {
             if (is_out)
             {
@@ -202,7 +198,7 @@ namespace enclave_marshaller
         template<>
         std::string renderer::render<renderer::POINTER_REFERENCE>(print_type option, bool from_host, const Library& lib,
                                                                   const std::string& name, bool is_in, bool is_out,
-                                                                  bool is_const, const std::string& object_type) const
+                                                                  bool is_const, const std::string& object_type, uint64_t& count) const
         {
             if (is_const && is_out)
             {
@@ -234,7 +230,7 @@ namespace enclave_marshaller
         template<>
         std::string renderer::render<renderer::POINTER_POINTER>(print_type option, bool from_host, const Library& lib,
                                                                 const std::string& name, bool is_in, bool is_out,
-                                                                bool is_const, const std::string& object_type) const
+                                                                bool is_const, const std::string& object_type, uint64_t& count) const
         {
             switch (option)
             {
@@ -262,7 +258,7 @@ namespace enclave_marshaller
         std::string renderer::render<renderer::INTERFACE_REFERENCE>(print_type option, bool from_host,
                                                                     const Library& lib, const std::string& name,
                                                                     bool is_in, bool is_out, bool is_const,
-                                                                    const std::string& object_type) const
+                                                                    const std::string& object_type, uint64_t& count) const
         {
             if (is_out)
             {
@@ -291,7 +287,7 @@ namespace enclave_marshaller
         template<>
         std::string renderer::render<renderer::INTERFACE_POINTER>(print_type option, bool from_host, const Library& lib,
                                                                   const std::string& name, bool is_in, bool is_out,
-                                                                  bool is_const, const std::string& object_type) const
+                                                                  bool is_const, const std::string& object_type, uint64_t& count) const
         {
             if (is_out)
             {
@@ -321,7 +317,7 @@ namespace enclave_marshaller
         std::string renderer::render<renderer::INTERFACE_POINTER_REFERENCE>(print_type option, bool from_host,
                                                                             const Library& lib, const std::string& name,
                                                                             bool is_in, bool is_out, bool is_const,
-                                                                            const std::string& object_type) const
+                                                                            const std::string& object_type, uint64_t& count) const
         {
             switch (option)
             {
@@ -345,7 +341,7 @@ namespace enclave_marshaller
         std::string renderer::render<renderer::INTERFACE_POINTER_POINTER>(print_type option, bool from_host,
                                                                           const Library& lib, const std::string& name,
                                                                           bool is_in, bool is_out, bool is_const,
-                                                                          const std::string& object_type) const
+                                                                          const std::string& object_type, uint64_t& count) const
         {
             switch (option)
             {
@@ -366,11 +362,12 @@ namespace enclave_marshaller
         }
 
         bool is_in_call(print_type option, bool from_host, const Library& lib, const std::string& name,
-                        const std::string& type, const std::list<std::string>& attributes, std::string& output)
+                        const std::string& type, const std::list<std::string>& attributes, uint64_t& count, std::string& output)
         {
             auto in = std::find(attributes.begin(), attributes.end(), "in") != attributes.end();
             auto out = std::find(attributes.begin(), attributes.end(), "out") != attributes.end();
             auto is_const = std::find(attributes.begin(), attributes.end(), "const") != attributes.end();
+            auto by_value = std::find(attributes.begin(), attributes.end(), "by_value") != attributes.end();
 
             if (out && !in)
                 return false;
@@ -394,11 +391,16 @@ namespace enclave_marshaller
                 if (referenceModifiers.empty())
                 {
                     output = renderer().render<renderer::BY_VALUE>(option, from_host, lib, name, in, out, is_const,
-                                                                     type_name);
+                                                                     type_name, count);
                 }
                 else if (referenceModifiers == "&")
                 {
-                    if (from_host == false)
+                    if(by_value)
+                    {
+                        output = renderer().render<renderer::BY_VALUE>(option, from_host, lib, name, in, out,
+                                                                          is_const, type_name, count);
+                    }
+                    else if (from_host == false)
                     {
                         std::cerr << "passing data by reference from a non host zone is not allowed\n";
                         throw "passing data by reference from a non host zone is not allowed\n";
@@ -406,33 +408,28 @@ namespace enclave_marshaller
                     else
                     {
                         output = renderer().render<renderer::REFERANCE>(option, from_host, lib, name, in, out,
-                                                                          is_const, type_name);
+                                                                          is_const, type_name, count);
                     }
-                }
-                else if (referenceModifiers == "^")
-                {
-                    output
-                        = renderer().render<renderer::COPY>(option, from_host, lib, name, in, out, is_const, type_name);
                 }
                 else if (referenceModifiers == "&&")
                 {
                     output
-                        = renderer().render<renderer::MOVE>(option, from_host, lib, name, in, out, is_const, type_name);
+                        = renderer().render<renderer::MOVE>(option, from_host, lib, name, in, out, is_const, type_name, count);
                 }
                 else if (referenceModifiers == "*")
                 {
                     output = renderer().render<renderer::POINTER>(option, from_host, lib, name, in, out, is_const,
-                                                                    type_name);
+                                                                    type_name, count);
                 }
                 else if (referenceModifiers == "*&")
                 {
                     output = renderer().render<renderer::POINTER_REFERENCE>(option, from_host, lib, name, in, out,
-                                                                              is_const, type_name);
+                                                                              is_const, type_name, count);
                 }
                 else if (referenceModifiers == "**")
                 {
                     output = renderer().render<renderer::POINTER_POINTER>(option, from_host, lib, name, in, out,
-                                                                            is_const, type_name);
+                                                                            is_const, type_name, count);
                 }
                 else
                 {
@@ -460,23 +457,23 @@ namespace enclave_marshaller
                     else
                     {
                         output = renderer().render<renderer::INTERFACE_REFERENCE>(option, from_host, lib, name, in,
-                                                                                    out, is_const, type_name);
+                                                                                    out, is_const, type_name, count);
                     }
                 }
                 else if (referenceModifiers == "*")
                 {
                     output = renderer().render<renderer::INTERFACE_POINTER>(option, from_host, lib, name, in, out,
-                                                                              is_const, type_name);
+                                                                              is_const, type_name, count);
                 }
                 else if (referenceModifiers == "*&")
                 {
                     output = renderer().render<renderer::INTERFACE_POINTER_REFERENCE>(option, from_host, lib, name,
-                                                                                        in, out, is_const, type_name);
+                                                                                        in, out, is_const, type_name, count);
                 }
                 else if (referenceModifiers == "**")
                 {
                     output = renderer().render<renderer::INTERFACE_POINTER_POINTER>(option, from_host, lib, name, in,
-                                                                                      out, is_const, type_name);
+                                                                                      out, is_const, type_name, count);
                 }
                 else
                 {
@@ -490,14 +487,21 @@ namespace enclave_marshaller
         }
 
         bool is_out_call(print_type option, bool from_host, const Library& lib, const std::string& name,
-                         const std::string& type, const std::list<std::string>& attributes, std::string& output)
+                         const std::string& type, const std::list<std::string>& attributes, uint64_t& count, std::string& output)
         {
             auto in = std::find(attributes.begin(), attributes.end(), "in") != attributes.end();
             auto out = std::find(attributes.begin(), attributes.end(), "out") != attributes.end();
+            auto by_value = std::find(attributes.begin(), attributes.end(), "by_value") != attributes.end();
             auto is_const = std::find(attributes.begin(), attributes.end(), "const") != attributes.end();
 
             if (!out)
                 return false;
+
+            if(is_const)
+            {
+                std::cerr << fmt::format("out parameters cannot be null");
+                throw fmt::format("out parameters cannot be null");
+            }
 
             std::string type_name = type;
             std::string referenceModifiers;
@@ -524,13 +528,21 @@ namespace enclave_marshaller
             {
                 if (referenceModifiers == "&")
                 {
-                    std::cerr << "passing data by reference as an out call is not possible\n";
-                    throw "passing data by reference as an out call is not possible\n";
+                    if(by_value)
+                    {
+                        output = renderer().render<renderer::BY_VALUE>(option, from_host, lib, name, in, out,
+                                                                          is_const, type_name, count);
+                    }
+                    else
+                    {
+                        std::cerr << "passing data by reference as an out call is not possible\n";
+                        throw "passing data by reference as an out call is not possible\n";
+                    }
                 }
                 else if (referenceModifiers == "^")
                 {
                     auto ret
-                        = renderer().render<renderer::COPY>(option, from_host, lib, name, in, out, is_const, type_name);
+                        = renderer().render<renderer::COPY>(option, from_host, lib, name, in, out, is_const, type_name, count);
                     throw "not implemented\n";
                 }
                 else if (referenceModifiers == "&&")
@@ -546,12 +558,12 @@ namespace enclave_marshaller
                 else if (referenceModifiers == "*&")
                 {
                     output = renderer().render<renderer::POINTER_REFERENCE>(option, from_host, lib, name, in, out,
-                                                                              is_const, type_name);
+                                                                              is_const, type_name, count);
                 }
                 else if (referenceModifiers == "**")
                 {
                     output = renderer().render<renderer::POINTER_POINTER>(option, from_host, lib, name, in, out,
-                                                                            is_const, type_name);
+                                                                            is_const, type_name, count);
                 }
                 else
                 {
@@ -579,23 +591,23 @@ namespace enclave_marshaller
                     else
                     {
                         output = renderer().render<renderer::INTERFACE_REFERENCE>(option, from_host, lib, name, in,
-                                                                                    out, is_const, type_name);
+                                                                                    out, is_const, type_name, count);
                     }
                 }
                 else if (referenceModifiers == "*")
                 {
                     output = renderer().render<renderer::INTERFACE_POINTER>(option, from_host, lib, name, in, out,
-                                                                              is_const, type_name);
+                                                                              is_const, type_name, count);
                 }
                 else if (referenceModifiers == "*&")
                 {
                     output = renderer().render<renderer::INTERFACE_POINTER_REFERENCE>(option, from_host, lib, name,
-                                                                                        in, out, is_const, type_name);
+                                                                                        in, out, is_const, type_name, count);
                 }
                 else if (referenceModifiers == "**")
                 {
                     output = renderer().render<renderer::INTERFACE_POINTER_POINTER>(option, from_host, lib, name, in,
-                                                                                      out, is_const, type_name);
+                                                                                      out, is_const, type_name, count);
                 }
                 else
                 {
@@ -693,19 +705,21 @@ namespace enclave_marshaller
 
                     bool has_inparams = false;
 
-                    stub("//STUB_DEMARSHALL_DECLARATION");
-                    for (auto& parameter : function.parameters)
                     {
-                        bool is_interface = false;
-                        std::string output;
-                        std::string proxy_value_return;
-                        if (is_in_call(STUB_DEMARSHALL_DECLARATION, from_host, lib, parameter.name, parameter.type,
-                                       parameter.m_attributes, output))
-                            has_inparams = true;
-                        else
-                            is_out_call(STUB_DEMARSHALL_DECLARATION, from_host, lib, parameter.name, parameter.type,
-                                        parameter.m_attributes, output);
-                        stub("{};", output);
+                        stub("//STUB_DEMARSHALL_DECLARATION");
+                        uint64_t count = 1;
+                        for (auto& parameter : function.parameters)
+                        {
+                            bool is_interface = false;
+                            std::string output;
+                            if (is_in_call(STUB_DEMARSHALL_DECLARATION, from_host, lib, parameter.name, parameter.type,
+                                        parameter.m_attributes, count, output))
+                                has_inparams = true;
+                            else
+                                is_out_call(STUB_DEMARSHALL_DECLARATION, from_host, lib, parameter.name, parameter.type,
+                                            parameter.m_attributes, count, output);
+                            stub("{};", output);
+                        }
                     }
 
                     if (has_inparams)
@@ -719,20 +733,20 @@ namespace enclave_marshaller
                         stub("yas::load<yas::mem|yas::binary>(in, YAS_OBJECT_NVP(");
                         stub("  \"in\"");
 
-                        int count = 0;
+                        uint64_t count = 1;
                         for (auto& parameter : function.parameters)
                         {
                             std::string output;
                             {
                                 if (!is_in_call(PROXY_MARSHALL_IN, from_host, lib, parameter.name, parameter.type,
-                                                parameter.m_attributes, output))
+                                                parameter.m_attributes, count, output))
                                     continue;
 
                                 proxy("  ,(\"_{}\", {})", count, output);
                             }
                             {
                                 if (!is_in_call(STUB_MARSHALL_IN, from_host, lib, parameter.name, parameter.type,
-                                                parameter.m_attributes, output))
+                                                parameter.m_attributes, count, output))
                                     continue;
 
                                 stub("  ,(\"_{}\", {})", count, output);
@@ -766,13 +780,14 @@ namespace enclave_marshaller
 
                     {
                         bool has_param = false;
+                        uint64_t count = 1;
                         for (auto& parameter : function.parameters)
                         {
                             std::string output;
                             if (!is_in_call(STUB_PARAM_CAST, from_host, lib, parameter.name, parameter.type,
-                                            parameter.m_attributes, output))
+                                            parameter.m_attributes, count, output))
                                 is_out_call(STUB_PARAM_CAST, from_host, lib, parameter.name, parameter.type,
-                                            parameter.m_attributes, output);
+                                            parameter.m_attributes, count, output);
                             if (has_param)
                             {
                                 stub.raw(",");
@@ -786,64 +801,71 @@ namespace enclave_marshaller
                     stub("  return ret;");
                     stub("");
 
-                    int count = 0;
-
-                    proxy("//PROXY_OUT_DECLARATION");
-                    for (auto& parameter : function.parameters)
                     {
-                        count++;
-                        std::string output;
-                        if (is_in_call(PROXY_OUT_DECLARATION, from_host, lib, parameter.name, parameter.type,
-                                       parameter.m_attributes, output))
-                            continue;
-                        if (!is_out_call(PROXY_OUT_DECLARATION, from_host, lib, parameter.name, parameter.type,
-                                         parameter.m_attributes, output))
-                            continue;
+                        uint64_t count = 1;
+                        proxy("//PROXY_OUT_DECLARATION");
+                        for (auto& parameter : function.parameters)
+                        {
+                            count++;
+                            std::string output;
+                            if (is_in_call(PROXY_OUT_DECLARATION, from_host, lib, parameter.name, parameter.type,
+                                        parameter.m_attributes, count, output))
+                                continue;
+                            if (!is_out_call(PROXY_OUT_DECLARATION, from_host, lib, parameter.name, parameter.type,
+                                            parameter.m_attributes, count, output))
+                                continue;
 
-                        proxy(output);
+                            proxy(output);
+                        }
                     }
-
-                    proxy("//PROXY_MARSHALL_OUT");
-                    proxy("yas::load<yas::mem|yas::binary>(yas::intrusive_buffer{{out_buf, 10000}}, YAS_OBJECT_NVP(");
-                    proxy("  \"out\"");
-                    proxy("  ,(\"_{}\", ret)", count);
-
-                    stub("//STUB_MARSHALL_OUT");
-                    stub("yas::mem_ostream os(out_buf_, out_size_);");
-                    stub("yas::save<yas::mem|yas::binary>(os, YAS_OBJECT_NVP(");
-                    stub("  \"out\"");
-                    stub("  ,(\"_{}\", ret)", count);
-
-                    for (auto& parameter : function.parameters)
+                    
                     {
-                        count++;
-                        std::string output;
-                        if (!is_out_call(PROXY_MARSHALL_OUT, from_host, lib, parameter.name, parameter.type,
-                                         parameter.m_attributes, output))
-                            continue;
-                        proxy("  ,(\"_{}\", {})", count, output);
+                        uint64_t count = 1;
+                        proxy("//PROXY_MARSHALL_OUT");
+                        proxy("yas::load<yas::mem|yas::binary>(yas::intrusive_buffer{{out_buf, 10000}}, YAS_OBJECT_NVP(");
+                        proxy("  \"out\"");
+                        proxy("  ,(\"_{}\", ret)", count);
 
-                        if (!is_out_call(STUB_MARSHALL_OUT, from_host, lib, parameter.name, parameter.type,
-                                         parameter.m_attributes, output))
-                            continue;
+                        stub("//STUB_MARSHALL_OUT");
+                        stub("yas::mem_ostream os(out_buf_, out_size_);");
+                        stub("yas::save<yas::mem|yas::binary>(os, YAS_OBJECT_NVP(");
+                        stub("  \"out\"");
+                        stub("  ,(\"_{}\", ret)", count);
 
-                        stub("  ,(\"_{}\", {})", count, output);
+                        for (auto& parameter : function.parameters)
+                        {
+                            count++;
+                            std::string output;
+                            if (!is_out_call(PROXY_MARSHALL_OUT, from_host, lib, parameter.name, parameter.type,
+                                            parameter.m_attributes, count, output))
+                                continue;
+                            proxy("  ,(\"_{}\", {})", count, output);
+
+                            if (!is_out_call(STUB_MARSHALL_OUT, from_host, lib, parameter.name, parameter.type,
+                                            parameter.m_attributes, count, output))
+                                continue;
+
+                            stub("  ,(\"_{}\", {})", count, output);
+                        }
                     }
                     proxy("  ));");
 
                     proxy("//PROXY_VALUE_RETURN");
-                    for (auto& parameter : function.parameters)
                     {
-                        count++;
-                        std::string output;
-                        if (is_in_call(PROXY_VALUE_RETURN, from_host, lib, parameter.name, parameter.type,
-                                       parameter.m_attributes, output))
-                            continue;
-                        if (!is_out_call(PROXY_VALUE_RETURN, from_host, lib, parameter.name, parameter.type,
-                                         parameter.m_attributes, output))
-                            continue;
+                        uint64_t count = 1;
+                        for (auto& parameter : function.parameters)
+                        {
+                            count++;
+                            std::string output;
+                            if (is_in_call(PROXY_VALUE_RETURN, from_host, lib, parameter.name, parameter.type,
+                                        parameter.m_attributes, count, output))
+                                continue;
+                            if (!is_out_call(PROXY_VALUE_RETURN, from_host, lib, parameter.name, parameter.type,
+                                            parameter.m_attributes, count, output))
+                                continue;
 
-                        proxy(output);
+                            proxy(output);
+                        }
                     }
 
                     proxy("return ret;");

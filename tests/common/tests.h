@@ -30,11 +30,11 @@ namespace marshalled_tests
         {
             int val = 33;
             ASSERT(foo.do_something_in_ptr(&val));
-        }/*
+        }
         {
             int val = 0;
             ASSERT(foo.do_something_out_ref(val));
-        }*/
+        }
         if(!enclave)
         {
             int* val = nullptr;
@@ -55,13 +55,18 @@ namespace marshalled_tests
             something_complicated val{33,"22"};
             ASSERT(foo.give_something_complicated_ref(val));
         }
-        /*{
+        {
             something_complicated val{33,"22"};
             ASSERT(foo.give_something_complicated_ref_val(val));
-        }*/
+        }
         {
             something_complicated val{33,"22"};
             ASSERT(foo.give_something_complicated_ptr(&val));
+        }
+        {
+            something_complicated val;
+            ASSERT(foo.recieve_something_complicated_ref(val));
+            std::cout << "got " << val.string_val << "\n";
         }
         if(!enclave)
         {
@@ -81,16 +86,22 @@ namespace marshalled_tests
             val.map_val["22"]=something_complicated{33,"22"};
             ASSERT(foo.give_something_more_complicated_ref(val));
         }
-        /*{
+        {
             something_more_complicated val;
             val.map_val["22"]=something_complicated{33,"22"};
             ASSERT(foo.give_something_more_complicated_ref_val(val));
-        }*/
+        }
         if(!enclave)
         {
             something_more_complicated val;
             val.map_val["22"]=something_complicated{33,"22"};
             ASSERT(foo.give_something_more_complicated_ptr(&val));
+        }
+        if(!enclave)
+        {
+            something_more_complicated val;
+            ASSERT(foo.recieve_something_more_complicated_ref(val));
+            std::cout << "got " << val.map_val.begin()->first << "\n";
         }
         if(!enclave)
         {
