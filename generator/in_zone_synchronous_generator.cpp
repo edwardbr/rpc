@@ -152,16 +152,17 @@ namespace enclave_marshaller
             switch (option)
             {
             case PROXY_MARSHALL_IN:
-                return "";
+                return name;
             case PROXY_MARSHALL_OUT:
-                return "";
+                return name;
             case STUB_DEMARSHALL_DECLARATION:
-                return "";
+                return fmt::format("{} {}_", object_type, name);
+            case STUB_MARSHALL_IN:
+                return fmt::format("{}_", name);
             case STUB_PARAM_CAST:
-                return "";
-            case PROXY_VALUE_RETURN:
-            case PROXY_OUT_DECLARATION:
+                return fmt::format("std::move({}_)", name);
             case STUB_MARSHALL_OUT:
+                return fmt::format("{}_", name);
             default:
                 return "";
             }

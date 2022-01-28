@@ -29,6 +29,10 @@ namespace marshalled_tests
         }
         {
             int val = 33;
+            ASSERT(foo.do_something_in_move_ref(std::move(val)));
+        }
+        {
+            int val = 33;
             ASSERT(foo.do_something_in_ptr(&val));
         }
         {
@@ -61,6 +65,10 @@ namespace marshalled_tests
         }
         {
             something_complicated val{33,"22"};
+            ASSERT(foo.give_something_complicated_move_ref(std::move(val)));
+        }
+        {
+            something_complicated val{33,"22"};
             ASSERT(foo.give_something_complicated_ptr(&val));
         }
         {
@@ -85,6 +93,11 @@ namespace marshalled_tests
             something_more_complicated val;
             val.map_val["22"]=something_complicated{33,"22"};
             ASSERT(foo.give_something_more_complicated_ref(val));
+        }
+        {
+            something_more_complicated val;
+            val.map_val["22"]=something_complicated{33,"22"};
+            ASSERT(foo.give_something_more_complicated_move_ref(std::move(val)));
         }
         {
             something_more_complicated val;

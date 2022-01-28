@@ -26,7 +26,12 @@ namespace marshalled_tests
             log(std::string("got ") + std::to_string(val));
             return 0;
         }
-        int do_something_in_ptr(int* val) 
+        int do_something_in_move_ref(int&& val) 
+        {
+            log(std::string("got ") + std::to_string(val));
+            return 0;
+        }
+        int do_something_in_ptr(const int* val) 
         {
             log(std::string("got ") + std::to_string(*val));
             return 0;
@@ -61,6 +66,11 @@ namespace marshalled_tests
             log(std::string("got ") + std::to_string(val.int_val));
             return 0;
         }
+        int give_something_complicated_move_ref(something_complicated&& val) 
+{
+                log(std::string("got ") + std::to_string(val.int_val));
+            return 0;
+}
         int give_something_complicated_ptr(const something_complicated* val) 
         {
             log(std::string("got ") + std::to_string(val->int_val));
@@ -82,6 +92,11 @@ namespace marshalled_tests
             return 0;
         }
         int give_something_more_complicated_ref(const something_more_complicated& val) 
+        {
+            log(std::string("got ") + val.map_val.begin()->first);
+            return 0;
+        }
+        int give_something_more_complicated_move_ref(something_more_complicated&& val) 
         {
             log(std::string("got ") + val.map_val.begin()->first);
             return 0;
