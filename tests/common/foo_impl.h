@@ -51,6 +51,12 @@ namespace marshalled_tests
             *val = new int(33);
             return 0;
         }
+        int do_something_in_out_ref(int& val)
+        {
+            log(std::string("got ") + std::to_string(val));
+            val = 33;
+            return 0;
+        }
         int give_something_complicated_val(const something_complicated val) 
         {
             log(std::string("got ") + std::to_string(val.int_val));
@@ -84,6 +90,12 @@ namespace marshalled_tests
         int recieve_something_complicated_ptr(something_complicated*& val) 
         {
             val = new something_complicated{33,"22"};
+            return 0;
+        }
+        int recieve_something_complicated_in_out_ref(something_complicated& val) 
+        {
+            log(std::string("got ") + std::to_string(val.int_val));
+            val.int_val = 33;
             return 0;
         }
         int give_something_more_complicated_val(const something_more_complicated val) 
@@ -120,6 +132,12 @@ namespace marshalled_tests
         {
             val = new something_more_complicated();
             val->map_val["22"]=something_complicated{33,"22"};
+            return 0;
+        }        
+        int recieve_something_more_complicated_in_out_ref(something_more_complicated& val) 
+        {
+            log(std::string("got ") + val.map_val.begin()->first);
+            val.map_val["22"]=something_complicated{33,"23"};
             return 0;
         }
         int do_multi_val(int val1, int val2) 

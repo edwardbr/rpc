@@ -39,7 +39,6 @@ namespace enclave_marshaller
             {
                 BY_VALUE,
                 REFERANCE,
-                COPY,
                 MOVE,
                 POINTER,
                 POINTER_REFERENCE,
@@ -66,9 +65,9 @@ namespace enclave_marshaller
             switch (option)
             {
             case PROXY_MARSHALL_IN:
-                return name;
+                return fmt::format("  ,(\"_{}\", {})", count, name);
             case PROXY_MARSHALL_OUT:
-                return name;
+                return fmt::format("  ,(\"_{}\", {})", count, name);
             case STUB_DEMARSHALL_DECLARATION:
                 return fmt::format("{} {}_", object_type, name);
             case STUB_MARSHALL_IN:
@@ -76,7 +75,7 @@ namespace enclave_marshaller
             case STUB_PARAM_CAST:
                 return fmt::format("{}_", name);
             case STUB_MARSHALL_OUT:
-                return fmt::format("{}_", name);
+                return fmt::format("  ,(\"_{}\", {}_)", count, name);
             default:
                 return "";
             }
@@ -96,38 +95,15 @@ namespace enclave_marshaller
             switch (option)
             {
             case PROXY_MARSHALL_IN:
-                return fmt::format("(uint64_t)&{}", name);
+                return fmt::format("  ,(\"_{}\", (uint64_t)&{})", count, name);
             case PROXY_MARSHALL_OUT:
-                return fmt::format("(uint64_t)&{}", name);
+                return fmt::format("  ,(\"_{}\", (uint64_t)&{})", count, name);
             case STUB_DEMARSHALL_DECLARATION:
                 return fmt::format("uint64_t {}_ = 0;", name);
             case STUB_MARSHALL_IN:
                 return fmt::format("{}_", name);
             case STUB_PARAM_CAST:
                 return fmt::format("*({}*){}_", object_type, name);
-            default:
-                return "";
-            }
-        };
-
-        template<>
-        std::string renderer::render<renderer::COPY>(print_type option, bool from_host, const Library& lib,
-                                                     const std::string& name, bool is_in, bool is_out, bool is_const,
-                                                     const std::string& object_type, uint64_t& count) const
-        {
-            switch (option)
-            {
-            case PROXY_MARSHALL_IN:
-                return "";
-            case PROXY_MARSHALL_OUT:
-                return "";
-            case STUB_DEMARSHALL_DECLARATION:
-                return "";
-            case STUB_PARAM_CAST:
-                return "";
-            case PROXY_VALUE_RETURN:
-            case PROXY_OUT_DECLARATION:
-            case STUB_MARSHALL_OUT:
             default:
                 return "";
             }
@@ -152,9 +128,9 @@ namespace enclave_marshaller
             switch (option)
             {
             case PROXY_MARSHALL_IN:
-                return name;
+                return fmt::format("  ,(\"_{}\", {})", count, name);
             case PROXY_MARSHALL_OUT:
-                return name;
+                return fmt::format("  ,(\"_{}\", {})", count, name);
             case STUB_DEMARSHALL_DECLARATION:
                 return fmt::format("{} {}_", object_type, name);
             case STUB_MARSHALL_IN:
@@ -162,7 +138,7 @@ namespace enclave_marshaller
             case STUB_PARAM_CAST:
                 return fmt::format("std::move({}_)", name);
             case STUB_MARSHALL_OUT:
-                return fmt::format("{}_", name);
+                return fmt::format("  ,(\"_{}\", {}_)", count, name);
             default:
                 return "";
             }
@@ -182,9 +158,9 @@ namespace enclave_marshaller
             switch (option)
             {
             case PROXY_MARSHALL_IN:
-                return fmt::format("(uint64_t) {}", name);
+                return fmt::format("  ,(\"_{}\", (uint64_t){})", count, name);
             case PROXY_MARSHALL_OUT:
-                return fmt::format("(uint64_t) {}", name);
+                return fmt::format("  ,(\"_{}\", (uint64_t) {})", count, name);
             case STUB_DEMARSHALL_DECLARATION:
                 return fmt::format("uint64_t {}_", name);
             case STUB_MARSHALL_IN:
@@ -209,9 +185,9 @@ namespace enclave_marshaller
             switch (option)
             {
             case PROXY_MARSHALL_IN:
-                return fmt::format("{}_", name);
+                return fmt::format("  ,(\"_{}\", {}_)", count, name);
             case PROXY_MARSHALL_OUT:
-                return fmt::format("{}_", name);
+                return fmt::format("  ,(\"_{}\", {}_)", count, name);
             case STUB_DEMARSHALL_DECLARATION:
                 return fmt::format("{}* {}_ = nullptr", object_type, name);
             case STUB_PARAM_CAST:
@@ -219,7 +195,7 @@ namespace enclave_marshaller
             case PROXY_OUT_DECLARATION:
                 return fmt::format("uint64_t {}_ = 0;", name);
             case STUB_MARSHALL_OUT:
-                return fmt::format("(uint64_t){}_", name);
+                return fmt::format("  ,(\"_{}\", (uint64_t){}_)", count, name);
             case PROXY_VALUE_RETURN:
                 return fmt::format("{} = ({}*){}_;", name, object_type, name);
 
@@ -236,9 +212,9 @@ namespace enclave_marshaller
             switch (option)
             {
             case PROXY_MARSHALL_IN:
-                return fmt::format("{}_", name);
+                return fmt::format("  ,(\"_{}\", {}_)", count, name);
             case PROXY_MARSHALL_OUT:
-                return fmt::format("{}_", name);
+                return fmt::format("  ,(\"_{}\", {}_)", count, name);
             case STUB_DEMARSHALL_DECLARATION:
                 return fmt::format("{}* {}_ = nullptr", object_type, name);
             case STUB_PARAM_CAST:
@@ -247,9 +223,8 @@ namespace enclave_marshaller
                 return fmt::format("*{} = ({}*){}_;", name, object_type, name);
             case PROXY_OUT_DECLARATION:
                 return fmt::format("uint64_t {}_ = 0;", name);
-                return fmt::format("(uint64_t){}_", name);
             case STUB_MARSHALL_OUT:
-                return fmt::format("(uint64_t){}_", name);
+                return fmt::format("  ,(\"_{}\", (uint64_t){}_)", count, name);
             default:
                 return "";
             }
@@ -270,9 +245,9 @@ namespace enclave_marshaller
             switch (option)
             {
             case PROXY_MARSHALL_IN:
-                return "";
+                return fmt::format("  ,(\"_{}\", {}_)", count, name);
             case PROXY_MARSHALL_OUT:
-                return "";
+                return fmt::format("  ,(\"_{}\", {}_)", count, name);
             case STUB_DEMARSHALL_DECLARATION:
                 return "";
             case STUB_PARAM_CAST:
@@ -280,6 +255,7 @@ namespace enclave_marshaller
             case PROXY_VALUE_RETURN:
             case PROXY_OUT_DECLARATION:
             case STUB_MARSHALL_OUT:
+                return fmt::format("  ,(\"_{}\", (uint64_t){}_)", count, name);
             default:
                 return "";
             }
@@ -299,9 +275,9 @@ namespace enclave_marshaller
             switch (option)
             {
             case PROXY_MARSHALL_IN:
-                return "";
+                return fmt::format("  ,(\"_{}\", {}_)", count, name);
             case PROXY_MARSHALL_OUT:
-                return "";
+                return fmt::format("  ,(\"_{}\", {}_)", count, name);
             case STUB_DEMARSHALL_DECLARATION:
                 return "";
             case STUB_PARAM_CAST:
@@ -309,6 +285,7 @@ namespace enclave_marshaller
             case PROXY_VALUE_RETURN:
             case PROXY_OUT_DECLARATION:
             case STUB_MARSHALL_OUT:
+                return fmt::format("  ,(\"_{}\", (uint64_t){}_)", count, name);
             default:
                 return "";
             }
@@ -323,9 +300,9 @@ namespace enclave_marshaller
             switch (option)
             {
             case PROXY_MARSHALL_IN:
-                return "";
+                return fmt::format("  ,(\"_{}\", {}_)", count, name);
             case PROXY_MARSHALL_OUT:
-                return "";
+                return fmt::format("  ,(\"_{}\", {}_)", count, name);
             case STUB_DEMARSHALL_DECLARATION:
                 return "";
             case STUB_PARAM_CAST:
@@ -333,6 +310,7 @@ namespace enclave_marshaller
             case PROXY_VALUE_RETURN:
             case PROXY_OUT_DECLARATION:
             case STUB_MARSHALL_OUT:
+                return fmt::format("  ,(\"_{}\", (uint64_t){}_)", count, name);
             default:
                 return "";
             }
@@ -347,9 +325,9 @@ namespace enclave_marshaller
             switch (option)
             {
             case PROXY_MARSHALL_IN:
-                return "";
+                return fmt::format("  ,(\"_{}\", {}_)", count, name);
             case PROXY_MARSHALL_OUT:
-                return "";
+                return fmt::format("  ,(\"_{}\", {}_)", count, name);
             case STUB_DEMARSHALL_DECLARATION:
                 return "";
             case STUB_PARAM_CAST:
@@ -357,6 +335,7 @@ namespace enclave_marshaller
             case PROXY_VALUE_RETURN:
             case PROXY_OUT_DECLARATION:
             case STUB_MARSHALL_OUT:
+                return fmt::format("  ,(\"_{}\", (uint64_t){}_)", count, name);
             default:
                 return "";
             }
@@ -539,12 +518,6 @@ namespace enclave_marshaller
                         std::cerr << "passing data by reference as an out call is not possible\n";
                         throw "passing data by reference as an out call is not possible\n";
                     }
-                }
-                else if (referenceModifiers == "^")
-                {
-                    auto ret
-                        = renderer().render<renderer::COPY>(option, from_host, lib, name, in, out, is_const, type_name, count);
-                    throw "not implemented\n";
                 }
                 else if (referenceModifiers == "&&")
                 {
@@ -743,7 +716,7 @@ namespace enclave_marshaller
                                                 parameter.m_attributes, count, output))
                                     continue;
 
-                                proxy("  ,(\"_{}\", {})", count, output);
+                                proxy(output);
                             }
                             {
                                 if (!is_in_call(STUB_MARSHALL_IN, from_host, lib, parameter.name, parameter.type,
@@ -840,13 +813,13 @@ namespace enclave_marshaller
                             if (!is_out_call(PROXY_MARSHALL_OUT, from_host, lib, parameter.name, parameter.type,
                                             parameter.m_attributes, count, output))
                                 continue;
-                            proxy("  ,(\"_{}\", {})", count, output);
+                            proxy(output);
 
                             if (!is_out_call(STUB_MARSHALL_OUT, from_host, lib, parameter.name, parameter.type,
                                             parameter.m_attributes, count, output))
                                 continue;
 
-                            stub("  ,(\"_{}\", {})", count, output);
+                            stub(output);
                         }
                     }
                     proxy("  ));");

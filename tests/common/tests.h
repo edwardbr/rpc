@@ -52,6 +52,10 @@ namespace marshalled_tests
             delete val;
         }
         {
+            int val = 32;
+            ASSERT(foo.do_something_in_out_ref(val));
+        }
+        {
             something_complicated val{33,"22"};
             ASSERT(foo.give_something_complicated_val(val));
         }
@@ -82,6 +86,12 @@ namespace marshalled_tests
             ASSERT(foo.recieve_something_complicated_ptr(val));
             std::cout << "got " << val->int_val << "\n";
             delete val;
+        }
+        {
+            something_complicated val;
+            val.int_val = 32;
+            ASSERT(foo.recieve_something_complicated_in_out_ref(val));
+            std::cout << "got " << val.int_val << "\n";
         }
         {
             something_more_complicated val;
@@ -122,6 +132,12 @@ namespace marshalled_tests
             ASSERT(foo.recieve_something_more_complicated_ptr(val));
             std::cout << "got " << val->map_val.begin()->first << "\n";
             delete val;
+        }
+        {
+            something_more_complicated val;
+            val.map_val["22"]=something_complicated{33,"22"};
+            ASSERT(foo.recieve_something_more_complicated_in_out_ref(val));
+            std::cout << "got " << val.map_val.begin()->first << "\n";
         }
         {
             int val1 = 1;
