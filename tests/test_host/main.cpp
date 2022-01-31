@@ -26,10 +26,11 @@ error_code i_marshaller_impl::send(uint64_t object_id, uint64_t interface_id, ui
         err_code = -1;
     return err_code;
 }
-error_code i_marshaller_impl::try_cast(i_unknown& from, uint64_t interface_id, remote_shared_ptr<i_unknown>& to)
+error_code i_marshaller_impl::try_cast(uint64_t zone_id_, uint64_t object_id, uint64_t interface_id)
 {
-    return 1;
+    return true;
 }
+
 
 int main()
 {
@@ -41,17 +42,20 @@ int main()
 
     //an inprocess marshalling of an object
     {
-        i_foo_stub stub(remote_shared_ptr<i_foo>(new foo()));
-        i_foo_proxy proxy(stub, 0);
-        i_foo& foo = proxy;
+        auto stub = std::make_shared<i_foo_stub>(rpc_cpp::remote_shared_ptr<i_foo>(new foo()));
+        std::shared_ptr<object_proxy> op = std::make_shared<object_proxy>(0, 0, stub);
+        auto proxy = rpc_cpp::make_remote_shared<i_foo_proxy>(op);
+        i_foo& foo = *proxy;
         standard_tests(foo, false);
+
+        auto i_barr = rpc_cpp::dynamic_remote_pointer_cast<i_bar>(proxy);
     }
 
     //an enclave marshalling of an object
     {
         error_code err_code = 0;
-        example ex("C:/Dev/experiments/enclave_marshaller/build/output/debug/marshal_test_enclave.signed.dll");
-        err_code = ex.load();
+        auto ex = std::make_shared<example>("C:/Dev/experiments/enclave_marshaller/build/output/debug/marshal_test_enclave.signed.dll");
+        err_code = ex->load();
         ASSERT(err_code);
 
         /*remote_shared_ptr<marshalled_tests::i_foo> target;
@@ -61,7 +65,8 @@ int main()
 
 
         //work in progress create_foo should be passing back an instance of foo
-        i_foo_proxy proxy(ex, 1);
+        auto op = std::make_shared<object_proxy>(1, 0, ex);
+        i_foo_proxy proxy(op);
         standard_tests(proxy, true);
     }
     return 0;

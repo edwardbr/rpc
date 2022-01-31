@@ -18,9 +18,9 @@ using namespace marshalled_tests;
 /*class class_factory
 {
 	public:
-	error_code create_foo(remote_shared_ptr<i_foo>& foo_obj)
+	error_code create_foo(rpc_cpp::remote_shared_ptr<i_foo>& foo_obj)
 	{
-		foo_obj = remote_shared_ptr<i_foo>(new foo);
+		foo_obj = rpc_cpp::remote_shared_ptr<i_foo>(new foo);
 		return 0;
 	};
 };*/
@@ -28,7 +28,7 @@ using namespace marshalled_tests;
 class example : public i_example
 {
 	public:
-	/*error_code create_foo(remote_shared_ptr<i_foo>& target) override
+	/*error_code create_foo(rpc_cpp::remote_shared_ptr<i_foo>& target) override
 	{
 		return 0;
 	}*/
@@ -38,7 +38,7 @@ error_code i_marshaller_impl::send(uint64_t object_id, uint64_t interface_id, ui
 {
     return 1;
 }
-error_code i_marshaller_impl::try_cast(i_unknown& from, uint64_t interface_id, remote_shared_ptr<i_unknown>& to)
+error_code i_marshaller_impl::try_cast(uint64_t zone_id_, uint64_t object_id, uint64_t interface_id)
 {
     return 1;
 }
@@ -53,10 +53,10 @@ class marshaller : public i_marshaller_impl
 public:
 	error_code initialise(zone_config* config)
 	{
-		remote_shared_ptr<i_example> ex(new example);
+		rpc_cpp::remote_shared_ptr<i_example> ex(new example);
 		the_example_stub = std::shared_ptr<i_example_stub>(new i_example_stub(ex));
 
-		foo_stub_ = std::make_shared<i_foo_stub>(remote_shared_ptr<i_foo>(new foo()));
+		foo_stub_ = std::make_shared<i_foo_stub>(rpc_cpp::remote_shared_ptr<i_foo>(new foo()));
 		return 0;
 	}
 	void shutdown(){}
@@ -86,7 +86,7 @@ public:
 		}
 		return ret;
 	}
-	error_code try_cast(i_unknown& from, uint64_t interface_id, remote_shared_ptr<i_unknown>& to) override
+	error_code try_cast(uint64_t zone_id_, uint64_t object_id, uint64_t interface_id) override
 	{
 		return 1;
 	}

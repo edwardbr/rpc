@@ -11,6 +11,8 @@ namespace marshalled_tests
 {
     class foo : public i_foo
     {
+        public:
+        ~foo(){}
         int do_something_in_val(int val)
         {
             log(std::string("got ") + std::to_string(val));

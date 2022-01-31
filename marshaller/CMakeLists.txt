@@ -2,7 +2,8 @@ cmake_minimum_required(VERSION 3.0.0)
 
 add_library(marshaller_enclave 
     include/marshaller/marshaller.h
-    src/marshaller.cpp)
+    src/marshaller.cpp
+    src/remote_pointer.cpp)
 
 target_compile_definitions(marshaller_enclave 
     PRIVATE 
@@ -24,11 +25,29 @@ set_property(TARGET marshaller_enclave PROPERTY COMPILE_PDB_NAME marshaller_encl
 ################################################################################
 add_library(marshaller_host
     include/marshaller/marshaller.h
-    src/marshaller.cpp)
+    src/marshaller.cpp
+    src/remote_pointer.cpp
+    )
 
-target_include_directories(marshaller_host PUBLIC include/)
-target_link_libraries(marshaller_host 
+
+target_compile_definitions(marshaller_host PRIVATE ${HOST_DEFINES})
+
+target_include_directories(marshaller_host 
     PUBLIC 
-    yas_common)
-set_property(TARGET marshaller_host PROPERTY COMPILE_PDB_NAME marshaller_host)
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+    "$<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/generated/include>"
+    "$<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/generated/src>"
+    PRIVATE 
+    ${HOST_INCLUDES})
+
+target_link_libraries(marshaller_host 
+    PRIVATE
+        yas_common
+    PUBLIC 
+        ${HOST_LIBRARIES})
+
+target_compile_options(marshaller_host PRIVATE ${HOST_COMPILE_OPTIONS})
+target_link_options(marshaller_host PRIVATE ${HOST_LINK_EXE_OPTIONS})
+target_link_directories(marshaller_host PUBLIC ${SGX_LIBRARY_PATH})
+set_property(TARGET marshaller_host PROPERTY COMPILE_PDB_NAME marshaller_host)     
 
