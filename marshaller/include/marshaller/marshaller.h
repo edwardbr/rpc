@@ -14,94 +14,43 @@ using error_code = int;
 // the base interface to all interfaces
 class i_marshaller;
 
-// a shared pointer that works accross enclaves
-/*template<class T>class remote_shared_ptr
-{
-        T* the_interface = nullptr;
-public:
-        remote_shared_ptr();
-        remote_shared_ptr(T* iface);
-        T* operator->();
-};
-
-//a weak pointer that works accross enclaves
-template<class T>
-class remote_weak_ptr
-{
-        T* the_interface = nullptr;
-public:
-        T* operator->();
-        const T* get() const {return the_interface;}
-
-        T* get(){return the_interface;}
-
-
-};
-
-template<class T>
-bool operator == (const remote_weak_ptr<T>& first, const remote_weak_ptr<T>& second)
-{
-        return first.get() == second.the_interface.get();
-}
-
-template<class T>
-bool operator == (const remote_weak_ptr<T>& first, std::nullptr_t second)
-{
-        return first.get() == nullptr;
-}
-
-template<class T>
-bool operator == (std::nullptr_t first, const remote_weak_ptr<T>& second)
-{
-        return second.get() == nullptr;
-}
-
-template<class _Tp>
-class enable_shared_remote_from_this
-{
-    mutable weak_ptr<_Tp> __weak_this_;
-protected:
-    constexpr enable_shared_remote_from_this() noexcept {}
-    enable_shared_remote_from_this( const enable_shared_remote_from_this<T>&obj ) noexcept {}
-    enable_shared_remote_from_this& operator=(enable_shared_remote_from_this const&) noexcept
-        {return *this;}
-    ~enable_shared_remote_from_this() {}
-public:
-    shared_ptr<_Tp> shared_from_this()
-        {return shared_ptr<_Tp>(__weak_this_);}
-    shared_ptr<_Tp const> shared_from_this() const
-        {return shared_ptr<const _Tp>(__weak_this_);}
-
-    template <class _Up> friend class shared_ptr;
-};*/
-
 class object_proxy;
 
-class i_proxy
+class i_proxy_impl
 {
 protected:
-    std::shared_ptr<object_proxy> object_proxy_;
-
-public:
-    i_proxy(std::shared_ptr<object_proxy> object_proxy)
+    i_proxy_impl(std::shared_ptr<object_proxy> object_proxy)
         : object_proxy_(object_proxy)
     {
     }
-    virtual ~i_proxy() = default;
-
+    std::shared_ptr<object_proxy> object_proxy_;
+    virtual ~i_proxy_impl() = default;
     std::shared_ptr<object_proxy> get_object_proxy() { return object_proxy_; }
+
+    template<class T1, class T2>
+    friend rpc_cpp::shared_ptr<T1> rpc_cpp::dynamic_pointer_cast(const shared_ptr<T2>&) noexcept;
 };
 
-class object_proxy : std::enable_shared_from_this<object_proxy>
+template<class T> class i_proxy : public i_proxy_impl, public T
+{
+public:
+    i_proxy(std::shared_ptr<object_proxy> object_proxy)
+        : i_proxy_impl(object_proxy)
+    {
+    }
+    virtual ~i_proxy() = default;
+};
+
+class object_proxy : public std::enable_shared_from_this<object_proxy>
 {
     uint64_t object_id_;
     uint64_t zone_id_;
     std::shared_ptr<i_marshaller> marshaller_;
-    std::unordered_map<uint64_t, rpc_cpp::remote_weak_ptr<i_proxy>> proxy_map;
+    std::unordered_map<uint64_t, rpc_cpp::weak_ptr<i_proxy_impl>> proxy_map;
     std::mutex insert_control;
 
     // note the interface pointer may change if there is already an interface inserted successfully
-    void register_interface(uint64_t interface_id, rpc_cpp::remote_weak_ptr<i_proxy>& value);
+    void register_interface(uint64_t interface_id, rpc_cpp::weak_ptr<i_proxy_impl>& value);
 
 public:
     object_proxy(uint64_t object_id, uint64_t zone_id, std::shared_ptr<i_marshaller> marshaller)
@@ -113,33 +62,39 @@ public:
     error_code send(uint64_t interface_id, uint64_t method_id, size_t in_size_, const char* in_buf_, size_t out_size_,
                     char* out_buf_);
 
-    template<class T> void create_interface_proxy(rpc_cpp::remote_shared_ptr<T>& inface);
+    template<class T> void create_interface_proxy(rpc_cpp::shared_ptr<T>& inface);
 
-    template<class T> error_code query_interface(rpc_cpp::remote_shared_ptr<T>& iface)
+    template<class T> error_code query_interface(rpc_cpp::shared_ptr<T>& iface)
     {
-		auto create = [&](std::unordered_map<uint64_t, rpc_cpp::remote_weak_ptr<i_proxy>>::iterator item) -> error_code
-		{
-			rpc_cpp::remote_shared_ptr<i_proxy> proxy = item->second.lock();
-			if (!proxy)
-			{
-				//weak pointer needs refreshing
-				create_interface_proxy<T>(iface);
-				item->second = rpc_cpp::reinterpret_pointer_cast<i_proxy>(iface);
-				return 0;
-			}
-			iface = rpc_cpp::reinterpret_pointer_cast<T>(proxy);
-			return 0;
-		};
+        auto create = [&](std::unordered_map<uint64_t, rpc_cpp::weak_ptr<i_proxy_impl>>::iterator item) -> error_code {
+            rpc_cpp::shared_ptr<i_proxy_impl> proxy = item->second.lock();
+            if (!proxy)
+            {
+                // weak pointer needs refreshing
+                create_interface_proxy<T>(iface);
+                item->second = rpc_cpp::reinterpret_pointer_cast<i_proxy_impl>(iface);
+                return 0;
+            }
+            iface = rpc_cpp::reinterpret_pointer_cast<T>(proxy);
+            return 0;
+        };
+
+        /*T* t = dynamic_cast<T>(iface.get());
+        if(t)
+        {
+                iface = rpc_cpp::shared_ptr<T>();
+        }*/
+
         {
             std::lock_guard guard(insert_control);
             auto item = proxy_map.find(T::id);
             if (item != proxy_map.end())
             {
-				return create(item);
+                return create(item);
             }
         }
         {
-			//see if object_id can implement interface
+            // see if object_id can implement interface
             error_code ret = marshaller_->try_cast(zone_id_, object_id_, T::id);
             if (ret != 0)
             {
@@ -157,30 +112,11 @@ public:
             }
 
             create_interface_proxy<T>(iface);
-            proxy_map[T::id] = rpc_cpp::reinterpret_pointer_cast<i_proxy>(iface);
+            proxy_map[T::id] = rpc_cpp::reinterpret_pointer_cast<i_proxy_impl>(iface);
             return 0;
         }
     }
 };
-
-/*template<class T>
-remote_shared_ptr<T>::remote_shared_ptr()
-{}
-
-template<class T>
-remote_shared_ptr<T>::remote_shared_ptr(T* iface) : the_interface(iface)
-{}
-
-template<class T>
-T* remote_shared_ptr<T>::operator->()
-{
-        return the_interface;
-}
-template<class T>
-T* remote_weak_ptr<T>::operator->()
-{
-        return the_interface;
-}*/
 
 // the used for marshalling data between zones
 class i_marshaller
@@ -192,13 +128,54 @@ public:
     virtual error_code try_cast(uint64_t zone_id_, uint64_t object_id, uint64_t interface_id) = 0;
 };
 
-class i_marshaller_impl : public i_marshaller
+class i_interface_marshaller
 {
 public:
-    uint64_t eid_ = 0;
-    error_code send(uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_, const char* in_buf_,
-                    size_t out_size_, char* out_buf_) override;
-    error_code try_cast(uint64_t zone_id_, uint64_t object_id, uint64_t interface_id) override;
+    virtual uint64_t get_interface_id() = 0;
+    virtual error_code call(uint64_t method_id, size_t in_size_, const char* in_buf_, size_t out_size_, char* out_buf_)
+        = 0;
+    virtual error_code cast(uint64_t interface_id, std::shared_ptr<i_interface_marshaller>& new_stub) = 0;
+};
+
+class object_stub
+{
+    // stubs have stong pointers
+    std::unordered_map<uint64_t, std::shared_ptr<i_interface_marshaller>> proxy_map;
+    std::mutex insert_control;
+
+public:
+    object_stub(std::shared_ptr<i_interface_marshaller> initial_interface)
+    {
+        proxy_map[initial_interface->get_interface_id()] = initial_interface;
+    }
+    error_code call(uint64_t interface_id, uint64_t method_id, size_t in_size_, const char* in_buf_, size_t out_size_,
+                    char* out_buf_)
+    {
+        error_code ret = -1;
+        std::lock_guard l(insert_control);
+        auto item = proxy_map.find(interface_id);
+        if (item != proxy_map.end())
+        {
+            ret = item->second->call(method_id, in_size_, in_buf_, out_size_, out_buf_);
+        }
+		return ret;
+    }
+    error_code try_cast(uint64_t interface_id)
+    {
+		error_code ret = 0;
+        std::lock_guard l(insert_control);
+        auto item = proxy_map.find(interface_id);
+        if (item == proxy_map.end())
+        {
+            std::shared_ptr<i_interface_marshaller> new_stub;
+            ret = proxy_map.begin()->second->cast(interface_id, new_stub);
+			if (!ret)
+            {
+                proxy_map.emplace(interface_id, std::move(new_stub));
+            }
+        }
+		return ret;
+    }
 };
 
 // a handler for new threads, this function needs to be thread safe!

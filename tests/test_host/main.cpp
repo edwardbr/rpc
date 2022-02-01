@@ -18,53 +18,78 @@
 
 using namespace marshalled_tests;
 
-error_code i_marshaller_impl::send(uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_, const char* in_buf_, size_t out_size_, char* out_buf_)
+class local_marshaller : public i_marshaller
 {
-    error_code err_code = 0;
-    sgx_status_t status = call(eid_, &err_code, object_id, interface_id, method_id, in_size_, in_buf_, out_size_, out_buf_);
-    if(status)
-        err_code = -1;
-    return err_code;
-}
-error_code i_marshaller_impl::try_cast(uint64_t zone_id_, uint64_t object_id, uint64_t interface_id)
-{
-    return true;
-}
+    std::shared_ptr<object_stub>& stub_;
 
+public:
+    local_marshaller(std::shared_ptr<object_stub>& stub)
+        : stub_(stub)
+    {
+    }
+
+    error_code send(uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_,
+                            const char* in_buf_, size_t out_size_, char* out_buf_) override
+    {
+        return stub_->call(interface_id, method_id, in_size_, in_buf_, out_size_, out_buf_);
+    }
+    error_code try_cast(uint64_t zone_id_, uint64_t object_id, uint64_t interface_id) override
+    {
+        return stub_->try_cast(interface_id);
+    }
+};
 
 int main()
 {
-    //conventional c++ object on stack
+    // conventional c++ object on stack
     {
         foo f;
         standard_tests(f, false);
     }
 
-    //an inprocess marshalling of an object
+    // an inprocess marshalling of an object
     {
-        auto stub = std::make_shared<i_foo_stub>(rpc_cpp::remote_shared_ptr<i_foo>(new foo()));
-        std::shared_ptr<object_proxy> op = std::make_shared<object_proxy>(0, 0, stub);
-        auto proxy = rpc_cpp::make_remote_shared<i_foo_proxy>(op);
-        i_foo& foo = *proxy;
+        //create a foo and expose it as i_foo
+        auto foo_ptr = std::shared_ptr<i_foo>(new foo());
+
+        //wrap an interface stub around it
+        auto stub = std::make_shared<i_foo_stub>(foo_ptr);
+
+        //assign and object_stub to the interface stub
+        auto os = std::make_shared<object_stub>(stub);
+
+        //wrap a marshaller around the object_stub
+        auto marshaller = std::shared_ptr<i_marshaller>(new local_marshaller(os));
+
+        //assign the marshaller to the object_proxy
+        auto op = std::make_shared<object_proxy>(0, 0, marshaller);
+
+        //get a remote pointer to ifoo
+        rpc_cpp::shared_ptr<i_foo> i_foo_ptr;
+        op->query_interface(i_foo_ptr);
+
+        i_foo& foo = *i_foo_ptr;
         standard_tests(foo, false);
 
-        auto i_barr = rpc_cpp::dynamic_remote_pointer_cast<i_bar>(proxy);
+        auto i_barr = rpc_cpp::dynamic_pointer_cast<i_bar>(i_foo_ptr);
+        if(i_barr)
+            i_barr->do_something_else(33);
     }
 
-    //an enclave marshalling of an object
+    // an enclave marshalling of an object
     {
         error_code err_code = 0;
-        auto ex = std::make_shared<example>("C:/Dev/experiments/enclave_marshaller/build/output/debug/marshal_test_enclave.signed.dll");
+        auto ex = std::make_shared<example>(
+            "C:/Dev/experiments/enclave_marshaller/build/output/debug/marshal_test_enclave.signed.dll");
         err_code = ex->load();
         ASSERT(err_code);
 
-        /*remote_shared_ptr<marshalled_tests::i_foo> target;
+        /*shared_ptr<marshalled_tests::i_foo> target;
         err_code = ex.create_foo(target);
         if(!err_code)
             std::cout << "aggggggg!";*/
 
-
-        //work in progress create_foo should be passing back an instance of foo
+        // work in progress create_foo should be passing back an instance of foo
         auto op = std::make_shared<object_proxy>(1, 0, ex);
         i_foo_proxy proxy(op);
         standard_tests(proxy, true);
@@ -72,11 +97,8 @@ int main()
     return 0;
 }
 
-//an ocall for logging the test
+// an ocall for logging the test
 extern "C"
 {
-    void log_str(const char* str, size_t sz)
-    {
-        puts(str);
-    }
+    void log_str(const char* str, size_t sz) { puts(str); }
 }

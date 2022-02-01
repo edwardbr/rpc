@@ -17,6 +17,9 @@ enclave {
 		public void enclave_marshal_test_destroy();
 
         public int call(uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t sz_int, [user_check] const char* data_in, size_t sz_out, [user_check] char* data_out);
+        public int try_cast(uint64_t zone_id_, uint64_t object_id, uint64_t interface_id);
+        public int add_ref(uint64_t interface_id);
+        public int release(uint64_t interface_id);
     };
 
     untrusted {

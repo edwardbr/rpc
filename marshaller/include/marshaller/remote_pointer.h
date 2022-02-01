@@ -20,1612 +20,333 @@
 #include <utility>
 #include <tuple>
 #include <functional>
-#include <functional>
-
-namespace rpc_cpp
-{
-    struct __shared_ptr_dummy_rebind_allocator_type;
-}
-
-namespace std
-{
-    template<> class allocator<rpc_cpp::__shared_ptr_dummy_rebind_allocator_type>
-    {
-    public:
-        template<class _Other> struct rebind
-        {
-            typedef allocator<_Other> other;
-        };
-    };
-
-    template<class T> using remove_extent_t = typename remove_extent<T>::type;
-}
+#include <memory>
 
 namespace rpc_cpp
 {
 
-    template<class _Tp, bool> struct __dependent_type : public _Tp
-    {
-    };
+    template<class T, class _Dx = std::default_delete<T>> class unique_ptr;
 
-#if defined(_LIBCPP_HAS_IS_FINAL)
-    template<class _Tp> struct __libcpp_is_final : public std::integral_constant<bool, __is_final(_Tp)>
-    {
-    };
-#else
-    template<class _Tp> struct __libcpp_is_final : public std::false_type
-    {
-    };
-#endif
+    template<class T> class shared_ptr;
 
-    template<class _Alloc> struct __allocation_guard
-    {
-        using _Pointer = typename std::allocator_traits<_Alloc>::pointer;
-        using _Size = typename std::allocator_traits<_Alloc>::size_type;
+    template<class T> class weak_ptr;
 
-        template<class _AllocT> // we perform the allocator conversion inside the constructor
-        explicit __allocation_guard(_AllocT __alloc, _Size __n)
-            : __alloc_(std::move(__alloc))
-            , __n_(__n)
-            , __ptr_(std::allocator_traits<_Alloc>::allocate(__alloc_, __n_)) // initialization order is important
-        {
-        }
-
-        ~__allocation_guard() noexcept
-        {
-            if (__ptr_ != nullptr)
-            {
-                std::allocator_traits<_Alloc>::deallocate(__alloc_, __ptr_, __n_);
-            }
-        }
-
-        _Pointer __release_ptr() noexcept
-        { // not called __release() because it's a keyword in objective-c++
-            _Pointer __tmp = __ptr_;
-            __ptr_ = nullptr;
-            return __tmp;
-        }
-
-        _Pointer __get() const noexcept { return __ptr_; }
-
-    private:
-        _Alloc __alloc_;
-        _Size __n_;
-        _Pointer __ptr_;
-    };
-
-    template<class _Tp, class _Up> struct __has_rebind
-    {
-    private:
-        struct __two
-        {
-            char __lx;
-            char __lxx;
-        };
-        template<class _Xp> static __two __test(...);
-        template<class _Xp> static char __test(typename _Xp::template rebind<_Up>* = 0);
-
-    public:
-        static const bool value = sizeof(__test<_Tp>(0)) == 1;
-    };
-
-    template<class _Tp, class _Up, bool = __has_rebind<_Tp, _Up>::value> struct __has_rebind_other
-    {
-    private:
-        struct __two
-        {
-            char __lx;
-            char __lxx;
-        };
-        template<class _Xp> static __two __test(...);
-        template<class _Xp> static char __test(typename _Xp::template rebind<_Up>::other* = 0);
-
-    public:
-        static const bool value = sizeof(__test<_Tp>(0)) == 1;
-    };
-
-    template<class _Tp, class _Up> struct __has_rebind_other<_Tp, _Up, false>
-    {
-        static const bool value = false;
-    };
-
-    template<class _Tp, class _Up, bool = __has_rebind_other<_Tp, _Up>::value> struct __allocator_traits_rebind
-    {
-        typedef typename _Tp::template rebind<_Up>::other type;
-    };
-
-    template<template<class, class...> class _Alloc, class _Tp, class... _Args, class _Up>
-    struct __allocator_traits_rebind<_Alloc<_Tp, _Args...>, _Up, true>
-    {
-        typedef typename _Alloc<_Tp, _Args...>::template rebind<_Up>::other type;
-    };
-
-    template<template<class, class...> class _Alloc, class _Tp, class... _Args, class _Up>
-    struct __allocator_traits_rebind<_Alloc<_Tp, _Args...>, _Up, false>
-    {
-        typedef _Alloc<_Up, _Args...> type;
-    };
-
-    template<class _Tp, int _Idx, bool _CanBeEmptyBase = std::is_empty<_Tp>::value && !__libcpp_is_final<_Tp>::value>
-    struct __compressed_pair_elem
-    {
-        typedef _Tp _ParamT;
-        typedef _Tp& reference;
-        typedef const _Tp& const_reference;
-
-#ifndef _LIBCPP_CXX03_LANG
-        constexpr __compressed_pair_elem()
-            : __value_()
-        {
-        }
-
-        template<class _Up, class = typename std::enable_if<
-                                !std::is_same<__compressed_pair_elem, typename std::decay<_Up>::type>::value>::type>
-
-        constexpr explicit __compressed_pair_elem(_Up&& __u)
-            : __value_(std::forward<_Up>(__u))
-        {
-        }
-
-        /*template<class... _Args, size_t... _Indexes>
-        constexpr __compressed_pair_elem(std::piecewise_construct_t, std::tuple<_Args...> __args,
-                                                             __tuple_indices<_Indexes...>)
-            : __value_(std::forward<_Args>(std::get<_Indexes>(__args))...)
-        {
-        }*/
-#else
-        __compressed_pair_elem()
-            : __value_()
-        {
-        }
-
-        __compressed_pair_elem(_ParamT __p)
-            : __value_(std::forward<_ParamT>(__p))
-        {
-        }
-#endif
-
-        reference __get() noexcept { return __value_; }
-
-        const_reference __get() const noexcept { return __value_; }
-
-    private:
-        _Tp __value_;
-    };
-
-    template<class _Tp, int _Idx> struct __compressed_pair_elem<_Tp, _Idx, true> : private _Tp
-    {
-        typedef _Tp _ParamT;
-        typedef _Tp& reference;
-        typedef const _Tp& const_reference;
-        typedef _Tp __value_type;
-
-#ifndef _LIBCPP_CXX03_LANG
-        constexpr __compressed_pair_elem() = default;
-
-        template<class _Up, class = typename std::enable_if<
-                                !std::is_same<__compressed_pair_elem, typename std::decay<_Up>::type>::value>::type>
-
-        constexpr explicit __compressed_pair_elem(_Up&& __u)
-            : __value_type(std::forward<_Up>(__u))
-        {
-        }
-
-        /*template<class... _Args, size_t... _Indexes>
-        constexpr __compressed_pair_elem(std::piecewise_construct_t, std::tuple<_Args...> __args,
-                                                             __tuple_indices<_Indexes...>)
-            : __value_type(std::forward<_Args>(std::get<_Indexes>(__args))...)
-        {
-        }*/
-#else
-        __compressed_pair_elem()
-            : __value_type()
-        {
-        }
-
-        __compressed_pair_elem(_ParamT __p)
-            : __value_type(std::forward<_ParamT>(__p))
-        {
-        }
-#endif
-
-        reference __get() noexcept { return *this; }
-
-        const_reference __get() const noexcept { return *this; }
-    };
-
-    // Tag used to construct the second element of the compressed pair.
-    struct __second_tag
-    {
-    };
-
-    template<class _T1, class _T2>
-    class __compressed_pair : private __compressed_pair_elem<_T1, 0>, private __compressed_pair_elem<_T2, 1>
-    {
-        typedef __compressed_pair_elem<_T1, 0> _Base1;
-        typedef __compressed_pair_elem<_T2, 1> _Base2;
-
-        // NOTE: This static assert should never fire because __compressed_pair
-        // is *almost never* used in a scenario where it's possible for T1 == T2.
-        // (The exception is std::function where it is possible that the function
-        //  object and the allocator have the same type).
-        static_assert((!std::is_same<_T1, _T2>::value),
-                      "__compressed_pair cannot be instantated when T1 and T2 are the same type; "
-                      "The current implementation is NOT ABI-compatible with the previous "
-                      "implementation for this configuration");
-
-    public:
-#ifndef _LIBCPP_CXX03_LANG
-        template<bool _Dummy = true, class = typename std::enable_if<
-                                         __dependent_type<is_default_constructible<_T1>, _Dummy>::value
-                                         && __dependent_type<is_default_constructible<_T2>, _Dummy>::value>::type>
-
-        constexpr __compressed_pair()
-        {
-        }
-
-        template<class _Tp, typename std::enable_if<
-                                !std::is_same<typename std::decay<_Tp>::type, __compressed_pair>::value, bool>::type
-                            = true>
-        constexpr explicit __compressed_pair(_Tp&& __t)
-            : _Base1(std::forward<_Tp>(__t))
-            , _Base2()
-        {
-        }
-
-        template<class _Tp>
-        constexpr __compressed_pair(__second_tag, _Tp&& __t)
-            : _Base1()
-            , _Base2(std::forward<_Tp>(__t))
-        {
-        }
-
-        template<class _U1, class _U2>
-        constexpr __compressed_pair(_U1&& __t1, _U2&& __t2)
-            : _Base1(std::forward<_U1>(__t1))
-            , _Base2(std::forward<_U2>(__t2))
-        {
-        }
-
-        template<class... _Args1, class... _Args2>
-        constexpr __compressed_pair(std::piecewise_construct_t __pc, std::tuple<_Args1...> __first_args,
-                                    std::tuple<_Args2...> __second_args)
-            : _Base1(__pc, std::move(__first_args), typename __make_tuple_indices<sizeof...(_Args1)>::type())
-            , _Base2(__pc, std::move(__second_args), typename __make_tuple_indices<sizeof...(_Args2)>::type())
-        {
-        }
-
-#else
-
-        __compressed_pair() { }
-
-        explicit __compressed_pair(_T1 __t1)
-            : _Base1(std::forward<_T1>(__t1))
-        {
-        }
-
-        __compressed_pair(__second_tag, _T2 __t2)
-            : _Base1()
-            , _Base2(std::forward<_T2>(__t2))
-        {
-        }
-
-        __compressed_pair(_T1 __t1, _T2 __t2)
-            : _Base1(std::forward<_T1>(__t1))
-            , _Base2(std::forward<_T2>(__t2))
-        {
-        }
-#endif
-
-        typename _Base1::reference first() noexcept { return static_cast<_Base1&>(*this).__get(); }
-
-        typename _Base1::const_reference first() const noexcept { return static_cast<_Base1 const&>(*this).__get(); }
-
-        typename _Base2::reference second() noexcept { return static_cast<_Base2&>(*this).__get(); }
-
-        typename _Base2::const_reference second() const noexcept { return static_cast<_Base2 const&>(*this).__get(); }
-
-        void
-        swap(__compressed_pair& __x) noexcept(__is_nothrow_swappable<_T1>::value&& __is_nothrow_swappable<_T2>::value)
-        {
-            using std::swap;
-            swap(first(), __x.first());
-            swap(second(), __x.second());
-        }
-    };
-
-    template<class _T1, class _T2>
-    inline void swap(__compressed_pair<_T1, _T2>& __x, __compressed_pair<_T1, _T2>& __y) noexcept(
-        __is_nothrow_swappable<_T1>::value&& __is_nothrow_swappable<_T2>::value)
-    {
-        __x.swap(__y);
-    }
-
-    /*template<class _Alloc> class __allocator_destructor
-    {
-        typedef _LIBCPP_NODEBUG std::allocator_traits<_Alloc> __alloc_traits;
-
-    public:
-        typedef _LIBCPP_NODEBUG typename __alloc_traits::pointer pointer;
-        typedef _LIBCPP_NODEBUG typename __alloc_traits::size_type size_type;
-
-    private:
-        _Alloc& __alloc_;
-        size_type __s_;
-
-    public:
-        __allocator_destructor(_Alloc& __a, size_type __s) noexcept : __alloc_(__a),
-                                                                                                 __s_(__s)
-        {
-        }
-
-        void operator()(pointer __p) noexcept { __alloc_traits::deallocate(__alloc_, __p, __s_); }
-    };
-
-// NOTE: Relaxed and acq/rel atomics (for increment and decrement respectively)
-// should be sufficient for thread safety.
-// See https://llvm.org/PR22803
-#if defined(__clang__) && __has_builtin(__atomic_add_fetch) && defined(__ATOMIC_RELAXED) && defined(__ATOMIC_ACQ_REL)
-#define _LIBCPP_HAS_BUILTIN_ATOMIC_SUPPORT
-#elif defined(_LIBCPP_COMPILER_GCC)
-#define _LIBCPP_HAS_BUILTIN_ATOMIC_SUPPORT
-#endif*/
-
-    template<class _Tp> inline _Tp __libcpp_atomic_refcount_increment(_Tp& __t) noexcept
-    {
-#if defined(_LIBCPP_HAS_BUILTIN_ATOMIC_SUPPORT) && !defined(_LIBCPP_HAS_NO_THREADS)
-        return __atomic_add_fetch(&__t, 1, __ATOMIC_RELAXED);
-#else
-        return __t += 1;
-#endif
-    }
-
-    template<class _Tp> inline _Tp __libcpp_atomic_refcount_decrement(_Tp& __t) noexcept
-    {
-#if defined(_LIBCPP_HAS_BUILTIN_ATOMIC_SUPPORT) && !defined(_LIBCPP_HAS_NO_THREADS)
-        return __atomic_add_fetch(&__t, -1, __ATOMIC_ACQ_REL);
-#else
-        return __t -= 1;
-#endif
-    }
-
-    class bad_weak_ptr : public std::exception
+    template<class T> class shared_ptr : public std::shared_ptr<T>
     {
     public:
-        bad_weak_ptr() noexcept = default;
-        bad_weak_ptr(const bad_weak_ptr&) noexcept = default;
-        virtual ~bad_weak_ptr() noexcept;
-        virtual const char* what() const noexcept;
+        using typename std::shared_ptr<T>::element_type;
+
+        using weak_type = std::weak_ptr<T>;
+
+        constexpr shared_ptr() noexcept
+            : std::shared_ptr<T>()
+        {
+        }
+
+        constexpr shared_ptr(std::nullptr_t) noexcept
+            : std::shared_ptr<T>(nullptr)
+        {
+        } // construct empty shared_ptr
+
+        constexpr shared_ptr(std::shared_ptr<T> val) noexcept
+            : std::shared_ptr<T>(val)
+        {
+        } // construct empty shared_ptr
+
+        template<class _Ux>
+        explicit shared_ptr(_Ux* _Px)
+            : std::shared_ptr<T>(_Px)
+        {
+        }
+
+        template<class _Ux, class _Dx>
+        shared_ptr(_Ux* _Px, _Dx _Dt)
+            : std::shared_ptr<T>(_Px, _Dt)
+        {
+        }
+
+        template<class _Ux, class _Dx, class _Alloc>
+        shared_ptr(_Ux* _Px, _Dx _Dt, _Alloc _Ax)
+            : std::shared_ptr<T>(_Px, _Dt, _Ax)
+        {
+        }
+
+        template<class _Dx>
+        shared_ptr(std::nullptr_t, _Dx _Dt)
+            : std::shared_ptr<T>(nullptr, _Dt)
+        {
+        }
+
+        template<class _Dx, class _Alloc>
+        shared_ptr(std::nullptr_t, _Dx _Dt, _Alloc _Ax)
+            : std::shared_ptr<T>(nullptr, _Dt, _Ax)
+        {
+        }
+
+        template<class T2>
+        shared_ptr(const shared_ptr<T2>& _Right, std::shared_ptr<T>::element_type* _Px) noexcept
+            : std::shared_ptr<T>(_Right, _Px)
+        {
+        }
+
+        template<class T2>
+        shared_ptr(shared_ptr<T2>&& _Right, element_type* _Px) noexcept
+            : std::shared_ptr<T>(std::move(_Right), _Px)
+        {
+        }
+
+        shared_ptr(const rpc_cpp::shared_ptr<T>& _Other) noexcept
+            : std::shared_ptr<T>(_Other)
+        {
+            *this = _Other;
+        }
+
+        template<class T2>
+        shared_ptr(const shared_ptr<T2>& _Other) noexcept
+            : std::shared_ptr<T>(_Other)
+        {
+        }
+
+        shared_ptr(shared_ptr&& _Right) noexcept
+            : std::shared_ptr<T>(std::move(_Right))
+        {
+        }
+
+        template<class T2>
+        shared_ptr(shared_ptr<T2>&& _Right) noexcept
+            : std::shared_ptr<T>(std::move(_Right))
+        {
+        }
+
+        template<class T2>
+        explicit shared_ptr(const weak_ptr<T2>& _Other)
+            : std::shared_ptr<T>(_Other)
+        {
+        }
+
+        template<class _Ux, class _Dx>
+        shared_ptr(unique_ptr<_Ux, _Dx>&& _Other)
+            : std::shared_ptr<T>(std::move(_Other))
+        {
+        }
+
+        shared_ptr& operator=(const shared_ptr& _Right) noexcept
+        {
+            std::shared_ptr<T>* psp = this;
+            *psp = _Right;
+            return *this;
+        }
+
+        template<class T2> shared_ptr& operator=(const shared_ptr<T2>& _Right) noexcept
+        {
+            std::shared_ptr<T>* psp = this;
+            *psp = _Right;
+            return *this;
+        }
+
+        shared_ptr& operator=(shared_ptr&& _Right) noexcept
+        {
+            std::shared_ptr<T>* psp = this;
+            *psp = std::move(_Right);
+            return *this;
+        }
+
+        template<class T2> shared_ptr& operator=(shared_ptr<T2>&& _Right) noexcept
+        {
+            std::shared_ptr<T>* psp = this;
+            *psp = std::move(_Right);
+            return *this;
+        }
+
+        template<class _Ux, class _Dx> shared_ptr& operator=(unique_ptr<_Ux, _Dx>&& _Right)
+        {
+            std::shared_ptr<T>* psp = this;
+            *psp = std::move(_Right);
+            return *this;
+        }
     };
 
-    [[noreturn]] inline void __throw_bad_weak_ptr()
+    template<class T> class weak_ptr : public std::weak_ptr<T>
     {
-#ifndef _LIBCPP_NO_EXCEPTIONS
-        throw bad_weak_ptr();
-#else
-        std::abort();
-#endif
-    }
+    public:
+        constexpr weak_ptr() noexcept
+            : std::weak_ptr<T>()
+        {
+        }
 
-    template<class _Tp> class remote_weak_ptr;
+        weak_ptr(const weak_ptr& _Other) noexcept
+            : std::weak_ptr<T>(_Other)
+        {
+        }
+        weak_ptr(const std::weak_ptr<T>& _Other) noexcept
+            : std::weak_ptr<T>(_Other)
+        {
+        }
+        weak_ptr(std::weak_ptr<T>&& _Other) noexcept
+            : std::weak_ptr<T>(std::move(_Other))
+        {
+        }
 
-    class __shared_count
-    {
-        __shared_count(const __shared_count&);
-        __shared_count& operator=(const __shared_count&);
+        template<class T2>
+        weak_ptr(const shared_ptr<T2>& _Other) noexcept
+            : std::weak_ptr<T>(_Other)
+        {
+        }
+
+        template<class T2>
+        weak_ptr(const weak_ptr<T2>& _Other) noexcept
+            : std::weak_ptr<T>(_Other)
+        {
+        }
+
+        weak_ptr(weak_ptr&& _Other) noexcept
+            : std::weak_ptr<T>(std::move(_Other))
+        {
+        }
+
+        template<class T2>
+        weak_ptr(weak_ptr<T2>&& _Other) noexcept
+            : std::weak_ptr<T>(std::move(_Other))
+        {
+        }
+
+        weak_ptr& operator=(const weak_ptr& _Right) noexcept
+        {
+            std::weak_ptr<T>* psp = this;
+            *psp = _Right;
+
+            return *this;
+        }
+
+        template<class T2> weak_ptr& operator=(const weak_ptr<T2>& _Right) noexcept
+        {
+            std::weak_ptr<T>* psp = this;
+            return *psp = _Right;
+        }
+
+        weak_ptr& operator=(weak_ptr&& _Right) noexcept
+        {
+            std::weak_ptr<T>* psp = this;
+            return *psp = std::move(_Right);
+        }
+        template<class T2> weak_ptr& operator=(weak_ptr<T2>&& _Right) noexcept
+        {
+            std::weak_ptr<T>* psp = this;
+            return *psp = std::move(_Right);
+        }
+
+        template<class T2> weak_ptr& operator=(const shared_ptr<T2>& _Right) noexcept
+        {
+            std::weak_ptr<T>* psp = this;
+            *psp = _Right;
+            return *this;
+        }
+
+        void reset() noexcept
+        { // release resource, convert to null weak_ptr object
+            weak_ptr {}.swap(*this);
+        }
+
+        [[nodiscard]] shared_ptr<T> lock() const noexcept
+        { // convert to shared_ptr
+            const std::weak_ptr<T>* psp = this;
+            return shared_ptr<T>(psp->lock());
+        }
+    };
+
+    template<class T> class enable_shared_from_this
+    { // provide member functions that create shared_ptr to this
+    public:
+        using _Esft_type = enable_shared_from_this;
+
+        [[nodiscard]] shared_ptr<T> shared_from_this() { return shared_ptr<T>(_Wptr); }
+
+        [[nodiscard]] shared_ptr<const T> shared_from_this() const { return shared_ptr<const T>(_Wptr); }
+
+        [[nodiscard]] weak_ptr<T> weak_from_this() noexcept { return _Wptr; }
+
+        [[nodiscard]] weak_ptr<const T> weak_from_this() const noexcept { return _Wptr; }
 
     protected:
-        std::atomic<long> __shared_owners_;
-        virtual ~__shared_count();
-
-    private:
-        virtual void __on_zero_shared() noexcept = 0;
-
-    public:
-        explicit __shared_count(long __refs = 0) noexcept
-            : __shared_owners_(__refs)
+        constexpr enable_shared_from_this() noexcept
+            : _Wptr()
         {
         }
 
-
-
-        void __add_shared() noexcept { __shared_owners_++; }
-
-        bool __release_shared() noexcept
+        enable_shared_from_this(const enable_shared_from_this&) noexcept
+            : _Wptr()
         {
-            if (__shared_owners_++ == -1)
-            {
-                __on_zero_shared();
-                return true;
-            }
-            return false;
+            // construct (must value-initialize _Wptr)
         }
 
-        long use_count() const noexcept { return __shared_owners_.load(std::memory_order::memory_order_relaxed) + 1; }
-    };
-
-    class __shared_weak_count : private __shared_count
-    {
-        std::atomic<long> __shared_weak_owners_;
-
-    public:
-        explicit __shared_weak_count(long __refs = 0) noexcept
-            : __shared_count(__refs)
-            , __shared_weak_owners_(__refs)
-        {
-        }
-
-    protected:
-        virtual ~__shared_weak_count();
-
-    public:
-#if defined(_LIBCPP_BUILDING_LIBRARY) && defined(_LIBCPP_DEPRECATED_ABI_LEGACY_LIBRARY_DEFINITIONS_FOR_INLINE_FUNCTIONS)
-        void __add_shared() noexcept;
-        void __add_weak() noexcept;
-        void __release_shared() noexcept;
-#else
-
-        void __add_shared() noexcept { __shared_count::__add_shared(); }
-
-        void __add_weak() noexcept { __shared_weak_owners_++; }
-
-        void __release_shared() noexcept
-        {
-            if (__shared_count::__release_shared())
-                __release_weak();
-        }
-#endif
-        void __release_weak() noexcept;
-
-        long use_count() const noexcept { return __shared_count::use_count(); }
-        __shared_weak_count* lock() noexcept;
-
-        virtual const void* __get_deleter(const type_info&) const noexcept;
-
-    private:
-        virtual void __on_zero_shared_weak() noexcept = 0;
-    };
-
-    template<class _Tp, class _Dp, class _Alloc> class __shared_ptr_pointer : public __shared_weak_count
-    {
-        __compressed_pair<__compressed_pair<_Tp, _Dp>, _Alloc> __data_;
-
-    public:
-        __shared_ptr_pointer(_Tp __p, _Dp __d, _Alloc __a)
-            : __data_(__compressed_pair<_Tp, _Dp>(__p, std::move(__d)), std::move(__a))
-        {
-        }
-
-        virtual const void* __get_deleter(const type_info&) const noexcept;
-
-    private:
-        virtual void __on_zero_shared() noexcept;
-        virtual void __on_zero_shared_weak() noexcept;
-    };
-
-    template<class _Tp, class _Dp, class _Alloc>
-    const void* __shared_ptr_pointer<_Tp, _Dp, _Alloc>::__get_deleter(const type_info& __t) const noexcept
-    {
-        return __t == typeid(_Dp) ? std::addressof(__data_.first().second()) : nullptr;
-    }
-
-    template<class _Tp, class _Dp, class _Alloc>
-    void __shared_ptr_pointer<_Tp, _Dp, _Alloc>::__on_zero_shared() noexcept
-    {
-        __data_.first().second()(__data_.first().first());
-        __data_.first().second().~_Dp();
-    }
-
-    template<class _Tp, class _Dp, class _Alloc>
-    void __shared_ptr_pointer<_Tp, _Dp, _Alloc>::__on_zero_shared_weak() noexcept
-    {
-        typedef typename __allocator_traits_rebind<_Alloc, __shared_ptr_pointer>::type _Al;
-        typedef std::allocator_traits<_Al> _ATraits;
-        typedef std::pointer_traits<typename _ATraits::pointer> _PTraits;
-
-        _Al __a(__data_.second());
-        __data_.second().~_Alloc();
-        __a.deallocate(_PTraits::pointer_to(*this), 1);
-    }
-
-    template<class _Tp, class _Alloc> struct __shared_ptr_emplace : __shared_weak_count
-    {
-        template<class... _Args>
-        explicit __shared_ptr_emplace(_Alloc __a, _Args&&... __args)
-            : __storage_(std::move(__a))
-        {
-#if _LIBCPP_STD_VER > 17
-            using _TpAlloc = typename __allocator_traits_rebind<_Alloc, _Tp>::type;
-            _TpAlloc __tmp(*__get_alloc());
-            std::allocator_traits<_TpAlloc>::construct(__tmp, __get_elem(), std::forward<_Args>(__args)...);
-#else
-            ::new ((void*)__get_elem()) _Tp(std::forward<_Args>(__args)...);
-#endif
-        }
-
-        _Alloc* __get_alloc() noexcept { return __storage_.__get_alloc(); }
-
-        _Tp* __get_elem() noexcept { return __storage_.__get_elem(); }
-
-    private:
-        virtual void __on_zero_shared() noexcept
-        {
-#if _LIBCPP_STD_VER > 17
-            using _TpAlloc = typename __allocator_traits_rebind<_Alloc, _Tp>::type;
-            _TpAlloc __tmp(*__get_alloc());
-            std::allocator_traits<_TpAlloc>::destroy(__tmp, __get_elem());
-#else
-            __get_elem()->~_Tp();
-#endif
-        }
-
-        virtual void __on_zero_shared_weak() noexcept
-        {
-            using _ControlBlockAlloc = typename __allocator_traits_rebind<_Alloc, __shared_ptr_emplace>::type;
-            using _ControlBlockPointer = typename std::allocator_traits<_ControlBlockAlloc>::pointer;
-            _ControlBlockAlloc __tmp(*__get_alloc());
-            __storage_.~_Storage();
-            std::allocator_traits<_ControlBlockAlloc>::deallocate(
-                __tmp, std::pointer_traits<_ControlBlockPointer>::pointer_to(*this), 1);
-        }
-
-        // This class implements the control block for non-array shared pointers created
-        // through `std::allocate_shared` and `std::make_remote_shared`.
-        //
-        // In previous versions of the library, we used a compressed pair to store
-        // both the _Alloc and the _Tp. This implies using EBO, which is incompatible
-        // with Allocator construction for _Tp. To allow implementing P0674 in C++20,
-        // we now use a properly aligned char buffer while making sure that we maintain
-        // the same layout that we had when we used a compressed pair.
-        using _CompressedPair = __compressed_pair<_Alloc, _Tp>;
-        struct alignas(_CompressedPair) _Storage
-        {
-            char __blob_[sizeof(_CompressedPair)];
-
-            explicit _Storage(_Alloc&& __a) { ::new ((void*)__get_alloc()) _Alloc(std::move(__a)); }
-            ~_Storage() { __get_alloc()->~_Alloc(); }
-            _Alloc* __get_alloc() noexcept
-            {
-                _CompressedPair* __as_pair = reinterpret_cast<_CompressedPair*>(__blob_);
-                auto* __first = &__as_pair->first();
-                _Alloc* __alloc = reinterpret_cast<_Alloc*>(__first);
-                return __alloc;
-            }
-            _Tp* __get_elem() noexcept
-            {
-                _CompressedPair* __as_pair = reinterpret_cast<_CompressedPair*>(__blob_);
-                auto* __second = &__as_pair->second();
-                _Tp* __elem = reinterpret_cast<_Tp*>(__second);
-                return __elem;
-            }
-        };
-
-        static_assert(alignof(_Storage) == alignof(_CompressedPair), "");
-        static_assert(sizeof(_Storage) == sizeof(_CompressedPair), "");
-        _Storage __storage_;
-    };
-
-    /*struct __shared_ptr_dummy_rebind_allocator_type;
-    template<> class allocator<__shared_ptr_dummy_rebind_allocator_type>
-    {
-    public:
-        template<class _Other> struct rebind
-        {
-            typedef allocator<_Other> other;
-        };
-    };*/
-
-    template<class _Tp> class enable_shared_remote_from_this;
-
-    template<class _Tp, class _Up>
-    struct __compatible_with : std::is_convertible<std::remove_extent_t<_Tp>*, std::remove_extent_t<_Up>*>
-    {
-    };
-
-    template<class _Ptr, class = void> struct __is_deletable : std::false_type
-    {
-    };
-    template<class _Ptr> struct __is_deletable<_Ptr, decltype(delete declval<_Ptr>())> : std::true_type
-    {
-    };
-
-    template<class _Ptr, class = void> struct __is_array_deletable : std::false_type
-    {
-    };
-    template<class _Ptr> struct __is_array_deletable<_Ptr, decltype(delete[] declval<_Ptr>())> : std::true_type
-    {
-    };
-
-    template<class _Dp, class _Pt, class = decltype(declval<_Dp>()(declval<_Pt>()))>
-    static std::true_type __well_formed_deleter_test(int);
-
-    template<class, class> static std::false_type __well_formed_deleter_test(...);
-
-    template<class _Dp, class _Pt> struct __well_formed_deleter : decltype(__well_formed_deleter_test<_Dp, _Pt>(0))
-    {
-    };
-
-    template<class _Dp, class _Tp, class _Yp> struct __shared_ptr_deleter_ctor_reqs
-    {
-        static const bool value = __compatible_with<_Tp, _Yp>::value && is_move_constructible<_Dp>::value
-                                  && __well_formed_deleter<_Dp, _Tp*>::value;
-    };
-
-    template<class _Tp> class remote_shared_ptr
-    {
-    public:
-        typedef remote_weak_ptr<_Tp> weak_type;
-        typedef std::remove_extent_t<_Tp> element_type;
-
-    private:
-        element_type* __ptr_;
-        __shared_weak_count* __cntrl_;
-
-    public:
-        constexpr remote_shared_ptr() noexcept
-            : __ptr_(nullptr)
-            , __cntrl_(nullptr)
-        {
-        }
-
-        /*
-                constexpr remote_shared_ptr(std::nullptr_t) noexcept
-                    : __ptr_(nullptr)
-                    , __cntrl_(nullptr)
-                {
-                }
-        */
-        template<class _Yp
-        /*,         class = __enable_if_t<_And<__compatible_with<_Yp, _Tp>
-        // In C++03 we get errors when trying to do SFINAE with the
-        // delete operator, so we always pretend that it's deletable.
-        // The same happens on GCC.
-#if !defined(_LIBCPP_CXX03_LANG) && !defined(_LIBCPP_COMPILER_GCC)
-                                            ,
-                                            _If<is_array<_Tp>::value, __is_array_deletable<_Yp*>, __is_deletable<_Yp*>>
-#endif
-                                            >::value>*/>
-        explicit remote_shared_ptr(_Yp* __p)
-            : __ptr_(__p)
-        {
-            std::unique_ptr<_Yp> __hold(__p);
-            typedef typename __shared_ptr_default_allocator<_Yp>::type _AllocT;
-            typedef __shared_ptr_pointer<_Yp*, __shared_ptr_default_delete<_Tp, _Yp>, _AllocT> _CntrlBlk;
-            __cntrl_ = new _CntrlBlk(__p, __shared_ptr_default_delete<_Tp, _Yp>(), _AllocT());
-            __hold.release();
-            __enable_weak_this(__p, __p);
-        }
-
-        template<class _Yp, class _Dp,
-                 class = __enable_if_t<__shared_ptr_deleter_ctor_reqs<_Dp, _Yp, element_type>::value>>
-        remote_shared_ptr(_Yp* __p, _Dp __d)
-            : __ptr_(__p)
-        {
-#ifndef _LIBCPP_NO_EXCEPTIONS
-            try
-            {
-#endif // _LIBCPP_NO_EXCEPTIONS
-                typedef typename __shared_ptr_default_allocator<_Yp>::type _AllocT;
-                typedef __shared_ptr_pointer<_Yp*, _Dp, _AllocT> _CntrlBlk;
-#ifndef _LIBCPP_CXX03_LANG
-                __cntrl_ = new _CntrlBlk(__p, std::move(__d), _AllocT());
-#else
-            __cntrl_ = new _CntrlBlk(__p, __d, _AllocT());
-#endif // not _LIBCPP_CXX03_LANG
-                __enable_weak_this(__p, __p);
-#ifndef _LIBCPP_NO_EXCEPTIONS
-            }
-            catch (...)
-            {
-                __d(__p);
-                throw;
-            }
-#endif // _LIBCPP_NO_EXCEPTIONS
-        }
-
-        template<class _Yp, class _Dp, class _Alloc,
-                 class = __enable_if_t<__shared_ptr_deleter_ctor_reqs<_Dp, _Yp, element_type>::value>>
-        remote_shared_ptr(_Yp* __p, _Dp __d, _Alloc __a)
-            : __ptr_(__p)
-        {
-#ifndef _LIBCPP_NO_EXCEPTIONS
-            try
-            {
-#endif // _LIBCPP_NO_EXCEPTIONS
-                typedef __shared_ptr_pointer<_Yp*, _Dp, _Alloc> _CntrlBlk;
-                typedef typename __allocator_traits_rebind<_Alloc, _CntrlBlk>::type _A2;
-                typedef __allocator_destructor<_A2> _D2;
-                _A2 __a2(__a);
-                std::unique_ptr<_CntrlBlk, _D2> __hold2(__a2.allocate(1), _D2(__a2, 1));
-                ::new ((void*)std::addressof(*__hold2.get()))
-#ifndef _LIBCPP_CXX03_LANG
-                    _CntrlBlk(__p, std::move(__d), __a);
-#else
-                _CntrlBlk(__p, __d, __a);
-#endif // not _LIBCPP_CXX03_LANG
-                __cntrl_ = std::addressof(*__hold2.release());
-                __enable_weak_this(__p, __p);
-#ifndef _LIBCPP_NO_EXCEPTIONS
-            }
-            catch (...)
-            {
-                __d(__p);
-                throw;
-            }
-#endif // _LIBCPP_NO_EXCEPTIONS
-        }
-
-        template<class _Dp>
-        remote_shared_ptr(std::nullptr_t __p, _Dp __d)
-            : __ptr_(nullptr)
-        {
-#ifndef _LIBCPP_NO_EXCEPTIONS
-            try
-            {
-#endif // _LIBCPP_NO_EXCEPTIONS
-                typedef typename __shared_ptr_default_allocator<_Tp>::type _AllocT;
-                typedef __shared_ptr_pointer<std::nullptr_t, _Dp, _AllocT> _CntrlBlk;
-#ifndef _LIBCPP_CXX03_LANG
-                __cntrl_ = new _CntrlBlk(__p, std::move(__d), _AllocT());
-#else
-            __cntrl_ = new _CntrlBlk(__p, __d, _AllocT());
-#endif // not _LIBCPP_CXX03_LANG
-#ifndef _LIBCPP_NO_EXCEPTIONS
-            }
-            catch (...)
-            {
-                __d(__p);
-                throw;
-            }
-#endif // _LIBCPP_NO_EXCEPTIONS
-        }
-
-        template<class _Dp, class _Alloc>
-        remote_shared_ptr(std::nullptr_t __p, _Dp __d, _Alloc __a)
-            : __ptr_(nullptr)
-        {
-#ifndef _LIBCPP_NO_EXCEPTIONS
-            try
-            {
-#endif // _LIBCPP_NO_EXCEPTIONS
-                typedef __shared_ptr_pointer<std::nullptr_t, _Dp, _Alloc> _CntrlBlk;
-                typedef typename __allocator_traits_rebind<_Alloc, _CntrlBlk>::type _A2;
-                typedef __allocator_destructor<_A2> _D2;
-                _A2 __a2(__a);
-                std::unique_ptr<_CntrlBlk, _D2> __hold2(__a2.allocate(1), _D2(__a2, 1));
-                ::new ((void*)std::addressof(*__hold2.get()))
-#ifndef _LIBCPP_CXX03_LANG
-                    _CntrlBlk(__p, std::move(__d), __a);
-#else
-                _CntrlBlk(__p, __d, __a);
-#endif // not _LIBCPP_CXX03_LANG
-                __cntrl_ = std::addressof(*__hold2.release());
-#ifndef _LIBCPP_NO_EXCEPTIONS
-            }
-            catch (...)
-            {
-                __d(__p);
-                throw;
-            }
-#endif // _LIBCPP_NO_EXCEPTIONS
-        }
-
-        template<class _Yp>
-        remote_shared_ptr(const remote_shared_ptr<_Yp>& __r, element_type* __p) noexcept
-            : __ptr_(__p)
-            , __cntrl_(__r.__cntrl_)
-        {
-            if (__cntrl_)
-                __cntrl_->__add_shared();
-        }
-
-        remote_shared_ptr(const remote_shared_ptr& __r) noexcept
-            : __ptr_(__r.__ptr_)
-            , __cntrl_(__r.__cntrl_)
-        {
-            if (__cntrl_)
-                __cntrl_->__add_shared();
-        }
-
-        template<class _Yp, class = __enable_if_t<__compatible_with<_Yp, _Tp>::value>>
-        remote_shared_ptr(const remote_shared_ptr<_Yp>& __r) noexcept
-            : __ptr_(__r.__ptr_)
-            , __cntrl_(__r.__cntrl_)
-        {
-            if (__cntrl_)
-                __cntrl_->__add_shared();
-        }
-
-        remote_shared_ptr(remote_shared_ptr&& __r) noexcept
-            : __ptr_(__r.__ptr_)
-            , __cntrl_(__r.__cntrl_)
-        {
-            __r.__ptr_ = nullptr;
-            __r.__cntrl_ = nullptr;
-        }
-
-        template<class _Yp, class = __enable_if_t<__compatible_with<_Yp, _Tp>::value>>
-        remote_shared_ptr(remote_shared_ptr<_Yp>&& __r) noexcept
-            : __ptr_(__r.__ptr_)
-            , __cntrl_(__r.__cntrl_)
-        {
-            __r.__ptr_ = nullptr;
-            __r.__cntrl_ = nullptr;
-        }
-
-        template<class _Yp, class = __enable_if_t<__compatible_with<_Yp, _Tp>::value>>
-        explicit remote_shared_ptr(const remote_weak_ptr<_Yp>& __r)
-            : __ptr_(__r.__ptr_)
-            , __cntrl_(__r.__cntrl_ ? __r.__cntrl_->lock() : __r.__cntrl_)
-        {
-            if (__cntrl_ == nullptr)
-                __throw_bad_weak_ptr();
-        }
-
-        /*template<class _Yp, class _Dp,
-                 class = __enable_if_t<!std::is_lvalue_reference<_Dp>::value
-                                       && std::is_convertible<typename unique_ptr<_Yp, _Dp>::pointer,
-element_type*>::value>> remote_shared_ptr(unique_ptr<_Yp, _Dp>&& __r) : __ptr_(__r.get())
-        {
-#if _LIBCPP_STD_VER > 11
-            if (__ptr_ == nullptr)
-                __cntrl_ = nullptr;
-            else
-#endif
-            {
-                typedef typename __shared_ptr_default_allocator<_Yp>::type _AllocT;
-                typedef __shared_ptr_pointer<typename unique_ptr<_Yp, _Dp>::pointer, _Dp, _AllocT> _CntrlBlk;
-                __cntrl_ = new _CntrlBlk(__r.get(), __r.get_deleter(), _AllocT());
-                __enable_weak_this(__r.get(), __r.get());
-            }
-            __r.release();
-        }*/
-
-        /*template<class _Yp, class _Dp, class = void,
-                 class = __enable_if_t<std::is_lvalue_reference<_Dp>::value
-                                       && std::is_convertible<typename unique_ptr<_Yp, _Dp>::pointer,
-element_type*>::value>> remote_shared_ptr(unique_ptr<_Yp, _Dp>&& __r) : __ptr_(__r.get())
-        {
-#if _LIBCPP_STD_VER > 11
-            if (__ptr_ == nullptr)
-                __cntrl_ = nullptr;
-            else
-#endif
-            {
-                typedef typename __shared_ptr_default_allocator<_Yp>::type _AllocT;
-                typedef __shared_ptr_pointer<typename unique_ptr<_Yp, _Dp>::pointer,
-                                             reference_wrapper<typename remove_reference<_Dp>::type>, _AllocT>
-                    _CntrlBlk;
-                __cntrl_ = new _CntrlBlk(__r.get(), std::ref(__r.get_deleter()), _AllocT());
-                __enable_weak_this(__r.get(), __r.get());
-            }
-            __r.release();
-        }*/
-
-        ~remote_shared_ptr()
-        {
-            if (__cntrl_)
-                __cntrl_->__release_shared();
-        }
-
-        remote_shared_ptr<_Tp>& operator=(const remote_shared_ptr& __r) noexcept
-        {
-            remote_shared_ptr(__r).swap(*this);
+        enable_shared_from_this& operator=(const enable_shared_from_this&) noexcept
+        { // assign (must not change _Wptr)
             return *this;
         }
 
-        template<class _Yp, class = __enable_if_t<__compatible_with<_Yp, _Tp>::value>>
-        remote_shared_ptr<_Tp>& operator=(const remote_shared_ptr<_Yp>& __r) noexcept
-        {
-            remote_shared_ptr(__r).swap(*this);
-            return *this;
-        }
-
-        remote_shared_ptr<_Tp>& operator=(remote_shared_ptr&& __r) noexcept
-        {
-            remote_shared_ptr(std::move(__r)).swap(*this);
-            return *this;
-        }
-
-        template<class _Yp, class = __enable_if_t<__compatible_with<_Yp, _Tp>::value>>
-        remote_shared_ptr<_Tp>& operator=(remote_shared_ptr<_Yp>&& __r)
-        {
-            remote_shared_ptr(std::move(__r)).swap(*this);
-            return *this;
-        }
-
-        /*template<class _Yp, class _Dp,
-                 class = __enable_if_t<std::is_convertible<typename unique_ptr<_Yp, _Dp>::pointer,
-        element_type*>::value>> remote_shared_ptr<_Tp>& operator=(unique_ptr<_Yp, _Dp>&& __r)
-        {
-            remote_shared_ptr(std::move(__r)).swap(*this);
-            return *this;
-        }*/
-
-        void swap(remote_shared_ptr& __r) noexcept
-        {
-            std::swap(__ptr_, __r.__ptr_);
-            std::swap(__cntrl_, __r.__cntrl_);
-        }
-
-        void reset() noexcept { remote_shared_ptr().swap(*this); }
-
-        template<class _Yp, class = __enable_if_t<__compatible_with<_Yp, _Tp>::value>> void reset(_Yp* __p)
-        {
-            remote_shared_ptr(__p).swap(*this);
-        }
-
-        template<class _Yp, class _Dp, class = __enable_if_t<__compatible_with<_Yp, _Tp>::value>>
-        void reset(_Yp* __p, _Dp __d)
-        {
-            remote_shared_ptr(__p, __d).swap(*this);
-        }
-
-        template<class _Yp, class _Dp, class _Alloc, class = __enable_if_t<__compatible_with<_Yp, _Tp>::value>>
-        void reset(_Yp* __p, _Dp __d, _Alloc __a)
-        {
-            remote_shared_ptr(__p, __d, __a).swap(*this);
-        }
-
-        element_type* get() const noexcept { return __ptr_; }
-
-        typename std::add_lvalue_reference<element_type>::type operator*() const noexcept { return *__ptr_; }
-
-        element_type* operator->() const noexcept
-        {
-            static_assert(!std::is_array<_Tp>::value,
-                          "std::remote_shared_ptr<T>::operator-> is only valid when T is not an array type.");
-            return __ptr_;
-        }
-
-        long use_count() const noexcept { return __cntrl_ ? __cntrl_->use_count() : 0; }
-
-        bool unique() const noexcept { return use_count() == 1; }
-
-        explicit operator bool() const noexcept { return get() != nullptr; }
-
-        template<class _Up> bool owner_before(remote_shared_ptr<_Up> const& __p) const noexcept
-        {
-            return __cntrl_ < __p.__cntrl_;
-        }
-
-        template<class _Up> bool owner_before(remote_weak_ptr<_Up> const& __p) const noexcept
-        {
-            return __cntrl_ < __p.__cntrl_;
-        }
-
-        bool __owner_equivalent(const remote_shared_ptr& __p) const { return __cntrl_ == __p.__cntrl_; }
-
-        typename std::add_lvalue_reference<element_type>::type operator[](ptrdiff_t __i) const
-        {
-            static_assert(is_array<_Tp>::value,
-                          "std::remote_shared_ptr<T>::operator[] is only valid when T is an array type.");
-            return __ptr_[__i];
-        }
-
-        template<class _Dp> _Dp* __get_deleter() const noexcept
-        {
-            return static_cast<_Dp*>(__cntrl_ ? const_cast<void*>(__cntrl_->__get_deleter(typeid(_Dp))) : nullptr);
-        }
-
-        template<class _Yp, class _CntrlBlk>
-        static remote_shared_ptr<_Tp> __create_with_control_block(_Yp* __p, _CntrlBlk* __cntrl) noexcept
-        {
-            remote_shared_ptr<_Tp> __r;
-            __r.__ptr_ = __p;
-            __r.__cntrl_ = __cntrl;
-            __r.__enable_weak_this(__r.__ptr_, __r.__ptr_);
-            return __r;
-        }
+        ~enable_shared_from_this() = default;
 
     private:
-        template<class _Yp, bool = std::is_function<_Yp>::value> struct __shared_ptr_default_allocator
-        {
-            typedef std::allocator<_Yp> type;
-        };
-
-        template<class _Yp> struct __shared_ptr_default_allocator<_Yp, true>
-        {
-            typedef std::allocator<__shared_ptr_dummy_rebind_allocator_type> type;
-        };
-
-        template<
-            class _Yp, class _OrigPtr,
-            class = __enable_if_t<std::is_convertible<_OrigPtr*, const enable_shared_remote_from_this<_Yp>*>::value>>
-        void __enable_weak_this(const enable_shared_remote_from_this<_Yp>* __e, _OrigPtr* __ptr) noexcept
-        {
-            typedef typename remove_cv<_Yp>::type _RawYp;
-            if (__e && __e->__weak_this_.expired())
-            {
-                __e->__weak_this_
-                    = remote_shared_ptr<_RawYp>(*this, const_cast<_RawYp*>(static_cast<const _Yp*>(__ptr)));
-            }
-        }
-
-        void __enable_weak_this(...) noexcept { }
-
-        template<class, class _Yp> struct __shared_ptr_default_delete : std::default_delete<_Yp>
-        {
-        };
-
-        template<class _Yp, class _Un, size_t _Sz>
-        struct __shared_ptr_default_delete<_Yp[_Sz], _Un> : std::default_delete<_Yp[]>
-        {
-        };
-
-        template<class _Yp, class _Un> struct __shared_ptr_default_delete<_Yp[], _Un> : std::default_delete<_Yp[]>
-        {
-        };
-
-        template<class _Up> friend class remote_shared_ptr;
-        template<class _Up> friend class remote_weak_ptr;
+        template<class _Yty> friend class shared_ptr;
+        mutable weak_ptr<T> _Wptr;
     };
 
-    template<class _Tp> remote_shared_ptr(remote_weak_ptr<_Tp>) -> remote_shared_ptr<_Tp>;
-    // template<class _Tp, class _Dp> remote_shared_ptr(unique_ptr<_Tp, _Dp>) -> remote_shared_ptr<_Tp>;
-
-    //
-    // std::allocate_shared and std::make_remote_shared
-    //
-    template<class _Tp, class _Alloc, class... _Args>
-    remote_shared_ptr<_Tp> allocate_shared(const _Alloc& __a, _Args&&... __args)
+    template<class T1, class T2>[[nodiscard]] shared_ptr<T1> static_pointer_cast(const shared_ptr<T2>& _Other) noexcept
     {
-        using _ControlBlock = __shared_ptr_emplace<_Tp, _Alloc>;
-        using _ControlBlockAllocator = typename __allocator_traits_rebind<_Alloc, _ControlBlock>::type;
-        __allocation_guard<_ControlBlockAllocator> __guard(__a, 1);
-        ::new ((void*)std::addressof(*__guard.__get())) _ControlBlock(__a, std::forward<_Args>(__args)...);
-        auto __control_block = __guard.__release_ptr();
-        return remote_shared_ptr<_Tp>::__create_with_control_block((*__control_block).__get_elem(),
-                                                                   std::addressof(*__control_block));
+        // static_cast for shared_ptr that properly respects the reference count control block
+        const auto _Ptr = static_cast<typename shared_ptr<T1>::element_type*>(_Other.get());
+        return shared_ptr<T1>(_Other, _Ptr);
     }
 
-    template<class _Tp, class... _Args> remote_shared_ptr<_Tp> make_remote_shared(_Args&&... __args)
+    template<class T1, class T2>[[nodiscard]] shared_ptr<T1> static_pointer_cast(shared_ptr<T2>&& _Other) noexcept
     {
-        return rpc_cpp::allocate_shared<_Tp>(std::allocator<_Tp>(), std::forward<_Args>(__args)...);
+        // static_cast for shared_ptr that properly respects the reference count control block
+        const auto _Ptr = static_cast<typename shared_ptr<T1>::element_type*>(_Other.get());
+        return shared_ptr<T1>(std::move(_Other), _Ptr);
     }
 
-    template<class _Tp, class _Up>
-    inline bool operator==(const remote_shared_ptr<_Tp>& __x, const remote_shared_ptr<_Up>& __y) noexcept
+    template<class T1, class T2>[[nodiscard]] shared_ptr<T1> const_pointer_cast(const shared_ptr<T2>& _Other) noexcept
     {
-        return __x.get() == __y.get();
+        // const_cast for shared_ptr that properly respects the reference count control block
+        const auto _Ptr = const_cast<typename shared_ptr<T1>::element_type*>(_Other.get());
+        return shared_ptr<T1>(_Other, _Ptr);
     }
 
-    template<class _Tp, class _Up>
-    inline bool operator!=(const remote_shared_ptr<_Tp>& __x, const remote_shared_ptr<_Up>& __y) noexcept
+    template<class T1, class T2>[[nodiscard]] shared_ptr<T1> const_pointer_cast(shared_ptr<T2>&& _Other) noexcept
     {
-        return !(__x == __y);
+        // const_cast for shared_ptr that properly respects the reference count control block
+        const auto _Ptr = const_cast<typename shared_ptr<T1>::element_type*>(_Other.get());
+        return shared_ptr<T1>(std::move(_Other), _Ptr);
     }
 
-    template<class _Tp, class _Up>
-    inline bool operator<(const remote_shared_ptr<_Tp>& __x, const remote_shared_ptr<_Up>& __y) noexcept
+    template<class T1, class T2>
+    [[nodiscard]] shared_ptr<T1> reinterpret_pointer_cast(const shared_ptr<T2>& _Other) noexcept
     {
-        return less<>()(__x.get(), __y.get());
+        // reinterpret_cast for shared_ptr that properly respects the reference count control block
+        const auto _Ptr = reinterpret_cast<typename shared_ptr<T1>::element_type*>(_Other.get());
+        return shared_ptr<T1>(_Other, _Ptr);
     }
 
-    template<class _Tp, class _Up>
-    inline bool operator>(const remote_shared_ptr<_Tp>& __x, const remote_shared_ptr<_Up>& __y) noexcept
+    template<class T1, class T2>[[nodiscard]] shared_ptr<T1> reinterpret_pointer_cast(shared_ptr<T2>&& _Other) noexcept
     {
-        return __y < __x;
+        // reinterpret_cast for shared_ptr that properly respects the reference count control block
+        const auto _Ptr = reinterpret_cast<typename shared_ptr<T1>::element_type*>(_Other.get());
+        return shared_ptr<T1>(std::move(_Other), _Ptr);
     }
 
-    template<class _Tp, class _Up>
-    inline bool operator<=(const remote_shared_ptr<_Tp>& __x, const remote_shared_ptr<_Up>& __y) noexcept
+    template<class T1, class T2> inline shared_ptr<T1> dynamic_pointer_cast(const shared_ptr<T2>& from) noexcept
     {
-        return !(__y < __x);
-    }
-
-    template<class _Tp, class _Up>
-    inline bool operator>=(const remote_shared_ptr<_Tp>& __x, const remote_shared_ptr<_Up>& __y) noexcept
-    {
-        return !(__x < __y);
-    }
-
-    template<class _Tp> inline bool operator==(const remote_shared_ptr<_Tp>& __x, std::nullptr_t) noexcept
-    {
-        return !__x;
-    }
-
-    template<class _Tp> inline bool operator==(std::nullptr_t, const remote_shared_ptr<_Tp>& __x) noexcept
-    {
-        return !__x;
-    }
-
-    template<class _Tp> inline bool operator!=(const remote_shared_ptr<_Tp>& __x, std::nullptr_t) noexcept
-    {
-        return static_cast<bool>(__x);
-    }
-
-    template<class _Tp> inline bool operator!=(std::nullptr_t, const remote_shared_ptr<_Tp>& __x) noexcept
-    {
-        return static_cast<bool>(__x);
-    }
-
-    template<class _Tp> inline bool operator<(const remote_shared_ptr<_Tp>& __x, std::nullptr_t) noexcept
-    {
-        return less<_Tp*>()(__x.get(), nullptr);
-    }
-
-    template<class _Tp> inline bool operator<(std::nullptr_t, const remote_shared_ptr<_Tp>& __x) noexcept
-    {
-        return less<_Tp*>()(nullptr, __x.get());
-    }
-
-    template<class _Tp> inline bool operator>(const remote_shared_ptr<_Tp>& __x, std::nullptr_t) noexcept
-    {
-        return nullptr < __x;
-    }
-
-    template<class _Tp> inline bool operator>(std::nullptr_t, const remote_shared_ptr<_Tp>& __x) noexcept
-    {
-        return __x < nullptr;
-    }
-
-    template<class _Tp> inline bool operator<=(const remote_shared_ptr<_Tp>& __x, std::nullptr_t) noexcept
-    {
-        return !(nullptr < __x);
-    }
-
-    template<class _Tp> inline bool operator<=(std::nullptr_t, const remote_shared_ptr<_Tp>& __x) noexcept
-    {
-        return !(__x < nullptr);
-    }
-
-    template<class _Tp> inline bool operator>=(const remote_shared_ptr<_Tp>& __x, std::nullptr_t) noexcept
-    {
-        return !(__x < nullptr);
-    }
-
-    template<class _Tp> inline bool operator>=(std::nullptr_t, const remote_shared_ptr<_Tp>& __x) noexcept
-    {
-        return !(nullptr < __x);
-    }
-
-    template<class _Tp> inline void swap(remote_shared_ptr<_Tp>& __x, remote_shared_ptr<_Tp>& __y) noexcept
-    {
-        __x.swap(__y);
-    }
-
-    template<class _Tp, class _Up>
-    inline remote_shared_ptr<_Tp> static_pointer_cast(const remote_shared_ptr<_Up>& __r) noexcept
-    {
-        return remote_shared_ptr<_Tp>(__r, static_cast<typename remote_shared_ptr<_Tp>::element_type*>(__r.get()));
-    }
-
-    template<class _Tp, class _Up>
-    inline remote_shared_ptr<_Tp> dynamic_remote_pointer_cast(const remote_shared_ptr<_Up>& __r) noexcept
-    {
-        typedef typename remote_shared_ptr<_Tp>::element_type _ET;
-        _ET* __p = dynamic_cast<_ET*>(__r.get());
-        if (__p)
-            return remote_shared_ptr<_Tp>(__r, __p);
-        i_proxy* proxy = dynamic_cast<i_proxy*>(__r.get());
+        auto* ptr = dynamic_cast<shared_ptr<T1>::element_type*>(from.get());
+        if (ptr)
+            return shared_ptr<T1>(from, ptr);
+        i_proxy_impl* proxy = dynamic_cast<i_proxy_impl*>(from.get());
         if (!proxy)
         {
-            return remote_shared_ptr<_Tp>();
+            return shared_ptr<T1>();
         }
         auto ob = proxy->get_object_proxy();
-        remote_shared_ptr<_Tp> ret;
-        ob->query_interface<_Tp>(ret);
+        shared_ptr<T1> ret;
+        ob->query_interface<T1>(ret);
         return ret;
     }
-
-    template<class _Tp, class _Up> remote_shared_ptr<_Tp> const_pointer_cast(const remote_shared_ptr<_Up>& __r) noexcept
-    {
-        typedef typename remote_shared_ptr<_Tp>::element_type _RTp;
-        return remote_shared_ptr<_Tp>(__r, const_cast<_RTp*>(__r.get()));
-    }
-
-    template<class _Tp, class _Up> remote_shared_ptr<_Tp> reinterpret_pointer_cast(const remote_shared_ptr<_Up>& __r)
-    noexcept
-    {
-        return remote_shared_ptr<_Tp>(__r, reinterpret_cast<typename remote_shared_ptr<_Tp>::element_type*>(__r.get()));
-    }
-
-    template<class _Dp, class _Tp> inline _Dp* get_deleter(const remote_shared_ptr<_Tp>& __p) noexcept
-    {
-        return __p.template __get_deleter<_Dp>();
-    }
-
-    template<class _Tp> class remote_weak_ptr
-    {
-    public:
-        typedef std::remove_extent_t<_Tp> element_type;
-
-    private:
-        element_type* __ptr_;
-        __shared_weak_count* __cntrl_;
-
-    public:
-        constexpr remote_weak_ptr() noexcept;
-        template<class _Yp>
-        remote_weak_ptr(remote_shared_ptr<_Yp> const& __r,
-                        typename std::enable_if<__compatible_with<_Yp, _Tp>::value, int>::type = 0) noexcept;
-
-        remote_weak_ptr(remote_weak_ptr const& __r) noexcept;
-        template<class _Yp>
-        remote_weak_ptr(remote_weak_ptr<_Yp> const& __r,
-                        typename std::enable_if<__compatible_with<_Yp, _Tp>::value, int>::type = 0) noexcept;
-
-        remote_weak_ptr(remote_weak_ptr&& __r) noexcept;
-        template<class _Yp>
-        remote_weak_ptr(remote_weak_ptr<_Yp>&& __r,
-                        typename std::enable_if<__compatible_with<_Yp, _Tp>::value, int>::type = 0) noexcept;
-        ~remote_weak_ptr();
-
-        remote_weak_ptr& operator=(remote_weak_ptr const& __r) noexcept;
-        template<class _Yp>
-        typename std::enable_if<__compatible_with<_Yp, _Tp>::value, remote_weak_ptr&>::type
-        operator=(remote_weak_ptr<_Yp> const& __r) noexcept;
-
-        remote_weak_ptr& operator=(remote_weak_ptr&& __r) noexcept;
-        template<class _Yp>
-        typename std::enable_if<__compatible_with<_Yp, _Tp>::value, remote_weak_ptr&>::type
-        operator=(remote_weak_ptr<_Yp>&& __r) noexcept;
-
-        template<class _Yp>
-        typename std::enable_if<__compatible_with<_Yp, _Tp>::value, remote_weak_ptr&>::type
-        operator=(remote_shared_ptr<_Yp> const& __r) noexcept;
-
-        void swap(remote_weak_ptr& __r) noexcept;
-
-        void reset() noexcept;
-
-        long use_count() const noexcept { return __cntrl_ ? __cntrl_->use_count() : 0; }
-
-        bool expired() const noexcept { return __cntrl_ == nullptr || __cntrl_->use_count() == 0; }
-        remote_shared_ptr<_Tp> lock() const noexcept;
-        template<class _Up> bool owner_before(const remote_shared_ptr<_Up>& __r) const noexcept
-        {
-            return __cntrl_ < __r.__cntrl_;
-        }
-        template<class _Up> bool owner_before(const remote_weak_ptr<_Up>& __r) const noexcept
-        {
-            return __cntrl_ < __r.__cntrl_;
-        }
-
-        template<class _Up> friend class remote_weak_ptr;
-        template<class _Up> friend class remote_shared_ptr;
-    };
-
-    template<class _Tp> remote_weak_ptr(remote_shared_ptr<_Tp>) -> remote_weak_ptr<_Tp>;
-
-    template<class _Tp>
-    inline constexpr remote_weak_ptr<_Tp>::remote_weak_ptr() noexcept
-        : __ptr_(nullptr)
-        , __cntrl_(nullptr)
-    {
-    }
-
-    template<class _Tp>
-    inline remote_weak_ptr<_Tp>::remote_weak_ptr(remote_weak_ptr const& __r) noexcept
-        : __ptr_(__r.__ptr_)
-        , __cntrl_(__r.__cntrl_)
-    {
-        if (__cntrl_)
-            __cntrl_->__add_weak();
-    }
-
-    template<class _Tp>
-    template<class _Yp>
-    inline remote_weak_ptr<_Tp>::remote_weak_ptr(
-        remote_shared_ptr<_Yp> const& __r,
-        typename std::enable_if<__compatible_with<_Yp, _Tp>::value, int>::type) noexcept
-        : __ptr_(__r.__ptr_)
-        , __cntrl_(__r.__cntrl_)
-    {
-        if (__cntrl_)
-            __cntrl_->__add_weak();
-    }
-
-    template<class _Tp>
-    template<class _Yp>
-    inline remote_weak_ptr<_Tp>::remote_weak_ptr(
-        remote_weak_ptr<_Yp> const& __r,
-        typename std::enable_if<__compatible_with<_Yp, _Tp>::value, int>::type) noexcept
-        : __ptr_(__r.__ptr_)
-        , __cntrl_(__r.__cntrl_)
-    {
-        if (__cntrl_)
-            __cntrl_->__add_weak();
-    }
-
-    template<class _Tp>
-    inline remote_weak_ptr<_Tp>::remote_weak_ptr(remote_weak_ptr&& __r) noexcept
-        : __ptr_(__r.__ptr_)
-        , __cntrl_(__r.__cntrl_)
-    {
-        __r.__ptr_ = nullptr;
-        __r.__cntrl_ = nullptr;
-    }
-
-    template<class _Tp>
-    template<class _Yp>
-    inline remote_weak_ptr<_Tp>::remote_weak_ptr(
-        remote_weak_ptr<_Yp>&& __r, typename std::enable_if<__compatible_with<_Yp, _Tp>::value, int>::type) noexcept
-        : __ptr_(__r.__ptr_)
-        , __cntrl_(__r.__cntrl_)
-    {
-        __r.__ptr_ = nullptr;
-        __r.__cntrl_ = nullptr;
-    }
-
-    template<class _Tp> remote_weak_ptr<_Tp>::~remote_weak_ptr()
-    {
-        if (__cntrl_)
-            __cntrl_->__release_weak();
-    }
-
-    template<class _Tp>
-    inline remote_weak_ptr<_Tp>& remote_weak_ptr<_Tp>::operator=(remote_weak_ptr const& __r) noexcept
-    {
-        remote_weak_ptr(__r).swap(*this);
-        return *this;
-    }
-
-    template<class _Tp>
-    template<class _Yp>
-    inline typename std::enable_if<__compatible_with<_Yp, _Tp>::value, remote_weak_ptr<_Tp>&>::type
-    remote_weak_ptr<_Tp>::operator=(remote_weak_ptr<_Yp> const& __r) noexcept
-    {
-        remote_weak_ptr(__r).swap(*this);
-        return *this;
-    }
-
-    template<class _Tp> inline remote_weak_ptr<_Tp>& remote_weak_ptr<_Tp>::operator=(remote_weak_ptr&& __r) noexcept
-    {
-        remote_weak_ptr(std::move(__r)).swap(*this);
-        return *this;
-    }
-
-    template<class _Tp>
-    template<class _Yp>
-    inline typename std::enable_if<__compatible_with<_Yp, _Tp>::value, remote_weak_ptr<_Tp>&>::type
-    remote_weak_ptr<_Tp>::operator=(remote_weak_ptr<_Yp>&& __r) noexcept
-    {
-        remote_weak_ptr(std::move(__r)).swap(*this);
-        return *this;
-    }
-
-    template<class _Tp>
-    template<class _Yp>
-    inline typename std::enable_if<__compatible_with<_Yp, _Tp>::value, remote_weak_ptr<_Tp>&>::type
-    remote_weak_ptr<_Tp>::operator=(remote_shared_ptr<_Yp> const& __r) noexcept
-    {
-        remote_weak_ptr(__r).swap(*this);
-        return *this;
-    }
-
-    template<class _Tp> inline void remote_weak_ptr<_Tp>::swap(remote_weak_ptr& __r) noexcept
-    {
-        std::swap(__ptr_, __r.__ptr_);
-        std::swap(__cntrl_, __r.__cntrl_);
-    }
-
-    template<class _Tp> inline void swap(remote_weak_ptr<_Tp>& __x, remote_weak_ptr<_Tp>& __y) noexcept
-    {
-        __x.swap(__y);
-    }
-
-    template<class _Tp> inline void remote_weak_ptr<_Tp>::reset() noexcept { remote_weak_ptr().swap(*this); }
-
-    template<class _Tp> remote_shared_ptr<_Tp> remote_weak_ptr<_Tp>::lock() const noexcept
-    {
-        remote_shared_ptr<_Tp> __r;
-        __r.__cntrl_ = __cntrl_ ? __cntrl_->lock() : __cntrl_;
-        if (__r.__cntrl_)
-            __r.__ptr_ = __ptr_;
-        return __r;
-    }
-
-    template<class _Tp = void> struct owner_less;
-
-    template<class _Tp> struct owner_less<remote_shared_ptr<_Tp>>
-    {
-
-        bool operator()(remote_shared_ptr<_Tp> const& __x, remote_shared_ptr<_Tp> const& __y) const noexcept
-        {
-            return __x.owner_before(__y);
-        }
-
-        bool operator()(remote_shared_ptr<_Tp> const& __x, remote_weak_ptr<_Tp> const& __y) const noexcept
-        {
-            return __x.owner_before(__y);
-        }
-
-        bool operator()(remote_weak_ptr<_Tp> const& __x, remote_shared_ptr<_Tp> const& __y) const noexcept
-        {
-            return __x.owner_before(__y);
-        }
-    };
-
-    template<class _Tp> struct owner_less<remote_weak_ptr<_Tp>>
-    {
-
-        bool operator()(remote_weak_ptr<_Tp> const& __x, remote_weak_ptr<_Tp> const& __y) const noexcept
-        {
-            return __x.owner_before(__y);
-        }
-
-        bool operator()(remote_shared_ptr<_Tp> const& __x, remote_weak_ptr<_Tp> const& __y) const noexcept
-        {
-            return __x.owner_before(__y);
-        }
-
-        bool operator()(remote_weak_ptr<_Tp> const& __x, remote_shared_ptr<_Tp> const& __y) const noexcept
-        {
-            return __x.owner_before(__y);
-        }
-    };
-
-    template<> struct owner_less<void>
-    {
-        template<class _Tp, class _Up>
-        bool operator()(remote_shared_ptr<_Tp> const& __x, remote_shared_ptr<_Up> const& __y) const noexcept
-        {
-            return __x.owner_before(__y);
-        }
-        template<class _Tp, class _Up>
-        bool operator()(remote_shared_ptr<_Tp> const& __x, remote_weak_ptr<_Up> const& __y) const noexcept
-        {
-            return __x.owner_before(__y);
-        }
-        template<class _Tp, class _Up>
-        bool operator()(remote_weak_ptr<_Tp> const& __x, remote_shared_ptr<_Up> const& __y) const noexcept
-        {
-            return __x.owner_before(__y);
-        }
-        template<class _Tp, class _Up>
-        bool operator()(remote_weak_ptr<_Tp> const& __x, remote_weak_ptr<_Up> const& __y) const noexcept
-        {
-            return __x.owner_before(__y);
-        }
-        typedef void is_transparent;
-    };
-
-    template<class _Tp> class enable_shared_remote_from_this
-    {
-        mutable remote_weak_ptr<_Tp> __weak_this_;
-
-    protected:
-        constexpr enable_shared_remote_from_this() noexcept { }
-
-        enable_shared_remote_from_this(enable_shared_remote_from_this const&) noexcept { }
-
-        enable_shared_remote_from_this& operator=(enable_shared_remote_from_this const&) noexcept { return *this; }
-
-        ~enable_shared_remote_from_this() { }
-
-    public:
-        remote_shared_ptr<_Tp> shared_from_this() { return remote_shared_ptr<_Tp>(__weak_this_); }
-
-        remote_shared_ptr<_Tp const> shared_from_this() const { return remote_shared_ptr<const _Tp>(__weak_this_); }
-
-        remote_weak_ptr<_Tp> weak_from_this() noexcept { return __weak_this_; }
-
-        remote_weak_ptr<const _Tp> weak_from_this() const noexcept { return __weak_this_; }
-
-        template<class _Up> friend class remote_shared_ptr;
-    };
-
-    template<class _Tp> struct hash;
-
-    template<class _Tp> struct hash<remote_shared_ptr<_Tp>>
-    {
-        size_t operator()(const remote_shared_ptr<_Tp>& __ptr) const noexcept
-        {
-            return hash<typename remote_shared_ptr<_Tp>::element_type*>()(__ptr.get());
-        }
-    };
-
-    //    template<class _CharT, class _Traits, class _Yp>
-    //    inline basic_ostream<_CharT, _Traits>& operator<<(basic_ostream<_CharT, _Traits>& __os, remote_shared_ptr<_Yp>
-    //    const& __p);
-
-    class __sp_mut
-    {
-        void* __lx;
-
-    public:
-        void lock() noexcept;
-        void unlock() noexcept;
-
-    private:
-        constexpr __sp_mut(void*) noexcept;
-        __sp_mut(const __sp_mut&);
-        __sp_mut& operator=(const __sp_mut&);
-
-        friend __sp_mut& __get_sp_mut(const void*);
-    };
-
-    __sp_mut& __get_sp_mut(const void*);
-
-    template<class _Tp> inline bool atomic_is_lock_free(const remote_shared_ptr<_Tp>*) { return false; }
-
-    template<class _Tp> remote_shared_ptr<_Tp> atomic_load(const remote_shared_ptr<_Tp>* __p)
-    {
-        __sp_mut& __m = __get_sp_mut(__p);
-        __m.lock();
-        remote_shared_ptr<_Tp> __q = *__p;
-        __m.unlock();
-        return __q;
-    }
-
-    template<class _Tp>
-    inline remote_shared_ptr<_Tp> atomic_load_explicit(const remote_shared_ptr<_Tp>* __p, std::memory_order)
-    {
-        return atomic_load(__p);
-    }
-
-    template<class _Tp> void atomic_store(remote_shared_ptr<_Tp>* __p, remote_shared_ptr<_Tp> __r)
-    {
-        __sp_mut& __m = __get_sp_mut(__p);
-        __m.lock();
-        __p->swap(__r);
-        __m.unlock();
-    }
-
-    template<class _Tp>
-    inline void atomic_store_explicit(remote_shared_ptr<_Tp>* __p, remote_shared_ptr<_Tp> __r, std::memory_order)
-    {
-        atomic_store(__p, __r);
-    }
-
-    template<class _Tp> remote_shared_ptr<_Tp> atomic_exchange(remote_shared_ptr<_Tp>* __p, remote_shared_ptr<_Tp> __r)
-    {
-        __sp_mut& __m = __get_sp_mut(__p);
-        __m.lock();
-        __p->swap(__r);
-        __m.unlock();
-        return __r;
-    }
-
-    template<class _Tp>
-    inline remote_shared_ptr<_Tp> atomic_exchange_explicit(remote_shared_ptr<_Tp>* __p, remote_shared_ptr<_Tp> __r,
-                                                           std::memory_order)
-    {
-        return atomic_exchange(__p, __r);
-    }
-
-    template<class _Tp>
-    bool atomic_compare_exchange_strong(remote_shared_ptr<_Tp>* __p, remote_shared_ptr<_Tp>* __v,
-                                        remote_shared_ptr<_Tp> __w)
-    {
-        remote_shared_ptr<_Tp> __temp;
-        __sp_mut& __m = __get_sp_mut(__p);
-        __m.lock();
-        if (__p->__owner_equivalent(*__v))
-        {
-            std::swap(__temp, *__p);
-            *__p = __w;
-            __m.unlock();
-            return true;
-        }
-        std::swap(__temp, *__v);
-        *__v = *__p;
-        __m.unlock();
-        return false;
-    }
-
-    template<class _Tp>
-    inline bool atomic_compare_exchange_weak(remote_shared_ptr<_Tp>* __p, remote_shared_ptr<_Tp>* __v,
-                                             remote_shared_ptr<_Tp> __w)
-    {
-        return atomic_compare_exchange_strong(__p, __v, __w);
-    }
-
-    template<class _Tp>
-    inline bool atomic_compare_exchange_strong_explicit(remote_shared_ptr<_Tp>* __p, remote_shared_ptr<_Tp>* __v,
-                                                        remote_shared_ptr<_Tp> __w, std::memory_order,
-                                                        std::memory_order)
-    {
-        return atomic_compare_exchange_strong(__p, __v, __w);
-    }
-
-    template<class _Tp>
-    inline bool atomic_compare_exchange_weak_explicit(remote_shared_ptr<_Tp>* __p, remote_shared_ptr<_Tp>* __v,
-                                                      remote_shared_ptr<_Tp> __w, std::memory_order, std::memory_order)
-    {
-        return atomic_compare_exchange_weak(__p, __v, __w);
-    }
-
 }

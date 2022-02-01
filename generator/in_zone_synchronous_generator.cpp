@@ -614,27 +614,29 @@ namespace enclave_marshaller
             header("static constexpr uint64_t id = {};", id);
             header("virtual ~{}() = default;", interface_name);
 
-            proxy("class {}_proxy : public {}, public i_proxy", interface_name, interface_name);
+            proxy("class {0}_proxy : public i_proxy<{0}>", interface_name);
             proxy("{{");
             proxy("public:");
             proxy("");
-            proxy("{}_proxy(std::shared_ptr<object_proxy> object_proxy = nullptr) : ", interface_name);
-            proxy("  i_proxy(object_proxy)");
+            proxy("{}_proxy(std::shared_ptr<object_proxy> object_proxy) : ", interface_name);
+            proxy("  i_proxy<{}>(object_proxy)", interface_name);
             proxy("  {{}}", interface_name);
             proxy("virtual ~{}_proxy(){{}}", interface_name);
             proxy("");
 
-            stub("class {}_stub : public i_marshaller_impl", interface_name);
+            stub("class {0}_stub : public i_interface_marshaller, public std::enable_shared_from_this<{0}_stub>", interface_name);
             stub("{{");
-            stub("rpc_cpp::remote_shared_ptr<{}> target_;", interface_name);
+            stub("std::shared_ptr<{}> target_;", interface_name);
             stub("public:");
             stub("");
-            stub("{}_stub(rpc_cpp::remote_shared_ptr<{}>& target) : ", interface_name, interface_name);
+            stub("{0}_stub(std::shared_ptr<{0}>& target) : ", interface_name);
             stub("  target_(target)", interface_name);
             stub("  {{}}");
             stub("");
-            stub("error_code send(uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_, "
-                 "const char* in_buf_, size_t out_size_, char* out_buf_) override");
+            stub("uint64_t get_interface_id() override {{ return {}::id; }};", interface_name);
+            stub("std::shared_ptr<{}> get_target() {{ return target_; }};", interface_name);
+            stub("error_code call(uint64_t method_id, size_t in_size_, const char* in_buf_, size_t out_size_, char* "
+                 "out_buf_) override");
             stub("{{");
 
             bool has_methods = false;
@@ -684,6 +686,10 @@ namespace enclave_marshaller
                     header.raw(") = 0;\n");
                     proxy.raw(") override\n");
                     proxy("{{");
+                    proxy("if(!object_proxy_)");
+                    proxy("{{");
+                    proxy("return -1;");
+                    proxy("}}");
 
                     bool has_inparams = false;
 
@@ -869,15 +875,42 @@ namespace enclave_marshaller
 
             header("}};");
             header("");
-
             proxy("}};");
             proxy("");
 
-            stub("return 0;");
+            stub("return -1;");
             stub("}}");
+            stub("error_code cast(uint64_t interface_id, std::shared_ptr<i_interface_marshaller>& new_stub) override;");
             stub("}};");
             stub("");
         };
+
+        void write_stub_factory(bool from_host, const Library& lib, const ClassObject& m_ob, writer& stub, int id)
+        {
+            auto interface_name = std::string(m_ob.type == ObjectLibrary ? "i_" : "") + m_ob.name;
+            stub("if(interface_id == {}::id)", interface_name);
+            stub("{{");
+            stub("auto* tmp = dynamic_cast<{0}*>(original->get_target().get());", interface_name);
+            stub("if(tmp != nullptr)");
+            stub("{{");
+            stub("std::shared_ptr<{}> tmp_ptr(original->get_target(), tmp);", interface_name);
+            stub("new_stub = std::shared_ptr<i_interface_marshaller>(new {0}_stub(tmp_ptr));",interface_name);
+            stub("return 0;");
+            stub("}}");
+            stub("return -1;");
+
+            stub("}}");
+        }
+
+        void write_stub_cast_factory(bool from_host, const Library& lib, const ClassObject& m_ob, writer& stub, int id)
+        {
+            auto interface_name = std::string(m_ob.type == ObjectLibrary ? "i_" : "") + m_ob.name;
+            stub("error_code {}_stub::cast(uint64_t interface_id, std::shared_ptr<i_interface_marshaller>& new_stub)", interface_name);
+            stub("{{");
+            stub("error_code ret = stub_factory(interface_id, shared_from_this(), new_stub);");
+            stub("return ret;");
+            stub("}}");
+        }
 
         void write_struct(const ClassObject& m_ob, writer& header)
         {
@@ -944,18 +977,61 @@ namespace enclave_marshaller
 
             write_interface(from_host, lib, m_ob, header, proxy, stub, 0);
 
+            {
+                stub("template<class T>");
+                stub("error_code stub_factory(uint64_t interface_id, std::shared_ptr<T> original, "
+                     "std::shared_ptr<i_interface_marshaller>& new_stub)");
+                stub("{{");
+                stub("error_code ret = -1;");
+                stub("if(interface_id == original->get_interface_id())");
+                stub("{{");
+                stub("new_stub = original;");
+                stub("return 0;;");
+                stub("}}");
+                int id = 1;
+                for (auto& name : m_ob.m_ownedClasses)
+                {
+                    const ClassObject* obj = nullptr;
+                    if (!lib.FindClassObject(name, obj))
+                    {
+                        continue;
+                    }
+                    if (obj->type == ObjectTypeInterface)
+                        write_stub_factory(from_host, lib, *obj, stub, id++);
+                }
+                write_stub_factory(from_host, lib, m_ob, stub, 0);
+                stub("return ret;");
+                stub("}}");
+            }
+
+            {
+                int id = 1;
+                for (auto& name : m_ob.m_ownedClasses)
+                {
+                    const ClassObject* obj = nullptr;
+                    if (!lib.FindClassObject(name, obj))
+                    {
+                        continue;
+                    }
+                    if (obj->type == ObjectTypeInterface)
+                        write_stub_cast_factory(from_host, lib, *obj, stub, id++);
+                }
+                write_stub_cast_factory(from_host, lib, m_ob, stub, 0);
+            }            
+
             proxy("#ifndef _IN_ENCLAVE");
             proxy("//the class that encapsulates an environment or zone");
             proxy("//only host code can use this class directly other enclaves *may* have access to the i_zone derived "
                   "interface");
-            proxy("class {} : public i_marshaller_impl, public i_{}_proxy", m_ob.name, m_ob.name);
+            proxy("class {} : public i_marshaller, public i_{}_proxy", m_ob.name, m_ob.name);
             proxy("{{");
+            proxy("uint64_t eid_ = 0;");
             proxy("zone_config config = {{}};");
             proxy("std::string filename_;");
 
             proxy("public:");
 
-            proxy("{0}(std::string filename) : i_{0}_proxy(), filename_(filename){{}}", m_ob.name);
+            proxy("{0}(std::string filename) : i_{0}_proxy(nullptr), filename_(filename){{}}", m_ob.name);
             proxy("~{}()", m_ob.name, m_ob.name);
             proxy("{{");
             proxy("enclave_marshal_test_destroy(eid_);");
@@ -973,6 +1049,26 @@ namespace enclave_marshaller
             proxy("return err_code;");
             proxy("}}");
             proxy("");
+
+            proxy("error_code send(uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_, "
+                  "const char* in_buf_, size_t out_size_, char* out_buf_)");
+            proxy("{{");
+            proxy("error_code err_code = 0;");
+            proxy("sgx_status_t status = ::call(eid_, &err_code, object_id, interface_id, method_id, in_size_, "
+                  "in_buf_, out_size_, out_buf_);");
+            proxy("if(status)");
+            proxy("  err_code = -1;");
+            proxy("return err_code;");
+            proxy("}}");
+            proxy("error_code try_cast(uint64_t zone_id_, uint64_t object_id, uint64_t interface_id)");
+            proxy("{{");
+            proxy("error_code err_code = 0;");
+            proxy("sgx_status_t status = ::try_cast(eid_, &err_code, zone_id_, object_id, interface_id);");
+            proxy("if(status)");
+            proxy("  err_code = -1;");
+            proxy("return err_code;");
+            proxy("}}");
+
             proxy("}};");
             proxy("#endif");
         };
@@ -998,11 +1094,11 @@ namespace enclave_marshaller
                     if (obj->type == ObjectTypeInterface)
                     {
 
-                        proxy("template<> void object_proxy::create_interface_proxy(rpc_cpp::remote_shared_ptr<{}{}>& "
+                        proxy("template<> void object_proxy::create_interface_proxy(rpc_cpp::shared_ptr<{}{}>& "
                               "inface)",
                               ns, obj->name);
                         proxy("{{");
-                        proxy("    inface = rpc_cpp::remote_shared_ptr<{1}{0}>(new {1}{0}_proxy(shared_from_this()));",
+                        proxy("    inface = rpc_cpp::shared_ptr<{1}{0}>(new {1}{0}_proxy(shared_from_this()));",
                               obj->name, ns);
                         proxy("}}");
                         proxy("");

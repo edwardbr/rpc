@@ -3,7 +3,7 @@
 
 namespace rpc_cpp
 {
-    __shared_count::~__shared_count() { }
+/*    __shared_count::~__shared_count() { }
     __shared_weak_count::~__shared_weak_count() { }
 
     void __shared_weak_count::__release_weak() noexcept
@@ -49,7 +49,7 @@ namespace rpc_cpp
         }
         return nullptr;
     }
-    const void* __shared_weak_count::__get_deleter(const type_info&) const noexcept { return nullptr; }
+    const void* __shared_weak_count::__get_deleter(const type_info&) const noexcept { return nullptr; }*/
 
 
 }
