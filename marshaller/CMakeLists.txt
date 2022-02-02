@@ -42,6 +42,8 @@ target_include_directories(marshaller_host
 
 target_link_libraries(marshaller_host 
     PRIVATE
+        marshal_test_edl_host
+        
         yas_common
     PUBLIC 
         ${HOST_LIBRARIES})

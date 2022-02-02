@@ -194,6 +194,12 @@ namespace rpc_cpp
         }
 
         template<class T2>
+        weak_ptr(const std::shared_ptr<T2>& _Other) noexcept
+            : std::weak_ptr<T>(_Other)
+        {
+        }
+
+        template<class T2>
         weak_ptr(const weak_ptr<T2>& _Other) noexcept
             : std::weak_ptr<T>(_Other)
         {
@@ -227,12 +233,15 @@ namespace rpc_cpp
         weak_ptr& operator=(weak_ptr&& _Right) noexcept
         {
             std::weak_ptr<T>* psp = this;
-            return *psp = std::move(_Right);
+            *psp = std::move(_Right);
+            return *this;
         }
+        
         template<class T2> weak_ptr& operator=(weak_ptr<T2>&& _Right) noexcept
         {
             std::weak_ptr<T>* psp = this;
-            return *psp = std::move(_Right);
+            *psp = std::move(_Right);
+            return *this;
         }
 
         template<class T2> weak_ptr& operator=(const shared_ptr<T2>& _Right) noexcept
@@ -288,6 +297,7 @@ namespace rpc_cpp
 
     private:
         template<class _Yty> friend class shared_ptr;
+    public://this should not be public, lacking brain capacity to work out why not
         mutable weak_ptr<T> _Wptr;
     };
 

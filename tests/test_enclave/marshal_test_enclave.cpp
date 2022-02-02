@@ -31,6 +31,13 @@ public:
     {
             return 0;
     }*/
+
+    
+	error_code add(int a, int b, int& c) override
+    {
+        c = a+b;
+        return 0;
+    }
 };
 
 class marshaller : public i_marshaller

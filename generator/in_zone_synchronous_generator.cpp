@@ -1023,53 +1023,7 @@ namespace enclave_marshaller
             proxy("//the class that encapsulates an environment or zone");
             proxy("//only host code can use this class directly other enclaves *may* have access to the i_zone derived "
                   "interface");
-            proxy("class {} : public i_marshaller, public i_{}_proxy", m_ob.name, m_ob.name);
-            proxy("{{");
-            proxy("uint64_t eid_ = 0;");
-            proxy("zone_config config = {{}};");
-            proxy("std::string filename_;");
-
-            proxy("public:");
-
-            proxy("{0}(std::string filename) : i_{0}_proxy(nullptr), filename_(filename){{}}", m_ob.name);
-            proxy("~{}()", m_ob.name, m_ob.name);
-            proxy("{{");
-            proxy("enclave_marshal_test_destroy(eid_);");
-            proxy("sgx_destroy_enclave(eid_);");
-            proxy("}}");
-            proxy("error_code load()", m_ob.name);
-            proxy("{{");
-            proxy("sgx_launch_token_t token = {{ 0 }};");
-            proxy("int updated = 0;");
-            proxy("sgx_status_t status = sgx_create_enclavea(filename_.data(), 1, &token, &updated, &eid_, NULL);");
-            proxy("if(status)");
-            proxy("  return -1;");
-            proxy("error_code err_code = 0;");
-            proxy("enclave_marshal_test_init(eid_, &err_code, &config);");
-            proxy("return err_code;");
-            proxy("}}");
-            proxy("");
-
-            proxy("error_code send(uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_, "
-                  "const char* in_buf_, size_t out_size_, char* out_buf_)");
-            proxy("{{");
-            proxy("error_code err_code = 0;");
-            proxy("sgx_status_t status = ::call(eid_, &err_code, object_id, interface_id, method_id, in_size_, "
-                  "in_buf_, out_size_, out_buf_);");
-            proxy("if(status)");
-            proxy("  err_code = -1;");
-            proxy("return err_code;");
-            proxy("}}");
-            proxy("error_code try_cast(uint64_t zone_id_, uint64_t object_id, uint64_t interface_id)");
-            proxy("{{");
-            proxy("error_code err_code = 0;");
-            proxy("sgx_status_t status = ::try_cast(eid_, &err_code, zone_id_, object_id, interface_id);");
-            proxy("if(status)");
-            proxy("  err_code = -1;");
-            proxy("return err_code;");
-            proxy("}}");
-
-            proxy("}};");
+            proxy("using {0}_zone = zone<i_{0}, i_{0}_proxy>;", m_ob.name);
             proxy("#endif");
         };
 

@@ -158,23 +158,23 @@ public:
         {
             ret = item->second->call(method_id, in_size_, in_buf_, out_size_, out_buf_);
         }
-		return ret;
+        return ret;
     }
     error_code try_cast(uint64_t interface_id)
     {
-		error_code ret = 0;
+        error_code ret = 0;
         std::lock_guard l(insert_control);
         auto item = proxy_map.find(interface_id);
         if (item == proxy_map.end())
         {
             std::shared_ptr<i_interface_marshaller> new_stub;
             ret = proxy_map.begin()->second->cast(interface_id, new_stub);
-			if (!ret)
+            if (!ret)
             {
                 proxy_map.emplace(interface_id, std::move(new_stub));
             }
         }
-		return ret;
+        return ret;
     }
 };
 
@@ -209,4 +209,38 @@ public:
 
     // this is to allow messaging between enclaves this will create an i_message_channel
     error_code create_message_link(i_message_target& target, i_zone& other_zone, std::string link_name);
+};
+
+struct zone_config;
+
+// the class that encapsulates an environment or zone
+// only host code can use this class directly other enclaves *may* have access to the i_zone derived interface
+class zone_base : public i_marshaller
+{
+    uint64_t eid_ = 0;
+    std::string filename_;
+
+public:
+    zone_base(std::string filename);
+    ~zone_base();
+    error_code load(zone_config& config);
+
+    error_code send(uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_, const char* in_buf_,
+                    size_t out_size_, char* out_buf_);
+    error_code try_cast(uint64_t zone_id_, uint64_t object_id, uint64_t interface_id);
+};
+
+template<class T, class TProxy> class zone : public zone_base, public rpc_cpp::enable_shared_from_this<zone<T, TProxy>>
+{
+public:
+    zone(std::string filename)
+        : zone_base(filename)
+    {
+    }
+
+    rpc_cpp::shared_ptr<T> get_remote_interface()
+    {
+        auto op = std::make_shared<object_proxy>(0, 0, shared_from_this());
+        return rpc_cpp::shared_ptr<T>(new TProxy(op));
+    }
 };

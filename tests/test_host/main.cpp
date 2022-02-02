@@ -79,10 +79,16 @@ int main()
     // an enclave marshalling of an object
     {
         error_code err_code = 0;
-        auto ex = std::make_shared<example>(
+        auto ex = std::make_shared<example_zone>(
             "C:/Dev/experiments/enclave_marshaller/build/output/debug/marshal_test_enclave.signed.dll");
-        err_code = ex->load();
-        ASSERT(err_code);
+        
+        err_code = ex->load(zone_config());
+        ASSERT(!err_code);
+
+        auto root_ptr = ex->get_remote_interface();
+
+        int val = 0;
+        root_ptr->add(1,2,val);
 
         /*shared_ptr<marshalled_tests::i_foo> target;
         err_code = ex.create_foo(target);
