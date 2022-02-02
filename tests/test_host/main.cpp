@@ -18,7 +18,7 @@
 
 using namespace marshalled_tests;
 
-class local_marshaller : public i_marshaller
+class local_marshaller : public zone_base_proxy
 {
     std::shared_ptr<object_stub>& stub_;
 
@@ -59,10 +59,10 @@ int main()
         auto os = std::make_shared<object_stub>(stub);
 
         //wrap a marshaller around the object_stub
-        auto marshaller = std::shared_ptr<i_marshaller>(new local_marshaller(os));
+        auto marshaller = rpc_cpp::shared_ptr<zone_base_proxy>(new local_marshaller(os));
 
         //assign the marshaller to the object_proxy
-        auto op = std::make_shared<object_proxy>(0, 0, marshaller);
+        auto op = rpc_cpp::shared_ptr<object_proxy>(new object_proxy(0, 0, marshaller));
 
         //get a remote pointer to ifoo
         rpc_cpp::shared_ptr<i_foo> i_foo_ptr;
@@ -79,8 +79,8 @@ int main()
     // an enclave marshalling of an object
     {
         error_code err_code = 0;
-        auto ex = std::make_shared<example_zone>(
-            "C:/Dev/experiments/enclave_marshaller/build/output/debug/marshal_test_enclave.signed.dll");
+        auto ex = rpc_cpp::shared_ptr<example_proxy>(new example_proxy(
+            "C:/Dev/experiments/enclave_marshaller/build/output/debug/marshal_test_enclave.signed.dll"));
         
         err_code = ex->load(zone_config());
         ASSERT(!err_code);
@@ -96,7 +96,7 @@ int main()
             std::cout << "aggggggg!";*/
 
         // work in progress create_foo should be passing back an instance of foo
-        auto op = std::make_shared<object_proxy>(1, 0, ex);
+        auto op = std::make_shared<object_proxy>(1, 0, rpc_cpp::static_pointer_cast<zone_base_proxy>(ex));
         i_foo_proxy proxy(op);
         standard_tests(proxy, true);
     }

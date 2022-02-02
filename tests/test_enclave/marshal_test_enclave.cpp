@@ -14,16 +14,6 @@
 
 using namespace marshalled_tests;
 
-/*class class_factory
-{
-        public:
-        error_code create_foo(rpc_cpp::shared_ptr<i_foo>& foo_obj)
-        {
-                foo_obj = rpc_cpp::shared_ptr<i_foo>(new foo);
-                return 0;
-        };
-};*/
-
 class example : public i_example
 {
 public:
@@ -40,7 +30,7 @@ public:
     }
 };
 
-class marshaller : public i_marshaller
+class marshaller : public zone_stub
 {
     std::shared_ptr<i_example_stub> the_example_stub;
 

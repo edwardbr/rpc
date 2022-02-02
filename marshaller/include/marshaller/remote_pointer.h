@@ -247,7 +247,8 @@ namespace rpc_cpp
         template<class T2> weak_ptr& operator=(const shared_ptr<T2>& _Right) noexcept
         {
             std::weak_ptr<T>* psp = this;
-            *psp = _Right;
+            const std::shared_ptr<T2>& other = _Right;
+            *psp = other;
             return *this;
         }
 

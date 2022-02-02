@@ -30,6 +30,7 @@ namespace enclave_marshaller
             STUB_DEMARSHALL_DECLARATION,
             STUB_MARSHALL_IN,
             STUB_PARAM_CAST,
+            STUB_ADD_REF_OUT,
             STUB_MARSHALL_OUT
         };
 
@@ -43,10 +44,8 @@ namespace enclave_marshaller
                 POINTER,
                 POINTER_REFERENCE,
                 POINTER_POINTER,
-                INTERFACE_REFERENCE,
-                INTERFACE_POINTER,
-                INTERFACE_POINTER_REFERENCE,
-                INTERFACE_POINTER_POINTER
+                INTERFACE,
+                INTERFACE_REFERENCE
             };
 
             template<param_type type>
@@ -236,10 +235,10 @@ namespace enclave_marshaller
         };
 
         template<>
-        std::string
-        renderer::render<renderer::INTERFACE_REFERENCE>(print_type option, bool from_host, const Library& lib,
-                                                        const std::string& name, bool is_in, bool is_out, bool is_const,
-                                                        const std::string& object_type, uint64_t& count) const
+        std::string renderer::render<renderer::INTERFACE>(print_type option, bool from_host, const Library& lib,
+                                                          const std::string& name, bool is_in, bool is_out,
+                                                          bool is_const, const std::string& object_type,
+                                                          uint64_t& count) const
         {
             if (is_out)
             {
@@ -252,13 +251,14 @@ namespace enclave_marshaller
             case PROXY_MARSHALL_IN:
                 return fmt::format("  ,(\"_{}\", {})", count, name);
             case PROXY_MARSHALL_OUT:
-                return fmt::format("  ,(\"_{}\", {})", count, name);
+                return fmt::format("  ,(\"_{}\", {}_)", count, name);
             case STUB_DEMARSHALL_DECLARATION:
                 return "";
             case STUB_PARAM_CAST:
                 return "";
             case PROXY_VALUE_RETURN:
             case PROXY_OUT_DECLARATION:
+                return fmt::format("  uint64_t {}_ = 0;", name);
             case STUB_MARSHALL_OUT:
                 return fmt::format("  ,(\"_{}\", (uint64_t){})", count, name);
             default:
@@ -267,86 +267,57 @@ namespace enclave_marshaller
         };
 
         template<>
-        std::string renderer::render<renderer::INTERFACE_POINTER>(print_type option, bool from_host, const Library& lib,
-                                                                  const std::string& name, bool is_in, bool is_out,
-                                                                  bool is_const, const std::string& object_type,
-                                                                  uint64_t& count) const
+        std::string
+        renderer::render<renderer::INTERFACE_REFERENCE>(print_type option, bool from_host, const Library& lib,
+                                                        const std::string& name, bool is_in, bool is_out, bool is_const,
+                                                        const std::string& object_type, uint64_t& count) const
         {
-            if (is_out)
-            {
-                std::cerr << "INTERFACE_POINTER does not support out vals\n";
-                throw "INTERFACE_POINTER does not support out vals\n";
-            }
-
             switch (option)
             {
             case PROXY_MARSHALL_IN:
-                return fmt::format("  ,(\"_{}\", {}_)", count, name);
+                return fmt::format("  ,(\"_{}\", {})", count, name);
             case PROXY_MARSHALL_OUT:
                 return fmt::format("  ,(\"_{}\", {}_)", count, name);
             case STUB_DEMARSHALL_DECLARATION:
-                return "";
+                return fmt::format("{} {}", object_type, name);
             case STUB_PARAM_CAST:
-                return "";
+                return name;
             case PROXY_VALUE_RETURN:
+                return fmt::format("get_object_proxy()->get_zone_base()->create_proxy({0}_, {0});", name);
             case PROXY_OUT_DECLARATION:
+                return fmt::format("uint64_t {}_ = 0;", name);
+            case STUB_ADD_REF_OUT:
+                return fmt::format("uint64_t {0}_ = zone_stub::get_zone_stub()->encapsulate_outbound_interfaces({0});",
+                                   name);
             case STUB_MARSHALL_OUT:
-                return fmt::format("  ,(\"_{}\", (uint64_t){}_)", count, name);
+                return fmt::format("  ,(\"_{}\", {}_)", count, name);
             default:
                 return "";
             }
         };
 
-        template<>
-        std::string renderer::render<renderer::INTERFACE_POINTER_REFERENCE>(print_type option, bool from_host,
-                                                                            const Library& lib, const std::string& name,
-                                                                            bool is_in, bool is_out, bool is_const,
-                                                                            const std::string& object_type,
-                                                                            uint64_t& count) const
+        std::string get_encapsulated_shared_ptr_type(const std::string& type_name)
         {
-            switch (option)
+            const std::string template_pattern = "rpc_cpp::shared_ptr<";
+            auto pos = type_name.find(template_pattern);
+            if (pos != std::string::npos)
             {
-            case PROXY_MARSHALL_IN:
-                return fmt::format("  ,(\"_{}\", {}_)", count, name);
-            case PROXY_MARSHALL_OUT:
-                return fmt::format("  ,(\"_{}\", {}_)", count, name);
-            case STUB_DEMARSHALL_DECLARATION:
-                return "";
-            case STUB_PARAM_CAST:
-                return "";
-            case PROXY_VALUE_RETURN:
-            case PROXY_OUT_DECLARATION:
-            case STUB_MARSHALL_OUT:
-                return fmt::format("  ,(\"_{}\", (uint64_t){}_)", count, name);
-            default:
-                return "";
+                pos += template_pattern.length();
+                while (type_name[pos] == ' ' || type_name[pos] == '\n' || type_name[pos] == '\r'
+                       || type_name[pos] == '\t')
+                    pos++;
+                auto rpos = type_name.rfind(">");
+                if (rpos == std::string::npos)
+                {
+                    std::cerr << fmt::format("template parameter is malformed {}", type_name);
+                    throw fmt::format("template parameter is malformed {}", type_name);
+                }
+                while (type_name[rpos] == ' ' || type_name[rpos] == '\n' || type_name[rpos] == '\r'
+                       || type_name[rpos] == '\t')
+                    rpos++;
+                return type_name.substr(pos, rpos - pos);
             }
-        };
-
-        template<>
-        std::string renderer::render<renderer::INTERFACE_POINTER_POINTER>(print_type option, bool from_host,
-                                                                          const Library& lib, const std::string& name,
-                                                                          bool is_in, bool is_out, bool is_const,
-                                                                          const std::string& object_type,
-                                                                          uint64_t& count) const
-        {
-            switch (option)
-            {
-            case PROXY_MARSHALL_IN:
-                return fmt::format("  ,(\"_{}\", {}_)", count, name);
-            case PROXY_MARSHALL_OUT:
-                return fmt::format("  ,(\"_{}\", {}_)", count, name);
-            case STUB_DEMARSHALL_DECLARATION:
-                return "";
-            case STUB_PARAM_CAST:
-                return "";
-            case PROXY_VALUE_RETURN:
-            case PROXY_OUT_DECLARATION:
-            case STUB_MARSHALL_OUT:
-                return fmt::format("  ,(\"_{}\", (uint64_t){}_)", count, name);
-            default:
-                return "";
-            }
+            return type_name;
         }
 
         bool is_in_call(print_type option, bool from_host, const Library& lib, const std::string& name,
@@ -365,10 +336,12 @@ namespace enclave_marshaller
             std::string referenceModifiers;
             stripReferenceModifiers(type_name, referenceModifiers);
 
+            std::string encapsulated_type = get_encapsulated_shared_ptr_type(type_name);
+
             bool is_interface = false;
             for (auto it = lib.m_classes.begin(); it != lib.m_classes.end(); it++)
             {
-                if ((*it)->name == type_name && (*it)->type == ObjectTypeInterface)
+                if ((*it)->name == encapsulated_type && (*it)->type == ObjectTypeInterface)
                 {
                     is_interface = true;
                     break;
@@ -433,36 +406,13 @@ namespace enclave_marshaller
             {
                 if (referenceModifiers.empty())
                 {
-                    std::cerr << "passing interfaces by value is not possible\n";
-                    throw "passing interfaces by value is not possible\n";
+                    output = renderer().render<renderer::INTERFACE>(option, from_host, lib, name, in, out, is_const,
+                                                                    type_name, count);
                 }
                 if (referenceModifiers == "&")
                 {
-                    if (from_host == false)
-                    {
-                        std::cerr << "passing data by reference from a non host zone is not allowed\n";
-                        throw "passing data by reference from a non host zone is not allowed\n";
-                    }
-                    else
-                    {
-                        output = renderer().render<renderer::INTERFACE_REFERENCE>(option, from_host, lib, name, in, out,
-                                                                                  is_const, type_name, count);
-                    }
-                }
-                else if (referenceModifiers == "*")
-                {
-                    output = renderer().render<renderer::INTERFACE_POINTER>(option, from_host, lib, name, in, out,
-                                                                            is_const, type_name, count);
-                }
-                else if (referenceModifiers == "*&")
-                {
-                    output = renderer().render<renderer::INTERFACE_POINTER_REFERENCE>(option, from_host, lib, name, in,
-                                                                                      out, is_const, type_name, count);
-                }
-                else if (referenceModifiers == "**")
-                {
-                    output = renderer().render<renderer::INTERFACE_POINTER_POINTER>(option, from_host, lib, name, in,
-                                                                                    out, is_const, type_name, count);
+                    output = renderer().render<renderer::INTERFACE_REFERENCE>(option, from_host, lib, name, in, out,
+                                                                              is_const, type_name, count);
                 }
                 else
                 {
@@ -497,10 +447,12 @@ namespace enclave_marshaller
             std::string referenceModifiers;
             stripReferenceModifiers(type_name, referenceModifiers);
 
+            std::string encapsulated_type = get_encapsulated_shared_ptr_type(type_name);
+
             bool is_interface = false;
             for (auto it = lib.m_classes.begin(); it != lib.m_classes.end(); it++)
             {
-                if ((*it)->name == type_name && (*it)->type == ObjectTypeInterface)
+                if ((*it)->name == encapsulated_type && (*it)->type == ObjectTypeInterface)
                 {
                     is_interface = true;
                     break;
@@ -560,38 +512,10 @@ namespace enclave_marshaller
             }
             else
             {
-                if (referenceModifiers.empty())
-                {
-                    std::cerr << "passing interfaces by value is not possible\n";
-                    throw "passing interfaces by value is not possible\n";
-                }
                 if (referenceModifiers == "&")
                 {
-                    if (from_host == false)
-                    {
-                        std::cerr << "passing data by reference from a non host zone is not allowed\n";
-                        throw "passing data by reference from a non host zone is not allowed\n";
-                    }
-                    else
-                    {
-                        output = renderer().render<renderer::INTERFACE_REFERENCE>(option, from_host, lib, name, in, out,
-                                                                                  is_const, type_name, count);
-                    }
-                }
-                else if (referenceModifiers == "*")
-                {
-                    output = renderer().render<renderer::INTERFACE_POINTER>(option, from_host, lib, name, in, out,
-                                                                            is_const, type_name, count);
-                }
-                else if (referenceModifiers == "*&")
-                {
-                    output = renderer().render<renderer::INTERFACE_POINTER_REFERENCE>(option, from_host, lib, name, in,
-                                                                                      out, is_const, type_name, count);
-                }
-                else if (referenceModifiers == "**")
-                {
-                    output = renderer().render<renderer::INTERFACE_POINTER_POINTER>(option, from_host, lib, name, in,
-                                                                                    out, is_const, type_name, count);
+                    output = renderer().render<renderer::INTERFACE_REFERENCE>(option, from_host, lib, name, in, out,
+                                                                              is_const, type_name, count);
                 }
                 else
                 {
@@ -618,13 +542,14 @@ namespace enclave_marshaller
             proxy("{{");
             proxy("public:");
             proxy("");
-            proxy("{}_proxy(std::shared_ptr<object_proxy> object_proxy) : ", interface_name);
+            proxy("{}_proxy(rpc_cpp::shared_ptr<object_proxy> object_proxy) : ", interface_name);
             proxy("  i_proxy<{}>(object_proxy)", interface_name);
             proxy("  {{}}", interface_name);
             proxy("virtual ~{}_proxy(){{}}", interface_name);
             proxy("");
 
-            stub("class {0}_stub : public i_interface_marshaller, public std::enable_shared_from_this<{0}_stub>", interface_name);
+            stub("class {0}_stub : public i_interface_marshaller, public std::enable_shared_from_this<{0}_stub>",
+                 interface_name);
             stub("{{");
             stub("std::shared_ptr<{}> target_;", interface_name);
             stub("public:");
@@ -686,7 +611,7 @@ namespace enclave_marshaller
                     header.raw(") = 0;\n");
                     proxy.raw(") override\n");
                     proxy("{{");
-                    proxy("if(!object_proxy_)");
+                    proxy("if(!get_object_proxy())");
                     proxy("{{");
                     proxy("return -1;");
                     proxy("}}");
@@ -754,7 +679,8 @@ namespace enclave_marshaller
                     // \"\\n\";");
 
                     proxy("char out_buf[10000];");
-                    proxy("error_code ret = object_proxy_->send({}::id, {}, in_.size, in_.data.get(), 10000, out_buf);",
+                    proxy("error_code ret = get_object_proxy()->send({}::id, {}, in_.size, in_.data.get(), 10000, "
+                          "out_buf);",
                           interface_name, function_count);
                     proxy("if(ret)");
                     proxy("{{");
@@ -805,7 +731,22 @@ namespace enclave_marshaller
                             proxy(output);
                         }
                     }
+                    {
+                        stub("//STUB_ADD_REF_OUT");
 
+                        uint64_t count = 1;
+                        for (auto& parameter : function.parameters)
+                        {
+                            count++;
+                            std::string output;
+
+                            if (!is_out_call(STUB_ADD_REF_OUT, from_host, lib, parameter.name, parameter.type,
+                                             parameter.m_attributes, count, output))
+                                continue;
+
+                            stub(output);
+                        }
+                    }
                     {
                         uint64_t count = 1;
                         proxy("//PROXY_MARSHALL_OUT");
@@ -894,7 +835,7 @@ namespace enclave_marshaller
             stub("if(tmp != nullptr)");
             stub("{{");
             stub("std::shared_ptr<{}> tmp_ptr(original->get_target(), tmp);", interface_name);
-            stub("new_stub = std::shared_ptr<i_interface_marshaller>(new {0}_stub(tmp_ptr));",interface_name);
+            stub("new_stub = std::shared_ptr<i_interface_marshaller>(new {0}_stub(tmp_ptr));", interface_name);
             stub("return 0;");
             stub("}}");
             stub("return -1;");
@@ -905,7 +846,8 @@ namespace enclave_marshaller
         void write_stub_cast_factory(bool from_host, const Library& lib, const ClassObject& m_ob, writer& stub, int id)
         {
             auto interface_name = std::string(m_ob.type == ObjectLibrary ? "i_" : "") + m_ob.name;
-            stub("error_code {}_stub::cast(uint64_t interface_id, std::shared_ptr<i_interface_marshaller>& new_stub)", interface_name);
+            stub("error_code {}_stub::cast(uint64_t interface_id, std::shared_ptr<i_interface_marshaller>& new_stub)",
+                 interface_name);
             stub("{{");
             stub("error_code ret = stub_factory(interface_id, shared_from_this(), new_stub);");
             stub("return ret;");
@@ -1017,13 +959,13 @@ namespace enclave_marshaller
                         write_stub_cast_factory(from_host, lib, *obj, stub, id++);
                 }
                 write_stub_cast_factory(from_host, lib, m_ob, stub, 0);
-            }            
+            }
 
             proxy("#ifndef _IN_ENCLAVE");
             proxy("//the class that encapsulates an environment or zone");
             proxy("//only host code can use this class directly other enclaves *may* have access to the i_zone derived "
                   "interface");
-            proxy("using {0}_zone = zone<i_{0}, i_{0}_proxy>;", m_ob.name);
+            proxy("using {0}_proxy = zone_proxy<i_{0}, i_{0}_proxy>;", m_ob.name);
             proxy("#endif");
         };
 
@@ -1071,24 +1013,26 @@ namespace enclave_marshaller
 
             header("#pragma once");
             header("");
-            header("#include <marshaller/marshaller.h>");
             header("#include <memory>");
             header("#include <vector>");
             header("#include <map>");
             header("#include <string>");
+
+            header("#include <marshaller/marshaller.h>");
             header("");
 
             proxy("#include <yas/mem_streams.hpp>");
             proxy("#include <yas/binary_iarchive.hpp>");
             proxy("#include <yas/binary_oarchive.hpp>");
             proxy("#include <yas/std_types.hpp>");
+            proxy("#include <marshaller/proxy.h>");
             proxy("#include \"{}\"", header_filename);
             proxy("");
 
             stub("#include <yas/mem_streams.hpp>");
             stub("#include <yas/binary_iarchive.hpp>");
             stub("#include <yas/binary_oarchive.hpp>");
-            proxy("#include <yas/std_types.hpp>");
+            stub("#include <marshaller/stub.h>");
             stub("#include \"{}\"", header_filename);
             stub("");
 

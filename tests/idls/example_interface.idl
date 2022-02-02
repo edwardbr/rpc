@@ -50,8 +50,8 @@ library example
 
 
 //        error_code give_interface(                                     [in]                    i_foo                       &   val);   //reference never be null
-/*        error_code give_interface([in]i_foo* val);//can be null
-        error_code recieve_interface([out]shared_ptr<i_foo>& val);//can be null*/
+/*        error_code give_interface([in]i_foo* val);//can be null*/
+        error_code recieve_interface([out]rpc_cpp::shared_ptr<i_foo>& val);//can be null
 
     };
 
@@ -59,6 +59,7 @@ library example
     {
         error_code do_something_else(int val);
     };
+    
     error_code add(int a, int b, [out, by_value] int& c);
     //error_code create_foo(shared_ptr<i_foo>& target);
 };

@@ -2,7 +2,8 @@ cmake_minimum_required(VERSION 3.0.0)
 
 add_library(marshaller_enclave 
     include/marshaller/marshaller.h
-    src/marshaller.cpp
+    src/proxy.cpp
+    src/stub.cpp
     src/remote_pointer.cpp)
 
 target_compile_definitions(marshaller_enclave 
@@ -25,7 +26,8 @@ set_property(TARGET marshaller_enclave PROPERTY COMPILE_PDB_NAME marshaller_encl
 ################################################################################
 add_library(marshaller_host
     include/marshaller/marshaller.h
-    src/marshaller.cpp
+    src/proxy.cpp
+    src/stub.cpp
     src/remote_pointer.cpp
     )
 

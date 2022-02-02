@@ -1,4 +1,4 @@
-#include "marshaller/marshaller.h"
+#include "marshaller/proxy.h"
 
 #ifndef _IN_ENCLAVE
 #include <sgx_urts.h>
@@ -31,17 +31,20 @@ void object_proxy::register_interface(uint64_t interface_id, rpc_cpp::weak_ptr<i
     proxy_map[interface_id] = value;
 }
 
+
 #ifndef _IN_ENCLAVE
-zone_base::zone_base(std::string filename)
+enclave_zone_proxy::enclave_zone_proxy(std::string filename)
     : filename_(filename)
 {
 }
-zone_base::~zone_base()
+
+enclave_zone_proxy::~enclave_zone_proxy()
 {
     enclave_marshal_test_destroy(eid_);
     sgx_destroy_enclave(eid_);
 }
-error_code zone_base::load(zone_config& config)
+
+error_code enclave_zone_proxy::load(zone_config& config)
 {
     sgx_launch_token_t token = {0};
     int updated = 0;
@@ -53,7 +56,7 @@ error_code zone_base::load(zone_config& config)
     return err_code;
 }
 
-error_code zone_base::send(uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_,
+error_code enclave_zone_proxy::send(uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_,
                            const char* in_buf_, size_t out_size_, char* out_buf_)
 {
     error_code err_code = 0;
@@ -63,7 +66,8 @@ error_code zone_base::send(uint64_t object_id, uint64_t interface_id, uint64_t m
         err_code = -1;
     return err_code;
 }
-error_code zone_base::try_cast(uint64_t zone_id_, uint64_t object_id, uint64_t interface_id)
+
+error_code enclave_zone_proxy::try_cast(uint64_t zone_id_, uint64_t object_id, uint64_t interface_id)
 {
     error_code err_code = 0;
     sgx_status_t status = ::try_cast(eid_, &err_code, zone_id_, object_id, interface_id);

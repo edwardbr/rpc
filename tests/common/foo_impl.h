@@ -152,5 +152,10 @@ namespace marshalled_tests
             log(std::string("got ") + val1.map_val.begin()->first);
             return 0;
         }
+
+        error_code recieve_interface(rpc_cpp::shared_ptr<i_foo>& val)
+        {
+            return 0;
+        }
     };
 }
