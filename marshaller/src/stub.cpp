@@ -66,14 +66,14 @@ uint64_t object_stub::release(std::function<void()> on_delete)
 }
 
 ////////////////////////////////////////////////////////////////////////////
-// zone_stub
+// rpc_service
 
-zone_stub::~zone_stub()
+rpc_service::~rpc_service()
 {
     shutdown();
 }
 
-void zone_stub::shutdown()
+void rpc_service::shutdown()
 {
     // clean up the zone root pointer
     release(zone_id, root_stub->get_target_stub().lock()->get_id());
@@ -83,7 +83,7 @@ void zone_stub::shutdown()
     assert(check_is_empty());
 }
 
-bool zone_stub::check_is_empty()
+bool rpc_service::check_is_empty()
 {
     if (root_stub)
         return false; // already initialised
@@ -94,7 +94,7 @@ bool zone_stub::check_is_empty()
     return true;
 }
 
-uint64_t zone_stub::get_root_object_id()
+uint64_t rpc_service::get_root_object_id()
 {
     if (!root_stub)
         return 0;
@@ -105,7 +105,7 @@ uint64_t zone_stub::get_root_object_id()
     return stub->get_id();
 }
 
-error_code zone_stub::send(uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_,
+error_code rpc_service::send(uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_,
                            const char* in_buf_, size_t out_size_, char* out_buf_)
 {
     error_code ret = -1;
@@ -121,7 +121,7 @@ error_code zone_stub::send(uint64_t object_id, uint64_t interface_id, uint64_t m
 }
 
 uint64_t
-zone_stub::add_lookup_stub(void* pointer,
+rpc_service::add_lookup_stub(void* pointer,
                            std::function<rpc_cpp::shared_ptr<i_interface_stub>(rpc_cpp::shared_ptr<object_stub>)> fn)
 {
     std::lock_guard g(insert_control);
@@ -140,7 +140,7 @@ zone_stub::add_lookup_stub(void* pointer,
     return item->second.lock()->get_id();
 }
 
-error_code zone_stub::add_object(void* pointer, rpc_cpp::shared_ptr<object_stub> stub)
+error_code rpc_service::add_object(void* pointer, rpc_cpp::shared_ptr<object_stub> stub)
 {
     std::lock_guard g(insert_control);
     assert(wrapped_object_to_stub.find(pointer) == wrapped_object_to_stub.end());
@@ -151,7 +151,7 @@ error_code zone_stub::add_object(void* pointer, rpc_cpp::shared_ptr<object_stub>
     return 0;
 }
 
-rpc_cpp::weak_ptr<object_stub> zone_stub::get_object(uint64_t object_id)
+rpc_cpp::weak_ptr<object_stub> rpc_service::get_object(uint64_t object_id)
 {
     std::lock_guard l(insert_control);
     auto item = stubs.find(object_id);
@@ -162,7 +162,7 @@ rpc_cpp::weak_ptr<object_stub> zone_stub::get_object(uint64_t object_id)
 
     return item->second;
 }
-error_code zone_stub::try_cast(uint64_t zone_id, uint64_t object_id, uint64_t interface_id)
+error_code rpc_service::try_cast(uint64_t zone_id, uint64_t object_id, uint64_t interface_id)
 {
     error_code ret = -1;
     rpc_cpp::weak_ptr<object_stub> weak_stub = get_object(object_id);
@@ -172,7 +172,7 @@ error_code zone_stub::try_cast(uint64_t zone_id, uint64_t object_id, uint64_t in
     return stub->try_cast(interface_id);
 }
 
-uint64_t zone_stub::add_ref(uint64_t zone_id, uint64_t object_id)
+uint64_t rpc_service::add_ref(uint64_t zone_id, uint64_t object_id)
 {
     error_code ret = -1;
     rpc_cpp::weak_ptr<object_stub> weak_stub = get_object(object_id);
@@ -182,7 +182,7 @@ uint64_t zone_stub::add_ref(uint64_t zone_id, uint64_t object_id)
     return stub->add_ref();
 }
 
-uint64_t zone_stub::release(uint64_t zone_id, uint64_t object_id)
+uint64_t rpc_service::release(uint64_t zone_id, uint64_t object_id)
 {
     rpc_cpp::weak_ptr<object_stub> weak_stub = get_object(object_id);
     auto stub = weak_stub.lock();

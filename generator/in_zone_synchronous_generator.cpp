@@ -998,7 +998,7 @@ namespace enclave_marshaller
                     if (obj->type == ObjectTypeInterface)
                     {
 
-                        stub("template<> uint64_t zone_stub::encapsulate_outbound_interfaces(rpc_cpp::shared_ptr<{}{}> "
+                        stub("template<> uint64_t rpc_service::encapsulate_outbound_interfaces(rpc_cpp::shared_ptr<{}{}> "
                              "iface);",
                              ns, obj->name);
                     }
@@ -1019,7 +1019,7 @@ namespace enclave_marshaller
             proxy("}}");
             proxy("");
 
-            stub("template<> uint64_t zone_stub::encapsulate_outbound_interfaces(rpc_cpp::shared_ptr<{}{}> "
+            stub("template<> uint64_t rpc_service::encapsulate_outbound_interfaces(rpc_cpp::shared_ptr<{}{}> "
                     "iface)",
                     ns, interface_name);
             stub("{{");

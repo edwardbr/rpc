@@ -15,7 +15,7 @@ class i_marshaller;
 
 class object_proxy;
 
-class zone_base_proxy;
+class rpc_proxy;
 
 // the used for marshalling data between zones
 class i_marshaller

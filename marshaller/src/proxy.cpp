@@ -38,7 +38,7 @@ void object_proxy::register_interface(uint64_t interface_id, rpc_cpp::weak_ptr<i
 }
 
 
-error_code zone_base_proxy::set_root_object(uint64_t object_id)
+error_code rpc_proxy::set_root_object(uint64_t object_id)
 {
     if(root_object_proxy_)
         return -1;
@@ -48,18 +48,18 @@ error_code zone_base_proxy::set_root_object(uint64_t object_id)
 
 
 #ifndef _IN_ENCLAVE
-enclave_zone_proxy::enclave_zone_proxy(std::string filename)
+enclave_rpc_proxy::enclave_rpc_proxy(std::string filename)
     : filename_(filename)
 {
 }
 
-enclave_zone_proxy::~enclave_zone_proxy()
+enclave_rpc_proxy::~enclave_rpc_proxy()
 {
     enclave_marshal_test_destroy(eid_);
     sgx_destroy_enclave(eid_);
 }
 
-error_code enclave_zone_proxy::load(zone_config& config)
+error_code enclave_rpc_proxy::load(zone_config& config)
 {
     sgx_launch_token_t token = {0};
     int updated = 0;
@@ -75,7 +75,7 @@ error_code enclave_zone_proxy::load(zone_config& config)
     return err_code;
 }
 
-error_code enclave_zone_proxy::send(uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_,
+error_code enclave_rpc_proxy::send(uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_,
                            const char* in_buf_, size_t out_size_, char* out_buf_)
 {
     error_code err_code = 0;
@@ -86,7 +86,7 @@ error_code enclave_zone_proxy::send(uint64_t object_id, uint64_t interface_id, u
     return err_code;
 }
 
-error_code enclave_zone_proxy::try_cast(uint64_t zone_id, uint64_t object_id, uint64_t interface_id)
+error_code enclave_rpc_proxy::try_cast(uint64_t zone_id, uint64_t object_id, uint64_t interface_id)
 {
     error_code err_code = 0;
     sgx_status_t status = ::try_cast(eid_, &err_code, zone_id, object_id, interface_id);
@@ -96,7 +96,7 @@ error_code enclave_zone_proxy::try_cast(uint64_t zone_id, uint64_t object_id, ui
 }
 
 
-uint64_t enclave_zone_proxy::add_ref(uint64_t zone_id, uint64_t object_id)
+uint64_t enclave_rpc_proxy::add_ref(uint64_t zone_id, uint64_t object_id)
 {
     uint64_t ret = 0;
     sgx_status_t status = ::add_ref(eid_, &ret, zone_id, object_id);
@@ -105,7 +105,7 @@ uint64_t enclave_zone_proxy::add_ref(uint64_t zone_id, uint64_t object_id)
     return ret;
 }
 
-uint64_t enclave_zone_proxy::release(uint64_t zone_id, uint64_t object_id) 
+uint64_t enclave_rpc_proxy::release(uint64_t zone_id, uint64_t object_id) 
 {
     uint64_t ret = 0;
     sgx_status_t status = ::release(eid_, &ret, zone_id, object_id);
@@ -115,3 +115,9 @@ uint64_t enclave_zone_proxy::release(uint64_t zone_id, uint64_t object_id)
 }
 
 #endif
+
+void local_rpc_proxy::initialise(rpc_cpp::shared_ptr<i_marshaller> the_service, uint64_t object_id)
+{
+    the_service_ = the_service;
+    set_root_object(object_id);
+}

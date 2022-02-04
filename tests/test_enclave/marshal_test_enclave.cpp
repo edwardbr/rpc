@@ -14,7 +14,7 @@
 
 using namespace marshalled_tests;
 
-zone_stub rpc_server;
+rpc_service rpc_server;
 
 int enclave_marshal_test_init(zone_config* config, uint64_t* root_object)
 {

@@ -9,8 +9,8 @@
 #include <marshaller/marshaller.h>
 
 class i_interface_stub;
-class zone_stub;
 class object_stub;
+class rpc_service;
 
 class object_stub
 {
@@ -20,10 +20,10 @@ class object_stub
     std::mutex insert_control;
     rpc_cpp::shared_ptr<object_stub> p_this;
     std::atomic<uint64_t> reference_count = 0;
-    zone_stub& zone_;
+    rpc_service& zone_;
 
 public:
-    object_stub(uint64_t id, zone_stub& zone)
+    object_stub(uint64_t id, rpc_service& zone)
         : id_(id)
         , zone_(zone)
     {
@@ -35,7 +35,7 @@ public:
     //this is called once the lifetime management needs to be activated
     void on_added_to_zone(rpc_cpp::shared_ptr<object_stub> stub){p_this = stub;}
 
-    zone_stub& get_zone() { return zone_; }
+    rpc_service& get_zone() { return zone_; }
 
     error_code call(uint64_t interface_id, uint64_t method_id, size_t in_size_, const char* in_buf_, size_t out_size_,
                     char* out_buf_);
@@ -59,7 +59,7 @@ public:
 };
 
 // responsible for all object lifetimes created within the zone
-class zone_stub : public i_marshaller
+class rpc_service : public i_marshaller
 {
     uint64_t zone_id = 0;
     std::atomic<uint64_t> object_id_generator;
@@ -74,7 +74,7 @@ class zone_stub : public i_marshaller
     rpc_cpp::shared_ptr<i_interface_stub> root_stub;
 
 public:
-    virtual ~zone_stub();
+    virtual ~rpc_service();
     template<class T, class Stub> error_code initialise(rpc_cpp::shared_ptr<T> root_ob)
     {
         assert(check_is_empty());

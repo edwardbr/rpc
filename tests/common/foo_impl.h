@@ -155,6 +155,7 @@ namespace marshalled_tests
 
         error_code recieve_interface(rpc_cpp::shared_ptr<i_foo>& val)
         {
+            val = rpc_cpp::shared_ptr<i_foo>(new foo);
             return 0;
         }
     };
