@@ -360,4 +360,12 @@ namespace rpc_cpp
         ob->query_interface<T1>(ret);
         return ret;
     }
+
+    template <class T, class... Args>
+    [[nodiscard]] shared_ptr<T> make_shared(Args&&... args) 
+    { 
+        // make a shared_ptr to non-array object
+        shared_ptr<T> ret(std::make_shared<T>(std::forward<Args>(args)...));
+        return ret;
+    }
 }

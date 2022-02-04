@@ -158,4 +158,20 @@ namespace marshalled_tests
             return 0;
         }
     };
+    class example : public i_example
+    {
+    public:
+        error_code create_foo(rpc_cpp::shared_ptr<i_foo>& target) override
+        {
+            target = rpc_cpp::shared_ptr<i_foo>(new foo);
+            return 0;
+        }
+
+        
+        error_code add(int a, int b, int& c) override
+        {
+            c = a+b;
+            return 0;
+        }
+    };
 }

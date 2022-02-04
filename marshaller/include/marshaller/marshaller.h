@@ -24,18 +24,10 @@ public:
     virtual error_code send(uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_,
                             const char* in_buf_, size_t out_size_, char* out_buf_)
         = 0;
-    virtual error_code try_cast(uint64_t zone_id_, uint64_t object_id, uint64_t interface_id) = 0;
+    virtual error_code try_cast(uint64_t zone_id, uint64_t object_id, uint64_t interface_id) = 0;
+    virtual uint64_t add_ref(uint64_t zone_id, uint64_t object_id) = 0;
+    virtual uint64_t release(uint64_t zone_id, uint64_t object_id) = 0;
 };
-
-class i_interface_marshaller
-{
-public:
-    virtual uint64_t get_interface_id() = 0;
-    virtual error_code call(uint64_t method_id, size_t in_size_, const char* in_buf_, size_t out_size_, char* out_buf_)
-        = 0;
-    virtual error_code cast(uint64_t interface_id, std::shared_ptr<i_interface_marshaller>& new_stub) = 0;
-};
-
 
 // a handler for new threads, this function needs to be thread safe!
 class i_thread_target

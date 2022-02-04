@@ -61,5 +61,5 @@ library example
     };
     
     error_code add(int a, int b, [out, by_value] int& c);
-    //error_code create_foo(shared_ptr<i_foo>& target);
+    error_code create_foo([out]rpc_cpp::shared_ptr<i_foo>& target);
 };

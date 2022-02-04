@@ -1,11 +1,17 @@
 #include "marshaller/proxy.h"
 
+#include <limits>
 #ifndef _IN_ENCLAVE
 #include <sgx_urts.h>
 #include <sgx_capable.h>
 
 #include "untrusted/enclave_marshal_test_u.h"
 #endif
+
+object_proxy::~object_proxy()
+{
+    marshaller_->release(zone_id_, object_id_);
+}
 
 error_code object_proxy::send(uint64_t interface_id, uint64_t method_id, size_t in_size_, const char* in_buf_,
                               size_t out_size_, char* out_buf_)
@@ -32,6 +38,15 @@ void object_proxy::register_interface(uint64_t interface_id, rpc_cpp::weak_ptr<i
 }
 
 
+error_code zone_base_proxy::set_root_object(uint64_t object_id)
+{
+    if(root_object_proxy_)
+        return -1;
+    root_object_proxy_ = std::make_shared<object_proxy>(object_id, zone_id_ , shared_from_this());
+    return 0;
+}
+
+
 #ifndef _IN_ENCLAVE
 enclave_zone_proxy::enclave_zone_proxy(std::string filename)
     : filename_(filename)
@@ -52,7 +67,11 @@ error_code enclave_zone_proxy::load(zone_config& config)
     if (status)
         return -1;
     error_code err_code = 0;
-    enclave_marshal_test_init(eid_, &err_code, &config);
+    uint64_t object_id = 0;
+    status = enclave_marshal_test_init(eid_, &err_code, &config, &object_id);
+    if (status)
+        return -1;
+    set_root_object(object_id);
     return err_code;
 }
 
@@ -67,13 +86,32 @@ error_code enclave_zone_proxy::send(uint64_t object_id, uint64_t interface_id, u
     return err_code;
 }
 
-error_code enclave_zone_proxy::try_cast(uint64_t zone_id_, uint64_t object_id, uint64_t interface_id)
+error_code enclave_zone_proxy::try_cast(uint64_t zone_id, uint64_t object_id, uint64_t interface_id)
 {
     error_code err_code = 0;
-    sgx_status_t status = ::try_cast(eid_, &err_code, zone_id_, object_id, interface_id);
+    sgx_status_t status = ::try_cast(eid_, &err_code, zone_id, object_id, interface_id);
     if (status)
         err_code = -1;
     return err_code;
+}
+
+
+uint64_t enclave_zone_proxy::add_ref(uint64_t zone_id, uint64_t object_id)
+{
+    uint64_t ret = 0;
+    sgx_status_t status = ::add_ref(eid_, &ret, zone_id, object_id);
+    if (status)
+        return std::numeric_limits<uint64_t>::max();
+    return ret;
+}
+
+uint64_t enclave_zone_proxy::release(uint64_t zone_id, uint64_t object_id) 
+{
+    uint64_t ret = 0;
+    sgx_status_t status = ::release(eid_, &ret, zone_id, object_id);
+    if (status)
+        return std::numeric_limits<uint64_t>::max();
+    return ret;
 }
 
 #endif
