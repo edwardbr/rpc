@@ -8,44 +8,43 @@
 #include <marshaller/marshaller.h>
 
 // non virtual class to allow for type erasure
-class i_proxy_impl
+class proxy_base
 {
     rpc_cpp::shared_ptr<object_proxy> object_proxy_;
 
 protected:
-    i_proxy_impl(rpc_cpp::shared_ptr<object_proxy> object_proxy)
+    proxy_base(rpc_cpp::shared_ptr<object_proxy> object_proxy)
         : object_proxy_(object_proxy)
     {
     }
-    virtual ~i_proxy_impl() = default;
+    virtual ~proxy_base() = default;
     rpc_cpp::shared_ptr<object_proxy> get_object_proxy() { return object_proxy_; }
 
     template<class T1, class T2>
     friend rpc_cpp::shared_ptr<T1> rpc_cpp::dynamic_pointer_cast(const shared_ptr<T2>&) noexcept;
 };
 
-template<class T> class i_proxy : public i_proxy_impl, public T
+template<class T> class proxy_impl : public proxy_base, public T
 {
 public:
-    i_proxy(rpc_cpp::shared_ptr<object_proxy> object_proxy)
-        : i_proxy_impl(object_proxy)
+    proxy_impl(rpc_cpp::shared_ptr<object_proxy> object_proxy)
+        : proxy_base(object_proxy)
     {
     }
-    virtual ~i_proxy() = default;
+    virtual ~proxy_impl() = default;
 };
 
-class object_proxy : public rpc_cpp::enable_shared_from_this<object_proxy>
+class object_proxy
 {
     uint64_t object_id_;
     uint64_t zone_id_;
     rpc_cpp::shared_ptr<rpc_proxy> marshaller_;
-    std::unordered_map<uint64_t, rpc_cpp::weak_ptr<i_proxy_impl>> proxy_map;
+    std::unordered_map<uint64_t, rpc_cpp::weak_ptr<proxy_base>> proxy_map;
     std::mutex insert_control;
+    mutable rpc_cpp::weak_ptr<object_proxy> weak_this_;
 
     // note the interface pointer may change if there is already an interface inserted successfully
-    void register_interface(uint64_t interface_id, rpc_cpp::weak_ptr<i_proxy_impl>& value);
-
-public:
+    void register_interface(uint64_t interface_id, rpc_cpp::weak_ptr<proxy_base>& value);
     object_proxy(uint64_t object_id, uint64_t zone_id, rpc_cpp::shared_ptr<rpc_proxy> marshaller)
         : object_id_(object_id)
         , zone_id_(zone_id)
@@ -53,7 +52,18 @@ public:
     {
     }
 
+public:
+
+    static rpc_cpp::shared_ptr<object_proxy> create(uint64_t object_id, uint64_t zone_id, rpc_cpp::shared_ptr<rpc_proxy> marshaller)
+    {
+        rpc_cpp::shared_ptr<object_proxy> ret(new object_proxy(object_id, zone_id, marshaller));
+        ret->weak_this_ = ret;
+        return ret;
+    }
+
     virtual ~object_proxy();
+    
+    rpc_cpp::shared_ptr<object_proxy> shared_from_this(){return rpc_cpp::shared_ptr<object_proxy>(weak_this_);}
 
     rpc_cpp::shared_ptr<rpc_proxy> get_zone_base() { return marshaller_; }
 
@@ -64,13 +74,13 @@ public:
 
     template<class T> error_code query_interface(rpc_cpp::shared_ptr<T>& iface, bool do_remote_check = true)
     {
-        auto create = [&](std::unordered_map<uint64_t, rpc_cpp::weak_ptr<i_proxy_impl>>::iterator item) -> error_code {
-            rpc_cpp::shared_ptr<i_proxy_impl> proxy = item->second.lock();
+        auto create = [&](std::unordered_map<uint64_t, rpc_cpp::weak_ptr<proxy_base>>::iterator item) -> error_code {
+            rpc_cpp::shared_ptr<proxy_base> proxy = item->second.lock();
             if (!proxy)
             {
                 // weak pointer needs refreshing
                 create_interface_proxy<T>(iface);
-                item->second = rpc_cpp::reinterpret_pointer_cast<i_proxy_impl>(iface);
+                item->second = rpc_cpp::reinterpret_pointer_cast<proxy_base>(iface);
                 return 0;
             }
             iface = rpc_cpp::reinterpret_pointer_cast<T>(proxy);
@@ -87,7 +97,7 @@ public:
             if (!do_remote_check)
             {
                 create_interface_proxy<T>(iface);
-                proxy_map[T::id] = rpc_cpp::reinterpret_pointer_cast<i_proxy_impl>(iface);
+                proxy_map[T::id] = rpc_cpp::reinterpret_pointer_cast<proxy_base>(iface);
                 return 0;
             }
         }
@@ -113,7 +123,7 @@ public:
             }
 
             create_interface_proxy<T>(iface);
-            proxy_map[T::id] = rpc_cpp::reinterpret_pointer_cast<i_proxy_impl>(iface);
+            proxy_map[T::id] = rpc_cpp::reinterpret_pointer_cast<proxy_base>(iface);
             return 0;
         }
     }
@@ -121,14 +131,19 @@ public:
 
 // the class that encapsulates an environment or zone
 // only host code can use this class directly other enclaves *may* have access to the i_zone derived interface
-class rpc_proxy : public i_marshaller, public rpc_cpp::enable_shared_from_this<rpc_proxy>
+class rpc_proxy : public i_marshaller
 {
     std::unordered_map<uint64_t, rpc_cpp::weak_ptr<object_proxy>> proxies;
     std::mutex insert_control;
-    std::shared_ptr<object_proxy> root_object_proxy_;
+    rpc_cpp::shared_ptr<object_proxy> root_object_proxy_;
     uint64_t zone_id_ = 0;
 
+protected:
+    rpc_proxy() = default;
+    mutable rpc_cpp::weak_ptr<rpc_proxy> weak_this_;
 public:
+
+    rpc_cpp::shared_ptr<rpc_proxy> shared_from_this(){return rpc_cpp::shared_ptr<rpc_proxy>(weak_this_);}
     error_code set_root_object(uint64_t object_id);
 
     template<class T> error_code create_proxy(uint64_t object_id, rpc_cpp::shared_ptr<T>& val)
@@ -141,7 +156,7 @@ public:
                 op = item->second.lock();
             else
             {
-                op = rpc_cpp::shared_ptr<object_proxy>(new object_proxy(object_id, 0, shared_from_this()));
+                op = object_proxy::create(object_id, 0, shared_from_this());
                 proxies[object_id] = op;
             }
         }
@@ -151,7 +166,7 @@ public:
     {
         auto tmp = root_object_proxy_;
         if (!tmp)
-            return nullptr;
+            return rpc_cpp::shared_ptr<T>();
         rpc_cpp::shared_ptr<T> out;
         tmp->query_interface(out);
         return out;
@@ -162,11 +177,20 @@ struct zone_config;
 
 class enclave_rpc_proxy : public rpc_proxy
 {
+    enclave_rpc_proxy(std::string filename);
+
+public:
+    static rpc_cpp::shared_ptr<enclave_rpc_proxy> create(std::string filename)
+    {
+        auto ret = rpc_cpp::shared_ptr<enclave_rpc_proxy>(new enclave_rpc_proxy(filename));
+        ret->weak_this_ = rpc_cpp::static_pointer_cast<rpc_proxy>(ret);
+        return ret;
+    }
     uint64_t eid_ = 0;
     std::string filename_;
 
 public:
-    enclave_rpc_proxy(std::string filename);
+
     ~enclave_rpc_proxy();
     error_code load(zone_config& config);
 
@@ -180,10 +204,18 @@ public:
 class local_rpc_proxy : public rpc_proxy
 {
     rpc_cpp::shared_ptr<i_marshaller> the_service_;
+    local_rpc_proxy(rpc_cpp::shared_ptr<i_marshaller> the_service) : the_service_(the_service)
+    {}
 
 public:
-    void initialise(rpc_cpp::shared_ptr<i_marshaller> the_service, uint64_t object_id);
-
+    static rpc_cpp::shared_ptr<local_rpc_proxy> create(rpc_cpp::shared_ptr<i_marshaller> the_service, uint64_t object_id)
+    {
+        auto ret = rpc_cpp::shared_ptr<local_rpc_proxy>(new local_rpc_proxy(the_service));
+        ret->weak_this_ = rpc_cpp::static_pointer_cast<rpc_proxy>(ret);
+        ret->set_root_object(object_id);
+        return ret;
+    }
+    
     error_code send(uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_, const char* in_buf_,
                     size_t out_size_, char* out_buf_) override
     {

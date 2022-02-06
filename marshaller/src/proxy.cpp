@@ -19,7 +19,7 @@ error_code object_proxy::send(uint64_t interface_id, uint64_t method_id, size_t 
     return marshaller_->send(object_id_, interface_id, method_id, in_size_, in_buf_, out_size_, out_buf_);
 }
 
-void object_proxy::register_interface(uint64_t interface_id, rpc_cpp::weak_ptr<i_proxy_impl>& value)
+void object_proxy::register_interface(uint64_t interface_id, rpc_cpp::weak_ptr<proxy_base>& value)
 {
     std::lock_guard guard(insert_control);
     auto item = proxy_map.find(interface_id);
@@ -42,7 +42,7 @@ error_code rpc_proxy::set_root_object(uint64_t object_id)
 {
     if(root_object_proxy_)
         return -1;
-    root_object_proxy_ = std::make_shared<object_proxy>(object_id, zone_id_ , shared_from_this());
+    root_object_proxy_ = object_proxy::create(object_id, zone_id_ , shared_from_this());
     return 0;
 }
 
@@ -115,9 +115,3 @@ uint64_t enclave_rpc_proxy::release(uint64_t zone_id, uint64_t object_id)
 }
 
 #endif
-
-void local_rpc_proxy::initialise(rpc_cpp::shared_ptr<i_marshaller> the_service, uint64_t object_id)
-{
-    the_service_ = the_service;
-    set_root_object(object_id);
-}

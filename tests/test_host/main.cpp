@@ -67,9 +67,8 @@ int main()
             break;
         }
 
-        auto service_proxy = rpc_cpp::make_shared<local_rpc_proxy>();
-        service_proxy->initialise(rpc_server, rpc_server->get_root_object_id());
-
+        auto service_proxy = local_rpc_proxy::create(rpc_cpp::static_pointer_cast<i_marshaller>(rpc_server), rpc_server->get_root_object_id());
+        
         auto example_ptr = service_proxy->get_remote_interface<i_example>();
 
         rpc_cpp::shared_ptr<marshalled_tests::i_foo> i_foo_ptr;
@@ -88,7 +87,7 @@ int main()
     // an enclave marshalling of an object
     {
         error_code err_code = 0;
-        auto ex = rpc_cpp::make_shared<enclave_rpc_proxy>(
+        auto ex = enclave_rpc_proxy::create(
             "C:/Dev/experiments/enclave_marshaller/build/output/debug/marshal_test_enclave.signed.dll");
 
         err_code = ex->load(zone_config());

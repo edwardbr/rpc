@@ -16,7 +16,7 @@ class object_stub
 {
     uint64_t id_ = 0;
     // stubs have stong pointers
-    std::unordered_map<uint64_t, rpc_cpp::shared_ptr<i_interface_stub>> proxy_map;
+    std::unordered_map<uint64_t, rpc_cpp::shared_ptr<i_interface_stub>> stub_map;
     std::mutex insert_control;
     rpc_cpp::shared_ptr<object_stub> p_this;
     std::atomic<uint64_t> reference_count = 0;
@@ -81,7 +81,7 @@ public:
 
         auto id = get_new_object_id();
         auto os = rpc_cpp::shared_ptr<object_stub>(new object_stub(id, *this));
-        root_stub = rpc_cpp::shared_ptr<i_interface_stub>(new Stub(root_ob, os));
+        root_stub = rpc_cpp::static_pointer_cast<i_interface_stub>(Stub::create(root_ob, os));
         os->add_interface(root_stub);
         add_object(root_ob.get(), os);
         return 0;
