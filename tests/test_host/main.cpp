@@ -70,16 +70,17 @@ int main()
         auto service_proxy = local_rpc_proxy::create(rpc_cpp::static_pointer_cast<i_marshaller>(rpc_server), rpc_server->get_root_object_id());
         
         auto example_ptr = service_proxy->get_remote_interface<i_example>();
-
-        rpc_cpp::shared_ptr<marshalled_tests::i_foo> i_foo_ptr;
-        err_code = example_ptr->create_foo(i_foo_ptr);
-        if (err_code)
         {
-            std::cout << "create_foo failed\n";
-            break;
+            rpc_cpp::shared_ptr<marshalled_tests::i_foo> i_foo_ptr;
+            err_code = example_ptr->create_foo(i_foo_ptr);
+            if (err_code)
+            {
+                std::cout << "create_foo failed\n";
+                break;
+            }
+            standard_tests(*i_foo_ptr, true);
         }
-        standard_tests(*i_foo_ptr, true);
-
+        
         remote_tests(example_ptr);
 
     } while (0);

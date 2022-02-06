@@ -433,7 +433,7 @@ namespace rpc_cpp
 
         bool __release_shared() noexcept
         {
-            if (__shared_owners_++ == -1)
+            if (--__shared_owners_ == -1)
             {
                 __on_zero_shared();
                 return true;
