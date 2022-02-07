@@ -9,7 +9,7 @@
 
 namespace rpc
 {
-    class rpc_proxy;
+    class service_proxy;
     class object_proxy;
 
     // non virtual class to allow for type erasure
@@ -43,14 +43,14 @@ namespace rpc
     {
         uint64_t object_id_;
         uint64_t zone_id_;
-        rpc::shared_ptr<rpc_proxy> marshaller_;
+        rpc::shared_ptr<service_proxy> marshaller_;
         std::unordered_map<uint64_t, rpc::weak_ptr<proxy_base>> proxy_map;
         std::mutex insert_control;
         mutable rpc::weak_ptr<object_proxy> weak_this_;
 
         // note the interface pointer may change if there is already an interface inserted successfully
         void register_interface(uint64_t interface_id, rpc::weak_ptr<proxy_base>& value);
-        object_proxy(uint64_t object_id, uint64_t zone_id, rpc::shared_ptr<rpc_proxy> marshaller)
+        object_proxy(uint64_t object_id, uint64_t zone_id, rpc::shared_ptr<service_proxy> marshaller)
             : object_id_(object_id)
             , zone_id_(zone_id)
             , marshaller_(marshaller)
@@ -59,7 +59,7 @@ namespace rpc
 
     public:
         static rpc::shared_ptr<object_proxy> create(uint64_t object_id, uint64_t zone_id,
-                                                    rpc::shared_ptr<rpc_proxy> marshaller)
+                                                    rpc::shared_ptr<service_proxy> marshaller)
         {
             rpc::shared_ptr<object_proxy> ret(new object_proxy(object_id, zone_id, marshaller));
             ret->weak_this_ = ret;
@@ -70,7 +70,7 @@ namespace rpc
 
         rpc::shared_ptr<object_proxy> shared_from_this() { return rpc::shared_ptr<object_proxy>(weak_this_); }
 
-        rpc::shared_ptr<rpc_proxy> get_zone_base() { return marshaller_; }
+        rpc::shared_ptr<service_proxy> get_zone_base() { return marshaller_; }
 
         error_code send(uint64_t interface_id, uint64_t method_id, size_t in_size_, const char* in_buf_,
                         size_t out_size_, char* out_buf_);
@@ -137,7 +137,7 @@ namespace rpc
     // the class that encapsulates an environment or zone
     // only host code can use this class directly other enclaves *may* have access to the i_marshaller derived interface
 
-    class rpc_proxy : public i_marshaller
+    class service_proxy : public i_marshaller
     {
         std::unordered_map<uint64_t, rpc::weak_ptr<object_proxy>> proxies;
         std::mutex insert_control;
@@ -145,11 +145,11 @@ namespace rpc
         uint64_t zone_id_ = 0;
 
     protected:
-        rpc_proxy() = default;
-        mutable rpc::weak_ptr<rpc_proxy> weak_this_;
+        service_proxy() = default;
+        mutable rpc::weak_ptr<service_proxy> weak_this_;
 
     public:
-        rpc::shared_ptr<rpc_proxy> shared_from_this() { return rpc::shared_ptr<rpc_proxy>(weak_this_); }
+        rpc::shared_ptr<service_proxy> shared_from_this() { return rpc::shared_ptr<service_proxy>(weak_this_); }
         error_code set_root_object(uint64_t object_id);
 
         template<class T> error_code create_proxy(uint64_t object_id, rpc::shared_ptr<T>& val)
@@ -179,64 +179,6 @@ namespace rpc
         }
     };
 
-    class enclave_rpc_proxy : public rpc_proxy
-    {
-        enclave_rpc_proxy(std::string filename);
 
-    public:
-        static rpc::shared_ptr<enclave_rpc_proxy> create(std::string filename)
-        {
-            auto ret = rpc::shared_ptr<enclave_rpc_proxy>(new enclave_rpc_proxy(filename));
-            ret->weak_this_ = rpc::static_pointer_cast<rpc_proxy>(ret);
-            return ret;
-        }
-        uint64_t eid_ = 0;
-        std::string filename_;
 
-    public:
-        ~enclave_rpc_proxy();
-        error_code initialise();
-
-        error_code send(uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_,
-                        const char* in_buf_, size_t out_size_, char* out_buf_) override;
-        error_code try_cast(uint64_t zone_id, uint64_t object_id, uint64_t interface_id) override;
-        uint64_t add_ref(uint64_t zone_id, uint64_t object_id) override;
-        uint64_t release(uint64_t zone_id, uint64_t object_id) override;
-    };
-
-    class local_rpc_proxy : public rpc_proxy
-    {
-        rpc::shared_ptr<i_marshaller> the_service_;
-        local_rpc_proxy(rpc::shared_ptr<i_marshaller> the_service)
-            : the_service_(the_service)
-        {
-        }
-
-    public:
-        static rpc::shared_ptr<local_rpc_proxy> create(rpc::shared_ptr<i_marshaller> the_service, uint64_t object_id)
-        {
-            auto ret = rpc::shared_ptr<local_rpc_proxy>(new local_rpc_proxy(the_service));
-            ret->weak_this_ = rpc::static_pointer_cast<rpc_proxy>(ret);
-            ret->set_root_object(object_id);
-            return ret;
-        }
-
-        error_code send(uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_,
-                        const char* in_buf_, size_t out_size_, char* out_buf_) override
-        {
-            return the_service_->send(object_id, interface_id, method_id, in_size_, in_buf_, out_size_, out_buf_);
-        }
-        error_code try_cast(uint64_t zone_id, uint64_t object_id, uint64_t interface_id) override
-        {
-            return the_service_->try_cast(zone_id, object_id, interface_id);
-        }
-        uint64_t add_ref(uint64_t zone_id, uint64_t object_id) override
-        {
-            return the_service_->add_ref(zone_id, object_id);
-        }
-        uint64_t release(uint64_t zone_id, uint64_t object_id) override
-        {
-            return the_service_->release(zone_id, object_id);
-        }
-    };
 }

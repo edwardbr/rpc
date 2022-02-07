@@ -586,7 +586,7 @@ namespace enclave_marshaller
             stub("");
             stub("uint64_t get_interface_id() override {{ return {}::id; }};", interface_name);
             stub("rpc::shared_ptr<{}> get_target() {{ return target_; }};", interface_name);
-            stub("rpc::weak_ptr<rpc::object_stub> get_target_stub() override {{ return target_stub_;}}");
+            stub("rpc::weak_ptr<rpc::object_stub> get_object_stub() override {{ return target_stub_;}}");
             stub("void* get_pointer() override {{ return target_.get();}}");
             stub("error_code call(uint64_t method_id, size_t in_size_, const char* in_buf_, size_t out_size_, char* "
                  "out_buf_) override");
@@ -864,7 +864,7 @@ namespace enclave_marshaller
             stub("{{");
             stub("rpc::shared_ptr<{}> tmp_ptr(original->get_target(), tmp);", interface_name);
             stub("new_stub = rpc::static_pointer_cast<rpc::i_interface_stub>({0}_stub::create(tmp_ptr, "
-                 "original->get_target_stub()));",
+                 "original->get_object_stub()));",
                  interface_name);
             stub("return 0;");
             stub("}}");
@@ -1043,7 +1043,7 @@ namespace enclave_marshaller
             stub("auto* marshaller = dynamic_cast<rpc::i_interface_stub*>(iface.get());");
             stub("if(marshaller)");
             stub("{{");
-            stub("return marshaller->get_target_stub().lock()->get_id();");
+            stub("return marshaller->get_object_stub().lock()->get_id();");
             stub("}}");
             stub("return add_lookup_stub(iface.get(), [&](rpc::shared_ptr<rpc::object_stub> stub) -> "
                  "rpc::shared_ptr<rpc::i_interface_stub>{{");

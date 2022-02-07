@@ -16,6 +16,9 @@
 #include <example_proxy.cpp>
 #include <example_stub.cpp>
 
+#include <marshaller/enclave_service_proxy.h>
+#include <marshaller/local_service_proxy.h>
+
 using namespace marshalled_tests;
 
 int main()
@@ -39,8 +42,9 @@ int main()
             break;
         }
 
-        auto marshalled_rpc_service = rpc::static_pointer_cast<rpc::i_marshaller>(service);
-        auto service_proxy = rpc::local_rpc_proxy::create(marshalled_rpc_service, service->get_root_object_id());
+        auto marshaller = rpc::static_pointer_cast<rpc::i_marshaller>(service);
+        
+        auto service_proxy = rpc::local_service_proxy::create(marshaller, service->get_root_object_id());
         
         auto example_ptr = service_proxy->get_interface<i_example>();
         
@@ -60,7 +64,7 @@ int main()
     // an enclave marshalling of an object
     {
         error_code err_code = 0;
-        auto ex = rpc::enclave_rpc_proxy::create(
+        auto ex = rpc::enclave_service_proxy::create(
             "C:/Dev/experiments/enclave_marshaller/build/output/debug/marshal_test_enclave.signed.dll");
 
         err_code = ex->initialise();

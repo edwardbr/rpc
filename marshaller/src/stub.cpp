@@ -71,7 +71,7 @@ namespace rpc
     void service::shutdown()
     {
         // clean up the zone root pointer
-        release(zone_id, root_stub->get_target_stub().lock()->get_id());
+        release(zone_id, root_stub->get_object_stub().lock()->get_id());
         root_stub.reset();
 
         // to do: assert that there are no more object_stubs in memory
@@ -93,7 +93,7 @@ namespace rpc
     {
         if (!root_stub)
             return 0;
-        auto stub = root_stub->get_target_stub().lock();
+        auto stub = root_stub->get_object_stub().lock();
         if (!stub)
             return 0;
 

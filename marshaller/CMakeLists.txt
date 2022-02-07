@@ -4,7 +4,8 @@ add_library(marshaller_enclave
     include/marshaller/marshaller.h
     src/proxy.cpp
     src/stub.cpp
-    src/remote_pointer.cpp)
+    src/remote_pointer.cpp
+    src/enclave_service_proxy.cpp)
 
 target_compile_definitions(marshaller_enclave 
     PRIVATE 
@@ -29,6 +30,7 @@ add_library(marshaller_host
     src/proxy.cpp
     src/stub.cpp
     src/remote_pointer.cpp
+    src/enclave_service_proxy.cpp
     )
 
 

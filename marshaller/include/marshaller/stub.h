@@ -58,7 +58,7 @@ namespace rpc
                                 char* out_buf_)
             = 0;
         virtual error_code cast(uint64_t interface_id, rpc::shared_ptr<i_interface_stub>& new_stub) = 0;
-        virtual rpc::weak_ptr<object_stub> get_target_stub() = 0;
+        virtual rpc::weak_ptr<object_stub> get_object_stub() = 0;
         virtual void* get_pointer() = 0;
     };
 
