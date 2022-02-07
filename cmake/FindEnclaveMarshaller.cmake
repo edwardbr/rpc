@@ -34,11 +34,13 @@ function(EnclaveMarshaller
 
   set(PATHS_PARAMS)
   foreach (path ${params_include_paths})
-    set(PATHS_PARAMS "${PATHS_PARAMS} --path ${path}")
+    set(PATHS_PARAMS "${PATHS_PARAMS} --path \"${path}\"")
   endforeach()
-  separate_arguments(PATHS_PARAMS WINDOWS_COMMAND "${PATHS_PARAMS}")
 
-#[[  message("  add_custom_command(
+  message("PATHS_PARAMS ${PATHS_PARAMS}")
+
+
+  message("add_custom_command(
     OUTPUT ${output_path}/${header}  ${output_path}/${proxy} ${output_path}/${stub}
     COMMAND ${ENCLAVE_MARSHALLER} 
       --idl ${idl} 
@@ -48,7 +50,7 @@ function(EnclaveMarshaller
       --stub ${stub}
       ${PATHS_PARAMS}
       --namespace ${namespace}
-    DEPENDS ${dependencies} ${idl})")]]
+    DEPENDS ${dependencies} ${idl})")
 
   add_custom_command(
     OUTPUT ${output_path}/${header}  ${output_path}/${proxy} ${output_path}/${stub}

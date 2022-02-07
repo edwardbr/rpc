@@ -9,8 +9,8 @@ EnclaveMarshaller(
     example_stub.cpp
     marshalled_tests
     include_paths
+        ${CMAKE_CURRENT_SOURCE_DIR}/.
         ${CMAKE_SOURCE_DIR}/submodules/idlparser/defines
-        .
     dependencies
         in_zone_synchronous_generator
     )
