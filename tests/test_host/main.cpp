@@ -29,22 +29,22 @@ int main()
     // an inprocess marshalling of an object
     do
     {
-        auto rpc_server = rpc_cpp::make_shared<rpc_service>();
+        auto service = rpc::make_shared<rpc::service>();
 
-        rpc_cpp::shared_ptr<i_example> ex(new example);
-        error_code err_code = rpc_server->initialise<i_example, i_example_stub>(ex);
+        rpc::shared_ptr<i_example> ex(new example);
+        error_code err_code = service->initialise<i_example, i_example_stub>(ex);
         if (err_code)
         {
             std::cout << "init failed\n";
             break;
         }
 
-        auto marshalled_rpc_service = rpc_cpp::static_pointer_cast<i_marshaller>(rpc_server);
-        auto service_proxy = local_rpc_proxy::create(marshalled_rpc_service, rpc_server->get_root_object_id());
+        auto marshalled_rpc_service = rpc::static_pointer_cast<rpc::i_marshaller>(service);
+        auto service_proxy = rpc::local_rpc_proxy::create(marshalled_rpc_service, service->get_root_object_id());
         
         auto example_ptr = service_proxy->get_interface<i_example>();
         
-        rpc_cpp::shared_ptr<marshalled_tests::i_foo> i_foo_ptr;
+        rpc::shared_ptr<marshalled_tests::i_foo> i_foo_ptr;
         err_code = example_ptr->create_foo(i_foo_ptr);
         if (err_code)
         {
@@ -60,15 +60,15 @@ int main()
     // an enclave marshalling of an object
     {
         error_code err_code = 0;
-        auto ex = enclave_rpc_proxy::create(
+        auto ex = rpc::enclave_rpc_proxy::create(
             "C:/Dev/experiments/enclave_marshaller/build/output/debug/marshal_test_enclave.signed.dll");
 
-        err_code = ex->initialise(zone_config());
+        err_code = ex->initialise();
         ASSERT(!err_code);
 
         auto example_ptr = ex->get_interface<i_example>();
 
-        rpc_cpp::shared_ptr<marshalled_tests::i_foo> i_foo_ptr;
+        rpc::shared_ptr<marshalled_tests::i_foo> i_foo_ptr;
         err_code = example_ptr->create_foo(i_foo_ptr);
         if (err_code)
         {

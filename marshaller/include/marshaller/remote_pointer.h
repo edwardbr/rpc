@@ -22,14 +22,14 @@
 #include <functional>
 #include <functional>
 
-namespace rpc_cpp
+namespace rpc
 {
     struct __shared_ptr_dummy_rebind_allocator_type;
 }
 
 namespace std
 {
-    template<> class allocator<rpc_cpp::__shared_ptr_dummy_rebind_allocator_type>
+    template<> class allocator<rpc::__shared_ptr_dummy_rebind_allocator_type>
     {
     public:
         template<class _Other> struct rebind
@@ -41,7 +41,7 @@ namespace std
     template<class T> using remove_extent_t = typename remove_extent<T>::type;
 }
 
-namespace rpc_cpp
+namespace rpc
 {
 
     template<class _Tp, bool> struct __dependent_type : public _Tp
@@ -1081,7 +1081,7 @@ element_type*>::value>> shared_ptr(unique_ptr<_Yp, _Dp>&& __r) : __ptr_(__r.get(
 
     template<class _Tp, class... _Args> shared_ptr<_Tp> make_shared(_Args&&... __args)
     {
-        return rpc_cpp::allocate_shared<_Tp>(std::allocator<_Tp>(), std::forward<_Args>(__args)...);
+        return rpc::allocate_shared<_Tp>(std::allocator<_Tp>(), std::forward<_Args>(__args)...);
     }
 
     template<class _Tp, class _Up>

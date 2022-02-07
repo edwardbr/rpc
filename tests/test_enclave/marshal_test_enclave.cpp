@@ -14,11 +14,11 @@
 
 using namespace marshalled_tests;
 
-rpc_service rpc_server;
+rpc::service rpc_server;
 
-int enclave_marshal_test_init(zone_config* config, uint64_t* root_object)
+int enclave_marshal_test_init(uint64_t* root_object)
 {
-    rpc_cpp::shared_ptr<i_example> ex(new example);
+    rpc::shared_ptr<i_example> ex(new example);
     error_code err_code = rpc_server.initialise<i_example, i_example_stub>(ex);
     if (err_code)
         return err_code;

@@ -298,7 +298,7 @@ namespace enclave_marshaller
 
         std::string get_encapsulated_shared_ptr_type(const std::string& type_name)
         {
-            const std::string template_pattern = "rpc_cpp::shared_ptr<";
+            const std::string template_pattern = "rpc::shared_ptr<";
             auto pos = type_name.find(template_pattern);
             if (pos != std::string::npos)
             {
@@ -538,55 +538,55 @@ namespace enclave_marshaller
             header("static constexpr uint64_t id = {};", id);
             header("virtual ~{}() = default;", interface_name);
 
-            proxy("class {0}_proxy : public proxy_impl<{0}>", interface_name);
+            proxy("class {0}_proxy : public rpc::proxy_impl<{0}>", interface_name);
             proxy("{{");
-            proxy("{}_proxy(rpc_cpp::shared_ptr<object_proxy> object_proxy) : ", interface_name);
-            proxy("  proxy_impl<{}>(object_proxy)", interface_name);
+            proxy("{}_proxy(rpc::shared_ptr<rpc::object_proxy> object_proxy) : ", interface_name);
+            proxy("  rpc::proxy_impl<{}>(object_proxy)", interface_name);
             proxy("  {{}}", interface_name);
-            proxy("mutable rpc_cpp::weak_ptr<{}_proxy> weak_this_;", interface_name);
+            proxy("mutable rpc::weak_ptr<{}_proxy> weak_this_;", interface_name);
             proxy("public:");
             proxy("");
             proxy("virtual ~{}_proxy(){{}}", interface_name);
-            proxy("static rpc_cpp::shared_ptr<{}> create(rpc_cpp::shared_ptr<object_proxy> object_proxy)",
+            proxy("static rpc::shared_ptr<{}> create(rpc::shared_ptr<rpc::object_proxy> object_proxy)",
                   interface_name);
             proxy("{{");
-            proxy("auto ret = rpc_cpp::shared_ptr<{0}_proxy>(new {0}_proxy(object_proxy));", interface_name);
+            proxy("auto ret = rpc::shared_ptr<{0}_proxy>(new {0}_proxy(object_proxy));", interface_name);
             proxy("ret->weak_this_ = ret;", interface_name);
-            proxy("return rpc_cpp::static_pointer_cast<{}>(ret);", interface_name);
+            proxy("return rpc::static_pointer_cast<{}>(ret);", interface_name);
             proxy("}}");
-            proxy("rpc_cpp::shared_ptr<{0}_proxy> shared_from_this(){{return "
-                  "rpc_cpp::shared_ptr<{0}_proxy>(weak_this_);}}",
+            proxy("rpc::shared_ptr<{0}_proxy> shared_from_this(){{return "
+                  "rpc::shared_ptr<{0}_proxy>(weak_this_);}}",
                   interface_name);
             proxy("");
 
-            stub("class {0}_stub : public i_interface_stub", interface_name);
+            stub("class {0}_stub : public rpc::i_interface_stub", interface_name);
             stub("{{");
-            stub("rpc_cpp::shared_ptr<{}> target_;", interface_name);
-            stub("rpc_cpp::weak_ptr<object_stub> target_stub_;", interface_name);
+            stub("rpc::shared_ptr<{}> target_;", interface_name);
+            stub("rpc::weak_ptr<rpc::object_stub> target_stub_;", interface_name);
             stub("");
-            stub("{0}_stub(rpc_cpp::shared_ptr<{0}>& target, rpc_cpp::weak_ptr<object_stub> target_stub) : ",
+            stub("{0}_stub(rpc::shared_ptr<{0}>& target, rpc::weak_ptr<rpc::object_stub> target_stub) : ",
                  interface_name);
             stub("  target_(target),", interface_name);
             stub("  target_stub_(target_stub)");
             stub("  {{}}");
-            stub("mutable rpc_cpp::weak_ptr<{}_stub> weak_this_;", interface_name);
+            stub("mutable rpc::weak_ptr<{}_stub> weak_this_;", interface_name);
             stub("");
             stub("public:");
-            stub("static rpc_cpp::shared_ptr<{0}_stub> create(rpc_cpp::shared_ptr<{0}>& target, "
-                 "rpc_cpp::weak_ptr<object_stub> target_stub)",
+            stub("static rpc::shared_ptr<{0}_stub> create(rpc::shared_ptr<{0}>& target, "
+                 "rpc::weak_ptr<rpc::object_stub> target_stub)",
                  interface_name);
             stub("{{");
-            stub("auto ret = rpc_cpp::shared_ptr<{0}_stub>(new {0}_stub(target, target_stub));", interface_name);
+            stub("auto ret = rpc::shared_ptr<{0}_stub>(new {0}_stub(target, target_stub));", interface_name);
             stub("ret->weak_this_ = ret;", interface_name);
             stub("return ret;", interface_name);
             stub("}}");
             stub(
-                "rpc_cpp::shared_ptr<{0}_stub> shared_from_this(){{return rpc_cpp::shared_ptr<{0}_stub>(weak_this_);}}",
+                "rpc::shared_ptr<{0}_stub> shared_from_this(){{return rpc::shared_ptr<{0}_stub>(weak_this_);}}",
                 interface_name);
             stub("");
             stub("uint64_t get_interface_id() override {{ return {}::id; }};", interface_name);
-            stub("rpc_cpp::shared_ptr<{}> get_target() {{ return target_; }};", interface_name);
-            stub("rpc_cpp::weak_ptr<object_stub> get_target_stub() override {{ return target_stub_;}}");
+            stub("rpc::shared_ptr<{}> get_target() {{ return target_; }};", interface_name);
+            stub("rpc::weak_ptr<rpc::object_stub> get_target_stub() override {{ return target_stub_;}}");
             stub("void* get_pointer() override {{ return target_.get();}}");
             stub("error_code call(uint64_t method_id, size_t in_size_, const char* in_buf_, size_t out_size_, char* "
                  "out_buf_) override");
@@ -849,7 +849,7 @@ namespace enclave_marshaller
 
             stub("return -1;");
             stub("}}");
-            stub("error_code cast(uint64_t interface_id, rpc_cpp::shared_ptr<i_interface_stub>& new_stub) override;");
+            stub("error_code cast(uint64_t interface_id, rpc::shared_ptr<rpc::i_interface_stub>& new_stub) override;");
             stub("}};");
             stub("");
         };
@@ -862,8 +862,8 @@ namespace enclave_marshaller
             stub("auto* tmp = dynamic_cast<{0}*>(original->get_target().get());", interface_name);
             stub("if(tmp != nullptr)");
             stub("{{");
-            stub("rpc_cpp::shared_ptr<{}> tmp_ptr(original->get_target(), tmp);", interface_name);
-            stub("new_stub = rpc_cpp::static_pointer_cast<i_interface_stub>({0}_stub::create(tmp_ptr, "
+            stub("rpc::shared_ptr<{}> tmp_ptr(original->get_target(), tmp);", interface_name);
+            stub("new_stub = rpc::static_pointer_cast<rpc::i_interface_stub>({0}_stub::create(tmp_ptr, "
                  "original->get_target_stub()));",
                  interface_name);
             stub("return 0;");
@@ -876,7 +876,7 @@ namespace enclave_marshaller
         void write_stub_cast_factory(bool from_host, const Library& lib, const ClassObject& m_ob, writer& stub, int id)
         {
             auto interface_name = std::string(m_ob.type == ObjectLibrary ? "i_" : "") + m_ob.name;
-            stub("error_code {}_stub::cast(uint64_t interface_id, rpc_cpp::shared_ptr<i_interface_stub>& new_stub)",
+            stub("error_code {}_stub::cast(uint64_t interface_id, rpc::shared_ptr<rpc::i_interface_stub>& new_stub)",
                  interface_name);
             stub("{{");
             stub("error_code ret = stub_factory(interface_id, shared_from_this(), new_stub);");
@@ -951,13 +951,13 @@ namespace enclave_marshaller
 
             {
                 stub("template<class T>");
-                stub("error_code stub_factory(uint64_t interface_id, rpc_cpp::shared_ptr<T> original, "
-                     "rpc_cpp::shared_ptr<i_interface_stub>& new_stub)");
+                stub("error_code stub_factory(uint64_t interface_id, rpc::shared_ptr<T> original, "
+                     "rpc::shared_ptr<rpc::i_interface_stub>& new_stub)");
                 stub("{{");
                 stub("error_code ret = -1;");
                 stub("if(interface_id == original->get_interface_id())");
                 stub("{{");
-                stub("new_stub = rpc_cpp::static_pointer_cast<i_interface_stub>(original);;");
+                stub("new_stub = rpc::static_pointer_cast<rpc::i_interface_stub>(original);;");
                 stub("return 0;");
                 stub("}}");
                 int id = 1;
@@ -990,13 +990,6 @@ namespace enclave_marshaller
                 }
                 write_stub_cast_factory(from_host, lib, m_ob, stub, 0);
             }
-
-            /*proxy("#ifndef _IN_ENCLAVE");
-            proxy("//the class that encapsulates an environment or zone");
-            proxy("//only host code can use this class directly other enclaves *may* have access to the i_zone derived "
-                  "interface");
-            proxy("using {0}_proxy = zone_proxy<i_{0}, i_{0}_proxy>;", m_ob.name);
-            proxy("#endif");*/
         };
 
         void write_encapsulate_outbound_interfaces(bool from_host, const Library& lib, const ClassObject& m_ob,
@@ -1022,7 +1015,7 @@ namespace enclave_marshaller
                     {
 
                         stub("template<> uint64_t "
-                             "rpc_service::encapsulate_outbound_interfaces(rpc_cpp::shared_ptr<{}{}> "
+                             "rpc::service::encapsulate_outbound_interfaces(rpc::shared_ptr<{}{}> "
                              "iface);",
                              ns, obj->name);
                     }
@@ -1034,7 +1027,7 @@ namespace enclave_marshaller
         {
             auto interface_name = std::string(obj->type == ObjectLibrary ? "i_" : "") + obj->name;
 
-            proxy("template<> void object_proxy::create_interface_proxy(rpc_cpp::shared_ptr<{}{}>& "
+            proxy("template<> void rpc::object_proxy::create_interface_proxy(rpc::shared_ptr<{}{}>& "
                   "inface)",
                   ns, interface_name);
             proxy("{{");
@@ -1042,19 +1035,19 @@ namespace enclave_marshaller
             proxy("}}");
             proxy("");
 
-            stub("template<> uint64_t rpc_service::encapsulate_outbound_interfaces(rpc_cpp::shared_ptr<{}{}> "
+            stub("template<> uint64_t rpc::service::encapsulate_outbound_interfaces(rpc::shared_ptr<{}{}> "
                  "iface)",
                  ns, interface_name);
             stub("{{");
 
-            stub("auto* marshaller = dynamic_cast<i_interface_stub*>(iface.get());");
+            stub("auto* marshaller = dynamic_cast<rpc::i_interface_stub*>(iface.get());");
             stub("if(marshaller)");
             stub("{{");
             stub("return marshaller->get_target_stub().lock()->get_id();");
             stub("}}");
-            stub("return add_lookup_stub(iface.get(), [&](rpc_cpp::shared_ptr<object_stub> stub) -> "
-                 "rpc_cpp::shared_ptr<i_interface_stub>{{");
-            stub("return rpc_cpp::static_pointer_cast<i_interface_stub>({}{}_stub::create(iface, stub));", ns,
+            stub("return add_lookup_stub(iface.get(), [&](rpc::shared_ptr<rpc::object_stub> stub) -> "
+                 "rpc::shared_ptr<rpc::i_interface_stub>{{");
+            stub("return rpc::static_pointer_cast<rpc::i_interface_stub>({}{}_stub::create(iface, stub));", ns,
                  interface_name);
             stub("}});");
             stub("}}");

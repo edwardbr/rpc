@@ -153,18 +153,18 @@ namespace marshalled_tests
             return 0;
         }
 
-        error_code recieve_interface(rpc_cpp::shared_ptr<i_foo>& val)
+        error_code recieve_interface(rpc::shared_ptr<i_foo>& val)
         {
-            val = rpc_cpp::shared_ptr<i_foo>(new foo);
+            val = rpc::shared_ptr<i_foo>(new foo);
             return 0;
         }
     };
     class example : public i_example
     {
     public:
-        error_code create_foo(rpc_cpp::shared_ptr<i_foo>& target) override
+        error_code create_foo(rpc::shared_ptr<i_foo>& target) override
         {
-            target = rpc_cpp::shared_ptr<i_foo>(new foo);
+            target = rpc::shared_ptr<i_foo>(new foo);
             return 0;
         }
 

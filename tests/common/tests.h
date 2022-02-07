@@ -153,23 +153,23 @@ namespace marshalled_tests
         }
     }
 
-    void remote_tests(rpc_cpp::shared_ptr<i_example> example_ptr)
+    void remote_tests(rpc::shared_ptr<i_example> example_ptr)
     {
         int val = 0;
         example_ptr->add(1, 2, val);
 
         // check the creation of an object that is passed back via interface
-        rpc_cpp::shared_ptr<marshalled_tests::i_foo> foo;
+        rpc::shared_ptr<marshalled_tests::i_foo> foo;
         example_ptr->create_foo(foo);
         foo->do_something_in_val(22);
 
         // test casting logic
-        auto i_bar_ptr = rpc_cpp::dynamic_pointer_cast<i_bar>(foo);
+        auto i_bar_ptr = rpc::dynamic_pointer_cast<i_bar>(foo);
         if (i_bar_ptr)
             i_bar_ptr->do_something_else(33);
 
         // test recursive interface passing
-        rpc_cpp::shared_ptr<i_foo> other_foo;
+        rpc::shared_ptr<i_foo> other_foo;
         error_code err_code = foo->recieve_interface(other_foo);
         if (err_code)
         {

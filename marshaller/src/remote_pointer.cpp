@@ -1,7 +1,7 @@
 
 #include <marshaller/remote_pointer.h>
 
-namespace rpc_cpp
+namespace rpc
 {
     bad_weak_ptr::~bad_weak_ptr() noexcept {}
 
