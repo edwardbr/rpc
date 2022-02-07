@@ -158,6 +158,10 @@ namespace marshalled_tests
             val = rpc::shared_ptr<i_foo>(new foo);
             return 0;
         }
+        error_code give_interface(rpc::shared_ptr<i_baz> val)
+        {
+            return 0;
+        }        
     };
     class example : public i_example
     {

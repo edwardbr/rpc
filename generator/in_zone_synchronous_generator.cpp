@@ -409,7 +409,7 @@ namespace enclave_marshaller
                     output = renderer().render<renderer::INTERFACE>(option, from_host, lib, name, in, out, is_const,
                                                                     type_name, count);
                 }
-                if (referenceModifiers == "&")
+                else if (referenceModifiers == "&")
                 {
                     output = renderer().render<renderer::INTERFACE_REFERENCE>(option, from_host, lib, name, in, out,
                                                                               is_const, type_name, count);
@@ -547,8 +547,7 @@ namespace enclave_marshaller
             proxy("public:");
             proxy("");
             proxy("virtual ~{}_proxy(){{}}", interface_name);
-            proxy("static rpc::shared_ptr<{}> create(rpc::shared_ptr<rpc::object_proxy> object_proxy)",
-                  interface_name);
+            proxy("static rpc::shared_ptr<{}> create(rpc::shared_ptr<rpc::object_proxy> object_proxy)", interface_name);
             proxy("{{");
             proxy("auto ret = rpc::shared_ptr<{0}_proxy>(new {0}_proxy(object_proxy));", interface_name);
             proxy("ret->weak_this_ = ret;", interface_name);
@@ -580,9 +579,8 @@ namespace enclave_marshaller
             stub("ret->weak_this_ = ret;", interface_name);
             stub("return ret;", interface_name);
             stub("}}");
-            stub(
-                "rpc::shared_ptr<{0}_stub> shared_from_this(){{return rpc::shared_ptr<{0}_stub>(weak_this_);}}",
-                interface_name);
+            stub("rpc::shared_ptr<{0}_stub> shared_from_this(){{return rpc::shared_ptr<{0}_stub>(weak_this_);}}",
+                 interface_name);
             stub("");
             stub("uint64_t get_interface_id() override {{ return {}::id; }};", interface_name);
             stub("rpc::shared_ptr<{}> get_target() {{ return target_; }};", interface_name);
@@ -884,6 +882,11 @@ namespace enclave_marshaller
             stub("}}");
         }
 
+        void write_interface_forward_declaration(const ClassObject& m_ob, writer& header)
+        {
+            header("class {};", m_ob.name);
+        }
+
         void write_struct(const ClassObject& m_ob, writer& header)
         {
             header("struct {}{}{}", m_ob.name, m_ob.parentName.empty() ? "" : ":", m_ob.parentName);
@@ -918,114 +921,37 @@ namespace enclave_marshaller
         };
 
         void write_library(bool from_host, const Library& lib, const ClassObject& m_ob, writer& header, writer& proxy,
-                           writer& stub)
-        {
-            for (auto& name : m_ob.m_ownedClasses)
-            {
-                const ClassObject* obj = nullptr;
-                if (!lib.FindClassObject(name, obj))
-                {
-                    continue;
-                }
-                if (obj->type == ObjectTypeInterface)
-                    write_interface_predeclaration(lib, *obj, header, proxy, stub);
-            }
+                           writer& stub) {
 
-            proxy("");
-
-            {
-                int id = 1;
-                for (auto& name : m_ob.m_ownedClasses)
-                {
-                    const ClassObject* obj = nullptr;
-                    if (!lib.FindClassObject(name, obj))
-                    {
-                        continue;
-                    }
-                    if (obj->type == ObjectTypeInterface)
-                        write_interface(from_host, lib, *obj, header, proxy, stub, id++);
-                }
-            }
-
-            write_interface(from_host, lib, m_ob, header, proxy, stub, 0);
-
-            {
-                stub("template<class T>");
-                stub("error_code stub_factory(uint64_t interface_id, rpc::shared_ptr<T> original, "
-                     "rpc::shared_ptr<rpc::i_interface_stub>& new_stub)");
-                stub("{{");
-                stub("error_code ret = -1;");
-                stub("if(interface_id == original->get_interface_id())");
-                stub("{{");
-                stub("new_stub = rpc::static_pointer_cast<rpc::i_interface_stub>(original);;");
-                stub("return 0;");
-                stub("}}");
-                int id = 1;
-                for (auto& name : m_ob.m_ownedClasses)
-                {
-                    const ClassObject* obj = nullptr;
-                    if (!lib.FindClassObject(name, obj))
-                    {
-                        continue;
-                    }
-                    if (obj->type == ObjectTypeInterface)
-                        write_stub_factory(from_host, lib, *obj, stub, id++);
-                }
-                write_stub_factory(from_host, lib, m_ob, stub, 0);
-                stub("return ret;");
-                stub("}}");
-            }
-
-            {
-                int id = 1;
-                for (auto& name : m_ob.m_ownedClasses)
-                {
-                    const ClassObject* obj = nullptr;
-                    if (!lib.FindClassObject(name, obj))
-                    {
-                        continue;
-                    }
-                    if (obj->type == ObjectTypeInterface)
-                        write_stub_cast_factory(from_host, lib, *obj, stub, id++);
-                }
-                write_stub_cast_factory(from_host, lib, m_ob, stub, 0);
-            }
         };
 
-        void write_encapsulate_outbound_interfaces(bool from_host, const Library& lib, const ClassObject& m_ob,
+        void write_encapsulate_outbound_interfaces(bool from_host, const Library& lib, const ClassObject& obj,
                                                    writer& header, writer& proxy, writer& stub,
                                                    const std::vector<std::string>& namespaces)
         {
+            auto interface_name = std::string(obj.type == ObjectLibrary ? "i_" : "") + obj.name;
             std::string ns;
 
             for (auto& name : namespaces)
             {
                 ns += name + "::";
             }
-            {
-                int id = 1;
-                for (auto& name : m_ob.m_ownedClasses)
-                {
-                    const ClassObject* obj = nullptr;
-                    if (!lib.FindClassObject(name, obj))
-                    {
-                        continue;
-                    }
-                    if (obj->type == ObjectTypeInterface)
-                    {
-
-                        stub("template<> uint64_t "
-                             "rpc::service::encapsulate_outbound_interfaces(rpc::shared_ptr<{}{}> "
-                             "iface);",
-                             ns, obj->name);
-                    }
-                }
-            }
+            int id = 1;
+            stub("template<> uint64_t "
+                 "rpc::service::encapsulate_outbound_interfaces(rpc::shared_ptr<{}{}> "
+                 "iface);",
+                 ns, interface_name);
         }
 
-        void write_library_proxy_factory(writer& proxy, writer& stub, const ClassObject* obj, std::string ns)
+        void write_library_proxy_factory(writer& proxy, writer& stub, const ClassObject* obj, const std::vector<std::string>& namespaces)
         {
             auto interface_name = std::string(obj->type == ObjectLibrary ? "i_" : "") + obj->name;
+            std::string ns;
+
+            for (auto& name : namespaces)
+            {
+                ns += name + "::";
+            }
 
             proxy("template<> void rpc::object_proxy::create_interface_proxy(rpc::shared_ptr<{}{}>& "
                   "inface)",
@@ -1051,34 +977,6 @@ namespace enclave_marshaller
                  interface_name);
             stub("}});");
             stub("}}");
-        }
-
-        void write_library_proxy_factories(bool from_host, const Library& lib, const ClassObject& m_ob, writer& header,
-                                           writer& proxy, writer& stub, const std::vector<std::string>& namespaces)
-        {
-            std::string ns;
-
-            for (auto& name : namespaces)
-            {
-                ns += name + "::";
-            }
-            {
-                int id = 1;
-                for (auto& name : m_ob.m_ownedClasses)
-                {
-                    const ClassObject* obj = nullptr;
-                    if (!lib.FindClassObject(name, obj))
-                    {
-                        continue;
-                    }
-                    if (obj->type == ObjectTypeInterface)
-                    {
-
-                        write_library_proxy_factory(proxy, stub, obj, ns);
-                    }
-                }
-            }
-            write_library_proxy_factory(proxy, stub, &m_ob, ns);
         }
 
         // entry point
@@ -1122,7 +1020,7 @@ namespace enclave_marshaller
                 {
                     continue;
                 }
-                if (obj->type == ObjectLibrary)
+                if (obj->type == ObjectLibrary || obj->type == ObjectTypeInterface)
                     write_encapsulate_outbound_interfaces(from_host, lib, *obj, header, proxy, stub, namespaces);
             }
 
@@ -1143,6 +1041,16 @@ namespace enclave_marshaller
                 {
                     continue;
                 }
+                if (obj->type == ObjectTypeInterface)
+                    write_interface_forward_declaration(*obj, header);
+            }
+            for (auto& name : lib.m_ownedClasses)
+            {
+                const ClassObject* obj = nullptr;
+                if (!lib.FindClassObject(name, obj))
+                {
+                    continue;
+                }
                 if (obj->type == ObjectStruct)
                     write_struct(*obj, header);
             }
@@ -1155,8 +1063,98 @@ namespace enclave_marshaller
                 {
                     continue;
                 }
+                if (obj->type == ObjectTypeInterface)
+                    write_interface_predeclaration(lib, *obj, header, proxy, stub);
+            }
+
+            proxy("");
+
+            {
+                int id = 1;
+                for (auto& name : lib.m_ownedClasses)
+                {
+                    const ClassObject* obj = nullptr;
+                    if (!lib.FindClassObject(name, obj))
+                    {
+                        continue;
+                    }
+                    if (obj->type == ObjectTypeInterface)
+                        write_interface(from_host, lib, *obj, header, proxy, stub, id++);
+                }
+            }
+
+            for (auto& name : lib.m_ownedClasses)
+            {
+                const ClassObject* obj = nullptr;
+                if (!lib.FindClassObject(name, obj))
+                {
+                    continue;
+                }
                 if (obj->type == ObjectLibrary)
-                    write_library(from_host, lib, *obj, header, proxy, stub);
+                    write_interface(from_host, lib, *obj, header, proxy, stub, 0);
+            }
+
+            {
+                stub("template<class T>");
+                stub("error_code stub_factory(uint64_t interface_id, rpc::shared_ptr<T> original, "
+                     "rpc::shared_ptr<rpc::i_interface_stub>& new_stub)");
+                stub("{{");
+                stub("error_code ret = -1;");
+                stub("if(interface_id == original->get_interface_id())");
+                stub("{{");
+                stub("new_stub = rpc::static_pointer_cast<rpc::i_interface_stub>(original);;");
+                stub("return 0;");
+                stub("}}");
+                int id = 1;
+                for (auto& name : lib.m_ownedClasses)
+                {
+                    const ClassObject* obj = nullptr;
+                    if (!lib.FindClassObject(name, obj))
+                    {
+                        continue;
+                    }
+                    if (obj->type == ObjectTypeInterface)
+                        write_stub_factory(from_host, lib, *obj, stub, id++);
+                }
+
+                for (auto& name : lib.m_ownedClasses)
+                {
+                    const ClassObject* obj = nullptr;
+                    if (!lib.FindClassObject(name, obj))
+                    {
+                        continue;
+                    }
+                    if (obj->type == ObjectLibrary)
+                        write_stub_factory(from_host, lib, *obj, stub, 0);
+                }
+
+                stub("return ret;");
+                stub("}}");
+            }
+
+            {
+                int id = 1;
+                for (auto& name : lib.m_ownedClasses)
+                {
+                    const ClassObject* obj = nullptr;
+                    if (!lib.FindClassObject(name, obj))
+                    {
+                        continue;
+                    }
+                    if (obj->type == ObjectTypeInterface)
+                        write_stub_cast_factory(from_host, lib, *obj, stub, id++);
+                }
+
+                for (auto& name : lib.m_ownedClasses)
+                {
+                    const ClassObject* obj = nullptr;
+                    if (!lib.FindClassObject(name, obj))
+                    {
+                        continue;
+                    }
+                    if (obj->type == ObjectLibrary)
+                        write_stub_cast_factory(from_host, lib, *obj, stub, 0);
+                }
             }
 
             for (auto& ns : namespaces)
@@ -1168,13 +1166,14 @@ namespace enclave_marshaller
 
             for (auto& name : lib.m_ownedClasses)
             {
+                std::string ns;
                 const ClassObject* obj = nullptr;
                 if (!lib.FindClassObject(name, obj))
                 {
                     continue;
                 }
-                if (obj->type == ObjectLibrary)
-                    write_library_proxy_factories(from_host, lib, *obj, header, proxy, stub, namespaces);
+                if (obj->type == ObjectLibrary || obj->type == ObjectTypeInterface)
+                    write_library_proxy_factory(proxy, stub, obj, namespaces);
             }
         }
     }

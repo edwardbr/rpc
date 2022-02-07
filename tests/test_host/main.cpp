@@ -21,6 +21,8 @@
 
 using namespace marshalled_tests;
 
+rpc::service host_rpc_server;
+
 int main()
 {
     // conventional c++ object on stack
@@ -43,11 +45,11 @@ int main()
         }
 
         auto marshaller = rpc::static_pointer_cast<rpc::i_marshaller>(service);
-        
+
         auto service_proxy = rpc::local_service_proxy::create(marshaller, service->get_root_object_id());
-        
+
         auto example_ptr = service_proxy->get_interface<i_example>();
-        
+
         rpc::shared_ptr<marshalled_tests::i_foo> i_foo_ptr;
         err_code = example_ptr->create_foo(i_foo_ptr);
         if (err_code)
@@ -56,7 +58,7 @@ int main()
             break;
         }
         standard_tests(*i_foo_ptr, true);
-        
+
         remote_tests(example_ptr);
 
     } while (0);
@@ -92,4 +94,18 @@ int main()
 extern "C"
 {
     void log_str(const char* str, size_t sz) { puts(str); }
+
+    int call_host(uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t sz_int, const char* data_in,
+                  size_t sz_out, char* data_out)
+    {
+        error_code ret = host_rpc_server.send(object_id, interface_id, method_id, sz_int, data_in, sz_out, data_out);
+        return ret;
+    }
+    int try_cast_host(uint64_t zone_id, uint64_t object_id, uint64_t interface_id)
+    {
+        error_code ret = host_rpc_server.try_cast(zone_id, object_id, interface_id);
+        return ret;
+    }
+    uint64_t add_ref_host(uint64_t zone_id, uint64_t object_id) { return host_rpc_server.add_ref(zone_id, object_id); }
+    uint64_t release_host(uint64_t zone_id, uint64_t object_id) { return host_rpc_server.release(zone_id, object_id); }
 }
