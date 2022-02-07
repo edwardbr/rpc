@@ -38,7 +38,7 @@ namespace marshalled_tests
             log(std::string("got ") + std::to_string(*val));
             return 0;
         }
-        int do_something_out_ref(int& val)
+        int do_something_out_val(int& val)
         {
             val = 33;
             return 0;

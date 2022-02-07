@@ -162,7 +162,7 @@ public:
         }
         return op->query_interface(val, false);
     }
-    template<class T> rpc_cpp::shared_ptr<T> get_remote_interface()
+    template<class T> rpc_cpp::shared_ptr<T> get_interface()
     {
         auto tmp = root_object_proxy_;
         if (!tmp)
@@ -192,7 +192,7 @@ public:
 public:
 
     ~enclave_rpc_proxy();
-    error_code load(zone_config& config);
+    error_code initialise(zone_config& config);
 
     error_code send(uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_, const char* in_buf_,
                     size_t out_size_, char* out_buf_) override;

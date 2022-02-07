@@ -4,7 +4,7 @@
 
 void error(int x)
 {
-    if (x) 
+    if (x)
         std::cerr << "bad test " << x << "\n";
 }
 
@@ -37,15 +37,15 @@ namespace marshalled_tests
         }
         {
             int val = 0;
-            ASSERT(foo.do_something_out_ref(val));
+            ASSERT(foo.do_something_out_val(val));
         }
-        if(!enclave)
+        if (!enclave)
         {
             int* val = nullptr;
             ASSERT(foo.do_something_out_ptr_ref(val));
             delete val;
         }
-        if(!enclave)
+        if (!enclave)
         {
             int* val = nullptr;
             ASSERT(foo.do_something_out_ptr_ptr(&val));
@@ -56,23 +56,23 @@ namespace marshalled_tests
             ASSERT(foo.do_something_in_out_ref(val));
         }
         {
-            something_complicated val{33,"22"};
+            something_complicated val {33, "22"};
             ASSERT(foo.give_something_complicated_val(val));
         }
         {
-            something_complicated val{33,"22"};
+            something_complicated val {33, "22"};
             ASSERT(foo.give_something_complicated_ref(val));
         }
         {
-            something_complicated val{33,"22"};
+            something_complicated val {33, "22"};
             ASSERT(foo.give_something_complicated_ref_val(val));
         }
         {
-            something_complicated val{33,"22"};
+            something_complicated val {33, "22"};
             ASSERT(foo.give_something_complicated_move_ref(std::move(val)));
         }
         {
-            something_complicated val{33,"22"};
+            something_complicated val {33, "22"};
             ASSERT(foo.give_something_complicated_ptr(&val));
         }
         {
@@ -80,7 +80,7 @@ namespace marshalled_tests
             ASSERT(foo.recieve_something_complicated_ref(val));
             std::cout << "got " << val.string_val << "\n";
         }
-        if(!enclave)
+        if (!enclave)
         {
             something_complicated* val = nullptr;
             ASSERT(foo.recieve_something_complicated_ptr(val));
@@ -95,38 +95,38 @@ namespace marshalled_tests
         }
         {
             something_more_complicated val;
-            val.map_val["22"]=something_complicated{33,"22"};
+            val.map_val["22"] = something_complicated {33, "22"};
             ASSERT(foo.give_something_more_complicated_val(val));
         }
-        if(!enclave)
+        if (!enclave)
         {
             something_more_complicated val;
-            val.map_val["22"]=something_complicated{33,"22"};
+            val.map_val["22"] = something_complicated {33, "22"};
             ASSERT(foo.give_something_more_complicated_ref(val));
         }
         {
             something_more_complicated val;
-            val.map_val["22"]=something_complicated{33,"22"};
+            val.map_val["22"] = something_complicated {33, "22"};
             ASSERT(foo.give_something_more_complicated_move_ref(std::move(val)));
         }
         {
             something_more_complicated val;
-            val.map_val["22"]=something_complicated{33,"22"};
+            val.map_val["22"] = something_complicated {33, "22"};
             ASSERT(foo.give_something_more_complicated_ref_val(val));
         }
-        if(!enclave)
+        if (!enclave)
         {
             something_more_complicated val;
-            val.map_val["22"]=something_complicated{33,"22"};
+            val.map_val["22"] = something_complicated {33, "22"};
             ASSERT(foo.give_something_more_complicated_ptr(&val));
         }
-        if(!enclave)
+        if (!enclave)
         {
             something_more_complicated val;
             ASSERT(foo.recieve_something_more_complicated_ref(val));
             std::cout << "got " << val.map_val.begin()->first << "\n";
         }
-        if(!enclave)
+        if (!enclave)
         {
             something_more_complicated* val = nullptr;
             ASSERT(foo.recieve_something_more_complicated_ptr(val));
@@ -135,7 +135,7 @@ namespace marshalled_tests
         }
         {
             something_more_complicated val;
-            val.map_val["22"]=something_complicated{33,"22"};
+            val.map_val["22"] = something_complicated {33, "22"};
             ASSERT(foo.recieve_something_more_complicated_in_out_ref(val));
             std::cout << "got " << val.map_val.begin()->first << "\n";
         }
@@ -147,9 +147,37 @@ namespace marshalled_tests
         {
             something_more_complicated val1;
             something_more_complicated val2;
-            val1.map_val["22"]=something_complicated{33,"22"};
-            val2.map_val["22"]=something_complicated{33,"22"};
+            val1.map_val["22"] = something_complicated {33, "22"};
+            val2.map_val["22"] = something_complicated {33, "22"};
             ASSERT(foo.do_multi_complicated_val(val1, val2));
+        }
+    }
+
+    void remote_tests(rpc_cpp::shared_ptr<i_example> example_ptr)
+    {
+        int val = 0;
+        example_ptr->add(1, 2, val);
+
+        // check the creation of an object that is passed back via interface
+        rpc_cpp::shared_ptr<marshalled_tests::i_foo> foo;
+        example_ptr->create_foo(foo);
+        foo->do_something_in_val(22);
+
+        // test casting logic
+        auto i_bar_ptr = rpc_cpp::dynamic_pointer_cast<i_bar>(foo);
+        if (i_bar_ptr)
+            i_bar_ptr->do_something_else(33);
+
+        // test recursive interface passing
+        rpc_cpp::shared_ptr<i_foo> other_foo;
+        error_code err_code = foo->recieve_interface(other_foo);
+        if (err_code)
+        {
+            std::cout << "create_foo failed\n";
+        }
+        else
+        {
+            other_foo->do_something_in_val(22);
         }
     }
 }
