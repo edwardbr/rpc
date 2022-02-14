@@ -4,14 +4,14 @@
 
 namespace rpc
 {
-    class enclave_service_proxy : public service_proxy
+    class host_service_proxy : public service_proxy
     {
-        enclave_service_proxy(const rpc::shared_ptr<service>& serv, uint64_t zone_id, std::string filename);
+        host_service_proxy(const rpc::shared_ptr<service>& serv, uint64_t zone_id);
 
     public:
-        static rpc::shared_ptr<enclave_service_proxy> create(const rpc::shared_ptr<service>& serv, uint64_t zone_id, std::string filename)
+        static rpc::shared_ptr<host_service_proxy> create(const rpc::shared_ptr<service>& serv, uint64_t zone_id)
         {
-            auto ret = rpc::shared_ptr<enclave_service_proxy>(new enclave_service_proxy(serv, zone_id, filename));
+            auto ret = rpc::shared_ptr<host_service_proxy>(new host_service_proxy(serv, zone_id));
             auto pthis = rpc::static_pointer_cast<service_proxy>(ret);
             ret->weak_this_ = pthis;
             serv->add_zone(zone_id, pthis);
@@ -21,7 +21,7 @@ namespace rpc
         std::string filename_;
 
     public:
-        virtual ~enclave_service_proxy();
+        virtual ~host_service_proxy();
         error_code initialise();
 
         error_code send(uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_,

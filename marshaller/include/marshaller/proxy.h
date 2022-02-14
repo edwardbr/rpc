@@ -6,6 +6,7 @@
 #include <mutex>
 
 #include <marshaller/marshaller.h>
+#include <marshaller/service.h>
 
 namespace rpc
 {
@@ -142,15 +143,20 @@ namespace rpc
         std::unordered_map<uint64_t, rpc::weak_ptr<object_proxy>> proxies;
         std::mutex insert_control;
         rpc::shared_ptr<object_proxy> root_object_proxy_;
+        rpc::shared_ptr<service> service_;
         uint64_t zone_id_ = 0;
 
     protected:
-        service_proxy() = default;
+        service_proxy(const rpc::shared_ptr<service>& service, uint64_t zone_id) : service_(service), zone_id_(zone_id){}
         mutable rpc::weak_ptr<service_proxy> weak_this_;
 
     public:
+        virtual ~service_proxy(){service_->remove_zone(zone_id_);}
         rpc::shared_ptr<service_proxy> shared_from_this() { return rpc::shared_ptr<service_proxy>(weak_this_); }
         error_code set_root_object(uint64_t object_id);
+
+        service& get_service(){return *service_;}
+        uint64_t get_zone_id(){return zone_id_;}
 
         template<class T> error_code create_proxy(uint64_t object_id, rpc::shared_ptr<T>& val)
         {

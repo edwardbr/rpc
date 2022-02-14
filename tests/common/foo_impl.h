@@ -12,7 +12,7 @@ namespace marshalled_tests
     class foo : public i_foo
     {
     public:
-        ~foo() { }
+        virtual ~foo() { }
         int do_something_in_val(int val)
         {
             log(std::string("got ") + std::to_string(val));
@@ -160,6 +160,7 @@ namespace marshalled_tests
         }
         error_code give_interface(rpc::shared_ptr<i_baz> val)
         {
+            val->callback(22);
             return 0;
         }        
     };

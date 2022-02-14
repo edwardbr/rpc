@@ -2,10 +2,13 @@ cmake_minimum_required(VERSION 3.0.0)
 
 add_library(marshaller_enclave 
     include/marshaller/marshaller.h
+    src/enclave_service_proxy.cpp
+    src/host_service_proxy.cpp
     src/proxy.cpp
-    src/stub.cpp
     src/remote_pointer.cpp
-    src/enclave_service_proxy.cpp)
+    src/service.cpp
+    src/stub.cpp
+    )
 
 target_compile_definitions(marshaller_enclave 
     PRIVATE 
@@ -17,6 +20,8 @@ target_include_directories(marshaller_enclave
     PRIVATE 
         ${ENCLAVE_LIBCXX_INCLUDES})
 target_link_libraries(marshaller_enclave 
+    PRIVATE
+        marshal_test_edl_enclave
     PUBLIC 
     yas_common)
 target_link_options(marshaller_enclave PRIVATE ${ENCLAVE_LINK_OPTIONS})
@@ -27,10 +32,12 @@ set_property(TARGET marshaller_enclave PROPERTY COMPILE_PDB_NAME marshaller_encl
 ################################################################################
 add_library(marshaller_host
     include/marshaller/marshaller.h
-    src/proxy.cpp
-    src/stub.cpp
-    src/remote_pointer.cpp
     src/enclave_service_proxy.cpp
+    src/host_service_proxy.cpp
+    src/proxy.cpp
+    src/remote_pointer.cpp
+    src/service.cpp
+    src/stub.cpp
     )
 
 

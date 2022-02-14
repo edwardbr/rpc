@@ -29,6 +29,7 @@ namespace enclave_marshaller
 
             STUB_DEMARSHALL_DECLARATION,
             STUB_MARSHALL_IN,
+            STUB_PARAM_WRAP,
             STUB_PARAM_CAST,
             STUB_ADD_REF_OUT,
             STUB_MARSHALL_OUT
@@ -72,7 +73,7 @@ namespace enclave_marshaller
             case STUB_DEMARSHALL_DECLARATION:
                 return fmt::format("{} {}_", object_type, name);
             case STUB_MARSHALL_IN:
-                return fmt::format("{}_", name);
+                return fmt::format("  ,(\"_{}\", {}_)", count, name);
             case STUB_PARAM_CAST:
                 return fmt::format("{}_", name);
             case STUB_MARSHALL_OUT:
@@ -103,7 +104,7 @@ namespace enclave_marshaller
             case STUB_DEMARSHALL_DECLARATION:
                 return fmt::format("uint64_t {}_ = 0;", name);
             case STUB_MARSHALL_IN:
-                return fmt::format("{}_", name);
+                return fmt::format("  ,(\"_{}\", {}_)", count, name);
             case STUB_PARAM_CAST:
                 return fmt::format("*({}*){}_", object_type, name);
             default:
@@ -136,7 +137,7 @@ namespace enclave_marshaller
             case STUB_DEMARSHALL_DECLARATION:
                 return fmt::format("{} {}_", object_type, name);
             case STUB_MARSHALL_IN:
-                return fmt::format("{}_", name);
+                return fmt::format("  ,(\"_{}\", {}_)", count, name);
             case STUB_PARAM_CAST:
                 return fmt::format("std::move({}_)", name);
             case STUB_MARSHALL_OUT:
@@ -166,7 +167,7 @@ namespace enclave_marshaller
             case STUB_DEMARSHALL_DECLARATION:
                 return fmt::format("uint64_t {}_", name);
             case STUB_MARSHALL_IN:
-                return fmt::format("{}_", name);
+                return fmt::format("  ,(\"_{}\", {}_)", count, name);
             case STUB_PARAM_CAST:
                 return fmt::format("({}*){}_", object_type, name);
             default:
@@ -249,18 +250,37 @@ namespace enclave_marshaller
             switch (option)
             {
             case PROXY_MARSHALL_IN:
-                return fmt::format("  ,(\"_{}\", {})", count, name);
+            {
+                auto ret = fmt::format(R"__(  ,("_{1}", get_object_proxy()->get_zone_base()->get_service().encapsulate_outbound_interfaces({0}))
+                  ,("_{2}", get_object_proxy()->get_zone_base()->get_service().get_zone_id()))__", name, count, count + 1);
+                count++;
+                return ret;
+            }
             case PROXY_MARSHALL_OUT:
                 return fmt::format("  ,(\"_{}\", {}_)", count, name);
             case STUB_DEMARSHALL_DECLARATION:
-                return "";
+                return fmt::format(R"__(uint64_t {0}_object_ = 0;
+                    uint64_t {0}_zone_ = 0)__", name);
+            case STUB_MARSHALL_IN:
+            {
+                auto ret = fmt::format(R"__(  ,("_{1}", {0}_object_)
+                      ,("_{2}", {0}_zone_))__", name, count, count + 1);
+                count++;
+                return ret;
+            }
+            case STUB_PARAM_WRAP:
+                return fmt::format(R"__(
+                    auto service_proxy_ = target_stub_.lock()->get_zone().get_zone({1}_zone_);
+                    {0} {1};
+                    service_proxy_.lock()->create_proxy({1}_object_, {1});
+)__", object_type, name);
             case STUB_PARAM_CAST:
-                return "";
+                return fmt::format("{}", name);
+            case STUB_MARSHALL_OUT:
+                return fmt::format("  ,(\"_{}\", (uint64_t){})", count, name);
             case PROXY_VALUE_RETURN:
             case PROXY_OUT_DECLARATION:
                 return fmt::format("  uint64_t {}_ = 0;", name);
-            case STUB_MARSHALL_OUT:
-                return fmt::format("  ,(\"_{}\", (uint64_t){})", count, name);
             default:
                 return "";
             }
@@ -683,12 +703,19 @@ namespace enclave_marshaller
 
                                 proxy(output);
                             }
+                            count++;
+                        }
+
+                        count = 1;
+                        for (auto& parameter : function.parameters)
+                        {
+                            std::string output;
                             {
                                 if (!is_in_call(STUB_MARSHALL_IN, from_host, lib, parameter.name, parameter.type,
                                                 parameter.m_attributes, count, output))
                                     continue;
 
-                                stub("  ,(\"_{}\", {})", count, output);
+                                stub(output);
                             }
                             count++;
                         }
@@ -712,6 +739,21 @@ namespace enclave_marshaller
                     proxy("{{");
                     proxy("return ret;");
                     proxy("}}");
+
+                    stub("//STUB_PARAM_WRAP");
+
+                    {
+                        uint64_t count = 1;
+                        for (auto& parameter : function.parameters)
+                        {
+                            std::string output;
+                            if (!is_in_call(STUB_PARAM_WRAP, from_host, lib, parameter.name, parameter.type,
+                                            parameter.m_attributes, count, output))
+                                is_out_call(STUB_PARAM_WRAP, from_host, lib, parameter.name, parameter.type,
+                                            parameter.m_attributes, count, output);
+                            stub.raw("{}", output);
+                        }
+                    }
 
                     stub("//STUB_PARAM_CAST");
                     stub.print_tabs();
@@ -937,7 +979,7 @@ namespace enclave_marshaller
                 ns += name + "::";
             }
             int id = 1;
-            stub("template<> uint64_t "
+            header("template<> uint64_t "
                  "rpc::service::encapsulate_outbound_interfaces(rpc::shared_ptr<{}{}> "
                  "iface);",
                  ns, interface_name);
@@ -995,34 +1037,29 @@ namespace enclave_marshaller
             header("#include <string>");
 
             header("#include <marshaller/marshaller.h>");
+            header("#include <marshaller/service.h>");
             header("");
 
+            proxy("#pragma once");
             proxy("#include <yas/mem_streams.hpp>");
             proxy("#include <yas/binary_iarchive.hpp>");
             proxy("#include <yas/binary_oarchive.hpp>");
             proxy("#include <yas/std_types.hpp>");
             proxy("#include <marshaller/proxy.h>");
+            proxy("#include <marshaller/service.h>");
             proxy("#include \"{}\"", header_filename);
             proxy("");
 
+            stub("#pragma once");
             stub("#include <yas/mem_streams.hpp>");
             stub("#include <yas/binary_iarchive.hpp>");
             stub("#include <yas/binary_oarchive.hpp>");
-            proxy("#include <yas/std_types.hpp>");
+            stub("#include <yas/std_types.hpp>");
             stub("#include <marshaller/stub.h>");
+            stub("#include <marshaller/proxy.h>");
+            stub("#include <marshaller/service.h>");
             stub("#include \"{}\"", header_filename);
             stub("");
-
-            for (auto& name : lib.m_ownedClasses)
-            {
-                const ClassObject* obj = nullptr;
-                if (!lib.FindClassObject(name, obj))
-                {
-                    continue;
-                }
-                if (obj->type == ObjectLibrary || obj->type == ObjectTypeInterface)
-                    write_encapsulate_outbound_interfaces(from_host, lib, *obj, header, proxy, stub, namespaces);
-            }
 
             for (auto& ns : namespaces)
             {
@@ -1164,6 +1201,18 @@ namespace enclave_marshaller
                 stub("}}");
             }
 
+
+            for (auto& name : lib.m_ownedClasses)
+            {
+                const ClassObject* obj = nullptr;
+                if (!lib.FindClassObject(name, obj))
+                {
+                    continue;
+                }
+                if (obj->type == ObjectLibrary || obj->type == ObjectTypeInterface)
+                    write_encapsulate_outbound_interfaces(from_host, lib, *obj, header, proxy, stub, namespaces);
+            }
+            
             for (auto& name : lib.m_ownedClasses)
             {
                 std::string ns;
