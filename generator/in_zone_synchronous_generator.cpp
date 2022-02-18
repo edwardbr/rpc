@@ -13,13 +13,6 @@ namespace enclave_marshaller
 {
     namespace in_zone_synchronous_generator
     {
-        void write_interface_predeclaration(const class_entity& lib, const class_entity& m_ob, writer& header,
-                                            writer& proxy, writer& stub)
-        {
-            proxy("class {}_proxy;", m_ob.get_name());
-            stub("class {}_stub;", m_ob.get_name());
-        };
-
         enum print_type
         {
             PROXY_MARSHALL_IN,
@@ -553,7 +546,7 @@ namespace enclave_marshaller
             return true;
         }
 
-        void write_interface(bool from_host, const class_entity& lib, const class_entity& m_ob, writer& header,
+        void write_interface(bool from_host, const class_entity& m_ob, writer& header,
                              writer& proxy, writer& stub, int id)
         {
             auto interface_name = std::string(m_ob.get_type() == entity_type::LIBRARY ? "i_" : "") + m_ob.get_name();
@@ -693,11 +686,11 @@ namespace enclave_marshaller
                         {
                             bool is_interface = false;
                             std::string output;
-                            if (is_in_call(STUB_DEMARSHALL_DECLARATION, from_host, lib, parameter.get_name(),
+                            if (is_in_call(STUB_DEMARSHALL_DECLARATION, from_host, m_ob, parameter.get_name(),
                                            parameter.get_type(), parameter.get_attributes(), count, output))
                                 has_inparams = true;
                             else
-                                is_out_call(STUB_DEMARSHALL_DECLARATION, from_host, lib, parameter.get_name(),
+                                is_out_call(STUB_DEMARSHALL_DECLARATION, from_host, m_ob, parameter.get_name(),
                                             parameter.get_type(), parameter.get_attributes(), count, output);
                             stub("{};", output);
                         }
@@ -719,7 +712,7 @@ namespace enclave_marshaller
                         {
                             std::string output;
                             {
-                                if (!is_in_call(PROXY_MARSHALL_IN, from_host, lib, parameter.get_name(),
+                                if (!is_in_call(PROXY_MARSHALL_IN, from_host, m_ob, parameter.get_name(),
                                                 parameter.get_type(), parameter.get_attributes(), count, output))
                                     continue;
 
@@ -733,7 +726,7 @@ namespace enclave_marshaller
                         {
                             std::string output;
                             {
-                                if (!is_in_call(STUB_MARSHALL_IN, from_host, lib, parameter.get_name(),
+                                if (!is_in_call(STUB_MARSHALL_IN, from_host, m_ob, parameter.get_name(),
                                                 parameter.get_type(), parameter.get_attributes(), count, output))
                                     continue;
 
@@ -769,9 +762,9 @@ namespace enclave_marshaller
                         for (auto& parameter : function.get_parameters())
                         {
                             std::string output;
-                            if (!is_in_call(STUB_PARAM_WRAP, from_host, lib, parameter.get_name(), parameter.get_type(),
+                            if (!is_in_call(STUB_PARAM_WRAP, from_host, m_ob, parameter.get_name(), parameter.get_type(),
                                             parameter.get_attributes(), count, output))
-                                is_out_call(STUB_PARAM_WRAP, from_host, lib, parameter.get_name(), parameter.get_type(),
+                                is_out_call(STUB_PARAM_WRAP, from_host, m_ob, parameter.get_name(), parameter.get_type(),
                                             parameter.get_attributes(), count, output);
                             stub.raw("{}", output);
                         }
@@ -787,9 +780,9 @@ namespace enclave_marshaller
                         for (auto& parameter : function.get_parameters())
                         {
                             std::string output;
-                            if (!is_in_call(STUB_PARAM_CAST, from_host, lib, parameter.get_name(), parameter.get_type(),
+                            if (!is_in_call(STUB_PARAM_CAST, from_host, m_ob, parameter.get_name(), parameter.get_type(),
                                             parameter.get_attributes(), count, output))
-                                is_out_call(STUB_PARAM_CAST, from_host, lib, parameter.get_name(), parameter.get_type(),
+                                is_out_call(STUB_PARAM_CAST, from_host, m_ob, parameter.get_name(), parameter.get_type(),
                                             parameter.get_attributes(), count, output);
                             if (has_param)
                             {
@@ -811,10 +804,10 @@ namespace enclave_marshaller
                         {
                             count++;
                             std::string output;
-                            if (is_in_call(PROXY_OUT_DECLARATION, from_host, lib, parameter.get_name(),
+                            if (is_in_call(PROXY_OUT_DECLARATION, from_host, m_ob, parameter.get_name(),
                                            parameter.get_type(), parameter.get_attributes(), count, output))
                                 continue;
-                            if (!is_out_call(PROXY_OUT_DECLARATION, from_host, lib, parameter.get_name(),
+                            if (!is_out_call(PROXY_OUT_DECLARATION, from_host, m_ob, parameter.get_name(),
                                              parameter.get_type(), parameter.get_attributes(), count, output))
                                 continue;
 
@@ -830,7 +823,7 @@ namespace enclave_marshaller
                             count++;
                             std::string output;
 
-                            if (!is_out_call(STUB_ADD_REF_OUT, from_host, lib, parameter.get_name(),
+                            if (!is_out_call(STUB_ADD_REF_OUT, from_host, m_ob, parameter.get_name(),
                                              parameter.get_type(), parameter.get_attributes(), count, output))
                                 continue;
 
@@ -855,12 +848,12 @@ namespace enclave_marshaller
                         {
                             count++;
                             std::string output;
-                            if (!is_out_call(PROXY_MARSHALL_OUT, from_host, lib, parameter.get_name(),
+                            if (!is_out_call(PROXY_MARSHALL_OUT, from_host, m_ob, parameter.get_name(),
                                              parameter.get_type(), parameter.get_attributes(), count, output))
                                 continue;
                             proxy(output);
 
-                            if (!is_out_call(STUB_MARSHALL_OUT, from_host, lib, parameter.get_name(),
+                            if (!is_out_call(STUB_MARSHALL_OUT, from_host, m_ob, parameter.get_name(),
                                              parameter.get_type(), parameter.get_attributes(), count, output))
                                 continue;
 
@@ -876,10 +869,10 @@ namespace enclave_marshaller
                         {
                             count++;
                             std::string output;
-                            if (is_in_call(PROXY_VALUE_RETURN, from_host, lib, parameter.get_name(),
+                            if (is_in_call(PROXY_VALUE_RETURN, from_host, m_ob, parameter.get_name(),
                                            parameter.get_type(), parameter.get_attributes(), count, output))
                                 continue;
-                            if (!is_out_call(PROXY_VALUE_RETURN, from_host, lib, parameter.get_name(),
+                            if (!is_out_call(PROXY_VALUE_RETURN, from_host, m_ob, parameter.get_name(),
                                              parameter.get_type(), parameter.get_attributes(), count, output))
                                 continue;
 
@@ -947,9 +940,16 @@ namespace enclave_marshaller
             stub("}}");
         }
 
-        void write_interface_forward_declaration(const class_entity& m_ob, writer& header)
+        void write_interface_forward_declaration(const class_entity& m_ob, writer& header, writer& proxy, writer& stub)
         {
             header("class {};", m_ob.get_name());
+            proxy("class {}_proxy;", m_ob.get_name());
+            stub("class {}_stub;", m_ob.get_name());
+        }
+
+        void write_struct_forward_declaration(const class_entity& m_ob, writer& header)
+        {
+            header("struct {};", m_ob.get_name());
         }
 
         void write_struct(const class_entity& m_ob, writer& header)
@@ -1016,6 +1016,14 @@ namespace enclave_marshaller
             {
                 ns += name + "::";
             }
+            
+            auto owner = obj.get_owner();
+            while(owner && !owner->get_name().empty())
+            {
+                ns += owner->get_name() + "::";
+                owner = owner->get_owner();
+            }
+            
             int id = 1;
             header("template<> uint64_t "
                    "rpc::service::encapsulate_outbound_interfaces(rpc::shared_ptr<{}{}> "
@@ -1032,6 +1040,12 @@ namespace enclave_marshaller
             for (auto& name : namespaces)
             {
                 ns += name + "::";
+            }
+            auto owner = obj.get_owner();
+            while(owner && !owner->get_name().empty())
+            {
+                ns += owner->get_name() + "::";
+                owner = owner->get_owner();
             }
 
             proxy("template<> void rpc::object_proxy::create_interface_proxy(rpc::shared_ptr<{}{}>& "
@@ -1060,43 +1074,24 @@ namespace enclave_marshaller
             stub("}}");
         }
 
+        void write_marshalling_logic_nested(bool from_host, const class_entity& cls, int id, writer& header,
+                                            writer& proxy, writer& stub)
+        {
+            if (cls.get_type() == entity_type::STRUCT)
+                write_struct(cls, header);
+
+            header("");
+
+            if (cls.get_type() == entity_type::INTERFACE)
+                write_interface(from_host, cls, header, proxy, stub, id);
+
+            if (cls.get_type() == entity_type::LIBRARY)
+                write_interface(from_host, cls, header, proxy, stub, 0);
+        }
+
         void write_marshalling_logic(bool from_host, const class_entity& lib, writer& header, writer& proxy,
                                      writer& stub)
         {
-            for (auto& cls : lib.get_classes())
-            {
-                if (cls->get_type() == entity_type::INTERFACE)
-                    write_interface_forward_declaration(*cls, header);
-            }
-            for (auto& cls : lib.get_classes())
-            {
-                if (cls->get_type() == entity_type::STRUCT)
-                    write_struct(*cls, header);
-            }
-            header("");
-
-            for (auto& cls : lib.get_classes())
-            {
-                if (cls->get_type() == entity_type::INTERFACE)
-                    write_interface_predeclaration(lib, *cls, header, proxy, stub);
-            }
-
-            proxy("");
-
-            {
-                int id = 1;
-                for (auto& cls : lib.get_classes())
-                {
-                    if (cls->get_type() == entity_type::INTERFACE)
-                        write_interface(from_host, lib, *cls, header, proxy, stub, id++);
-                }
-            }
-
-            for (auto& cls : lib.get_classes())
-            {
-                if (cls->get_type() == entity_type::LIBRARY)
-                    write_interface(from_host, lib, *cls, header, proxy, stub, 0);
-            }
 
             {
                 stub("template<class T>");
@@ -1143,9 +1138,18 @@ namespace enclave_marshaller
         }
 
         // entry point
-        void write_namespace(bool from_host, const class_entity& lib, writer& header, writer& proxy, writer& stub)
+        void write_namespace_predeclaration(bool from_host, const class_entity& lib, int& id, writer& header, writer& proxy,
+                             writer& stub)
         {
-            /*for (auto cls : lib.get_classes())
+            for (auto cls : lib.get_classes())
+            {
+                if (cls->get_type() == entity_type::INTERFACE)
+                    write_interface_forward_declaration(*cls, header, proxy, stub);
+                if (cls->get_type() == entity_type::STRUCT)
+                    write_struct_forward_declaration(*cls, header);
+            }
+
+            for (auto cls : lib.get_classes())
             {
                 if (cls->get_type() == entity_type::NAMESPACE)
                 {
@@ -1157,7 +1161,32 @@ namespace enclave_marshaller
                     stub("namespace {}", cls->get_name());
                     stub("{{");
 
-                    write_namespace(from_host, *cls, header, proxy, stub);
+                    write_namespace_predeclaration(from_host, *cls, id, header, proxy, stub);
+
+                    header("}}");
+                    proxy("}}");
+                    stub("}}");
+                }
+            }
+        }
+
+        // entry point
+        void write_namespace(bool from_host, const class_entity& lib, int& id, writer& header, writer& proxy,
+                             writer& stub)
+        {
+            for (auto cls : lib.get_classes())
+            {
+                if (cls->get_type() == entity_type::NAMESPACE)
+                {
+
+                    header("namespace {}", cls->get_name());
+                    header("{{");
+                    proxy("namespace {}", cls->get_name());
+                    proxy("{{");
+                    stub("namespace {}", cls->get_name());
+                    stub("{{");
+
+                    write_namespace(from_host, *cls, id, header, proxy, stub);
 
                     header("}}");
                     proxy("}}");
@@ -1165,11 +1194,35 @@ namespace enclave_marshaller
                 }
                 else
                 {
-                    write_marshalling_logic(from_host, lib, header, proxy, stub);
+                    write_marshalling_logic_nested(from_host, *cls, id++, header, proxy, stub);
                 }
-            }*/
+            }
             write_marshalling_logic(from_host, lib, header, proxy, stub);
         }
+
+        void write_epilog(bool from_host, const class_entity& lib, int& id, writer& header, writer& proxy,
+                             writer& stub, const std::vector<std::string>& namespaces)
+        {
+            for (auto cls : lib.get_classes())
+            {
+                if (cls->get_type() == entity_type::NAMESPACE)
+                {
+
+                    write_epilog(from_host, *cls, id, header, proxy, stub, namespaces);
+                }
+                else
+                {
+                    if (cls->get_type() == entity_type::LIBRARY || cls->get_type() == entity_type::INTERFACE)
+                        write_encapsulate_outbound_interfaces(from_host, lib, *cls, header, proxy, stub, namespaces);
+
+                    if (cls->get_type() == entity_type::LIBRARY || cls->get_type() == entity_type::INTERFACE)
+                        write_library_proxy_factory(proxy, stub, *cls, namespaces);
+                }
+            }
+        }
+
+        
+
 
         // entry point
         void write_files(bool from_host, const class_entity& lib, std::ostream& hos, std::ostream& pos,
@@ -1222,7 +1275,9 @@ namespace enclave_marshaller
                 stub("{{");
             }
 
-            write_namespace(from_host, lib, header, proxy, stub);
+            int id = 0;
+            write_namespace_predeclaration(from_host, lib, id, header, proxy, stub);
+            write_namespace(from_host, lib, id, header, proxy, stub);
 
             for (auto& ns : namespaces)
             {
@@ -1231,17 +1286,7 @@ namespace enclave_marshaller
                 stub("}}");
             }
 
-            for (auto& cls : lib.get_classes())
-            {
-                if (cls->get_type() == entity_type::LIBRARY || cls->get_type() == entity_type::INTERFACE)
-                    write_encapsulate_outbound_interfaces(from_host, lib, *cls, header, proxy, stub, namespaces);
-            }
-
-            for (auto& cls : lib.get_classes())
-            {
-                if (cls->get_type() == entity_type::LIBRARY || cls->get_type() == entity_type::INTERFACE)
-                    write_library_proxy_factory(proxy, stub, *cls, namespaces);
-            }
+            write_epilog(from_host, lib, id, header, proxy, stub, namespaces);
         }
     }
 }

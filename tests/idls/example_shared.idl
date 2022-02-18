@@ -1,3 +1,5 @@
+namespace xxx
+{
 typedef uint64_t error_code;
 
 struct something_complicated
@@ -60,3 +62,4 @@ interface i_baz
 {
     error_code callback(int val);
 };
+}

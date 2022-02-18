@@ -40,8 +40,8 @@ int main()
 
         auto other_service = rpc::make_shared<rpc::service>(2); 
         //create the root object
-        rpc::shared_ptr<i_example> ex(new example);
-        error_code err_code = other_service->initialise<i_example, i_example_stub>(ex);
+        rpc::shared_ptr<yyy::i_example> ex(new example);
+        error_code err_code = other_service->initialise<yyy::i_example, yyy::i_example_stub>(ex);
         if (err_code)
             return err_code;
 
@@ -49,12 +49,12 @@ int main()
 
         //create a proxy for the rpc::service hosting the example object
         auto service_proxy = rpc::local_service_proxy::create(service, 2, other_marshaller, other_service->get_root_object_id());
-        auto example_ptr = service_proxy->get_interface<i_example>();
+        auto example_ptr = service_proxy->get_interface<yyy::i_example>();
 
         //create a proxy for the other rpc::service, keep an instance going
         auto other_service_proxy = rpc::local_service_proxy::create(other_service, 1, marshaller, 0);
 
-        rpc::shared_ptr<marshalled_tests::i_foo> i_foo_ptr;
+        rpc::shared_ptr<marshalled_tests::xxx::i_foo> i_foo_ptr;
         err_code = example_ptr->create_foo(i_foo_ptr);
         if (err_code)
         {
@@ -80,9 +80,9 @@ int main()
         err_code = ex->initialise();
         ASSERT(!err_code);
 
-        auto example_ptr = ex->get_interface<i_example>();
+        auto example_ptr = ex->get_interface<yyy::i_example>();
 
-        rpc::shared_ptr<marshalled_tests::i_foo> i_foo_ptr;
+        rpc::shared_ptr<marshalled_tests::xxx::i_foo> i_foo_ptr;
         err_code = example_ptr->create_foo(i_foo_ptr);
         if (err_code)
         {

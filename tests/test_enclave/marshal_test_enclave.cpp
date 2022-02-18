@@ -24,8 +24,8 @@ int marshal_test_init_enclave(uint64_t zone_id, uint64_t* root_object)
     rpc_server = rpc::make_shared<rpc::service>(zone_id); 
 
     //create the root object
-    rpc::shared_ptr<i_example> ex(new example);
-    error_code err_code = rpc_server->initialise<i_example, i_example_stub>(ex);
+    rpc::shared_ptr<yyy::i_example> ex(new example);
+    error_code err_code = rpc_server->initialise<yyy::i_example, yyy::i_example_stub>(ex);
     if (err_code)
         return err_code;
 

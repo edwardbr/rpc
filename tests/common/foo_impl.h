@@ -9,7 +9,7 @@ void log(std::string& data)
 
 namespace marshalled_tests
 {
-    class foo : public i_foo
+    class foo : public xxx::i_foo
     {
     public:
         virtual ~foo() { }
@@ -59,87 +59,87 @@ namespace marshalled_tests
             val = 33;
             return 0;
         }
-        int give_something_complicated_val(const something_complicated val)
+        int give_something_complicated_val(const xxx::something_complicated val)
         {
             log(std::string("got ") + std::to_string(val.int_val));
             return 0;
         }
-        int give_something_complicated_ref(const something_complicated& val)
+        int give_something_complicated_ref(const xxx::something_complicated& val)
         {
             log(std::string("got ") + std::to_string(val.int_val));
             return 0;
         }
-        int give_something_complicated_ref_val(const something_complicated& val)
+        int give_something_complicated_ref_val(const xxx::something_complicated& val)
         {
             log(std::string("got ") + std::to_string(val.int_val));
             return 0;
         }
-        int give_something_complicated_move_ref(something_complicated&& val)
+        int give_something_complicated_move_ref(xxx::something_complicated&& val)
         {
             log(std::string("got ") + std::to_string(val.int_val));
             return 0;
         }
-        int give_something_complicated_ptr(const something_complicated* val)
+        int give_something_complicated_ptr(const xxx::something_complicated* val)
         {
             log(std::string("got ") + std::to_string(val->int_val));
             return 0;
         }
-        int recieve_something_complicated_ref(something_complicated& val)
+        int recieve_something_complicated_ref(xxx::something_complicated& val)
         {
-            val = something_complicated {33, "22"};
+            val = xxx::something_complicated {33, "22"};
             return 0;
         }
-        int recieve_something_complicated_ptr(something_complicated*& val)
+        int recieve_something_complicated_ptr(xxx::something_complicated*& val)
         {
-            val = new something_complicated {33, "22"};
+            val = new xxx::something_complicated {33, "22"};
             return 0;
         }
-        int recieve_something_complicated_in_out_ref(something_complicated& val)
+        int recieve_something_complicated_in_out_ref(xxx::something_complicated& val)
         {
             log(std::string("got ") + std::to_string(val.int_val));
             val.int_val = 33;
             return 0;
         }
-        int give_something_more_complicated_val(const something_more_complicated val)
+        int give_something_more_complicated_val(const xxx::something_more_complicated val)
         {
             log(std::string("got ") + val.map_val.begin()->first);
             return 0;
         }
-        int give_something_more_complicated_ref(const something_more_complicated& val)
+        int give_something_more_complicated_ref(const xxx::something_more_complicated& val)
         {
             log(std::string("got ") + val.map_val.begin()->first);
             return 0;
         }
-        int give_something_more_complicated_move_ref(something_more_complicated&& val)
+        int give_something_more_complicated_move_ref(xxx::something_more_complicated&& val)
         {
             log(std::string("got ") + val.map_val.begin()->first);
             return 0;
         }
-        int give_something_more_complicated_ref_val(const something_more_complicated& val)
+        int give_something_more_complicated_ref_val(const xxx::something_more_complicated& val)
         {
             log(std::string("got ") + val.map_val.begin()->first);
             return 0;
         }
-        int give_something_more_complicated_ptr(const something_more_complicated* val)
+        int give_something_more_complicated_ptr(const xxx::something_more_complicated* val)
         {
             log(std::string("got ") + val->map_val.begin()->first);
             return 0;
         }
-        int recieve_something_more_complicated_ref(something_more_complicated& val)
+        int recieve_something_more_complicated_ref(xxx::something_more_complicated& val)
         {
-            val.map_val["22"] = something_complicated {33, "22"};
+            val.map_val["22"] = xxx::something_complicated {33, "22"};
             return 0;
         }
-        int recieve_something_more_complicated_ptr(something_more_complicated*& val)
+        int recieve_something_more_complicated_ptr(xxx::something_more_complicated*& val)
         {
-            val = new something_more_complicated();
-            val->map_val["22"] = something_complicated {33, "22"};
+            val = new xxx::something_more_complicated();
+            val->map_val["22"] = xxx::something_complicated {33, "22"};
             return 0;
         }
-        int recieve_something_more_complicated_in_out_ref(something_more_complicated& val)
+        int recieve_something_more_complicated_in_out_ref(xxx::something_more_complicated& val)
         {
             log(std::string("got ") + val.map_val.begin()->first);
-            val.map_val["22"] = something_complicated {33, "23"};
+            val.map_val["22"] = xxx::something_complicated {33, "23"};
             return 0;
         }
         int do_multi_val(int val1, int val2)
@@ -147,7 +147,7 @@ namespace marshalled_tests
             log(std::string("got ") + std::to_string(val1));
             return 0;
         }
-        int do_multi_complicated_val(const something_more_complicated val1, const something_more_complicated val2)
+        int do_multi_complicated_val(const xxx::something_more_complicated val1, const xxx::something_more_complicated val2)
         {
             log(std::string("got ") + val1.map_val.begin()->first);
             return 0;
@@ -155,21 +155,21 @@ namespace marshalled_tests
 
         error_code recieve_interface(rpc::shared_ptr<i_foo>& val)
         {
-            val = rpc::shared_ptr<i_foo>(new foo);
+            val = rpc::shared_ptr<xxx::i_foo>(new foo);
             return 0;
         }
-        error_code give_interface(rpc::shared_ptr<i_baz> val)
+        error_code give_interface(rpc::shared_ptr<xxx::i_baz> val)
         {
             val->callback(22);
             return 0;
         }        
     };
-    class example : public i_example
+    class example : public yyy::i_example
     {
     public:
-        error_code create_foo(rpc::shared_ptr<i_foo>& target) override
+        error_code create_foo(rpc::shared_ptr<xxx::i_foo>& target) override
         {
-            target = rpc::shared_ptr<i_foo>(new foo);
+            target = rpc::shared_ptr<xxx::i_foo>(new foo);
             return 0;
         }
 
