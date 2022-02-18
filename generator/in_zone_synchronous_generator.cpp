@@ -1086,7 +1086,7 @@ namespace enclave_marshaller
                 write_interface(from_host, cls, header, proxy, stub, id);
 
             if (cls.get_type() == entity_type::LIBRARY)
-                write_interface(from_host, cls, header, proxy, stub, 0);
+                write_interface(from_host, cls, header, proxy, stub, id);
         }
 
         void write_marshalling_logic(bool from_host, const class_entity& lib, writer& header, writer& proxy,
@@ -1275,8 +1275,10 @@ namespace enclave_marshaller
                 stub("{{");
             }
 
-            int id = 0;
+            int id = 1;
             write_namespace_predeclaration(from_host, lib, id, header, proxy, stub);
+
+            id = 1;
             write_namespace(from_host, lib, id, header, proxy, stub);
 
             for (auto& ns : namespaces)
@@ -1286,6 +1288,7 @@ namespace enclave_marshaller
                 stub("}}");
             }
 
+            id = 1;
             write_epilog(from_host, lib, id, header, proxy, stub, namespaces);
         }
     }
