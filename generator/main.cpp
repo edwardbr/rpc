@@ -74,8 +74,7 @@ int main(const int argc, char* argv[])
 
 	for(auto& define : defines)
 	{
-		std::vector<std::string> elems;
-		split(define, '=', elems);
+		auto elems = split(define, '=');
 		{
 			macro_parser::definition def;
 			std::string defName = elems[0];
@@ -122,7 +121,7 @@ int main(const int argc, char* argv[])
         std::vector<std::string> loaded_includes;
 
 		std::stringstream output_stream;
-		parser->Load(output_stream, rootIdl, parsed_paths, loaded_includes);
+		parser->load(output_stream, rootIdl, parsed_paths, loaded_includes);
 		pre_parsed_data = output_stream.str();
 		if(dump_preprocessor_output_and_die)
 		{
@@ -137,9 +136,9 @@ int main(const int argc, char* argv[])
 	}
 
 	//load the idl file
-	Library objects;
+	library_entity objects;
 	const auto* ppdata = pre_parsed_data.data();
-	objects.GetStructure(ppdata,std::string(), true, false);
+	objects.parse_structure(ppdata,true, false);
 
 	try
 	{
