@@ -13,8 +13,8 @@ namespace enclave_marshaller
 {
     namespace in_zone_synchronous_generator
     {
-        void write_interface_predeclaration(const library_entity& lib, const class_entity& m_ob, writer& header, writer& proxy,
-                                            writer& stub)
+        void write_interface_predeclaration(const class_entity& lib, const class_entity& m_ob, writer& header,
+                                            writer& proxy, writer& stub)
         {
             proxy("class {}_proxy;", m_ob.get_name());
             stub("class {}_stub;", m_ob.get_name());
@@ -50,7 +50,7 @@ namespace enclave_marshaller
             };
 
             template<param_type type>
-            std::string render(print_type option, bool from_host, const library_entity& lib, const std::string& name,
+            std::string render(print_type option, bool from_host, const class_entity& lib, const std::string& name,
                                bool is_in, bool is_out, bool is_const, const std::string& object_type,
                                uint64_t& count) const
             {
@@ -59,7 +59,7 @@ namespace enclave_marshaller
         };
 
         template<>
-        std::string renderer::render<renderer::BY_VALUE>(print_type option, bool from_host, const library_entity& lib,
+        std::string renderer::render<renderer::BY_VALUE>(print_type option, bool from_host, const class_entity& lib,
                                                          const std::string& name, bool is_in, bool is_out,
                                                          bool is_const, const std::string& object_type,
                                                          uint64_t& count) const
@@ -84,7 +84,7 @@ namespace enclave_marshaller
         };
 
         template<>
-        std::string renderer::render<renderer::REFERANCE>(print_type option, bool from_host, const library_entity& lib,
+        std::string renderer::render<renderer::REFERANCE>(print_type option, bool from_host, const class_entity& lib,
                                                           const std::string& name, bool is_in, bool is_out,
                                                           bool is_const, const std::string& object_type,
                                                           uint64_t& count) const
@@ -113,7 +113,7 @@ namespace enclave_marshaller
         };
 
         template<>
-        std::string renderer::render<renderer::MOVE>(print_type option, bool from_host, const library_entity& lib,
+        std::string renderer::render<renderer::MOVE>(print_type option, bool from_host, const class_entity& lib,
                                                      const std::string& name, bool is_in, bool is_out, bool is_const,
                                                      const std::string& object_type, uint64_t& count) const
         {
@@ -148,7 +148,7 @@ namespace enclave_marshaller
         };
 
         template<>
-        std::string renderer::render<renderer::POINTER>(print_type option, bool from_host, const library_entity& lib,
+        std::string renderer::render<renderer::POINTER>(print_type option, bool from_host, const class_entity& lib,
                                                         const std::string& name, bool is_in, bool is_out, bool is_const,
                                                         const std::string& object_type, uint64_t& count) const
         {
@@ -176,10 +176,10 @@ namespace enclave_marshaller
         };
 
         template<>
-        std::string renderer::render<renderer::POINTER_REFERENCE>(print_type option, bool from_host, const library_entity& lib,
-                                                                  const std::string& name, bool is_in, bool is_out,
-                                                                  bool is_const, const std::string& object_type,
-                                                                  uint64_t& count) const
+        std::string renderer::render<renderer::POINTER_REFERENCE>(print_type option, bool from_host,
+                                                                  const class_entity& lib, const std::string& name,
+                                                                  bool is_in, bool is_out, bool is_const,
+                                                                  const std::string& object_type, uint64_t& count) const
         {
             if (is_const && is_out)
             {
@@ -209,10 +209,10 @@ namespace enclave_marshaller
         };
 
         template<>
-        std::string renderer::render<renderer::POINTER_POINTER>(print_type option, bool from_host, const library_entity& lib,
-                                                                const std::string& name, bool is_in, bool is_out,
-                                                                bool is_const, const std::string& object_type,
-                                                                uint64_t& count) const
+        std::string renderer::render<renderer::POINTER_POINTER>(print_type option, bool from_host,
+                                                                const class_entity& lib, const std::string& name,
+                                                                bool is_in, bool is_out, bool is_const,
+                                                                const std::string& object_type, uint64_t& count) const
         {
             switch (option)
             {
@@ -236,7 +236,7 @@ namespace enclave_marshaller
         };
 
         template<>
-        std::string renderer::render<renderer::INTERFACE>(print_type option, bool from_host, const library_entity& lib,
+        std::string renderer::render<renderer::INTERFACE>(print_type option, bool from_host, const class_entity& lib,
                                                           const std::string& name, bool is_in, bool is_out,
                                                           bool is_const, const std::string& object_type,
                                                           uint64_t& count) const
@@ -251,8 +251,10 @@ namespace enclave_marshaller
             {
             case PROXY_MARSHALL_IN:
             {
-                auto ret = fmt::format(R"__(  ,("_{1}", get_object_proxy()->get_zone_base()->get_service().encapsulate_outbound_interfaces({0}))
-                  ,("_{2}", get_object_proxy()->get_zone_base()->get_service().get_zone_id()))__", name, count, count + 1);
+                auto ret = fmt::format(
+                    R"__(  ,("_{1}", get_object_proxy()->get_zone_base()->get_service().encapsulate_outbound_interfaces({0}))
+                  ,("_{2}", get_object_proxy()->get_zone_base()->get_service().get_zone_id()))__",
+                    name, count, count + 1);
                 count++;
                 return ret;
             }
@@ -260,11 +262,13 @@ namespace enclave_marshaller
                 return fmt::format("  ,(\"_{}\", {}_)", count, name);
             case STUB_DEMARSHALL_DECLARATION:
                 return fmt::format(R"__(uint64_t {0}_object_ = 0;
-                    uint64_t {0}_zone_ = 0)__", name);
+                    uint64_t {0}_zone_ = 0)__",
+                                   name);
             case STUB_MARSHALL_IN:
             {
                 auto ret = fmt::format(R"__(  ,("_{1}", {0}_object_)
-                      ,("_{2}", {0}_zone_))__", name, count, count + 1);
+                      ,("_{2}", {0}_zone_))__",
+                                       name, count, count + 1);
                 count++;
                 return ret;
             }
@@ -273,7 +277,8 @@ namespace enclave_marshaller
                     auto service_proxy_ = target_stub_.lock()->get_zone().get_zone({1}_zone_);
                     {0} {1};
                     service_proxy_.lock()->create_proxy({1}_object_, {1});
-)__", object_type, name);
+)__",
+                                   object_type, name);
             case STUB_PARAM_CAST:
                 return fmt::format("{}", name);
             case STUB_MARSHALL_OUT:
@@ -288,7 +293,7 @@ namespace enclave_marshaller
 
         template<>
         std::string
-        renderer::render<renderer::INTERFACE_REFERENCE>(print_type option, bool from_host, const library_entity& lib,
+        renderer::render<renderer::INTERFACE_REFERENCE>(print_type option, bool from_host, const class_entity& lib,
                                                         const std::string& name, bool is_in, bool is_out, bool is_const,
                                                         const std::string& object_type, uint64_t& count) const
         {
@@ -340,7 +345,7 @@ namespace enclave_marshaller
             return type_name;
         }
 
-        bool is_in_call(print_type option, bool from_host, const library_entity& lib, const std::string& name,
+        bool is_in_call(print_type option, bool from_host, const class_entity& lib, const std::string& name,
                         const std::string& type, const std::list<std::string>& attributes, uint64_t& count,
                         std::string& output)
         {
@@ -360,9 +365,9 @@ namespace enclave_marshaller
 
             bool is_interface = false;
             std::shared_ptr<class_entity> obj;
-            if(lib.find_class(encapsulated_type, obj))
+            if (lib.find_class(encapsulated_type, obj))
             {
-                if(obj->get_type() == entity_type::INTERFACE)
+                if (obj->get_type() == entity_type::INTERFACE)
                 {
                     is_interface = true;
                 }
@@ -445,7 +450,7 @@ namespace enclave_marshaller
             return true;
         }
 
-        bool is_out_call(print_type option, bool from_host, const library_entity& lib, const std::string& name,
+        bool is_out_call(print_type option, bool from_host, const class_entity& lib, const std::string& name,
                          const std::string& type, const std::list<std::string>& attributes, uint64_t& count,
                          std::string& output)
         {
@@ -471,9 +476,9 @@ namespace enclave_marshaller
 
             bool is_interface = false;
             std::shared_ptr<class_entity> obj;
-            if(lib.find_class(encapsulated_type, obj))
+            if (lib.find_class(encapsulated_type, obj))
             {
-                if(obj->get_type() == entity_type::INTERFACE)
+                if (obj->get_type() == entity_type::INTERFACE)
                 {
                     is_interface = true;
                 }
@@ -548,18 +553,27 @@ namespace enclave_marshaller
             return true;
         }
 
-        void write_interface(bool from_host, const library_entity& lib, const class_entity& m_ob, writer& header, writer& proxy,
-                             writer& stub, int id)
+        void write_interface(bool from_host, const class_entity& lib, const class_entity& m_ob, writer& header,
+                             writer& proxy, writer& stub, int id)
         {
             auto interface_name = std::string(m_ob.get_type() == entity_type::LIBRARY ? "i_" : "") + m_ob.get_name();
 
-            std::string owner_name;
-            auto owner = m_ob.get_owner().lock();
-            if(owner)
-                owner_name = owner->get_name();
-            else
-                owner_name = m_ob.get_unidentified_owner_name();
-            header("class {}{}{}", interface_name, owner_name.empty() ? "" : ":", owner_name);
+            std::string base_class_declaration;
+            auto bc = m_ob.get_base_classes();
+            if (!bc.empty())
+            {
+
+                base_class_declaration = " : ";
+                int i = 0;
+                for (auto base_class : bc)
+                {
+                    if (i)
+                        base_class_declaration += ", ";
+                    base_class_declaration += base_class->get_name();
+                    i++;
+                }
+            }
+            header("class {}{}", interface_name, base_class_declaration);
             header("{{");
             header("public:");
             header("static constexpr uint64_t id = {};", id);
@@ -642,7 +656,8 @@ namespace enclave_marshaller
                     header.print_tabs();
                     proxy.print_tabs();
                     header.raw("virtual {} {}(", function.get_return_type(), function.get_name());
-                    proxy.raw("virtual {} {}_proxy::{} (", function.get_return_type(), interface_name, function.get_name());
+                    proxy.raw("virtual {} {}_proxy::{} (", function.get_return_type(), interface_name,
+                              function.get_name());
                     bool has_parameter = false;
                     for (auto& parameter : function.get_parameters())
                     {
@@ -678,12 +693,12 @@ namespace enclave_marshaller
                         {
                             bool is_interface = false;
                             std::string output;
-                            if (is_in_call(STUB_DEMARSHALL_DECLARATION, from_host, lib, parameter.get_name(), parameter.get_type(),
-                                           parameter.get_attributes(), count, output))
+                            if (is_in_call(STUB_DEMARSHALL_DECLARATION, from_host, lib, parameter.get_name(),
+                                           parameter.get_type(), parameter.get_attributes(), count, output))
                                 has_inparams = true;
                             else
-                                is_out_call(STUB_DEMARSHALL_DECLARATION, from_host, lib, parameter.get_name(), parameter.get_type(),
-                                            parameter.get_attributes(), count, output);
+                                is_out_call(STUB_DEMARSHALL_DECLARATION, from_host, lib, parameter.get_name(),
+                                            parameter.get_type(), parameter.get_attributes(), count, output);
                             stub("{};", output);
                         }
                     }
@@ -704,8 +719,8 @@ namespace enclave_marshaller
                         {
                             std::string output;
                             {
-                                if (!is_in_call(PROXY_MARSHALL_IN, from_host, lib, parameter.get_name(), parameter.get_type(),
-                                                parameter.get_attributes(), count, output))
+                                if (!is_in_call(PROXY_MARSHALL_IN, from_host, lib, parameter.get_name(),
+                                                parameter.get_type(), parameter.get_attributes(), count, output))
                                     continue;
 
                                 proxy(output);
@@ -718,8 +733,8 @@ namespace enclave_marshaller
                         {
                             std::string output;
                             {
-                                if (!is_in_call(STUB_MARSHALL_IN, from_host, lib, parameter.get_name(), parameter.get_type(),
-                                                parameter.get_attributes(), count, output))
+                                if (!is_in_call(STUB_MARSHALL_IN, from_host, lib, parameter.get_name(),
+                                                parameter.get_type(), parameter.get_attributes(), count, output))
                                     continue;
 
                                 stub(output);
@@ -796,11 +811,11 @@ namespace enclave_marshaller
                         {
                             count++;
                             std::string output;
-                            if (is_in_call(PROXY_OUT_DECLARATION, from_host, lib, parameter.get_name(), parameter.get_type(),
-                                           parameter.get_attributes(), count, output))
+                            if (is_in_call(PROXY_OUT_DECLARATION, from_host, lib, parameter.get_name(),
+                                           parameter.get_type(), parameter.get_attributes(), count, output))
                                 continue;
-                            if (!is_out_call(PROXY_OUT_DECLARATION, from_host, lib, parameter.get_name(), parameter.get_type(),
-                                             parameter.get_attributes(), count, output))
+                            if (!is_out_call(PROXY_OUT_DECLARATION, from_host, lib, parameter.get_name(),
+                                             parameter.get_type(), parameter.get_attributes(), count, output))
                                 continue;
 
                             proxy(output);
@@ -815,8 +830,8 @@ namespace enclave_marshaller
                             count++;
                             std::string output;
 
-                            if (!is_out_call(STUB_ADD_REF_OUT, from_host, lib, parameter.get_name(), parameter.get_type(),
-                                             parameter.get_attributes(), count, output))
+                            if (!is_out_call(STUB_ADD_REF_OUT, from_host, lib, parameter.get_name(),
+                                             parameter.get_type(), parameter.get_attributes(), count, output))
                                 continue;
 
                             stub(output);
@@ -840,13 +855,13 @@ namespace enclave_marshaller
                         {
                             count++;
                             std::string output;
-                            if (!is_out_call(PROXY_MARSHALL_OUT, from_host, lib, parameter.get_name(), parameter.get_type(),
-                                             parameter.get_attributes(), count, output))
+                            if (!is_out_call(PROXY_MARSHALL_OUT, from_host, lib, parameter.get_name(),
+                                             parameter.get_type(), parameter.get_attributes(), count, output))
                                 continue;
                             proxy(output);
 
-                            if (!is_out_call(STUB_MARSHALL_OUT, from_host, lib, parameter.get_name(), parameter.get_type(),
-                                             parameter.get_attributes(), count, output))
+                            if (!is_out_call(STUB_MARSHALL_OUT, from_host, lib, parameter.get_name(),
+                                             parameter.get_type(), parameter.get_attributes(), count, output))
                                 continue;
 
                             stub(output);
@@ -861,11 +876,11 @@ namespace enclave_marshaller
                         {
                             count++;
                             std::string output;
-                            if (is_in_call(PROXY_VALUE_RETURN, from_host, lib, parameter.get_name(), parameter.get_type(),
-                                           parameter.get_attributes(), count, output))
+                            if (is_in_call(PROXY_VALUE_RETURN, from_host, lib, parameter.get_name(),
+                                           parameter.get_type(), parameter.get_attributes(), count, output))
                                 continue;
-                            if (!is_out_call(PROXY_VALUE_RETURN, from_host, lib, parameter.get_name(), parameter.get_type(),
-                                             parameter.get_attributes(), count, output))
+                            if (!is_out_call(PROXY_VALUE_RETURN, from_host, lib, parameter.get_name(),
+                                             parameter.get_type(), parameter.get_attributes(), count, output))
                                 continue;
 
                             proxy(output);
@@ -901,7 +916,7 @@ namespace enclave_marshaller
             stub("");
         };
 
-        void write_stub_factory(bool from_host, const library_entity& lib, const class_entity& m_ob, writer& stub, int id)
+        void write_stub_factory(bool from_host, const class_entity& lib, const class_entity& m_ob, writer& stub, int id)
         {
             auto interface_name = std::string(m_ob.get_type() == entity_type::LIBRARY ? "i_" : "") + m_ob.get_name();
             stub("if(interface_id == {}::id)", interface_name);
@@ -920,7 +935,8 @@ namespace enclave_marshaller
             stub("}}");
         }
 
-        void write_stub_cast_factory(bool from_host, const library_entity& lib, const class_entity& m_ob, writer& stub, int id)
+        void write_stub_cast_factory(bool from_host, const class_entity& lib, const class_entity& m_ob, writer& stub,
+                                     int id)
         {
             auto interface_name = std::string(m_ob.get_type() == entity_type::LIBRARY ? "i_" : "") + m_ob.get_name();
             stub("error_code {}_stub::cast(uint64_t interface_id, rpc::shared_ptr<rpc::i_interface_stub>& new_stub)",
@@ -938,9 +954,22 @@ namespace enclave_marshaller
 
         void write_struct(const class_entity& m_ob, writer& header)
         {
-            auto owner = m_ob.get_owner().lock();
-            auto ownername = owner ? owner->get_name() : std::string();
-            header("struct {}{}{}", m_ob.get_name(), ownername.empty() ? "" : ":", ownername);
+            std::string base_class_declaration;
+            auto bc = m_ob.get_base_classes();
+            if (!bc.empty())
+            {
+
+                base_class_declaration = " : ";
+                int i = 0;
+                for (auto base_class : bc)
+                {
+                    if (i)
+                        base_class_declaration += ", ";
+                    base_class_declaration += base_class->get_name();
+                    i++;
+                }
+            }
+            header("struct {}{}", m_ob.get_name(), base_class_declaration);
             header("{{");
 
             for (auto& field : m_ob.get_functions())
@@ -971,12 +1000,12 @@ namespace enclave_marshaller
             header("}};");
         };
 
-        void write_library(bool from_host, const library_entity& lib, const class_entity& m_ob, writer& header, writer& proxy,
-                           writer& stub) {
+        void write_library(bool from_host, const class_entity& lib, const class_entity& m_ob, writer& header,
+                           writer& proxy, writer& stub) {
 
         };
 
-        void write_encapsulate_outbound_interfaces(bool from_host, const library_entity& lib, const class_entity& obj,
+        void write_encapsulate_outbound_interfaces(bool from_host, const class_entity& lib, const class_entity& obj,
                                                    writer& header, writer& proxy, writer& stub,
                                                    const std::vector<std::string>& namespaces)
         {
@@ -989,12 +1018,13 @@ namespace enclave_marshaller
             }
             int id = 1;
             header("template<> uint64_t "
-                 "rpc::service::encapsulate_outbound_interfaces(rpc::shared_ptr<{}{}> "
-                 "iface);",
-                 ns, interface_name);
+                   "rpc::service::encapsulate_outbound_interfaces(rpc::shared_ptr<{}{}> "
+                   "iface);",
+                   ns, interface_name);
         }
 
-        void write_library_proxy_factory(writer& proxy, writer& stub, const class_entity& obj, const std::vector<std::string>& namespaces)
+        void write_library_proxy_factory(writer& proxy, writer& stub, const class_entity& obj,
+                                         const std::vector<std::string>& namespaces)
         {
             auto interface_name = std::string(obj.get_type() == entity_type::LIBRARY ? "i_" : "") + obj.get_name();
             std::string ns;
@@ -1030,56 +1060,9 @@ namespace enclave_marshaller
             stub("}}");
         }
 
-        // entry point
-        void write_files(bool from_host, const library_entity& lib, std::ostream& hos, std::ostream& pos, std::ostream& sos,
-                         const std::vector<std::string>& namespaces, const std::string& header_filename)
+        void write_marshalling_logic(bool from_host, const class_entity& lib, writer& header, writer& proxy,
+                                     writer& stub)
         {
-            writer header(hos);
-            writer proxy(pos);
-            writer stub(sos);
-
-            header("#pragma once");
-            header("");
-            header("#include <memory>");
-            header("#include <vector>");
-            header("#include <map>");
-            header("#include <string>");
-
-            header("#include <marshaller/marshaller.h>");
-            header("#include <marshaller/service.h>");
-            header("");
-
-            proxy("#pragma once");
-            proxy("#include <yas/mem_streams.hpp>");
-            proxy("#include <yas/binary_iarchive.hpp>");
-            proxy("#include <yas/binary_oarchive.hpp>");
-            proxy("#include <yas/std_types.hpp>");
-            proxy("#include <marshaller/proxy.h>");
-            proxy("#include <marshaller/service.h>");
-            proxy("#include \"{}\"", header_filename);
-            proxy("");
-
-            stub("#pragma once");
-            stub("#include <yas/mem_streams.hpp>");
-            stub("#include <yas/binary_iarchive.hpp>");
-            stub("#include <yas/binary_oarchive.hpp>");
-            stub("#include <yas/std_types.hpp>");
-            stub("#include <marshaller/stub.h>");
-            stub("#include <marshaller/proxy.h>");
-            stub("#include <marshaller/service.h>");
-            stub("#include \"{}\"", header_filename);
-            stub("");
-
-            for (auto& ns : namespaces)
-            {
-                header("namespace {}", ns);
-                header("{{");
-                proxy("namespace {}", ns);
-                proxy("{{");
-                stub("namespace {}", ns);
-                stub("{{");
-            }
-
             for (auto& cls : lib.get_classes())
             {
                 if (cls->get_type() == entity_type::INTERFACE)
@@ -1157,6 +1140,89 @@ namespace enclave_marshaller
                         write_stub_cast_factory(from_host, lib, *cls, stub, 0);
                 }
             }
+        }
+
+        // entry point
+        void write_namespace(bool from_host, const class_entity& lib, writer& header, writer& proxy, writer& stub)
+        {
+            /*for (auto cls : lib.get_classes())
+            {
+                if (cls->get_type() == entity_type::NAMESPACE)
+                {
+
+                    header("namespace {}", cls->get_name());
+                    header("{{");
+                    proxy("namespace {}", cls->get_name());
+                    proxy("{{");
+                    stub("namespace {}", cls->get_name());
+                    stub("{{");
+
+                    write_namespace(from_host, *cls, header, proxy, stub);
+
+                    header("}}");
+                    proxy("}}");
+                    stub("}}");
+                }
+                else
+                {
+                    write_marshalling_logic(from_host, lib, header, proxy, stub);
+                }
+            }*/
+            write_marshalling_logic(from_host, lib, header, proxy, stub);
+        }
+
+        // entry point
+        void write_files(bool from_host, const class_entity& lib, std::ostream& hos, std::ostream& pos,
+                         std::ostream& sos, const std::vector<std::string>& namespaces,
+                         const std::string& header_filename)
+        {
+            writer header(hos);
+            writer proxy(pos);
+            writer stub(sos);
+
+            header("#pragma once");
+            header("");
+            header("#include <memory>");
+            header("#include <vector>");
+            header("#include <map>");
+            header("#include <string>");
+
+            header("#include <marshaller/marshaller.h>");
+            header("#include <marshaller/service.h>");
+            header("");
+
+            proxy("#pragma once");
+            proxy("#include <yas/mem_streams.hpp>");
+            proxy("#include <yas/binary_iarchive.hpp>");
+            proxy("#include <yas/binary_oarchive.hpp>");
+            proxy("#include <yas/std_types.hpp>");
+            proxy("#include <marshaller/proxy.h>");
+            proxy("#include <marshaller/service.h>");
+            proxy("#include \"{}\"", header_filename);
+            proxy("");
+
+            stub("#pragma once");
+            stub("#include <yas/mem_streams.hpp>");
+            stub("#include <yas/binary_iarchive.hpp>");
+            stub("#include <yas/binary_oarchive.hpp>");
+            stub("#include <yas/std_types.hpp>");
+            stub("#include <marshaller/stub.h>");
+            stub("#include <marshaller/proxy.h>");
+            stub("#include <marshaller/service.h>");
+            stub("#include \"{}\"", header_filename);
+            stub("");
+
+            for (auto& ns : namespaces)
+            {
+                header("namespace {}", ns);
+                header("{{");
+                proxy("namespace {}", ns);
+                proxy("{{");
+                stub("namespace {}", ns);
+                stub("{{");
+            }
+
+            write_namespace(from_host, lib, header, proxy, stub);
 
             for (auto& ns : namespaces)
             {
@@ -1165,13 +1231,12 @@ namespace enclave_marshaller
                 stub("}}");
             }
 
-
             for (auto& cls : lib.get_classes())
             {
                 if (cls->get_type() == entity_type::LIBRARY || cls->get_type() == entity_type::INTERFACE)
                     write_encapsulate_outbound_interfaces(from_host, lib, *cls, header, proxy, stub, namespaces);
             }
-            
+
             for (auto& cls : lib.get_classes())
             {
                 if (cls->get_type() == entity_type::LIBRARY || cls->get_type() == entity_type::INTERFACE)

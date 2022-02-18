@@ -136,9 +136,9 @@ int main(const int argc, char* argv[])
 	}
 
 	//load the idl file
-	library_entity objects;
+	auto objects = std::make_shared<class_entity>(nullptr);
 	const auto* ppdata = pre_parsed_data.data();
-	objects.parse_structure(ppdata,true, false);
+	objects->parse_structure(ppdata,true);
 
 	try
 	{
@@ -173,7 +173,7 @@ int main(const int argc, char* argv[])
 
 		//do the generation to the ostrstreams
 		{
-			enclave_marshaller::in_zone_synchronous_generator::write_files(true, objects, header_stream, proxy_stream, stub_stream, namespaces, headerPath);
+			enclave_marshaller::in_zone_synchronous_generator::write_files(true, *objects, header_stream, proxy_stream, stub_stream, namespaces, headerPath);
 
 			header_stream << ends;
 			proxy_stream << ends;
