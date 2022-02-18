@@ -1,6 +1,5 @@
 #include "marshaller/enclave_service_proxy.h"
 
-
 #ifndef _IN_ENCLAVE
 #include <sgx_urts.h>
 #include <sgx_capable.h>
@@ -8,12 +7,13 @@
 #include "untrusted/enclave_marshal_test_u.h"
 #endif
 
-
 namespace rpc
 {
 #ifndef _IN_ENCLAVE
-    enclave_service_proxy::enclave_service_proxy(const rpc::shared_ptr<service>& serv, uint64_t zone_id, std::string filename)
-        : service_proxy(serv, zone_id), filename_(filename)
+    enclave_service_proxy::enclave_service_proxy(const rpc::shared_ptr<service>& serv, uint64_t zone_id,
+                                                 std::string filename)
+        : service_proxy(serv, zone_id)
+        , filename_(filename)
     {
     }
 
@@ -39,14 +39,27 @@ namespace rpc
         return err_code;
     }
 
-    error_code enclave_service_proxy::send(uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_,
-                                       const char* in_buf_, size_t out_size_, char* out_buf_)
+    error_code enclave_service_proxy::send(uint64_t object_id, uint64_t interface_id, uint64_t method_id,
+                                           size_t in_size_, const char* in_buf_, std::vector<char>& out_buf_)
     {
         error_code err_code = 0;
-        sgx_status_t status
-            = ::call_enclave(eid_, &err_code, object_id, interface_id, method_id, in_size_, in_buf_, out_size_, out_buf_);
+        size_t data_out_sz = 0;
+        void* tls = nullptr;
+        sgx_status_t status = ::call_enclave(eid_, &err_code, object_id, interface_id, method_id, in_size_, in_buf_,
+                                             out_buf_.size(), out_buf_.data(), &data_out_sz, &tls);
+
         if (status)
-            err_code = -1;
+            return -1;
+
+        out_buf_.resize(data_out_sz);
+
+        if (err_code == -2)
+        {
+            // data too small reallocate memory and try again
+            status = ::call_enclave(eid_, &err_code, object_id, interface_id, method_id, in_size_, in_buf_,
+                                    out_buf_.size(), out_buf_.data(), &data_out_sz, &tls);
+        }
+
         return err_code;
     }
 

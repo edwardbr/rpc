@@ -47,9 +47,51 @@ void marshal_test_destroy_enclave()
 }
 
 int call_enclave(uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t sz_int, const char* data_in,
-         size_t sz_out, char* data_out)
+         size_t sz_out, char* data_out, size_t* data_out_sz, void** tls)
 {
-    error_code ret = rpc_server->send(object_id, interface_id, method_id, sz_int, data_in, sz_out, data_out);
+    //a retry cache using thread local storage, perhaps leaky if the client does not retry with more memory
+    std::vector<char>** out_buf = nullptr;
+    if(tls)
+    {
+        out_buf = (std::vector<char>**)tls;
+        if(out_buf && *out_buf && !sgx_is_within_enclave(*out_buf, sizeof(std::vector<char>*)))
+        {
+            return -3;
+        }
+    }
+
+
+    if(out_buf && *out_buf)
+    {
+        if((*out_buf)->size() <= sz_out)
+        {
+            memcpy(data_out, (*out_buf)->data(), (*out_buf)->size());
+            *data_out_sz = (*out_buf)->size();
+            delete (*out_buf);
+            (*out_buf) = nullptr;
+            return 0;
+        }
+        return -2;
+    }
+    
+    std::vector<char> tmp;
+    error_code ret = rpc_server->send(object_id, interface_id, method_id, sz_int, data_in, tmp);
+    if(ret == 0)
+    {
+        *data_out_sz = tmp.size();
+        if(tmp.size() <= sz_out)
+        {
+            memcpy(data_out, tmp.data(), tmp.size());
+            return 0;
+        }
+
+        //not enough memory so cache the results into the thread local storage
+        if(!out_buf)
+            return -1;
+            
+        (*out_buf) = new std::vector<char>(std::move(tmp));
+        return -2;
+    }
     return ret;
 }
 

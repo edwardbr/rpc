@@ -546,8 +546,8 @@ namespace enclave_marshaller
             return true;
         }
 
-        void write_interface(bool from_host, const class_entity& m_ob, writer& header,
-                             writer& proxy, writer& stub, int id)
+        void write_interface(bool from_host, const class_entity& m_ob, writer& header, writer& proxy, writer& stub,
+                             int id)
         {
             auto interface_name = std::string(m_ob.get_type() == entity_type::LIBRARY ? "i_" : "") + m_ob.get_name();
 
@@ -620,7 +620,7 @@ namespace enclave_marshaller
             stub("rpc::shared_ptr<{}> get_target() {{ return target_; }};", interface_name);
             stub("rpc::weak_ptr<rpc::object_stub> get_object_stub() override {{ return target_stub_;}}");
             stub("void* get_pointer() override {{ return target_.get();}}");
-            stub("error_code call(uint64_t method_id, size_t in_size_, const char* in_buf_, size_t out_size_, char* "
+            stub("error_code call(uint64_t method_id, size_t in_size_, const char* in_buf_, std::vector<char>& "
                  "out_buf_) override");
             stub("{{");
 
@@ -699,12 +699,12 @@ namespace enclave_marshaller
                     if (has_inparams)
                     {
                         proxy("//PROXY_MARSHALL_IN");
-                        proxy("const auto in_ = yas::save<yas::mem|yas::binary>(YAS_OBJECT_NVP(");
+                        proxy("const auto in_ = yas::save<yas::mem|yas::binary|yas::no_header>(YAS_OBJECT_NVP(");
                         proxy("  \"in\"");
 
                         stub("//STUB_MARSHALL_IN");
                         stub("yas::intrusive_buffer in(in_buf_, in_size_);");
-                        stub("yas::load<yas::mem|yas::binary>(in, YAS_OBJECT_NVP(");
+                        stub("yas::load<yas::mem|yas::binary|yas::no_header>(in, YAS_OBJECT_NVP(");
                         stub("  \"in\"");
 
                         uint64_t count = 1;
@@ -746,9 +746,8 @@ namespace enclave_marshaller
                     // proxy("for(int i = 0;i < in_.size;i++){{std::cout << in_.data.get() + i;}} std::cout <<
                     // \"\\n\";");
 
-                    proxy("char out_buf[10000];");
-                    proxy("error_code ret = get_object_proxy()->send({}::id, {}, in_.size, in_.data.get(), 10000, "
-                          "out_buf);",
+                    proxy("std::vector<char> out_buf_(24); //max size using short string optimisation");
+                    proxy("error_code ret = get_object_proxy()->send({}::id, {}, in_.size, in_.data.get(), out_buf_);",
                           interface_name, function_count);
                     proxy("if(ret)");
                     proxy("{{");
@@ -762,10 +761,10 @@ namespace enclave_marshaller
                         for (auto& parameter : function.get_parameters())
                         {
                             std::string output;
-                            if (!is_in_call(STUB_PARAM_WRAP, from_host, m_ob, parameter.get_name(), parameter.get_type(),
-                                            parameter.get_attributes(), count, output))
-                                is_out_call(STUB_PARAM_WRAP, from_host, m_ob, parameter.get_name(), parameter.get_type(),
-                                            parameter.get_attributes(), count, output);
+                            if (!is_in_call(STUB_PARAM_WRAP, from_host, m_ob, parameter.get_name(),
+                                            parameter.get_type(), parameter.get_attributes(), count, output))
+                                is_out_call(STUB_PARAM_WRAP, from_host, m_ob, parameter.get_name(),
+                                            parameter.get_type(), parameter.get_attributes(), count, output);
                             stub.raw("{}", output);
                         }
                     }
@@ -780,10 +779,10 @@ namespace enclave_marshaller
                         for (auto& parameter : function.get_parameters())
                         {
                             std::string output;
-                            if (!is_in_call(STUB_PARAM_CAST, from_host, m_ob, parameter.get_name(), parameter.get_type(),
-                                            parameter.get_attributes(), count, output))
-                                is_out_call(STUB_PARAM_CAST, from_host, m_ob, parameter.get_name(), parameter.get_type(),
-                                            parameter.get_attributes(), count, output);
+                            if (!is_in_call(STUB_PARAM_CAST, from_host, m_ob, parameter.get_name(),
+                                            parameter.get_type(), parameter.get_attributes(), count, output))
+                                is_out_call(STUB_PARAM_CAST, from_host, m_ob, parameter.get_name(),
+                                            parameter.get_type(), parameter.get_attributes(), count, output);
                             if (has_param)
                             {
                                 stub.raw(",");
@@ -833,14 +832,13 @@ namespace enclave_marshaller
                     {
                         uint64_t count = 1;
                         proxy("//PROXY_MARSHALL_OUT");
-                        proxy(
-                            "yas::load<yas::mem|yas::binary>(yas::intrusive_buffer{{out_buf, 10000}}, YAS_OBJECT_NVP(");
+                        proxy("yas::load<yas::mem|yas::binary|yas::no_header>(yas::intrusive_buffer{{out_buf_.data(), "
+                              "out_buf_.size()}}, YAS_OBJECT_NVP(");
                         proxy("  \"out\"");
                         proxy("  ,(\"_{}\", ret)", count);
 
                         stub("//STUB_MARSHALL_OUT");
-                        stub("yas::mem_ostream os(out_buf_, out_size_);");
-                        stub("yas::save<yas::mem|yas::binary>(os, YAS_OBJECT_NVP(");
+                        stub("const auto yas_mapping_ = YAS_OBJECT_NVP(");
                         stub("  \"out\"");
                         stub("  ,(\"_{}\", ret)", count);
 
@@ -861,6 +859,16 @@ namespace enclave_marshaller
                         }
                     }
                     proxy("  ));");
+
+                    stub("  );");
+
+                    stub("yas::count_ostream counter_;");
+                    stub("yas::binary_oarchive<yas::count_ostream, yas::mem|yas::binary|yas::no_header> oa(counter_);");
+                    stub("oa(yas_mapping_);");
+                    stub("out_buf_.resize(counter_.total_size);");
+                    stub("yas::mem_ostream writer_(out_buf_.data(), counter_.total_size);");
+                    stub("yas::save<yas::mem|yas::binary|yas::no_header>(writer_, yas_mapping_);");
+                    stub("return ret;");
 
                     proxy("//PROXY_VALUE_RETURN");
                     {
@@ -883,9 +891,6 @@ namespace enclave_marshaller
                     proxy("return ret;");
                     proxy("}}");
                     proxy("");
-
-                    stub("  ));");
-                    stub("return ret;");
 
                     function_count++;
                     stub("}}");
@@ -1016,14 +1021,14 @@ namespace enclave_marshaller
             {
                 ns += name + "::";
             }
-            
+
             auto owner = obj.get_owner();
-            while(owner && !owner->get_name().empty())
+            while (owner && !owner->get_name().empty())
             {
                 ns += owner->get_name() + "::";
                 owner = owner->get_owner();
             }
-            
+
             int id = 1;
             header("template<> uint64_t "
                    "rpc::service::encapsulate_outbound_interfaces(rpc::shared_ptr<{}{}> "
@@ -1042,7 +1047,7 @@ namespace enclave_marshaller
                 ns += name + "::";
             }
             auto owner = obj.get_owner();
-            while(owner && !owner->get_name().empty())
+            while (owner && !owner->get_name().empty())
             {
                 ns += owner->get_name() + "::";
                 owner = owner->get_owner();
@@ -1138,8 +1143,8 @@ namespace enclave_marshaller
         }
 
         // entry point
-        void write_namespace_predeclaration(bool from_host, const class_entity& lib, int& id, writer& header, writer& proxy,
-                             writer& stub)
+        void write_namespace_predeclaration(bool from_host, const class_entity& lib, int& id, writer& header,
+                                            writer& proxy, writer& stub)
         {
             for (auto cls : lib.get_classes())
             {
@@ -1200,8 +1205,8 @@ namespace enclave_marshaller
             write_marshalling_logic(from_host, lib, header, proxy, stub);
         }
 
-        void write_epilog(bool from_host, const class_entity& lib, int& id, writer& header, writer& proxy,
-                             writer& stub, const std::vector<std::string>& namespaces)
+        void write_epilog(bool from_host, const class_entity& lib, int& id, writer& header, writer& proxy, writer& stub,
+                          const std::vector<std::string>& namespaces)
         {
             for (auto cls : lib.get_classes())
             {
@@ -1220,9 +1225,6 @@ namespace enclave_marshaller
                 }
             }
         }
-
-        
-
 
         // entry point
         void write_files(bool from_host, const class_entity& lib, std::ostream& hos, std::ostream& pos,
@@ -1249,6 +1251,7 @@ namespace enclave_marshaller
             proxy("#include <yas/binary_iarchive.hpp>");
             proxy("#include <yas/binary_oarchive.hpp>");
             proxy("#include <yas/std_types.hpp>");
+            proxy("#include <yas/count_streams.hpp>");
             proxy("#include <marshaller/proxy.h>");
             proxy("#include <marshaller/service.h>");
             proxy("#include \"{}\"", header_filename);
@@ -1258,6 +1261,7 @@ namespace enclave_marshaller
             stub("#include <yas/mem_streams.hpp>");
             stub("#include <yas/binary_iarchive.hpp>");
             stub("#include <yas/binary_oarchive.hpp>");
+            stub("#include <yas/count_streams.hpp>");
             stub("#include <yas/std_types.hpp>");
             stub("#include <marshaller/stub.h>");
             stub("#include <marshaller/proxy.h>");

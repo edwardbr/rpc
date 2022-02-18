@@ -29,7 +29,7 @@ namespace rpc
     class service : public i_marshaller
     {
         uint64_t zone_id_ = 0;
-        std::atomic<uint64_t> object_id_generator;
+        std::atomic<uint64_t> object_id_generator = 0;
 
         // map object_id's to stubs
         std::unordered_map<uint64_t, rpc::weak_ptr<object_stub>> stubs;
@@ -68,7 +68,7 @@ namespace rpc
         template<class T> uint64_t encapsulate_outbound_interfaces(rpc::shared_ptr<T> object);
 
         error_code send(uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_,
-                        const char* in_buf_, size_t out_size_, char* out_buf_) override;
+                        const char* in_buf_, std::vector<char>& out_buf_) override;
 
         uint64_t add_lookup_stub(void* pointer,
                                  std::function<rpc::shared_ptr<i_interface_stub>(rpc::shared_ptr<object_stub>)> fn);

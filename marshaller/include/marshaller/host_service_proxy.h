@@ -25,7 +25,7 @@ namespace rpc
         error_code initialise();
 
         error_code send(uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_,
-                        const char* in_buf_, size_t out_size_, char* out_buf_) override;
+                        const char* in_buf_, std::vector<char>& out_buf_) override;
         error_code try_cast(uint64_t zone_id, uint64_t object_id, uint64_t interface_id) override;
         uint64_t add_ref(uint64_t zone_id, uint64_t object_id) override;
         uint64_t release(uint64_t zone_id, uint64_t object_id) override;

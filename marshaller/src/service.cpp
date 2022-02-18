@@ -51,7 +51,7 @@ namespace rpc
     }
 
     error_code service::send(uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_,
-                             const char* in_buf_, size_t out_size_, char* out_buf_)
+                             const char* in_buf_, std::vector<char>& out_buf_)
     {
         error_code ret = -1;
 
@@ -61,7 +61,7 @@ namespace rpc
         {
             return -1;
         }
-        ret = stub->call(interface_id, method_id, in_size_, in_buf_, out_size_, out_buf_);
+        ret = stub->call(interface_id, method_id, in_size_, in_buf_, out_buf_);
         return ret;
     }
 

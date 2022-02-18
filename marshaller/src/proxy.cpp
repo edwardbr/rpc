@@ -5,9 +5,9 @@ namespace rpc
     object_proxy::~object_proxy() { marshaller_->release(zone_id_, object_id_); }
 
     error_code object_proxy::send(uint64_t interface_id, uint64_t method_id, size_t in_size_, const char* in_buf_,
-                                  size_t out_size_, char* out_buf_)
+                                  std::vector<char>& out_buf_)
     {
-        return marshaller_->send(object_id_, interface_id, method_id, in_size_, in_buf_, out_size_, out_buf_);
+        return marshaller_->send(object_id_, interface_id, method_id, in_size_, in_buf_, out_buf_);
     }
 
     void object_proxy::register_interface(uint64_t interface_id, rpc::weak_ptr<proxy_base>& value)

@@ -74,7 +74,7 @@ namespace rpc
         rpc::shared_ptr<service_proxy> get_zone_base() { return marshaller_; }
 
         error_code send(uint64_t interface_id, uint64_t method_id, size_t in_size_, const char* in_buf_,
-                        size_t out_size_, char* out_buf_);
+                        std::vector<char>& out_buf_);
 
         template<class T> void create_interface_proxy(rpc::shared_ptr<T>& inface);
 

@@ -15,14 +15,14 @@ namespace rpc
     }
 
     error_code object_stub::call(uint64_t interface_id, uint64_t method_id, size_t in_size_, const char* in_buf_,
-                                 size_t out_size_, char* out_buf_)
+                                 std::vector<char>& out_buf_)
     {
         error_code ret = -1;
         std::lock_guard l(insert_control);
         auto item = stub_map.find(interface_id);
         if (item != stub_map.end())
         {
-            ret = item->second->call(method_id, in_size_, in_buf_, out_size_, out_buf_);
+            ret = item->second->call(method_id, in_size_, in_buf_, out_buf_);
         }
         return ret;
     }

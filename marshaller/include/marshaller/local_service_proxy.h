@@ -24,9 +24,9 @@ namespace rpc
         }
 
         error_code send(uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_,
-                        const char* in_buf_, size_t out_size_, char* out_buf_) override
+                        const char* in_buf_, std::vector<char>& out_buf_) override
         {
-            return marshaller_->send(object_id, interface_id, method_id, in_size_, in_buf_, out_size_, out_buf_);
+            return marshaller_->send(object_id, interface_id, method_id, in_size_, in_buf_, out_buf_);
         }
         error_code try_cast(uint64_t zone_id, uint64_t object_id, uint64_t interface_id) override
         {
