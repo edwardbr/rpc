@@ -19,6 +19,7 @@ target_link_libraries(marshal_test_host
   PUBLIC 
     marshaller_host
     marshal_test_edl_host
+    common_host
     
     yas_common    
     fmt::fmt-header-only

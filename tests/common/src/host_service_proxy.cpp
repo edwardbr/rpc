@@ -1,4 +1,4 @@
-#include "marshaller/host_service_proxy.h"
+#include "common/host_service_proxy.h"
 
 
 #ifdef _IN_ENCLAVE

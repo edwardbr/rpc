@@ -1,10 +1,12 @@
-#include "marshaller/enclave_service_proxy.h"
+#include "common/enclave_service_proxy.h"
 
 #ifndef _IN_ENCLAVE
 #include <sgx_urts.h>
 #include <sgx_capable.h>
 
-#include "untrusted/enclave_marshal_test_u.h"
+#include <C:/Dev/experiments/enclave_marshaller/build/tests/edl/untrusted/enclave_marshal_test_u.h>
+
+//#include "untrusted/enclave_marshal_test_u.h"
 #endif
 
 namespace rpc

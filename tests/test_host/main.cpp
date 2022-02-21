@@ -3,20 +3,19 @@
 #include <sgx_urts.h>
 #include <sgx_quote.h>
 #include <sgx_uae_service.h>
-//#include <sgx_tae_service.h>
 #include <sgx_capable.h>
 #include <sgx_uae_service.h>
 #include <sgx_eid.h>
 #include "untrusted/enclave_marshal_test_u.h"
 
-#include "../common/foo_impl.h"
-#include "../common/tests.h"
+#include <common/foo_impl.h>
+#include <common/tests.h>
+#include <common/enclave_service_proxy.h>
 
 #include <example/example.h>
 #include <example_proxy.cpp>
 #include <example_stub.cpp>
 
-#include <marshaller/enclave_service_proxy.h>
 #include <marshaller/local_service_proxy.h>
 
 using namespace marshalled_tests;

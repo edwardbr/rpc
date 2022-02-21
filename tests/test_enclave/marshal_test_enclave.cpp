@@ -3,15 +3,15 @@
 #include <cstring>
 #include <cstdio>
 
-#include "sgx_trts.h"
-#include "trusted/enclave_marshal_test_t.h"
+#include <sgx_trts.h>
+#include <trusted/enclave_marshal_test_t.h>
 
-#include "../common/foo_impl.h"
+#include <common/foo_impl.h>
+#include <common/host_service_proxy.h>
 
 #include <example/example.h>
 #include <example_stub.cpp>
 #include <example_proxy.cpp>
-#include <marshaller/host_service_proxy.h>
 
 using namespace marshalled_tests;
 

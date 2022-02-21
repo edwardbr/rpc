@@ -32,6 +32,7 @@ if(${BUILD_ENCLAVE})
   PUBLIC
     marshaller_enclave
     marshal_test_edl_enclave    
+    common_enclave
 
     ${SGX_ENCLAVE_LIBS}
   )
