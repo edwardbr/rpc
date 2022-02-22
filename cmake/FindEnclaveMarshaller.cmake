@@ -37,6 +37,10 @@ function(EnclaveMarshaller
     set(PATHS_PARAMS "${PATHS_PARAMS} --path \"${path}\"")
   endforeach()
 
+  if(NOT ${namespace} STREQUAL "")
+    set(PATHS_PARAMS "${PATHS_PARAMS} --namespace \"${namespace}\"")
+  endif()
+
   message("PATHS_PARAMS ${PATHS_PARAMS}")
 
 
@@ -49,7 +53,6 @@ function(EnclaveMarshaller
       --proxy ${proxy}
       --stub ${stub}
       ${PATHS_PARAMS}
-      --namespace ${namespace}
     DEPENDS ${dependencies} ${idl})")
 
   add_custom_command(
@@ -61,7 +64,6 @@ function(EnclaveMarshaller
       --proxy ${proxy}
       --stub ${stub}
       ${PATHS_PARAMS}
-      --namespace ${namespace}
     DEPENDS ${dependencies} ${idl})
 
   add_custom_target(${name}
