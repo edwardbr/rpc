@@ -4,9 +4,8 @@
 #include <sgx_urts.h>
 #include <sgx_capable.h>
 
-#include <C:/Dev/experiments/enclave_marshaller/build/tests/edl/untrusted/enclave_marshal_test_u.h>
+#include <untrusted/enclave_marshal_test_u.h>
 
-//#include "untrusted/enclave_marshal_test_u.h"
 #endif
 
 namespace rpc
