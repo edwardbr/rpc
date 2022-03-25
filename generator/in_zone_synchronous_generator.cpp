@@ -957,6 +957,11 @@ namespace enclave_marshaller
             header("struct {};", m_ob.get_name());
         }
 
+        void write_typedef_forward_declaration(const class_entity& m_ob, writer& header)
+        {
+            header("typedef {} {};", m_ob.get_alias_name(), m_ob.get_name());
+        }
+
         void write_struct(const class_entity& m_ob, writer& header)
         {
             std::string base_class_declaration;
@@ -973,6 +978,20 @@ namespace enclave_marshaller
                     base_class_declaration += base_class->get_name();
                     i++;
                 }
+            }
+            if(!m_ob.get_template_params().empty())
+            {
+                header.print_tabs();
+                header.raw("template<");
+                bool first_pass = true;
+                for(const auto& param : m_ob.get_template_params())
+                {
+                    if(!first_pass)
+                        header.raw(", ");    
+                    first_pass = false;
+                    header.raw("{} {}", param.type, param.name);
+                }
+                header.raw(">\n");
             }
             header("struct {}{}", m_ob.get_name(), base_class_declaration);
             header("{{");
@@ -1155,6 +1174,8 @@ namespace enclave_marshaller
                     write_interface_forward_declaration(*cls, header, proxy, stub);
                 if (cls->get_type() == entity_type::STRUCT)
                     write_struct_forward_declaration(*cls, header);
+                if (cls->get_type() == entity_type::TYPEDEF)
+                    write_typedef_forward_declaration(*cls, header);
             }
 
             for (auto cls : lib.get_classes())

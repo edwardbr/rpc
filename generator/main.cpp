@@ -98,11 +98,11 @@ int main(const int argc, char* argv[])
 
 		}
 
-		{
+		/*{
 			macro_parser::definition def;
 			def.m_substitutionString = "unsigned int ";
 			parser->AddDefine("size_t", def);
-		}
+		}*/
 		std::error_code ec;
 
 		auto idl = std::filesystem::absolute(rootIdl, ec);
