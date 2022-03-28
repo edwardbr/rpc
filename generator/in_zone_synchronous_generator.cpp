@@ -953,13 +953,39 @@ namespace enclave_marshaller
         }
 
         void write_struct_forward_declaration(const class_entity& m_ob, writer& header)
-        {
+        {            
+            if(!m_ob.get_template_params().empty())
+            {
+                header.print_tabs();
+                header.raw("template<");
+                bool first_pass = true;
+                for(const auto& param : m_ob.get_template_params())
+                {
+                    if(!first_pass)
+                        header.raw(", ");    
+                    first_pass = false;
+                    header.raw("{} {}", param.type, param.name);
+                }
+                header.raw(">\n");
+            }
             header("struct {};", m_ob.get_name());
+        }
+
+        void write_enum_forward_declaration(const class_entity& m_ob, writer& header)
+        {
+            header("enum class {}", m_ob.get_name());
+            header("{{");
+            auto enum_vals = m_ob.get_functions();
+            for(auto& enum_val : enum_vals)
+            {
+                header("{},", enum_val.get_name());                 
+            }
+            header("}};");
         }
 
         void write_typedef_forward_declaration(const class_entity& m_ob, writer& header)
         {
-            header("typedef {} {};", m_ob.get_alias_name(), m_ob.get_name());
+            header("using {} = {};", m_ob.get_name(), m_ob.get_alias_name());
         }
 
         void write_struct(const class_entity& m_ob, writer& header)
@@ -1005,6 +1031,8 @@ namespace enclave_marshaller
                 header.raw("{} {}", field.get_return_type(), field.get_name());
                 if(field.get_array_size())
                     header.raw("[{}]", field.get_array_size());
+                if(!field.get_default_value().empty())
+                    header.raw(" = {}::{}", field.get_return_type(), field.get_default_value());
                 header.raw(";\n");
             }
 
@@ -1174,6 +1202,8 @@ namespace enclave_marshaller
                     write_interface_forward_declaration(*cls, header, proxy, stub);
                 if (cls->get_type() == entity_type::STRUCT)
                     write_struct_forward_declaration(*cls, header);
+                if (cls->get_type() == entity_type::ENUM)
+                    write_enum_forward_declaration(*cls, header);
                 if (cls->get_type() == entity_type::TYPEDEF)
                     write_typedef_forward_declaration(*cls, header);
             }
