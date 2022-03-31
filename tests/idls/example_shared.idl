@@ -1,7 +1,7 @@
+typedef int error_code;
+
 namespace xxx
 {
-typedef uint64_t error_code;
-
 struct something_complicated
 {
     int int_val;
