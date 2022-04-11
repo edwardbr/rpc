@@ -6,6 +6,7 @@ host_edl_library(
   ""
   OFF
   ""
+  ""
 )
 set_property(TARGET marshal_test_edl_host PROPERTY COMPILE_PDB_NAME marshal_test_edl_host)    
 
@@ -14,6 +15,7 @@ enclave_edl_library(
   enclave_marshal_test.edl
   ""
   OFF
+  ""
   ""
 )
 set_property(TARGET marshal_test_edl_enclave PROPERTY COMPILE_PDB_NAME marshal_test_edl_enclave)   
