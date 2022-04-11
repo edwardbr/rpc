@@ -1,0 +1,10 @@
+#include "example_shared.idl"
+
+namespace yyy
+{
+    library example
+    {
+        error_code add(int a, int b, [out, by_value] int& c);
+        error_code create_foo([out]rpc::shared_ptr<xxx::i_foo>& target);
+    };
+}

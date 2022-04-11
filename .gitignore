@@ -1,0 +1,9 @@
+Debug
+Release
+.vs
+.vscode
+x64
+test
+build
+.vscode/launch.json
+.vscode/settings.json

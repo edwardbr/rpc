@@ -1,0 +1,35 @@
+#include "example_shared.idl"
+
+namespace marshal_test_enclave
+{
+    [enclave]
+    zone bft
+    {
+        class foo : 
+            marshal_test_common::i_foo, 
+            marshal_test_common::i_bar;
+
+        error_code add(int a, int b, [ out, by_value ] int& c);
+        error_code create_foo([out] rpc::shared_ptr<i_foo> & target);
+    };
+}
+
+namespace marshal_test_host
+{
+    interface i_baz
+    {
+        error_code shake_your_booty(int a, int b, [ out, by_value ] int& c);
+    };
+
+    [host]
+    zone node
+    {
+        [final] class bingo : 
+            marshal_test_common::i_foo, 
+            marshal_test_common::i_bar, 
+            marshal_test_common::i_baz;
+
+        error_code add(int a, int b, [ out, by_value ] int& c);
+        error_code create_foo([out] rpc::shared_ptr<i_foo> & target);
+    };
+}
