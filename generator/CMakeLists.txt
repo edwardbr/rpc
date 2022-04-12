@@ -12,6 +12,7 @@ target_compile_options(in_zone_synchronous_generator PRIVATE ${HOST_COMPILE_OPTI
 target_include_directories(in_zone_synchronous_generator 
     PRIVATE 
         ${HOST_INCLUDES})
+add_dependencies(in_zone_synchronous_generator miscellaneous_host)
 target_link_libraries(in_zone_synchronous_generator 
     PUBLIC 
         ast_parser
