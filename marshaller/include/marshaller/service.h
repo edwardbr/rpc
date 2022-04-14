@@ -45,12 +45,12 @@ namespace rpc
     public:
         service(uint64_t zone_id = 1) : zone_id_(zone_id){}
         virtual ~service();
-        template<class T, class Stub> error_code initialise(rpc::shared_ptr<T> root_ob)
+        template<class T, class Stub, class obj_stub = object_stub> error_code initialise(rpc::shared_ptr<T> root_ob)
         {
             assert(check_is_empty());
 
             auto id = get_new_object_id();
-            auto os = rpc::shared_ptr<object_stub>(new object_stub(id, *this));
+            auto os = rpc::shared_ptr<obj_stub>(new obj_stub(id, *this));
             root_stub = rpc::static_pointer_cast<i_interface_stub>(Stub::create(root_ob, os));
             os->add_interface(root_stub);
             add_object(root_ob.get(), os);
@@ -80,7 +80,7 @@ namespace rpc
         uint64_t release(uint64_t zone_id, uint64_t object_id) override;
 
         void add_zone(uint64_t zone_id, rpc::weak_ptr<service_proxy> zone);
-        rpc::weak_ptr<service_proxy> service::get_zone(uint64_t zone_id);
+        rpc::weak_ptr<service_proxy> get_zone(uint64_t zone_id);
         void remove_zone(uint64_t zone_id);
     };
 }

@@ -2,7 +2,7 @@
 
 #include <example/example.h>
 
-void log(std::string& data)
+void log(const std::string& data)
 {
     log_str(data.data(), data.size() + 1);
 }

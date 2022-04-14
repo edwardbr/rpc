@@ -649,8 +649,9 @@ namespace enclave_marshaller
                     header.print_tabs();
                     proxy.print_tabs();
                     header.raw("virtual {} {}(", function.get_return_type(), function.get_name());
-                    proxy.raw("virtual {} {}_proxy::{} (", function.get_return_type(), interface_name,
-                              function.get_name());
+                    // proxy.raw("virtual {} {}_proxy::{} (", function.get_return_type(), interface_name,
+                    //           function.get_name());
+                    proxy.raw("virtual {} {}(", function.get_return_type(), function.get_name());
                     bool has_parameter = false;
                     for (auto& parameter : function.get_parameters())
                     {

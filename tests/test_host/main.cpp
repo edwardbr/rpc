@@ -2,9 +2,8 @@
 
 #include <sgx_urts.h>
 #include <sgx_quote.h>
-#include <sgx_uae_service.h>
 #include <sgx_capable.h>
-#include <sgx_uae_service.h>
+#include <sgx_uae_epid.h>
 #include <sgx_eid.h>
 #include "untrusted/enclave_marshal_test_u.h"
 
@@ -76,7 +75,7 @@ int main()
         // create a proxy for the other rpc::service, keep an instance going
         auto other_service_proxy = rpc::local_service_proxy::create(other_service, 1, marshaller, 0);
 
-        rpc::shared_ptr<marshalled_tests::xxx::i_foo> i_foo_ptr;
+        rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
         err_code = example_ptr->create_foo(i_foo_ptr);
         if (err_code)
         {
@@ -104,7 +103,7 @@ int main()
 
         auto example_ptr = ex->get_interface<yyy::i_example>();
 
-        rpc::shared_ptr<marshalled_tests::xxx::i_foo> i_foo_ptr;
+        rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
         err_code = example_ptr->create_foo(i_foo_ptr);
         if (err_code)
         {

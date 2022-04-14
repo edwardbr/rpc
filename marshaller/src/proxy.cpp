@@ -28,6 +28,11 @@ namespace rpc
         proxy_map[interface_id] = value;
     }
 
+    error_code object_proxy::try_cast(uint64_t interface_id)
+    {
+        return marshaller_->try_cast(zone_id_, object_id_, interface_id);
+    }
+
     error_code service_proxy::set_root_object(uint64_t object_id)
     {
         if (root_object_proxy_)

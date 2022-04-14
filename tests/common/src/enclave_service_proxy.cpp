@@ -28,7 +28,11 @@ namespace rpc
     {
         sgx_launch_token_t token = {0};
         int updated = 0;
-        sgx_status_t status = sgx_create_enclavea(filename_.data(), 1, &token, &updated, &eid_, NULL);
+        #ifdef _WIN32
+            auto status = sgx_create_enclavea(filename_.data(), 1, &token, &updated, &eid_, NULL);
+        #else
+            auto status = sgx_create_enclave(filename_.data(), 1, &token, &updated, &eid_, NULL);
+        #endif
         if (status)
             return -1;
         error_code err_code = 0;

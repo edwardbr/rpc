@@ -651,11 +651,11 @@ if(SGX_FOUND)
     target_link_libraries(
       ${target}
       "${SGX_COMMON_CFLAGS} \
-                                         -L${SGX_LIBRARY_PATH} \
-                                         -l${SGX_URTS_LIB} \
-                                         -l${SGX_USVC_LIB} \
-                                         -lsgx_ukey_exchange \
-                                         -lpthread")
+      -L${SGX_LIBRARY_PATH} \
+      -l${SGX_URTS_LIB} \
+      -l${SGX_USVC_LIB} \
+      -lsgx_ukey_exchange \
+      -lpthread")
 
     set_property(
       DIRECTORY APPEND PROPERTY ADDITIONAL_MAKE_CLEAN_FILES

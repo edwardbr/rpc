@@ -168,7 +168,7 @@ namespace marshalled_tests
         example_ptr->add(1, 2, val);
 
         // check the creation of an object that is passed back via interface
-        rpc::shared_ptr<marshalled_tests::xxx::i_foo> foo;
+        rpc::shared_ptr<xxx::i_foo> foo;
         example_ptr->create_foo(foo);
         foo->do_something_in_val(22);
 

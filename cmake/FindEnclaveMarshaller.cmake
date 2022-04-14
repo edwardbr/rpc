@@ -34,7 +34,7 @@ function(EnclaveMarshaller
 
   set(PATHS_PARAMS)
   foreach (path ${params_include_paths})
-    set(PATHS_PARAMS "${PATHS_PARAMS} --path \"${path}\"")
+    set(PATHS_PARAMS ${PATHS_PARAMS} "--path" "\"${path}\"")
   endforeach()
 
   if(NOT ${namespace} STREQUAL "")

@@ -56,7 +56,7 @@ namespace rpc
         }
         return nullptr;
     }
-    const void* __shared_weak_count::__get_deleter(const type_info&) const noexcept { return nullptr; }
+    const void* __shared_weak_count::__get_deleter(const std::type_info&) const noexcept { return nullptr; }
 
 
 }

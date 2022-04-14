@@ -26,7 +26,7 @@ namespace rpc
         virtual ~proxy_base() = default;
         rpc::shared_ptr<object_proxy> get_object_proxy() { return object_proxy_; }
 
-        template<class T1, class T2>
+        template<class T1, class T2, class proxy>
         friend rpc::shared_ptr<T1> rpc::dynamic_pointer_cast(const shared_ptr<T2>&) noexcept;
     };
 
@@ -57,6 +57,8 @@ namespace rpc
             , marshaller_(marshaller)
         {
         }
+
+        error_code try_cast(uint64_t interface_id);
 
     public:
         static rpc::shared_ptr<object_proxy> create(uint64_t object_id, uint64_t zone_id,
@@ -112,7 +114,7 @@ namespace rpc
             if (do_remote_check)
             {
                 // see if object_id can implement interface
-                error_code ret = marshaller_->try_cast(zone_id_, object_id_, T::id);
+                error_code ret = try_cast(T::id);
                 if (ret != 0)
                 {
                     return ret;
@@ -163,7 +165,7 @@ namespace rpc
             rpc::shared_ptr<object_proxy> op;
             {
                 std::lock_guard l(insert_control);
-                auto& item = proxies.find(object_id);
+                auto item = proxies.find(object_id);
                 if (item != proxies.end())
                     op = item->second.lock();
                 else
