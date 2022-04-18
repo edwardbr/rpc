@@ -121,7 +121,7 @@ int main(const int argc, char* argv[])
         std::vector<std::string> loaded_includes;
 
 		std::stringstream output_stream;
-		parser->load(output_stream, rootIdl, parsed_paths, loaded_includes);
+		auto r = parser->load(output_stream, rootIdl, parsed_paths, loaded_includes);
 		pre_parsed_data = output_stream.str();
 		if(dump_preprocessor_output_and_die)
 		{
