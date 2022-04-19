@@ -37,11 +37,10 @@ namespace std
             typedef allocator<_Other> other;
         };
     };
-#define STRINGIZE(x) #x
-#define SSTRINGIZE(x) STRINGIZE(x)
-#pragma message ("_LIBCPP_STD_VER = " SSTRINGIZE(_LIBCPP_STD_VER))
-#pragma message ("__cplusplus = " SSTRINGIZE(__cplusplus))
+
+#if _LIBCPP_STD_VER <= 11
     template<class T> using remove_extent_t = typename remove_extent<T>::type;
+#endif
 }
 
 namespace rpc
