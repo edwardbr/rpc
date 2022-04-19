@@ -37,7 +37,9 @@ namespace std
             typedef allocator<_Other> other;
         };
     };
-
+#define STRINGIZE(x) "_LIBCPP_STD_VER = " #x
+#define SSTRINGIZE(x) STRINGIZE(x)
+#pragma message (SSTRINGIZE(_LIBCPP_STD_VER))
     template<class T> using remove_extent_t = typename remove_extent<T>::type;
 }
 
