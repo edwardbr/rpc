@@ -1,4 +1,5 @@
-#include "example_shared.idl"
+#import "example_shared.idl"
+#import "example_import.idl"
 
 namespace yyy
 {

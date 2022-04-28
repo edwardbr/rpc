@@ -20,6 +20,21 @@ std::stringstream verboseStream;
 
 namespace javascript_json{	namespace json	{		extern string namespace_name;	}}
 
+void get_imports(const std::shared_ptr<class_entity>& object, std::list<std::string>& imports, std::set<std::string>& imports_cache)
+{
+	for(auto& cls : object->get_classes())	
+	{
+		if(!cls->get_import_lib().empty())
+		{
+			if(imports_cache.find(cls->get_import_lib()) == imports_cache.end())
+			{
+				imports_cache.insert(cls->get_import_lib());
+				imports.push_back(cls->get_import_lib());
+			}
+		}
+	}
+}
+
 int main(const int argc, char* argv[])
 {
 	string rootIdl;
@@ -140,6 +155,18 @@ int main(const int argc, char* argv[])
 	const auto* ppdata = pre_parsed_data.data();
 	objects->parse_structure(ppdata,true);
 
+	std::list<std::string> imports;
+	{
+		std::set<std::string> imports_cache;
+		if(!objects->get_import_lib().empty())
+		{
+			std::cout << "root object has a non empty import lib\n";
+			return -1;
+		}
+
+		get_imports(objects, imports, imports_cache);
+	}
+
 	try
 	{
 		string interfaces_h_data;
@@ -173,7 +200,7 @@ int main(const int argc, char* argv[])
 
 		//do the generation to the ostrstreams
 		{
-			enclave_marshaller::in_zone_synchronous_generator::write_files(true, *objects, header_stream, proxy_stream, stub_stream, namespaces, headerPath);
+			enclave_marshaller::in_zone_synchronous_generator::write_files(true, *objects, header_stream, proxy_stream, stub_stream, namespaces, headerPath, imports);
 
 			header_stream << ends;
 			proxy_stream << ends;

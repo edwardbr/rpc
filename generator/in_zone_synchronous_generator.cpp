@@ -4,6 +4,7 @@
 #include <type_traits>
 #include "coreclasses.h"
 #include "cpp_parser.h"
+#include <filesystem>
 
 #include "writer.h"
 
@@ -1148,8 +1149,12 @@ namespace enclave_marshaller
         void write_marshalling_logic(bool from_host, const class_entity& lib, writer& header, writer& proxy,
                                      writer& stub)
         {
-
             {
+                if(lib.get_owner() == nullptr)
+                {
+                    stub("#ifndef STUB_FACTORY");
+                    stub("#define STUB_FACTORY");
+                }
                 stub("template<class T>");
                 stub("error_code stub_factory(uint64_t interface_id, rpc::shared_ptr<T> original, "
                      "rpc::shared_ptr<rpc::i_interface_stub>& new_stub)");
@@ -1163,30 +1168,42 @@ namespace enclave_marshaller
                 int id = 1;
                 for (auto& cls : lib.get_classes())
                 {
+                    if(!cls->get_import_lib().empty())
+                        continue;
                     if (cls->get_type() == entity_type::INTERFACE)
                         write_stub_factory(from_host, lib, *cls, stub, id++);
                 }
 
                 for (auto& cls : lib.get_classes())
                 {
+                    if(!cls->get_import_lib().empty())
+                        continue;
                     if (cls->get_type() == entity_type::LIBRARY)
                         write_stub_factory(from_host, lib, *cls, stub, 0);
                 }
 
                 stub("return ret;");
                 stub("}}");
+                if(lib.get_owner() == nullptr)
+                {
+                    stub("#endif");
+                }
             }
 
             {
                 int id = 1;
                 for (auto& cls : lib.get_classes())
                 {
+                    if(!cls->get_import_lib().empty())
+                        continue;
                     if (cls->get_type() == entity_type::INTERFACE)
                         write_stub_cast_factory(from_host, lib, *cls, stub, id++);
                 }
 
                 for (auto& cls : lib.get_classes())
                 {
+                    if(!cls->get_import_lib().empty())
+                        continue;
                     if (cls->get_type() == entity_type::LIBRARY)
                         write_stub_cast_factory(from_host, lib, *cls, stub, 0);
                 }
@@ -1199,6 +1216,8 @@ namespace enclave_marshaller
         {
             for (auto cls : lib.get_classes())
             {
+                if(!cls->get_import_lib().empty())
+                    continue;
                 if (cls->get_type() == entity_type::INTERFACE)
                     write_interface_forward_declaration(*cls, header, proxy, stub);
                 if (cls->get_type() == entity_type::STRUCT)
@@ -1211,6 +1230,8 @@ namespace enclave_marshaller
 
             for (auto cls : lib.get_classes())
             {
+                if(!cls->get_import_lib().empty())
+                    continue;
                 if (cls->get_type() == entity_type::NAMESPACE)
                 {
 
@@ -1236,6 +1257,8 @@ namespace enclave_marshaller
         {
             for (auto cls : lib.get_classes())
             {
+                if(!cls->get_import_lib().empty())
+                    continue;
                 if (cls->get_type() == entity_type::NAMESPACE)
                 {
 
@@ -1265,6 +1288,8 @@ namespace enclave_marshaller
         {
             for (auto cls : lib.get_classes())
             {
+                if(!cls->get_import_lib().empty())
+                    continue;
                 if (cls->get_type() == entity_type::NAMESPACE)
                 {
 
@@ -1284,7 +1309,7 @@ namespace enclave_marshaller
         // entry point
         void write_files(bool from_host, const class_entity& lib, std::ostream& hos, std::ostream& pos,
                          std::ostream& sos, const std::vector<std::string>& namespaces,
-                         const std::string& header_filename)
+                         const std::string& header_filename, const std::list<std::string>& imports)
         {
             writer header(hos);
             writer proxy(pos);
@@ -1299,6 +1324,14 @@ namespace enclave_marshaller
 
             header("#include <marshaller/marshaller.h>");
             header("#include <marshaller/service.h>");
+
+            for(const auto& import : imports)
+            {
+                std::filesystem::path p(import);
+                auto import_header = p.stem();
+                header("#include \"{}.h\"", import_header.string());
+            }
+
             header("");
 
             proxy("#pragma once");

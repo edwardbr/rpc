@@ -10,8 +10,15 @@
 #include <common/host_service_proxy.h>
 
 #include <example/example.h>
-#include <example_stub.cpp>
+
+#include <example_shared_proxy.cpp>
+#include <example_shared_stub.cpp>
+
+#include <example_import_proxy.cpp>
+#include <example_import_stub.cpp>
+
 #include <example_proxy.cpp>
+#include <example_stub.cpp>
 
 using namespace marshalled_tests;
 
