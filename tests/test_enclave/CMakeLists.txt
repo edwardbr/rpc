@@ -16,6 +16,7 @@ if(${BUILD_ENCLAVE})
     marshaller_enclave
     marshal_test_edl_enclave    
     common_enclave
+    example_interface
     ${SGX_ENCLAVE_LIBS}
     )
   
@@ -33,7 +34,6 @@ if(${BUILD_ENCLAVE})
   target_link_options(marshal_test_enclave PRIVATE ${ENCLAVE_LINK_OPTIONS})
 
   set_property(TARGET marshal_test_enclave PROPERTY COMPILE_PDB_NAME marshal_test_enclave)
-  add_dependencies(marshal_test_enclave example_interface)
 
   enclave_sign(marshal_test_enclave KEY marshal_test_enclave_private.pem CONFIG marshal_test_enclave.config.xml)
 

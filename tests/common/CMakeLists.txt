@@ -28,12 +28,12 @@ if(${BUILD_ENCLAVE})
    PUBLIC
      marshaller_enclave
      marshal_test_edl_enclave
+     example_interface
 
      yas_common    
     )
   
    set_property(TARGET common_enclave PROPERTY COMPILE_PDB_NAME common_enclave)
-   add_dependencies(common_enclave example_interface)
   
 
 endif()
@@ -60,11 +60,11 @@ if(${BUILD_HOST})
  PUBLIC
    marshaller_host 
    marshal_test_edl_host
+   example_interface
 
    yas_common    
  )
 
  set_property(TARGET common_host PROPERTY COMPILE_PDB_NAME common_host)
- add_dependencies(common_host example_interface)
-
+ 
  endif()

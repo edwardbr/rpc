@@ -9,11 +9,10 @@ EnclaveMarshaller(
     example_shared_proxy.cpp
     example_shared_stub.cpp
     marshalled_tests
+    dependencies
     include_paths
         ${CMAKE_CURRENT_SOURCE_DIR}/.
         ${CMAKE_SOURCE_DIR}/submodules/idlparser/defines
-    dependencies
-        in_zone_synchronous_generator
     )    
 
 EnclaveMarshaller(
@@ -24,14 +23,13 @@ EnclaveMarshaller(
     example_import_proxy.cpp
     example_import_stub.cpp
     marshalled_tests
+    dependencies
+        example_shared
     include_paths
         ${CMAKE_CURRENT_SOURCE_DIR}/.
         ${CMAKE_SOURCE_DIR}/submodules/idlparser/defines
-    dependencies
-        in_zone_synchronous_generator
-        example_shared
     )
-    
+
 EnclaveMarshaller(
     example_interface
     ${CMAKE_CURRENT_SOURCE_DIR}/example_interface.idl
@@ -40,11 +38,10 @@ EnclaveMarshaller(
     example_proxy.cpp
     example_stub.cpp
     marshalled_tests
+    dependencies
+        example_import
+        example_shared
     include_paths
         ${CMAKE_CURRENT_SOURCE_DIR}/.
         ${CMAKE_SOURCE_DIR}/submodules/idlparser/defines
-    dependencies
-        in_zone_synchronous_generator
-        example_import
-        example_shared
     )
