@@ -1328,7 +1328,7 @@ namespace enclave_marshaller
             for(const auto& import : imports)
             {
                 std::filesystem::path p(import);
-                auto import_header = p.stem();
+                auto import_header = p.root_name() / p.parent_path() / p.stem();
                 header("#include \"{}.h\"", import_header.string());
             }
 

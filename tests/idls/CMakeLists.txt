@@ -3,7 +3,8 @@ cmake_minimum_required(VERSION 3.12)
 
 EnclaveMarshaller(
     example_shared
-    ${CMAKE_CURRENT_SOURCE_DIR}/example_shared.idl
+    example_shared.idl
+    ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_BINARY_DIR}/generated
     example/example_shared.h
     example_shared_proxy.cpp
@@ -17,7 +18,8 @@ EnclaveMarshaller(
 
 EnclaveMarshaller(
     example_import
-    ${CMAKE_CURRENT_SOURCE_DIR}/example_import.idl
+    example_import.idl
+    ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_BINARY_DIR}/generated
     example/example_import.h
     example_import_proxy.cpp
@@ -32,7 +34,8 @@ EnclaveMarshaller(
 
 EnclaveMarshaller(
     example_interface
-    ${CMAKE_CURRENT_SOURCE_DIR}/example_interface.idl
+    example_interface.idl
+    ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_BINARY_DIR}/generated
     example/example.h
     example_proxy.cpp
