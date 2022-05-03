@@ -9,6 +9,9 @@ add_executable(in_zone_synchronous_generator
 
 target_compile_definitions(in_zone_synchronous_generator PRIVATE ${HOST_DEFINES})
 target_compile_options(in_zone_synchronous_generator PRIVATE ${HOST_COMPILE_OPTIONS})
+if(UNIX)
+    add_dependencies(in_zone_synchronous_generator miscellaneous_host)
+endif()
 target_include_directories(in_zone_synchronous_generator 
     PRIVATE 
         ${HOST_INCLUDES})
