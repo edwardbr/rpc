@@ -8,11 +8,11 @@
 
 #include "writer.h"
 
-#include "in_zone_synchronous_generator.h"
+#include "synchronous_generator.h"
 
 namespace enclave_marshaller
 {
-    namespace in_zone_synchronous_generator
+    namespace synchronous_generator
     {
         enum print_type
         {
@@ -1329,7 +1329,10 @@ namespace enclave_marshaller
             {
                 std::filesystem::path p(import);
                 auto import_header = p.root_name() / p.parent_path() / p.stem();
-                header("#include \"{}.h\"", import_header.string());
+                auto path = import_header.string();
+                std::replace(path.begin(), path.end(),'\\', '/');
+                header("#include \"{}.h\"", path);
+
             }
 
             header("");

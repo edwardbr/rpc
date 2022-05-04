@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.12)
 
+set(DEBUG_RPC_GEN ON)
 
 EnclaveMarshaller(
     example_shared
@@ -10,6 +11,7 @@ EnclaveMarshaller(
     example_shared_proxy.cpp
     example_shared_stub.cpp
     marshalled_tests
+    mock example/example_shared_mock.h
     dependencies
     include_paths
         ${CMAKE_CURRENT_SOURCE_DIR}/.
@@ -25,6 +27,7 @@ EnclaveMarshaller(
     example_import_proxy.cpp
     example_import_stub.cpp
     marshalled_tests
+    mock example/example_import_mock.h
     dependencies
         example_shared
     include_paths
@@ -41,6 +44,7 @@ EnclaveMarshaller(
     example_proxy.cpp
     example_stub.cpp
     marshalled_tests
+    mock example/example_mock.h
     dependencies
         example_import
         example_shared

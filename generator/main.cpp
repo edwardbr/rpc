@@ -11,7 +11,8 @@
 
 #include <coreclasses.h>
 
-#include "in_zone_synchronous_generator.h"
+#include "synchronous_generator.h"
+#include "synchronous_mock_generator.h"
 
 using namespace std;
 
@@ -41,6 +42,7 @@ int main(const int argc, char* argv[])
 	string headerPath;
 	string proxyPath;
 	string stubPath;
+	string mockPath;
 	string output_path;
 	std::vector<std::string> namespaces;
 	std::vector<std::string> include_paths;
@@ -55,6 +57,7 @@ int main(const int argc, char* argv[])
         clipp::required("-h", "--header").doc("the generated header relative filename") & clipp::value("header",headerPath),
         clipp::required("-x", "--proxy").doc("the generated proxy relative filename") & clipp::value("proxy",proxyPath),
         clipp::required("-s", "--stub").doc("the generated stub relative filename") & clipp::value("stub",stubPath),
+        clipp::option("-m", "--mock").doc("the generated mock relative filename") & clipp::value("mock",mockPath),
 		clipp::repeatable(clipp::option("-p", "--path") & clipp::value("path",include_paths)).doc("locations of include files used by the idl"),
 		clipp::option("-n","--namespace").doc("namespace of the generated interface") & clipp::value("namespace",namespaces),
 		clipp::option("-d","--dump_preprocessor_output_and_die").set(dump_preprocessor_output_and_die).doc("dump preprocessor output and die"),
@@ -83,6 +86,8 @@ int main(const int argc, char* argv[])
 	std::replace( headerPath.begin(), headerPath.end(), '\\', '/'); 
 	std::replace( proxyPath.begin(), proxyPath.end(), '\\', '/'); 
 	std::replace( stubPath.begin(), stubPath.end(), '\\', '/'); 
+	if(mockPath.length())
+		std::replace( mockPath.begin(), mockPath.end(), '\\', '/'); 
 	std::replace( output_path.begin(), output_path.end(), '\\', '/'); 
 
     std::unique_ptr<macro_parser> parser = std::unique_ptr<macro_parser>(new macro_parser());
@@ -172,14 +177,18 @@ int main(const int argc, char* argv[])
 		string interfaces_h_data;
 		string interfaces_proxy_data;
 		string interfaces_stub_data;
+		string interfaces_mock_data;
 
 		auto header_path = std::filesystem::path(output_path) / "include" / headerPath;
 		auto proxy_path = std::filesystem::path(output_path) / "src" / proxyPath;
 		auto stub_path = std::filesystem::path(output_path) / "src" / stubPath;
+		auto mock_path = std::filesystem::path(output_path) / "include" / mockPath;
 
 		std::filesystem::create_directories(header_path.parent_path());
 		std::filesystem::create_directories(proxy_path.parent_path());
 		std::filesystem::create_directories(stub_path.parent_path());
+		if(mockPath.length())
+			std::filesystem::create_directories(mock_path.parent_path());
 
 		//read the original data and close the files afterwards
 		{
@@ -192,19 +201,31 @@ int main(const int argc, char* argv[])
 
 			ifstream stub_fs(stub_path);
 			std::getline(stub_fs, interfaces_stub_data, '\0');
+
+			if(mockPath.length())
+			{
+				ifstream mock_fs(mock_path);
+				std::getline(mock_fs, interfaces_mock_data, '\0');
+			}
 		}
 
 		std::stringstream header_stream;
 		std::stringstream proxy_stream;
 		std::stringstream stub_stream;
+		std::stringstream mock_stream;
 
 		//do the generation to the ostrstreams
 		{
-			enclave_marshaller::in_zone_synchronous_generator::write_files(true, *objects, header_stream, proxy_stream, stub_stream, namespaces, headerPath, imports);
+			enclave_marshaller::synchronous_generator::write_files(true, *objects, header_stream, proxy_stream, stub_stream, namespaces, headerPath, imports);
 
 			header_stream << ends;
 			proxy_stream << ends;
 			stub_stream << ends;
+			if(mockPath.length())
+			{
+				enclave_marshaller::synchronous_mock_generator::write_files(true, *objects, mock_stream, namespaces, headerPath, imports);
+				mock_stream << ends;
+			}
 		}
 
 		//compare and write if different
@@ -222,6 +243,14 @@ int main(const int argc, char* argv[])
 		{
 			ofstream file(stub_path);
 			file << stub_stream.str();
+		}
+		if(mockPath.length())
+		{
+			if(interfaces_mock_data != mock_stream.str())
+			{
+				ofstream file(mock_path);
+				file << mock_stream.str();
+			}
 		}
 
 	}
