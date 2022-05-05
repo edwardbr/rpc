@@ -45,14 +45,14 @@ function(EnclaveMarshaller
 
   set(PATHS_PARAMS)
   foreach (path ${params_include_paths})
-    set(PATHS_PARAMS ${PATHS_PARAMS} "--path" "\"${path}\"")
+    set(PATHS_PARAMS "${PATHS_PARAMS} --path \"${path}\"")
   endforeach()
 
   foreach (dep ${params_dependencies})
     get_target_property(dep_base_dir ${dep}_generate base_dir)
     if(dep_base_dir)
       message("dep_base_dir ${dep_base_dir}")
-      set(PATHS_PARAMS ${PATHS_PARAMS} "--path" "\"${dep_base_dir}\"")
+      set(PATHS_PARAMS "${PATHS_PARAMS} --path \"${dep_base_dir}\"")
     endif()
   endforeach()  
 
