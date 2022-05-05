@@ -43,26 +43,26 @@ function(EnclaveMarshaller
     set(ENCLAVE_MARSHALLER generator)
   endif()
 
-  set(PATHS_PARAMS)
   foreach (path ${params_include_paths})
-    set(PATHS_PARAMS "${PATHS_PARAMS} --path \"${path}\"")
+    list(APPEND PATHS_PARAMS --path \"${path}\")
   endforeach()
 
   foreach (dep ${params_dependencies})
     get_target_property(dep_base_dir ${dep}_generate base_dir)
     if(dep_base_dir)
-      message("dep_base_dir ${dep_base_dir}")
-      set(PATHS_PARAMS "${PATHS_PARAMS} --path \"${dep_base_dir}\"")
+      list(APPEND PATHS_PARAMS --path \"${dep_base_dir}\")
     endif()
   endforeach()  
 
   if(NOT ${namespace} STREQUAL "")
-    set(PATHS_PARAMS "${PATHS_PARAMS} --namespace \"${namespace}\"")
+    list(APPEND PATHS_PARAMS --namespace \"${namespace}\")
   endif()
 
   if(DEFINED params_mock AND NOT ${params_mock} STREQUAL "")
-    set(PATHS_PARAMS "${PATHS_PARAMS} --mock \"${params_mock}\"")
+    list(APPEND PATHS_PARAMS --mock \"${params_mock}\")
   endif()
+
+  list(JOIN PATHS_PARAMS " " PATHS_PARAMS)
 
   if(${DEBUG_RPC_GEN})
     message("
