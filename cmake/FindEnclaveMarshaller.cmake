@@ -44,22 +44,26 @@ function(EnclaveMarshaller
   endif()
 
   foreach (path ${params_include_paths})
-    list(APPEND PATHS_PARAMS --path \"${path}\")
+    list(APPEND PATHS_PARAMS --path)
+    list(APPEND PATHS_PARAMS \"${path}\")
   endforeach()
 
   foreach (dep ${params_dependencies})
     get_target_property(dep_base_dir ${dep}_generate base_dir)
     if(dep_base_dir)
-      list(APPEND PATHS_PARAMS --path \"${dep_base_dir}\")
+      list(APPEND PATHS_PARAMS --path)
+      list(APPEND PATHS_PARAMS \"${dep_base_dir}\")
     endif()
   endforeach()  
 
   if(NOT ${namespace} STREQUAL "")
-    list(APPEND PATHS_PARAMS --namespace \"${namespace}\")
+  list(APPEND PATHS_PARAMS --namespace)
+  list(APPEND PATHS_PARAMS \"${namespace}\")
   endif()
 
   if(DEFINED params_mock AND NOT ${params_mock} STREQUAL "")
-    list(APPEND PATHS_PARAMS --mock \"${params_mock}\")
+    list(APPEND PATHS_PARAMS --mock)
+    list(APPEND PATHS_PARAMS \"${params_mock}\")
   endif()
 
   list(JOIN PATHS_PARAMS " " PATHS_PARAMS)
