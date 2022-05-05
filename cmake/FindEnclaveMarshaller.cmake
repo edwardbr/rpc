@@ -61,7 +61,7 @@ function(EnclaveMarshaller
   endif()
 
   if(DEFINED params_mock AND NOT ${params_mock} STREQUAL "")
-    set(GEN_MOCKS "--mock \"${params_mock}\"")
+    set(PATHS_PARAMS "${PATHS_PARAMS} --mock \"${params_mock}\"")
   endif()
 
   if(${DEBUG_RPC_GEN})
@@ -74,7 +74,6 @@ function(EnclaveMarshaller
         --proxy ${proxy}
         --stub ${stub}
         ${PATHS_PARAMS}
-        ${GEN_MOCKS}
       DEPENDS ${idl} ${params_dependencies}
       BYPRODUCTS ${output_path}/${header}  ${output_path}/${proxy} ${output_path}/${stub})
 
@@ -100,7 +99,6 @@ function(EnclaveMarshaller
       --proxy ${proxy}
       --stub ${stub}
       ${PATHS_PARAMS}
-      ${GEN_MOCKS}
     DEPENDS ${idl} ${params_dependencies}
     BYPRODUCTS ${output_path}/${header}  ${output_path}/${proxy} ${output_path}/${stub})
 
