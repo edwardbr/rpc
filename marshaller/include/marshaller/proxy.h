@@ -27,8 +27,8 @@ namespace rpc
         virtual ~proxy_base() = default;
         rpc::shared_ptr<object_proxy> get_object_proxy() { return object_proxy_; }
 
-        template<class T1, class T2, class proxy = proxy_base>
-        [[nodiscard]] friend rpc::shared_ptr<T1> dynamic_pointer_cast(const shared_ptr<T2>& from) noexcept;
+        template<class T1, class T2, class proxy>
+        friend rpc::shared_ptr<T1> dynamic_pointer_cast(const shared_ptr<T2>& from) noexcept;
     };
 
     template<class T> class proxy_impl : public proxy_base, public T
