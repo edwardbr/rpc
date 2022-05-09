@@ -5,8 +5,6 @@
 #include <unordered_map>
 #include <mutex>
 
-#include <marshaller/remote_pointer.h>
-
 #include <yas/serialize.hpp>
 
 using error_code = int;

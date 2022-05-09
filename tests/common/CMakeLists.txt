@@ -58,10 +58,10 @@ if(${BUILD_HOST})
 
  target_link_libraries(common_host 
  PUBLIC
-   marshaller_host 
    marshal_test_edl_host
    example_interface
 
+   rpc::marshaller_host 
    yas_common    
  )
 

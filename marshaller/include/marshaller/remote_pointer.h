@@ -685,13 +685,12 @@ namespace rpc
         {
         }
 
-        /*
-                constexpr shared_ptr(std::nullptr_t) noexcept
-                    : __ptr_(nullptr)
-                    , __cntrl_(nullptr)
-                {
-                }
-        */
+        constexpr shared_ptr(std::nullptr_t) noexcept
+            : __ptr_(nullptr)
+            , __cntrl_(nullptr)
+        {
+        }
+        
         template<class _Yp
         /*,         class = __enable_if_t<_And<__compatible_with<_Yp, _Tp>
         // In C++03 we get errors when trying to do SFINAE with the
@@ -1212,24 +1211,6 @@ element_type*>::value>> shared_ptr(unique_ptr<_Yp, _Dp>&& __r) : __ptr_(__r.get(
         return shared_ptr<_Tp>(__r, static_cast<typename shared_ptr<_Tp>::element_type*>(__r.get()));
     }
 
-    class proxy_base;
-    template<class T1, class T2, class proxy = proxy_base>
-    inline shared_ptr<T1> dynamic_pointer_cast(const shared_ptr<T2>& from) noexcept
-    {
-        auto* ptr = dynamic_cast<typename shared_ptr<T1>::element_type*>(from.get());
-        if (ptr)
-            return shared_ptr<T1>(from, ptr);
-        proxy* proxy_ = dynamic_cast<proxy*>(from.get());
-        if (!proxy_)
-        {
-            return shared_ptr<T1>();
-        }
-        auto ob = proxy_->get_object_proxy();
-        shared_ptr<T1> ret;
-        ob->template query_interface<T1>(ret);
-        return ret;
-    }
-
     template<class _Tp, class _Up> shared_ptr<_Tp> const_pointer_cast(const shared_ptr<_Up>& __r) noexcept
     {
         typedef typename shared_ptr<_Tp>::element_type _RTp;
@@ -1502,7 +1483,7 @@ element_type*>::value>> shared_ptr(unique_ptr<_Yp, _Dp>&& __r) : __ptr_(__r.get(
         }
         typedef void is_transparent;
     };
-/*
+
     template<class _Tp> class enable_shared_from_this
     {
         mutable weak_ptr<_Tp> __weak_this_;
@@ -1536,7 +1517,7 @@ element_type*>::value>> shared_ptr(unique_ptr<_Yp, _Dp>&& __r) : __ptr_(__r.get(
         {
             return hash<typename shared_ptr<_Tp>::element_type*>()(__ptr.get());
         }
-    };*/
+    };
 
     //    template<class _CharT, class _Traits, class _Yp>
     //    inline basic_ostream<_CharT, _Traits>& operator<<(basic_ostream<_CharT, _Traits>& __os, shared_ptr<_Yp>
@@ -1649,4 +1630,22 @@ element_type*>::value>> shared_ptr(unique_ptr<_Yp, _Dp>&& __r) : __ptr_(__r.get(
         return atomic_compare_exchange_weak(__p, __v, __w);
     }
 
+    class proxy_base;
+    
+    template<class T1, class T2, class proxy = proxy_base>
+    [[nodiscard]] inline shared_ptr<T1> dynamic_pointer_cast(const shared_ptr<T2>& from) noexcept
+    {
+        auto* ptr = dynamic_cast<typename shared_ptr<T1>::element_type*>(from.get());
+        if (ptr)
+            return shared_ptr<T1>(from, ptr);
+        proxy* proxy_ = dynamic_cast<proxy*>(from.get());
+        if (!proxy_)
+        {
+            return shared_ptr<T1>();
+        }
+        auto ob = proxy_->get_object_proxy();
+        shared_ptr<T1> ret;
+        ob->template query_interface<T1>(ret);
+        return ret;
+    }
 }

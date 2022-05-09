@@ -5,8 +5,10 @@
 #include <unordered_map>
 #include <mutex>
 #include <assert.h>
+#include <atomic>
 
 #include <marshaller/marshaller.h>
+#include <marshaller/remote_pointer.h>
 
 namespace rpc
 {
