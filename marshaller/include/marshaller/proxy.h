@@ -98,6 +98,10 @@ namespace rpc
 
             { // scope for the lock
                 std::lock_guard guard(insert_control);
+                if(T::id == 0)
+                {
+                    return 0;
+                }
                 auto item = proxy_map.find(T::id);
                 if (item != proxy_map.end())
                 {

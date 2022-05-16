@@ -18,12 +18,19 @@ namespace rpc
                                  std::vector<char>& out_buf_)
     {
         error_code ret = -1;
-        std::lock_guard l(insert_control);
-        auto item = stub_map.find(interface_id);
-        if (item != stub_map.end())
+        rpc::shared_ptr<i_interface_stub> stub;
         {
-            ret = item->second->call(method_id, in_size_, in_buf_, out_buf_);
+            std::lock_guard l(insert_control);
+            auto item = stub_map.find(interface_id);
+            if (item != stub_map.end())
+            {
+                stub = item->second;
+            }
         }
+        if(stub)
+        {
+            ret = stub->call(method_id, in_size_, in_buf_, out_buf_);
+        }        
         return ret;
     }
     error_code object_stub::try_cast(uint64_t interface_id)

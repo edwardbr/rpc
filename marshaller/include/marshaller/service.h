@@ -37,7 +37,8 @@ namespace rpc
     public:
         service(uint64_t zone_id = 1) : zone_id_(zone_id){}
         virtual ~service();
-        template<class T, class Stub, class obj_stub = object_stub> error_code initialise(rpc::shared_ptr<T> root_ob)
+        template<class T, class Stub, class obj_stub = object_stub> 
+        error_code initialise(rpc::shared_ptr<T> root_ob)
         {
             assert(check_is_empty());
 
