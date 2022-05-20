@@ -103,7 +103,7 @@ int main()
 
         auto ex = rpc::enclave_service_proxy::create(
             host_rpc_server, 2,
-            "C:/Dev/experiments/enclave_marshaller/build/output/debug/marshal_test_enclave.signed.dll");
+            "./marshal_test_enclave.signed.dll");
 
         err_code = ex->initialise();
         ASSERT(!err_code);

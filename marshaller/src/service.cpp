@@ -72,7 +72,7 @@ namespace rpc
         auto item = wrapped_object_to_stub.find(pointer);
         if (item == wrapped_object_to_stub.end())
         {
-            auto id = object_id_generator++;
+            auto id = get_new_object_id();
             auto stub = rpc::shared_ptr<object_stub>(new object_stub(id, *this));
             rpc::shared_ptr<i_interface_stub> wrapped_interface = fn(stub);
             stub->add_interface(wrapped_interface);
@@ -84,7 +84,7 @@ namespace rpc
         return item->second.lock()->get_id();
     }
 
-    error_code service::add_object(void* pointer, rpc::shared_ptr<object_stub> stub)
+    error_code service::add_object(void* pointer, const rpc::shared_ptr<object_stub>& stub)
     {
         std::lock_guard g(insert_control);
         assert(wrapped_object_to_stub.find(pointer) == wrapped_object_to_stub.end());

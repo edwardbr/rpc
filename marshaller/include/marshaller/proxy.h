@@ -75,6 +75,7 @@ namespace rpc
         rpc::shared_ptr<object_proxy> shared_from_this() { return rpc::shared_ptr<object_proxy>(weak_this_); }
 
         rpc::shared_ptr<service_proxy> get_zone_base() { return marshaller_; }
+        uint64_t get_object_id(){return object_id_;}
 
         error_code send(uint64_t interface_id, uint64_t method_id, size_t in_size_, const char* in_buf_,
                         std::vector<char>& out_buf_);
@@ -161,6 +162,7 @@ namespace rpc
         virtual ~service_proxy(){service_->remove_zone(zone_id_);}
         rpc::shared_ptr<service_proxy> shared_from_this() { return rpc::shared_ptr<service_proxy>(weak_this_); }
         error_code set_root_object(uint64_t object_id);
+        uint64_t get_root_object_id()const {return root_object_proxy_?root_object_proxy_->get_object_id():0;}
 
         service& get_service(){return *service_;}
         uint64_t get_zone_id(){return zone_id_;}

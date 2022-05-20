@@ -38,7 +38,7 @@ namespace rpc
         service(uint64_t zone_id = 1) : zone_id_(zone_id){}
         virtual ~service();
         template<class T, class Stub, class obj_stub = object_stub> 
-        error_code initialise(rpc::shared_ptr<T> root_ob)
+        error_code initialise(const rpc::shared_ptr<T>& root_ob, uint64_t* stub_id = nullptr)
         {
             assert(check_is_empty());
 
@@ -47,6 +47,8 @@ namespace rpc
             root_stub = rpc::static_pointer_cast<i_interface_stub>(Stub::create(root_ob, os));
             os->add_interface(root_stub);
             add_object(root_ob.get(), os);
+            if(stub_id)
+                *stub_id = id;
             return 0;
         }
 
@@ -56,16 +58,16 @@ namespace rpc
         uint64_t get_zone_id(){return zone_id_;}
         void set_zone_id(uint64_t zone_id){zone_id_ = zone_id;}
         uint64_t get_root_object_id();
-        uint64_t get_new_object_id() { return object_id_generator++; }
+        uint64_t get_new_object_id() { return ++object_id_generator; }
 
-        template<class T> uint64_t encapsulate_outbound_interfaces(rpc::shared_ptr<T> object);
+        template<class T> uint64_t encapsulate_outbound_interfaces(const rpc::shared_ptr<T>& object);
 
         error_code send(uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_,
                         const char* in_buf_, std::vector<char>& out_buf_) override;
 
         uint64_t add_lookup_stub(void* pointer,
                                  std::function<rpc::shared_ptr<i_interface_stub>(rpc::shared_ptr<object_stub>)> fn);
-        error_code add_object(void* pointer, rpc::shared_ptr<object_stub> stub);
+        error_code add_object(void* pointer, const rpc::shared_ptr<object_stub>& stub);
         rpc::weak_ptr<object_stub> get_object(uint64_t object_id);
 
         error_code try_cast(uint64_t zone_id, uint64_t object_id, uint64_t interface_id) override;

@@ -35,7 +35,10 @@ namespace rpc
         {
         }
         ~object_stub() {};
-        uint64_t get_id() { return id_; }
+        uint64_t get_id() 
+        {
+            return id_; 
+        }
         void* get_pointer();
 
         // this is called once the lifetime management needs to be activated
@@ -47,7 +50,7 @@ namespace rpc
                         std::vector<char>& out_buf_);
         error_code try_cast(uint64_t interface_id);
 
-        void add_interface(rpc::shared_ptr<i_interface_stub> iface);
+        void add_interface(const rpc::shared_ptr<i_interface_stub>& iface);
 
         uint64_t add_ref();
         uint64_t release(std::function<void()> on_delete);

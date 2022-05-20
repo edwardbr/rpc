@@ -8,7 +8,7 @@ namespace rpc
         return stub_map.begin()->second->get_pointer();
     }
 
-    void object_stub::add_interface(rpc::shared_ptr<i_interface_stub> iface)
+    void object_stub::add_interface(const rpc::shared_ptr<i_interface_stub>& iface)
     {
         std::lock_guard l(insert_control);
         stub_map[iface->get_interface_id()] = iface;
