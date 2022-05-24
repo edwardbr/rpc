@@ -621,7 +621,7 @@ namespace enclave_marshaller
             stub("rpc::shared_ptr<{}> get_target() {{ return target_; }};", interface_name);
             stub("rpc::weak_ptr<rpc::object_stub> get_object_stub() override {{ return target_stub_;}}");
             stub("void* get_pointer() override {{ return target_.get();}}");
-            stub("error_code call(uint64_t method_id, size_t in_size_, const char* in_buf_, std::vector<char>& "
+            stub("int call(uint64_t method_id, size_t in_size_, const char* in_buf_, std::vector<char>& "
                  "out_buf_) override");
             stub("{{");
 
@@ -745,7 +745,7 @@ namespace enclave_marshaller
                     // \"\\n\";");
 
                     proxy("std::vector<char> out_buf_(24); //max size using short string optimisation");
-                    proxy("error_code ret = get_object_proxy()->send({}::id, {}, in_.size, in_.data.get(), out_buf_);",
+                    proxy("int ret = get_object_proxy()->send({}::id, {}, in_.size, in_.data.get(), out_buf_);",
                           interface_name, function_count);
                     proxy("if(ret != rpc::error::OK())");
                     proxy("{{");
@@ -769,7 +769,7 @@ namespace enclave_marshaller
 
                     stub("//STUB_PARAM_CAST");
                     stub.print_tabs();
-                    stub.raw("error_code ret = target_->{}(", function.get_name());
+                    stub.raw("int ret = target_->{}(", function.get_name());
 
                     {
                         bool has_param = false;
@@ -907,7 +907,7 @@ namespace enclave_marshaller
 
             stub("return rpc::error::INVALID_METHOD_ID();");
             stub("}}");
-            stub("error_code cast(uint64_t interface_id, rpc::shared_ptr<rpc::i_interface_stub>& new_stub) override;");
+            stub("int cast(uint64_t interface_id, rpc::shared_ptr<rpc::i_interface_stub>& new_stub) override;");
             stub("}};");
             stub("");
         };
@@ -934,10 +934,10 @@ namespace enclave_marshaller
         void write_stub_cast_factory(bool from_host, const class_entity& lib, const class_entity& m_ob, writer& stub)
         {
             auto interface_name = std::string(m_ob.get_type() == entity_type::LIBRARY ? "i_" : "") + m_ob.get_name();
-            stub("error_code {}_stub::cast(uint64_t interface_id, rpc::shared_ptr<rpc::i_interface_stub>& new_stub)",
+            stub("int {}_stub::cast(uint64_t interface_id, rpc::shared_ptr<rpc::i_interface_stub>& new_stub)",
                  interface_name);
             stub("{{");
-            stub("error_code ret = stub_factory(interface_id, shared_from_this(), new_stub);");
+            stub("int ret = stub_factory(interface_id, shared_from_this(), new_stub);");
             stub("return ret;");
             stub("}}");
         }
@@ -1153,7 +1153,7 @@ namespace enclave_marshaller
                     stub("#define STUB_FACTORY");
                 }
                 stub("template<class T>");
-                stub("error_code stub_factory(uint64_t interface_id, rpc::shared_ptr<T> original, "
+                stub("int stub_factory(uint64_t interface_id, rpc::shared_ptr<T> original, "
                      "rpc::shared_ptr<rpc::i_interface_stub>& new_stub)");
                 stub("{{");
                 stub("if(interface_id == original->get_interface_id())");
