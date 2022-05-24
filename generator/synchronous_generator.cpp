@@ -582,7 +582,7 @@ namespace enclave_marshaller
             proxy("public:");
             proxy("");
             proxy("virtual ~{}_proxy(){{}}", interface_name);
-            proxy("static rpc::shared_ptr<{}> create(const rpc::shared_ptr<rpc::object_proxy>& object_proxy)", interface_name);
+            proxy("[[nodiscard]] static rpc::shared_ptr<{}> create(const rpc::shared_ptr<rpc::object_proxy>& object_proxy)", interface_name);
             proxy("{{");
             proxy("auto ret = rpc::shared_ptr<{0}_proxy>(new {0}_proxy(object_proxy));", interface_name);
             proxy("ret->weak_this_ = ret;", interface_name);
@@ -674,10 +674,6 @@ namespace enclave_marshaller
                     header.raw(") = 0;\n");
                     proxy.raw(") override\n");
                     proxy("{{");
-                    proxy("if(!get_object_proxy())");
-                    proxy("{{");
-                    proxy("return -1;");
-                    proxy("}}");
 
                     bool has_inparams = false;
 
@@ -751,7 +747,7 @@ namespace enclave_marshaller
                     proxy("std::vector<char> out_buf_(24); //max size using short string optimisation");
                     proxy("error_code ret = get_object_proxy()->send({}::id, {}, in_.size, in_.data.get(), out_buf_);",
                           interface_name, function_count);
-                    proxy("if(ret)");
+                    proxy("if(ret != rpc::error::OK())");
                     proxy("{{");
                     proxy("return ret;");
                     proxy("}}");
@@ -794,7 +790,7 @@ namespace enclave_marshaller
                         }
                     }
                     stub.raw(");\n");
-                    stub("if(ret)");
+                    stub("if(ret != rpc::error::OK())");
                     stub("  return ret;");
                     stub("");
 
@@ -900,7 +896,7 @@ namespace enclave_marshaller
                 }
 
                 stub("default:");
-                stub("return -1;");
+                stub("return rpc::error::INVALID_METHOD_ID();");
                 stub("}};");
             }
 
@@ -909,7 +905,7 @@ namespace enclave_marshaller
             proxy("}};");
             proxy("");
 
-            stub("return -1;");
+            stub("return rpc::error::INVALID_METHOD_ID();");
             stub("}}");
             stub("error_code cast(uint64_t interface_id, rpc::shared_ptr<rpc::i_interface_stub>& new_stub) override;");
             stub("}};");
@@ -928,9 +924,9 @@ namespace enclave_marshaller
             stub("new_stub = rpc::static_pointer_cast<rpc::i_interface_stub>({0}_stub::create(tmp_ptr, "
                  "original->get_object_stub()));",
                  interface_name);
-            stub("return 0;");
+            stub("return rpc::error::OK();");
             stub("}}");
-            stub("return -1;");
+            stub("return rpc::error::INVALID_CAST();");
 
             stub("}}");
         }
@@ -1160,11 +1156,10 @@ namespace enclave_marshaller
                 stub("error_code stub_factory(uint64_t interface_id, rpc::shared_ptr<T> original, "
                      "rpc::shared_ptr<rpc::i_interface_stub>& new_stub)");
                 stub("{{");
-                stub("error_code ret = -1;");
                 stub("if(interface_id == original->get_interface_id())");
                 stub("{{");
                 stub("new_stub = rpc::static_pointer_cast<rpc::i_interface_stub>(original);");
-                stub("return 0;");
+                stub("return rpc::error::OK();");
                 stub("}}");
                 int id = 1;
                 for (auto& cls : lib.get_classes())
@@ -1183,7 +1178,7 @@ namespace enclave_marshaller
                         write_stub_factory(from_host, lib, *cls, stub);
                 }
 
-                stub("return ret;");
+                stub("return rpc::error::INVALID_DATA();");
                 stub("}}");
                 if(lib.get_owner() == nullptr)
                 {
@@ -1325,6 +1320,7 @@ namespace enclave_marshaller
 
             header("#include <marshaller/marshaller.h>");
             header("#include <marshaller/service.h>");
+            header("#include <marshaller/error_codes.h>");
 
             for(const auto& import : imports)
             {

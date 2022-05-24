@@ -15,7 +15,7 @@ namespace marshalled_tests
 
     void standard_tests(xxx::i_foo& foo, bool enclave)
     {
-        error_code ret = 0;
+        int ret = 0;
         {
             ASSERT(!foo.do_something_in_val(33));
         }
@@ -155,7 +155,7 @@ namespace marshalled_tests
 
     class baz : public xxx::i_baz
     {
-        error_code callback(int val)
+        int callback(int val)
         {            
             std::cout << "callback " << val << "\n";
             return 0;
@@ -179,8 +179,8 @@ namespace marshalled_tests
 
         // test recursive interface passing
         rpc::shared_ptr<xxx::i_foo> other_foo;
-        error_code err_code = foo->recieve_interface(other_foo);
-        if (err_code)
+        int err_code = foo->recieve_interface(other_foo);
+        if (err_code != rpc::error::OK())
         {
             std::cout << "create_foo failed\n";
         }

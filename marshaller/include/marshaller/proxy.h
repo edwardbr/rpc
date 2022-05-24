@@ -24,7 +24,10 @@ namespace rpc
             : object_proxy_(object_proxy)
         {
         }
-        virtual ~proxy_base() = default;
+        virtual ~proxy_base()
+        {
+            LOG("~proxy_base",100);
+        }
         rpc::shared_ptr<object_proxy> get_object_proxy() { return object_proxy_; }
 
         template<class T1, class T2, class proxy>
@@ -59,7 +62,7 @@ namespace rpc
         {
         }
 
-        error_code try_cast(uint64_t interface_id);
+        int try_cast(uint64_t interface_id);
 
     public:
         static rpc::shared_ptr<object_proxy> create(uint64_t object_id, uint64_t zone_id,
@@ -77,14 +80,14 @@ namespace rpc
         rpc::shared_ptr<service_proxy> get_zone_base() { return marshaller_; }
         uint64_t get_object_id(){return object_id_;}
 
-        error_code send(uint64_t interface_id, uint64_t method_id, size_t in_size_, const char* in_buf_,
+        int send(uint64_t interface_id, uint64_t method_id, size_t in_size_, const char* in_buf_,
                         std::vector<char>& out_buf_);
 
         template<class T> void create_interface_proxy(rpc::shared_ptr<T>& inface);
 
-        template<class T> error_code query_interface(rpc::shared_ptr<T>& iface, bool do_remote_check = true)
+        template<class T> int query_interface(rpc::shared_ptr<T>& iface, bool do_remote_check = true)
         {
-            auto create = [&](std::unordered_map<uint64_t, rpc::weak_ptr<proxy_base>>::iterator item) -> error_code {
+            auto create = [&](std::unordered_map<uint64_t, rpc::weak_ptr<proxy_base>>::iterator item) -> int {
                 rpc::shared_ptr<proxy_base> proxy = item->second.lock();
                 if (!proxy)
                 {
@@ -120,8 +123,8 @@ namespace rpc
             if (do_remote_check)
             {
                 // see if object_id can implement interface
-                error_code ret = try_cast(T::id);
-                if (ret != 0)
+                int ret = try_cast(T::id);
+                if (ret != rpc::error::OK())
                 {
                     return ret;
                 }
@@ -150,24 +153,31 @@ namespace rpc
     {
         std::unordered_map<uint64_t, rpc::weak_ptr<object_proxy>> proxies;
         std::mutex insert_control;
-        rpc::shared_ptr<object_proxy> root_object_proxy_;
-        rpc::shared_ptr<service> service_;
+        rpc::weak_ptr<service> service_;
         uint64_t zone_id_ = 0;
 
     protected:
-        service_proxy(const rpc::shared_ptr<service>& service, uint64_t zone_id) : service_(service), zone_id_(zone_id){}
+        service_proxy(const rpc::shared_ptr<service>& service, uint64_t zone_id) : 
+            service_(service), 
+            zone_id_(zone_id)
+        {}
         mutable rpc::weak_ptr<service_proxy> weak_this_;
 
     public:
-        virtual ~service_proxy(){service_->remove_zone(zone_id_);}
+        virtual ~service_proxy()
+        {
+            LOG("~service_proxy",100);
+            auto srv = service_.lock();
+            if(srv)
+                srv->remove_zone(zone_id_);
+        }
         rpc::shared_ptr<service_proxy> shared_from_this() { return rpc::shared_ptr<service_proxy>(weak_this_); }
-        error_code set_root_object(uint64_t object_id);
-        uint64_t get_root_object_id()const {return root_object_proxy_?root_object_proxy_->get_object_id():0;}
+        int set_root_object(uint64_t object_id);
 
-        service& get_service(){return *service_;}
+        service& get_service(){return *service_.lock();}
         uint64_t get_zone_id(){return zone_id_;}
 
-        template<class T> error_code create_proxy(uint64_t object_id, rpc::shared_ptr<T>& val)
+        template<class T> int create_proxy(uint64_t object_id, rpc::shared_ptr<T>& val)
         {
             rpc::shared_ptr<object_proxy> op;
             {
@@ -177,13 +187,13 @@ namespace rpc
                     op = item->second.lock();
                 else
                 {
-                    op = object_proxy::create(object_id, 0, shared_from_this());
+                    op = object_proxy::create(object_id, zone_id_, shared_from_this());
                     proxies[object_id] = op;
                 }
             }
             return op->query_interface(val, false);
         }
-        template<class T> rpc::shared_ptr<T> get_interface()
+        template<class T> rpc::shared_ptr<T> get_root_object()
         {
             auto tmp = root_object_proxy_;
             if (!tmp)

@@ -21,6 +21,23 @@
 #include <tuple>
 #include <functional>
 #include <memory>
+#include <string>
+#include <typeinfo>
+
+#ifdef DUMP_REF_COUNT
+#include <sgx_error.h>
+extern "C" {
+#ifdef _IN_ENCLAVE
+sgx_status_t __cdecl log_str(const char* str, size_t sz);
+#else
+void __cdecl log_str(const char* str, size_t sz);
+#endif
+}
+
+#define LOG(str, sz) log_str(str, sz)
+#else
+#define LOG(str, sz)
+#endif
 
 namespace rpc
 {
@@ -439,6 +456,7 @@ namespace rpc
 
         bool __release_shared() noexcept
         {
+            LOG((std::string("__release_shared()") + std::to_string(__shared_owners_.load())).data(),100);
             if (--__shared_owners_ == -1)
             {
                 __on_zero_shared();
@@ -518,6 +536,7 @@ namespace rpc
     template<class _Tp, class _Dp, class _Alloc>
     void __shared_ptr_pointer<_Tp, _Dp, _Alloc>::__on_zero_shared() noexcept
     {
+        LOG(std::to_string((uint64_t)&__data_.first().second()).data(),100);
         __data_.first().second()(__data_.first().first());
         __data_.first().second().~_Dp();
     }
@@ -1398,7 +1417,10 @@ element_type*>::value>> shared_ptr(unique_ptr<_Yp, _Dp>&& __r) : __ptr_(__r.get(
         ~shared_ptr()
         {
             if (__cntrl_)
+            {
+                LOG(typeid(*this).raw_name(),100);
                 __cntrl_->__release_shared();
+            }
         }
 
         shared_ptr<_Tp>& operator=(const shared_ptr& __r) noexcept
@@ -1574,7 +1596,11 @@ element_type*>::value>> shared_ptr(unique_ptr<_Yp, _Dp>&& __r) : __ptr_(__r.get(
 
     template<class _Tp, class... _Args> shared_ptr<_Tp> make_shared(_Args&&... __args)
     {
-        return rpc::allocate_shared<_Tp>(std::allocator<_Tp>(), std::forward<_Args>(__args)...);
+        auto tmp = rpc::allocate_shared<_Tp>(std::allocator<_Tp>(), std::forward<_Args>(__args)...);
+        LOG(typeid(tmp).raw_name(),100);
+        LOG("make_shared",100);
+        LOG(std::to_string((uint64_t)tmp.get()).data(),100);
+        return tmp;
     }
 
     template<class _Tp, class _Up>

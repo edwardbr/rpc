@@ -34,7 +34,7 @@ namespace rpc
             , zone_(zone)
         {
         }
-        ~object_stub() {};
+        ~object_stub();
         uint64_t get_id() 
         {
             return id_; 
@@ -46,9 +46,9 @@ namespace rpc
 
         service& get_zone() { return zone_; }
 
-        error_code call(uint64_t interface_id, uint64_t method_id, size_t in_size_, const char* in_buf_,
+        int call(uint64_t interface_id, uint64_t method_id, size_t in_size_, const char* in_buf_,
                         std::vector<char>& out_buf_);
-        error_code try_cast(uint64_t interface_id);
+        int try_cast(uint64_t interface_id);
 
         void add_interface(const rpc::shared_ptr<i_interface_stub>& iface);
 
@@ -60,9 +60,9 @@ namespace rpc
     {
     public:
         virtual uint64_t get_interface_id() = 0;
-        virtual error_code call(uint64_t method_id, size_t in_size_, const char* in_buf_, std::vector<char>& out_buf_)
+        virtual int call(uint64_t method_id, size_t in_size_, const char* in_buf_, std::vector<char>& out_buf_)
             = 0;
-        virtual error_code cast(uint64_t interface_id, rpc::shared_ptr<i_interface_stub>& new_stub) = 0;
+        virtual int cast(uint64_t interface_id, rpc::shared_ptr<i_interface_stub>& new_stub) = 0;
         virtual rpc::weak_ptr<object_stub> get_object_stub() = 0;
         virtual void* get_pointer() = 0;
     };
