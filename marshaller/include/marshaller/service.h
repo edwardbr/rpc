@@ -89,7 +89,10 @@ namespace rpc
             root_stub_ = rpc::static_pointer_cast<i_interface_stub>(Stub::create(root_ob, os));
             os->add_interface(root_stub_);
             add_object(root_ob.get(), os);
-            rpc_server->add_zone(parent_service_->get_zone_id(), parent_service_);
+            if(parent_service_)
+            {
+                rpc_server->add_zone(parent_service_->get_zone_id(), parent_service_);
+            }
             if(stub_id)
                 *stub_id = id;
             return 0;
