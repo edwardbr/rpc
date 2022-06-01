@@ -31,11 +31,11 @@ rpc::service* current_host_service = nullptr;
 int main()
 {
     // conventional c++ object on stack
-    /*{
+    {
         foo f;
         standard_tests(f, false);
     }
-
+/*
     {
         int ret = 77;
         // STUB_ADD_REF_OUT
