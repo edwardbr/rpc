@@ -19,6 +19,7 @@
 
 #include <example_proxy.cpp>
 #include <example_stub.cpp>
+#include <marshaller/remote_pointer.h>
 
 using namespace marshalled_tests;
 
