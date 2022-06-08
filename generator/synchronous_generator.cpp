@@ -1043,7 +1043,7 @@ namespace enclave_marshaller
             header("template<typename Ar>");
             header("void serialize(Ar &ar)");
             header("{{");
-            header("ar & YAS_OBJECT(\"{}\"", m_ob.get_name());
+            header("ar & YAS_OBJECT_NVP(\"{}\"", m_ob.get_name());
 
             int count = 0;
             for (auto& field : m_ob.get_functions())
