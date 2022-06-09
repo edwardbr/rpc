@@ -1048,7 +1048,7 @@ namespace enclave_marshaller
             int count = 0;
             for (auto& field : m_ob.get_functions())
             {
-                header("  ,(\"_{}\", {})", count++, field.get_name());
+                header("  ,(\"{}\", {})", field.get_name(), field.get_name());
             }
             header(");");
 
