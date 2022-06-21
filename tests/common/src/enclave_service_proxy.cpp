@@ -26,6 +26,28 @@ namespace rpc
         sgx_destroy_enclave(eid_);
     }
 
+    int enclave_service_proxy::inner_initialise(rpc::shared_ptr<object_proxy>& proxy)
+    {
+        sgx_launch_token_t token = {0};
+        int updated = 0;
+        #ifdef _WIN32
+            auto status = sgx_create_enclavea(filename_.data(), 1, &token, &updated, &eid_, NULL);
+        #else
+            auto status = sgx_create_enclave(filename_.data(), 1, &token, &updated, &eid_, NULL);
+        #endif
+        if (status)
+            return rpc::error::TRANSPORT_ERROR();
+        int err_code = error::OK();
+        uint64_t object_id = 0;
+        status = marshal_test_init_enclave(eid_, &err_code, get_service().get_zone_id(), get_zone_id(), &object_id);
+        if (status)
+            return rpc::error::TRANSPORT_ERROR();
+        if (err_code)
+            return err_code;
+        proxy = object_proxy::create(object_id, get_zone_id(), shared_from_this());
+        return rpc::error::OK();
+    }
+
     int enclave_service_proxy::send(uint64_t object_id, uint64_t interface_id, uint64_t method_id,
                                            size_t in_size_, const char* in_buf_, std::vector<char>& out_buf_)
     {
