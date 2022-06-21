@@ -91,7 +91,7 @@ namespace rpc
             if(parent_service)
             {
                 parent_service_ = parent_service;
-                rpc_server->add_zone(parent_service_->get_zone_id(), parent_service_);
+                add_zone(parent_service_->get_zone_id(), parent_service_);
             }
             
             if(stub_id)
