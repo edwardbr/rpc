@@ -1043,7 +1043,7 @@ namespace rpc
     {
         typedef typename unique_ptr<_T1, _D1>::pointer _P1;
         typedef typename unique_ptr<_T2, _D2>::pointer _P2;
-        typedef typename common_type<_P1, _P2>::type _Vp;
+        typedef typename std::common_type<_P1, _P2>::type _Vp;
         return less<_Vp>()(__x.get(), __y.get());
     }
     template<class _T1, class _D1, class _T2, class _D2>
@@ -1143,7 +1143,7 @@ namespace rpc
     template<class _Tp>
     inline typename __unique_if<_Tp>::__unique_array_unknown_bound make_unique(size_t __n)
     {
-        typedef typename remove_extent<_Tp>::type _Up;
+        typedef typename std::remove_extent<_Tp>::type _Up;
         return unique_ptr<_Tp>(new _Up[__n]());
     }
     /*template<class _Tp, class... _Args>
