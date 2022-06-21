@@ -2,7 +2,7 @@
 
 #include <marshaller/proxy.h>
 
-namespace rpc
+/*namespace rpc
 {
     class master_service_proxy : public service_proxy
     {
@@ -99,4 +99,4 @@ namespace rpc
             return m->release(zone_id, object_id);
         }
     };
-}
+}*/

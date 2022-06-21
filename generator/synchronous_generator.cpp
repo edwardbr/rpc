@@ -745,8 +745,8 @@ namespace enclave_marshaller
                     // \"\\n\";");
 
                     proxy("std::vector<char> out_buf_(24); //max size using short string optimisation");
-                    proxy("int ret = get_object_proxy()->send({}::id, {}, in_.size, in_.data.get(), out_buf_);",
-                          interface_name, function_count);
+                    proxy("{} ret = get_object_proxy()->send({}::id, {}, in_.size, in_.data.get(), out_buf_);",
+                          function.get_return_type(), interface_name, function_count);
                     proxy("if(ret != rpc::error::OK())");
                     proxy("{{");
                     proxy("return ret;");
@@ -1038,12 +1038,11 @@ namespace enclave_marshaller
             header("template<typename Ar>");
             header("void serialize(Ar &ar)");
             header("{{");
-            header("ar & YAS_OBJECT(\"{}\"", m_ob.get_name());
+            header("ar & YAS_OBJECT_NVP(\"{}\"", m_ob.get_name());
 
-            int count = 0;
             for (auto& field : m_ob.get_functions())
             {
-                header("  ,(\"_{}\", {})", count++, field.get_name());
+                header("  ,(\"{0}\", {0})", field.get_name());
             }
             header(");");
 

@@ -10,9 +10,9 @@ add_executable(generator
 
 target_compile_definitions(generator PRIVATE ${HOST_DEFINES})
 target_compile_options(generator PRIVATE ${HOST_COMPILE_OPTIONS})
-if(UNIX)
+#[[if(UNIX)
     add_dependencies(generator miscellaneous_host)
-endif()
+endif()]]
 target_include_directories(generator 
     PRIVATE 
         ${HOST_INCLUDES})

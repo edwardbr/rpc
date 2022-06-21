@@ -172,7 +172,6 @@ namespace rpc
                 srv->remove_zone(zone_id_);
         }
         rpc::shared_ptr<service_proxy> shared_from_this() { return rpc::shared_ptr<service_proxy>(weak_this_); }
-        int set_root_object(uint64_t object_id);
 
         service& get_service(){return *service_.lock();}
         uint64_t get_zone_id(){return zone_id_;}
@@ -192,15 +191,6 @@ namespace rpc
                 }
             }
             return op->query_interface(val, false);
-        }
-        template<class T> rpc::shared_ptr<T> get_root_object()
-        {
-            auto tmp = root_object_proxy_;
-            if (!tmp)
-                return rpc::shared_ptr<T>();
-            rpc::shared_ptr<T> out;
-            tmp->query_interface(out);
-            return out;
         }
     };
 
