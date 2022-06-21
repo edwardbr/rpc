@@ -22,7 +22,7 @@
             auto ret = rpc::shared_ptr<master_service_proxy>(new master_service_proxy(serv, zone_id, marshaller));
             auto pthis = rpc::static_pointer_cast<service_proxy>(ret);
             ret->weak_this_ = pthis;
-            serv->add_zone(zone_id, pthis);
+            serv->add_zone(pthis);
             ret->set_root_object(object_id);
             return ret;
         }
@@ -64,7 +64,7 @@
             auto ret = rpc::shared_ptr<slave_service_proxy>(new slave_service_proxy(serv, zone_id, marshaller));
             auto pthis = rpc::static_pointer_cast<service_proxy>(ret);
             ret->weak_this_ = pthis;
-            serv->add_zone(zone_id, pthis);
+            serv->add_zone(pthis);
             ret->set_root_object(object_id);
             return ret;
         }

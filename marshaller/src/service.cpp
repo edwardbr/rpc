@@ -122,10 +122,10 @@ namespace rpc
         return ret;
     }
 
-    void service::add_zone(uint64_t zone_id, rpc::weak_ptr<service_proxy> zone)
+    void service::add_zone(const rpc::shared_ptr<service_proxy>& zone)
     {
         std::lock_guard g(insert_control);
-        other_zones[zone_id] = zone;
+        other_zones[zone->get_zone_id()] = zone;
     }
     rpc::weak_ptr<service_proxy> service::get_zone(uint64_t zone_id)
     {

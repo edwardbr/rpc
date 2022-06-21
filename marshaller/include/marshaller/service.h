@@ -58,7 +58,7 @@ namespace rpc
         uint64_t add_ref(uint64_t zone_id, uint64_t object_id) override;
         uint64_t release(uint64_t zone_id, uint64_t object_id) override;
 
-        void add_zone(uint64_t zone_id, rpc::weak_ptr<service_proxy> zone);
+        void add_zone(const rpc::shared_ptr<service_proxy>& zone);
         rpc::weak_ptr<service_proxy> get_zone(uint64_t zone_id);
         void remove_zone(uint64_t zone_id);
     };
@@ -91,7 +91,7 @@ namespace rpc
             if(parent_service)
             {
                 parent_service_ = parent_service;
-                add_zone(parent_service_->get_zone_id(), parent_service_);
+                add_zone(parent_service_);
             }
             
             if(stub_id)
