@@ -28,7 +28,7 @@ namespace rpc
         {
             LOG("~proxy_base",100);
         }
-        rpc::shared_ptr<object_proxy> get_object_proxy() { return object_proxy_; }
+        rpc::shared_ptr<object_proxy> get_object_proxy() const { return object_proxy_; }
 
         template<class T1, class T2, class proxy>
         friend rpc::shared_ptr<T1> dynamic_pointer_cast(const shared_ptr<T2>& from) noexcept;
@@ -75,10 +75,11 @@ namespace rpc
 
         virtual ~object_proxy();
 
+        rpc::shared_ptr<object_proxy const> shared_from_this() const { return rpc::shared_ptr<object_proxy const>(weak_this_); }
         rpc::shared_ptr<object_proxy> shared_from_this() { return rpc::shared_ptr<object_proxy>(weak_this_); }
 
-        rpc::shared_ptr<service_proxy> get_zone_base() { return marshaller_; }
-        uint64_t get_object_id(){return object_id_;}
+        rpc::shared_ptr<service_proxy> get_zone_base() const { return marshaller_; }
+        uint64_t get_object_id() const {return object_id_;}
 
         int send(uint64_t interface_id, uint64_t method_id, size_t in_size_, const char* in_buf_,
                         std::vector<char>& out_buf_);
@@ -172,9 +173,10 @@ namespace rpc
                 srv->remove_zone(zone_id_);
         }
         rpc::shared_ptr<service_proxy> shared_from_this() { return rpc::shared_ptr<service_proxy>(weak_this_); }
+        rpc::shared_ptr<service_proxy const> shared_from_this() const { return rpc::shared_ptr<service_proxy const>(weak_this_); }
 
-        service& get_service(){return *service_.lock();}
-        uint64_t get_zone_id(){return zone_id_;}
+        service& get_service() const {return *service_.lock();}
+        uint64_t get_zone_id() const {return zone_id_;}
 
         template<class T> int create_proxy(uint64_t object_id, rpc::shared_ptr<T>& val)
         {

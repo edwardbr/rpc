@@ -24,13 +24,11 @@ namespace rpc
         other_zones.clear();
     }
 
-    bool service::check_is_empty()
+    bool service::check_is_empty() const
     {
         if (!stubs.empty())
             return false;
         if (!wrapped_object_to_stub.empty())
-            return false;
-        if (!other_zones.empty())
             return false;
         return true;
     }
@@ -55,7 +53,7 @@ namespace rpc
         auto item = wrapped_object_to_stub.find(pointer);
         if (item == wrapped_object_to_stub.end())
         {
-            auto id = get_new_object_id();
+            auto id = generate_new_object_id();
             auto stub = rpc::shared_ptr<object_stub>(new object_stub(id, *this));
             rpc::shared_ptr<i_interface_stub> wrapped_interface = fn(stub);
             stub->add_interface(wrapped_interface);
@@ -78,7 +76,7 @@ namespace rpc
         return error::OK();
     }
 
-    rpc::weak_ptr<object_stub> service::get_object(uint64_t object_id)
+    rpc::weak_ptr<object_stub> service::get_object(uint64_t object_id) const
     {
         std::lock_guard l(insert_control);
         auto item = stubs.find(object_id);
@@ -127,7 +125,7 @@ namespace rpc
         std::lock_guard g(insert_control);
         other_zones[zone->get_zone_id()] = zone;
     }
-    rpc::weak_ptr<service_proxy> service::get_zone(uint64_t zone_id)
+    rpc::weak_ptr<service_proxy> service::get_zone(uint64_t zone_id) const
     {
         std::lock_guard g(insert_control);
         auto item = other_zones.find(zone_id);
@@ -165,14 +163,14 @@ namespace rpc
         service::cleanup();
     }
 
-    bool child_service::check_is_empty()
+    bool child_service::check_is_empty() const
     {
         if (root_stub_)
             return false; // already initialised
         return service::check_is_empty();
     }
 
-    uint64_t child_service::get_root_object_id()
+    uint64_t child_service::get_root_object_id() const
     {
         if (!root_stub_)
             return 0;

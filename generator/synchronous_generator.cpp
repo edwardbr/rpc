@@ -617,10 +617,10 @@ namespace enclave_marshaller
             stub("rpc::shared_ptr<{0}_stub> shared_from_this(){{return rpc::shared_ptr<{0}_stub>(weak_this_);}}",
                  interface_name);
             stub("");
-            stub("uint64_t get_interface_id() override {{ return {}::id; }};", interface_name);
-            stub("rpc::shared_ptr<{}> get_target() {{ return target_; }};", interface_name);
-            stub("rpc::weak_ptr<rpc::object_stub> get_object_stub() override {{ return target_stub_;}}");
-            stub("void* get_pointer() override {{ return target_.get();}}");
+            stub("uint64_t get_interface_id() const override {{ return {}::id; }};", interface_name);
+            stub("rpc::shared_ptr<{}> get_target() const {{ return target_; }};", interface_name);
+            stub("rpc::weak_ptr<rpc::object_stub> get_object_stub() const override {{ return target_stub_;}}");
+            stub("void* get_pointer() const override {{ return target_.get();}}");
             stub("int call(uint64_t method_id, size_t in_size_, const char* in_buf_, std::vector<char>& "
                  "out_buf_) override");
             stub("{{");

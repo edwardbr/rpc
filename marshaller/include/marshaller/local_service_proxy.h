@@ -2,28 +2,27 @@
 
 #include <marshaller/proxy.h>
 
-/*namespace rpc
+namespace rpc
 {
-    class master_service_proxy : public service_proxy
+    class root_service_proxy : public service_proxy
     {
         rpc::shared_ptr<i_marshaller> marshaller_;
-        master_service_proxy(const rpc::shared_ptr<service>& service, uint64_t zone_id, rpc::shared_ptr<i_marshaller> marshaller)
+        root_service_proxy(const rpc::shared_ptr<service>& service, uint64_t zone_id, rpc::shared_ptr<i_marshaller> marshaller)
             : service_proxy(service, zone_id), marshaller_(marshaller)
         {
         }
 
     public:
-        ~master_service_proxy()
+        ~root_service_proxy()
         {
-            log_str("~master_service_proxy",100);
+            log_str("~root_service_proxy",100);
         }
-        static rpc::shared_ptr<master_service_proxy> create(const rpc::shared_ptr<service>& serv, uint64_t zone_id, rpc::shared_ptr<i_marshaller> marshaller, uint64_t object_id)
+        static rpc::shared_ptr<root_service_proxy> create(const rpc::shared_ptr<service>& serv, uint64_t zone_id, rpc::shared_ptr<i_marshaller> marshaller)
         {
-            auto ret = rpc::shared_ptr<master_service_proxy>(new master_service_proxy(serv, zone_id, marshaller));
+            auto ret = rpc::shared_ptr<root_service_proxy>(new root_service_proxy(serv, zone_id, marshaller));
             auto pthis = rpc::static_pointer_cast<service_proxy>(ret);
             ret->weak_this_ = pthis;
             serv->add_zone(pthis);
-            ret->set_root_object(object_id);
             return ret;
         }
 
@@ -46,26 +45,25 @@
         }
     };
 
-    class slave_service_proxy : public service_proxy
+    class branch_service_proxy : public service_proxy
     {
         rpc::weak_ptr<i_marshaller> marshaller_;
-        slave_service_proxy(const rpc::shared_ptr<service>& service, uint64_t zone_id, rpc::shared_ptr<i_marshaller> marshaller)
+        branch_service_proxy(const rpc::shared_ptr<service>& service, uint64_t zone_id, rpc::shared_ptr<i_marshaller> marshaller)
             : service_proxy(service, zone_id), marshaller_(marshaller)
         {
         }
 
     public:
-        ~slave_service_proxy()
+        ~branch_service_proxy()
         {
-            log_str("~slave_service_proxy",100);
+            log_str("~branch_service_proxy",100);
         }
-        static rpc::shared_ptr<slave_service_proxy> create(const rpc::shared_ptr<service>& serv, uint64_t zone_id, rpc::shared_ptr<i_marshaller> marshaller, uint64_t object_id)
+        static rpc::shared_ptr<branch_service_proxy> create(const rpc::shared_ptr<service>& serv, uint64_t zone_id, rpc::shared_ptr<i_marshaller> marshaller)
         {
-            auto ret = rpc::shared_ptr<slave_service_proxy>(new slave_service_proxy(serv, zone_id, marshaller));
+            auto ret = rpc::shared_ptr<branch_service_proxy>(new branch_service_proxy(serv, zone_id, marshaller));
             auto pthis = rpc::static_pointer_cast<service_proxy>(ret);
             ret->weak_this_ = pthis;
             serv->add_zone(pthis);
-            ret->set_root_object(object_id);
             return ret;
         }
 
@@ -99,4 +97,4 @@
             return m->release(zone_id, object_id);
         }
     };
-}*/
+}

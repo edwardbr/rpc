@@ -35,16 +35,16 @@ namespace rpc
         {
         }
         ~object_stub();
-        uint64_t get_id() 
+        uint64_t get_id() const
         {
             return id_; 
         }
-        void* get_pointer();
+        void* get_pointer() const;
 
         // this is called once the lifetime management needs to be activated
         void on_added_to_zone(rpc::shared_ptr<object_stub> stub) { p_this = stub; }
 
-        service& get_zone() { return zone_; }
+        service& get_zone() const { return zone_; }
 
         int call(uint64_t interface_id, uint64_t method_id, size_t in_size_, const char* in_buf_,
                         std::vector<char>& out_buf_);
@@ -59,12 +59,12 @@ namespace rpc
     class i_interface_stub
     {
     public:
-        virtual uint64_t get_interface_id() = 0;
+        virtual uint64_t get_interface_id() const = 0;
         virtual int call(uint64_t method_id, size_t in_size_, const char* in_buf_, std::vector<char>& out_buf_)
             = 0;
         virtual int cast(uint64_t interface_id, rpc::shared_ptr<i_interface_stub>& new_stub) = 0;
-        virtual rpc::weak_ptr<object_stub> get_object_stub() = 0;
-        virtual void* get_pointer() = 0;
+        virtual rpc::weak_ptr<object_stub> get_object_stub() const = 0;
+        virtual void* get_pointer() const = 0;
     };
 
 }

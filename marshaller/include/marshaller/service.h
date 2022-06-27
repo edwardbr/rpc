@@ -22,7 +22,7 @@ namespace rpc
     {
     protected:
         uint64_t zone_id_ = 0;
-        std::atomic<uint64_t> object_id_generator = 0;
+        mutable std::atomic<uint64_t> object_id_generator = 0;
 
         // map object_id's to stubs
         std::unordered_map<uint64_t, rpc::weak_ptr<object_stub>> stubs;
@@ -32,17 +32,17 @@ namespace rpc
         std::unordered_map<uint64_t, rpc::weak_ptr<service_proxy>> other_zones;
 
         // hard lock on the root object
-        std::mutex insert_control;
+        mutable std::mutex insert_control;
     public:
         service(uint64_t zone_id = 1) : zone_id_(zone_id){}
         virtual ~service();
 
         // this function is needed by services where there is no shared pointer to this object, and its lifetime
         virtual void cleanup();
-        virtual bool check_is_empty();
-        uint64_t get_zone_id(){return zone_id_;}
+        virtual bool check_is_empty() const;
+        uint64_t get_zone_id() const {return zone_id_;}
         void set_zone_id(uint64_t zone_id){zone_id_ = zone_id;}
-        uint64_t get_new_object_id() { return ++object_id_generator; }
+        uint64_t generate_new_object_id() const { return ++object_id_generator; }
 
         template<class T> uint64_t encapsulate_outbound_interfaces(const rpc::shared_ptr<T>& object);
 
@@ -52,14 +52,14 @@ namespace rpc
         uint64_t add_lookup_stub(void* pointer,
                                  std::function<rpc::shared_ptr<i_interface_stub>(rpc::shared_ptr<object_stub>)> fn);
         int add_object(void* pointer, const rpc::shared_ptr<object_stub>& stub);
-        rpc::weak_ptr<object_stub> get_object(uint64_t object_id);
+        rpc::weak_ptr<object_stub> get_object(uint64_t object_id) const;
 
         int try_cast(uint64_t zone_id, uint64_t object_id, uint64_t interface_id) override;
         uint64_t add_ref(uint64_t zone_id, uint64_t object_id) override;
         uint64_t release(uint64_t zone_id, uint64_t object_id) override;
 
         void add_zone(const rpc::shared_ptr<service_proxy>& zone);
-        rpc::weak_ptr<service_proxy> get_zone(uint64_t zone_id);
+        rpc::weak_ptr<service_proxy> get_zone(uint64_t zone_id) const;
         void remove_zone(uint64_t zone_id);
     };
 
@@ -67,7 +67,7 @@ namespace rpc
     class child_service : public service
     {
         //the enclave needs to hold a hard lock to a root object that represents a runtime
-        //the enclave service lifetime is managed by edl functions 
+        //the enclave service lifetime is managed by the transport functions 
         rpc::shared_ptr<i_interface_stub> root_stub_;
         rpc::shared_ptr<rpc::service_proxy> parent_service_;
     public:
@@ -82,7 +82,7 @@ namespace rpc
         {
             assert(check_is_empty());
 
-            auto id = get_new_object_id();
+            auto id = generate_new_object_id();
             auto os = rpc::shared_ptr<obj_stub>(new obj_stub(id, *this));
             root_stub_ = rpc::static_pointer_cast<i_interface_stub>(Stub::create(root_ob, os));
             os->add_interface(root_stub_);
@@ -99,7 +99,7 @@ namespace rpc
             return 0;
         }
         virtual void cleanup() override;
-        bool check_is_empty() override;
-        uint64_t get_root_object_id();
+        bool check_is_empty() const override;
+        uint64_t get_root_object_id() const;
     };
 }

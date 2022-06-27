@@ -7,7 +7,7 @@ namespace rpc
         LOG("~object_stub",100);
     }
 
-    void* object_stub::get_pointer()
+    void* object_stub::get_pointer() const
     {
         assert(!stub_map.empty());
         return stub_map.begin()->second->get_pointer();
