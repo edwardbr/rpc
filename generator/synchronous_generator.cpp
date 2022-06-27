@@ -1029,8 +1029,13 @@ namespace enclave_marshaller
                 if(field.get_array_size())
                     header.raw("[{}]", field.get_array_size());
                 if(!field.get_default_value().empty())
-                    header.raw(" = {}::{}", field.get_return_type(), field.get_default_value());
-                header.raw(";\n");
+                {
+                    header.raw(" = {}::{};\n", field.get_return_type(), field.get_default_value());
+                }
+                else
+                {
+                    header.raw("{{}};\n");
+                }
             }
 
             header("");
