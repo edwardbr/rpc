@@ -19,6 +19,7 @@ target_link_libraries(marshal_test_host
   PUBLIC 
     marshal_test_edl_host
     common_host
+    example_interface
     
     rpc::marshaller_host 
     yas_common    
@@ -33,5 +34,5 @@ target_link_options(marshal_test_host PRIVATE ${HOST_LINK_EXE_OPTIONS})
 target_link_directories(marshal_test_host PUBLIC ${SGX_LIBRARY_PATH})
 set_property(TARGET marshal_test_host PROPERTY COMPILE_PDB_NAME marshal_test_host) 
 
-add_dependencies(marshal_test_host example_interface)
+
 
