@@ -1,7 +1,5 @@
 cmake_minimum_required(VERSION 3.12)
 
-set(DEBUG_RPC_GEN ON)
-
 EnclaveMarshaller(
     example_shared
     example_shared.idl

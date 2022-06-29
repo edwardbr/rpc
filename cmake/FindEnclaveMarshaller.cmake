@@ -122,6 +122,11 @@ function(EnclaveMarshaller
 
   add_library(${name} INTERFACE)
   add_dependencies(${name} ${name}_generate)    
+  
+  foreach (dep ${params_dependencies})
+    add_dependencies(${name} ${dep}_generate)    
+  endforeach()  
+
   target_include_directories(${name} INTERFACE "$<BUILD_INTERFACE:${output_path}>" "$<BUILD_INTERFACE:${output_path}/include>")    
 
   if(DEFINED params_dependencies)
