@@ -570,7 +570,7 @@ namespace enclave_marshaller
             header("class {}{}", interface_name, base_class_declaration);
             header("{{");
             header("public:");
-            header("static constexpr uint64_t id = {};", id);
+            header("static constexpr uint64_t id = {}ull;", id);
             header("virtual ~{}() = default;", interface_name);
 
             proxy("class {0}_proxy : public rpc::proxy_impl<{0}>", interface_name);
