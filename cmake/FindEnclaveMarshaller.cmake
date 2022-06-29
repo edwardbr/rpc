@@ -116,13 +116,13 @@ function(EnclaveMarshaller
   )
 
   message(${name}_generate)
-  add_custom_target(${name}_generate DEPENDS ${full_header_path}  ${full_proxy_path})
+  add_custom_target(${name}_generate DEPENDS ${full_header_path}  ${full_proxy_path} ${full_stub_path})
 
   set_target_properties(${name}_generate PROPERTIES base_dir ${base_dir})
 
   add_library(${name} INTERFACE)
   add_dependencies(${name} ${name}_generate)    
-  target_include_directories(${name} INTERFACE "${output_path}")    
+  target_include_directories(${name} INTERFACE "$<BUILD_INTERFACE:${output_path}>" "$<BUILD_INTERFACE:${output_path}/include>")    
 
   if(DEFINED params_dependencies)
     target_link_libraries(${name} INTERFACE ${params_dependencies})
