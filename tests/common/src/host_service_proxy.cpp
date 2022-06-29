@@ -30,9 +30,9 @@ namespace rpc
         if (status)
             return rpc::error::TRANSPORT_ERROR();
 
-        out_buf_.resize(data_out_sz);
-        if (status == -2)
+        if (err_code == rpc::error::NEED_MORE_MEMORY)
         {
+            out_buf_.resize(data_out_sz);
             //data too small reallocate memory and try again
 
             status
