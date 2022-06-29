@@ -244,19 +244,16 @@ int main(const int argc, char* argv[])
 		//compare and write if different
 		if(is_dfferent(header_stream, interfaces_h_data))
 		{
-			std::cout << "whriting header\n";
 			ofstream file(header_path);
 			file << header_stream.str();
 		}
 		if(is_dfferent(proxy_stream, interfaces_proxy_data))
 		{
-			std::cout << "whriting proxy\n";
 			ofstream file(proxy_path);
 			file << proxy_stream.str();
 		}
 		if(is_dfferent(stub_stream, interfaces_stub_data))
 		{
-			std::cout << "whriting stub\n";
 			ofstream file(stub_path);
 			file << stub_stream.str();
 		}

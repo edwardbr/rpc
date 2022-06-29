@@ -20,6 +20,10 @@ function(EnclaveMarshaller
   cmake_parse_arguments("params" "${options}" "${singleValueArgs}" "${multiValueArgs}" ${ARGN})          
 
   cmake_path(APPEND base_dir ${idl} OUTPUT_VARIABLE idl)
+  
+  set(full_header_path ${output_path}/include/${header})
+  set(full_proxy_path ${output_path}/src/${proxy})
+  set(full_stub_path ${output_path}/src/${stub})
 
   if(${DEBUG_RPC_GEN})
     message("EnclaveMarshaller name ${name}")
@@ -34,6 +38,9 @@ function(EnclaveMarshaller
     message("paths ${params_include_paths}")
     message("paths ${params_include_paths}")
     message("mock ${params_mock}")
+    message("full_header_path ${full_header_path}")
+    message("full_proxy_path ${full_proxy_path}")
+    message("full_stub_path ${full_stub_path}")
   endif()
 
   # Test if including from FindFlatBuffers
@@ -65,7 +72,7 @@ function(EnclaveMarshaller
 
   if(${DEBUG_RPC_GEN})
     message("
-    add_custom_command(OUTPUT ${output_path}/${header}  ${output_path}/${proxy} ${output_path}/${stub} ${output_path}/${name}.stamp
+    add_custom_command(OUTPUT ${full_header_path}  ${full_proxy_path} ${full_stub_path}
     COMMAND ${ENCLAVE_MARSHALLER} 
       --idl ${idl} 
       --output_path ${output_path}
@@ -73,8 +80,6 @@ function(EnclaveMarshaller
       --proxy ${proxy}
       --stub ${stub}
       ${PATHS_PARAMS}
-    COMMAND
-        cmake -E touch ${output_path}/${name}.stamp
     MAIN_DEPENDENCY ${idl} 
     IMPLICIT_DEPENDS ${idl} 
     DEPENDS ${params_dependencies}
@@ -82,20 +87,21 @@ function(EnclaveMarshaller
   )
 
   message(${name}_generate)
-  add_custom_target(${name}_generate DEPENDS ${output_path}/${name}.stamp)
+  add_custom_target(${name}_generate DEPENDS ${full_header_path}  ${full_proxy_path})
 
   set_target_properties(${name}_generate PROPERTIES base_dir ${base_dir})
 
   add_library(${name} INTERFACE)
   add_dependencies(${name} ${name}_generate)    
-  target_include_directories(${name} INTERFACE \"${output_path}\")    
+  target_include_directories(${name} INTERFACE "${output_path}")    
 
   if(DEFINED params_dependencies)
     target_link_libraries(${name} INTERFACE ${params_dependencies})
-  endif()")
+  endif()  
+")
   endif()
-
-  add_custom_command(OUTPUT ${output_path}/${header}  ${output_path}/${proxy} ${output_path}/${stub} ${output_path}/${name}.stamp
+  
+  add_custom_command(OUTPUT ${full_header_path}  ${full_proxy_path} ${full_stub_path}
     COMMAND ${ENCLAVE_MARSHALLER} 
       --idl ${idl} 
       --output_path ${output_path}
@@ -103,8 +109,6 @@ function(EnclaveMarshaller
       --proxy ${proxy}
       --stub ${stub}
       ${PATHS_PARAMS}
-    COMMAND
-        cmake -E touch ${output_path}/${name}.stamp
     MAIN_DEPENDENCY ${idl} 
     IMPLICIT_DEPENDS ${idl} 
     DEPENDS ${params_dependencies}
@@ -112,7 +116,7 @@ function(EnclaveMarshaller
   )
 
   message(${name}_generate)
-  add_custom_target(${name}_generate DEPENDS ${output_path}/${name}.stamp)
+  add_custom_target(${name}_generate DEPENDS ${full_header_path}  ${full_proxy_path})
 
   set_target_properties(${name}_generate PROPERTIES base_dir ${base_dir})
 
