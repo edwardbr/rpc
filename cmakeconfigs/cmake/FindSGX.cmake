@@ -534,9 +534,7 @@ if(SGX_FOUND)
     get_target_property(OUTPUT_DIR ${target} LIBRARY_OUTPUT_DIRECTORY)
     set(${target}_sign_OUTPUT_NAME ${OUTPUT_DIR}/${OUTPUT_NAME} CACHE STRING "signed target file name")
     if(SGX_HW AND SGX_MODE STREQUAL "release")
-      add_custom_target(
-        ${target}_sign ALL
-        DEPENDS ${target}
+      add_custom_command(TARGET ${target} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E cmake_echo_color --cyan "First step ${SGX_ENCLAVE_SIGNER} signing $<TARGET_FILE:${target}>"
         COMMAND ${SGX_ENCLAVE_SIGNER} gendata -config ${CONFIG_ABSPATH} -enclave "$<TARGET_FILE:${target}>" -out "$<TARGET_FILE_DIR:${target}>/${target}_hash.hex"
         COMMAND ${CMAKE_COMMAND} -E cmake_echo_color --cyan "Second step openssl signing"
@@ -547,7 +545,7 @@ if(SGX_FOUND)
         USES_TERMINAL
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
     else()
-      add_custom_target(${target}_sign ALL
+      add_custom_command(TARGET ${target} POST_BUILD
         COMMAND ${SGX_ENCLAVE_SIGNER} sign -key ${KEY_ABSPATH} -config ${CONFIG_ABSPATH} -enclave $<TARGET_FILE:${target}> -out $<TARGET_FILE_DIR:${target}>/${OUTPUT_NAME}
         USES_TERMINAL
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
