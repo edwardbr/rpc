@@ -53,6 +53,7 @@ target_compile_definitions(marshaller_host PRIVATE ${HOST_DEFINES})
 target_include_directories(marshaller_host 
     PUBLIC 
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+    "$<INSTALL_INTERFACE:include/marshaller>"
     PRIVATE 
     ${HOST_INCLUDES})
 
@@ -69,3 +70,9 @@ set_property(TARGET marshaller_host PROPERTY COMPILE_PDB_NAME marshaller_host)
 
 
 add_library(rpc::marshaller_host ALIAS marshaller_host)
+
+install(DIRECTORY include/ DESTINATION include/marshaller 
+FILES_MATCHING 
+  PATTERN "*.h*" 
+  #PATTERN "private" EXCLUDE
+)
