@@ -149,7 +149,7 @@ int main(const int argc, char* argv[])
 			return 0;
 		}
 	}
-	catch(std::exception ex)
+	catch(const std::exception& ex)
 	{
 		std::cout << ex.what() << '\n';
 		return -1;
