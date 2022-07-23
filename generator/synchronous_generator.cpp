@@ -548,7 +548,7 @@ namespace enclave_marshaller
         }
 
         void write_interface(bool from_host, const class_entity& m_ob, writer& header, writer& proxy, writer& stub,
-                             int id)
+                             size_t id)
         {
             auto interface_name = std::string(m_ob.get_type() == entity_type::LIBRARY ? "i_" : "") + m_ob.get_name();
 
@@ -570,7 +570,7 @@ namespace enclave_marshaller
             header("class {}{}", interface_name, base_class_declaration);
             header("{{");
             header("public:");
-            header("static constexpr uint64_t id = {};", id);
+            header("static constexpr uint64_t id = {}ull;", id);
             header("virtual ~{}() = default;", interface_name);
 
             proxy("class {0}_proxy : public rpc::proxy_impl<{0}>", interface_name);
@@ -582,7 +582,7 @@ namespace enclave_marshaller
             proxy("public:");
             proxy("");
             proxy("virtual ~{}_proxy(){{}}", interface_name);
-            proxy("static rpc::shared_ptr<{}> create(rpc::shared_ptr<rpc::object_proxy> object_proxy)", interface_name);
+            proxy("[[nodiscard]] static rpc::shared_ptr<{}> create(const rpc::shared_ptr<rpc::object_proxy>& object_proxy)", interface_name);
             proxy("{{");
             proxy("auto ret = rpc::shared_ptr<{0}_proxy>(new {0}_proxy(object_proxy));", interface_name);
             proxy("ret->weak_this_ = ret;", interface_name);
@@ -598,7 +598,7 @@ namespace enclave_marshaller
             stub("rpc::shared_ptr<{}> target_;", interface_name);
             stub("rpc::weak_ptr<rpc::object_stub> target_stub_;", interface_name);
             stub("");
-            stub("{0}_stub(rpc::shared_ptr<{0}>& target, rpc::weak_ptr<rpc::object_stub> target_stub) : ",
+            stub("{0}_stub(const rpc::shared_ptr<{0}>& target, rpc::weak_ptr<rpc::object_stub> target_stub) : ",
                  interface_name);
             stub("  target_(target),", interface_name);
             stub("  target_stub_(target_stub)");
@@ -606,7 +606,7 @@ namespace enclave_marshaller
             stub("mutable rpc::weak_ptr<{}_stub> weak_this_;", interface_name);
             stub("");
             stub("public:");
-            stub("static rpc::shared_ptr<{0}_stub> create(rpc::shared_ptr<{0}>& target, "
+            stub("static rpc::shared_ptr<{0}_stub> create(const rpc::shared_ptr<{0}>& target, "
                  "rpc::weak_ptr<rpc::object_stub> target_stub)",
                  interface_name);
             stub("{{");
@@ -617,11 +617,11 @@ namespace enclave_marshaller
             stub("rpc::shared_ptr<{0}_stub> shared_from_this(){{return rpc::shared_ptr<{0}_stub>(weak_this_);}}",
                  interface_name);
             stub("");
-            stub("uint64_t get_interface_id() override {{ return {}::id; }};", interface_name);
-            stub("rpc::shared_ptr<{}> get_target() {{ return target_; }};", interface_name);
-            stub("rpc::weak_ptr<rpc::object_stub> get_object_stub() override {{ return target_stub_;}}");
-            stub("void* get_pointer() override {{ return target_.get();}}");
-            stub("error_code call(uint64_t method_id, size_t in_size_, const char* in_buf_, std::vector<char>& "
+            stub("uint64_t get_interface_id() const override {{ return {}::id; }};", interface_name);
+            stub("rpc::shared_ptr<{}> get_target() const {{ return target_; }};", interface_name);
+            stub("rpc::weak_ptr<rpc::object_stub> get_object_stub() const override {{ return target_stub_;}}");
+            stub("void* get_pointer() const override {{ return target_.get();}}");
+            stub("int call(uint64_t method_id, size_t in_size_, const char* in_buf_, std::vector<char>& "
                  "out_buf_) override");
             stub("{{");
 
@@ -674,10 +674,6 @@ namespace enclave_marshaller
                     header.raw(") = 0;\n");
                     proxy.raw(") override\n");
                     proxy("{{");
-                    proxy("if(!get_object_proxy())");
-                    proxy("{{");
-                    proxy("return -1;");
-                    proxy("}}");
 
                     bool has_inparams = false;
 
@@ -749,9 +745,9 @@ namespace enclave_marshaller
                     // \"\\n\";");
 
                     proxy("std::vector<char> out_buf_(24); //max size using short string optimisation");
-                    proxy("error_code ret = get_object_proxy()->send({}::id, {}, in_.size, in_.data.get(), out_buf_);",
-                          interface_name, function_count);
-                    proxy("if(ret)");
+                    proxy("{} ret = get_object_proxy()->send({}::id, {}, in_.size, in_.data.get(), out_buf_);",
+                          function.get_return_type(), interface_name, function_count);
+                    proxy("if(ret != rpc::error::OK())");
                     proxy("{{");
                     proxy("return ret;");
                     proxy("}}");
@@ -773,7 +769,7 @@ namespace enclave_marshaller
 
                     stub("//STUB_PARAM_CAST");
                     stub.print_tabs();
-                    stub.raw("error_code ret = target_->{}(", function.get_name());
+                    stub.raw("int ret = target_->{}(", function.get_name());
 
                     {
                         bool has_param = false;
@@ -794,7 +790,7 @@ namespace enclave_marshaller
                         }
                     }
                     stub.raw(");\n");
-                    stub("if(ret)");
+                    stub("if(ret != rpc::error::OK())");
                     stub("  return ret;");
                     stub("");
 
@@ -900,7 +896,7 @@ namespace enclave_marshaller
                 }
 
                 stub("default:");
-                stub("return -1;");
+                stub("return rpc::error::INVALID_METHOD_ID();");
                 stub("}};");
             }
 
@@ -909,14 +905,14 @@ namespace enclave_marshaller
             proxy("}};");
             proxy("");
 
-            stub("return -1;");
+            stub("return rpc::error::INVALID_METHOD_ID();");
             stub("}}");
-            stub("error_code cast(uint64_t interface_id, rpc::shared_ptr<rpc::i_interface_stub>& new_stub) override;");
+            stub("int cast(uint64_t interface_id, rpc::shared_ptr<rpc::i_interface_stub>& new_stub) override;");
             stub("}};");
             stub("");
         };
 
-        void write_stub_factory(bool from_host, const class_entity& lib, const class_entity& m_ob, writer& stub, int id)
+        void write_stub_factory(bool from_host, const class_entity& lib, const class_entity& m_ob, writer& stub)
         {
             auto interface_name = std::string(m_ob.get_type() == entity_type::LIBRARY ? "i_" : "") + m_ob.get_name();
             stub("if(interface_id == {}::id)", interface_name);
@@ -928,21 +924,20 @@ namespace enclave_marshaller
             stub("new_stub = rpc::static_pointer_cast<rpc::i_interface_stub>({0}_stub::create(tmp_ptr, "
                  "original->get_object_stub()));",
                  interface_name);
-            stub("return 0;");
+            stub("return rpc::error::OK();");
             stub("}}");
-            stub("return -1;");
+            stub("return rpc::error::INVALID_CAST();");
 
             stub("}}");
         }
 
-        void write_stub_cast_factory(bool from_host, const class_entity& lib, const class_entity& m_ob, writer& stub,
-                                     int id)
+        void write_stub_cast_factory(bool from_host, const class_entity& lib, const class_entity& m_ob, writer& stub)
         {
             auto interface_name = std::string(m_ob.get_type() == entity_type::LIBRARY ? "i_" : "") + m_ob.get_name();
-            stub("error_code {}_stub::cast(uint64_t interface_id, rpc::shared_ptr<rpc::i_interface_stub>& new_stub)",
+            stub("int {}_stub::cast(uint64_t interface_id, rpc::shared_ptr<rpc::i_interface_stub>& new_stub)",
                  interface_name);
             stub("{{");
-            stub("error_code ret = stub_factory(interface_id, shared_from_this(), new_stub);");
+            stub("int ret = stub_factory(interface_id, shared_from_this(), new_stub);");
             stub("return ret;");
             stub("}}");
         }
@@ -1050,10 +1045,9 @@ namespace enclave_marshaller
             header("{{");
             header("ar & YAS_OBJECT_NVP(\"{}\"", m_ob.get_name());
 
-            int count = 0;
             for (auto& field : m_ob.get_functions())
             {
-                header("  ,(\"{}\", {})", field.get_name(), field.get_name());
+                header("  ,(\"{0}\", {0})", field.get_name());
             }
             header(");");
 
@@ -1088,7 +1082,7 @@ namespace enclave_marshaller
 
             int id = 1;
             header("template<> uint64_t "
-                   "rpc::service::encapsulate_outbound_interfaces(rpc::shared_ptr<{}{}> "
+                   "rpc::service::encapsulate_outbound_interfaces(const rpc::shared_ptr<{}{}>& "
                    "iface);",
                    ns, interface_name);
         }
@@ -1118,7 +1112,7 @@ namespace enclave_marshaller
             proxy("}}");
             proxy("");
 
-            stub("template<> uint64_t rpc::service::encapsulate_outbound_interfaces(rpc::shared_ptr<{}{}> "
+            stub("template<> uint64_t rpc::service::encapsulate_outbound_interfaces(const rpc::shared_ptr<{}{}>& "
                  "iface)",
                  ns, interface_name);
             stub("{{");
@@ -1128,7 +1122,7 @@ namespace enclave_marshaller
             stub("{{");
             stub("return marshaller->get_object_stub().lock()->get_id();");
             stub("}}");
-            stub("return add_lookup_stub(iface.get(), [&](rpc::shared_ptr<rpc::object_stub> stub) -> "
+            stub("return add_lookup_stub(iface.get(), [&](const rpc::shared_ptr<rpc::object_stub>& stub) -> "
                  "rpc::shared_ptr<rpc::i_interface_stub>{{");
             stub("return rpc::static_pointer_cast<rpc::i_interface_stub>({}{}_stub::create(iface, stub));", ns,
                  interface_name);
@@ -1136,7 +1130,7 @@ namespace enclave_marshaller
             stub("}}");
         }
 
-        void write_marshalling_logic_nested(bool from_host, const class_entity& cls, int id, writer& header,
+        void write_marshalling_logic_nested(bool from_host, const class_entity& cls, std::string prefix, writer& header,
                                             writer& proxy, writer& stub)
         {
             if (cls.get_type() == entity_type::STRUCT)
@@ -1144,14 +1138,16 @@ namespace enclave_marshaller
 
             header("");
 
+            std::size_t hash = std::hash<std::string>{}(prefix + "::" + cls.get_name());
+
             if (cls.get_type() == entity_type::INTERFACE)
-                write_interface(from_host, cls, header, proxy, stub, id);
+                write_interface(from_host, cls, header, proxy, stub, hash);
 
             if (cls.get_type() == entity_type::LIBRARY)
-                write_interface(from_host, cls, header, proxy, stub, id);
+                write_interface(from_host, cls, header, proxy, stub, hash);
         }
 
-        void write_marshalling_logic(bool from_host, const class_entity& lib, writer& header, writer& proxy,
+        void write_marshalling_logic(bool from_host, const class_entity& lib, std::string prefix, writer& header, writer& proxy,
                                      writer& stub)
         {
             {
@@ -1161,14 +1157,13 @@ namespace enclave_marshaller
                     stub("#define STUB_FACTORY");
                 }
                 stub("template<class T>");
-                stub("error_code stub_factory(uint64_t interface_id, rpc::shared_ptr<T> original, "
+                stub("int stub_factory(uint64_t interface_id, rpc::shared_ptr<T> original, "
                      "rpc::shared_ptr<rpc::i_interface_stub>& new_stub)");
                 stub("{{");
-                stub("error_code ret = -1;");
                 stub("if(interface_id == original->get_interface_id())");
                 stub("{{");
-                stub("new_stub = rpc::static_pointer_cast<rpc::i_interface_stub>(original);;");
-                stub("return 0;");
+                stub("new_stub = rpc::static_pointer_cast<rpc::i_interface_stub>(original);");
+                stub("return rpc::error::OK();");
                 stub("}}");
                 int id = 1;
                 for (auto& cls : lib.get_classes())
@@ -1176,7 +1171,7 @@ namespace enclave_marshaller
                     if(!cls->get_import_lib().empty())
                         continue;
                     if (cls->get_type() == entity_type::INTERFACE)
-                        write_stub_factory(from_host, lib, *cls, stub, id++);
+                        write_stub_factory(from_host, lib, *cls, stub);
                 }
 
                 for (auto& cls : lib.get_classes())
@@ -1184,10 +1179,10 @@ namespace enclave_marshaller
                     if(!cls->get_import_lib().empty())
                         continue;
                     if (cls->get_type() == entity_type::LIBRARY)
-                        write_stub_factory(from_host, lib, *cls, stub, 0);
+                        write_stub_factory(from_host, lib, *cls, stub);
                 }
 
-                stub("return ret;");
+                stub("return rpc::error::INVALID_DATA();");
                 stub("}}");
                 if(lib.get_owner() == nullptr)
                 {
@@ -1202,7 +1197,7 @@ namespace enclave_marshaller
                     if(!cls->get_import_lib().empty())
                         continue;
                     if (cls->get_type() == entity_type::INTERFACE)
-                        write_stub_cast_factory(from_host, lib, *cls, stub, id++);
+                        write_stub_cast_factory(from_host, lib, *cls, stub);
                 }
 
                 for (auto& cls : lib.get_classes())
@@ -1210,13 +1205,13 @@ namespace enclave_marshaller
                     if(!cls->get_import_lib().empty())
                         continue;
                     if (cls->get_type() == entity_type::LIBRARY)
-                        write_stub_cast_factory(from_host, lib, *cls, stub, 0);
+                        write_stub_cast_factory(from_host, lib, *cls, stub);
                 }
             }
         }
 
         // entry point
-        void write_namespace_predeclaration(bool from_host, const class_entity& lib, int& id, writer& header,
+        void write_namespace_predeclaration(bool from_host, const class_entity& lib, writer& header,
                                             writer& proxy, writer& stub)
         {
             for (auto cls : lib.get_classes())
@@ -1247,7 +1242,7 @@ namespace enclave_marshaller
                     stub("namespace {}", cls->get_name());
                     stub("{{");
 
-                    write_namespace_predeclaration(from_host, *cls, id, header, proxy, stub);
+                    write_namespace_predeclaration(from_host, *cls, header, proxy, stub);
 
                     header("}}");
                     proxy("}}");
@@ -1257,7 +1252,7 @@ namespace enclave_marshaller
         }
 
         // entry point
-        void write_namespace(bool from_host, const class_entity& lib, int& id, writer& header, writer& proxy,
+        void write_namespace(bool from_host, const class_entity& lib, std::string prefix, writer& header, writer& proxy,
                              writer& stub)
         {
             for (auto cls : lib.get_classes())
@@ -1274,7 +1269,7 @@ namespace enclave_marshaller
                     stub("namespace {}", cls->get_name());
                     stub("{{");
 
-                    write_namespace(from_host, *cls, id, header, proxy, stub);
+                    write_namespace(from_host, *cls, prefix + cls->get_name() + "::", header, proxy, stub);
 
                     header("}}");
                     proxy("}}");
@@ -1282,13 +1277,13 @@ namespace enclave_marshaller
                 }
                 else
                 {
-                    write_marshalling_logic_nested(from_host, *cls, id++, header, proxy, stub);
+                    write_marshalling_logic_nested(from_host, *cls, prefix, header, proxy, stub);
                 }
             }
-            write_marshalling_logic(from_host, lib, header, proxy, stub);
+            write_marshalling_logic(from_host, lib, prefix, header, proxy, stub);
         }
 
-        void write_epilog(bool from_host, const class_entity& lib, int& id, writer& header, writer& proxy, writer& stub,
+        void write_epilog(bool from_host, const class_entity& lib, writer& header, writer& proxy, writer& stub,
                           const std::vector<std::string>& namespaces)
         {
             for (auto cls : lib.get_classes())
@@ -1298,7 +1293,7 @@ namespace enclave_marshaller
                 if (cls->get_type() == entity_type::NAMESPACE)
                 {
 
-                    write_epilog(from_host, *cls, id, header, proxy, stub, namespaces);
+                    write_epilog(from_host, *cls, header, proxy, stub, namespaces);
                 }
                 else
                 {
@@ -1329,6 +1324,7 @@ namespace enclave_marshaller
 
             header("#include <marshaller/marshaller.h>");
             header("#include <marshaller/service.h>");
+            header("#include <marshaller/error_codes.h>");
 
             for(const auto& import : imports)
             {
@@ -1365,6 +1361,7 @@ namespace enclave_marshaller
             stub("#include \"{}\"", header_filename);
             stub("");
 
+            std::string prefix;
             for (auto& ns : namespaces)
             {
                 header("namespace {}", ns);
@@ -1373,13 +1370,13 @@ namespace enclave_marshaller
                 proxy("{{");
                 stub("namespace {}", ns);
                 stub("{{");
+
+                prefix += ns + "::";
             }
 
-            int id = 1;
-            write_namespace_predeclaration(from_host, lib, id, header, proxy, stub);
+            write_namespace_predeclaration(from_host, lib, header, proxy, stub);
 
-            id = 1;
-            write_namespace(from_host, lib, id, header, proxy, stub);
+            write_namespace(from_host, lib, prefix, header, proxy, stub);
 
             for (auto& ns : namespaces)
             {
@@ -1388,8 +1385,7 @@ namespace enclave_marshaller
                 stub("}}");
             }
 
-            id = 1;
-            write_epilog(from_host, lib, id, header, proxy, stub, namespaces);
+            write_epilog(from_host, lib, header, proxy, stub, namespaces);
         }
     }
 }

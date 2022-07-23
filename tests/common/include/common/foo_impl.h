@@ -12,7 +12,14 @@ namespace marshalled_tests
     class foo : public xxx::i_foo
     {
     public:
-        virtual ~foo() { }
+        foo()
+        {
+            log_str("foo",100);
+        }
+        virtual ~foo()
+        {
+            log_str("~foo",100);
+        }
         error_code do_something_in_val(int val)
         {
             log(std::string("got ") + std::to_string(val));
@@ -167,6 +174,8 @@ namespace marshalled_tests
     class example : public yyy::i_example
     {
     public:
+        example(){log_str("new example",100);}
+        ~example(){log_str("delete example",100);}
         error_code create_foo(rpc::shared_ptr<xxx::i_foo>& target) override
         {
             target = rpc::shared_ptr<xxx::i_foo>(new foo);

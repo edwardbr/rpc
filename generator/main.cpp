@@ -36,6 +36,19 @@ void get_imports(const std::shared_ptr<class_entity>& object, std::list<std::str
 	}
 }
 
+bool is_dfferent(const std::stringstream& stream, const std::string& data)
+{
+	auto stream_str = stream.str();
+	if(stream_str.empty())
+	{
+		if(data.empty())
+			return true;
+		return false;
+	}
+	stream_str = stream_str.substr(0, stream_str.length() - 1);
+	return stream_str != data;
+}
+
 int main(const int argc, char* argv[])
 {
 	string rootIdl;
@@ -229,17 +242,17 @@ int main(const int argc, char* argv[])
 		}
 
 		//compare and write if different
-		if(interfaces_h_data != header_stream.str())
+		if(is_dfferent(header_stream, interfaces_h_data))
 		{
 			ofstream file(header_path);
 			file << header_stream.str();
 		}
-		if(interfaces_proxy_data != proxy_stream.str())
+		if(is_dfferent(proxy_stream, interfaces_proxy_data))
 		{
 			ofstream file(proxy_path);
 			file << proxy_stream.str();
 		}
-		if(interfaces_stub_data != stub_stream.str())
+		if(is_dfferent(stub_stream, interfaces_stub_data))
 		{
 			ofstream file(stub_path);
 			file << stub_stream.str();
@@ -252,7 +265,6 @@ int main(const int argc, char* argv[])
 				file << mock_stream.str();
 			}
 		}
-
 	}
 	catch (std::string msg)
 	{

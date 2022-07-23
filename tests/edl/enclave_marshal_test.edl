@@ -8,7 +8,7 @@ enclave {
 
     trusted {
 		/* define ECALLs here. */
-		public int marshal_test_init_enclave(uint64_t zone_id, [out]uint64_t* root_object);		
+		public int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t child_zone_id, [out]uint64_t* root_object);		
 		public void marshal_test_destroy_enclave();
 
         public int call_enclave(uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t sz_int, [in, size=sz_int] const char* data_in, size_t sz_out, [out, size=sz_out] char* data_out, [out] size_t* data_out_sz, [user_check] void** tls);

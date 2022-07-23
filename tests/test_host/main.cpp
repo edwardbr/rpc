@@ -26,7 +26,7 @@
 
 using namespace marshalled_tests;
 
-rpc::service* current_host_service = nullptr;
+rpc::weak_ptr<rpc::service> current_host_service;
 
 int main()
 {
@@ -36,94 +36,75 @@ int main()
         standard_tests(f, false);
     }
 
-    {
-        error_code ret = 77;
-        // STUB_ADD_REF_OUT
-        uint64_t target_ = 66;
-        // STUB_MARSHALL_OUT
-
-        std::vector<char> out_buf_;
-
-        const auto yas_mapping_ = YAS_OBJECT_NVP("out", ("_1", ret), ("_2", target_));
-        yas::count_ostream counter_;
-        yas::binary_oarchive<yas::count_ostream, yas::mem | yas::binary> oa(counter_);
-        oa(yas_mapping_);
-        out_buf_.resize(counter_.total_size);
-        yas::mem_ostream writer_(out_buf_.data(), counter_.total_size);
-        yas::save<yas::mem | yas::binary>(writer_, yas_mapping_);
-
-        uint64_t new_target_ = 0;
-        error_code new_ret_ = 0;
-        yas::load<yas::mem | yas::binary>(yas::intrusive_buffer {out_buf_.data(), out_buf_.size()},
-                                          YAS_OBJECT_NVP("out", ("_1", new_ret_), ("_2", new_target_)));
-    }
-
     // an inprocess marshalling of an object
     do
     {
-        auto service = rpc::make_shared<rpc::service>(1);
-
-        auto marshaller = rpc::static_pointer_cast<rpc::i_marshaller>(service);
-
-        auto other_service = rpc::make_shared<rpc::service>(2);
-        // create the root object
-        rpc::shared_ptr<yyy::i_example> ex(new example);
-        error_code err_code = other_service->initialise<yyy::i_example, yyy::i_example_stub>(ex);
-        if (err_code)
-            return err_code;
-
-        auto other_marshaller = rpc::static_pointer_cast<rpc::i_marshaller>(other_service);
+        int zone_gen = 0;
+        auto root_service = rpc::make_shared<rpc::service>(++zone_gen);
+        auto branch_service = rpc::make_shared<rpc::child_service>(++zone_gen);
+        uint64_t stub_id = 0;
 
         // create a proxy for the rpc::service hosting the example object
-        auto service_proxy
-            = rpc::local_service_proxy::create(service, 2, other_marshaller, other_service->get_root_object_id());
-        auto example_ptr = service_proxy->get_interface<yyy::i_example>();
+        auto service_proxy = rpc::root_service_proxy::create(root_service, root_service->get_zone_id(), root_service);
+        // create a proxy for the remote rpc::service, keep an instance going
+        auto branch_service_proxy
+            = rpc::branch_service_proxy::create(branch_service, branch_service->get_zone_id(), branch_service);
 
-        // create a proxy for the other rpc::service, keep an instance going
-        auto other_service_proxy = rpc::local_service_proxy::create(other_service, 1, marshaller, 0);
+        {
+            // create the remote root object
+            rpc::shared_ptr<yyy::i_example> remote_ex(new example);
+            int err_code
+                = branch_service->initialise<yyy::i_example, yyy::i_example_stub>(remote_ex, service_proxy, &stub_id);
+            if (err_code)
+                return err_code;
+        }
+
+        rpc::shared_ptr<yyy::i_example> i_example_ptr;
+        ASSERT(!branch_service_proxy->create_proxy(stub_id, i_example_ptr));
 
         rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
-        err_code = example_ptr->create_foo(i_foo_ptr);
+        int err_code = i_example_ptr->create_foo(i_foo_ptr);
         if (err_code)
         {
             std::cout << "create_foo failed\n";
             break;
         }
+
+        ASSERT(!i_foo_ptr->do_something_in_val(33));
         standard_tests(*i_foo_ptr, true);
 
-        remote_tests(example_ptr);
-
+        remote_tests(i_example_ptr);
     } while (0);
 
     // an enclave marshalling of an object
     {
-        error_code err_code = 0;
-        auto host_rpc_server = rpc::make_shared<rpc::service>(1);
-        current_host_service = host_rpc_server.get();
+        int err_code = rpc::error::OK();
+        int zone_gen = 0;
+        auto root_service = rpc::make_shared<rpc::service>(++zone_gen);
+        current_host_service = root_service;
 
-        auto ex = rpc::enclave_service_proxy::create(
-            host_rpc_server, 2,
-            "C:/Dev/experiments/enclave_marshaller/build/output/debug/marshal_test_enclave.signed.dll");
-
-        err_code = ex->initialise();
-        ASSERT(!err_code);
-
-        auto example_ptr = ex->get_interface<yyy::i_example>();
-
-        rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
-        err_code = example_ptr->create_foo(i_foo_ptr);
-        if (err_code)
         {
-            std::cout << "create_foo failed\n";
-        }
-        else
-        {
-            standard_tests(*i_foo_ptr, true);
+            rpc::shared_ptr<yyy::i_example> example_ptr;
+            {
+                auto ex = rpc::enclave_service_proxy::create(root_service, ++zone_gen,
+                                                             "./marshal_test_enclave.signed.dll");
 
-            remote_tests(example_ptr);
-        }
+                err_code = ex->initialise<yyy::i_example>(example_ptr);
+                ASSERT(!err_code);
+            }
+            rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
+            err_code = example_ptr->create_foo(i_foo_ptr);
+            if (err_code)
+            {
+                std::cout << "create_foo failed\n";
+            }
+            else
+            {
+                standard_tests(*i_foo_ptr, true);
 
-        current_host_service = nullptr;
+                remote_tests(example_ptr);
+            }
+        }
     }
     return 0;
 }
@@ -137,12 +118,18 @@ extern "C"
                   size_t sz_out, char* data_out, size_t* data_out_sz)
     {
         thread_local std::vector<char> out_buf;
-        error_code ret = 0;
+        int ret = 0;
+
+        auto root_service = current_host_service.lock();
+        if (!root_service)
+        {
+            return rpc::error::TRANSPORT_ERROR();
+        }
         if (out_buf.empty())
         {
-            ret = current_host_service->send(object_id, interface_id, method_id, sz_int, data_in, out_buf);
+            ret = root_service->send(object_id, interface_id, method_id, sz_int, data_in, out_buf);
         }
-        if (ret == 0)
+        if (ret == rpc::error::OK())
         {
             *data_out_sz = out_buf.size();
             if (out_buf.size() <= sz_out)
@@ -157,15 +144,30 @@ extern "C"
     }
     int try_cast_host(uint64_t zone_id, uint64_t object_id, uint64_t interface_id)
     {
-        error_code ret = current_host_service->try_cast(zone_id, object_id, interface_id);
+        auto root_service = current_host_service.lock();
+        if (!root_service)
+        {
+            return rpc::error::TRANSPORT_ERROR();
+        }
+        int ret = root_service->try_cast(zone_id, object_id, interface_id);
         return ret;
     }
     uint64_t add_ref_host(uint64_t zone_id, uint64_t object_id)
     {
-        return current_host_service->add_ref(zone_id, object_id);
+        auto root_service = current_host_service.lock();
+        if (!root_service)
+        {
+            return rpc::error::TRANSPORT_ERROR();
+        }
+        return root_service->add_ref(zone_id, object_id);
     }
     uint64_t release_host(uint64_t zone_id, uint64_t object_id)
     {
-        return current_host_service->release(zone_id, object_id);
+        auto root_service = current_host_service.lock();
+        if (!root_service)
+        {
+            return rpc::error::TRANSPORT_ERROR();
+        }
+        return root_service->release(zone_id, object_id);
     }
 }

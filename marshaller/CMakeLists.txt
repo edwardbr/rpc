@@ -12,6 +12,7 @@ add_library(marshaller_enclave
     src/remote_pointer.cpp
     src/service.cpp
     src/stub.cpp
+    src/error_codes.cpp
     )
 
 target_compile_definitions(marshaller_enclave 
@@ -45,6 +46,7 @@ add_library(marshaller_host
     src/remote_pointer.cpp
     src/service.cpp
     src/stub.cpp
+    src/error_codes.cpp
     )
 
 

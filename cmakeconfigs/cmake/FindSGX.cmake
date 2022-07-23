@@ -18,21 +18,16 @@ elseif(EXISTS $ENV{SGX_DIR})
 elseif(EXISTS $ENV{SGX_ROOT})
   set(SGX_PATH $ENV{SGX_ROOT})
 else()
-	if(NOT WIN32)
-		message("linux")
-		set(SGX_PATH "/opt/intel/sgxsdk")
-	else()
-		message("windows")
-		set(SGX_PATH "C:/PROGRA~2/Intel/INTELS~1")
-	endif()
+  if(WIN32)
+    message("windows")
+    set(SGX_PATH "C:/PROGRA~2/Intel/INTELS~1")
+  else() # Linux
+    message("linux")
+    set(SGX_PATH "/opt/intel/sgxsdk")
+  endif()
 endif()
 
-if(NOT WIN32)
-  set(SGX_COMMON_CFLAGS -m64)
-  set(SGX_LIBRARY_PATH ${SGX_PATH}/lib64)
-  set(SGX_ENCLAVE_SIGNER ${SGX_PATH}/bin/x64/sgx_sign)
-  set(SGX_EDGER8R ${SGX_PATH}/bin/x64/sgx_edger8r)
-else()
+if(WIN32)
   set(SGX_BINARIES ${SGX_PATH}/bin/win32/Release)
   #set(SGX_COMMON_CFLAGS -m32)
   if((${SGX_MODE} STREQUAL "prerelease") OR (${SGX_MODE} STREQUAL "release")) #not simulation nor debug nor "optimized debug" nor "optimized simulation"
@@ -42,6 +37,40 @@ else()
   endif()
   set(SGX_ENCLAVE_SIGNER ${SGX_BINARIES}/sgx_sign.exe)
   set(SGX_EDGER8R ${SGX_BINARIES}/sgx_edger8r.exe)
+
+  set(ENCLAVE_INC_FLAGS -I${SGX_INCLUDE_DIR} -I${SGX_TLIBC_INCLUDE_DIR} -I${SGX_LIBCXX_INCLUDE_DIR})
+  set(ENCLAVE_C_FLAGS "${SGX_COMMON_CFLAGS} ${ENCLAVE_INC_FLAGS}")
+  set(ENCLAVE_CXX_FLAGS ${ENCLAVE_C_FLAGS})
+else() # Linux
+  if(CMAKE_SIZEOF_VOID_P EQUAL 4)
+      set(SGX_COMMON_CFLAGS -m32)
+      set(SGX_LIBRARY_PATH ${SGX_PATH}/lib32)
+      set(SGX_ENCLAVE_SIGNER ${SGX_PATH}/bin/x86/sgx_sign)
+      set(SGX_EDGER8R ${SGX_PATH}/bin/x86/sgx_edger8r)
+  else()
+      set(SGX_COMMON_CFLAGS -m64)
+      set(SGX_LIBRARY_PATH ${SGX_PATH}/lib64)
+      set(SGX_ENCLAVE_SIGNER ${SGX_PATH}/bin/x64/sgx_sign)
+      set(SGX_EDGER8R ${SGX_PATH}/bin/x64/sgx_edger8r)
+  endif()
+  if(SGX_MODE STREQUAL "debug")
+    if(${BUILD_TYPE} STREQUAL "release") # SimulationOptimized aka SimulationPrerelease
+      set(SGX_COMMON_CFLAGS "${SGX_COMMON_CFLAGS} -O2 -DNDEBUG -UEDEBUG")
+    else() # Debug
+      set(SGX_COMMON_CFLAGS "${SGX_COMMON_CFLAGS} -O0 -g -UNDEBUG -UEDEBUG")
+    endif()
+  elseif(SGX_MODE STREQUAL "prerelease")
+    set(SGX_COMMON_CFLAGS "${SGX_COMMON_CFLAGS} -O2 -DNDEBUG -DEDEBUG")
+  elseif(SGX_MODE STREQUAL "release")
+    set(SGX_COMMON_CFLAGS "${SGX_COMMON_CFLAGS} -O2 -DNDEBUG -UEDEBUG")
+  else()
+    message(FATAL_ERROR "SGX_MODE ${SGX_MODE} is not debug, prerelease or release.")
+  endif()
+
+  set(ENCLAVE_INC_FLAGS -I${SGX_INCLUDE_DIR} -I${SGX_TLIBC_INCLUDE_DIR} -I${SGX_LIBCXX_INCLUDE_DIR})
+  set(ENCLAVE_C_FLAGS "${SGX_COMMON_CFLAGS} -nostdinc -fvisibility=hidden -fpie -fstack-protector-strong")
+  set(ENCLAVE_CXX_FLAGS "${ENCLAVE_C_FLAGS} -nostdinc++")
+ 
 endif()
 
 if(NOT WIN32)
@@ -86,20 +115,23 @@ if(SGX_FOUND)
     set(SGX_TSVC_LIB sgx_tservice_sim)
   endif()
 
-  set(SGX_ENCLAVE_LIBS 
-    ${SGX_TCXX_LIB}.lib
-    ${SGX_TRTS_LIB}.lib
-    ${SGX_TSTDC_LIB}.lib
-    ${SGX_TSVC_LIB}.lib
-    ${SGX_TCRYPTO_LIB}.lib
-    ${SGX_HEADER_ONLY_LIBS})
+  if(WIN32)
+    set(SGX_ENCLAVE_LIBS 
+      ${SGX_TCXX_LIB}.lib
+      ${SGX_TRTS_LIB}.lib
+      ${SGX_TSTDC_LIB}.lib
+      ${SGX_TSVC_LIB}.lib
+      ${SGX_TCRYPTO_LIB}.lib
+      ${SGX_HEADER_ONLY_LIBS})
+  endif()
 
-  set(ENCLAVE_INC_FLAGS -I${SGX_INCLUDE_DIR} -I${SGX_TLIBC_INCLUDE_DIR} -I${SGX_LIBCXX_INCLUDE_DIR})
-  set(ENCLAVE_C_FLAGS "${SGX_COMMON_CFLAGS} ${ENCLAVE_INC_FLAGS}")
-  set(ENCLAVE_CXX_FLAGS ${ENCLAVE_C_FLAGS})
   set(APP_INC_FLAGS "-I${SGX_INCLUDE_DIR}")
   set(APP_C_FLAGS "${SGX_COMMON_CFLAGS} ${APP_INC_FLAGS}")
   set(APP_CXX_FLAGS "${APP_C_FLAGS}")  
+
+  if(WIN32)
+    set(EDGER8R_USE_CPP "--cpp")
+  endif()
 
   function(_build_trusted_edl_header PARENT_TARGET edl SEARCH_PATHS use_prefix)
 
@@ -119,7 +151,7 @@ if(SGX_FOUND)
     
     add_custom_target(
       ${target}-${EDL_NAME}-edlhdr ALL
-      ${SGX_EDGER8R} ${USE_PREFIX} --cpp --trusted --header-only "${EDL_ABSPATH}" --search-path "${SEARCH_PATHS}"
+      ${SGX_EDGER8R} ${USE_PREFIX} ${EDGER8R_USE_CPP} --trusted --header-only "${EDL_ABSPATH}" --search-path "${SEARCH_PATHS}"
       COMMAND cmake -E copy_if_different ${EDL_T_H} ${EDL_TT_H}
       BYPRODUCTS ${EDL_TT_H}
       DEPENDS ${EDL_ABSPATH}
@@ -157,7 +189,7 @@ if(SGX_FOUND)
     add_custom_command(
       OUTPUT ${EDL_TT_H}
       BYPRODUCTS ${EDL_T_H}
-      COMMAND ${SGX_EDGER8R} ${USE_PREFIX} --cpp --trusted --header-only "${EDL_ABSPATH}" --search-path "${SGX_EDL_SEARCH_PATHS}"
+      COMMAND ${SGX_EDGER8R} ${USE_PREFIX} ${EDGER8R_USE_CPP} --trusted --header-only "${EDL_ABSPATH}" --search-path "${SGX_EDL_SEARCH_PATHS}"
       COMMAND cmake -E copy_if_different ${EDL_T_H} ${EDL_TT_H}
       DEPENDS ${EDL_ABSPATH}
       WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
@@ -197,7 +229,7 @@ if(SGX_FOUND)
     add_custom_command(
       OUTPUT ${EDL_TT_H}
       BYPRODUCTS ${EDL_T_H}
-      COMMAND ${SGX_EDGER8R} ${USE_PREFIX} --cpp --untrusted --header-only "${EDL_ABSPATH}" --search-path "${SGX_EDL_SEARCH_PATHS}"
+      COMMAND ${SGX_EDGER8R} ${USE_PREFIX} ${EDGER8R_USE_CPP} --untrusted --header-only "${EDL_ABSPATH}" --search-path "${SGX_EDL_SEARCH_PATHS}"
       COMMAND cmake -E copy_if_different ${EDL_T_H} ${EDL_TT_H}
       DEPENDS ${EDL_ABSPATH}
       WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
@@ -242,7 +274,7 @@ if(SGX_FOUND)
     target_link_libraries(${target} PRIVATE ${SGX_HEADER_ONLY_LIBS})
   endfunction()
 
-  function(enclave_edl_library target edl edl_search_paths use_prefix edl_include_path)
+  function(enclave_edl_library target edl edl_search_paths use_prefix edl_include_path edl_link_libraries)
     get_filename_component(EDL_NAME ${edl} NAME_WE)
     get_filename_component(EDL_ABSPATH ${edl} ABSOLUTE)
     set(EDL_T_C "${CMAKE_CURRENT_BINARY_DIR}/${EDL_NAME}_t.c")
@@ -266,7 +298,7 @@ if(SGX_FOUND)
     add_custom_command(
       OUTPUT ${EDL_TT_H} ${EDL_TT_C}
       BYPRODUCTS ${EDL_T_H} ${EDL_T_C}
-      COMMAND ${SGX_EDGER8R} ${USE_PREFIX} --cpp --trusted "${EDL_ABSPATH}" --search-path "${SEARCH_PATHS}" 
+      COMMAND ${SGX_EDGER8R} ${USE_PREFIX} ${EDGER8R_USE_CPP} --trusted "${EDL_ABSPATH}" --search-path "${SEARCH_PATHS}" 
         WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
       COMMAND cmake -E copy_if_different ${EDL_T_H} ${EDL_TT_H}
       COMMAND cmake -E copy_if_different ${EDL_T_C} ${EDL_TT_C}
@@ -283,6 +315,18 @@ if(SGX_FOUND)
         ${INCLUDE_PATHS} 
         ${ENCLAVE_LIBCXX_INCLUDES}
     )
+    set(SGX_LINKER_FLAGS "${SGX_COMMON_CFLAGS} \
+        -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles -L${SGX_LIBRARY_PATH} \
+        -Wl,--whole-archive  -l${SGX_TSTDC_LIB} -l${SGX_TRTS_LIB} -l${SGX_TSVC_LIB}  -l${SGX_TCRYPTO_LIB}  -l${SGX_TCXX_LIB} \
+        -Wl,--start-group ${TLIB_LIST} -l${SGX_URTS_LIB} -lsgx_tkey_exchange -Wl,--end-group -Wl,--no-whole-archive\
+        -Wl,-Bstatic -Wl,-Bsymbolic \
+        -Wl,-pie,-eenclave_entry -Wl,--export-dynamic"
+        )
+    target_link_libraries(${target} 
+      PRIVATE
+        ${edl_link_libraries} 
+        #${SGX_LINKER_FLAGS}
+    )
     target_compile_definitions(${target} PRIVATE ${ENCLAVE_DEFINES})
     target_compile_options(${target} PRIVATE ${ENCLAVE_COMPILE_OPTIONS})
 
@@ -297,11 +341,17 @@ if(SGX_FOUND)
   endfunction()
 
 
-  function(host_edl_library target edl edl_search_paths use_prefix edl_include_path)
+  function(host_edl_library target edl edl_search_paths use_prefix edl_include_path edl_link_libraries)
+    cmake_parse_arguments("SGX" "" "" "EXTRA_LIBS" ${ARGN})
     get_filename_component(EDL_NAME ${edl} NAME_WE)
     get_filename_component(EDL_ABSPATH ${edl} ABSOLUTE)
-    set(EDL_U_C "${CMAKE_CURRENT_BINARY_DIR}/${EDL_NAME}_u.cpp")
-    set(EDL_UT_C "${CMAKE_CURRENT_BINARY_DIR}/untrusted/${EDL_NAME}_u.cpp")
+    if(WIN32)
+      set(EDL_U_C "${CMAKE_CURRENT_BINARY_DIR}/${EDL_NAME}_u.cpp")
+      set(EDL_UT_C "${CMAKE_CURRENT_BINARY_DIR}/untrusted/${EDL_NAME}_u.cpp")
+    else()
+      set(EDL_U_C "${CMAKE_CURRENT_BINARY_DIR}/${EDL_NAME}_u.c")
+      set(EDL_UT_C "${CMAKE_CURRENT_BINARY_DIR}/untrusted/${EDL_NAME}_u.c")
+    endif()
     set(EDL_U_H "${CMAKE_CURRENT_BINARY_DIR}/${EDL_NAME}_u.h")
     set(EDL_UT_H "${CMAKE_CURRENT_BINARY_DIR}/untrusted/${EDL_NAME}_u.h")
 
@@ -322,17 +372,24 @@ if(SGX_FOUND)
     add_custom_command(
       OUTPUT ${EDL_UT_H} ${EDL_UT_C}
       BYPRODUCTS ${EDL_U_H} ${EDL_U_C}
-      COMMAND ${SGX_EDGER8R} ${USE_PREFIX} --cpp --untrusted "${EDL_ABSPATH}" --search-path "${SEARCH_PATHS}" 
+      COMMAND ${SGX_EDGER8R} ${USE_PREFIX} ${EDGER8R_USE_CPP} --untrusted "${EDL_ABSPATH}" --search-path "${SEARCH_PATHS}" 
         WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
       COMMAND cmake -E copy_if_different ${EDL_U_H} ${EDL_UT_H}
       COMMAND cmake -E copy_if_different ${EDL_U_C} ${EDL_UT_C}
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+
+    add_custom_target(${target}-create-header ALL DEPENDS ${EDL_UT_H}) # Used to avoid problems when in cyclic references e.g. add_dependencies(bft_raft_host_edl_calls secretarium_bft_raft_edl_host-create-header)
 
     add_library(${target} STATIC ${EDL_UT_H} ${EDL_UT_C})
     #set_target_properties(${target} PROPERTIES COMPILE_FLAGS ${ENCLAVE_C_FLAGS})
     set(INCLUDE_PATHS ${CMAKE_CURRENT_BINARY_DIR} ${HOST_SGX_INCLUDE_DIRS} ${edl_include_path})
     separate_arguments(INCLUDE_PATHS)
     target_include_directories(${target} PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>" PRIVATE ${INCLUDE_PATHS})
+    target_link_libraries(${target} 
+      PRIVATE
+        ${edl_link_libraries}
+        ${SGX_EXTRA_LIBS}
+    )
     target_compile_definitions(${target} PRIVATE ${HOST_DEFINES})
     target_compile_options(${target} PRIVATE ${HOST_COMPILE_OPTIONS})
 
@@ -349,7 +406,7 @@ if(SGX_FOUND)
 
   # build enclave shared library
   function(add_enclave_library target)
-    set(optionArgs USE_PREFIX)
+    set(optionArgs USE_PREFIX REMOVE_INIT_SECTION)
     set(oneValueArgs EDL_IMPL LDSCRIPT)
     set(multiValueArgs SRCS TRUSTED_LIBS HEADER_ONLY_LIBS EDL EDL_SEARCH_PATHS EDL_INCLUDE_PATH)
     cmake_parse_arguments("SGX" "${optionArgs}" "${oneValueArgs}"
@@ -380,29 +437,48 @@ if(SGX_FOUND)
                                                ${ENCLAVE_CXX_FLAGS})
     target_include_directories(${target} PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 
-    set(TLIB_LIST "")
-    foreach(TLIB ${SGX_TRUSTED_LIBS})
-      string(APPEND TLIB_LIST "$<TARGET_FILE:${TLIB}> ")
-      add_dependencies(${target} ${TLIB})
-    endforeach()
+    if(UNIX) # Linux
+      if(${SGX_REMOVE_INIT_SECTION}) # needed when linking against e.g. OpenSSL::Crypto
+        add_custom_command(
+          TARGET ${target} POST_BUILD
+          COMMAND objcopy --remove-section .init "$<TARGET_FILE:${target}>"
+          VERBATIM
+        )
+      endif()
 
-    if(NOT WIN32)
-    set(SGX_LINKER_FLAGS "${SGX_COMMON_CFLAGS} \
-      -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles -L${SGX_LIBRARY_PATH} \
-      -Wl,--whole-archive  -l${SGX_TSTDC_LIB} -l${SGX_TRTS_LIB} -l${SGX_TSVC_LIB}  -l${SGX_TCRYPTO_LIB}  -l${SGX_TCXX_LIB} -Wl,--no-whole-archive \
-      -Wl,--start-group ${TLIB_LIST} -l${SGX_URTS_LIB} -lsgx_tkey_exchange -Wl,--end-group \
-      -Wl,-Bstatic -Wl,-Bsymbolic -Wl,--no-undefined \
-      -Wl,-pie,-eenclave_entry -Wl,--export-dynamic \
-      ${LDSCRIPT_FLAG} \
-      -Wl,--defsym,__ImageBase=0")
+      set(TLIB_LIST "")
+      set(T_LIST "")
+      set(THEADER_LIB_LIST "")
+      foreach(TLIB ${SGX_TRUSTED_LIBS})
+        add_dependencies(${target} ${TLIB})
+        # Include all target directories
+        target_include_directories(${target} PRIVATE $<TARGET_PROPERTY:${TLIB},INCLUDE_DIRECTORIES>)
+        # If TLIB is not an INTERFACE library (i.e. has a target), then adds its target to the library list to be scrippted below.
+        string(APPEND TLIB_LIST "$<$<NOT:$<STREQUAL:$<TARGET_PROPERTY:${TLIB},TYPE>,INTERFACE_LIBRARY>>:$<TARGET_FILE:${TLIB}> >")
+      endforeach()
 
-      target_link_libraries(
-        ${target}
+      target_compile_definitions(${target} PRIVATE ${ENCLAVE_DEFINES})
+      target_compile_options(${target} PRIVATE ${ENCLAVE_COMPILE_OPTIONS})
+      # Wl,-pie and -shared are incompatible for "ld.gold"
+      set(SGX_LINKER_FLAGS "${SGX_COMMON_CFLAGS} \
+            -Wl,--no-undefined -nostdlib -nodefaultlibs -nostartfiles -L${SGX_LIBRARY_PATH} \
+            -Wl,--whole-archive -l${SGX_TRTS_LIB} -Wl,--no-whole-archive \
+            -Wl,--start-group ${TLIB_LIST} -lsgx_tstdc -lsgx_tcxx -lsgx_tkey_exchange -lsgx_tcrypto -l${SGX_TSVC_LIB} -Wl,--end-group \
+            -Wl,-Bstatic -Wl,-Bsymbolic \
+            -Wl,-eenclave_entry,--export-dynamic \
+            ${LDSCRIPT_FLAG} \
+            -Wl,--defsym,__ImageBase=0"
+        )
+	# "-fuse-ld=gold -Wl,--rosegment" was excluded due to several warnings on SGX 2.15
+
+      target_link_libraries(${target} 
         PRIVATE
-        ${SGX_HEADER_ONLY_LIBS}
-        ${SGX_LINKER_FLAGS})
-    else()
+          ${SGX_HEADER_ONLY_LIBS}
+          ${SGX_LINKER_FLAGS}
+        )
+    else() # Windows
       target_link_directories(${target} PRIVATE ${SGX_LIBRARY_PATH})
+      target_link_libraries(${target} ${SGX_TRUSTED_LIBS})
 
         target_link_options(${target} 
           PRIVATE  
@@ -447,7 +523,7 @@ if(SGX_FOUND)
       if(WIN32)
         set(OUTPUT_NAME "${target}.signed.dll")
       else()
-      set(OUTPUT_NAME "${target}.signed.so")
+        set(OUTPUT_NAME "${target}.signed.so")
       endif()
     else()
       set(OUTPUT_NAME ${SGX_OUTPUT})
@@ -458,9 +534,7 @@ if(SGX_FOUND)
     get_target_property(OUTPUT_DIR ${target} LIBRARY_OUTPUT_DIRECTORY)
     set(${target}_sign_OUTPUT_NAME ${OUTPUT_DIR}/${OUTPUT_NAME} CACHE STRING "signed target file name")
     if(SGX_HW AND SGX_MODE STREQUAL "release")
-      add_custom_target(
-        ${target}_sign ALL
-        DEPENDS ${target}
+      add_custom_command(TARGET ${target} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E cmake_echo_color --cyan "First step ${SGX_ENCLAVE_SIGNER} signing $<TARGET_FILE:${target}>"
         COMMAND ${SGX_ENCLAVE_SIGNER} gendata -config ${CONFIG_ABSPATH} -enclave "$<TARGET_FILE:${target}>" -out "$<TARGET_FILE_DIR:${target}>/${target}_hash.hex"
         COMMAND ${CMAKE_COMMAND} -E cmake_echo_color --cyan "Second step openssl signing"
@@ -471,8 +545,7 @@ if(SGX_FOUND)
         USES_TERMINAL
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
     else()
-      message("COMMAND ${SGX_ENCLAVE_SIGNER} sign -key ${KEY_ABSPATH} -config ${CONFIG_ABSPATH} -enclave ${target} -out ${target}/${OUTPUT_NAME}")
-      add_custom_target(${target}_sign ALL
+      add_custom_command(TARGET ${target} POST_BUILD
         COMMAND ${SGX_ENCLAVE_SIGNER} sign -key ${KEY_ABSPATH} -config ${CONFIG_ABSPATH} -enclave $<TARGET_FILE:${target}> -out $<TARGET_FILE_DIR:${target}>/${OUTPUT_NAME}
         USES_TERMINAL
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
@@ -501,7 +574,7 @@ if(SGX_FOUND)
 
     add_custom_target(
       ${target}-${EDL_NAME}-edlhdr ALL
-      ${SGX_EDGER8R} ${USE_PREFIX} --cpp --untrusted --header-only "${EDL_ABSPATH}" --search-path "${SEARCH_PATHS}"
+      ${SGX_EDGER8R} ${USE_PREFIX} ${EDGER8R_USE_CPP} --untrusted --header-only "${EDL_ABSPATH}" --search-path "${SEARCH_PATHS}"
       COMMAND cmake -E copy_if_different ${EDL_T_H} ${EDL_TT_H}
       BYPRODUCTS ${EDL_TT_H}
       DEPENDS ${EDL_ABSPATH}
@@ -543,7 +616,7 @@ if(SGX_FOUND)
 
       add_custom_target(
         ${PARENT_TARGET}-${EDL_NAME}-edlhdr ALL
-        COMMAND ${SGX_EDGER8R} ${USE_PREFIX} --cpp --untrusted "${EDL_ABSPATH}" --search-path "${SEARCH_PATHS}"
+        COMMAND ${SGX_EDGER8R} ${USE_PREFIX} ${EDGER8R_USE_CPP} --untrusted "${EDL_ABSPATH}" --search-path "${SEARCH_PATHS}"
         COMMAND cmake -E copy_if_different ${EDL_U_H} ${EDL_UU_H}
         COMMAND cmake -E copy_if_different ${EDL_U_C} ${EDL_UU_C}
         BYPRODUCTS ${EDL_UU_H} ${EDL_UU_C}
@@ -639,7 +712,7 @@ if(SGX_FOUND)
       endif()
       add_custom_command(
         OUTPUT ${EDL_U_C}
-        COMMAND ${SGX_EDGER8R} ${USE_PREFIX} --cpp --untrusted "${EDL_ABSPATH}" --search-path "${SEARCH_PATHS}"
+        COMMAND ${SGX_EDGER8R} ${USE_PREFIX} ${EDGER8R_USE_CPP} --untrusted "${EDL_ABSPATH}" --search-path "${SEARCH_PATHS}"
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 
       list(APPEND EDL_U_SRCS ${EDL_U_C})
@@ -651,11 +724,11 @@ if(SGX_FOUND)
     target_link_libraries(
       ${target}
       "${SGX_COMMON_CFLAGS} \
-      -L${SGX_LIBRARY_PATH} \
-      -l${SGX_URTS_LIB} \
-      -l${SGX_USVC_LIB} \
-      -lsgx_ukey_exchange \
-      -lpthread")
+        -L${SGX_LIBRARY_PATH} \
+        -l${SGX_URTS_LIB} \
+        -l${SGX_USVC_LIB} \
+        -lsgx_ukey_exchange \
+        -lpthread")
 
     set_property(
       DIRECTORY APPEND PROPERTY ADDITIONAL_MAKE_CLEAN_FILES

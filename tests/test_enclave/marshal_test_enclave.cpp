@@ -6,6 +6,8 @@
 #include <sgx_trts.h>
 #include <trusted/enclave_marshal_test_t.h>
 
+#include <marshaller/error_codes.h>
+
 #include <common/foo_impl.h>
 #include <common/host_service_proxy.h>
 
@@ -23,25 +25,18 @@
 
 using namespace marshalled_tests;
 
-rpc::shared_ptr<rpc::service> rpc_server;
-rpc::shared_ptr<rpc::host_service_proxy> host_service;
+rpc::shared_ptr<rpc::child_service> rpc_server;
 
-int marshal_test_init_enclave(uint64_t zone_id, uint64_t* root_object)
+int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t child_zone_id, uint64_t* root_object)
 {
     //create a zone service for the enclave
-    rpc_server = rpc::make_shared<rpc::service>(zone_id); 
+    rpc_server = rpc::make_shared<rpc::child_service>(child_zone_id); 
 
     //create the root object
     rpc::shared_ptr<yyy::i_example> ex(new example);
-    error_code err_code = rpc_server->initialise<yyy::i_example, yyy::i_example_stub>(ex);
+    int err_code = rpc_server->initialise<yyy::i_example, yyy::i_example_stub>(ex, rpc::host_service_proxy::create(rpc_server, host_zone_id));
     if (err_code)
         return err_code;
-
-    //create a zone proxy for the host
-    host_service = rpc::host_service_proxy::create(rpc_server, 1);
-
-    //wire in the ocalls
-    rpc_server->add_zone(host_service->get_zone_id(), host_service);
 
     *root_object = rpc_server->get_root_object_id();
 
@@ -50,7 +45,6 @@ int marshal_test_init_enclave(uint64_t zone_id, uint64_t* root_object)
 
 void marshal_test_destroy_enclave()
 {
-    host_service.reset();
     rpc_server.reset();
 }
 
@@ -64,7 +58,7 @@ int call_enclave(uint64_t object_id, uint64_t interface_id, uint64_t method_id, 
         out_buf = (std::vector<char>**)tls;
         if(out_buf && *out_buf && !sgx_is_within_enclave(*out_buf, sizeof(std::vector<char>*)))
         {
-            return -3;
+            return rpc::error::SECURITY_ERROR();
         }
     }
 
@@ -79,33 +73,33 @@ int call_enclave(uint64_t object_id, uint64_t interface_id, uint64_t method_id, 
             (*out_buf) = nullptr;
             return 0;
         }
-        return -2;
+        return rpc::error::NEED_MORE_MEMORY();
     }
     
     std::vector<char> tmp;
-    error_code ret = rpc_server->send(object_id, interface_id, method_id, sz_int, data_in, tmp);
-    if(ret == 0)
+    int ret = rpc_server->send(object_id, interface_id, method_id, sz_int, data_in, tmp);
+    if(ret == rpc::error::OK())
     {
         *data_out_sz = tmp.size();
         if(tmp.size() <= sz_out)
         {
             memcpy(data_out, tmp.data(), tmp.size());
-            return 0;
+            return rpc::error::OK();
         }
 
         //not enough memory so cache the results into the thread local storage
         if(!out_buf)
-            return -1;
+            return rpc::error::OUT_OF_MEMORY();
             
         (*out_buf) = new std::vector<char>(std::move(tmp));
-        return -2;
+        return rpc::error::NEED_MORE_MEMORY();
     }
     return ret;
 }
 
 int try_cast_enclave(uint64_t zone_id, uint64_t object_id, uint64_t interface_id)
 {
-    error_code ret = rpc_server->try_cast(zone_id, object_id, interface_id);
+    int ret = rpc_server->try_cast(zone_id, object_id, interface_id);
     return ret;
 }
 
