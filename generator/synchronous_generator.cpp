@@ -85,8 +85,7 @@ namespace enclave_marshaller
         {
             if (is_out)
             {
-                std::cerr << "REFERANCE does not support out vals\n";
-                throw "REFERANCE does not support out vals\n";
+                throw std::runtime_error("REFERANCE does not support out vals");
             }
 
             switch (option)
@@ -113,13 +112,11 @@ namespace enclave_marshaller
         {
             if (is_out)
             {
-                std::cerr << "MOVE does not support out vals\n";
-                throw "MOVE does not support out vals\n";
+                throw std::runtime_error("MOVE does not support out vals");
             }
             if (is_const)
             {
-                std::cerr << "MOVE does not support const vals\n";
-                throw "MOVE does not support const vals\n";
+                throw std::runtime_error("MOVE does not support const vals");
             }
 
             switch (option)
@@ -148,8 +145,7 @@ namespace enclave_marshaller
         {
             if (is_out)
             {
-                std::cerr << "POINTER does not support out vals\n";
-                throw "POINTER does not support out vals\n";
+                throw std::runtime_error("POINTER does not support out vals");
             }
 
             switch (option)
@@ -177,8 +173,7 @@ namespace enclave_marshaller
         {
             if (is_const && is_out)
             {
-                std::cerr << "POINTER_REFERENCE does not support const out vals\n";
-                throw "POINTER_REFERENCE does not support const out vals\n";
+                throw std::runtime_error("POINTER_REFERENCE does not support const out vals");
             }
             switch (option)
             {
@@ -237,8 +232,7 @@ namespace enclave_marshaller
         {
             if (is_out)
             {
-                std::cerr << "INTERFACE_REFERENCE does not support out vals\n";
-                throw "INTERFACE_REFERENCE does not support out vals\n";
+                throw std::runtime_error("INTERFACE_REFERENCE does not support out vals");
             }
 
             switch (option)
@@ -383,8 +377,7 @@ namespace enclave_marshaller
                     }
                     else if (from_host == false)
                     {
-                        std::cerr << "passing data by reference from a non host zone is not allowed\n";
-                        throw "passing data by reference from a non host zone is not allowed\n";
+                        throw std::runtime_error("passing data by reference from a non host zone is not allowed");
                     }
                     else
                     {
@@ -496,19 +489,16 @@ namespace enclave_marshaller
                     }
                     else
                     {
-                        std::cerr << "passing data by reference as an out call is not possible\n";
-                        throw "passing data by reference as an out call is not possible\n";
+                        throw std::runtime_error("passing data by reference as an out call is not possible");
                     }
                 }
                 else if (referenceModifiers == "&&")
                 {
-                    std::cerr << "out call rvalue references is not possible\n";
-                    throw "out call rvalue references is not possible\n";
+                    throw std::runtime_error("out call rvalue references is not possible");
                 }
                 else if (referenceModifiers == "*")
                 {
-                    std::cerr << "passing [out] by_pointer data by * will not work use a ** or *&\n";
-                    throw "passing [out] by_pointer data by * will not work use a ** or *&\n";
+                    throw std::runtime_error("passing [out] by_pointer data by * will not work use a ** or *&");
                 }
                 else if (referenceModifiers == "*&")
                 {
