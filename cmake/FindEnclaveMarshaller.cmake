@@ -43,7 +43,6 @@ function(EnclaveMarshaller
     message("full_stub_path ${full_stub_path}")
   endif()
 
-  # Test if including from FindFlatBuffers
   if(EXISTS ENCLAVE_MARSHALLER_EXECUTABLE)
     set(ENCLAVE_MARSHALLER ${ENCLAVE_MARSHALLER_EXECUTABLE})
   else()

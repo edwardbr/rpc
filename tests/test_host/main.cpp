@@ -22,7 +22,7 @@
 #include <example_proxy.cpp>
 #include <example_stub.cpp>
 
-#include <marshaller/local_service_proxy.h>
+#include <rpc/basic_service_proxies.h>
 
 using namespace marshalled_tests;
 

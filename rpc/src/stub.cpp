@@ -1,4 +1,4 @@
-#include "marshaller/stub.h"
+#include "rpc/stub.h"
 
 namespace rpc
 {

@@ -6,7 +6,7 @@
 #include <sgx_trts.h>
 #include <trusted/enclave_marshal_test_t.h>
 
-#include <marshaller/error_codes.h>
+#include <rpc/error_codes.h>
 
 #include <common/foo_impl.h>
 #include <common/host_service_proxy.h>
@@ -21,7 +21,7 @@
 
 #include <example_proxy.cpp>
 #include <example_stub.cpp>
-#include <marshaller/remote_pointer.h>
+#include <rpc/remote_pointer.h>
 
 using namespace marshalled_tests;
 

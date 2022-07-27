@@ -133,8 +133,8 @@ namespace enclave_marshaller
             header("#include <gtest/gtest-spi.h>");
             header("#include <gmock/gmock-matchers.h>");
 
-            header("#include <marshaller/marshaller.h>");
-            header("#include <marshaller/service.h>");
+            header("#include <rpc/marshaller.h>");
+            header("#include <rpc/service.h>");
             
             header("#include \"{}\"", header_filename);
 

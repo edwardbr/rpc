@@ -23,7 +23,7 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 include(FindEnclaveMarshaller)
 
 add_subdirectory(generator)
-add_subdirectory(marshaller)
+add_subdirectory(rpc)
 add_subdirectory(tests)
 
 

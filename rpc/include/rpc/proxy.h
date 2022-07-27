@@ -5,9 +5,9 @@
 #include <unordered_map>
 #include <mutex>
 
-#include <marshaller/marshaller.h>
-#include <marshaller/service.h>
-#include <marshaller/remote_pointer.h>
+#include <rpc/marshaller.h>
+#include <rpc/service.h>
+#include <rpc/remote_pointer.h>
 
 namespace rpc
 {

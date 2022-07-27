@@ -1,5 +1,5 @@
 
-#include <marshaller/remote_pointer.h>
+#include <rpc/remote_pointer.h>
 
 namespace rpc
 {

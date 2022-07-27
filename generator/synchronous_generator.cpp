@@ -1312,9 +1312,9 @@ namespace enclave_marshaller
             header("#include <map>");
             header("#include <string>");
 
-            header("#include <marshaller/marshaller.h>");
-            header("#include <marshaller/service.h>");
-            header("#include <marshaller/error_codes.h>");
+            header("#include <rpc/marshaller.h>");
+            header("#include <rpc/service.h>");
+            header("#include <rpc/error_codes.h>");
 
             for(const auto& import : imports)
             {
@@ -1334,8 +1334,8 @@ namespace enclave_marshaller
             proxy("#include <yas/binary_oarchive.hpp>");
             proxy("#include <yas/std_types.hpp>");
             proxy("#include <yas/count_streams.hpp>");
-            proxy("#include <marshaller/proxy.h>");
-            proxy("#include <marshaller/service.h>");
+            proxy("#include <rpc/proxy.h>");
+            proxy("#include <rpc/service.h>");
             proxy("#include \"{}\"", header_filename);
             proxy("");
 
@@ -1345,9 +1345,9 @@ namespace enclave_marshaller
             stub("#include <yas/binary_oarchive.hpp>");
             stub("#include <yas/count_streams.hpp>");
             stub("#include <yas/std_types.hpp>");
-            stub("#include <marshaller/stub.h>");
-            stub("#include <marshaller/proxy.h>");
-            stub("#include <marshaller/service.h>");
+            stub("#include <rpc/stub.h>");
+            stub("#include <rpc/proxy.h>");
+            stub("#include <rpc/service.h>");
             stub("#include \"{}\"", header_filename);
             stub("");
 

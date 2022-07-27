@@ -1,6 +1,6 @@
 #pragma once
 
-#include <marshaller/proxy.h>
+#include <rpc/proxy.h>
 
 namespace rpc
 {

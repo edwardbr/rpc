@@ -1,7 +1,7 @@
 #pragma once
 
 #include <sgx_urts.h>
-#include <marshaller/proxy.h>
+#include <rpc/proxy.h>
 
 namespace rpc
 {

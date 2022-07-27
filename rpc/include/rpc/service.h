@@ -7,8 +7,8 @@
 #include <assert.h>
 #include <atomic>
 
-#include <marshaller/marshaller.h>
-#include <marshaller/remote_pointer.h>
+#include <rpc/marshaller.h>
+#include <rpc/remote_pointer.h>
 
 namespace rpc
 {
