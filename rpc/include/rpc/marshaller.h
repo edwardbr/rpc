@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <mutex>
 
+#include <yas/count_streams.hpp>
 #include <yas/serialize.hpp>
 #include <rpc/error_codes.h>
 
