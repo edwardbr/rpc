@@ -22,6 +22,7 @@ target_compile_options(marshaller_enclave PRIVATE ${ENCLAVE_COMPILE_OPTIONS})
 target_include_directories(marshaller_enclave 
     PUBLIC 
         "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+        "$<INSTALL_INTERFACE:include/rpc>"
     PRIVATE 
         ${ENCLAVE_LIBCXX_INCLUDES})
 target_link_libraries(marshaller_enclave 
