@@ -91,15 +91,15 @@ namespace enclave_marshaller
             switch (option)
             {
             case PROXY_MARSHALL_IN:
-                return fmt::format("  ,(\"_{}\", (uint64_t)&{})", count, name);
+                return fmt::format("  ,(\"_{}\", {})", count, name);
             case PROXY_MARSHALL_OUT:
-                return fmt::format("  ,(\"_{}\", (uint64_t)&{})", count, name);
+                return fmt::format("  ,(\"_{}\", {})", count, name);
             case STUB_DEMARSHALL_DECLARATION:
-                return fmt::format("uint64_t {}_ = 0;", name);
+                return fmt::format("{} {}_{{}}", object_type, name);
             case STUB_MARSHALL_IN:
                 return fmt::format("  ,(\"_{}\", {}_)", count, name);
             case STUB_PARAM_CAST:
-                return fmt::format("*({}*){}_", object_type, name);
+                return fmt::format("{}_", name);
             default:
                 return "";
             }
