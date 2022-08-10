@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include "rpc/service.h"
 #include "rpc/stub.h"
 #include "rpc/proxy.h"
@@ -6,6 +8,8 @@ namespace rpc
 {
     ////////////////////////////////////////////////////////////////////////////
     // service
+
+    std::atomic<uint64_t> service::zone_count;
 
     service::~service() 
     {
@@ -19,6 +23,10 @@ namespace rpc
         // to do: assert that there are no more object_stubs in memory
         assert(check_is_empty());
 
+        std::for_each(stubs.begin(), stubs.end(), [](auto& item){
+            auto stub = item.second.lock();
+            assert(!stub);
+        });
         stubs.clear();
         wrapped_object_to_stub.clear();
         other_zones.clear();
@@ -33,17 +41,36 @@ namespace rpc
         return true;
     }
 
-    int service::send(uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_,
+    int service::send(uint64_t zone_id, uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_,
                              const char* in_buf_, std::vector<char>& out_buf_)
     {
-        rpc::weak_ptr<object_stub> weak_stub = get_object(object_id);
-        auto stub = weak_stub.lock();
-        if (stub == nullptr)
+        if(zone_id != get_zone_id())
         {
-            return rpc::error::INVALID_DATA();
+            rpc::shared_ptr<service_proxy> other_zone;
+            {
+                std::lock_guard g(insert_control);
+                auto found = other_zones.find(zone_id);
+                if(found != other_zones.end())
+                {
+                    other_zone = found->second.lock();
+                }
+            }
+            if(!other_zone)
+            {
+                return rpc::error::ZONE_NOT_SUPPORTED();
+            }
+            return other_zone->send(zone_id, object_id, interface_id, method_id, in_size_, in_buf_, out_buf_);
         }
-        auto ret = stub->call(interface_id, method_id, in_size_, in_buf_, out_buf_);
-        return ret;
+        else
+        {
+            rpc::weak_ptr<object_stub> weak_stub = get_object(object_id);
+            auto stub = weak_stub.lock();
+            if (stub == nullptr)
+            {
+                return rpc::error::INVALID_DATA();
+            }
+            return stub->call(interface_id, method_id, in_size_, in_buf_, out_buf_);
+        }
     }
 
     uint64_t service::add_lookup_stub(void* pointer,

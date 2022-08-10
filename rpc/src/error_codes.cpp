@@ -1,3 +1,5 @@
+#include <rpc/error_codes.h>
+
 namespace rpc
 {
     namespace error
@@ -15,6 +17,7 @@ namespace rpc
         int INVALID_METHOD_ID(){return offset_val + (offset_val_is_negative ? - 6 : 6);}
         int INVALID_INTERFACE_ID(){return offset_val + (offset_val_is_negative ? - 7 : 7);}
         int INVALID_CAST(){return offset_val + (offset_val_is_negative ? - 8 : 8);}
+        int ZONE_NOT_SUPPORTED(){return offset_val + (offset_val_is_negative ? - 9 : 9);}
 
         void set_OK_val(int val){OK_val = val;}
         void set_offset_val(int val){offset_val = val;}

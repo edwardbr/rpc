@@ -36,7 +36,7 @@ namespace rpc
             return rpc::error::OK();
         }
 
-        int send(uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_,
+        int send(uint64_t zone_id, uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_,
                         const char* in_buf_, std::vector<char>& out_buf_) override;
         int try_cast(uint64_t zone_id, uint64_t object_id, uint64_t interface_id) override;
         uint64_t add_ref(uint64_t zone_id, uint64_t object_id) override;

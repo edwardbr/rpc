@@ -26,10 +26,10 @@ namespace rpc
             return ret;
         }
 
-        int send(uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_,
+        int send(uint64_t zone_id, uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_,
                         const char* in_buf_, std::vector<char>& out_buf_) override
         {
-            return marshaller_->send(object_id, interface_id, method_id, in_size_, in_buf_, out_buf_);
+            return marshaller_->send(zone_id, object_id, interface_id, method_id, in_size_, in_buf_, out_buf_);
         }
         int try_cast(uint64_t zone_id, uint64_t object_id, uint64_t interface_id) override
         {
@@ -67,13 +67,13 @@ namespace rpc
             return ret;
         }
 
-        int send(uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_,
+        int send(uint64_t zone_id, uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_,
                         const char* in_buf_, std::vector<char>& out_buf_) override
         {
             auto m = marshaller_.lock();
             if(!m)
                 return -4;
-            return m->send(object_id, interface_id, method_id, in_size_, in_buf_, out_buf_);
+            return m->send(zone_id, object_id, interface_id, method_id, in_size_, in_buf_, out_buf_);
         }
         int try_cast(uint64_t zone_id, uint64_t object_id, uint64_t interface_id) override
         {

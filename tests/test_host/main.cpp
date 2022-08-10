@@ -114,7 +114,7 @@ extern "C"
 {
     void log_str(const char* str, size_t sz) { puts(str); }
 
-    int call_host(uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t sz_int, const char* data_in,
+    int call_host(uint64_t zone_id, uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t sz_int, const char* data_in,
                   size_t sz_out, char* data_out, size_t* data_out_sz)
     {
         thread_local std::vector<char> out_buf;
@@ -127,7 +127,7 @@ extern "C"
         }
         if (out_buf.empty())
         {
-            ret = root_service->send(object_id, interface_id, method_id, sz_int, data_in, out_buf);
+            ret = root_service->send(zone_id, object_id, interface_id, method_id, sz_int, data_in, out_buf);
         }
         if (ret == rpc::error::OK())
         {

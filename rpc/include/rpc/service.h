@@ -21,6 +21,7 @@ namespace rpc
     class service : public i_marshaller
     {
     protected:
+        static std::atomic<uint64_t> zone_count;
         uint64_t zone_id_ = 0;
         mutable std::atomic<uint64_t> object_id_generator = 0;
 
@@ -34,7 +35,7 @@ namespace rpc
         // hard lock on the root object
         mutable std::mutex insert_control;
     public:
-        service(uint64_t zone_id = 1) : zone_id_(zone_id){}
+        service(uint64_t zone_id = ++zone_count) : zone_id_(zone_id){}
         virtual ~service();
 
         // this function is needed by services where there is no shared pointer to this object, and its lifetime
@@ -46,7 +47,7 @@ namespace rpc
 
         template<class T> uint64_t encapsulate_outbound_interfaces(const rpc::shared_ptr<T>& object);
 
-        int send(uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_,
+        int send(uint64_t zone_id, uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_,
                         const char* in_buf_, std::vector<char>& out_buf_) override;
 
         uint64_t add_lookup_stub(void* pointer,

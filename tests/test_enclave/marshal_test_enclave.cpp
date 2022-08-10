@@ -48,7 +48,7 @@ void marshal_test_destroy_enclave()
     rpc_server.reset();
 }
 
-int call_enclave(uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t sz_int, const char* data_in,
+int call_enclave(uint64_t zone_id, uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t sz_int, const char* data_in,
          size_t sz_out, char* data_out, size_t* data_out_sz, void** tls)
 {
     //a retry cache using thread local storage, perhaps leaky if the client does not retry with more memory
@@ -77,7 +77,7 @@ int call_enclave(uint64_t object_id, uint64_t interface_id, uint64_t method_id, 
     }
     
     std::vector<char> tmp;
-    int ret = rpc_server->send(object_id, interface_id, method_id, sz_int, data_in, tmp);
+    int ret = rpc_server->send(zone_id, object_id, interface_id, method_id, sz_int, data_in, tmp);
     if(ret == rpc::error::OK())
     {
         *data_out_sz = tmp.size();

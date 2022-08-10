@@ -13,8 +13,10 @@ namespace rpc
         int INVALID_METHOD_ID();
         int INVALID_INTERFACE_ID();
         int INVALID_CAST();
+        int ZONE_NOT_SUPPORTED();
 
         void set_OK_val(int val);
         void set_offset_val(int val);
+        void set_offset_val_is_negative(bool val);
     };
 }
