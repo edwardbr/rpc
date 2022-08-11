@@ -86,8 +86,13 @@ int main()
         {
             rpc::shared_ptr<yyy::i_example> example_ptr;
             {
+                #ifdef _WIN32
                 auto ex = rpc::enclave_service_proxy::create(root_service, ++zone_gen,
                                                              "./marshal_test_enclave.signed.dll");
+                #else // Linux
+                auto ex = rpc::enclave_service_proxy::create(root_service, ++zone_gen,
+                                                             "./libmarshal_test_enclave.signed.so");
+                #endif
 
                 err_code = ex->initialise<yyy::i_example>(example_ptr);
                 ASSERT(!err_code);
