@@ -8,8 +8,8 @@
 
 namespace rpc
 {
-    host_service_proxy::host_service_proxy(const rpc::shared_ptr<service>& serv, uint64_t zone_id)
-        : service_proxy(serv, zone_id)
+    host_service_proxy::host_service_proxy(uint64_t host_zone_id, const rpc::shared_ptr<service>& operating_zone_service)
+        : service_proxy(host_zone_id, operating_zone_service)
     {
         log_str("host_service_proxy",100);
     }

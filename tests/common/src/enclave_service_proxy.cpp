@@ -11,9 +11,8 @@
 namespace rpc
 {
 #ifndef _IN_ENCLAVE
-    enclave_service_proxy::enclave_service_proxy(const rpc::shared_ptr<service>& serv, uint64_t zone_id,
-                                                 std::string filename)
-        : service_proxy(serv, zone_id)
+    enclave_service_proxy::enclave_service_proxy(uint64_t zone_id, std::string filename, const rpc::shared_ptr<service>& operating_zone_service)
+        : service_proxy(zone_id, operating_zone_service)
         , filename_(filename)
     {
         log_str("enclave_service_proxy",100);
@@ -26,7 +25,7 @@ namespace rpc
         sgx_destroy_enclave(eid_);
     }
 
-    int enclave_service_proxy::inner_initialise(rpc::shared_ptr<object_proxy>& proxy)
+    int enclave_service_proxy::initialise_enclave(rpc::shared_ptr<object_proxy>& proxy)
     {
         sgx_launch_token_t token = {0};
         int updated = 0;
@@ -39,7 +38,7 @@ namespace rpc
             return rpc::error::TRANSPORT_ERROR();
         int err_code = error::OK();
         uint64_t object_id = 0;
-        status = marshal_test_init_enclave(eid_, &err_code, get_service().get_zone_id(), get_zone_id(), &object_id);
+        status = marshal_test_init_enclave(eid_, &err_code, get_operating_zone_id(), get_zone_id(), &object_id);
         if (status)
             return rpc::error::TRANSPORT_ERROR();
         if (err_code)

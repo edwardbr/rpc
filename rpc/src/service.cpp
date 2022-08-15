@@ -96,9 +96,10 @@ namespace rpc
     {
         std::lock_guard g(insert_control);
         assert(wrapped_object_to_stub.find(pointer) == wrapped_object_to_stub.end());
-        assert(stubs.find(stub->get_id()) == stubs.end());
+        auto stub_id = stub->get_id();
+        assert(stubs.find(stub_id) == stubs.end());
         wrapped_object_to_stub[pointer] = stub;
-        stubs[stub->get_id()] = stub;
+        stubs[stub_id] = stub;
         stub->on_added_to_zone(stub);
         return error::OK();
     }
@@ -147,21 +148,22 @@ namespace rpc
         return ret;
     }
 
-    void service::add_zone(const rpc::shared_ptr<service_proxy>& zone)
+    void service::add_zone_proxy(const rpc::shared_ptr<service_proxy>& zone)
     {
+        assert(zone->get_zone_id() != zone_id_);
         std::lock_guard g(insert_control);
         other_zones[zone->get_zone_id()] = zone;
     }
-    rpc::weak_ptr<service_proxy> service::get_zone(uint64_t zone_id) const
+    rpc::shared_ptr<service_proxy> service::get_zone_proxy(uint64_t zone_id) const
     {
         std::lock_guard g(insert_control);
         auto item = other_zones.find(zone_id);
         if (item != other_zones.end())
-            return item->second;
+            return item->second.lock();
 
-        return rpc::weak_ptr<service_proxy>();
+        return nullptr;
     }
-    void service::remove_zone(uint64_t zone_id)
+    void service::remove_zone_proxy(uint64_t zone_id)
     {
         std::lock_guard g(insert_control);
         other_zones.erase(zone_id);
@@ -171,7 +173,7 @@ namespace rpc
     {
         if(parent_service_)
         {
-            remove_zone(parent_service_->get_zone_id());
+            remove_zone_proxy(parent_service_->get_zone_id());
         }
         cleanup();
     }
@@ -206,6 +208,16 @@ namespace rpc
             return 0;
 
         return stub->get_id();
+    }
+
+    rpc::shared_ptr<service_proxy> child_service::get_zone_proxy(uint64_t zone_id) const
+    {
+        auto proxy = service::get_zone_proxy(zone_id);
+        if(!proxy)
+        {
+            proxy = parent_service_;
+        }
+        return proxy;
     }
 
 }

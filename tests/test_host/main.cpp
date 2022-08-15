@@ -42,38 +42,38 @@ int main()
         int zone_gen = 0;
         auto root_service = rpc::make_shared<rpc::service>(++zone_gen);
         auto branch_service = rpc::make_shared<rpc::child_service>(++zone_gen);
-        uint64_t stub_id = 0;
-
-        // create a proxy for the rpc::service hosting the example object
-        auto service_proxy = rpc::root_service_proxy::create(root_service, root_service->get_zone_id(), root_service);
-        // create a proxy for the remote rpc::service, keep an instance going
-        auto branch_service_proxy
-            = rpc::branch_service_proxy::create(branch_service, branch_service->get_zone_id(), branch_service);
-
         {
-            // create the remote root object
-            rpc::shared_ptr<yyy::i_example> remote_ex(new example);
-            int err_code
-                = branch_service->initialise<yyy::i_example, yyy::i_example_stub>(remote_ex, service_proxy, &stub_id);
-            if (err_code)
-                return err_code;
+            uint64_t stub_id = 0;
+
+            // create a proxy for the rpc::service hosting the example object
+            auto service_proxy = rpc::root_service_proxy::create(root_service);
+            // create a proxy for the remote rpc::service, keep an instance going
+            auto branch_service_proxy = rpc::branch_service_proxy::create(branch_service, root_service);
+            branch_service->add_zone_proxy(rpc::static_pointer_cast<rpc::service_proxy>(service_proxy));
+            {
+                {
+                    // create the remote root object
+                    rpc::shared_ptr<yyy::i_example> remote_ex(new example);
+                    branch_service->create_stub<yyy::i_example, yyy::i_example_stub>(remote_ex, &stub_id);
+                }
+
+                rpc::shared_ptr<yyy::i_example> i_example_ptr;
+                ASSERT(!branch_service_proxy->create_proxy(stub_id, i_example_ptr));
+
+                rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
+                int err_code = i_example_ptr->create_foo(i_foo_ptr);
+                if (err_code)
+                {
+                    std::cout << "create_foo failed\n";
+                    break;
+                }
+
+                ASSERT(!i_foo_ptr->do_something_in_val(33));
+                standard_tests(*i_foo_ptr, true);
+
+                remote_tests(i_example_ptr);
+            }
         }
-
-        rpc::shared_ptr<yyy::i_example> i_example_ptr;
-        ASSERT(!branch_service_proxy->create_proxy(stub_id, i_example_ptr));
-
-        rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
-        int err_code = i_example_ptr->create_foo(i_foo_ptr);
-        if (err_code)
-        {
-            std::cout << "create_foo failed\n";
-            break;
-        }
-
-        ASSERT(!i_foo_ptr->do_something_in_val(33));
-        standard_tests(*i_foo_ptr, true);
-
-        remote_tests(i_example_ptr);
     } while (0);
 
     // an enclave marshalling of an object
@@ -85,13 +85,9 @@ int main()
 
         {
             rpc::shared_ptr<yyy::i_example> example_ptr;
-            {
-                auto ex = rpc::enclave_service_proxy::create(root_service, ++zone_gen,
-                                                             "./marshal_test_enclave.signed.dll");
+            err_code = rpc::enclave_service_proxy::create(++zone_gen, "./marshal_test_enclave.signed.dll", root_service, example_ptr);
+            ASSERT(!err_code);
 
-                err_code = ex->initialise<yyy::i_example>(example_ptr);
-                ASSERT(!err_code);
-            }
             rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
             err_code = example_ptr->create_foo(i_foo_ptr);
             if (err_code)
@@ -104,6 +100,20 @@ int main()
 
                 remote_tests(example_ptr);
             }
+
+            // relay test
+
+            rpc::shared_ptr<yyy::i_example> example_relay_ptr;
+            err_code = rpc::enclave_service_proxy::create(++zone_gen, "./marshal_test_enclave.signed.dll", root_service, example_relay_ptr);
+            ASSERT(!err_code);
+
+            rpc::shared_ptr<marshalled_tests::xxx::i_baz> i_baz;
+            i_foo_ptr->create_baz_interface(i_baz);
+
+            rpc::shared_ptr<xxx::i_foo> i_foo_relay_ptr;
+            example_relay_ptr->create_foo(i_foo_relay_ptr);
+
+            i_foo_relay_ptr->call_baz_interface(i_baz);
         }
     }
     return 0;
@@ -114,8 +124,8 @@ extern "C"
 {
     void log_str(const char* str, size_t sz) { puts(str); }
 
-    int call_host(uint64_t zone_id, uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t sz_int, const char* data_in,
-                  size_t sz_out, char* data_out, size_t* data_out_sz)
+    int call_host(uint64_t zone_id, uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t sz_int,
+                  const char* data_in, size_t sz_out, char* data_out, size_t* data_out_sz)
     {
         thread_local std::vector<char> out_buf;
         int ret = 0;

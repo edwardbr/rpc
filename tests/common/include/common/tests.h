@@ -153,15 +153,6 @@ namespace marshalled_tests
         }
     }
 
-    class baz : public xxx::i_baz
-    {
-        int callback(int val)
-        {            
-            std::cout << "callback " << val << "\n";
-            return 0;
-        }
-    };
-
     void remote_tests(rpc::shared_ptr<yyy::i_example> example_ptr)
     {
         int val = 0;
@@ -190,6 +181,6 @@ namespace marshalled_tests
         }
 
         rpc::shared_ptr<xxx::i_baz> b(new baz());
-        err_code = foo->give_interface(b);
+        err_code = foo->call_baz_interface(b);
     }
 }

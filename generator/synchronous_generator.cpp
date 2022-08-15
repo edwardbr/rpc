@@ -232,7 +232,7 @@ namespace enclave_marshaller
         {
             if (is_out)
             {
-                throw std::runtime_error("INTERFACE_REFERENCE does not support out vals");
+                throw std::runtime_error("INTERFACE does not support out vals");
             }
 
             switch (option)
@@ -240,8 +240,8 @@ namespace enclave_marshaller
             case PROXY_MARSHALL_IN:
             {
                 auto ret = fmt::format(
-                    R"__(  ,("_{1}", get_object_proxy()->get_zone_base()->get_service().encapsulate_outbound_interfaces({0}))
-                  ,("_{2}", get_object_proxy()->get_zone_base()->get_service().get_zone_id()))__",
+                    R"__(  ,("_{1}", encapsulate_outbound_interfaces({0}))
+                  ,("_{2}", get_interface_zone_id({0})))__",
                     name, count, count + 1);
                 count++;
                 return ret;
@@ -262,13 +262,13 @@ namespace enclave_marshaller
             }
             case STUB_PARAM_WRAP:
                 return fmt::format(R"__(
-                    auto service_proxy_ = target_stub_.lock()->get_zone().get_zone({1}_zone_);
+                    auto service_proxy_ = target_stub_.lock()->get_zone().get_zone_proxy({1}_zone_);
                     {0} {1};
-                    service_proxy_.lock()->create_proxy({1}_object_, {1});
+                    service_proxy_->create_proxy({1}_object_, {1}, {1}_zone_);
 )__",
                                    object_type, name);
             case STUB_PARAM_CAST:
-                return fmt::format("{}", name);
+                return fmt::format("{}", name);  
             case STUB_MARSHALL_OUT:
                 return fmt::format("  ,(\"_{}\", (uint64_t){})", count, name);
             case PROXY_VALUE_RETURN:
@@ -296,7 +296,7 @@ namespace enclave_marshaller
             case STUB_PARAM_CAST:
                 return name;
             case PROXY_VALUE_RETURN:
-                return fmt::format("get_object_proxy()->get_zone_base()->create_proxy({0}_, {0});", name);
+                return fmt::format("get_object_proxy()->get_service_proxy()->create_proxy({0}_, {0});", name);
             case PROXY_OUT_DECLARATION:
                 return fmt::format("uint64_t {}_ = 0;", name);
             case STUB_ADD_REF_OUT:
@@ -416,10 +416,10 @@ namespace enclave_marshaller
             }
             else
             {
-                if (referenceModifiers.empty())
+                if (referenceModifiers.empty() || (referenceModifiers == "&" && (is_const || !out)))
                 {
-                    output = renderer().render<renderer::INTERFACE>(option, from_host, lib, name, in, out, is_const,
-                                                                    type_name, count);
+                    output = renderer().render<renderer::INTERFACE>(option, from_host, lib, name, in, out,
+                                                                              is_const, type_name, count);
                 }
                 else if (referenceModifiers == "&")
                 {

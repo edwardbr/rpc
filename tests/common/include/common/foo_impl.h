@@ -9,6 +9,15 @@ void log(const std::string& data)
 
 namespace marshalled_tests
 {
+    class baz : public xxx::i_baz
+    {
+        int callback(int val)
+        {            
+            log(std::string("callback ") + std::to_string(val));
+            return 0;
+        }
+    };
+
     class foo : public xxx::i_foo
     {
     public:
@@ -165,11 +174,25 @@ namespace marshalled_tests
             val = rpc::shared_ptr<xxx::i_foo>(new foo);
             return 0;
         }
-        error_code give_interface(rpc::shared_ptr<xxx::i_baz> val)
+
+        error_code give_interface(rpc::shared_ptr<xxx::i_baz> baz)
+        {
+            baz->callback(22);
+            return 0;
+        }
+
+        error_code call_baz_interface(const rpc::shared_ptr<xxx::i_baz>& val)
         {
             val->callback(22);
             return 0;
         }        
+
+        
+        error_code create_baz_interface(rpc::shared_ptr<xxx::i_baz>& val)
+        {
+            val = rpc::shared_ptr<xxx::i_baz>(new baz());
+            return 0;
+        }
     };
     class example : public yyy::i_example
     {

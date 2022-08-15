@@ -51,6 +51,8 @@ interface i_foo
 
     error_code recieve_interface([out]rpc::shared_ptr<i_foo>& val);//can be null
     error_code give_interface([in]rpc::shared_ptr<i_baz> val);//can be null
+    error_code call_baz_interface([in]const rpc::shared_ptr<i_baz>& val);//can be null
+    error_code create_baz_interface([out]rpc::shared_ptr<i_baz>& val);//can be null
 };
 
 interface i_bar

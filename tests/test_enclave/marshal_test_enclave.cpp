@@ -27,18 +27,16 @@ using namespace marshalled_tests;
 
 rpc::shared_ptr<rpc::child_service> rpc_server;
 
-int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t child_zone_id, uint64_t* root_object)
+int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t child_zone_id, uint64_t* root_object_id)
 {
     //create a zone service for the enclave
     rpc_server = rpc::make_shared<rpc::child_service>(child_zone_id); 
+    auto host_proxy = rpc::host_service_proxy::create(host_zone_id, rpc_server);
+    rpc_server->set_parent(host_proxy);
 
     //create the root object
     rpc::shared_ptr<yyy::i_example> ex(new example);
-    int err_code = rpc_server->initialise<yyy::i_example, yyy::i_example_stub>(ex, rpc::host_service_proxy::create(rpc_server, host_zone_id));
-    if (err_code)
-        return err_code;
-
-    *root_object = rpc_server->get_root_object_id();
+    rpc_server->create_stub<yyy::i_example, yyy::i_example_stub>(ex, root_object_id);
 
     return 0;
 }

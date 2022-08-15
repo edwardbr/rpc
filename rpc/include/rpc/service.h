@@ -59,9 +59,9 @@ namespace rpc
         uint64_t add_ref(uint64_t zone_id, uint64_t object_id) override;
         uint64_t release(uint64_t zone_id, uint64_t object_id) override;
 
-        void add_zone(const rpc::shared_ptr<service_proxy>& zone);
-        rpc::weak_ptr<service_proxy> get_zone(uint64_t zone_id) const;
-        void remove_zone(uint64_t zone_id);
+        virtual void add_zone_proxy(const rpc::shared_ptr<service_proxy>& zone);
+        virtual rpc::shared_ptr<service_proxy> get_zone_proxy(uint64_t zone_id) const;
+        virtual void remove_zone_proxy(uint64_t zone_id);
     };
 
     //Child services need to maintain the lifetime of the root object in its zone 
@@ -78,8 +78,14 @@ namespace rpc
 
         virtual ~child_service();
 
+        void set_parent(const rpc::shared_ptr<rpc::service_proxy>& parent_service)
+        {
+            parent_service_ = parent_service;
+            add_zone_proxy(parent_service_);
+        }
+
         template<class T, class Stub, class obj_stub = object_stub> 
-        int initialise(const rpc::shared_ptr<T>& root_ob, const rpc::shared_ptr<rpc::service_proxy>& parent_service, uint64_t* stub_id = nullptr)
+        void create_stub(const rpc::shared_ptr<T>& root_ob, uint64_t* stub_id = nullptr)
         {
             assert(check_is_empty());
 
@@ -88,19 +94,15 @@ namespace rpc
             root_stub_ = rpc::static_pointer_cast<i_interface_stub>(Stub::create(root_ob, os));
             os->add_interface(root_stub_);
             add_object(root_ob.get(), os);
-
-            if(parent_service)
-            {
-                parent_service_ = parent_service;
-                add_zone(parent_service_);
-            }
             
             if(stub_id)
+            {
                 *stub_id = id;
-            return 0;
+            }
         }
         virtual void cleanup() override;
         bool check_is_empty() const override;
         uint64_t get_root_object_id() const;
+        rpc::shared_ptr<service_proxy> get_zone_proxy(uint64_t zone_id) const override;
     };
 }
