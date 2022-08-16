@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.0.0)
 
 add_executable(marshal_test_host 
     main.cpp
+    host_telemetry_service.cpp
     )
 
 target_compile_definitions(marshal_test_host PRIVATE ${HOST_DEFINES})

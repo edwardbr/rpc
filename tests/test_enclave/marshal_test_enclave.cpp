@@ -60,13 +60,13 @@ public:
         on_service_proxy_release_host(name, originating_zone_id, zone_id, object_id);
     }
 
-    virtual void on_impl_creation(const char* name, uint64_t zone_id, uint64_t object_id) const
+    virtual void on_impl_creation(const char* name, uint64_t interface_id) const
     {
-        on_impl_creation_host(name, zone_id, object_id);
+        on_impl_creation_host(name, interface_id);
     }
-    virtual void on_impl_deletion(const char* name, uint64_t zone_id, uint64_t object_id) const
+    virtual void on_impl_deletion(const char* name, uint64_t interface_id) const
     {
-        on_impl_deletion_host(name, zone_id, object_id);
+        on_impl_deletion_host(name, interface_id);
     }
 
     virtual void on_stub_creation(const char* name, uint64_t zone_id, uint64_t object_id, uint64_t interface_id) const
@@ -131,7 +131,7 @@ int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t child_zone_id, uin
     rpc_server->set_parent(host_proxy);
 
     //create the root object
-    rpc::shared_ptr<yyy::i_example> ex(new example);
+    rpc::shared_ptr<yyy::i_example> ex(new example(p_telemetry_service));
     rpc_server->create_stub<yyy::i_example, yyy::i_example_stub>(ex, root_object_id);
 
     return 0;

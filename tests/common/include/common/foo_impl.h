@@ -1,6 +1,7 @@
 #pragma once
 
 #include <example/example.h>
+#include <rpc/i_telemetry_service.h>
 
 void log(const std::string& data)
 {
@@ -11,6 +12,19 @@ namespace marshalled_tests
 {
     class baz : public xxx::i_baz
     {
+        const i_telemetry_service* telemetry_ = nullptr;
+    public:
+        baz(const i_telemetry_service* telemetry) : telemetry_(telemetry)
+        {
+            if(telemetry_)
+                telemetry_->on_impl_creation("baz", xxx::i_baz::id);
+        }
+
+        virtual ~baz()
+        {
+            if(telemetry_)
+                telemetry_->on_impl_deletion("baz", xxx::i_baz::id);
+        }
         int callback(int val)
         {            
             log(std::string("callback ") + std::to_string(val));
@@ -20,14 +34,17 @@ namespace marshalled_tests
 
     class foo : public xxx::i_foo
     {
+        const i_telemetry_service* telemetry_ = nullptr;
     public:
-        foo()
+        foo(const i_telemetry_service* telemetry) : telemetry_(telemetry)
         {
-            log_str("foo",100);
+            if(telemetry_)
+                telemetry_->on_impl_creation("foo", xxx::i_foo::id);
         }
         virtual ~foo()
         {
-            log_str("~foo",100);
+            if(telemetry_)
+                telemetry_->on_impl_deletion("foo", xxx::i_foo::id);
         }
         error_code do_something_in_val(int val)
         {
@@ -171,7 +188,7 @@ namespace marshalled_tests
 
         error_code recieve_interface(rpc::shared_ptr<i_foo>& val)
         {
-            val = rpc::shared_ptr<xxx::i_foo>(new foo);
+            val = rpc::shared_ptr<xxx::i_foo>(new foo(telemetry_));
             return 0;
         }
 
@@ -190,18 +207,27 @@ namespace marshalled_tests
         
         error_code create_baz_interface(rpc::shared_ptr<xxx::i_baz>& val)
         {
-            val = rpc::shared_ptr<xxx::i_baz>(new baz());
+            val = rpc::shared_ptr<xxx::i_baz>(new baz(telemetry_));
             return 0;
         }
     };
     class example : public yyy::i_example
     {
+        const i_telemetry_service* telemetry_ = nullptr;
     public:
-        example(){log_str("new example",100);}
-        ~example(){log_str("delete example",100);}
+        example(const i_telemetry_service* telemetry) : telemetry_(telemetry)
+        {
+            if(telemetry_)
+                telemetry_->on_impl_creation("example", yyy::i_example::id);
+        }
+        ~example()
+        {
+            if(telemetry_)
+                telemetry_->on_impl_deletion("example", yyy::i_example::id);
+        }
         error_code create_foo(rpc::shared_ptr<xxx::i_foo>& target) override
         {
-            target = rpc::shared_ptr<xxx::i_foo>(new foo);
+            target = rpc::shared_ptr<xxx::i_foo>(new foo(telemetry_));
             return 0;
         }
 
