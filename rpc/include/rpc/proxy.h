@@ -187,7 +187,7 @@ namespace rpc
         std::mutex insert_control;
         rpc::weak_ptr<service> service_;
         uint64_t zone_id_ = 0;
-        rpc::shared_ptr<service> operating_zone_service_;
+        rpc::weak_ptr<service> operating_zone_service_;
         const i_telemetry_service* const telemetry_service_ = nullptr;
 
     protected:
@@ -223,8 +223,8 @@ namespace rpc
 
         service& get_service() const {return *service_.lock();}
         uint64_t get_zone_id() const {return zone_id_;}
-        uint64_t get_operating_zone_id() const {return operating_zone_service_->get_zone_id();}
-        rpc::shared_ptr<service> get_operating_zone_service() const {return operating_zone_service_;}
+        uint64_t get_operating_zone_id() const {return operating_zone_service_.lock()->get_zone_id();}
+        rpc::shared_ptr<service> get_operating_zone_service() const {return operating_zone_service_.lock();}
         const i_telemetry_service* get_telemetry_service(){return telemetry_service_;}
 
         template<class T> int create_proxy(uint64_t object_id, rpc::shared_ptr<T>& val, uint64_t zone_id = 0)
