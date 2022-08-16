@@ -28,8 +28,8 @@ public:
 
     virtual void on_service_creation(const char* name, uint64_t zone_id) const = 0;
     virtual void on_service_deletion(const char* name, uint64_t zone_id) const = 0;
-    virtual void on_service_proxy_creation(const char* name, uint64_t zone_id) const = 0;
-    virtual void on_service_proxy_deletion(const char* name, uint64_t zone_id) const = 0;
+    virtual void on_service_proxy_creation(const char* name, uint64_t originating_zone_id, uint64_t zone_id) const = 0;
+    virtual void on_service_proxy_deletion(const char* name, uint64_t originating_zone_id, uint64_t zone_id) const = 0;
     virtual void on_service_proxy_try_cast(const char* name, uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id, uint64_t interface_id) const = 0;
     virtual void on_service_proxy_add_ref(const char* name, uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id) const = 0;
     virtual void on_service_proxy_release(const char* name, uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id) const = 0;  

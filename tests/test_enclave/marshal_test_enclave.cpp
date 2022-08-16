@@ -39,13 +39,13 @@ public:
     {
         on_service_deletion_host(name, zone_id);
     }
-    virtual void on_service_proxy_creation(const char* name, uint64_t zone_id) const
+    virtual void on_service_proxy_creation(const char* name, uint64_t originating_zone_id, uint64_t zone_id) const
     {
-        on_service_proxy_creation_host(name, zone_id);
+        on_service_proxy_creation_host(name, originating_zone_id, zone_id);
     }
-    virtual void on_service_proxy_deletion(const char* name, uint64_t zone_id) const
+    virtual void on_service_proxy_deletion(const char* name, uint64_t originating_zone_id, uint64_t zone_id) const
     {
-        on_service_proxy_deletion_host(name, zone_id);
+        on_service_proxy_deletion_host(name, originating_zone_id, zone_id);
     }
     virtual void on_service_proxy_try_cast(const char* name, uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id, uint64_t interface_id) const
     {

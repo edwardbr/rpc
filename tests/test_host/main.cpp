@@ -39,8 +39,9 @@ class host_telemetry_service : public i_telemetry_service
     };
 
     using zone_object = std::pair<uint64_t,uint64_t>;
+    using orig_zone = std::pair<uint64_t,uint64_t>;
 
-    struct zone_object_hash
+    struct uint64_pair_hash
     {
         std::size_t operator()(zone_object const& s) const noexcept
         {
@@ -80,9 +81,9 @@ class host_telemetry_service : public i_telemetry_service
 
     mutable std::mutex mux;
     mutable std::unordered_map<uint64_t, name_count> services;
-    mutable std::unordered_map<uint64_t, name_count> service_proxies;
-    mutable std::unordered_map<zone_object, name_count, zone_object_hash> impls;
-    mutable std::unordered_map<zone_object, name_count, zone_object_hash> stubs;
+    mutable std::unordered_map<orig_zone, name_count, uint64_pair_hash> service_proxies;
+    mutable std::unordered_map<zone_object, name_count, uint64_pair_hash> impls;
+    mutable std::unordered_map<zone_object, name_count, uint64_pair_hash> stubs;
     mutable std::unordered_map<interface_proxy_id, name_count, interface_proxy_id_hash> interface_proxies;
     mutable std::unordered_map<interface_proxy_id, uint64_t, interface_proxy_id_hash> object_proxies;
 
@@ -98,7 +99,7 @@ public:
         spdlog::info("orphaned object_proxies {}", object_proxies.size());
 
         std::for_each(services.begin(), services.end(), [](std::pair<uint64_t, name_count> const& it){spdlog::warn("service {} zone {} count {}", it.second.name, it.first, it.second.count);});
-        std::for_each(service_proxies.begin(), service_proxies.end(), [](std::pair<uint64_t, name_count> const& it){spdlog::warn("service_proxies {} zone {} count {}", it.second.name, it.first, it.second.count);});
+        std::for_each(service_proxies.begin(), service_proxies.end(), [](std::pair<orig_zone, name_count> const& it){spdlog::warn("service_proxies {} originating_zone {} zone {} count {}", it.second.name, it.first.first, it.first.second, it.second.count);});
         std::for_each(impls.begin(), impls.end(), [](std::pair<zone_object, name_count> const& it){spdlog::warn("impls {} zone {} object_id {} count {}", it.second.name, it.first.first, it.first.second, it.second.count);});
         std::for_each(stubs.begin(), stubs.end(), [](std::pair<zone_object, name_count> const& it){spdlog::warn("stubs {} zone {} object_id {} count {}", it.second.name, it.first.first, it.first.second, it.second.count);});
         std::for_each(object_proxies.begin(), object_proxies.end(), [](std::pair<interface_proxy_id, uint64_t> const& it){spdlog::warn("object_proxies originating_zone {} zone {} object_id {} count {}", it.first.originating_zone_id, it.first.zone_id, it.first.object_id, it.second);});
@@ -144,31 +145,31 @@ public:
             spdlog::info("on_service_deletion {} {}", name, zone_id);
         }
     }
-    virtual void on_service_proxy_creation(const char* name, uint64_t zone_id) const
+    virtual void on_service_proxy_creation(const char* name, uint64_t originating_zone_id, uint64_t zone_id) const
     {
         std::lock_guard g(mux);
-        service_proxies.emplace(zone_id, name_count{name, 1});
+        service_proxies.emplace(orig_zone{originating_zone_id, zone_id}, name_count{name, 1});
         spdlog::info("on_service_proxy_creation {} {}", name, zone_id);
     }
-    virtual void on_service_proxy_deletion(const char* name, uint64_t zone_id) const
+    virtual void on_service_proxy_deletion(const char* name, uint64_t originating_zone_id, uint64_t zone_id) const
     {
         std::lock_guard g(mux);
-        auto found = service_proxies.find(zone_id);
+        auto found = service_proxies.find(orig_zone{originating_zone_id, zone_id});
         if(found == service_proxies.end())
         {
-            spdlog::error("service_proxy not found {} {}", name, zone_id);
+            spdlog::error("service_proxy not found {} {} {}", name, originating_zone_id, zone_id);
         }
         else if(found->second.count == 1)
         {
             service_proxies.erase(found);
-            spdlog::info("on_service_proxy_deletion {} {}", name, zone_id);
+            spdlog::info("on_service_proxy_deletion {} {} {}", name, originating_zone_id, zone_id);
         }
         else
         {
             
             found->second.count--;
-            spdlog::error("service still being used!{} {}", name, zone_id);
-            spdlog::info("on_service_proxy_deletion {} {}", name, zone_id);
+            spdlog::error("service still being used! {} {} {}", name, originating_zone_id, zone_id);
+            spdlog::info("on_service_proxy_deletion {} {} {}", name, originating_zone_id, zone_id);
         }        
     }
     virtual void on_service_proxy_try_cast(const char* name, uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id, uint64_t interface_id) const
@@ -404,7 +405,7 @@ int main()
 
                 // relay test
 
-                /*rpc::shared_ptr<yyy::i_example> example_relay_ptr;
+                rpc::shared_ptr<yyy::i_example> example_relay_ptr;
                 err_code = rpc::enclave_service_proxy::create(++zone_gen, "./marshal_test_enclave.signed.dll", root_service, example_relay_ptr, telemetry_service);
                 ASSERT(!err_code);
 
@@ -414,7 +415,7 @@ int main()
                 rpc::shared_ptr<xxx::i_foo> i_foo_relay_ptr;
                 example_relay_ptr->create_foo(i_foo_relay_ptr);
 
-                i_foo_relay_ptr->call_baz_interface(i_baz);*/
+                i_foo_relay_ptr->call_baz_interface(i_baz);
             }
         }
         telemetry_service = nullptr;
@@ -497,15 +498,15 @@ extern "C"
         if(telemetry_service)
             telemetry_service->on_service_deletion(name, zone_id);
     }
-    void on_service_proxy_creation_host(const char* name, uint64_t zone_id)
+    void on_service_proxy_creation_host(const char* name, uint64_t originating_zone_id, uint64_t zone_id)
     {
         if(telemetry_service)
-            telemetry_service->on_service_proxy_creation(name, zone_id);
+            telemetry_service->on_service_proxy_creation(name, originating_zone_id, zone_id);
     }
-    void on_service_proxy_deletion_host(const char* name, uint64_t zone_id)
+    void on_service_proxy_deletion_host(const char* name, uint64_t originating_zone_id, uint64_t zone_id)
     {
         if(telemetry_service)
-            telemetry_service->on_service_proxy_deletion(name, zone_id);
+            telemetry_service->on_service_proxy_deletion(name, originating_zone_id, zone_id);
     }
     void on_service_proxy_try_cast_host(const char* name, uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id, uint64_t interface_id)
     {

@@ -187,6 +187,7 @@ namespace rpc
         std::mutex insert_control;
         rpc::weak_ptr<service> service_;
         uint64_t zone_id_ = 0;
+        uint64_t operating_zone_id = 0;
         rpc::weak_ptr<service> operating_zone_service_;
         const i_telemetry_service* const telemetry_service_ = nullptr;
 
@@ -197,6 +198,7 @@ namespace rpc
                         const i_telemetry_service* telemetry_service) : 
             service_(serv), 
             zone_id_(serv->get_zone_id()),
+            operating_zone_id(operating_zone_service->get_zone_id()),
             operating_zone_service_(operating_zone_service),
             telemetry_service_(telemetry_service)
         {}
@@ -204,6 +206,7 @@ namespace rpc
                         const rpc::shared_ptr<service>& operating_zone_service,
                         const i_telemetry_service* telemetry_service) : 
             zone_id_(zone_id),
+            operating_zone_id(operating_zone_service->get_zone_id()),
             operating_zone_service_(operating_zone_service),
             telemetry_service_(telemetry_service)
         {}
@@ -223,7 +226,7 @@ namespace rpc
 
         service& get_service() const {return *service_.lock();}
         uint64_t get_zone_id() const {return zone_id_;}
-        uint64_t get_operating_zone_id() const {return operating_zone_service_.lock()->get_zone_id();}
+        uint64_t get_operating_zone_id() const {return operating_zone_id;}
         rpc::shared_ptr<service> get_operating_zone_service() const {return operating_zone_service_.lock();}
         const i_telemetry_service* get_telemetry_service(){return telemetry_service_;}
 

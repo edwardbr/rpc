@@ -14,7 +14,7 @@ namespace rpc
         {
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
             {
-                telemetry_service->on_service_proxy_creation("local_service_proxy", get_zone_id());
+                telemetry_service->on_service_proxy_creation("local_service_proxy", get_operating_zone_id(), get_zone_id());
             }
         }
 
@@ -23,7 +23,7 @@ namespace rpc
         {
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
             {
-                telemetry_service->on_service_proxy_deletion("local_service_proxy", get_zone_id());
+                telemetry_service->on_service_proxy_deletion("local_service_proxy", get_operating_zone_id(), get_zone_id());
             }
         }
         static rpc::shared_ptr<local_service_proxy> create(const rpc::shared_ptr<service>& serv,
@@ -78,7 +78,7 @@ namespace rpc
         {
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
             {
-                telemetry_service->on_service_proxy_creation("local_child_service_proxy", get_zone_id());
+                telemetry_service->on_service_proxy_creation("local_child_service_proxy", get_operating_zone_id(), get_zone_id());
             }
         }
 
@@ -87,7 +87,7 @@ namespace rpc
         {
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
             {
-                telemetry_service->on_service_proxy_deletion("local_child_service_proxy", get_zone_id());
+                telemetry_service->on_service_proxy_deletion("local_child_service_proxy", get_operating_zone_id(), get_zone_id());
             }
         }
         static rpc::shared_ptr<local_child_service_proxy> create(const rpc::shared_ptr<service>& serv,
