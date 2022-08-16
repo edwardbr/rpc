@@ -24,5 +24,32 @@ enclave {
         uint64_t release_host(uint64_t zone_id, uint64_t object_id);
 
         void log_str([in, size=sz] const char* str, size_t sz);
+
+
+        void on_service_creation_host([in, string] const char* name, uint64_t zone_id);
+        void on_service_deletion_host([in, string] const char* name, uint64_t zone_id);
+        void on_service_proxy_creation_host([in, string] const char* name, uint64_t zone_id);
+        void on_service_proxy_deletion_host([in, string] const char* name, uint64_t zone_id);
+        void on_service_proxy_try_cast_host([in, string] const char* name, uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id, uint64_t interface_id);
+        void on_service_proxy_add_ref_host([in, string] const char* name, uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id);
+        void on_service_proxy_release_host([in, string] const char* name, uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id);  
+
+        void on_impl_creation_host([in, string] const char* name, uint64_t object_id, uint64_t interface_id);
+        void on_impl_deletion_host([in, string] const char* name, uint64_t object_id, uint64_t interface_id);
+
+        void on_stub_creation_host([in, string] const char* name, uint64_t zone_id, uint64_t object_id, uint64_t interface_id);    
+        void on_stub_deletion_host([in, string] const char* name, uint64_t zone_id, uint64_t object_id, uint64_t interface_id);
+        void on_stub_send_host(uint64_t zone_id, uint64_t object_id, uint64_t interface_id, uint64_t method_id);
+        void on_stub_add_ref_host(uint64_t zone_id, uint64_t object_id, uint64_t interface_id, uint64_t count);
+        void on_stub_release_host(uint64_t zone_id, uint64_t object_id, uint64_t interface_id, uint64_t count);
+
+        void on_object_proxy_creation_host(uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id);
+        void on_object_proxy_deletion_host(uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id);
+
+        void on_proxy_creation_host([in, string] const char* name, uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id, uint64_t interface_id);
+        void on_proxy_deletion_host([in, string] const char* name, uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id, uint64_t interface_id);
+        void on_proxy_send_host([in, string] const char* name, uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id, uint64_t interface_id, uint64_t method_id);
+
+        void message_host(uint64_t level, [in, string] const char* name);  
     };
 };

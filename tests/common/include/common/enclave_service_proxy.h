@@ -8,14 +8,14 @@ namespace rpc
     //This is for hosts to call services on an enclave
     class enclave_service_proxy : public service_proxy
     {
-        enclave_service_proxy(uint64_t zone_id, std::string filename, const rpc::shared_ptr<service>& operating_zone_service);
+        enclave_service_proxy(uint64_t zone_id, std::string filename, const rpc::shared_ptr<service>& operating_zone_service, const i_telemetry_service* telemetry_service);
         int initialise_enclave(rpc::shared_ptr<object_proxy>& proxy);
 
     public:
         template<class T>
-        static int create(uint64_t zone_id, std::string filename, const rpc::shared_ptr<service>& operating_zone_service, rpc::shared_ptr<T>& root_object)
+        static int create(uint64_t zone_id, std::string filename, const rpc::shared_ptr<service>& operating_zone_service, rpc::shared_ptr<T>& root_object, const i_telemetry_service* telemetry_service)
         {
-            auto ret = rpc::shared_ptr<enclave_service_proxy>(new enclave_service_proxy(zone_id, filename, operating_zone_service));
+            auto ret = rpc::shared_ptr<enclave_service_proxy>(new enclave_service_proxy(zone_id, filename, operating_zone_service, telemetry_service));
             auto pthis = rpc::static_pointer_cast<service_proxy>(ret);
 
             ret->weak_this_ = pthis;

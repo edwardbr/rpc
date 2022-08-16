@@ -2,63 +2,100 @@
 
 #include <rpc/proxy.h>
 #include <rpc/error_codes.h>
+#include <rpc/i_telemetry_service.h>
 
 namespace rpc
 {
-    class root_service_proxy : public service_proxy
+    class local_service_proxy : public service_proxy
     {
-        root_service_proxy(const rpc::shared_ptr<service>& serv)
-            : service_proxy(serv, serv)
+        local_service_proxy(const rpc::shared_ptr<service>& serv,
+                            const i_telemetry_service* telemetry_service)
+            : service_proxy(serv, serv, telemetry_service)
         {
+            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
+            {
+                telemetry_service->on_service_proxy_creation("local_service_proxy", get_zone_id());
+            }
         }
 
     public:
-        ~root_service_proxy()
+        virtual ~local_service_proxy()
         {
-            log_str("~root_service_proxy",100);
+            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
+            {
+                telemetry_service->on_service_proxy_deletion("local_service_proxy", get_zone_id());
+            }
         }
-        static rpc::shared_ptr<root_service_proxy> create(const rpc::shared_ptr<service>& serv)
+        static rpc::shared_ptr<local_service_proxy> create(const rpc::shared_ptr<service>& serv,
+                                                           const i_telemetry_service* telemetry_service)
         {
-            auto ret = rpc::shared_ptr<root_service_proxy>(new root_service_proxy(serv));
+            auto ret = rpc::shared_ptr<local_service_proxy>(new local_service_proxy(serv, telemetry_service));
             auto pthis = rpc::static_pointer_cast<service_proxy>(ret);
             ret->weak_this_ = pthis;
             return ret;
         }
 
         int send(uint64_t zone_id, uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_,
-                        const char* in_buf_, std::vector<char>& out_buf_) override
+                 const char* in_buf_, std::vector<char>& out_buf_) override
         {
             return get_service().send(zone_id, object_id, interface_id, method_id, in_size_, in_buf_, out_buf_);
         }
         int try_cast(uint64_t zone_id, uint64_t object_id, uint64_t interface_id) override
         {
+            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
+            {
+                telemetry_service->on_service_proxy_try_cast("local_service_proxy", get_operating_zone_id(), zone_id,
+                                                             object_id, interface_id);
+            }
             return get_service().try_cast(zone_id, object_id, interface_id);
         }
         uint64_t add_ref(uint64_t zone_id, uint64_t object_id) override
         {
+            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
+            {
+                telemetry_service->on_service_proxy_add_ref("local_service_proxy", get_operating_zone_id(), zone_id,
+                                                            object_id);
+            }
             return get_service().add_ref(zone_id, object_id);
         }
         uint64_t release(uint64_t zone_id, uint64_t object_id) override
         {
+            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
+            {
+                telemetry_service->on_service_proxy_release("local_service_proxy", get_operating_zone_id(), zone_id,
+                                                            object_id);
+            }
             return get_service().release(zone_id, object_id);
         }
     };
 
-    class branch_service_proxy : public service_proxy
+    class local_child_service_proxy : public service_proxy
     {
-        branch_service_proxy(const rpc::shared_ptr<service>& serv, const rpc::shared_ptr<service>& operating_zone_service)
-            : service_proxy(serv, operating_zone_service)
+        local_child_service_proxy(const rpc::shared_ptr<service>& serv,
+                                  const rpc::shared_ptr<service>& operating_zone_service,
+                                  const i_telemetry_service* telemetry_service)
+            : service_proxy(serv, operating_zone_service, telemetry_service)
         {
+            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
+            {
+                telemetry_service->on_service_proxy_creation("local_child_service_proxy", get_zone_id());
+            }
         }
 
     public:
-        ~branch_service_proxy()
+        virtual ~local_child_service_proxy()
         {
-            log_str("~branch_service_proxy",100);
+            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
+            {
+                telemetry_service->on_service_proxy_deletion("local_child_service_proxy", get_zone_id());
+            }
         }
-        static rpc::shared_ptr<branch_service_proxy> create(const rpc::shared_ptr<service>& serv, const rpc::shared_ptr<service>& operating_zone_service)
+        static rpc::shared_ptr<local_child_service_proxy> create(const rpc::shared_ptr<service>& serv,
+                                                                 const rpc::shared_ptr<service>& operating_zone_service,
+                                                                 const i_telemetry_service* telemetry_service)
         {
-            auto ret = rpc::shared_ptr<branch_service_proxy>(new branch_service_proxy(serv, operating_zone_service));
+            auto ret = rpc::shared_ptr<local_child_service_proxy>(
+                new local_child_service_proxy(serv, operating_zone_service, telemetry_service));
             auto pthis = rpc::static_pointer_cast<service_proxy>(ret);
             ret->weak_this_ = pthis;
             operating_zone_service->add_zone_proxy(pthis);
@@ -66,20 +103,36 @@ namespace rpc
         }
 
         int send(uint64_t zone_id, uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_,
-                        const char* in_buf_, std::vector<char>& out_buf_) override
+                 const char* in_buf_, std::vector<char>& out_buf_) override
         {
             return get_service().send(zone_id, object_id, interface_id, method_id, in_size_, in_buf_, out_buf_);
         }
         int try_cast(uint64_t zone_id, uint64_t object_id, uint64_t interface_id) override
         {
+            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
+            {
+                telemetry_service->on_service_proxy_try_cast("local_child_service_proxy", get_operating_zone_id(),
+                                                             zone_id, object_id, interface_id);
+            }
             return get_service().try_cast(zone_id, object_id, interface_id);
         }
         uint64_t add_ref(uint64_t zone_id, uint64_t object_id) override
         {
+            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
+            {
+                telemetry_service->on_service_proxy_add_ref("local_child_service_proxy", get_operating_zone_id(),
+                                                            zone_id, object_id);
+            }
+
             return get_service().add_ref(zone_id, object_id);
         }
         uint64_t release(uint64_t zone_id, uint64_t object_id) override
         {
+            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
+            {
+                telemetry_service->on_service_proxy_release("local_child_service_proxy", get_operating_zone_id(),
+                                                            zone_id, object_id);
+            }
             return get_service().release(zone_id, object_id);
         }
     };

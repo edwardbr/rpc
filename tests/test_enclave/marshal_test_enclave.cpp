@@ -25,13 +25,109 @@
 
 using namespace marshalled_tests;
 
+class enclave_telemetry_service : public i_telemetry_service
+{
+public:
+    virtual ~enclave_telemetry_service() = default;
+
+    virtual void on_service_creation(const char* name, uint64_t zone_id) const
+    {
+        on_service_creation_host(name, zone_id);
+    }
+
+    virtual void on_service_deletion(const char* name, uint64_t zone_id) const
+    {
+        on_service_deletion_host(name, zone_id);
+    }
+    virtual void on_service_proxy_creation(const char* name, uint64_t zone_id) const
+    {
+        on_service_proxy_creation_host(name, zone_id);
+    }
+    virtual void on_service_proxy_deletion(const char* name, uint64_t zone_id) const
+    {
+        on_service_proxy_deletion_host(name, zone_id);
+    }
+    virtual void on_service_proxy_try_cast(const char* name, uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id, uint64_t interface_id) const
+    {
+        on_service_proxy_try_cast_host(name, originating_zone_id, zone_id, object_id, interface_id);
+    }
+    virtual void on_service_proxy_add_ref(const char* name, uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id) const
+    {
+        on_service_proxy_add_ref_host(name, originating_zone_id, zone_id, object_id);
+    }
+    virtual void on_service_proxy_release(const char* name, uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id) const
+    {
+        on_service_proxy_release_host(name, originating_zone_id, zone_id, object_id);
+    }
+
+    virtual void on_impl_creation(const char* name, uint64_t zone_id, uint64_t object_id) const
+    {
+        on_impl_creation_host(name, zone_id, object_id);
+    }
+    virtual void on_impl_deletion(const char* name, uint64_t zone_id, uint64_t object_id) const
+    {
+        on_impl_deletion_host(name, zone_id, object_id);
+    }
+
+    virtual void on_stub_creation(const char* name, uint64_t zone_id, uint64_t object_id, uint64_t interface_id) const
+    {
+        on_stub_creation_host(name, zone_id, object_id, interface_id);
+    }
+    virtual void on_stub_deletion(const char* name, uint64_t zone_id, uint64_t object_id, uint64_t interface_id) const
+    {
+        on_stub_deletion_host(name, zone_id, object_id, interface_id);
+    }
+    virtual void on_stub_send(uint64_t zone_id, uint64_t object_id, uint64_t interface_id, uint64_t method_id) const
+    {
+        on_stub_send_host(zone_id, object_id, interface_id, method_id);
+    }
+    virtual void on_stub_add_ref(uint64_t zone_id, uint64_t object_id, uint64_t interface_id, uint64_t count) const
+    {
+        on_stub_add_ref_host(zone_id, object_id, interface_id, count);
+    }
+    virtual void on_stub_release(uint64_t zone_id, uint64_t object_id, uint64_t interface_id, uint64_t count) const
+    {
+        on_stub_release_host(zone_id, object_id, interface_id, count);
+    }
+
+    virtual void on_object_proxy_creation(uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id) const
+    {
+        on_object_proxy_creation_host(originating_zone_id, zone_id, object_id);
+    }
+    virtual void on_object_proxy_deletion(uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id) const
+    {
+        on_object_proxy_deletion_host(originating_zone_id, zone_id, object_id);
+    }
+
+    virtual void on_interface_proxy_creation(const char* name, uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id, uint64_t interface_id) const
+    {
+        on_proxy_creation_host(name, originating_zone_id, zone_id, object_id, interface_id);
+    }
+    virtual void on_interface_proxy_deletion(const char* name, uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id, uint64_t interface_id) const
+    {
+        on_proxy_deletion_host(name, originating_zone_id, zone_id, object_id, interface_id);
+    }
+    virtual void on_interface_proxy_send(const char* name, uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id, uint64_t interface_id, uint64_t method_id) const
+    {
+        on_proxy_send_host(name, originating_zone_id, zone_id, object_id, interface_id, method_id);
+    }
+
+    virtual void message(i_telemetry_service::level_enum level, const char* message) const
+    {
+        message_host(level, message);
+    }
+};
+
+enclave_telemetry_service telemetry_service;
+
 rpc::shared_ptr<rpc::child_service> rpc_server;
 
 int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t child_zone_id, uint64_t* root_object_id)
 {
     //create a zone service for the enclave
     rpc_server = rpc::make_shared<rpc::child_service>(child_zone_id); 
-    auto host_proxy = rpc::host_service_proxy::create(host_zone_id, rpc_server);
+    const i_telemetry_service* p_telemetry_service = &telemetry_service;
+    auto host_proxy = rpc::host_service_proxy::create(host_zone_id, rpc_server, p_telemetry_service);
     rpc_server->set_parent(host_proxy);
 
     //create the root object

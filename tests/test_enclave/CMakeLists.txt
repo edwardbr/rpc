@@ -17,6 +17,8 @@ if(${BUILD_ENCLAVE})
     marshal_test_edl_enclave    
     common_enclave
     example_interface
+
+    yas_common
     ${SGX_ENCLAVE_LIBS}
     )
   

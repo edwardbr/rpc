@@ -8,7 +8,7 @@
 #include <rpc/marshaller.h>
 #include <rpc/service.h>
 #include <rpc/remote_pointer.h>
-
+#include <rpc/i_telemetry_service.h>
 namespace rpc
 {
     class service;
@@ -27,9 +27,7 @@ namespace rpc
         {
         }
         virtual ~proxy_base()
-        {
-            LOG("~proxy_base",100);
-        }
+        {}
         rpc::shared_ptr<object_proxy> get_object_proxy() const { return object_proxy_; }
 
         template<class T>
@@ -79,27 +77,22 @@ namespace rpc
     {
         uint64_t object_id_;
         uint64_t zone_id_;
-        rpc::shared_ptr<service_proxy> marshaller_;
+        rpc::shared_ptr<service_proxy> service_proxy_;
         std::unordered_map<uint64_t, rpc::weak_ptr<proxy_base>> proxy_map;
         std::mutex insert_control;
         mutable rpc::weak_ptr<object_proxy> weak_this_;
 
         // note the interface pointer may change if there is already an interface inserted successfully
         void register_interface(uint64_t interface_id, rpc::weak_ptr<proxy_base>& value);
-        object_proxy(uint64_t object_id, uint64_t zone_id, rpc::shared_ptr<service_proxy> marshaller)
-            : object_id_(object_id)
-            , zone_id_(zone_id)
-            , marshaller_(marshaller)
-        {
-        }
+        object_proxy(uint64_t object_id, uint64_t zone_id, rpc::shared_ptr<service_proxy> service_proxy);
 
         int try_cast(uint64_t interface_id);
 
     public:
         static rpc::shared_ptr<object_proxy> create(uint64_t object_id, uint64_t zone_id,
-                                                    rpc::shared_ptr<service_proxy> marshaller)
+                                                    rpc::shared_ptr<service_proxy> service_proxy)
         {
-            rpc::shared_ptr<object_proxy> ret(new object_proxy(object_id, zone_id, marshaller));
+            rpc::shared_ptr<object_proxy> ret(new object_proxy(object_id, zone_id, service_proxy));
             ret->weak_this_ = ret;
             return ret;
         }
@@ -109,7 +102,7 @@ namespace rpc
         rpc::shared_ptr<object_proxy const> shared_from_this() const { return rpc::shared_ptr<object_proxy const>(weak_this_); }
         rpc::shared_ptr<object_proxy> shared_from_this() { return rpc::shared_ptr<object_proxy>(weak_this_); }
 
-        rpc::shared_ptr<service_proxy> get_service_proxy() const { return marshaller_; }
+        rpc::shared_ptr<service_proxy> get_service_proxy() const { return service_proxy_; }
         uint64_t get_object_id() const {return object_id_;}
         uint64_t get_zone_id() const {return zone_id_;}
 
@@ -186,7 +179,7 @@ namespace rpc
     };
 
     // the class that encapsulates an environment or zone
-    // only host code can use this class directly other enclaves *may* have access to the i_marshaller derived interface
+    // only host code can use this class directly other enclaves *may* have access to the i_service_proxy derived interface
 
     class service_proxy : public i_marshaller
     {
@@ -195,25 +188,30 @@ namespace rpc
         rpc::weak_ptr<service> service_;
         uint64_t zone_id_ = 0;
         rpc::shared_ptr<service> operating_zone_service_;
+        const i_telemetry_service* const telemetry_service_ = nullptr;
 
     protected:
+
         service_proxy(  const rpc::shared_ptr<service>& serv, 
-                        const rpc::shared_ptr<service>& operating_zone_service) : 
+                        const rpc::shared_ptr<service>& operating_zone_service,
+                        const i_telemetry_service* telemetry_service) : 
             service_(serv), 
             zone_id_(serv->get_zone_id()),
-            operating_zone_service_(operating_zone_service)
+            operating_zone_service_(operating_zone_service),
+            telemetry_service_(telemetry_service)
         {}
         service_proxy(  uint64_t zone_id, 
-                        const rpc::shared_ptr<service>& operating_zone_service) : 
+                        const rpc::shared_ptr<service>& operating_zone_service,
+                        const i_telemetry_service* telemetry_service) : 
             zone_id_(zone_id),
-            operating_zone_service_(operating_zone_service)
+            operating_zone_service_(operating_zone_service),
+            telemetry_service_(telemetry_service)
         {}
         mutable rpc::weak_ptr<service_proxy> weak_this_;
 
     public:
         virtual ~service_proxy()
         {
-            LOG("~service_proxy",100);
             auto srv = service_.lock();
             if(srv)
             {
@@ -227,6 +225,7 @@ namespace rpc
         uint64_t get_zone_id() const {return zone_id_;}
         uint64_t get_operating_zone_id() const {return operating_zone_service_->get_zone_id();}
         rpc::shared_ptr<service> get_operating_zone_service() const {return operating_zone_service_;}
+        const i_telemetry_service* get_telemetry_service(){return telemetry_service_;}
 
         template<class T> int create_proxy(uint64_t object_id, rpc::shared_ptr<T>& val, uint64_t zone_id = 0)
         {
@@ -247,7 +246,4 @@ namespace rpc
             return op->query_interface(val, false);
         }
     };
-
-
-
 }

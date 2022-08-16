@@ -14,4 +14,9 @@ if(RPC_STANDALONE)
 
     
   add_subdirectory(idlparser)
+
+  set(SPDLOG_FMT_EXTERNAL ON CACHE BOOL "external fmt" FORCE)
+  set(SPDLOG_NO_EXCEPTIONS ON CACHE BOOL "no exceptions" FORCE)
+  set(SPDLOG_INSTALL ON)
+  add_subdirectory(spdlog)
 endif()

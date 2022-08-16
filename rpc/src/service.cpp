@@ -148,11 +148,11 @@ namespace rpc
         return ret;
     }
 
-    void service::add_zone_proxy(const rpc::shared_ptr<service_proxy>& zone)
+    void service::add_zone_proxy(const rpc::shared_ptr<service_proxy>& service_proxy)
     {
-        assert(zone->get_zone_id() != zone_id_);
+        assert(service_proxy->get_zone_id() != zone_id_);
         std::lock_guard g(insert_control);
-        other_zones[zone->get_zone_id()] = zone;
+        other_zones[service_proxy->get_zone_id()] = service_proxy;
     }
     rpc::shared_ptr<service_proxy> service::get_zone_proxy(uint64_t zone_id) const
     {
@@ -174,6 +174,7 @@ namespace rpc
         if(parent_service_)
         {
             remove_zone_proxy(parent_service_->get_zone_id());
+            parent_service_ = nullptr;
         }
         cleanup();
     }

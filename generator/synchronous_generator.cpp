@@ -567,11 +567,22 @@ namespace enclave_marshaller
             proxy("{{");
             proxy("{}_proxy(rpc::shared_ptr<rpc::object_proxy> object_proxy) : ", interface_name);
             proxy("  rpc::proxy_impl<{}>(object_proxy)", interface_name);
-            proxy("  {{}}", interface_name);
+            proxy("  {{");
+            proxy("     if(auto* telemetry_service = get_object_proxy()->get_service_proxy()->get_telemetry_service();telemetry_service)");
+            proxy("     {{");
+            proxy("     telemetry_service->on_interface_proxy_creation(\"{0}_proxy\", get_object_proxy()->get_service_proxy()->get_operating_zone_id(), get_object_proxy()->get_service_proxy()->get_zone_id(), get_object_proxy()->get_object_id(), {0}_proxy::id);", interface_name);
+            proxy("     }}");
+            proxy("  }}");
             proxy("mutable rpc::weak_ptr<{}_proxy> weak_this_;", interface_name);
             proxy("public:");
             proxy("");
-            proxy("virtual ~{}_proxy(){{}}", interface_name);
+            proxy("virtual ~{}_proxy()", interface_name);
+            proxy("  {{");
+            proxy("     if(auto* telemetry_service = get_object_proxy()->get_service_proxy()->get_telemetry_service();telemetry_service)");
+            proxy("     {{");
+            proxy("     telemetry_service->on_interface_proxy_deletion(\"{0}_proxy\", get_object_proxy()->get_service_proxy()->get_operating_zone_id(), get_object_proxy()->get_service_proxy()->get_zone_id(), get_object_proxy()->get_object_id(), {0}_proxy::id);", interface_name);
+            proxy("     }}");
+            proxy("  }}");
             proxy("[[nodiscard]] static rpc::shared_ptr<{}> create(const rpc::shared_ptr<rpc::object_proxy>& object_proxy)", interface_name);
             proxy("{{");
             proxy("auto ret = rpc::shared_ptr<{0}_proxy>(new {0}_proxy(object_proxy));", interface_name);
@@ -666,6 +677,11 @@ namespace enclave_marshaller
                     proxy("{{");
 
                     bool has_inparams = false;
+
+                    proxy("if(auto* telemetry_service = get_object_proxy()->get_service_proxy()->get_telemetry_service();telemetry_service)");
+                    proxy("{{");
+                    proxy("telemetry_service->on_interface_proxy_send(\"{0}_proxy\", get_object_proxy()->get_service_proxy()->get_operating_zone_id(), get_object_proxy()->get_service_proxy()->get_zone_id(), get_object_proxy()->get_object_id(), {0}_proxy::id, {1});", interface_name, function_count);
+                    proxy("}}");
 
                     {
                         stub("//STUB_DEMARSHALL_DECLARATION");

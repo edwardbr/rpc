@@ -27,6 +27,9 @@ target_link_libraries(marshal_test_host
     GTest::gtest_main
     GTest::gmock_main
 
+    spdlog::spdlog_header_only
+
+
     ${HOST_LIBRARIES})
 
 target_compile_options(marshal_test_host PRIVATE ${HOST_COMPILE_OPTIONS})
