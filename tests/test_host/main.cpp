@@ -102,7 +102,11 @@ int main()
 
             {
                 rpc::shared_ptr<yyy::i_example> example_ptr;
+                #ifdef _WIN32 // windows
                 err_code = rpc::enclave_service_proxy::create(++zone_gen, "./marshal_test_enclave.signed.dll", root_service, example_ptr, telemetry_service);
+                #else // Linux
+                err_code = rpc::enclave_service_proxy::create(++zone_gen, "./libmarshal_test_enclave.signed.so", root_service, example_ptr, telemetry_service);
+                #endif
                 ASSERT(!err_code);
 
                 rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
@@ -121,7 +125,11 @@ int main()
                 // relay test
 
                 rpc::shared_ptr<yyy::i_example> example_relay_ptr;
+                #ifdef _WIN32 // windows
                 err_code = rpc::enclave_service_proxy::create(++zone_gen, "./marshal_test_enclave.signed.dll", root_service, example_relay_ptr, telemetry_service);
+                #else // Linux
+                err_code = rpc::enclave_service_proxy::create(++zone_gen, "./libmarshal_test_enclave.signed.so", root_service, example_relay_ptr, telemetry_service);
+                #endif
                 ASSERT(!err_code);
 
                 rpc::shared_ptr<marshalled_tests::xxx::i_baz> i_baz;

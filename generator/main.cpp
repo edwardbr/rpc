@@ -259,9 +259,9 @@ int main(const int argc, char* argv[])
             }
         }
     }
-    catch (std::exception ex)
+    catch (const std::exception& e)
     {
-        std::cerr << ex.what() << std::endl;
+        std::cerr << e.what() << std::endl;
         return 1;
     }
 
