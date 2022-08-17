@@ -155,35 +155,6 @@ namespace rpc
         }
     };
 
-    template<class T>
-    uint64_t proxy_base::encapsulate_outbound_interfaces(const rpc::shared_ptr<T>& iface)
-    {
-        auto operating_service = object_proxy_->get_service_proxy()->get_operating_zone_service();
-
-        //this is to check that an interface is belonging to another zone and not the operating zone
-        auto cast = dynamic_cast<proxy_base*>(iface.get());
-        if(cast && cast->get_object_proxy()->get_zone_id() != operating_service->get_zone_id())
-        {
-            return cast->get_object_proxy()->get_object_id();
-        }
-
-        //else encapsulate away
-        return operating_service->encapsulate_outbound_interfaces(iface);
-    }
-
-    template<class T>
-    uint64_t proxy_base::get_interface_zone_id(const rpc::shared_ptr<T>& iface)
-    {
-        //fist check if this shared pointer is a remote one
-        auto* impl = dynamic_cast<rpc::proxy_impl<T>*>(iface.get());
-        if(impl)
-        {
-            return impl->object_proxy_->get_zone_id();
-        }
-        //else get the zone id of the service that runs this zone or enclave
-        return object_proxy_->get_service_proxy()->get_operating_zone_id();
-    }
-
     // the class that encapsulates an environment or zone
     // only host code can use this class directly other enclaves *may* have access to the i_service_proxy derived interface
 
@@ -255,4 +226,34 @@ namespace rpc
             return op->query_interface(val, false);
         }
     };
+
+    //declared here as object_proxy and service_proxy is not fully defined in the body of proxy_base
+    template<class T>
+    uint64_t proxy_base::encapsulate_outbound_interfaces(const rpc::shared_ptr<T>& iface)
+    {
+        auto operating_service = object_proxy_->get_service_proxy()->get_operating_zone_service();
+
+        //this is to check that an interface is belonging to another zone and not the operating zone
+        auto cast = dynamic_cast<proxy_base*>(iface.get());
+        if(cast && cast->get_object_proxy()->get_zone_id() != operating_service->get_zone_id())
+        {
+            return cast->get_object_proxy()->get_object_id();
+        }
+
+        //else encapsulate away
+        return operating_service->encapsulate_outbound_interfaces(iface);
+    }
+
+    template<class T>
+    uint64_t proxy_base::get_interface_zone_id(const rpc::shared_ptr<T>& iface)
+    {
+        //fist check if this shared pointer is a remote one
+        auto* impl = dynamic_cast<rpc::proxy_impl<T>*>(iface.get());
+        if(impl)
+        {
+            return impl->object_proxy_->get_zone_id();
+        }
+        //else get the zone id of the service that runs this zone or enclave
+        return object_proxy_->get_service_proxy()->get_operating_zone_id();
+    }
 }
