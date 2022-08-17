@@ -189,13 +189,13 @@ namespace rpc
         uint64_t zone_id_ = 0;
         uint64_t operating_zone_id = 0;
         rpc::weak_ptr<service> operating_zone_service_;
-        const i_telemetry_service* const telemetry_service_ = nullptr;
+        const rpc::i_telemetry_service* const telemetry_service_ = nullptr;
 
     protected:
 
         service_proxy(  const rpc::shared_ptr<service>& serv, 
                         const rpc::shared_ptr<service>& operating_zone_service,
-                        const i_telemetry_service* telemetry_service) : 
+                        const rpc::i_telemetry_service* telemetry_service) : 
             service_(serv), 
             zone_id_(serv->get_zone_id()),
             operating_zone_id(operating_zone_service->get_zone_id()),
@@ -204,7 +204,7 @@ namespace rpc
         {}
         service_proxy(  uint64_t zone_id, 
                         const rpc::shared_ptr<service>& operating_zone_service,
-                        const i_telemetry_service* telemetry_service) : 
+                        const rpc::i_telemetry_service* telemetry_service) : 
             zone_id_(zone_id),
             operating_zone_id(operating_zone_service->get_zone_id()),
             operating_zone_service_(operating_zone_service),
@@ -228,7 +228,7 @@ namespace rpc
         uint64_t get_zone_id() const {return zone_id_;}
         uint64_t get_operating_zone_id() const {return operating_zone_id;}
         rpc::shared_ptr<service> get_operating_zone_service() const {return operating_zone_service_.lock();}
-        const i_telemetry_service* get_telemetry_service(){return telemetry_service_;}
+        const rpc::i_telemetry_service* get_telemetry_service(){return telemetry_service_;}
 
         template<class T> int create_proxy(uint64_t object_id, rpc::shared_ptr<T>& val, uint64_t zone_id = 0)
         {

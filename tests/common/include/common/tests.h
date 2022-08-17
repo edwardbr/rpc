@@ -13,7 +13,7 @@ void error(int x)
 namespace marshalled_tests
 {
 
-    void standard_tests(xxx::i_foo& foo, bool enclave, const i_telemetry_service* telemetry_service)
+    void standard_tests(xxx::i_foo& foo, bool enclave, const rpc::i_telemetry_service* telemetry_service)
     {
         int ret = 0;
         {
@@ -153,7 +153,7 @@ namespace marshalled_tests
         }
     }
 
-    void remote_tests(rpc::shared_ptr<yyy::i_example> example_ptr, const i_telemetry_service* telemetry_service)
+    void remote_tests(rpc::shared_ptr<yyy::i_example> example_ptr, const rpc::i_telemetry_service* telemetry_service)
     {
         int val = 0;
         example_ptr->add(1, 2, val);

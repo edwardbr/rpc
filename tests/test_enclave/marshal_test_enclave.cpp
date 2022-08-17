@@ -25,7 +25,7 @@
 
 using namespace marshalled_tests;
 
-class enclave_telemetry_service : public i_telemetry_service
+class enclave_telemetry_service : public rpc::i_telemetry_service
 {
 public:
     virtual ~enclave_telemetry_service() = default;
@@ -112,7 +112,7 @@ public:
         on_proxy_send_host(name, originating_zone_id, zone_id, object_id, interface_id, method_id);
     }
 
-    virtual void message(i_telemetry_service::level_enum level, const char* message) const
+    virtual void message(rpc::i_telemetry_service::level_enum level, const char* message) const
     {
         message_host(level, message);
     }
@@ -126,7 +126,7 @@ int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t child_zone_id, uin
 {
     //create a zone service for the enclave
     rpc_server = rpc::make_shared<rpc::child_service>(child_zone_id); 
-    const i_telemetry_service* p_telemetry_service = &telemetry_service;
+    const rpc::i_telemetry_service* p_telemetry_service = &telemetry_service;
     auto host_proxy = rpc::host_service_proxy::create(host_zone_id, rpc_server, p_telemetry_service);
     rpc_server->set_parent(host_proxy);
 

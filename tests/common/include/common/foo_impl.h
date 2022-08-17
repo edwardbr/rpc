@@ -12,9 +12,9 @@ namespace marshalled_tests
 {
     class baz : public xxx::i_baz
     {
-        const i_telemetry_service* telemetry_ = nullptr;
+        const rpc::i_telemetry_service* telemetry_ = nullptr;
     public:
-        baz(const i_telemetry_service* telemetry) : telemetry_(telemetry)
+        baz(const rpc::i_telemetry_service* telemetry) : telemetry_(telemetry)
         {
             if(telemetry_)
                 telemetry_->on_impl_creation("baz", xxx::i_baz::id);
@@ -34,9 +34,9 @@ namespace marshalled_tests
 
     class foo : public xxx::i_foo
     {
-        const i_telemetry_service* telemetry_ = nullptr;
+        const rpc::i_telemetry_service* telemetry_ = nullptr;
     public:
-        foo(const i_telemetry_service* telemetry) : telemetry_(telemetry)
+        foo(const rpc::i_telemetry_service* telemetry) : telemetry_(telemetry)
         {
             if(telemetry_)
                 telemetry_->on_impl_creation("foo", xxx::i_foo::id);
@@ -213,9 +213,9 @@ namespace marshalled_tests
     };
     class example : public yyy::i_example
     {
-        const i_telemetry_service* telemetry_ = nullptr;
+        const rpc::i_telemetry_service* telemetry_ = nullptr;
     public:
-        example(const i_telemetry_service* telemetry) : telemetry_(telemetry)
+        example(const rpc::i_telemetry_service* telemetry) : telemetry_(telemetry)
         {
             if(telemetry_)
                 telemetry_->on_impl_creation("example", yyy::i_example::id);

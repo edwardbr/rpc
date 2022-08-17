@@ -7,10 +7,10 @@ namespace rpc
     //This is for enclaves to call the host 
     class host_service_proxy : public service_proxy
     {
-        host_service_proxy(uint64_t host_zone_id, const rpc::shared_ptr<service>& operating_zone_service, const i_telemetry_service* telemetry_service);
+        host_service_proxy(uint64_t host_zone_id, const rpc::shared_ptr<service>& operating_zone_service, const rpc::i_telemetry_service* telemetry_service);
 
     public:
-        static rpc::shared_ptr<service_proxy> create(uint64_t host_zone_id, const rpc::shared_ptr<service>& operating_zone_service, const i_telemetry_service* telemetry_service)
+        static rpc::shared_ptr<service_proxy> create(uint64_t host_zone_id, const rpc::shared_ptr<service>& operating_zone_service, const rpc::i_telemetry_service* telemetry_service)
         {
             auto ret = rpc::shared_ptr<host_service_proxy>(new host_service_proxy(host_zone_id, operating_zone_service, telemetry_service));
             auto pthis = rpc::static_pointer_cast<service_proxy>(ret);

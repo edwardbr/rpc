@@ -11,7 +11,7 @@
 namespace rpc
 {
 #ifndef _IN_ENCLAVE
-    enclave_service_proxy::enclave_service_proxy(uint64_t zone_id, std::string filename, const rpc::shared_ptr<service>& operating_zone_service, const i_telemetry_service* telemetry_service)
+    enclave_service_proxy::enclave_service_proxy(uint64_t zone_id, std::string filename, const rpc::shared_ptr<service>& operating_zone_service, const rpc::i_telemetry_service* telemetry_service)
         : service_proxy(zone_id, operating_zone_service, telemetry_service)
         , filename_(filename)
     {

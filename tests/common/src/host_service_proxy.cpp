@@ -10,7 +10,7 @@
 namespace rpc
 {
     host_service_proxy::host_service_proxy(uint64_t host_zone_id, const rpc::shared_ptr<service>& operating_zone_service,
-                        const i_telemetry_service* telemetry_service)
+                        const rpc::i_telemetry_service* telemetry_service)
         : service_proxy(host_zone_id, operating_zone_service, telemetry_service)
     {
         if (auto* telemetry_service = get_telemetry_service(); telemetry_service)

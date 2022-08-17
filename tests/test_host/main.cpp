@@ -30,7 +30,7 @@ using namespace marshalled_tests;
 
 rpc::weak_ptr<rpc::service> current_host_service;
 
-const i_telemetry_service* telemetry_service = nullptr;
+const rpc::i_telemetry_service* telemetry_service = nullptr;
 
 int main()
 {
@@ -306,7 +306,7 @@ extern "C"
     void message_host(uint64_t level, const char* name)
     {
         if(telemetry_service)
-            telemetry_service->message((i_telemetry_service::level_enum)level, name);
+            telemetry_service->message((rpc::i_telemetry_service::level_enum)level, name);
     }  
 
 }

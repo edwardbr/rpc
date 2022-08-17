@@ -9,7 +9,7 @@ namespace rpc
     class local_service_proxy : public service_proxy
     {
         local_service_proxy(const rpc::shared_ptr<service>& serv,
-                            const i_telemetry_service* telemetry_service)
+                            const rpc::i_telemetry_service* telemetry_service)
             : service_proxy(serv, serv, telemetry_service)
         {
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
@@ -27,7 +27,7 @@ namespace rpc
             }
         }
         static rpc::shared_ptr<local_service_proxy> create(const rpc::shared_ptr<service>& serv,
-                                                           const i_telemetry_service* telemetry_service)
+                                                           const rpc::i_telemetry_service* telemetry_service)
         {
             auto ret = rpc::shared_ptr<local_service_proxy>(new local_service_proxy(serv, telemetry_service));
             auto pthis = rpc::static_pointer_cast<service_proxy>(ret);
@@ -73,7 +73,7 @@ namespace rpc
     {
         local_child_service_proxy(const rpc::shared_ptr<service>& serv,
                                   const rpc::shared_ptr<service>& operating_zone_service,
-                                  const i_telemetry_service* telemetry_service)
+                                  const rpc::i_telemetry_service* telemetry_service)
             : service_proxy(serv, operating_zone_service, telemetry_service)
         {
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
@@ -92,7 +92,7 @@ namespace rpc
         }
         static rpc::shared_ptr<local_child_service_proxy> create(const rpc::shared_ptr<service>& serv,
                                                                  const rpc::shared_ptr<service>& operating_zone_service,
-                                                                 const i_telemetry_service* telemetry_service)
+                                                                 const rpc::i_telemetry_service* telemetry_service)
         {
             auto ret = rpc::shared_ptr<local_child_service_proxy>(
                 new local_child_service_proxy(serv, operating_zone_service, telemetry_service));

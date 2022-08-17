@@ -8,7 +8,7 @@
 #include <rpc/i_telemetry_service.h>
 
 
-class host_telemetry_service : public i_telemetry_service
+class host_telemetry_service : public rpc::i_telemetry_service
 {
     struct name_count
     {
