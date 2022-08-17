@@ -198,7 +198,7 @@ namespace rpc
                         const rpc::i_telemetry_service* telemetry_service) : 
             service_(serv), 
             zone_id_(serv->get_zone_id()),
-            operating_zone_id(operating_zone_service->get_zone_id()),
+            operating_zone_id(operating_zone_service ? operating_zone_service->get_zone_id() : 0),
             operating_zone_service_(operating_zone_service),
             telemetry_service_(telemetry_service)
         {}
@@ -206,7 +206,7 @@ namespace rpc
                         const rpc::shared_ptr<service>& operating_zone_service,
                         const rpc::i_telemetry_service* telemetry_service) : 
             zone_id_(zone_id),
-            operating_zone_id(operating_zone_service->get_zone_id()),
+            operating_zone_id(operating_zone_service ? operating_zone_service->get_zone_id() : 0),
             operating_zone_service_(operating_zone_service),
             telemetry_service_(telemetry_service)
         {}
