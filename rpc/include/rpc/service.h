@@ -35,7 +35,7 @@ namespace rpc
         // hard lock on the root object
         mutable std::mutex insert_control;
     public:
-        service(uint64_t zone_id = ++zone_count) : zone_id_(zone_id){}
+        service(uint64_t zone_id = generate_new_zone_id()) : zone_id_(zone_id){}
         virtual ~service();
 
         // this function is needed by services where there is no shared pointer to this object, and its lifetime
@@ -43,6 +43,7 @@ namespace rpc
         virtual bool check_is_empty() const;
         uint64_t get_zone_id() const {return zone_id_;}
         void set_zone_id(uint64_t zone_id){zone_id_ = zone_id;}
+        static uint64_t generate_new_zone_id() { return ++zone_count; }
         uint64_t generate_new_object_id() const { return ++object_id_generator; }
 
         template<class T> uint64_t encapsulate_outbound_interfaces(const rpc::shared_ptr<T>& object);
