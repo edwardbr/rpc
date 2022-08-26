@@ -1327,6 +1327,7 @@ namespace enclave_marshaller
             header("#include <vector>");
             header("#include <map>");
             header("#include <string>");
+            header("#include <array>");
 
             header("#include <rpc/marshaller.h>");
             header("#include <rpc/service.h>");

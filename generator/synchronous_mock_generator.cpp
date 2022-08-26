@@ -125,6 +125,7 @@ namespace enclave_marshaller
             header("#include <vector>");
             header("#include <map>");
             header("#include <string>");
+            header("#include <array>");
 
             header("#include <gmock/gmock-actions.h>");
             header("#include <gmock/gmock.h>");
