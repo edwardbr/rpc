@@ -207,7 +207,8 @@ namespace rpc
         rpc::shared_ptr<service> get_operating_zone_service() const {return operating_zone_service_.lock();}
         const rpc::i_telemetry_service* get_telemetry_service(){return telemetry_service_;}
 
-        template<class T> int create_proxy(uint64_t object_id, rpc::shared_ptr<T>& val, uint64_t zone_id = 0)
+        template<class T> 
+        int create_proxy(uint64_t object_id, rpc::shared_ptr<T>& val, uint64_t zone_id = 0)
         {
             rpc::shared_ptr<object_proxy> op;
             {
