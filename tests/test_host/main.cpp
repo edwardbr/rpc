@@ -132,13 +132,18 @@ int main()
                 #endif
                 ASSERT(!err_code);
 
-                rpc::shared_ptr<marshalled_tests::xxx::i_baz> i_baz;
-                i_foo_ptr->create_baz_interface(i_baz);
+                rpc::shared_ptr<marshalled_tests::xxx::i_baz> baz;
+                i_foo_ptr->create_baz_interface(baz);
+                auto x = rpc::dynamic_pointer_cast<marshalled_tests::xxx::i_baz>(baz);
+//#bug 2 the clean up crashes
+//              auto y = rpc::dynamic_pointer_cast<marshalled_tests::xxx::i_bar>(baz);
+//              y->do_something_else(1);
+                auto z = rpc::dynamic_pointer_cast<marshalled_tests::xxx::i_foo>(baz);
 
                 rpc::shared_ptr<xxx::i_foo> i_foo_relay_ptr;
                 example_relay_ptr->create_foo(i_foo_relay_ptr);
 
-                i_foo_relay_ptr->call_baz_interface(i_baz);
+                i_foo_relay_ptr->call_baz_interface(baz);
             }
         }
         telemetry_service = nullptr;

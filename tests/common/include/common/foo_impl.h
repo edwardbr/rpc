@@ -10,7 +10,9 @@ void log(const std::string& data)
 
 namespace marshalled_tests
 {
-    class baz : public xxx::i_baz
+    class baz : 
+        public xxx::i_baz,
+        public xxx::i_bar
     {
         const rpc::i_telemetry_service* telemetry_ = nullptr;
     public:
@@ -28,6 +30,11 @@ namespace marshalled_tests
         int callback(int val)
         {            
             log(std::string("callback ") + std::to_string(val));
+            return 0;
+        }
+        error_code do_something_else(int val)
+        {
+            log(std::string("baz do_something_else"));
             return 0;
         }
     };
@@ -189,18 +196,23 @@ namespace marshalled_tests
         error_code recieve_interface(rpc::shared_ptr<i_foo>& val)
         {
             val = rpc::shared_ptr<xxx::i_foo>(new foo(telemetry_));
+            auto val1 = rpc::dynamic_pointer_cast<xxx::i_bar>(val);
             return 0;
         }
 
         error_code give_interface(rpc::shared_ptr<xxx::i_baz> baz)
         {
             baz->callback(22);
+            auto val1 = rpc::dynamic_pointer_cast<xxx::i_bar>(baz);
             return 0;
         }
 
         error_code call_baz_interface(const rpc::shared_ptr<xxx::i_baz>& val)
         {
             val->callback(22);
+            auto val1 = rpc::dynamic_pointer_cast<xxx::i_baz>(val);
+//#bug 1 in an enclave this fails
+//            auto val2 = rpc::dynamic_pointer_cast<xxx::i_bar>(val);
             return 0;
         }        
 
