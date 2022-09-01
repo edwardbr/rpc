@@ -9,12 +9,13 @@ function(EnclaveMarshaller
           namespace
           #multivalue expects string "dependencies"
           #multivalue expects string "include_paths"
+          #multivalue expects string "defines"
           #optional_val mock
           )
 
   set(options )
   set(singleValueArgs mock)
-  set(multiValueArgs dependencies include_paths)
+  set(multiValueArgs dependencies include_paths defines)
 
   #split out multivalue variables
   cmake_parse_arguments("params" "${options}" "${singleValueArgs}" "${multiValueArgs}" ${ARGN})          
@@ -36,7 +37,7 @@ function(EnclaveMarshaller
     message("namespace ${namespace}")
     message("dependencies ${params_dependencies}")
     message("paths ${params_include_paths}")
-    message("paths ${params_include_paths}")
+    message("defines ${params_defines}")
     message("mock ${params_mock}")
     message("full_header_path ${full_header_path}")
     message("full_proxy_path ${full_proxy_path}")
@@ -52,6 +53,10 @@ function(EnclaveMarshaller
   set(PATHS_PARAMS "")
   foreach (path ${params_include_paths})
     set(PATHS_PARAMS ${PATHS_PARAMS} --path "${path}")
+  endforeach()
+  
+  foreach (define ${params_defines})
+    set(PATHS_PARAMS ${PATHS_PARAMS} -D "${define}")
   endforeach()
 
   foreach (dep ${params_dependencies})
