@@ -232,6 +232,9 @@ namespace rpc
     template<class T>
     uint64_t proxy_base::encapsulate_outbound_interfaces(const rpc::shared_ptr<T>& iface)
     {
+        if(!iface)
+            return 0;
+            
         auto operating_service = object_proxy_->get_service_proxy()->get_operating_zone_service();
 
         //this is to check that an interface is belonging to another zone and not the operating zone
@@ -248,6 +251,8 @@ namespace rpc
     template<class T>
     uint64_t proxy_base::get_interface_zone_id(const rpc::shared_ptr<T>& iface)
     {
+        if(!iface)
+            return 0;
         //fist check if this shared pointer is a remote one
         auto* impl = dynamic_cast<rpc::proxy_impl<T>*>(iface.get());
         if(impl)

@@ -25,6 +25,7 @@ namespace enclave_marshaller
             STUB_MARSHALL_IN,
             STUB_PARAM_WRAP,
             STUB_PARAM_CAST,
+            STUB_ADD_REF_OUT_PREDECLARE,
             STUB_ADD_REF_OUT,
             STUB_MARSHALL_OUT
         };
@@ -262,9 +263,15 @@ namespace enclave_marshaller
             }
             case STUB_PARAM_WRAP:
                 return fmt::format(R"__(
-                    auto service_proxy_ = target_stub_.lock()->get_zone().get_zone_proxy({1}_zone_);
-                    {0} {1};
-                    service_proxy_->create_proxy({1}_object_, {1}, {1}_zone_);
+                {0} {1};
+				if(ret == rpc::error::OK() && {1}_zone_ && {1}_object_)
+                {{
+                    auto {1}_service_proxy_ = target_stub_.lock()->get_zone().get_zone_proxy({1}_zone_);
+                    if({1}_service_proxy_)
+                        {1}_service_proxy_->create_proxy({1}_object_, {1}, {1}_zone_);
+                    else
+                        ret = rpc::error::ZONE_NOT_FOUND();
+                }}
 )__",
                                    object_type, name);
             case STUB_PARAM_CAST:
@@ -299,9 +306,12 @@ namespace enclave_marshaller
                 return fmt::format("get_object_proxy()->get_service_proxy()->create_proxy({0}_, {0});", name);
             case PROXY_OUT_DECLARATION:
                 return fmt::format("uint64_t {}_ = 0;", name);
+            case STUB_ADD_REF_OUT_PREDECLARE:
+                return fmt::format(
+                    "uint64_t {0}_ = 0;", name);
             case STUB_ADD_REF_OUT:
                 return fmt::format(
-                    "uint64_t {0}_ = target_stub_.lock()->get_zone().encapsulate_outbound_interfaces({0});", name);
+                    "{0}_ = target_stub_.lock()->get_zone().encapsulate_outbound_interfaces({0});", name);
             case STUB_MARSHALL_OUT:
                 return fmt::format("  ,(\"_{}\", {}_)", count, name);
             default:
@@ -674,6 +684,7 @@ namespace enclave_marshaller
 
                     {
                         stub("//STUB_DEMARSHALL_DECLARATION");
+                        stub("int ret = rpc::error::OK();");
                         uint64_t count = 1;
                         for (auto& parameter : function.get_parameters())
                         {
@@ -763,8 +774,10 @@ namespace enclave_marshaller
                     }
 
                     stub("//STUB_PARAM_CAST");
+                    stub("if(ret == rpc::error::OK())");
+                    stub("{{");
                     stub.print_tabs();
-                    stub.raw("int ret = target_->{}(", function.get_name());
+                    stub.raw("ret = target_->{}(", function.get_name());
 
                     {
                         bool has_param = false;
@@ -785,9 +798,7 @@ namespace enclave_marshaller
                         }
                     }
                     stub.raw(");\n");
-                    stub("if(ret != rpc::error::OK())");
-                    stub("  return ret;");
-                    stub("");
+                    stub("}}");
 
                     {
                         uint64_t count = 1;
@@ -807,9 +818,25 @@ namespace enclave_marshaller
                         }
                     }
                     {
-                        stub("//STUB_ADD_REF_OUT");
-
+                        stub("//STUB_ADD_REF_OUT_PREDECLARE");
                         uint64_t count = 1;
+                        for (auto& parameter : function.get_parameters())
+                        {
+                            count++;
+                            std::string output;
+
+                            if (!is_out_call(STUB_ADD_REF_OUT_PREDECLARE, from_host, m_ob, parameter.get_name(),
+                                             parameter.get_type(), parameter.get_attributes(), count, output))
+                                continue;
+
+                            stub(output);
+                        }                        
+
+                        stub("//STUB_ADD_REF_OUT");
+                        stub("if(ret == rpc::error::OK())");
+                        stub("{{");      
+        
+                        count = 1;
                         for (auto& parameter : function.get_parameters())
                         {
                             count++;
@@ -821,6 +848,7 @@ namespace enclave_marshaller
 
                             stub(output);
                         }
+                        stub("}}");                        
                     }
                     {
                         uint64_t count = 1;
