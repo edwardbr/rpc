@@ -492,15 +492,8 @@ namespace enclave_marshaller
             {
                 if (referenceModifiers == "&")
                 {
-                    if (by_value)
-                    {
-                        output = renderer().render<renderer::BY_VALUE>(option, from_host, lib, name, in, out, is_const,
-                                                                       type_name, count);
-                    }
-                    else
-                    {
-                        throw std::runtime_error("passing data by reference as an out call is not possible");
-                    }
+                    output = renderer().render<renderer::BY_VALUE>(option, from_host, lib, name, in, out, is_const,
+                                                                    type_name, count);
                 }
                 else if (referenceModifiers == "&&")
                 {
