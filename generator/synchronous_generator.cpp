@@ -931,7 +931,7 @@ namespace enclave_marshaller
             auto interface_name = std::string(m_ob.get_type() == entity_type::LIBRARY ? "i_" : "") + m_ob.get_name();
             auto owner = m_ob.get_owner();
             std::string ns = interface_name;
-            while(owner)
+            while(!owner->get_name().empty())
             {
                 ns = owner->get_name() + "::" + ns;
                 owner = owner->get_owner();
