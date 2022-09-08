@@ -378,7 +378,7 @@ if(SGX_FOUND)
       COMMAND cmake -E copy_if_different ${EDL_U_C} ${EDL_UT_C}
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 
-    add_custom_target(${target}-create-header ALL DEPENDS ${EDL_UT_H}) # Used to avoid problems when in cyclic references e.g. add_dependencies(bft_raft_host_edl_calls secretarium_bft_raft_edl_host-create-header)
+    add_custom_target(${target}-create-header ALL DEPENDS ${EDL_UT_H}) # Used to avoid problems when in cyclic references e.g. add_dependencies(runtime_edl_host secretarium_bft_raft_edl_host-create-header)
 
     add_library(${target} STATIC ${EDL_UT_H} ${EDL_UT_C})
     #set_target_properties(${target} PROPERTIES COMPILE_FLAGS ${ENCLAVE_C_FLAGS})
