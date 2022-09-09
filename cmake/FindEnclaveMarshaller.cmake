@@ -1,4 +1,4 @@
-function(EnclaveMarshaller 
+function(EnclaveMarshaller
           name
           idl
           base_dir
@@ -18,10 +18,10 @@ function(EnclaveMarshaller
   set(multiValueArgs dependencies include_paths defines)
 
   #split out multivalue variables
-  cmake_parse_arguments("params" "${options}" "${singleValueArgs}" "${multiValueArgs}" ${ARGN})          
+  cmake_parse_arguments("params" "${options}" "${singleValueArgs}" "${multiValueArgs}" ${ARGN})
 
   cmake_path(APPEND base_dir ${idl} OUTPUT_VARIABLE idl)
-  
+
   set(full_header_path ${output_path}/include/${header})
   set(full_proxy_path ${output_path}/src/${proxy})
   set(full_stub_path ${output_path}/src/${stub})
@@ -54,7 +54,7 @@ function(EnclaveMarshaller
   foreach (path ${params_include_paths})
     set(PATHS_PARAMS ${PATHS_PARAMS} --path "${path}")
   endforeach()
-  
+
   foreach (define ${params_defines})
     set(PATHS_PARAMS ${PATHS_PARAMS} -D "${define}")
   endforeach()
@@ -64,7 +64,7 @@ function(EnclaveMarshaller
     if(dep_base_dir)
       set(PATHS_PARAMS ${PATHS_PARAMS} --path "${dep_base_dir}")
     endif()
-  endforeach()  
+  endforeach()
 
   if(NOT ${namespace} STREQUAL "")
     set(PATHS_PARAMS ${PATHS_PARAMS} --namespace "${namespace}")
@@ -77,15 +77,15 @@ function(EnclaveMarshaller
   if(${DEBUG_RPC_GEN})
     message("
     add_custom_command(OUTPUT ${full_header_path}  ${full_proxy_path} ${full_stub_path}
-    COMMAND ${ENCLAVE_MARSHALLER} 
-      --idl ${idl} 
+    COMMAND ${ENCLAVE_MARSHALLER}
+      --idl ${idl}
       --output_path ${output_path}
       --header ${header}
       --proxy ${proxy}
       --stub ${stub}
       ${PATHS_PARAMS}
-    MAIN_DEPENDENCY ${idl} 
-    IMPLICIT_DEPENDS ${idl} 
+    MAIN_DEPENDENCY ${idl}
+    IMPLICIT_DEPENDS ${idl}
     DEPENDS ${params_dependencies}
     COMMENT \"Running generator\"
   )
@@ -96,25 +96,25 @@ function(EnclaveMarshaller
   set_target_properties(${name}_generate PROPERTIES base_dir ${base_dir})
 
   add_library(${name} INTERFACE)
-  add_dependencies(${name} ${name}_generate)    
-  target_include_directories(${name} INTERFACE "${output_path}")    
+  add_dependencies(${name} ${name}_generate)
+  target_include_directories(${name} INTERFACE \"${output_path}\")
 
   if(DEFINED params_dependencies)
     target_link_libraries(${name} INTERFACE ${params_dependencies})
-  endif()  
+  endif()
 ")
   endif()
-  
+
   add_custom_command(OUTPUT ${full_header_path}  ${full_proxy_path} ${full_stub_path}
-    COMMAND ${ENCLAVE_MARSHALLER} 
-      --idl ${idl} 
+    COMMAND ${ENCLAVE_MARSHALLER}
+      --idl ${idl}
       --output_path ${output_path}
       --header ${header}
       --proxy ${proxy}
       --stub ${stub}
       ${PATHS_PARAMS}
-    MAIN_DEPENDENCY ${idl} 
-    IMPLICIT_DEPENDS ${idl} 
+    MAIN_DEPENDENCY ${idl}
+    IMPLICIT_DEPENDS ${idl}
     DEPENDS ${params_dependencies}
     COMMENT "Running generator"
   )
@@ -125,15 +125,15 @@ function(EnclaveMarshaller
   set_target_properties(${name}_generate PROPERTIES base_dir ${base_dir})
 
   add_library(${name} INTERFACE)
-  add_dependencies(${name} ${name}_generate)    
-  
-  foreach (dep ${params_dependencies})
-    add_dependencies(${name} ${dep}_generate)    
-  endforeach()  
+  add_dependencies(${name} ${name}_generate)
 
-  target_include_directories(${name} INTERFACE "$<BUILD_INTERFACE:${output_path}>" "$<BUILD_INTERFACE:${output_path}/include>")    
+  foreach (dep ${params_dependencies})
+    add_dependencies(${name} ${dep}_generate)
+  endforeach()
+
+  target_include_directories(${name} INTERFACE "$<BUILD_INTERFACE:${output_path}>" "$<BUILD_INTERFACE:${output_path}/include>")
 
   if(DEFINED params_dependencies)
     target_link_libraries(${name} INTERFACE ${params_dependencies})
-  endif()  
+  endif()
 endfunction()
