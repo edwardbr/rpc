@@ -1403,6 +1403,7 @@ namespace enclave_marshaller
             header("#include <memory>");
             header("#include <vector>");
             header("#include <map>");
+            header("#include <set>");
             header("#include <string>");
             header("#include <array>");
 
