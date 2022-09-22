@@ -67,6 +67,10 @@ int main()
                         // create the remote root object
                         rpc::shared_ptr<yyy::i_example> remote_ex(new example(telemetry_service));
                         branch_service->create_stub<yyy::i_example, yyy::i_example_stub>(remote_ex, &stub_id);
+
+                        //simple test to check that we can get a usefule local interface based on type and object id
+                        auto example_from_cast = branch_service->get_local_interface<yyy::i_example>(stub_id);
+                        assert(example_from_cast == remote_ex);
                     }
 
                     rpc::shared_ptr<yyy::i_example> i_example_ptr;

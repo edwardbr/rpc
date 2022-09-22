@@ -169,6 +169,17 @@ namespace rpc
         other_zones.erase(zone_id);
     }
 
+    rpc::shared_ptr<casting_interface> service::get_castable_interface(uint64_t object_id, uint64_t interface_id)
+    {
+        auto ob = get_object(object_id).lock();
+        if(!ob)
+            return nullptr;
+        auto interface_stub = ob->get_interface(interface_id);
+        if(!interface_stub)
+            return nullptr;
+        return interface_stub->get_castable_pointer();
+    }
+
     child_service::~child_service()
     {
         if(parent_service_)
@@ -220,5 +231,4 @@ namespace rpc
         }
         return proxy;
     }
-
 }

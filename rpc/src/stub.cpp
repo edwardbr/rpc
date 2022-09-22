@@ -19,6 +19,15 @@ namespace rpc
         stub_map[iface->get_interface_id()] = iface;
     }
 
+    rpc::shared_ptr<i_interface_stub> object_stub::get_interface(uint64_t interface_id)
+    {
+        std::lock_guard l(insert_control);
+        auto res = stub_map.find(interface_id);
+        if(res == stub_map.end())
+            return nullptr;
+        return res->second;
+    }
+
     int object_stub::call(uint64_t interface_id, uint64_t method_id, size_t in_size_, const char* in_buf_,
                                  std::vector<char>& out_buf_)
     {

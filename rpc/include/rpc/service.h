@@ -16,6 +16,10 @@ namespace rpc
     class object_stub;
     class service;
     class service_proxy;
+
+    //this do nothing class is for static pointer casting
+    class casting_interface
+    {};
     
     // responsible for all object lifetimes created within the zone
     class service : public i_marshaller
@@ -34,6 +38,7 @@ namespace rpc
 
         // hard lock on the root object
         mutable std::mutex insert_control;
+        rpc::shared_ptr<casting_interface> get_castable_interface(uint64_t object_id, uint64_t interface_id);
     public:
         service(uint64_t zone_id = generate_new_zone_id()) : zone_id_(zone_id){}
         virtual ~service();
@@ -63,6 +68,10 @@ namespace rpc
         virtual void add_zone_proxy(const rpc::shared_ptr<service_proxy>& zone);
         virtual rpc::shared_ptr<service_proxy> get_zone_proxy(uint64_t zone_id) const;
         virtual void remove_zone_proxy(uint64_t zone_id);
+        template<class T> rpc::shared_ptr<T> get_local_interface(uint64_t object_id)
+        {
+            return rpc::reinterpret_pointer_cast<T>(get_castable_interface(object_id, T::id));
+        }
     };
 
     //Child services need to maintain the lifetime of the root object in its zone 

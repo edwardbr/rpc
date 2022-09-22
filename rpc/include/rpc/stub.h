@@ -17,6 +17,7 @@ namespace rpc
     class object_stub;
     class service;
     class service_proxy;
+    class casting_interface;
 
     class object_stub
     {
@@ -51,6 +52,7 @@ namespace rpc
         int try_cast(uint64_t interface_id);
 
         void add_interface(const rpc::shared_ptr<i_interface_stub>& iface);
+        rpc::shared_ptr<i_interface_stub> get_interface(uint64_t interface_id);
 
         uint64_t add_ref();
         uint64_t release(std::function<void()> on_delete);
@@ -65,6 +67,7 @@ namespace rpc
         virtual int cast(uint64_t interface_id, rpc::shared_ptr<i_interface_stub>& new_stub) = 0;
         virtual rpc::weak_ptr<object_stub> get_object_stub() const = 0;
         virtual void* get_pointer() const = 0;
+        virtual rpc::shared_ptr<casting_interface> get_castable_pointer() const = 0;
     };
 
 }
