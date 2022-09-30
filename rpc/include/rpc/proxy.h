@@ -50,6 +50,25 @@ namespace rpc
         virtual ~proxy_impl() = default;
     };
 
+    //this bundle of joy implements a non locking pointer where if the remote object is not there
+    //it will return an error without crashing
+    template<class T> class optimistic_proxy_impl : public T
+    {
+        uint64_t object_id_;
+        uint64_t zone_id_;
+        rpc::weak_ptr<service_proxy> service_proxy_;
+    public:
+        optimistic_proxy_impl(rpc::shared_ptr<object_proxy> object_proxy)
+            : object_id_(object_proxy->get_object_id())
+            , zone_id_(object_proxy->get_zone_id())
+            , service_proxy_(object_proxy->get_service_proxy())
+        {}
+        virtual ~optimistic_proxy_impl() = default;
+        uint64_t get_object_id() const {return object_id_;}
+        uint64_t get_zone_id() const {return zone_id_;}
+        rpc::weak_ptr<service_proxy> get_service_proxy() const { return service_proxy_; }
+    };
+
     class object_proxy
     {
         uint64_t object_id_;

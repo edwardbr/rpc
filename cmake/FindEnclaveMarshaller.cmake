@@ -87,7 +87,7 @@ function(EnclaveMarshaller
     MAIN_DEPENDENCY ${idl}
     IMPLICIT_DEPENDS ${idl}
     DEPENDS ${params_dependencies}
-    COMMENT \"Running generator\"
+    COMMENT \"Running generator ${idl}\"
   )
 
   message(${name}_generate)
@@ -116,7 +116,7 @@ function(EnclaveMarshaller
     MAIN_DEPENDENCY ${idl}
     IMPLICIT_DEPENDS ${idl}
     DEPENDS ${params_dependencies}
-    COMMENT "Running generator"
+    COMMENT "Running generator ${idl}"
   )
 
   message(${name}_generate)
