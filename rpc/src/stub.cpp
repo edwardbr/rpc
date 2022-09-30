@@ -10,13 +10,17 @@ namespace rpc
     void* object_stub::get_pointer() const
     {
         assert(!stub_map.empty());
-        return stub_map.begin()->second->get_pointer();
+		auto sz = stub_map.size();
+		auto ptr = stub_map.begin()->second->get_pointer();
+		return pointer_;
     }
 
     void object_stub::add_interface(const rpc::shared_ptr<i_interface_stub>& iface)
     {
         std::lock_guard l(insert_control);
         stub_map[iface->get_interface_id()] = iface;
+		if (!pointer_)
+			pointer_ = iface->get_pointer();
     }
 
     rpc::shared_ptr<i_interface_stub> object_stub::get_interface(uint64_t interface_id)
@@ -60,6 +64,9 @@ namespace rpc
             if (ret == rpc::error::OK())
             {
                 stub_map.emplace(interface_id, std::move(new_stub));
+				if (!pointer_)
+					pointer_ = new_stub->get_pointer();
+
             }
         }
         return ret;
