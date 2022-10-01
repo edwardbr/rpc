@@ -10,8 +10,6 @@ namespace rpc
     void* object_stub::get_pointer() const
     {
         assert(!stub_map.empty());
-		auto sz = stub_map.size();
-		auto ptr = stub_map.begin()->second->get_pointer();
 		return pointer_;
     }
 
