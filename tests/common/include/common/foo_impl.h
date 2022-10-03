@@ -13,6 +13,13 @@ namespace marshalled_tests
     class baz : public xxx::i_baz
     {
         const rpc::i_telemetry_service* telemetry_ = nullptr;
+        void* get_address() const override { return (void*)this; }
+        rpc::casting_interface* query_interface(uint64_t interface_id) const override 
+        { 
+            if(xxx::i_baz::id == interface_id)
+                return (xxx::i_baz*)this; 
+            return nullptr;
+        }
     public:
         baz(const rpc::i_telemetry_service* telemetry) : telemetry_(telemetry)
         {
@@ -35,6 +42,13 @@ namespace marshalled_tests
     class foo : public xxx::i_foo
     {
         const rpc::i_telemetry_service* telemetry_ = nullptr;
+        void* get_address() const override { return (void*)this; }
+        rpc::casting_interface* query_interface(uint64_t interface_id) const override 
+        { 
+            if(xxx::i_foo::id == interface_id)
+                return (xxx::i_foo*)this; 
+            return nullptr;
+        }
     public:
         foo(const rpc::i_telemetry_service* telemetry) : telemetry_(telemetry)
         {
@@ -211,20 +225,73 @@ namespace marshalled_tests
             return 0;
         }
     };
+
+    class multiple_inheritance : 
+        public xxx::i_bar,
+        public xxx::i_baz
+    {
+        const rpc::i_telemetry_service* telemetry_ = nullptr;
+        
+        void* get_address() const override { return (void*)this; }
+        rpc::casting_interface* query_interface(uint64_t interface_id) const override 
+        { 
+            if(xxx::i_bar::id == interface_id)
+                return (xxx::i_bar*)this; 
+            if(xxx::i_baz::id == interface_id)
+                return (xxx::i_baz*)this; 
+            return nullptr;
+        }
+    public:
+        multiple_inheritance(const rpc::i_telemetry_service* telemetry) : telemetry_(telemetry)
+        {
+            if(telemetry_)
+                telemetry_->on_impl_creation("multiple_inheritance", xxx::i_bar::id);
+        }
+        virtual ~multiple_inheritance()
+        {
+            if(telemetry_)
+                telemetry_->on_impl_deletion("multiple_inheritance", xxx::i_bar::id);
+        }
+
+        error_code do_something_else(int val)
+        {
+            return 0;
+        }
+        int callback(int val)
+        {            
+            log(std::string("callback ") + std::to_string(val));
+            return 0;
+        }
+    };
+
     class example : public yyy::i_example
     {
         const rpc::i_telemetry_service* telemetry_ = nullptr;
+        void* get_address() const override { return (void*)this; }
+        rpc::casting_interface* query_interface(uint64_t interface_id) const override 
+        { 
+            if(yyy::i_example::id == interface_id)
+                return (yyy::i_example*)this; 
+            return nullptr;
+        }
     public:
         example(const rpc::i_telemetry_service* telemetry) : telemetry_(telemetry)
         {
             if(telemetry_)
                 telemetry_->on_impl_creation("example", yyy::i_example::id);
         }
-        ~example()
+        virtual ~example()
         {
             if(telemetry_)
                 telemetry_->on_impl_deletion("example", yyy::i_example::id);
         }
+        
+        error_code create_multiple_inheritance(rpc::shared_ptr<xxx::i_baz>& target) override
+        {
+            target = rpc::shared_ptr<xxx::i_baz>(new multiple_inheritance(telemetry_));
+            return 0;
+        }
+
         error_code create_foo(rpc::shared_ptr<xxx::i_foo>& target) override
         {
             target = rpc::shared_ptr<xxx::i_foo>(new foo(telemetry_));

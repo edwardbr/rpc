@@ -47,6 +47,17 @@ namespace rpc
             : proxy_base(object_proxy)
         {
         }
+        
+        virtual void* get_address() const
+        {
+            return (T*)this;
+        }   
+        rpc::casting_interface* query_interface(uint64_t interface_id) const override 
+        { 
+            if(T::id == interface_id)
+                return (T*)this; 
+            return nullptr;
+        }
         virtual ~proxy_impl() = default;
     };
 

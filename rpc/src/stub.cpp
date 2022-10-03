@@ -7,23 +7,20 @@ namespace rpc
         LOG("~object_stub",100);
     }
 
-    void* object_stub::get_pointer() const
+    rpc::shared_ptr<rpc::casting_interface> object_stub::get_castable_interface() const
     {
         assert(!stub_map.empty());
-		return pointer_;
+        auto& iface = stub_map.begin()->second;
+        return iface->get_castable_interface();
     }
 
     void object_stub::add_interface(const rpc::shared_ptr<i_interface_stub>& iface)
     {
-        std::lock_guard l(insert_control);
         stub_map[iface->get_interface_id()] = iface;
-		if (!pointer_)
-			pointer_ = iface->get_pointer();
     }
 
     rpc::shared_ptr<i_interface_stub> object_stub::get_interface(uint64_t interface_id)
     {
-        std::lock_guard l(insert_control);
         auto res = stub_map.find(interface_id);
         if(res == stub_map.end())
             return nullptr;
@@ -35,7 +32,6 @@ namespace rpc
     {
         rpc::shared_ptr<i_interface_stub> stub;
         {
-            std::lock_guard l(insert_control);
             auto item = stub_map.find(interface_id);
             if (item != stub_map.end())
             {
@@ -52,7 +48,6 @@ namespace rpc
     int object_stub::try_cast(uint64_t interface_id)
     {
         int ret = rpc::error::OK();
-        std::lock_guard l(insert_control);
         auto item = stub_map.find(interface_id);
         if (item == stub_map.end())
         {
@@ -61,10 +56,7 @@ namespace rpc
             ret = stub->cast(interface_id, new_stub);
             if (ret == rpc::error::OK())
             {
-                stub_map.emplace(interface_id, std::move(new_stub));
-				if (!pointer_)
-					pointer_ = new_stub->get_pointer();
-
+                add_interface(new_stub);
             }
         }
         return ret;
@@ -72,20 +64,13 @@ namespace rpc
 
     uint64_t object_stub::add_ref()
     {
-        std::lock_guard l(insert_control);
         uint64_t ret = reference_count++;
         return ret;
     }
 
-    uint64_t object_stub::release(std::function<void()> on_delete)
+    uint64_t object_stub::release()
     {
-        std::lock_guard l(insert_control);
         uint64_t count = reference_count--;
-        if (count == 0)
-        {
-            on_delete();
-            p_this.reset();
-        }
         return count;
     }
 

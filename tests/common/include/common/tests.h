@@ -158,29 +158,40 @@ namespace marshalled_tests
         int val = 0;
         example_ptr->add(1, 2, val);
 
-        // check the creation of an object that is passed back via interface
-        rpc::shared_ptr<xxx::i_foo> foo;
-        example_ptr->create_foo(foo);
-        foo->do_something_in_val(22);
-
-        // test casting logic
-        auto i_bar_ptr = rpc::dynamic_pointer_cast<xxx::i_bar>(foo);
-        if (i_bar_ptr)
-            i_bar_ptr->do_something_else(33);
-
-        // test recursive interface passing
-        rpc::shared_ptr<xxx::i_foo> other_foo;
-        int err_code = foo->recieve_interface(other_foo);
-        if (err_code != rpc::error::OK())
         {
-            std::cout << "create_foo failed\n";
-        }
-        else
-        {
-            other_foo->do_something_in_val(22);
-        }
+            // check the creation of an object that is passed back via interface
+            rpc::shared_ptr<xxx::i_foo> foo;
+            example_ptr->create_foo(foo);
+            foo->do_something_in_val(22);
 
-        rpc::shared_ptr<xxx::i_baz> b(new baz(telemetry_service));
-        err_code = foo->call_baz_interface(b);
+            // test casting logic
+            auto i_bar_ptr = rpc::dynamic_pointer_cast<xxx::i_bar>(foo);
+            assert(i_bar_ptr == nullptr);
+
+            // test recursive interface passing
+            rpc::shared_ptr<xxx::i_foo> other_foo;
+            int err_code = foo->recieve_interface(other_foo);
+            if (err_code != rpc::error::OK())
+            {
+                std::cout << "create_foo failed\n";
+            }
+            else
+            {
+                other_foo->do_something_in_val(22);
+            }
+
+            rpc::shared_ptr<xxx::i_baz> b(new baz(telemetry_service));
+            err_code = foo->call_baz_interface(b);
+        }
+        {
+            rpc::shared_ptr<xxx::i_baz> i_baz_ptr;
+            example_ptr->create_multiple_inheritance(i_baz_ptr);
+            auto i_bar_ptr1 = rpc::dynamic_pointer_cast<xxx::i_bar>(i_baz_ptr);
+            assert(i_bar_ptr1 != nullptr);
+            auto i_baz_ptr2 = rpc::dynamic_pointer_cast<xxx::i_baz>(i_bar_ptr1);
+            assert(i_baz_ptr2 != nullptr);
+            auto i_bar_ptr2 = rpc::dynamic_pointer_cast<xxx::i_bar>(i_baz_ptr2);
+            assert(i_bar_ptr2 != nullptr);
+        }
     }
 }
