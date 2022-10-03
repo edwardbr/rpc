@@ -7,5 +7,6 @@ namespace yyy
     {
         error_code add(int a, int b, [out, by_value] int& c);
         error_code create_foo([out]rpc::shared_ptr<xxx::i_foo>& target);
+        error_code create_multiple_inheritance([out]rpc::shared_ptr<xxx::i_baz>& target);
     };
 } 

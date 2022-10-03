@@ -560,7 +560,7 @@ namespace enclave_marshaller
                     i++;
                 }
             }
-            header("class {}{}", interface_name, base_class_declaration);
+            header("class {}{} : public rpc::casting_interface", interface_name, base_class_declaration);
             header("{{");
             header("public:");
             header("static constexpr uint64_t id = {}ull;", id);
@@ -942,7 +942,7 @@ namespace enclave_marshaller
 
             stub("if(interface_id == {}::id)", ns);
             stub("{{");
-            stub("auto* tmp = dynamic_cast<{0}*>(original->get_target().get());", ns);
+            stub("auto* tmp = static_cast<{0}*>(original->get_target()->query_interface({0}::id));", ns);
             stub("if(tmp != nullptr)");
             stub("{{");
             stub("rpc::shared_ptr<{}> tmp_ptr(original->get_target(), tmp);", ns);
@@ -1000,7 +1000,7 @@ namespace enclave_marshaller
             stub("");
             stub("uint64_t get_interface_id() const override {{ return {}::id; }};", interface_name);
             stub("rpc::shared_ptr<{}> get_target() const {{ return target_; }};", interface_name);
-            stub("virtual rpc::shared_ptr<rpc::casting_interface> get_castable_pointer() const override {{ return rpc::reinterpret_pointer_cast<rpc::casting_interface>(target_); }}", interface_name);
+            stub("virtual rpc::shared_ptr<rpc::casting_interface> get_castable_interface() const override {{ return rpc::static_pointer_cast<rpc::casting_interface>(target_); }}", interface_name);
 
             stub("rpc::weak_ptr<rpc::object_stub> get_object_stub() const override {{ return target_stub_;}}");
             stub("void* get_pointer() const override {{ return target_.get();}}");
@@ -1412,6 +1412,8 @@ namespace enclave_marshaller
             header("#include <rpc/marshaller.h>");
             header("#include <rpc/service.h>");
             header("#include <rpc/error_codes.h>");
+            header("#include <rpc/casting_interface.h>");
+            
 
             for (const auto& import : imports)
             {

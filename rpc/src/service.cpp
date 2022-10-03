@@ -73,17 +73,18 @@ namespace rpc
         }
     }
 
-    uint64_t service::add_lookup_stub(void* pointer,
+    uint64_t service::add_lookup_stub(rpc::casting_interface* iface,
                                       std::function<rpc::shared_ptr<i_interface_stub>(rpc::shared_ptr<object_stub>)> fn)
     {
         std::lock_guard g(insert_control);
+        auto* pointer = iface->get_address();
         auto item = wrapped_object_to_stub.find(pointer);
         if (item == wrapped_object_to_stub.end())
         {
             auto id = generate_new_object_id();
             auto stub = rpc::shared_ptr<object_stub>(new object_stub(id, *this));
-            rpc::shared_ptr<i_interface_stub> wrapped_interface = fn(stub);
-            stub->add_interface(wrapped_interface);
+            rpc::shared_ptr<i_interface_stub> interface_stub = fn(stub);
+            stub->add_interface(interface_stub);
             wrapped_object_to_stub[pointer] = stub;
             stubs[id] = stub;
             stub->on_added_to_zone(stub);
@@ -92,9 +93,10 @@ namespace rpc
         return item->second.lock()->get_id();
     }
 
-    int service::add_object(void* pointer, const rpc::shared_ptr<object_stub>& stub)
+    int service::add_object(const rpc::shared_ptr<object_stub>& stub)
     {
         std::lock_guard g(insert_control);
+        auto* pointer = stub->get_castable_interface()->get_address();
         assert(wrapped_object_to_stub.find(pointer) == wrapped_object_to_stub.end());
         auto stub_id = stub->get_id();
         assert(stubs.find(stub_id) == stubs.end());
@@ -135,17 +137,41 @@ namespace rpc
 
     uint64_t service::release(uint64_t zone_id, uint64_t object_id)
     {
-        rpc::weak_ptr<object_stub> weak_stub = get_object(object_id);
-        auto stub = weak_stub.lock();
+        std::lock_guard l(insert_control);
+        auto item = stubs.find(object_id);
+        if (item == stubs.end())
+        {
+            return -1;
+        }
+
+        auto stub = item->second.lock();
+
         if (!stub)
             return -1;
-        uint64_t ret = stub->release([&]() {
-            std::lock_guard l(insert_control);
-            stubs.erase(stub->get_id());
-            wrapped_object_to_stub.erase(stub->get_pointer());
-        });
+        uint64_t count = stub->release();
+        if(!count)
+        {
+            {
+                auto it = stubs.find(stub->get_id());
+                if(it != stubs.end())
+                    stubs.erase(it);
+                else
+                    assert(false);
+            }
+            {
+                auto* pointer = stub->get_castable_interface()->get_address();
+                auto it = wrapped_object_to_stub.find(pointer);
+                if(it != wrapped_object_to_stub.end())
+                {
+                    wrapped_object_to_stub.erase(it);
+                }
+                else
+                    assert(false);
+            }
+            stub->reset();        
+        }
 
-        return ret;
+        return count;
     }
 
     void service::add_zone_proxy(const rpc::shared_ptr<service_proxy>& service_proxy)
@@ -177,7 +203,7 @@ namespace rpc
         auto interface_stub = ob->get_interface(interface_id);
         if(!interface_stub)
             return nullptr;
-        return interface_stub->get_castable_pointer();
+        return interface_stub->get_castable_interface();
     }
 
     child_service::~child_service()
