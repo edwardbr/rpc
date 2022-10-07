@@ -1013,7 +1013,7 @@ namespace enclave_marshaller
 
         void write_struct_forward_declaration(const class_entity& m_ob, writer& header)
         {
-            if (!m_ob.get_template_params().empty())
+            if (m_ob.get_is_template())
             {
                 header.print_tabs();
                 header.raw("template<");
@@ -1064,7 +1064,7 @@ namespace enclave_marshaller
                     i++;
                 }
             }
-            if (!m_ob.get_template_params().empty())
+            if (m_ob.get_is_template())
             {
                 header.print_tabs();
                 header.raw("template<");
@@ -1090,6 +1090,8 @@ namespace enclave_marshaller
                 header.raw("{} {}", field.get_return_type(), field.get_name());
                 if (field.get_array_size())
                     header.raw("[{}]", field.get_array_size());
+                if (field.get_array_string().size())
+                    header.raw("[{}]", field.get_array_string());
                 if (!field.get_default_value().empty())
                 {
                     header.raw(" = {}::{};\n", field.get_return_type(), field.get_default_value());
