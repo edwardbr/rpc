@@ -1088,8 +1088,6 @@ namespace enclave_marshaller
 
                 header.print_tabs();
                 header.raw("{} {}", field.get_return_type(), field.get_name());
-                if (field.get_array_size())
-                    header.raw("[{}]", field.get_array_size());
                 if (field.get_array_string().size())
                     header.raw("[{}]", field.get_array_string());
                 if (!field.get_default_value().empty())
