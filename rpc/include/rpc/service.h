@@ -20,7 +20,9 @@ namespace rpc
     class service_proxy;
     
     // responsible for all object lifetimes created within the zone
-    class service : public i_marshaller
+    class service : 
+        public i_marshaller,
+        public rpc::enable_shared_from_this<service>
     {
     protected:
         static std::atomic<uint64_t> zone_count;
@@ -49,12 +51,12 @@ namespace rpc
         static uint64_t generate_new_zone_id() { return ++zone_count; }
         uint64_t generate_new_object_id() const { return ++object_id_generator; }
 
-        template<class T> uint64_t encapsulate_outbound_interfaces(const rpc::shared_ptr<T>& object);
+        template<class T> rpc::encapsulated_interface encapsulate_outbound_interfaces(const rpc::shared_ptr<T>& object);
 
         int send(uint64_t zone_id, uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_,
                         const char* in_buf_, std::vector<char>& out_buf_) override;
 
-        uint64_t add_lookup_stub(rpc::casting_interface* pointer,
+        encapsulated_interface add_lookup_stub(rpc::casting_interface* pointer,
                                  std::function<rpc::shared_ptr<i_interface_stub>(rpc::shared_ptr<object_stub>)> fn);
         int add_object(const rpc::shared_ptr<object_stub>& stub);
         rpc::weak_ptr<object_stub> get_object(uint64_t object_id) const;
@@ -64,7 +66,8 @@ namespace rpc
         uint64_t release(uint64_t zone_id, uint64_t object_id) override;
 
         virtual void add_zone_proxy(const rpc::shared_ptr<service_proxy>& zone);
-        virtual rpc::shared_ptr<service_proxy> get_zone_proxy(uint64_t zone_id) const;
+        //void service::add_zone_proxy(const rpc::shared_ptr<service_proxy>& service_proxy, uint64_t zone_id);//this is to make one zone be a relay to another
+        virtual rpc::shared_ptr<service_proxy> get_zone_proxy(uint64_t zone_id);
         virtual void remove_zone_proxy(uint64_t zone_id);
         template<class T> rpc::shared_ptr<T> get_local_interface(uint64_t object_id)
         {
@@ -111,6 +114,6 @@ namespace rpc
         virtual void cleanup() override;
         bool check_is_empty() const override;
         uint64_t get_root_object_id() const;
-        rpc::shared_ptr<service_proxy> get_zone_proxy(uint64_t zone_id) const override;
+        rpc::shared_ptr<service_proxy> get_zone_proxy(uint64_t zone_id) override;
     };
 }

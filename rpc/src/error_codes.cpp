@@ -20,6 +20,7 @@ namespace rpc
         int ZONE_NOT_SUPPORTED(){return offset_val + (offset_val_is_negative ? - 9 : 9);}
         int ZONE_NOT_INITIALISED(){return offset_val + (offset_val_is_negative ? - 10 : 10);}
         int ZONE_NOT_FOUND(){return offset_val + (offset_val_is_negative ? - 11 : 11);}
+        int OBJECT_NOT_FOUND(){return offset_val + (offset_val_is_negative ? - 12 : 12);}
 
         void set_OK_val(int val){OK_val = val;}
         void set_offset_val(int val){offset_val = val;}
