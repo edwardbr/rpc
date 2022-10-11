@@ -241,7 +241,7 @@ namespace enclave_marshaller
             case PROXY_MARSHALL_IN:
             {
                 auto ret = fmt::format(
-                    ",(\"_{1}\", encapsulate_outbound_interfaces({0}))",
+                    ",(\"_{1}\", encapsulate_outbound_interfaces({0}, false))",
                     name, count);
                 count++;
                 return ret;
@@ -308,7 +308,7 @@ namespace enclave_marshaller
                     "rpc::encapsulated_interface {0}_;", name);
             case STUB_ADD_REF_OUT:
                 return fmt::format(
-                    "{0}_ = target_stub_.lock()->get_zone().encapsulate_outbound_interfaces({0});", name);
+                    "{0}_ = target_stub_.lock()->get_zone().encapsulate_outbound_interfaces({0}, true);", name);
             case STUB_MARSHALL_OUT:
                 return fmt::format("  ,(\"_{}\", {}_)", count, name);
             default:
@@ -1137,7 +1137,7 @@ namespace enclave_marshaller
             int id = 1;
             header("template<> rpc::encapsulated_interface "
                    "rpc::service::encapsulate_outbound_interfaces(const rpc::shared_ptr<{}{}>& "
-                   "iface);",
+                   "iface, bool add_ref);",
                    ns, interface_name);
         }
 
@@ -1167,20 +1167,15 @@ namespace enclave_marshaller
             proxy("");
 
             stub("template<> rpc::encapsulated_interface rpc::service::encapsulate_outbound_interfaces(const rpc::shared_ptr<{}{}>& "
-                 "iface)",
+                 "iface, bool add_ref)",
                  ns, interface_name);
             stub("{{");
 
-/*            stub("auto* marshaller = dynamic_cast<rpc::i_interface_stub*>(iface.get());");
-            stub("if(marshaller)");
-            stub("{{");
-            stub("return marshaller->get_object_stub().lock()->get_id();");
-            stub("}}");*/
-            stub("return add_lookup_stub(iface.get(), [&](const rpc::shared_ptr<rpc::object_stub>& stub) -> "
+            stub("return find_or_create_stub(iface.get(), [&](const rpc::shared_ptr<rpc::object_stub>& stub) -> "
                  "rpc::shared_ptr<rpc::i_interface_stub>{{");
             stub("return rpc::static_pointer_cast<rpc::i_interface_stub>({}{}_stub::create(iface, stub));", ns,
                  interface_name);
-            stub("}});");
+            stub("}}, add_ref);");
             stub("}}");
         }
 

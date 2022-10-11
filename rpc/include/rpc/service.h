@@ -51,13 +51,14 @@ namespace rpc
         static uint64_t generate_new_zone_id() { return ++zone_count; }
         uint64_t generate_new_object_id() const { return ++object_id_generator; }
 
-        template<class T> rpc::encapsulated_interface encapsulate_outbound_interfaces(const rpc::shared_ptr<T>& object);
+        template<class T> rpc::encapsulated_interface encapsulate_outbound_interfaces(const rpc::shared_ptr<T>& object, bool add_ref);
 
         int send(uint64_t zone_id, uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_,
                         const char* in_buf_, std::vector<char>& out_buf_) override;
 
-        encapsulated_interface add_lookup_stub(rpc::casting_interface* pointer,
-                                 std::function<rpc::shared_ptr<i_interface_stub>(rpc::shared_ptr<object_stub>)> fn);
+        encapsulated_interface find_or_create_stub(rpc::casting_interface* pointer,
+                                 std::function<rpc::shared_ptr<i_interface_stub>(rpc::shared_ptr<object_stub>)> fn,
+                                 bool add_ref);
         int add_object(const rpc::shared_ptr<object_stub>& stub);
         rpc::weak_ptr<object_stub> get_object(uint64_t object_id) const;
 
