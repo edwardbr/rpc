@@ -73,10 +73,17 @@ namespace rpc
         }
     }
 
-    uint64_t service::add_lookup_stub(rpc::casting_interface* iface,
+    encapsulated_interface service::add_lookup_stub(rpc::casting_interface* iface,
                                       std::function<rpc::shared_ptr<i_interface_stub>(rpc::shared_ptr<object_stub>)> fn)
     {
         std::lock_guard g(insert_control);
+        auto proxy_base = iface->query_proxy_base();
+        if(proxy_base)
+        {
+            auto object_proxy = proxy_base->get_object_proxy();
+            return {object_proxy->get_object_id(), object_proxy->get_zone_id()};
+        }
+
         auto* pointer = iface->get_address();
         auto item = wrapped_object_to_stub.find(pointer);
         if (item == wrapped_object_to_stub.end())
@@ -88,9 +95,10 @@ namespace rpc
             wrapped_object_to_stub[pointer] = stub;
             stubs[id] = stub;
             stub->on_added_to_zone(stub);
-            return id;
+            return {id, get_zone_id()};
         }
-        return item->second.lock()->get_id();
+        auto obj = item->second.lock();
+        return {obj->get_id(), obj->get_zone().get_zone_id()};
     }
 
     int service::add_object(const rpc::shared_ptr<object_stub>& stub)
@@ -119,11 +127,31 @@ namespace rpc
     }
     int service::try_cast(uint64_t zone_id, uint64_t object_id, uint64_t interface_id)
     {
-        rpc::weak_ptr<object_stub> weak_stub = get_object(object_id);
-        auto stub = weak_stub.lock();
-        if (!stub)
-            return error::INVALID_DATA();
-        return stub->try_cast(interface_id);
+        if(zone_id != get_zone_id())
+        {
+            rpc::shared_ptr<service_proxy> other_zone;
+            {
+                std::lock_guard g(insert_control);
+                auto found = other_zones.find(zone_id);
+                if(found != other_zones.end())
+                {
+                    other_zone = found->second.lock();
+                }
+            }
+            if(!other_zone)
+            {
+                return rpc::error::ZONE_NOT_SUPPORTED();
+            }
+            return other_zone->try_cast(zone_id, object_id, interface_id);
+        }
+        else
+        {
+            rpc::weak_ptr<object_stub> weak_stub = get_object(object_id);
+            auto stub = weak_stub.lock();
+            if (!stub)
+                return error::INVALID_DATA();
+            return stub->try_cast(interface_id);
+        }
     }
 
     uint64_t service::add_ref(uint64_t zone_id, uint64_t object_id)
@@ -180,7 +208,13 @@ namespace rpc
         std::lock_guard g(insert_control);
         other_zones[service_proxy->get_zone_id()] = service_proxy;
     }
-    rpc::shared_ptr<service_proxy> service::get_zone_proxy(uint64_t zone_id) const
+    /*void service::add_zone_proxy(const rpc::shared_ptr<service_proxy>& service_proxy, uint64_t zone_id)
+    {
+        assert(zone_id != zone_id_);
+        std::lock_guard g(insert_control);
+        other_zones[zone_id] = service_proxy;
+    }*/
+    rpc::shared_ptr<service_proxy> service::get_zone_proxy(uint64_t zone_id)
     {
         std::lock_guard g(insert_control);
         auto item = other_zones.find(zone_id);
@@ -248,12 +282,13 @@ namespace rpc
         return stub->get_id();
     }
 
-    rpc::shared_ptr<service_proxy> child_service::get_zone_proxy(uint64_t zone_id) const
+    rpc::shared_ptr<service_proxy> child_service::get_zone_proxy(uint64_t zone_id)
     {
         auto proxy = service::get_zone_proxy(zone_id);
         if(!proxy)
         {
-            proxy = parent_service_;
+            proxy = parent_service_->clone_for_zone(zone_id);
+            add_zone_proxy(proxy);
         }
         return proxy;
     }

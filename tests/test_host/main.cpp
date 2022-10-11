@@ -74,7 +74,7 @@ int main()
                     }
 
                     rpc::shared_ptr<yyy::i_example> i_example_ptr;
-                    ASSERT(!local_child_service_proxy->create_proxy(stub_id, i_example_ptr));
+                    ASSERT(!local_child_service_proxy->create_proxy({stub_id, branch_service->get_zone_id()}, i_example_ptr));
 
                     rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
                     int err_code = i_example_ptr->create_foo(i_foo_ptr);
