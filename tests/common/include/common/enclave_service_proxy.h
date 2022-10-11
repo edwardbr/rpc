@@ -12,7 +12,7 @@ namespace rpc
         int initialise_enclave(rpc::shared_ptr<object_proxy>& proxy);
 
        
-        virtual rpc::shared_ptr<service_proxy> clone_for_zone(uint64_t zone_id)
+        rpc::shared_ptr<service_proxy> clone_for_zone(uint64_t zone_id) override
         {
             assert(false);//this class needs a shared pointer to the enclave id. otherwise the first instance will break for both
             auto ret = rpc::make_shared<enclave_service_proxy>(*this);

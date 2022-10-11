@@ -32,7 +32,7 @@ namespace marshalled_tests
             if(telemetry_)
                 telemetry_->on_impl_deletion("baz", xxx::i_baz::id);
         }
-        int callback(int val)
+        int callback(int val) override
         {            
             log(std::string("callback ") + std::to_string(val));
             return 0;
@@ -60,166 +60,166 @@ namespace marshalled_tests
             if(telemetry_)
                 telemetry_->on_impl_deletion("foo", xxx::i_foo::id);
         }
-        error_code do_something_in_val(int val)
+        error_code do_something_in_val(int val) override
         {
             log(std::string("got ") + std::to_string(val));
             return 0;
         }
-        error_code do_something_in_ref(const int& val)
+        error_code do_something_in_ref(const int& val) override
         {
             log(std::string("got ") + std::to_string(val));
             return 0;
         }
-        error_code do_something_in_by_val_ref(const int& val)
+        error_code do_something_in_by_val_ref(const int& val) override
         {
             log(std::string("got ") + std::to_string(val));
             return 0;
         }
-        error_code do_something_in_move_ref(int&& val)
+        error_code do_something_in_move_ref(int&& val) override
         {
             log(std::string("got ") + std::to_string(val));
             return 0;
         }
-        error_code do_something_in_ptr(const int* val)
+        error_code do_something_in_ptr(const int* val) override
         {
             log(std::string("got ") + std::to_string(*val));
             return 0;
         }
-        error_code do_something_out_val(int& val)
+        error_code do_something_out_val(int& val) override
         {
             val = 33;
             return 0;
         };
-        error_code do_something_out_ptr_ref(int*& val)
+        error_code do_something_out_ptr_ref(int*& val) override
         {
             val = new int(33);
             return 0;
         }
-        error_code do_something_out_ptr_ptr(int** val)
+        error_code do_something_out_ptr_ptr(int** val) override
         {
             *val = new int(33);
             return 0;
         }
-        error_code do_something_in_out_ref(int& val)
+        error_code do_something_in_out_ref(int& val) override
         {
             log(std::string("got ") + std::to_string(val));
             val = 33;
             return 0;
         }
-        error_code give_something_complicated_val(const xxx::something_complicated val)
+        error_code give_something_complicated_val(const xxx::something_complicated val) override
         {
             log(std::string("got ") + std::to_string(val.int_val));
             return 0;
         }
-        error_code give_something_complicated_ref(const xxx::something_complicated& val)
+        error_code give_something_complicated_ref(const xxx::something_complicated& val) override
         {
             log(std::string("got ") + std::to_string(val.int_val));
             return 0;
         }
-        error_code give_something_complicated_ref_val(const xxx::something_complicated& val)
+        error_code give_something_complicated_ref_val(const xxx::something_complicated& val) override
         {
             log(std::string("got ") + std::to_string(val.int_val));
             return 0;
         }
-        error_code give_something_complicated_move_ref(xxx::something_complicated&& val)
+        error_code give_something_complicated_move_ref(xxx::something_complicated&& val) override
         {
             log(std::string("got ") + std::to_string(val.int_val));
             return 0;
         }
-        error_code give_something_complicated_ptr(const xxx::something_complicated* val)
+        error_code give_something_complicated_ptr(const xxx::something_complicated* val) override
         {
             log(std::string("got ") + std::to_string(val->int_val));
             return 0;
         }
-        error_code recieve_something_complicated_ref(xxx::something_complicated& val)
+        error_code recieve_something_complicated_ref(xxx::something_complicated& val) override
         {
             val = xxx::something_complicated {33, "22"};
             return 0;
         }
-        error_code recieve_something_complicated_ptr(xxx::something_complicated*& val)
+        error_code recieve_something_complicated_ptr(xxx::something_complicated*& val) override
         {
             val = new xxx::something_complicated {33, "22"};
             return 0;
         }
-        error_code recieve_something_complicated_in_out_ref(xxx::something_complicated& val)
+        error_code recieve_something_complicated_in_out_ref(xxx::something_complicated& val) override
         {
             log(std::string("got ") + std::to_string(val.int_val));
             val.int_val = 33;
             return 0;
         }
-        error_code give_something_more_complicated_val(const xxx::something_more_complicated val)
+        error_code give_something_more_complicated_val(const xxx::something_more_complicated val) override
         {
             log(std::string("got ") + val.map_val.begin()->first);
             return 0;
         }
-        error_code give_something_more_complicated_ref(const xxx::something_more_complicated& val)
+        error_code give_something_more_complicated_ref(const xxx::something_more_complicated& val) override
         {
             log(std::string("got ") + val.map_val.begin()->first);
             return 0;
         }
-        error_code give_something_more_complicated_move_ref(xxx::something_more_complicated&& val)
+        error_code give_something_more_complicated_move_ref(xxx::something_more_complicated&& val) override
         {
             log(std::string("got ") + val.map_val.begin()->first);
             return 0;
         }
-        error_code give_something_more_complicated_ref_val(const xxx::something_more_complicated& val)
+        error_code give_something_more_complicated_ref_val(const xxx::something_more_complicated& val) override
         {
             log(std::string("got ") + val.map_val.begin()->first);
             return 0;
         }
-        error_code give_something_more_complicated_ptr(const xxx::something_more_complicated* val)
+        error_code give_something_more_complicated_ptr(const xxx::something_more_complicated* val) override
         {
             log(std::string("got ") + val->map_val.begin()->first);
             return 0;
         }
-        error_code recieve_something_more_complicated_ref(xxx::something_more_complicated& val)
+        error_code recieve_something_more_complicated_ref(xxx::something_more_complicated& val) override
         {
             val.map_val["22"] = xxx::something_complicated {33, "22"};
             return 0;
         }
-        error_code recieve_something_more_complicated_ptr(xxx::something_more_complicated*& val)
+        error_code recieve_something_more_complicated_ptr(xxx::something_more_complicated*& val) override
         {
             val = new xxx::something_more_complicated();
             val->map_val["22"] = xxx::something_complicated {33, "22"};
             return 0;
         }
-        error_code recieve_something_more_complicated_in_out_ref(xxx::something_more_complicated& val)
+        error_code recieve_something_more_complicated_in_out_ref(xxx::something_more_complicated& val) override
         {
             log(std::string("got ") + val.map_val.begin()->first);
             val.map_val["22"] = xxx::something_complicated {33, "23"};
             return 0;
         }
-        error_code do_multi_val(int val1, int val2)
+        error_code do_multi_val(int val1, int val2) override
         {
             log(std::string("got ") + std::to_string(val1));
             return 0;
         }
-        error_code do_multi_complicated_val(const xxx::something_more_complicated val1, const xxx::something_more_complicated val2)
+        error_code do_multi_complicated_val(const xxx::something_more_complicated val1, const xxx::something_more_complicated val2) override
         {
             log(std::string("got ") + val1.map_val.begin()->first);
             return 0;
         }
 
-        error_code recieve_interface(rpc::shared_ptr<i_foo>& val)
+        error_code recieve_interface(rpc::shared_ptr<i_foo>& val) override
         {
             val = rpc::shared_ptr<xxx::i_foo>(new foo(telemetry_));
             return 0;
         }
 
-        error_code give_interface(rpc::shared_ptr<xxx::i_baz> baz)
+        error_code give_interface(rpc::shared_ptr<xxx::i_baz> baz) override
         {
             baz->callback(22);
             return 0;
         }
 
-        error_code call_baz_interface(const rpc::shared_ptr<xxx::i_baz>& val)
+        error_code call_baz_interface(const rpc::shared_ptr<xxx::i_baz>& val) override
         {
             val->callback(22);
             return 0;
         }        
 
         
-        error_code create_baz_interface(rpc::shared_ptr<xxx::i_baz>& val)
+        error_code create_baz_interface(rpc::shared_ptr<xxx::i_baz>& val) override
         {
             val = rpc::shared_ptr<xxx::i_baz>(new baz(telemetry_));
             return 0;
@@ -253,11 +253,11 @@ namespace marshalled_tests
                 telemetry_->on_impl_deletion("multiple_inheritance", xxx::i_bar::id);
         }
 
-        error_code do_something_else(int val)
+        error_code do_something_else(int val) override
         {
             return 0;
         }
-        int callback(int val)
+        int callback(int val) override
         {            
             log(std::string("callback ") + std::to_string(val));
             return 0;

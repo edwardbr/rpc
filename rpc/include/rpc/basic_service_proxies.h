@@ -17,7 +17,7 @@ namespace rpc
                 telemetry_service->on_service_proxy_creation("local_service_proxy", get_operating_zone_id(), get_zone_id());
             }
         }
-        virtual rpc::shared_ptr<service_proxy> clone_for_zone(uint64_t zone_id)
+        rpc::shared_ptr<service_proxy> clone_for_zone(uint64_t zone_id) override
         {
             auto ret = rpc::make_shared<local_service_proxy>(*this);
             ret->set_zone_id(zone_id);
@@ -90,7 +90,7 @@ namespace rpc
             }
         }
 
-        virtual rpc::shared_ptr<service_proxy> clone_for_zone(uint64_t zone_id)
+        rpc::shared_ptr<service_proxy> clone_for_zone(uint64_t zone_id) override
         {
             auto ret = rpc::make_shared<local_child_service_proxy>(*this);
             ret->set_zone_id(zone_id);
