@@ -32,7 +32,7 @@ namespace rpc
         rpc::shared_ptr<object_proxy> get_object_proxy() const { return object_proxy_; }
 
         template<class T>
-        encapsulated_interface encapsulate_outbound_interfaces(const rpc::shared_ptr<T>& iface);
+        encapsulated_interface encapsulate_outbound_interfaces(const rpc::shared_ptr<T>& iface, bool add_ref);
 
         template<class T>
         uint64_t get_interface_zone_id(const rpc::shared_ptr<T>& iface);
@@ -283,7 +283,7 @@ namespace rpc
 
     //declared here as object_proxy and service_proxy is not fully defined in the body of proxy_base
     template<class T>
-    encapsulated_interface proxy_base::encapsulate_outbound_interfaces(const rpc::shared_ptr<T>& iface)
+    encapsulated_interface proxy_base::encapsulate_outbound_interfaces(const rpc::shared_ptr<T>& iface, bool add_ref)
     {
         if(!iface)
             return {0,0};
@@ -298,7 +298,7 @@ namespace rpc
         }
 
         //else encapsulate away
-        return operating_service->encapsulate_outbound_interfaces(iface);
+        return operating_service->encapsulate_outbound_interfaces(iface, add_ref);
     }
 
     template<class T>
