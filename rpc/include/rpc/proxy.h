@@ -50,7 +50,7 @@ namespace rpc
         {
         }
         
-        virtual void* get_address() const
+        virtual void* get_address() const override
         {
             return (T*)this;
         }   
