@@ -11,7 +11,17 @@ namespace rpc
         enclave_service_proxy(uint64_t zone_id, std::string filename, const rpc::shared_ptr<service>& operating_zone_service, const rpc::i_telemetry_service* telemetry_service);
         int initialise_enclave(rpc::shared_ptr<object_proxy>& proxy);
 
+       
+        rpc::shared_ptr<service_proxy> clone_for_zone(uint64_t zone_id) override
+        {
+            assert(false);//this class needs a shared pointer to the enclave id. otherwise the first instance will break for both
+            auto ret = rpc::make_shared<enclave_service_proxy>(*this);
+            ret->set_zone_id(zone_id);
+            return ret;
+        }
     public:
+        enclave_service_proxy(const enclave_service_proxy& other) = default;
+
         template<class T>
         static int create(uint64_t zone_id, std::string filename, const rpc::shared_ptr<service>& operating_zone_service, rpc::shared_ptr<T>& root_object, const rpc::i_telemetry_service* telemetry_service)
         {

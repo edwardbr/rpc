@@ -2,6 +2,7 @@
 
 #include <string>
 #include <memory>
+#include <map>
 #include <unordered_map>
 #include <mutex>
 #include <assert.h>
@@ -9,6 +10,7 @@
 
 #include <rpc/marshaller.h>
 #include <rpc/remote_pointer.h>
+#include <rpc/casting_interface.h>
 
 namespace rpc
 {
@@ -16,13 +18,11 @@ namespace rpc
     class object_stub;
     class service;
     class service_proxy;
-
-    //this do nothing class is for static pointer casting
-    class casting_interface
-    {};
     
     // responsible for all object lifetimes created within the zone
-    class service : public i_marshaller
+    class service : 
+        public i_marshaller,
+        public rpc::enable_shared_from_this<service>
     {
     protected:
         static std::atomic<uint64_t> zone_count;
@@ -32,7 +32,7 @@ namespace rpc
         // map object_id's to stubs
         std::unordered_map<uint64_t, rpc::weak_ptr<object_stub>> stubs;
         // map wrapped objects pointers to stubs
-        std::unordered_map<void*, rpc::weak_ptr<object_stub>> wrapped_object_to_stub;
+        std::map<void*, rpc::weak_ptr<object_stub>> wrapped_object_to_stub;
 
         std::unordered_map<uint64_t, rpc::weak_ptr<service_proxy>> other_zones;
 
@@ -51,14 +51,15 @@ namespace rpc
         static uint64_t generate_new_zone_id() { return ++zone_count; }
         uint64_t generate_new_object_id() const { return ++object_id_generator; }
 
-        template<class T> uint64_t encapsulate_outbound_interfaces(const rpc::shared_ptr<T>& object);
+        template<class T> rpc::encapsulated_interface encapsulate_outbound_interfaces(const rpc::shared_ptr<T>& object, bool add_ref);
 
         int send(uint64_t zone_id, uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_,
                         const char* in_buf_, std::vector<char>& out_buf_) override;
 
-        uint64_t add_lookup_stub(void* pointer,
-                                 std::function<rpc::shared_ptr<i_interface_stub>(rpc::shared_ptr<object_stub>)> fn);
-        int add_object(void* pointer, const rpc::shared_ptr<object_stub>& stub);
+        encapsulated_interface find_or_create_stub(rpc::casting_interface* pointer,
+                                 std::function<rpc::shared_ptr<i_interface_stub>(rpc::shared_ptr<object_stub>)> fn,
+                                 bool add_ref);
+        int add_object(const rpc::shared_ptr<object_stub>& stub);
         rpc::weak_ptr<object_stub> get_object(uint64_t object_id) const;
 
         int try_cast(uint64_t zone_id, uint64_t object_id, uint64_t interface_id) override;
@@ -66,11 +67,12 @@ namespace rpc
         uint64_t release(uint64_t zone_id, uint64_t object_id) override;
 
         virtual void add_zone_proxy(const rpc::shared_ptr<service_proxy>& zone);
-        virtual rpc::shared_ptr<service_proxy> get_zone_proxy(uint64_t zone_id) const;
+        //void service::add_zone_proxy(const rpc::shared_ptr<service_proxy>& service_proxy, uint64_t zone_id);//this is to make one zone be a relay to another
+        virtual rpc::shared_ptr<service_proxy> get_zone_proxy(uint64_t zone_id);
         virtual void remove_zone_proxy(uint64_t zone_id);
         template<class T> rpc::shared_ptr<T> get_local_interface(uint64_t object_id)
         {
-            return rpc::reinterpret_pointer_cast<T>(get_castable_interface(object_id, T::id));
+            return rpc::static_pointer_cast<T>(get_castable_interface(object_id, T::id));
         }
     };
 
@@ -103,7 +105,7 @@ namespace rpc
             auto os = rpc::shared_ptr<obj_stub>(new obj_stub(id, *this,nullptr));
             root_stub_ = rpc::static_pointer_cast<i_interface_stub>(Stub::create(root_ob, os));
             os->add_interface(root_stub_);
-            add_object(root_ob.get(), os);
+            add_object(os);
             
             if(stub_id)
             {
@@ -113,6 +115,6 @@ namespace rpc
         virtual void cleanup() override;
         bool check_is_empty() const override;
         uint64_t get_root_object_id() const;
-        rpc::shared_ptr<service_proxy> get_zone_proxy(uint64_t zone_id) const override;
+        rpc::shared_ptr<service_proxy> get_zone_proxy(uint64_t zone_id) override;
     };
 }
