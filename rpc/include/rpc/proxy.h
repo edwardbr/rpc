@@ -37,7 +37,7 @@ namespace rpc
         template<class T>
         uint64_t get_interface_zone_id(const rpc::shared_ptr<T>& iface);
 
-        template<class T1, class T2, class proxy>
+        template<class T1, class T2>
         friend rpc::shared_ptr<T1> dynamic_pointer_cast(const shared_ptr<T2>& from) noexcept;
         friend service;
     };
@@ -58,10 +58,10 @@ namespace rpc
         { 
             return static_cast<proxy_base*>(const_cast<proxy_impl*>(this)); 
         }   
-        rpc::casting_interface* query_interface(uint64_t interface_id) const override 
+        const rpc::casting_interface* query_interface(uint64_t interface_id) const override 
         { 
             if(T::id == interface_id)
-                return static_cast<T*>(const_cast<proxy_impl*>(this));  
+                return static_cast<const T*>(this);  
             return nullptr;
         }
         virtual ~proxy_impl() = default;

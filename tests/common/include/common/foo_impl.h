@@ -14,10 +14,10 @@ namespace marshalled_tests
     {
         const rpc::i_telemetry_service* telemetry_ = nullptr;
         void* get_address() const override { return (void*)this; }
-        rpc::casting_interface* query_interface(uint64_t interface_id) const override 
+        const rpc::casting_interface* query_interface(uint64_t interface_id) const override 
         { 
             if(xxx::i_baz::id == interface_id)
-                return (xxx::i_baz*)this; 
+                return static_cast<const xxx::i_baz*>(this); 
             return nullptr;
         }
     public:
@@ -43,10 +43,10 @@ namespace marshalled_tests
     {
         const rpc::i_telemetry_service* telemetry_ = nullptr;
         void* get_address() const override { return (void*)this; }
-        rpc::casting_interface* query_interface(uint64_t interface_id) const override 
+        const rpc::casting_interface* query_interface(uint64_t interface_id) const override 
         { 
             if(xxx::i_foo::id == interface_id)
-                return (xxx::i_foo*)this; 
+                return static_cast<const xxx::i_foo*>(this); 
             return nullptr;
         }
     public:
@@ -233,12 +233,12 @@ namespace marshalled_tests
         const rpc::i_telemetry_service* telemetry_ = nullptr;
         
         void* get_address() const override { return (void*)this; }
-        rpc::casting_interface* query_interface(uint64_t interface_id) const override 
+        const rpc::casting_interface* query_interface(uint64_t interface_id) const override 
         { 
             if(xxx::i_bar::id == interface_id)
-                return (xxx::i_bar*)this; 
+                return static_cast<const xxx::i_bar*>(this); 
             if(xxx::i_baz::id == interface_id)
-                return (xxx::i_baz*)this; 
+                return static_cast<const xxx::i_baz*>(this); 
             return nullptr;
         }
     public:
@@ -268,10 +268,10 @@ namespace marshalled_tests
     {
         const rpc::i_telemetry_service* telemetry_ = nullptr;
         void* get_address() const override { return (void*)this; }
-        rpc::casting_interface* query_interface(uint64_t interface_id) const override 
+        const rpc::casting_interface* query_interface(uint64_t interface_id) const override 
         { 
             if(yyy::i_example::id == interface_id)
-                return (yyy::i_example*)this; 
+                return static_cast<const yyy::i_example*>(this); 
             return nullptr;
         }
     public:
