@@ -939,7 +939,7 @@ namespace enclave_marshaller
 
             stub("if(interface_id == {}::id)", ns);
             stub("{{");
-            stub("auto* tmp = static_cast<{0}*>(original->get_target()->query_interface({0}::id));", ns);
+            stub("auto* tmp = const_cast<{0}*>(static_cast<const {0}*>(original->get_target()->query_interface({0}::id)));", ns);
             stub("if(tmp != nullptr)");
             stub("{{");
             stub("rpc::shared_ptr<{}> tmp_ptr(original->get_target(), tmp);", ns);
