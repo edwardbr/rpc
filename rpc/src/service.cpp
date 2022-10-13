@@ -81,7 +81,7 @@ namespace rpc
         if (item == wrapped_object_to_stub.end())
         {
             auto id = generate_new_object_id();
-            auto stub = rpc::shared_ptr<object_stub>(new object_stub(id, *this));
+            auto stub = rpc::shared_ptr<object_stub>(new object_stub(id, *this, pointer));
             rpc::shared_ptr<i_interface_stub> wrapped_interface = fn(stub);
             stub->add_interface(wrapped_interface);
             wrapped_object_to_stub[pointer] = stub;
