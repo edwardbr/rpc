@@ -20,6 +20,8 @@ namespace marshalled_tests
         { 
             if(xxx::i_baz::id == interface_id)
                 return static_cast<const xxx::i_baz*>(this); 
+            if(xxx::i_bar::id == interface_id)
+                return static_cast<const xxx::i_bar*>(this); 
             return nullptr;
         }
     public:
@@ -226,7 +228,7 @@ namespace marshalled_tests
             val->callback(22);
             auto val1 = rpc::dynamic_pointer_cast<xxx::i_baz>(val);
 //#bug 1 in an enclave this fails
-//            auto val2 = rpc::dynamic_pointer_cast<xxx::i_bar>(val);
+            auto val2 = rpc::dynamic_pointer_cast<xxx::i_bar>(val);
             return 0;
         }        
 

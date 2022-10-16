@@ -61,7 +61,7 @@ void host_telemetry_service::on_service_proxy_creation(const char* name, uint64_
 {
     std::lock_guard g(mux);
     service_proxies.emplace(orig_zone{originating_zone_id, zone_id}, name_count{name, 1});
-    spdlog::info("on_service_proxy_creation {} {}", name, zone_id);
+    spdlog::info("on_service_proxy_creation {} {} {}", name, originating_zone_id, zone_id);
 }
 void host_telemetry_service::on_service_proxy_deletion(const char* name, uint64_t originating_zone_id, uint64_t zone_id) const
 {
@@ -171,13 +171,13 @@ void host_telemetry_service::on_stub_release(uint64_t zone_id, uint64_t object_i
 void host_telemetry_service::on_object_proxy_creation(uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id) const
 {
     std::lock_guard g(mux);
-    object_proxies.emplace(interface_proxy_id{originating_zone_id, zone_id, object_id}, 1);
+    object_proxies.emplace(interface_proxy_id{originating_zone_id, zone_id, object_id, 0}, 1);
     spdlog::info("on_object_proxy_creation {} {}", zone_id, object_id);
 }
 void host_telemetry_service::on_object_proxy_deletion(uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id) const
 {
     std::lock_guard g(mux);
-    auto found = object_proxies.find(interface_proxy_id{originating_zone_id, zone_id, object_id});
+    auto found = object_proxies.find(interface_proxy_id{originating_zone_id, zone_id, object_id, 0});
     if(found == object_proxies.end())
     {
         spdlog::error("object proxy not found {} {}", object_id, zone_id);
@@ -198,27 +198,27 @@ void host_telemetry_service::on_object_proxy_deletion(uint64_t originating_zone_
 void host_telemetry_service::on_interface_proxy_creation(const char* name, uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id, uint64_t interface_id) const
 {
     std::lock_guard g(mux);
-    interface_proxies.emplace(interface_proxy_id{originating_zone_id, zone_id, object_id}, name_count{name, 1});
+    interface_proxies.emplace(interface_proxy_id{originating_zone_id, zone_id, object_id, interface_id}, name_count{name, 1});
     spdlog::info("on_interface_proxy_creation {} {} {} {} {}", name, originating_zone_id, zone_id, object_id, interface_id);
 }
 void host_telemetry_service::on_interface_proxy_deletion(const char* name, uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id, uint64_t interface_id) const
 {
     std::lock_guard g(mux);
-    auto found = interface_proxies.find(interface_proxy_id{originating_zone_id, zone_id, object_id});
+    auto found = interface_proxies.find(interface_proxy_id{originating_zone_id, zone_id, object_id, interface_id});
     if(found == interface_proxies.end())
     {
-        spdlog::error("interface proxy not found {} {}", name, zone_id);
+        spdlog::error("interface proxy not found {} {} {} {}", name, originating_zone_id, zone_id, object_id);
     }
     else if(found->second.count == 1)
     {
         interface_proxies.erase(found);
-        spdlog::info("on_interface_proxy_deletion {} {}", name, zone_id);
+        spdlog::info("on_interface_proxy_deletion {} {} {} {}", name, originating_zone_id, zone_id, object_id);
     }
     else
     {            
         found->second.count--;
-        spdlog::error("interface proxy still being used! {} {}", name, zone_id);
-        spdlog::info("on_interface_proxy_deletion {} {}", name, zone_id);
+        spdlog::error("interface proxy still being used! {} {} {} {}", name, originating_zone_id, zone_id, object_id);
+        spdlog::info("on_interface_proxy_deletion {} {} {} {}", name, originating_zone_id, zone_id, object_id);
     }
 }
 void host_telemetry_service::on_interface_proxy_send(const char* name, uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id, uint64_t interface_id, uint64_t method_id) const

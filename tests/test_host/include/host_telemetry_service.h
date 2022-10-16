@@ -39,11 +39,13 @@ class host_telemetry_service : public rpc::i_telemetry_service
         {
         return  originating_zone_id == other.originating_zone_id &&
                 zone_id == other.zone_id &&
-                object_id == other.object_id;
+                object_id == other.object_id &&
+                interface_id == other.interface_id;
         }
         uint64_t originating_zone_id = 0;
         uint64_t zone_id = 0;
         uint64_t object_id = 0;
+        uint64_t interface_id = 0;
     };
 
     struct interface_proxy_id_hash

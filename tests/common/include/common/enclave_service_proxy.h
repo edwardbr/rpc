@@ -17,6 +17,11 @@ namespace rpc
             assert(false);//this class needs a shared pointer to the enclave id. otherwise the first instance will break for both
             auto ret = rpc::make_shared<enclave_service_proxy>(*this);
             ret->set_zone_id(zone_id);
+            ret->weak_this_ = ret;
+            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
+            {
+                telemetry_service->on_service_proxy_creation("enclave_service_proxy", ret->get_operating_zone_id(), ret->get_zone_id());
+            }
             return ret;
         }
     public:

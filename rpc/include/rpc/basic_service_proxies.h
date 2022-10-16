@@ -21,6 +21,11 @@ namespace rpc
         {
             auto ret = rpc::make_shared<local_service_proxy>(*this);
             ret->set_zone_id(zone_id);
+            ret->weak_this_ = ret;
+            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
+            {
+                telemetry_service->on_service_proxy_creation("local_service_proxy", ret->get_operating_zone_id(), ret->get_zone_id());
+            }
             return ret;
         }
 
@@ -94,6 +99,11 @@ namespace rpc
         {
             auto ret = rpc::make_shared<local_child_service_proxy>(*this);
             ret->set_zone_id(zone_id);
+            ret->weak_this_ = ret;
+            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
+            {
+                telemetry_service->on_service_proxy_creation("local_child_service_proxy", ret->get_operating_zone_id(), ret->get_zone_id());
+            }
             return ret;
         }
 
