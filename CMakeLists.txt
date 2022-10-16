@@ -24,7 +24,9 @@ include(FindEnclaveMarshaller)
 
 add_subdirectory(generator)
 add_subdirectory(rpc)
+if(${BUILD_TEST})
 add_subdirectory(tests)
+endif()
 
 
 INSTALL(FILES "${CMAKE_CURRENT_LIST_DIR}/cmake/FindEnclaveMarshaller.cmake"

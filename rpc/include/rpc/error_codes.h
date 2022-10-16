@@ -15,6 +15,8 @@ namespace rpc
         int INVALID_CAST();
         int ZONE_NOT_SUPPORTED();
         int ZONE_NOT_INITIALISED();
+        int ZONE_NOT_FOUND();
+        int OBJECT_NOT_FOUND();
 
         void set_OK_val(int val);
         void set_offset_val(int val);

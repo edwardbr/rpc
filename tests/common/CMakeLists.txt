@@ -37,7 +37,7 @@ if(${BUILD_ENCLAVE})
   
 
 endif()
-if(${BUILD_HOST})
+#if(${BUILD_HOST})
 
  add_library(common_host STATIC
 
@@ -67,4 +67,4 @@ if(${BUILD_HOST})
 
  set_property(TARGET common_host PROPERTY COMPILE_PDB_NAME common_host)
  
- endif()
+ #endif()

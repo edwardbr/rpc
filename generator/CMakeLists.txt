@@ -20,9 +20,7 @@ target_link_libraries(generator
         utils
 
         clipp::clipp
-        fmt::fmt-header-only
-    PRIVATE
-        ${HOST_LIBRARIES})
+        fmt::fmt-header-only)
 target_link_options(generator PRIVATE ${HOST_LINK_EXE_OPTIONS})
 
 set_property(TARGET generator PROPERTY COMPILE_PDB_NAME generator)
