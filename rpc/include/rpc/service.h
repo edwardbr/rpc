@@ -102,7 +102,7 @@ namespace rpc
             assert(check_is_empty());
 
             auto id = generate_new_object_id();
-            auto os = rpc::shared_ptr<obj_stub>(new obj_stub(id, *this,nullptr));
+            auto os = rpc::shared_ptr<obj_stub>(new obj_stub(id, *this));
             root_stub_ = rpc::static_pointer_cast<i_interface_stub>(Stub::create(root_ob, os));
             os->add_interface(root_stub_);
             add_object(os);

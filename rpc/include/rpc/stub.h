@@ -27,13 +27,11 @@ namespace rpc
         shared_ptr<object_stub> p_this;
         std::atomic<uint64_t> reference_count = 0;
         service& zone_;
-		void* pointer_ = 0x0;//necessary because of stub_map ambiguity
 
     public:
-        object_stub(uint64_t id, service& zone,void* pointer)
+        object_stub(uint64_t id, service& zone)
             : id_(id)
             , zone_(zone)
-			, pointer_(pointer)
         {
         }
         ~object_stub();
