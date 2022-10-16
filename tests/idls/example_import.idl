@@ -1,8 +1,11 @@
 #import "example_shared.idl"
-namespace zzz
+[inline] namespace v1
 {
-    interface i_zzz
+    namespace zzz
     {
-        error_code add(int a, int b, [out, by_value] int& c);
-    };
+        interface i_zzz
+        {
+            error_code add(int a, int b, [out, by_value] int& c);
+        };
+    }
 }

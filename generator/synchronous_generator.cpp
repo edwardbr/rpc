@@ -1115,6 +1115,16 @@ namespace enclave_marshaller
             header("}};");
         };
 
+        void build_scoped_name(const class_entity* entity, std::string& name)
+        {
+            auto* owner = entity->get_owner();
+            if(owner && !owner->get_name().empty())
+            {
+                build_scoped_name(owner, name);
+            }
+            name += entity->get_name() + "::";
+        }
+
         void write_encapsulate_outbound_interfaces(const class_entity& lib, const class_entity& obj,
                                                    writer& header, writer& proxy, writer& stub,
                                                    const std::vector<std::string>& namespaces)
@@ -1128,10 +1138,9 @@ namespace enclave_marshaller
             }
 
             auto owner = obj.get_owner();
-            while (owner && !owner->get_name().empty())
+            if(owner && !owner->get_name().empty())
             {
-                ns += owner->get_name() + "::";
-                owner = owner->get_owner();
+                build_scoped_name(owner, ns);
             }
 
             int id = 1;
@@ -1152,10 +1161,9 @@ namespace enclave_marshaller
                 ns += name + "::";
             }
             auto owner = obj.get_owner();
-            while (owner && !owner->get_name().empty())
+            if (owner && !owner->get_name().empty())
             {
-                ns += owner->get_name() + "::";
-                owner = owner->get_owner();
+                build_scoped_name(owner, ns);
             }
 
             proxy("template<> void rpc::object_proxy::create_interface_proxy(rpc::shared_ptr<{}{}>& "
@@ -1243,12 +1251,22 @@ namespace enclave_marshaller
                     continue;
                 if (cls->get_type() == entity_type::NAMESPACE)
                 {
+                    bool is_inline = cls->get_attribute("inline") == "inline";
+                    if(is_inline)
+                    {
+                        header("inline namespace {}", cls->get_name());
+                        proxy("inline namespace {}", cls->get_name());
+                        stub("inline namespace {}", cls->get_name());
+                    }
+                    else
+                    {
+                        header("namespace {}", cls->get_name());
+                        proxy("namespace {}", cls->get_name());
+                        stub("namespace {}", cls->get_name());
+                    }
 
-                    header("namespace {}", cls->get_name());
                     header("{{");
-                    proxy("namespace {}", cls->get_name());
                     proxy("{{");
-                    stub("namespace {}", cls->get_name());
                     stub("{{");
 
                     write_namespace_predeclaration(*cls, header, proxy, stub);
@@ -1270,12 +1288,22 @@ namespace enclave_marshaller
                     continue;
                 if (cls->get_type() == entity_type::NAMESPACE)
                 {
+                    bool is_inline = cls->get_attribute("inline") == "inline";
 
-                    header("namespace {}", cls->get_name());
+                    if(is_inline)
+                    {
+                        header("inline namespace {}", cls->get_name());
+                        proxy("inline namespace {}", cls->get_name());
+                        stub("inline namespace {}", cls->get_name());
+                    }
+                    else
+                    {
+                        header("namespace {}", cls->get_name());
+                        proxy("namespace {}", cls->get_name());
+                        stub("namespace {}", cls->get_name());
+                    }
                     header("{{");
-                    proxy("namespace {}", cls->get_name());
                     proxy("{{");
-                    stub("namespace {}", cls->get_name());
                     stub("{{");
 
                     write_namespace(from_host, *cls, prefix + cls->get_name() + "::", header, proxy, stub);
