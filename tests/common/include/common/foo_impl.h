@@ -41,7 +41,7 @@ namespace marshalled_tests
             log(std::string("callback ") + std::to_string(val));
             return 0;
         }
-        error_code do_something_else(int val)
+        error_code do_something_else(int val) override
         {
             log(std::string("baz do_something_else"));
             return 0;
@@ -227,7 +227,7 @@ namespace marshalled_tests
         {
             val->callback(22);
             auto val1 = rpc::dynamic_pointer_cast<xxx::i_baz>(val);
-//#bug 1 in an enclave this fails
+//#sgx dynamic cast in an enclave this fails
             auto val2 = rpc::dynamic_pointer_cast<xxx::i_bar>(val);
             return 0;
         }        
