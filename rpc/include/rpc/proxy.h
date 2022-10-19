@@ -120,17 +120,17 @@ namespace rpc
                     // weak pointer needs refreshing
                     create_interface_proxy<T>(iface);
                     item->second = rpc::reinterpret_pointer_cast<proxy_base>(iface);
-                    return 0;
+                    return rpc::error::OK();
                 }
                 iface = rpc::reinterpret_pointer_cast<T>(proxy);
-                return 0;
+                return rpc::error::OK();
             };
 
             { // scope for the lock
                 std::lock_guard guard(insert_control);
                 if(T::id == 0)
                 {
-                    return 0;
+                    return rpc::error::OK();
                 }
                 auto item = proxy_map.find(T::id);
                 if (item != proxy_map.end())
@@ -141,7 +141,7 @@ namespace rpc
                 {
                     create_interface_proxy<T>(iface);
                     proxy_map[T::id] = rpc::reinterpret_pointer_cast<proxy_base>(iface);
-                    return 0;
+                    return rpc::error::OK();
                 }
             }
 
@@ -167,7 +167,7 @@ namespace rpc
 
                 create_interface_proxy<T>(iface);
                 proxy_map[T::id] = rpc::reinterpret_pointer_cast<proxy_base>(iface);
-                return 0;
+                return rpc::error::OK();
             }
         }
     };

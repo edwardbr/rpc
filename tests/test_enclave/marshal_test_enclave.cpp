@@ -134,7 +134,7 @@ int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t child_zone_id, uin
     rpc::shared_ptr<yyy::i_example> ex(new example(p_telemetry_service));
     rpc_server->create_stub<yyy::i_example, yyy::i_example_stub>(ex, root_object_id);
 
-    return 0;
+    return rpc::error::OK();
 }
 
 void marshal_test_destroy_enclave()
@@ -165,7 +165,7 @@ int call_enclave(uint64_t zone_id, uint64_t object_id, uint64_t interface_id, ui
             *data_out_sz = (*out_buf)->size();
             delete (*out_buf);
             (*out_buf) = nullptr;
-            return 0;
+            return rpc::error::OK();
         }
         return rpc::error::NEED_MORE_MEMORY();
     }
