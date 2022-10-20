@@ -36,6 +36,13 @@ namespace enclave_marshaller
             }
             header("class {0}_mock : public {0}", interface_name);
             header("{{");
+            header("void* get_address() const override {{ return (void*)this; }}");
+            header("const rpc::casting_interface* query_interface(uint64_t interface_id) const override ");
+            header("{{");
+            header("if({0}::id == interface_id)", interface_name);
+            header("return static_cast<const {0}*>(this); ",interface_name);
+            header("return nullptr;");
+            header("}}");            
             header("public:");
 
             bool has_methods = false;
