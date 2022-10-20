@@ -163,29 +163,25 @@ extern "C"
                   const char* data_in, size_t sz_out, char* data_out, size_t* data_out_sz)
     {
         thread_local std::vector<char> out_buf;
-        int ret = 0;
 
         auto root_service = current_host_service.lock();
         if (!root_service)
         {
+            out_buf.clear();
             return rpc::error::TRANSPORT_ERROR();
         }
         if (out_buf.empty())
         {
-            ret = root_service->send(zone_id, object_id, interface_id, method_id, sz_int, data_in, out_buf);
+            int ret = root_service->send(zone_id, object_id, interface_id, method_id, sz_int, data_in, out_buf);
+            if(ret >= rpc::error::MIN() && ret <= rpc::error::MAX())
+                return ret;
         }
-        if (ret == rpc::error::OK())
-        {
-            *data_out_sz = out_buf.size();
-            if (out_buf.size() <= sz_out)
-            {
-                memcpy(data_out, out_buf.data(), out_buf.size());
-                out_buf.clear();
-                return 0;
-            }
-            return -2;
-        }
-        return ret;
+        *data_out_sz = out_buf.size();
+        if (*data_out_sz > sz_out)
+            return rpc::error::NEED_MORE_MEMORY();
+        memcpy(data_out, out_buf.data(), out_buf.size());
+        out_buf.clear();
+        return rpc::error::OK();
     }
     int try_cast_host(uint64_t zone_id, uint64_t object_id, uint64_t interface_id)
     {

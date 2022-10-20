@@ -41,6 +41,12 @@ namespace marshalled_tests
             log(std::string("callback ") + std::to_string(val));
             return 0;
         }
+        error_code blob_test(const std::vector<uint8_t>& inval, std::vector<uint8_t>& out_val) override
+        {
+            log(std::string("baz blob_test ") + std::to_string(inval.size()));
+            out_val = inval;
+            return 0;
+        }
         error_code do_something_else(int val) override
         {
             log(std::string("baz do_something_else"));
@@ -229,6 +235,20 @@ namespace marshalled_tests
             auto val1 = rpc::dynamic_pointer_cast<xxx::i_baz>(val);
 //#sgx dynamic cast in an enclave this fails
             auto val2 = rpc::dynamic_pointer_cast<xxx::i_bar>(val);
+
+            std::vector<uint8_t> in_val{1,2,3,4};
+            std::vector<uint8_t> out_val;
+
+            val->blob_test(in_val, out_val);
+            assert(in_val == out_val);
+
+            //this should trigger NEED_MORE_MEMORY signal requiring more out param data to be provided to the called 
+            //the out param data is temporarily cached and given over when enough memory has been provided, without
+            //recalling the implementation
+            in_val.resize(100000);
+            std::fill(in_val.begin(), in_val.end(), 42);
+            val->blob_test(in_val, out_val);
+            assert(in_val == out_val);
             return 0;
         }        
 
@@ -274,6 +294,11 @@ namespace marshalled_tests
         int callback(int val) override
         {            
             log(std::string("callback ") + std::to_string(val));
+            return 0;
+        }
+        error_code blob_test(const std::vector<uint8_t>& inval, std::vector<uint8_t>& out_val) override
+        {
+            out_val = inval;
             return 0;
         }
     };

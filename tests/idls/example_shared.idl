@@ -63,5 +63,6 @@ interface i_bar
 interface i_baz
 {
     error_code callback(int val);
+    error_code blob_test([in] const std::vector<uint8_t>& inval, [out] std::vector<uint8_t>& out_val);
 };
 }

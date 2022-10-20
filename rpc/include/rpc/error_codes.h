@@ -5,6 +5,7 @@ namespace rpc
     namespace error
     {
         int OK();
+        int MIN();
         int OUT_OF_MEMORY();
         int NEED_MORE_MEMORY();
         int SECURITY_ERROR();
@@ -17,6 +18,7 @@ namespace rpc
         int ZONE_NOT_INITIALISED();
         int ZONE_NOT_FOUND();
         int OBJECT_NOT_FOUND();
+        int MAX();//the biggest value
 
         void set_OK_val(int val);
         void set_offset_val(int val);

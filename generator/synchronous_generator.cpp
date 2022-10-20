@@ -737,13 +737,10 @@ namespace enclave_marshaller
                         proxy("const yas::shared_buffer in_;");
                     }
 
-                    // proxy("for(int i = 0;i < in_.size;i++){{std::cout << in_.data.get() + i;}} std::cout <<
-                    // \"\\n\";");
-
                     proxy("std::vector<char> out_buf_(24); //max size using short string optimisation");
                     proxy("{} ret = get_object_proxy()->send({}::id, {}, in_.size, in_.data.get(), out_buf_);",
                           function.get_return_type(), interface_name, function_count);
-                    proxy("if(ret != rpc::error::OK())");
+                    proxy("if(ret >= rpc::error::MIN() && ret <= rpc::error::MAX())");
                     proxy("{{");
                     proxy("return ret;");
                     proxy("}}");

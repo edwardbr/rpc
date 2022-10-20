@@ -142,53 +142,59 @@ void marshal_test_destroy_enclave()
     rpc_server.reset();
 }
 
-int call_enclave(uint64_t zone_id, uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t sz_int, const char* data_in,
-         size_t sz_out, char* data_out, size_t* data_out_sz, void** tls)
+int call_enclave(
+    uint64_t zone_id, 
+    uint64_t object_id, 
+    uint64_t interface_id, 
+    uint64_t method_id, 
+    size_t sz_int, 
+    const char* data_in,
+    size_t sz_out, 
+    char* data_out, 
+    size_t* data_out_sz, 
+    void** enclave_retry_buffer)
 {
-    //a retry cache using thread local storage, perhaps leaky if the client does not retry with more memory
-    std::vector<char>** out_buf = nullptr;
-    if(tls)
+    //a retry cache using enclave_retry_buffer as thread local storage, leaky if the client does not retry with more memory
+    if(!enclave_retry_buffer)
+    {        
+        return rpc::error::INVALID_DATA();
+    }
+
+    auto*& retry_buf = *reinterpret_cast<std::vector<char>**>(enclave_retry_buffer);
+    if(retry_buf && !sgx_is_within_enclave(retry_buf, sizeof(std::vector<char>*)))
     {
-        out_buf = (std::vector<char>**)tls;
-        if(out_buf && *out_buf && !sgx_is_within_enclave(*out_buf, sizeof(std::vector<char>*)))
-        {
-            return rpc::error::SECURITY_ERROR();
-        }
+        return rpc::error::SECURITY_ERROR();
     }
 
 
-    if(out_buf && *out_buf)
+    if(retry_buf)
     {
-        if((*out_buf)->size() <= sz_out)
+        *data_out_sz = retry_buf->size();
+        if(*data_out_sz > sz_out)
         {
-            memcpy(data_out, (*out_buf)->data(), (*out_buf)->size());
-            *data_out_sz = (*out_buf)->size();
-            delete (*out_buf);
-            (*out_buf) = nullptr;
-            return rpc::error::OK();
+            return rpc::error::NEED_MORE_MEMORY();
         }
-        return rpc::error::NEED_MORE_MEMORY();
-    }
     
+        memcpy(data_out, retry_buf->data(), retry_buf->size());
+        delete retry_buf;
+        retry_buf = nullptr;
+        return rpc::error::OK();
+    }
+
     std::vector<char> tmp;
     int ret = rpc_server->send(zone_id, object_id, interface_id, method_id, sz_int, data_in, tmp);
-    if(ret == rpc::error::OK())
-    {
-        *data_out_sz = tmp.size();
-        if(tmp.size() <= sz_out)
-        {
-            memcpy(data_out, tmp.data(), tmp.size());
-            return rpc::error::OK();
-        }
+    if(ret >= rpc::error::MIN() && ret <= rpc::error::MAX())
+        return ret;
 
-        //not enough memory so cache the results into the thread local storage
-        if(!out_buf)
-            return rpc::error::OUT_OF_MEMORY();
-            
-        (*out_buf) = new std::vector<char>(std::move(tmp));
-        return rpc::error::NEED_MORE_MEMORY();
+    *data_out_sz = tmp.size();
+    if(*data_out_sz <= sz_out)
+    {
+        memcpy(data_out, tmp.data(), *data_out_sz);
+        return rpc::error::OK();
     }
-    return ret;
+
+    retry_buf = new std::vector<char>(std::move(tmp));
+    return rpc::error::NEED_MORE_MEMORY();
 }
 
 int try_cast_enclave(uint64_t zone_id, uint64_t object_id, uint64_t interface_id)
