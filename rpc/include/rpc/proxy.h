@@ -29,7 +29,6 @@ namespace rpc
         }
         virtual ~proxy_base()
         {}
-        rpc::shared_ptr<object_proxy> get_object_proxy() const { return object_proxy_; }
 
         template<class T>
         encapsulated_interface encapsulate_outbound_interfaces(const rpc::shared_ptr<T>& iface, bool add_ref);
@@ -40,6 +39,8 @@ namespace rpc
         template<class T1, class T2>
         friend rpc::shared_ptr<T1> dynamic_pointer_cast(const shared_ptr<T2>& from) noexcept;
         friend service;
+    public:
+        rpc::shared_ptr<object_proxy> get_object_proxy() const { return object_proxy_; }
     };
 
     template<class T> class proxy_impl : public proxy_base, public T
