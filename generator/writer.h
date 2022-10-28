@@ -48,5 +48,8 @@ public:
             strm_ << '\t';
         }
     }
+
+    int get_count(){return count_;}
+    void set_count(int count){count_ = count;}
 };
 

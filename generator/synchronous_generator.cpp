@@ -5,6 +5,7 @@
 #include "coreclasses.h"
 #include "cpp_parser.h"
 #include <filesystem>
+#include <sstream>
 
 #include "writer.h"
 
@@ -1110,6 +1111,56 @@ namespace enclave_marshaller
             header("}}");
 
             header("}};");
+
+            std::stringstream sstr;
+            std::string obj_type(m_ob.get_name());
+            {
+                writer tmpl(sstr);
+                tmpl.set_count(header.get_count());
+                if (m_ob.get_is_template())
+                {
+                    tmpl.print_tabs();
+                    tmpl.raw("template<");
+                    if(!m_ob.get_template_params().empty())
+                        obj_type += "<";
+                    bool first_pass = true;
+                    for (const auto& param : m_ob.get_template_params())
+                    {
+                        if (!first_pass)
+                        {
+                            tmpl.raw(", ");
+                            obj_type += ", ";
+                        }
+                        first_pass = false;
+                        tmpl.raw("{} {}", param.type, param.name);
+                        obj_type += param.name;
+                    }
+                    if(!m_ob.get_template_params().empty())
+                        obj_type += ">";
+                    tmpl.raw(">\n");
+                }
+            }
+            header.raw(sstr.str());
+            header("inline bool operator != (const {0}& lhs, const {0}& rhs)", obj_type);
+            header("{{");
+            header.print_tabs();
+            header.raw("return ");
+            bool first_pass = true;
+            for (auto& field : m_ob.get_functions())
+            {
+                header.raw("\n");
+                header.print_tabs();
+                header.raw("{1}lhs.{0} != lhs.{0}", field.get_name(), first_pass ? "" : "|| ");
+                first_pass = false;
+            }
+            header.raw(";\n");
+            header("}}");
+
+            header.raw(sstr.str());
+            header("inline bool operator == (const {0}& lhs, const {0}& rhs)", obj_type);
+            header("{{");
+            header("return !(lhs != rhs);");
+            header("}}");
         };
 
         void build_scoped_name(const class_entity* entity, std::string& name)
