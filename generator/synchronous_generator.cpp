@@ -1150,7 +1150,7 @@ namespace enclave_marshaller
             {
                 header.raw("\n");
                 header.print_tabs();
-                header.raw("{1}lhs.{0} != lhs.{0}", field.get_name(), first_pass ? "" : "|| ");
+                header.raw("{1}lhs.{0} != rhs.{0}", field.get_name(), first_pass ? "" : "|| ");
                 first_pass = false;
             }
             header.raw(";\n");
