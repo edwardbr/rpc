@@ -5,6 +5,7 @@
 #include "coreclasses.h"
 #include "cpp_parser.h"
 #include <filesystem>
+#include <sstream>
 
 #include "writer.h"
 
@@ -88,6 +89,108 @@ namespace enclave_marshaller
             header("");
         };
 
+
+        void write_struct(bool from_host, const class_entity& m_ob, writer& header, int id)
+        {
+            auto interface_name = m_ob.get_name();
+
+            //create a matcher for structures
+
+            std::stringstream sstr;
+            std::string obj_type(interface_name);
+            {
+                writer tmpl(sstr);
+                tmpl.set_count(header.get_count());
+                if (m_ob.get_is_template())
+                {
+                    if(m_ob.get_template_params().empty())
+                        return; //too complicated for now
+                    tmpl.print_tabs();
+                    tmpl.raw("template<");
+                    if(!m_ob.get_template_params().empty())
+                        obj_type += "<";
+                    bool first_pass = true;
+                    for (const auto& param : m_ob.get_template_params())
+                    {
+                        if (!first_pass)
+                        {
+                            tmpl.raw(", ");
+                            obj_type += ", ";
+                        }
+                        first_pass = false;
+                        tmpl.raw("{} {}", param.type, param.name);
+                        obj_type += param.name;
+                    }
+                    if(!m_ob.get_template_params().empty())
+                        obj_type += ">";
+                    tmpl.raw(">\n");
+                }
+            }
+            header.raw(sstr.str());
+            header("class {0}_matcher : public MatcherInterface<{1}>", interface_name, obj_type);
+            header("{{");
+            for (auto& function : m_ob.get_functions())
+            {
+                header("Matcher<{}> {}_matcher_;", function.get_return_type(), function.get_name());
+            }
+            header("public:");
+            header("{0}_matcher(", interface_name);
+            header.set_count(header.get_count() + 1);
+            bool is_first = true;
+            for (auto& function : m_ob.get_functions())
+            {
+                if(!is_first)
+                    header.raw(",\n");
+                is_first = false;
+                header.print_tabs();
+                header.raw("const Matcher<{}> {}_matcher", function.get_return_type(), function.get_name());
+            }
+            if(!m_ob.get_functions().empty())
+                header.raw("\n");
+            header(")");
+            is_first = true;
+            for (auto& function : m_ob.get_functions())
+            {
+                if(is_first)
+                    header(": {0}_matcher_({0}_matcher)", function.get_name());
+                else
+                    header(", {0}_matcher_({0}_matcher)", function.get_name());
+                is_first = false;
+            }                
+            header.set_count(header.get_count() - 1);
+            header("{{}}");
+
+            header("virtual bool MatchAndExplain({} request, MatchResultListener* listener) const", obj_type);
+            header("{{");
+            for (auto& function : m_ob.get_functions())
+            {
+                header("if (!{0}_matcher_.MatchAndExplain(request.{0}, listener))", function.get_name());
+                header("\treturn false;");
+            }
+		    header("return true;");
+        	header("}};");     
+            header("virtual void DescribeTo(::std::ostream* os) const");
+            header("{{");
+            header("(*os) << \"is working \";");
+            for (auto& function : m_ob.get_functions())
+            {
+                header("(*os) << \"{} \";", function.get_name());
+		        header("{}_matcher_.DescribeTo(os);", function.get_name());
+            }
+        	header("}};");              
+            header("virtual void DescribeNegationTo(::std::ostream* os) const");
+            header("{{");   
+            header("(*os) << \"is not working \";");
+            for (auto& function : m_ob.get_functions())
+            {
+                header("(*os) << \"{} \";", function.get_name());
+                header("{}_matcher_.DescribeTo(os);", function.get_name());           
+            }
+            header("}};");              
+            header("}};");
+            header("");
+        }
+
         void write_marshalling_logic_nested(bool from_host, const class_entity& cls, int id, writer& header)
         {
             if (cls.get_type() == entity_type::INTERFACE)
@@ -95,6 +198,9 @@ namespace enclave_marshaller
 
             if (cls.get_type() == entity_type::LIBRARY)
                 write_interface(from_host, cls, header, id);
+
+            if (cls.get_type() == entity_type::STRUCT)
+                write_struct(from_host, cls, header, id);
         }
 
         // entry point

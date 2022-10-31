@@ -14,6 +14,12 @@ struct something_more_complicated
     std::map<std::string, something_complicated> map_val;    
 };
 
+template<typename T>
+struct typed_payload
+{
+    std::array<uint8_t, sizeof(T)> payload;
+};
+
 interface i_foo
 {
     error_code do_something_in_val(                                                        int                             val); //marshal by value - implictly const
