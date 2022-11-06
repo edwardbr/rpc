@@ -34,7 +34,7 @@ namespace rpc
         // map wrapped objects pointers to stubs
         std::map<void*, rpc::weak_ptr<object_stub>> wrapped_object_to_stub;
 
-        std::unordered_map<uint64_t, rpc::weak_ptr<service_proxy>> other_zones;
+        std::map<uint64_t, rpc::weak_ptr<service_proxy>> other_zones;
 
         // hard lock on the root object
         mutable std::mutex insert_control;
@@ -53,7 +53,7 @@ namespace rpc
 
         template<class T> rpc::encapsulated_interface encapsulate_outbound_interfaces(const rpc::shared_ptr<T>& object, bool add_ref);
 
-        int send(uint64_t zone_id, uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_,
+        int send(uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_,
                         const char* in_buf_, std::vector<char>& out_buf_) override;
 
         encapsulated_interface find_or_create_stub(rpc::casting_interface* pointer,
@@ -68,11 +68,17 @@ namespace rpc
 
         virtual void add_zone_proxy(const rpc::shared_ptr<service_proxy>& zone);
         //void service::add_zone_proxy(const rpc::shared_ptr<service_proxy>& service_proxy, uint64_t zone_id);//this is to make one zone be a relay to another
-        virtual rpc::shared_ptr<service_proxy> get_zone_proxy(uint64_t zone_id);
+        virtual rpc::shared_ptr<service_proxy> get_zone_proxy(uint64_t originating_zone_id, uint64_t zone_id);
         virtual void remove_zone_proxy(uint64_t zone_id);
         template<class T> rpc::shared_ptr<T> get_local_interface(uint64_t object_id)
         {
             return rpc::static_pointer_cast<T>(get_castable_interface(object_id, T::id));
+        }
+
+        template<class T> int get_interface(const rpc::encapsulated_interface& descriptor, const rpc::shared_ptr<service_proxy>& svp, rpc::shared_ptr<T>& iface)
+        {
+            auto proxy = object_proxy::create(descriptor.object_id, descriptor.zone_id, svp);
+            return proxy->query_interface(iface);
         }
     };
 
@@ -93,7 +99,6 @@ namespace rpc
         void set_parent(const rpc::shared_ptr<rpc::service_proxy>& parent_service)
         {
             parent_service_ = parent_service;
-            add_zone_proxy(parent_service_);
         }
 
         template<class T, class Stub, class obj_stub = object_stub> 
@@ -115,6 +120,6 @@ namespace rpc
         virtual void cleanup() override;
         bool check_is_empty() const override;
         uint64_t get_root_object_id() const;
-        rpc::shared_ptr<service_proxy> get_zone_proxy(uint64_t zone_id) override;
+        rpc::shared_ptr<service_proxy> get_zone_proxy(uint64_t originating_zone_id, uint64_t zone_id) override;
     };
 }

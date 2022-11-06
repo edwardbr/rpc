@@ -143,6 +143,7 @@ void marshal_test_destroy_enclave()
 }
 
 int call_enclave(
+    uint64_t originating_zone_id,
     uint64_t zone_id, 
     uint64_t object_id, 
     uint64_t interface_id, 
@@ -182,7 +183,7 @@ int call_enclave(
     }
 
     std::vector<char> tmp;
-    int ret = rpc_server->send(zone_id, object_id, interface_id, method_id, sz_int, data_in, tmp);
+    int ret = rpc_server->send(originating_zone_id, zone_id, object_id, interface_id, method_id, sz_int, data_in, tmp);
     if(ret >= rpc::error::MIN() && ret <= rpc::error::MAX())
         return ret;
 

@@ -41,7 +41,7 @@ namespace rpc
         return true;
     }
 
-    int service::send(uint64_t zone_id, uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_,
+    int service::send(uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_,
                              const char* in_buf_, std::vector<char>& out_buf_)
     {
         if(zone_id != get_zone_id())
@@ -59,7 +59,7 @@ namespace rpc
             {
                 return rpc::error::ZONE_NOT_SUPPORTED();
             }
-            return other_zone->send(zone_id, object_id, interface_id, method_id, in_size_, in_buf_, out_buf_);
+            return other_zone->send(get_zone_id(), zone_id, object_id, interface_id, method_id, in_size_, in_buf_, out_buf_);
         }
         else
         {
@@ -69,7 +69,7 @@ namespace rpc
             {
                 return rpc::error::INVALID_DATA();
             }
-            return stub->call(interface_id, method_id, in_size_, in_buf_, out_buf_);
+            return stub->call(originating_zone_id, interface_id, method_id, in_size_, in_buf_, out_buf_);
         }
     }
 
@@ -255,6 +255,7 @@ namespace rpc
     {
         assert(service_proxy->get_zone_id() != zone_id_);
         std::lock_guard g(insert_control);
+        assert(other_zones.find(service_proxy->get_zone_id()) == other_zones.end());
         other_zones[service_proxy->get_zone_id()] = service_proxy;
     }
     /*void service::add_zone_proxy(const rpc::shared_ptr<service_proxy>& service_proxy, uint64_t zone_id)
@@ -263,13 +264,24 @@ namespace rpc
         std::lock_guard g(insert_control);
         other_zones[zone_id] = service_proxy;
     }*/
-    rpc::shared_ptr<service_proxy> service::get_zone_proxy(uint64_t zone_id)
+    rpc::shared_ptr<service_proxy> service::get_zone_proxy(uint64_t originating_zone_id, uint64_t zone_id)
     {
         std::lock_guard g(insert_control);
         auto item = other_zones.find(zone_id);
         if (item != other_zones.end())
             return item->second.lock();
-
+        if(originating_zone_id == 0)
+            return nullptr;
+        item = other_zones.find(originating_zone_id);
+        if (item != other_zones.end())
+        {
+            auto originating_proxy = item->second.lock();
+            if(!originating_proxy)
+                return nullptr;
+            auto proxy = originating_proxy->clone_for_zone(zone_id);
+            other_zones[zone_id] = proxy;
+            return proxy;
+        }
         return nullptr;
     }
     void service::remove_zone_proxy(uint64_t zone_id)
@@ -331,9 +343,16 @@ namespace rpc
         return stub->get_id();
     }
 
-    rpc::shared_ptr<service_proxy> child_service::get_zone_proxy(uint64_t zone_id)
+    rpc::shared_ptr<service_proxy> child_service::get_zone_proxy(uint64_t originating_zone_id, uint64_t zone_id)
     {
-        auto proxy = service::get_zone_proxy(zone_id);
+        rpc::shared_ptr<service_proxy> proxy;
+        {
+            std::lock_guard g(insert_control);
+            auto item = other_zones.find(zone_id);
+            if (item != other_zones.end())
+                proxy = item->second.lock();
+        }
+
         if(!proxy)
         {
             proxy = parent_service_->clone_for_zone(zone_id);

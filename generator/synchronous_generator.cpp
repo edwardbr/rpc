@@ -264,7 +264,7 @@ namespace enclave_marshaller
                 {0} {1};
 				if(ret == rpc::error::OK() && {1}_object_.zone_id && {1}_object_.object_id)
                 {{
-                    auto {1}_service_proxy_ = target_stub_.lock()->get_zone().get_zone_proxy({1}_object_.zone_id);
+                    auto {1}_service_proxy_ = target_stub_.lock()->get_zone().get_zone_proxy(originating_zone_id, {1}_object_.zone_id);
                     if({1}_service_proxy_)
                         {1}_service_proxy_->create_proxy({1}_object_, {1});
                     else
@@ -301,7 +301,7 @@ namespace enclave_marshaller
             case STUB_PARAM_CAST:
                 return name;
             case PROXY_VALUE_RETURN:
-                return fmt::format("get_object_proxy()->get_service_proxy()->create_proxy({0}_, {0});", name);
+                return fmt::format("if({0}_.zone_id != 0) get_object_proxy()->get_service_proxy()->create_proxy({0}_, {0});", name);
             case PROXY_OUT_DECLARATION:
                 return fmt::format("rpc::encapsulated_interface {}_;", name);
             case STUB_ADD_REF_OUT_PREDECLARE:
@@ -607,7 +607,7 @@ namespace enclave_marshaller
                   interface_name);
             proxy("");
 
-            stub("int {0}_stub::call(uint64_t method_id, size_t in_size_, const char* in_buf_, std::vector<char>& "
+            stub("int {0}_stub::call(uint64_t originating_zone_id, uint64_t method_id, size_t in_size_, const char* in_buf_, std::vector<char>& "
                  "out_buf_)", interface_name);
             stub("{{");
 
@@ -999,7 +999,7 @@ namespace enclave_marshaller
 
             stub("rpc::weak_ptr<rpc::object_stub> get_object_stub() const override {{ return target_stub_;}}");
             stub("void* get_pointer() const override {{ return target_.get();}}");
-            stub("int call(uint64_t method_id, size_t in_size_, const char* in_buf_, std::vector<char>& "
+            stub("int call(uint64_t originating_zone_id, uint64_t method_id, size_t in_size_, const char* in_buf_, std::vector<char>& "
                  "out_buf_) override;");
             stub("int cast(uint64_t interface_id, rpc::shared_ptr<rpc::i_interface_stub>& new_stub) override;");
             stub("}};");

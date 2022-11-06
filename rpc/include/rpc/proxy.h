@@ -85,7 +85,7 @@ namespace rpc
 
     public:
         static rpc::shared_ptr<object_proxy> create(uint64_t object_id, uint64_t zone_id,
-                                                    rpc::shared_ptr<service_proxy> service_proxy)
+                                                    const rpc::shared_ptr<service_proxy>& service_proxy)
         {
             rpc::shared_ptr<object_proxy> ret(new object_proxy(object_id, zone_id, service_proxy));
             ret->weak_this_ = ret;
@@ -206,6 +206,7 @@ namespace rpc
         uint64_t operating_zone_id = 0;
         rpc::weak_ptr<service> operating_zone_service_;
         const rpc::i_telemetry_service* const telemetry_service_ = nullptr;
+        bool allow_local_cast_ = true;
 
     protected:
 
@@ -260,26 +261,33 @@ namespace rpc
         rpc::shared_ptr<service> get_operating_zone_service() const {return operating_zone_service_.lock();}
         const rpc::i_telemetry_service* get_telemetry_service(){return telemetry_service_;}
 
+        //when you have multiple rpc::services in the same memory address space and you want to use a marshalled pointer 
+        //between them (e.g. for testing) rather than a local pointer setting to false will prevent this
+        void set_allow_local_cast(bool cast){allow_local_cast_ = cast;}
+
         template<class T> 
         int create_proxy(rpc::encapsulated_interface encap, rpc::shared_ptr<T>& val)
         {
             rpc::shared_ptr<object_proxy> op;
-            auto local_service = service_.lock();
-            if(local_service && (local_service->get_zone_id() == encap.zone_id))
+            if(allow_local_cast_)
             {
-                val = local_service->template get_local_interface<T>(encap.object_id);
-                if(!val)
+                auto local_service = service_.lock();
+                if(local_service && (local_service->get_zone_id() == encap.zone_id))
                 {
-                    return rpc::error::OBJECT_NOT_FOUND();
+                    val = local_service->template get_local_interface<T>(encap.object_id);
+                    if(!val)
+                    {
+                        return rpc::error::OBJECT_NOT_FOUND();
+                    }
+                    return rpc::error::OK();
                 }
-                return rpc::error::OK();
             }
 
             rpc::shared_ptr<service_proxy> service_proxy;
             if(get_zone_id() != encap.zone_id)
             {
                 auto operating_zone_service = get_operating_zone_service();
-                service_proxy = operating_zone_service->get_zone_proxy(encap.zone_id);
+                service_proxy = operating_zone_service->get_zone_proxy(0, encap.zone_id);
             }
             else
             {

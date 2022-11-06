@@ -47,7 +47,7 @@ namespace rpc
 
         service& get_zone() const { return zone_; }
 
-        int call(uint64_t interface_id, uint64_t method_id, size_t in_size_, const char* in_buf_,
+        int call(uint64_t originating_zone_id, uint64_t interface_id, uint64_t method_id, size_t in_size_, const char* in_buf_,
                         std::vector<char>& out_buf_);
         int try_cast(uint64_t interface_id);
 
@@ -62,7 +62,7 @@ namespace rpc
     {
     public:
         virtual uint64_t get_interface_id() const = 0;
-        virtual int call(uint64_t method_id, size_t in_size_, const char* in_buf_, std::vector<char>& out_buf_)
+        virtual int call(uint64_t originating_zone_id, uint64_t method_id, size_t in_size_, const char* in_buf_, std::vector<char>& out_buf_)
             = 0;
         virtual int cast(uint64_t interface_id, shared_ptr<i_interface_stub>& new_stub) = 0;
         virtual weak_ptr<object_stub> get_object_stub() const = 0;

@@ -27,7 +27,7 @@ namespace rpc
         return res->second;
     }
 
-    int object_stub::call(uint64_t interface_id, uint64_t method_id, size_t in_size_, const char* in_buf_,
+    int object_stub::call(uint64_t originating_zone_id, uint64_t interface_id, uint64_t method_id, size_t in_size_, const char* in_buf_,
                                  std::vector<char>& out_buf_)
     {
         rpc::shared_ptr<i_interface_stub> stub;
@@ -40,7 +40,7 @@ namespace rpc
         }
         if(stub)
         {
-            return stub->call(method_id, in_size_, in_buf_, out_buf_);
+            return stub->call(originating_zone_id, method_id, in_size_, in_buf_, out_buf_);
         }        
         return rpc::error::INVALID_DATA();
     }
