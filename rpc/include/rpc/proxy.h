@@ -287,7 +287,7 @@ namespace rpc
             if(get_zone_id() != encap.zone_id)
             {
                 auto operating_zone_service = get_operating_zone_service();
-                service_proxy = operating_zone_service->get_zone_proxy(0, encap.zone_id);
+                service_proxy = operating_zone_service->get_zone_proxy(zone_id_, encap.zone_id);
             }
             else
             {
