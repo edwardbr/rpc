@@ -350,7 +350,11 @@ namespace rpc
             std::lock_guard g(insert_control);
             auto item = other_zones.find(zone_id);
             if (item != other_zones.end())
+            {
                 proxy = item->second.lock();
+                if (!proxy)
+                    other_zones.erase(item);
+            }
         }
 
         if(!proxy)
