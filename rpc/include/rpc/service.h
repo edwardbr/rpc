@@ -74,12 +74,6 @@ namespace rpc
         {
             return rpc::static_pointer_cast<T>(get_castable_interface(object_id, T::id));
         }
-
-        template<class T> int get_interface(const rpc::encapsulated_interface& descriptor, const rpc::shared_ptr<service_proxy>& svp, rpc::shared_ptr<T>& iface)
-        {
-            auto proxy = rpc::object_proxy::create(descriptor.object_id, descriptor.zone_id, svp);
-            return proxy->query_interface(iface);
-        }
     };
 
     //Child services need to maintain the lifetime of the root object in its zone 

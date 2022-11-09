@@ -344,4 +344,10 @@ namespace rpc
         //else get the zone id of the service that runs this zone or enclave
         return object_proxy_->get_service_proxy()->get_operating_zone_id();
     }
+
+    template<class T> int get_interface(const rpc::encapsulated_interface& descriptor, const rpc::shared_ptr<service_proxy>& svp, rpc::shared_ptr<T>& iface)
+    {
+        auto proxy = rpc::object_proxy::create(descriptor.object_id, descriptor.zone_id, svp);
+        return proxy->query_interface(iface);
+    }
 }
