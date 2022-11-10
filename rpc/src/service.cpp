@@ -360,7 +360,8 @@ namespace rpc
         if(!proxy)
         {
             proxy = parent_service_->clone_for_zone(zone_id);
-            add_zone_proxy(proxy);
+            if(get_zone_id() != zone_id)
+                add_zone_proxy(proxy);
         }
         return proxy;
     }
