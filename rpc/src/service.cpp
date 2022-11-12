@@ -23,10 +23,6 @@ namespace rpc
         // to do: assert that there are no more object_stubs in memory
         assert(check_is_empty());
 
-        std::for_each(stubs.begin(), stubs.end(), [](auto& item){
-            auto stub = item.second.lock();
-            assert(!stub);
-        });
         stubs.clear();
         wrapped_object_to_stub.clear();
         other_zones.clear();
@@ -34,11 +30,38 @@ namespace rpc
 
     bool service::check_is_empty() const
     {
-        if (!stubs.empty())
-            return false;
-        if (!wrapped_object_to_stub.empty())
-            return false;
-        return true;
+        bool success = true;
+        for(auto item : stubs)
+        {
+            auto stub =  item.second.lock();
+            if(!stub)
+            {
+                auto message = std::string("service ") + std::to_string(get_zone_id()) + std::string(", object stub ") + std::to_string(item.first) + std::string(" has been released but not deregisted in the service suspected unclean shutdown");
+                LOG(message.data(), 100);
+            }
+            else
+            {
+                auto message = std::string("service ") + std::to_string(get_zone_id()) + std::string(", object stub ") + std::to_string(item.first) + std::string(" has not been deregisted in the service suspected unclean shutdown");
+                LOG(message.data(), 100);
+            }
+            success = false;
+        }
+        for(auto item : wrapped_object_to_stub)
+        {
+            auto stub =  item.second.lock();
+            if(!stub)
+            {
+                auto message = std::string("service ") + std::to_string(get_zone_id()) + std::string(", wrapped_object has been released but not deregisted in the service suspected unclean shutdown");
+                LOG(message.data(), 100);
+            }
+            else
+            {
+                auto message = std::string("service ") + std::to_string(get_zone_id()) + std::string(", wrapped_object ") + std::to_string(stub->get_id()) + std::string(" has not been deregisted in the service suspected unclean shutdown");
+                LOG(message.data(), 100);
+            }
+            success = false;
+        }
+        return success;
     }
 
     int service::send(uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_,
@@ -350,11 +373,7 @@ namespace rpc
             std::lock_guard g(insert_control);
             auto item = other_zones.find(zone_id);
             if (item != other_zones.end())
-            {
                 proxy = item->second.lock();
-                if (!proxy)
-                    other_zones.erase(item);
-            }
         }
 
         if(!proxy)
