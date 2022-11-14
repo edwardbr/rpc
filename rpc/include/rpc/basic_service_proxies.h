@@ -8,9 +8,13 @@ namespace rpc
 {
     class local_service_proxy : public service_proxy
     {
+        rpc::weak_ptr<service> service_;
+
         local_service_proxy(const rpc::shared_ptr<service>& serv,
+                            const rpc::shared_ptr<service>& operating_zone_service,
                             const rpc::i_telemetry_service* telemetry_service)
-            : service_proxy(serv, serv, telemetry_service)
+            : service_proxy(serv->get_zone_id(), operating_zone_service, telemetry_service),
+            service_(serv)
         {
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
             {
@@ -40,18 +44,36 @@ namespace rpc
             }
         }
         static rpc::shared_ptr<local_service_proxy> create(const rpc::shared_ptr<service>& serv,
+                                                           const rpc::shared_ptr<service>& operating_zone_service,
                                                            const rpc::i_telemetry_service* telemetry_service)
         {
-            auto ret = rpc::shared_ptr<local_service_proxy>(new local_service_proxy(serv, telemetry_service));
+            auto ret = rpc::shared_ptr<local_service_proxy>(new local_service_proxy(serv, operating_zone_service, telemetry_service));
             auto pthis = rpc::static_pointer_cast<service_proxy>(ret);
             ret->weak_this_ = pthis;
             return ret;
         }
 
+        template<class T> 
+        int create_proxy(rpc::encapsulated_interface encap, rpc::shared_ptr<T>& val)
+        {
+            rpc::shared_ptr<object_proxy> op;
+            auto local_service = service_.lock();
+            if(local_service && (local_service->get_zone_id() == encap.zone_id))
+            {
+                val = local_service->template get_local_interface<T>(encap.object_id);
+                if(!val)
+                {
+                    return rpc::error::OBJECT_NOT_FOUND();
+                }
+                return rpc::error::OK();
+            }
+            return service_proxy::create_proxy(encap, val);
+        }
+
         int send(uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_,
                  const char* in_buf_, std::vector<char>& out_buf_) override
         {
-            return get_service()->send(originating_zone_id, zone_id, object_id, interface_id, method_id, in_size_, in_buf_, out_buf_);
+            return service_.lock()->send(originating_zone_id, zone_id, object_id, interface_id, method_id, in_size_, in_buf_, out_buf_);
         }
         int try_cast(uint64_t zone_id, uint64_t object_id, uint64_t interface_id) override
         {
@@ -60,7 +82,7 @@ namespace rpc
                 telemetry_service->on_service_proxy_try_cast("local_service_proxy", get_operating_zone_id(), zone_id,
                                                              object_id, interface_id);
             }
-            return get_service()->try_cast(zone_id, object_id, interface_id);
+            return service_.lock()->try_cast(zone_id, object_id, interface_id);
         }
         uint64_t add_ref(uint64_t zone_id, uint64_t object_id) override
         {
@@ -69,7 +91,7 @@ namespace rpc
                 telemetry_service->on_service_proxy_add_ref("local_service_proxy", get_operating_zone_id(), zone_id,
                                                             object_id);
             }
-            return get_service()->add_ref(zone_id, object_id);
+            return service_.lock()->add_ref(zone_id, object_id);
         }
         uint64_t release(uint64_t zone_id, uint64_t object_id) override
         {
@@ -78,16 +100,19 @@ namespace rpc
                 telemetry_service->on_service_proxy_release("local_service_proxy", get_operating_zone_id(), zone_id,
                                                             object_id);
             }
-            return get_service()->release(zone_id, object_id);
+            return service_.lock()->release(zone_id, object_id);
         }
     };
 
     class local_child_service_proxy : public service_proxy
     {
+        rpc::weak_ptr<service> service_;
+
         local_child_service_proxy(const rpc::shared_ptr<service>& serv,
                                   const rpc::shared_ptr<service>& operating_zone_service,
                                   const rpc::i_telemetry_service* telemetry_service)
-            : service_proxy(serv, operating_zone_service, telemetry_service)
+            : service_proxy(serv->get_zone_id(), operating_zone_service, telemetry_service),
+            service_(serv)
         {
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
             {
@@ -128,10 +153,27 @@ namespace rpc
             return ret;
         }
 
+        template<class T> 
+        int create_proxy(rpc::encapsulated_interface encap, rpc::shared_ptr<T>& val)
+        {
+            rpc::shared_ptr<object_proxy> op;
+            auto local_service = service_.lock();
+            if(local_service && (local_service->get_zone_id() == encap.zone_id))
+            {
+                val = local_service->template get_local_interface<T>(encap.object_id);
+                if(!val)
+                {
+                    return rpc::error::OBJECT_NOT_FOUND();
+                }
+                return rpc::error::OK();
+            }
+            return service_proxy::create_proxy(encap, val);
+        }
+
         int send(uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_,
                  const char* in_buf_, std::vector<char>& out_buf_) override
         {
-            return get_service()->send(originating_zone_id, zone_id, object_id, interface_id, method_id, in_size_, in_buf_, out_buf_);
+            return service_.lock()->send(originating_zone_id, zone_id, object_id, interface_id, method_id, in_size_, in_buf_, out_buf_);
         }
         int try_cast(uint64_t zone_id, uint64_t object_id, uint64_t interface_id) override
         {
@@ -140,7 +182,7 @@ namespace rpc
                 telemetry_service->on_service_proxy_try_cast("local_child_service_proxy", get_operating_zone_id(),
                                                              zone_id, object_id, interface_id);
             }
-            return get_service()->try_cast(zone_id, object_id, interface_id);
+            return service_.lock()->try_cast(zone_id, object_id, interface_id);
         }
         uint64_t add_ref(uint64_t zone_id, uint64_t object_id) override
         {
@@ -150,7 +192,7 @@ namespace rpc
                                                             zone_id, object_id);
             }
 
-            return get_service()->add_ref(zone_id, object_id);
+            return service_.lock()->add_ref(zone_id, object_id);
         }
         uint64_t release(uint64_t zone_id, uint64_t object_id) override
         {
@@ -159,7 +201,7 @@ namespace rpc
                 telemetry_service->on_service_proxy_release("local_child_service_proxy", get_operating_zone_id(),
                                                             zone_id, object_id);
             }
-            return get_service()->release(zone_id, object_id);
+            return service_.lock()->release(zone_id, object_id);
         }
     };
 }

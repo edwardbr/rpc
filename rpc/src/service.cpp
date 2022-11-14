@@ -329,6 +329,9 @@ namespace rpc
         if(parent_service_)
         {
             remove_zone_proxy(parent_service_->get_zone_id());
+        #ifdef _DEBUG
+            parent_service_->set_operating_zone_service_released();
+        #endif
             parent_service_ = nullptr;
         }
         cleanup();

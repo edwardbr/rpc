@@ -201,40 +201,34 @@ namespace rpc
     {
         std::unordered_map<uint64_t, rpc::weak_ptr<object_proxy>> proxies;
         std::mutex insert_control;
-        rpc::weak_ptr<service> service_;
         uint64_t zone_id_ = 0;
         uint64_t operating_zone_id = 0;
         rpc::weak_ptr<service> operating_zone_service_;
         const rpc::i_telemetry_service* const telemetry_service_ = nullptr;
-        bool allow_local_cast_ = true;
+        #ifdef _DEBUG
+        bool operating_zone_service_released = false;
+        #endif
 
     protected:
 
-        service_proxy(  const rpc::shared_ptr<service>& serv, 
-                        const rpc::shared_ptr<service>& operating_zone_service,
-                        const rpc::i_telemetry_service* telemetry_service) : 
-            service_(serv), 
-            zone_id_(serv->get_zone_id()),
-            operating_zone_id(operating_zone_service ? operating_zone_service->get_zone_id() : 0),
-            operating_zone_service_(operating_zone_service),
-            telemetry_service_(telemetry_service)
-        {}
-        service_proxy(  uint64_t zone_id, 
+        service_proxy(  uint64_t zone_id,
                         const rpc::shared_ptr<service>& operating_zone_service,
                         const rpc::i_telemetry_service* telemetry_service) : 
             zone_id_(zone_id),
             operating_zone_id(operating_zone_service ? operating_zone_service->get_zone_id() : 0),
             operating_zone_service_(operating_zone_service),
             telemetry_service_(telemetry_service)
-        {}
+        {
+            assert(operating_zone_service != nullptr);
+        }
 
         service_proxy( const service_proxy& other) : 
-                service_(other.service_),
                 zone_id_(other.zone_id_),
                 operating_zone_id(other.operating_zone_id),
                 operating_zone_service_(other.operating_zone_service_),
                 telemetry_service_(other.telemetry_service_)
         {
+            assert(operating_zone_service_.lock() != nullptr);
         }
 
         mutable rpc::weak_ptr<service_proxy> weak_this_;
@@ -243,45 +237,33 @@ namespace rpc
     public:
         virtual ~service_proxy()
         {
-            auto srv = service_.lock();
-            if(srv)
+            auto operating_zone_service = operating_zone_service_.lock();
+            assert(operating_zone_service != nullptr || operating_zone_service_released);
+            if(operating_zone_service)
             {
-                srv->remove_zone_proxy(zone_id_);
+                operating_zone_service->remove_zone_proxy(zone_id_);
             }
         }
+        #ifdef _DEBUG
+        void set_operating_zone_service_released()
+        {
+            operating_zone_service_released = true;
+        }
+        #endif
 
         virtual rpc::shared_ptr<service_proxy> clone_for_zone(uint64_t zone_id) = 0;
 
         rpc::shared_ptr<service_proxy> shared_from_this() { return rpc::shared_ptr<service_proxy>(weak_this_); }
         rpc::shared_ptr<service_proxy const> shared_from_this() const { return rpc::shared_ptr<service_proxy const>(weak_this_); }
 
-        rpc::shared_ptr<service> get_service() const {return service_.lock();}
         uint64_t get_zone_id() const {return zone_id_;}
         uint64_t get_operating_zone_id() const {return operating_zone_id;}
         rpc::shared_ptr<service> get_operating_zone_service() const {return operating_zone_service_.lock();}
         const rpc::i_telemetry_service* get_telemetry_service(){return telemetry_service_;}
 
-        //when you have multiple rpc::services in the same memory address space and you want to use a marshalled pointer 
-        //between them (e.g. for testing) rather than a local pointer setting to false will prevent this
-        void set_allow_local_cast(bool cast){allow_local_cast_ = cast;}
-
         template<class T> 
         int create_proxy(rpc::encapsulated_interface encap, rpc::shared_ptr<T>& val)
         {
-            rpc::shared_ptr<object_proxy> op;
-            if(allow_local_cast_)
-            {
-                auto local_service = service_.lock();
-                if(local_service && (local_service->get_zone_id() == encap.zone_id))
-                {
-                    val = local_service->template get_local_interface<T>(encap.object_id);
-                    if(!val)
-                    {
-                        return rpc::error::OBJECT_NOT_FOUND();
-                    }
-                    return rpc::error::OK();
-                }
-            }
 
             rpc::shared_ptr<service_proxy> service_proxy;
             if(get_zone_id() != encap.zone_id)
@@ -296,8 +278,11 @@ namespace rpc
 
             std::lock_guard l(service_proxy->insert_control);
             auto item = service_proxy->proxies.find(encap.object_id);
+            rpc::shared_ptr<object_proxy> op;
             if (item != service_proxy->proxies.end())
+            {
                 op = item->second.lock();
+            }
             else
             {
                 op = object_proxy::create(encap.object_id, encap.zone_id, service_proxy);

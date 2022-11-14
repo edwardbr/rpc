@@ -24,6 +24,8 @@ namespace rpc
             }
             return ret;
         }
+        uint64_t eid_ = 0;
+        std::string filename_;
     public:
         enclave_service_proxy(const enclave_service_proxy& other) = default;
 
@@ -45,10 +47,7 @@ namespace rpc
             operating_zone_service->add_zone_proxy(ret);
             return rpc::error::OK();
         }
-        uint64_t eid_ = 0;
-        std::string filename_;
 
-    public:
         virtual ~enclave_service_proxy();
 
 

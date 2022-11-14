@@ -58,7 +58,7 @@ int main()
                 uint64_t stub_id = 0;
 
                 // create a proxy for the rpc::service hosting the example object
-                auto service_proxy = rpc::local_service_proxy::create(root_service, telemetry_service);
+                auto service_proxy = rpc::local_service_proxy::create(root_service, branch_service, telemetry_service);
                 // create a proxy for the remote rpc::service, keep an instance going
                 auto local_child_service_proxy = rpc::local_child_service_proxy::create(branch_service, root_service, telemetry_service);
                 branch_service->add_zone_proxy(rpc::static_pointer_cast<rpc::service_proxy>(service_proxy));
