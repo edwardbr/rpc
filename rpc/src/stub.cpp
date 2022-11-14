@@ -64,13 +64,13 @@ namespace rpc
 
     uint64_t object_stub::add_ref()
     {
-        uint64_t ret = reference_count++;
+        uint64_t ret = ++reference_count;
         return ret;
     }
 
     uint64_t object_stub::release()
     {
-        uint64_t count = reference_count--;
+        uint64_t count = --reference_count;
         return count;
     }
 

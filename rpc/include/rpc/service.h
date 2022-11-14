@@ -51,14 +51,20 @@ namespace rpc
         static uint64_t generate_new_zone_id() { return ++zone_count; }
         uint64_t generate_new_object_id() const { return ++object_id_generator; }
 
-        template<class T> rpc::encapsulated_interface encapsulate_outbound_interfaces(const rpc::shared_ptr<T>& object, bool add_ref);
+        template<class T> rpc::encapsulated_interface encapsulate_in_param(const rpc::shared_ptr<T>& iface, rpc::shared_ptr<rpc::object_stub>& stub);
+        template<class T> rpc::encapsulated_interface encapsulate_out_param(const rpc::shared_ptr<T>& iface);
 
         int send(uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_,
                         const char* in_buf_, std::vector<char>& out_buf_) override;
 
         encapsulated_interface find_or_create_stub(rpc::casting_interface* pointer,
                                  std::function<rpc::shared_ptr<i_interface_stub>(rpc::shared_ptr<object_stub>)> fn,
-                                 bool add_ref);
+                                bool add_ref,
+                                 rpc::shared_ptr<object_stub>& stub);
+
+        encapsulated_interface find_or_create_stub(rpc::casting_interface* pointer,
+                                 std::function<rpc::shared_ptr<i_interface_stub>(rpc::shared_ptr<object_stub>)> fn);
+                                 
         int add_object(const rpc::shared_ptr<object_stub>& stub);
         rpc::weak_ptr<object_stub> get_object(uint64_t object_id) const;
 
@@ -67,7 +73,6 @@ namespace rpc
         uint64_t release(uint64_t zone_id, uint64_t object_id) override;
 
         virtual void add_zone_proxy(const rpc::shared_ptr<service_proxy>& zone);
-        //void service::add_zone_proxy(const rpc::shared_ptr<service_proxy>& service_proxy, uint64_t zone_id);//this is to make one zone be a relay to another
         virtual rpc::shared_ptr<service_proxy> get_zone_proxy(uint64_t originating_zone_id, uint64_t zone_id);
         virtual void remove_zone_proxy(uint64_t zone_id);
         template<class T> rpc::shared_ptr<T> get_local_interface(uint64_t object_id)

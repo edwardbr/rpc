@@ -136,17 +136,33 @@ int main()
                 #endif
                 ASSERT(!err_code);
 
-                rpc::shared_ptr<marshalled_tests::xxx::i_baz> baz;
-                i_foo_ptr->create_baz_interface(baz);
-                auto x = rpc::dynamic_pointer_cast<marshalled_tests::xxx::i_baz>(baz);
-                auto y = rpc::dynamic_pointer_cast<marshalled_tests::xxx::i_bar>(baz);
-                y->do_something_else(1);
-                auto z = rpc::dynamic_pointer_cast<marshalled_tests::xxx::i_foo>(baz);
+                {
+                    rpc::shared_ptr<marshalled_tests::xxx::i_baz> baz;
+                    i_foo_ptr->create_baz_interface(baz);
+                    i_foo_ptr->call_baz_interface(nullptr);//feed in a nullptr
+                    i_foo_ptr->call_baz_interface(baz);//feed back to the implementation
 
-                rpc::shared_ptr<xxx::i_foo> i_foo_relay_ptr;
-                example_relay_ptr->create_foo(i_foo_relay_ptr);
+                    auto x = rpc::dynamic_pointer_cast<marshalled_tests::xxx::i_baz>(baz);
+                    auto y = rpc::dynamic_pointer_cast<marshalled_tests::xxx::i_bar>(baz);
+                    y->do_something_else(1);
+                    auto z = rpc::dynamic_pointer_cast<marshalled_tests::xxx::i_foo>(baz);
 
-                i_foo_relay_ptr->call_baz_interface(baz);
+                    rpc::shared_ptr<xxx::i_foo> i_foo_relay_ptr;
+                    example_relay_ptr->create_foo(i_foo_relay_ptr);
+
+                    i_foo_relay_ptr->call_baz_interface(baz);
+                }
+                {
+                    rpc::shared_ptr<marshalled_tests::xxx::i_baz> c;
+                    //check for null
+                    i_foo_ptr->get_interface(c);
+
+                    auto b = rpc::make_shared<marshalled_tests::baz>(telemetry_service);
+                    i_foo_ptr->set_interface(b);
+                    i_foo_ptr->get_interface(c);
+                    i_foo_ptr->set_interface(nullptr);
+                    assert(b == c);
+                }
             }
         }
         telemetry_service = nullptr;

@@ -97,8 +97,16 @@ namespace rpc
     }
 
     encapsulated_interface service::find_or_create_stub(rpc::casting_interface* iface,
+                                        std::function<rpc::shared_ptr<i_interface_stub>(rpc::shared_ptr<object_stub>)> fn)
+    {
+        rpc::shared_ptr<object_stub> stub;
+        return find_or_create_stub(iface, fn, true, stub);
+    }
+
+    encapsulated_interface service::find_or_create_stub(rpc::casting_interface* iface,
                                         std::function<rpc::shared_ptr<i_interface_stub>(rpc::shared_ptr<object_stub>)> fn,
-                                        bool add_ref)
+                                        bool add_ref,
+                                        rpc::shared_ptr<object_stub>& stub)
     {
         std::lock_guard g(insert_control);
         auto proxy_base = iface->query_proxy_base();
@@ -117,19 +125,17 @@ namespace rpc
         if (item == wrapped_object_to_stub.end())
         {
             auto id = generate_new_object_id();
-            auto stub = rpc::shared_ptr<object_stub>(new object_stub(id, *this));
+            stub = rpc::shared_ptr<object_stub>(new object_stub(id, *this));
             rpc::shared_ptr<i_interface_stub> interface_stub = fn(stub);
             stub->add_interface(interface_stub);
             wrapped_object_to_stub[pointer] = stub;
             stubs[id] = stub;
             stub->on_added_to_zone(stub);
+            stub->add_ref();
             return {id, get_zone_id()};
         }
         auto obj = item->second.lock();
-        if(add_ref)
-        {
-            obj->add_ref();
-        }
+        obj->add_ref();
         return {obj->get_id(), obj->get_zone().get_zone_id()};
     }
 
@@ -143,6 +149,7 @@ namespace rpc
         wrapped_object_to_stub[pointer] = stub;
         stubs[stub_id] = stub;
         stub->on_added_to_zone(stub);
+        stub->add_ref();
         return error::OK();
     }
 
@@ -251,11 +258,7 @@ namespace rpc
             if(!count)
             {
                 {
-                    auto it = stubs.find(stub->get_id());
-                    if(it != stubs.end())
-                        stubs.erase(it);
-                    else
-                        assert(false);
+                    stubs.erase(item);
                 }
                 {
                     auto* pointer = stub->get_castable_interface()->get_address();

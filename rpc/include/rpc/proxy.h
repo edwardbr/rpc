@@ -30,8 +30,8 @@ namespace rpc
         virtual ~proxy_base()
         {}
 
-        template<class T>
-        encapsulated_interface encapsulate_outbound_interfaces(const rpc::shared_ptr<T>& iface, bool add_ref);
+        template<class T> rpc::encapsulated_interface encapsulate_in_param(const rpc::shared_ptr<T>& iface, rpc::shared_ptr<rpc::object_stub>& stub);
+        template<class T> rpc::encapsulated_interface encapsulate_out_param(const rpc::shared_ptr<T>& iface);
 
         template<class T>
         uint64_t get_interface_zone_id(const rpc::shared_ptr<T>& iface);
@@ -264,8 +264,19 @@ namespace rpc
         template<class T> 
         int create_proxy(rpc::encapsulated_interface encap, rpc::shared_ptr<T>& val)
         {
+            if(encap.object_id == 0 || encap.zone_id == 0)
+                return rpc::error::OK();
 
             rpc::shared_ptr<service_proxy> service_proxy;
+            auto serv = get_operating_zone_service();
+            if(serv->get_zone_id() == encap.zone_id)
+            {
+                val = serv->get_local_interface<T>(encap.object_id);
+                if(val)
+                    return rpc::error::OK();
+                return rpc::error::OBJECT_NOT_FOUND();
+            }
+
             if(get_zone_id() != encap.zone_id)
             {
                 auto operating_zone_service = get_operating_zone_service();
@@ -295,9 +306,13 @@ namespace rpc
         friend child_service;
     };
 
+
+        template<class T> rpc::encapsulated_interface encapsulate_in_param(const rpc::shared_ptr<T>& iface, rpc::shared_ptr<rpc::object_stub>& stub);
+        template<class T> rpc::encapsulated_interface encapsulate_out_param(const rpc::shared_ptr<T>& iface);
+
     //declared here as object_proxy and service_proxy is not fully defined in the body of proxy_base
     template<class T>
-    encapsulated_interface proxy_base::encapsulate_outbound_interfaces(const rpc::shared_ptr<T>& iface, bool add_ref)
+    encapsulated_interface proxy_base::encapsulate_in_param(const rpc::shared_ptr<T>& iface, rpc::shared_ptr<rpc::object_stub>& stub)
     {
         if(!iface)
             return {0,0};
@@ -312,7 +327,27 @@ namespace rpc
         }
 
         //else encapsulate away
-        return operating_service->encapsulate_outbound_interfaces(iface, add_ref);
+        return operating_service->encapsulate_in_param(iface, stub);
+    }
+
+    //declared here as object_proxy and service_proxy is not fully defined in the body of proxy_base
+    template<class T>
+    encapsulated_interface proxy_base::encapsulate_out_param(const rpc::shared_ptr<T>& iface)
+    {
+        if(!iface)
+            return {0,0};
+            
+        auto operating_service = object_proxy_->get_service_proxy()->get_operating_zone_service();
+
+        //this is to check that an interface is belonging to another zone and not the operating zone
+        auto proxy = iface->query_proxy_base();
+        if(proxy && proxy->get_object_proxy()->get_zone_id() != operating_service->get_zone_id())
+        {
+            return {proxy->get_object_proxy()->get_object_id(), proxy->get_object_proxy()->get_zone_id()};
+        }
+
+        //else encapsulate away
+        return operating_service->encapsulate_out_param(iface);
     }
 
     template<class T>
@@ -335,4 +370,19 @@ namespace rpc
         auto proxy = rpc::object_proxy::create(descriptor.object_id, descriptor.zone_id, svp);
         return proxy->query_interface(iface);
     }
+
+    template<class T> 
+    int get_interface(rpc::service& serv, uint64_t originating_zone_id, const rpc::encapsulated_interface& encap, rpc::shared_ptr<T>& iface)
+    {
+        if(serv.get_zone_id() == encap.zone_id)
+        {
+            iface = serv.get_local_interface<T>(encap.object_id);
+            return rpc::error::OK();
+        }
+        auto remote_service_proxy_ = serv.get_zone_proxy(originating_zone_id, encap.zone_id);
+        if(remote_service_proxy_)
+            return remote_service_proxy_->create_proxy(encap, iface);
+        return rpc::error::ZONE_NOT_FOUND();
+    }
+
 }

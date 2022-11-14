@@ -17,10 +17,12 @@ namespace enclave_marshaller
     {
         enum print_type
         {
+            PROXY_PREPARE_IN,
             PROXY_MARSHALL_IN,
             PROXY_OUT_DECLARATION,
             PROXY_MARSHALL_OUT,
             PROXY_VALUE_RETURN,
+            PROXY_CLEAN_IN,
 
             STUB_DEMARSHALL_DECLARATION,
             STUB_MARSHALL_IN,
@@ -239,16 +241,22 @@ namespace enclave_marshaller
 
             switch (option)
             {
+            case PROXY_PREPARE_IN:
+                return fmt::format("rpc::shared_ptr<rpc::object_stub> {}_stub_;", name);
             case PROXY_MARSHALL_IN:
             {
                 auto ret = fmt::format(
-                    ",(\"_{1}\", encapsulate_outbound_interfaces({0}, false))",
+                    ",(\"_{1}\", encapsulate_in_param({0}, {0}_stub_))",
                     name, count);
                 count++;
                 return ret;
             }
             case PROXY_MARSHALL_OUT:
                 return fmt::format("  ,(\"_{}\", {}_)", count, name);
+
+            case PROXY_CLEAN_IN:
+                return fmt::format("if({0}_stub_) {0}_stub_->release();", name);
+
             case STUB_DEMARSHALL_DECLARATION:
                 return fmt::format(R"__(rpc::encapsulated_interface {0}_object_;
                     uint64_t {0}_zone_ = 0)__",
@@ -264,11 +272,7 @@ namespace enclave_marshaller
                 {0} {1};
 				if(ret == rpc::error::OK() && {1}_object_.zone_id && {1}_object_.object_id)
                 {{
-                    auto {1}_service_proxy_ = target_stub_.lock()->get_zone().get_zone_proxy(originating_zone_id, {1}_object_.zone_id);
-                    if({1}_service_proxy_)
-                        {1}_service_proxy_->create_proxy({1}_object_, {1});
-                    else
-                        ret = rpc::error::ZONE_NOT_FOUND();
+                    ret = rpc::get_interface(target_stub_.lock()->get_zone(), originating_zone_id, {1}_object_, {1});
                 }}
 )__",
                                    object_type, name);
@@ -292,6 +296,8 @@ namespace enclave_marshaller
         {
             switch (option)
             {
+            case PROXY_PREPARE_IN:
+                return fmt::format("rpc::shared_ptr<rpc::object_stub> {}_stub_;", name);
             case PROXY_MARSHALL_IN:
                 return fmt::format("  ,(\"_{}\", {})", count, name);
             case PROXY_MARSHALL_OUT:
@@ -301,7 +307,7 @@ namespace enclave_marshaller
             case STUB_PARAM_CAST:
                 return name;
             case PROXY_VALUE_RETURN:
-                return fmt::format("if({0}_.zone_id != 0) get_object_proxy()->get_service_proxy()->create_proxy({0}_, {0});", name);
+                return fmt::format("get_object_proxy()->get_service_proxy()->create_proxy({0}_, {0});", name);
             case PROXY_OUT_DECLARATION:
                 return fmt::format("rpc::encapsulated_interface {}_;", name);
             case STUB_ADD_REF_OUT_PREDECLARE:
@@ -309,7 +315,7 @@ namespace enclave_marshaller
                     "rpc::encapsulated_interface {0}_;", name);
             case STUB_ADD_REF_OUT:
                 return fmt::format(
-                    "{0}_ = target_stub_.lock()->get_zone().encapsulate_outbound_interfaces({0}, true);", name);
+                    "{0}_ = target_stub_.lock()->get_zone().encapsulate_out_param({0});", name);
             case STUB_MARSHALL_OUT:
                 return fmt::format("  ,(\"_{}\", {}_)", count, name);
             default:
@@ -693,6 +699,21 @@ namespace enclave_marshaller
 
                     if (has_inparams)
                     {
+                        proxy("//PROXY_PREPARE_IN");
+                        uint64_t count = 1;
+                        for (auto& parameter : function.get_parameters())
+                        {
+                            std::string output;
+                            {
+                                if (!is_in_call(PROXY_PREPARE_IN, from_host, m_ob, parameter.get_name(),
+                                                parameter.get_type(), parameter.get_attributes(), count, output))
+                                    continue;
+
+                                proxy(output);
+                            }
+                            count++;
+                        }
+                        
                         proxy("//PROXY_MARSHALL_IN");
                         proxy("const auto in_ = yas::save<yas::mem|yas::binary|yas::no_header>(YAS_OBJECT_NVP(");
                         proxy("  \"in\"");
@@ -702,7 +723,7 @@ namespace enclave_marshaller
                         stub("yas::load<yas::mem|yas::binary|yas::no_header>(in, YAS_OBJECT_NVP(");
                         stub("  \"in\"");
 
-                        uint64_t count = 1;
+                        count = 1;
                         for (auto& parameter : function.get_parameters())
                         {
                             std::string output;
@@ -894,6 +915,22 @@ namespace enclave_marshaller
                                 continue;
 
                             proxy(output);
+                        }
+                    }
+                    proxy("//PROXY_CLEAN_IN");
+                    {
+                        uint64_t count = 1;
+                        for (auto& parameter : function.get_parameters())
+                        {
+                            std::string output;
+                            {
+                                if (!is_in_call(PROXY_CLEAN_IN, from_host, m_ob, parameter.get_name(),
+                                                parameter.get_type(), parameter.get_attributes(), count, output))
+                                    continue;
+
+                                proxy(output);
+                            }
+                            count++;
                         }
                     }
 
@@ -1193,8 +1230,12 @@ namespace enclave_marshaller
 
             int id = 1;
             header("template<> rpc::encapsulated_interface "
-                   "rpc::service::encapsulate_outbound_interfaces(const rpc::shared_ptr<{}{}>& "
-                   "iface, bool add_ref);",
+                   "rpc::service::encapsulate_in_param(const rpc::shared_ptr<{}{}>& "
+                   "iface, rpc::shared_ptr<rpc::object_stub>& stub);",
+                   ns, interface_name);
+            header("template<> rpc::encapsulated_interface "
+                   "rpc::service::encapsulate_out_param(const rpc::shared_ptr<{}{}>& "
+                   "iface);",
                    ns, interface_name);
         }
 
@@ -1222,16 +1263,34 @@ namespace enclave_marshaller
             proxy("}}");
             proxy("");
 
-            stub("template<> rpc::encapsulated_interface rpc::service::encapsulate_outbound_interfaces(const rpc::shared_ptr<{}{}>& "
-                 "iface, bool add_ref)",
+            stub("template<> rpc::encapsulated_interface rpc::service::encapsulate_in_param(const rpc::shared_ptr<{}{}>& iface, rpc::shared_ptr<rpc::object_stub>& stub)",
                  ns, interface_name);
             stub("{{");
+            stub("if(!iface)");
+            stub("{{");
+            stub("return {{0,0}};");
+            stub("}}");
 
             stub("return find_or_create_stub(iface.get(), [&](const rpc::shared_ptr<rpc::object_stub>& stub) -> "
                  "rpc::shared_ptr<rpc::i_interface_stub>{{");
             stub("return rpc::static_pointer_cast<rpc::i_interface_stub>({}{}_stub::create(iface, stub));", ns,
                  interface_name);
-            stub("}}, add_ref);");
+            stub("}}, false, stub);");
+            stub("}}");
+            
+            stub("template<> rpc::encapsulated_interface rpc::service::encapsulate_out_param(const rpc::shared_ptr<{}{}>& iface)",
+                 ns, interface_name);
+            stub("{{");
+            stub("if(!iface)");
+            stub("{{");
+            stub("return {{0,0}};");
+            stub("}}");
+
+            stub("return find_or_create_stub(iface.get(), [&](const rpc::shared_ptr<rpc::object_stub>& stub) -> "
+                 "rpc::shared_ptr<rpc::i_interface_stub>{{");
+            stub("return rpc::static_pointer_cast<rpc::i_interface_stub>({}{}_stub::create(iface, stub));", ns,
+                 interface_name);
+            stub("}});");
             stub("}}");
         }
 
@@ -1501,6 +1560,7 @@ namespace enclave_marshaller
             proxy("#include <yas/std_types.hpp>");
             proxy("#include <yas/count_streams.hpp>");
             proxy("#include <rpc/proxy.h>");
+            proxy("#include <rpc/stub.h>");
             proxy("#include <rpc/service.h>");
             proxy("#include \"{}\"", header_filename);
             proxy("");
