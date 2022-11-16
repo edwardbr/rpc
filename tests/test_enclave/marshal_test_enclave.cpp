@@ -112,6 +112,16 @@ public:
         on_proxy_send_host(name, originating_zone_id, zone_id, object_id, interface_id, method_id);
     }
 
+    void on_service_proxy_add_external_ref(const char* name, uint64_t originating_zone_id, uint64_t zone_id, int ref_count) const
+    {
+        ::on_service_proxy_add_external_ref(name, originating_zone_id, zone_id, ref_count);
+    }
+
+    void on_service_proxy_release_external_ref(const char* name, uint64_t originating_zone_id, uint64_t zone_id, int ref_count) const
+    {
+        ::on_service_proxy_release_external_ref(name, originating_zone_id, zone_id, ref_count);
+    }
+
     virtual void message(rpc::i_telemetry_service::level_enum level, const char* message) const
     {
         message_host(level, message);

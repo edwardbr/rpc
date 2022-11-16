@@ -1,4 +1,5 @@
 #include "rpc/stub.h"
+#include "rpc/service.h"
 
 namespace rpc
 {
@@ -65,13 +66,21 @@ namespace rpc
     uint64_t object_stub::add_ref()
     {
         uint64_t ret = ++reference_count;
+        assert(ret != std::numeric_limits<uint64_t>::max());
+        assert(ret != 0);
         return ret;
     }
 
     uint64_t object_stub::release()
     {
         uint64_t count = --reference_count;
+        assert(count != std::numeric_limits<uint64_t>::max());
         return count;
+    }
+
+    void object_stub::release_from_service()
+    {
+        zone_.release_local_stub(p_this);
     }
 
 }

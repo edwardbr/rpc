@@ -104,6 +104,8 @@ public:
     void on_service_proxy_try_cast(const char* name, uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id, uint64_t interface_id) const override;
     void on_service_proxy_add_ref(const char* name, uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id) const override;
     void on_service_proxy_release(const char* name, uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id) const override;  
+    void on_service_proxy_add_external_ref(const char* name, uint64_t originating_zone_id, uint64_t zone_id, int ref_count) const override;
+    void on_service_proxy_release_external_ref(const char* name, uint64_t originating_zone_id, uint64_t zone_id, int ref_count) const override;  
 
     void on_impl_creation(const char* name, uint64_t interface_id) const override;
     void on_impl_deletion(const char* name, uint64_t interface_id) const override;

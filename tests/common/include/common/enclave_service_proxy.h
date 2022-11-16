@@ -8,13 +8,21 @@ namespace rpc
     //This is for hosts to call services on an enclave
     class enclave_service_proxy : public service_proxy
     {
+        struct enclave_owner
+        {
+        public:
+            enclave_owner(uint64_t eid) : eid_(eid)
+            {}
+            uint64_t eid_ = 0;
+            ~enclave_owner();
+        };
+
         enclave_service_proxy(uint64_t zone_id, std::string filename, const rpc::shared_ptr<service>& operating_zone_service, const rpc::i_telemetry_service* telemetry_service);
         int initialise_enclave(rpc::shared_ptr<object_proxy>& proxy);
 
        
         rpc::shared_ptr<service_proxy> clone_for_zone(uint64_t zone_id) override
         {
-            assert(false);//this class needs a shared pointer to the enclave id. otherwise the first instance will break for both
             auto ret = rpc::make_shared<enclave_service_proxy>(*this);
             ret->set_zone_id(zone_id);
             ret->weak_this_ = ret;
@@ -22,9 +30,11 @@ namespace rpc
             {
                 telemetry_service->on_service_proxy_creation("enclave_service_proxy", ret->get_operating_zone_id(), ret->get_zone_id());
             }
+            ret->add_external_ref();
             return ret;
         }
-        uint64_t eid_ = 0;
+        std::shared_ptr<enclave_owner> enclave_owner_;
+        uint64_t eid_ = 0;        
         std::string filename_;
     public:
         enclave_service_proxy(const enclave_service_proxy& other) = default;
@@ -45,6 +55,7 @@ namespace rpc
             if(error != rpc::error::OK())
                 return error;
             operating_zone_service->add_zone_proxy(ret);
+            ret->add_external_ref();
             return rpc::error::OK();
         }
 

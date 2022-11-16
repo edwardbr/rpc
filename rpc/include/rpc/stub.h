@@ -59,6 +59,7 @@ namespace rpc
 
         uint64_t add_ref();
         uint64_t release();
+        void release_from_service();
     };
 
     class i_interface_stub

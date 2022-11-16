@@ -363,5 +363,41 @@ namespace marshalled_tests
             c = a + b;
             return rpc::error::OK();
         }
+        
+        error_code call_create_enclave(const rpc::shared_ptr<yyy::i_host>& host) override
+        {
+            return call_create_enclave_val(host);
+        }
+        error_code call_create_enclave_val(rpc::shared_ptr<yyy::i_host> host) override
+        {
+            if(!host)
+                return rpc::error::INVALID_DATA();
+            rpc::shared_ptr<marshalled_tests::yyy::i_example> target;
+            host->create_enclave(target);
+            if(!target)
+                return rpc::error::INVALID_DATA();
+//            target = nullptr;
+            int outval = 0;
+            auto ret = target->add(1,2, outval);
+            if(ret != rpc::error::OK())
+                return ret;
+            if(outval != 3)
+                return rpc::error::INVALID_DATA();
+            return rpc::error::OK();
+        }
+
+        error_code recieve_interface(rpc::shared_ptr<xxx::i_foo>& val) override
+        {
+            val = rpc::shared_ptr<xxx::i_foo>(new foo(telemetry_));
+            auto val1 = rpc::dynamic_pointer_cast<xxx::i_bar>(val);
+            return rpc::error::OK();
+        }
+         error_code give_interface(const rpc::shared_ptr<xxx::i_baz> baz) override
+        {
+            baz->callback(22);
+            auto val1 = rpc::dynamic_pointer_cast<xxx::i_bar>(baz);
+            return rpc::error::OK();
+        }
+
     };
 }

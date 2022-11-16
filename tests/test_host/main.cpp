@@ -31,6 +31,32 @@ using namespace marshalled_tests;
 rpc::weak_ptr<rpc::service> current_host_service;
 
 const rpc::i_telemetry_service* telemetry_service = nullptr;
+int zone_gen = 0;
+
+std::vector<rpc::shared_ptr<yyy::i_example>> cached;
+
+class host : 
+    public yyy::i_host
+{
+    void* get_address() const override { return (void*)this; }
+    const rpc::casting_interface* query_interface(uint64_t interface_id) const override 
+    {
+        if(yyy::i_host::id == interface_id)
+        return static_cast<const yyy::i_host*>(this); 
+        return nullptr;
+    }
+    error_code create_enclave(rpc::shared_ptr<yyy::i_example>& target) override
+    {
+        #ifdef _WIN32 // windows
+        auto err_code = rpc::enclave_service_proxy::create(++zone_gen, "./marshal_test_enclave.signed.dll", current_host_service.lock(), target, telemetry_service);
+        #else // Linux
+        auto err_code = rpc::enclave_service_proxy::create(++zone_gen, "./libmarshal_test_enclave.signed.so", current_host_service.lock(), target, telemetry_service);
+        #endif
+        //cached.push_back(target);
+        return err_code;
+    };
+
+};
 
 int main()
 {
@@ -46,12 +72,11 @@ int main()
     }
 
     // an inprocess marshalling of an object
-    do
+    /*do
     {
         host_telemetry_service tm;
         telemetry_service = &tm;
         {
-            int zone_gen = 0;
             auto root_service = rpc::make_shared<rpc::service>(++zone_gen);
             auto branch_service = rpc::make_shared<rpc::child_service>(++zone_gen);
             {
@@ -74,7 +99,7 @@ int main()
                     }
 
                     rpc::shared_ptr<yyy::i_example> i_example_ptr;
-                    ASSERT(!local_child_service_proxy->create_proxy({stub_id, branch_service->get_zone_id()}, i_example_ptr));
+                    ASSERT(!local_child_service_proxy->create_proxy({stub_id, branch_service->get_zone_id()}, i_example_ptr, false, false));
 
                     rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
                     int err_code = i_example_ptr->create_foo(i_foo_ptr);
@@ -92,7 +117,7 @@ int main()
             }
         }
         telemetry_service = nullptr;
-    } while (0);
+    } while (0);*/
 
     // an enclave marshalling of an object
     {
@@ -100,7 +125,6 @@ int main()
         telemetry_service = &tm;
         {
             int err_code = rpc::error::OK();
-            int zone_gen = 0;
             auto root_service = rpc::make_shared<rpc::service>(++zone_gen);
             current_host_service = root_service;
 
@@ -156,12 +180,37 @@ int main()
                     rpc::shared_ptr<marshalled_tests::xxx::i_baz> c;
                     //check for null
                     i_foo_ptr->get_interface(c);
-
+                    assert(c == nullptr);
+                }
+                {
+                    auto b = rpc::make_shared<marshalled_tests::baz>(telemetry_service);
+                    //set
+                    i_foo_ptr->set_interface(b);
+                    //reset
+                    i_foo_ptr->set_interface(nullptr);
+                    //set
+                    i_foo_ptr->set_interface(b);
+                    //reset
+                    i_foo_ptr->set_interface(nullptr);
+                }
+                {
+                    rpc::shared_ptr<marshalled_tests::xxx::i_baz> c;
                     auto b = rpc::make_shared<marshalled_tests::baz>(telemetry_service);
                     i_foo_ptr->set_interface(b);
                     i_foo_ptr->get_interface(c);
                     i_foo_ptr->set_interface(nullptr);
                     assert(b == c);
+                }
+                {
+                    auto ret = example_ptr->give_interface(rpc::shared_ptr<xxx::i_baz>(new multiple_inheritance(telemetry_service)));
+                    assert(ret == rpc::error::OK());
+                    cached.clear();
+                }
+                {
+                    auto h = rpc::make_shared<host>();
+                    auto ret = example_ptr->call_create_enclave_val(h);
+                    assert(ret == rpc::error::OK());
+                    cached.clear();
                 }
             }
         }
@@ -329,6 +378,17 @@ extern "C"
     {
         if(telemetry_service)
             telemetry_service->on_interface_proxy_send(name, originating_zone_id, zone_id, object_id, interface_id, method_id);
+    }
+    
+    void on_service_proxy_add_external_ref(const char* name, uint64_t originating_zone_id, uint64_t zone_id, int ref_count)
+    {
+        if(telemetry_service)
+            telemetry_service->on_service_proxy_add_external_ref(name, originating_zone_id, zone_id, ref_count);
+    }
+    void on_service_proxy_release_external_ref(const char* name, uint64_t originating_zone_id, uint64_t zone_id, int ref_count)
+    {
+        if(telemetry_service)
+            telemetry_service->on_service_proxy_release_external_ref(name, originating_zone_id, zone_id, ref_count);
     }
 
     void message_host(uint64_t level, const char* name)

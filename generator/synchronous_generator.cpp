@@ -255,7 +255,7 @@ namespace enclave_marshaller
                 return fmt::format("  ,(\"_{}\", {}_)", count, name);
 
             case PROXY_CLEAN_IN:
-                return fmt::format("if({0}_stub_) {0}_stub_->release();", name);
+                return fmt::format("if({0}_stub_) {0}_stub_->release_from_service();", name);
 
             case STUB_DEMARSHALL_DECLARATION:
                 return fmt::format(R"__(rpc::encapsulated_interface {0}_object_;
@@ -302,12 +302,16 @@ namespace enclave_marshaller
                 return fmt::format("  ,(\"_{}\", {})", count, name);
             case PROXY_MARSHALL_OUT:
                 return fmt::format("  ,(\"_{}\", {}_)", count, name);
+
+            case PROXY_CLEAN_IN:
+                return fmt::format("if({0}_stub_) {0}_stub_->release_from_service();", name);
+
             case STUB_DEMARSHALL_DECLARATION:
                 return fmt::format("{} {}", object_type, name);
             case STUB_PARAM_CAST:
                 return name;
             case PROXY_VALUE_RETURN:
-                return fmt::format("get_object_proxy()->get_service_proxy()->create_proxy({0}_, {0});", name);
+                return fmt::format("rpc::recieve_interface(get_object_proxy()->get_service_proxy(), {0}_, {0});", name);
             case PROXY_OUT_DECLARATION:
                 return fmt::format("rpc::encapsulated_interface {}_;", name);
             case STUB_ADD_REF_OUT_PREDECLARE:
@@ -315,7 +319,7 @@ namespace enclave_marshaller
                     "rpc::encapsulated_interface {0}_;", name);
             case STUB_ADD_REF_OUT:
                 return fmt::format(
-                    "{0}_ = target_stub_.lock()->get_zone().encapsulate_out_param({0});", name);
+                    "{0}_ = target_stub_.lock()->get_zone().encapsulate_out_param(originating_zone_id, {0});", name);
             case STUB_MARSHALL_OUT:
                 return fmt::format("  ,(\"_{}\", {}_)", count, name);
             default:
@@ -1234,7 +1238,7 @@ namespace enclave_marshaller
                    "iface, rpc::shared_ptr<rpc::object_stub>& stub);",
                    ns, interface_name);
             header("template<> rpc::encapsulated_interface "
-                   "rpc::service::encapsulate_out_param(const rpc::shared_ptr<{}{}>& "
+                   "rpc::service::encapsulate_out_param(uint64_t originating_zone_id, const rpc::shared_ptr<{}{}>& "
                    "iface);",
                    ns, interface_name);
         }
@@ -1271,14 +1275,14 @@ namespace enclave_marshaller
             stub("return {{0,0}};");
             stub("}}");
 
-            stub("return find_or_create_stub(iface.get(), [&](const rpc::shared_ptr<rpc::object_stub>& stub) -> "
+            stub("return find_or_create_stub(0, iface.get(), [&](const rpc::shared_ptr<rpc::object_stub>& stub) -> "
                  "rpc::shared_ptr<rpc::i_interface_stub>{{");
             stub("return rpc::static_pointer_cast<rpc::i_interface_stub>({}{}_stub::create(iface, stub));", ns,
                  interface_name);
             stub("}}, false, stub);");
             stub("}}");
             
-            stub("template<> rpc::encapsulated_interface rpc::service::encapsulate_out_param(const rpc::shared_ptr<{}{}>& iface)",
+            stub("template<> rpc::encapsulated_interface rpc::service::encapsulate_out_param(uint64_t originating_zone_id, const rpc::shared_ptr<{}{}>& iface)",
                  ns, interface_name);
             stub("{{");
             stub("if(!iface)");
@@ -1286,7 +1290,7 @@ namespace enclave_marshaller
             stub("return {{0,0}};");
             stub("}}");
 
-            stub("return find_or_create_stub(iface.get(), [&](const rpc::shared_ptr<rpc::object_stub>& stub) -> "
+            stub("return find_or_create_stub(originating_zone_id, iface.get(), [&](const rpc::shared_ptr<rpc::object_stub>& stub) -> "
                  "rpc::shared_ptr<rpc::i_interface_stub>{{");
             stub("return rpc::static_pointer_cast<rpc::i_interface_stub>({}{}_stub::create(iface, stub));", ns,
                  interface_name);

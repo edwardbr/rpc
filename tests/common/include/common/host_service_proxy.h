@@ -18,6 +18,7 @@ namespace rpc
             {
                 telemetry_service->on_service_proxy_creation("host_service_proxy", ret->get_operating_zone_id(), ret->get_zone_id());
             }
+            ret->add_external_ref();
             return ret;
         }
     public:
@@ -29,6 +30,7 @@ namespace rpc
             auto pthis = rpc::static_pointer_cast<service_proxy>(ret);
             ret->weak_this_ = pthis;
             operating_zone_service->add_zone_proxy(ret);
+            ret->add_external_ref();
             return pthis;
         }
 

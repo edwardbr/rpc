@@ -54,7 +54,10 @@ namespace rpc
         }
 
         template<class T> 
-        int create_proxy(rpc::encapsulated_interface encap, rpc::shared_ptr<T>& val)
+        int create_proxy(   rpc::encapsulated_interface encap, 
+                            rpc::shared_ptr<T>& val,
+                            bool stub_needs_add_ref,
+                            bool service_proxy_needs_add_ref)
         {
             rpc::shared_ptr<object_proxy> op;
             auto local_service = service_.lock();
@@ -67,7 +70,7 @@ namespace rpc
                 }
                 return rpc::error::OK();
             }
-            return service_proxy::create_proxy(encap, val);
+            return service_proxy::create_proxy(encap, val, stub_needs_add_ref, service_proxy_needs_add_ref);
         }
 
         int send(uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_,
@@ -91,7 +94,12 @@ namespace rpc
                 telemetry_service->on_service_proxy_add_ref("local_service_proxy", get_operating_zone_id(), zone_id,
                                                             object_id);
             }
-            return service_.lock()->add_ref(zone_id, object_id);
+            auto ret = service_.lock()->add_ref(zone_id, object_id);
+            if(ret != std::numeric_limits<uint64_t>::max())
+            {
+                add_external_ref();
+            }
+            return ret;
         }
         uint64_t release(uint64_t zone_id, uint64_t object_id) override
         {
@@ -100,7 +108,12 @@ namespace rpc
                 telemetry_service->on_service_proxy_release("local_service_proxy", get_operating_zone_id(), zone_id,
                                                             object_id);
             }
-            return service_.lock()->release(zone_id, object_id);
+            auto ret = service_.lock()->release(zone_id, object_id);
+            if(ret != std::numeric_limits<uint64_t>::max())
+            {
+                release_external_ref();
+            }
+            return ret;
         }
     };
 
@@ -154,7 +167,10 @@ namespace rpc
         }
 
         template<class T> 
-        int create_proxy(rpc::encapsulated_interface encap, rpc::shared_ptr<T>& val)
+        int create_proxy(   rpc::encapsulated_interface encap, 
+                            rpc::shared_ptr<T>& val,
+                            bool stub_needs_add_ref,
+                            bool service_proxy_needs_add_ref)
         {
             rpc::shared_ptr<object_proxy> op;
             auto local_service = service_.lock();
@@ -167,7 +183,7 @@ namespace rpc
                 }
                 return rpc::error::OK();
             }
-            return service_proxy::create_proxy(encap, val);
+            return service_proxy::create_proxy(encap, val, stub_needs_add_ref, service_proxy_needs_add_ref);
         }
 
         int send(uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_,
@@ -191,8 +207,12 @@ namespace rpc
                 telemetry_service->on_service_proxy_add_ref("local_child_service_proxy", get_operating_zone_id(),
                                                             zone_id, object_id);
             }
-
-            return service_.lock()->add_ref(zone_id, object_id);
+            auto ret = service_.lock()->add_ref(zone_id, object_id);
+            if(ret != std::numeric_limits<uint64_t>::max())
+            {
+                add_external_ref();
+            }
+            return ret;
         }
         uint64_t release(uint64_t zone_id, uint64_t object_id) override
         {
@@ -201,7 +221,12 @@ namespace rpc
                 telemetry_service->on_service_proxy_release("local_child_service_proxy", get_operating_zone_id(),
                                                             zone_id, object_id);
             }
-            return service_.lock()->release(zone_id, object_id);
+            auto ret = service_.lock()->release(zone_id, object_id);
+            if(ret != std::numeric_limits<uint64_t>::max())
+            {
+                release_external_ref();
+            }
+            return ret;            
         }
     };
 }

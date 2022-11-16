@@ -3,10 +3,20 @@
 
 namespace yyy
 {
-    library example
+    interface i_example
     {
         error_code add(int a, int b, [out, by_value] int& c);
         error_code create_foo([out]rpc::shared_ptr<xxx::i_foo>& target);
         error_code create_multiple_inheritance([out]rpc::shared_ptr<xxx::i_baz>& target);
+    
+        error_code recieve_interface([out]rpc::shared_ptr<xxx::i_foo>& val);//can be null
+        error_code give_interface([in]const rpc::shared_ptr<xxx::i_baz> val);//can be null
+        error_code call_create_enclave_val(rpc::shared_ptr<i_host> host);//can be null
+        error_code call_create_enclave(const rpc::shared_ptr<i_host>& host);//can be null
+    };
+
+    interface i_host
+    {
+        error_code create_enclave([out, by_value] rpc::shared_ptr<i_example>& target);
     };
 } 

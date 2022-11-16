@@ -2,7 +2,11 @@
 
 namespace rpc
 {
-    object_proxy::object_proxy(uint64_t object_id, uint64_t zone_id, rpc::shared_ptr<service_proxy> service_proxy)
+    object_proxy::object_proxy( uint64_t object_id, 
+                                uint64_t zone_id, 
+                                rpc::shared_ptr<service_proxy> service_proxy,
+                                bool stub_needs_add_ref,
+                                bool service_proxy_needs_add_ref)
         : object_id_(object_id)
         , zone_id_(zone_id)
         , service_proxy_(service_proxy)
@@ -11,6 +15,10 @@ namespace rpc
         {
             telemetry_service->on_object_proxy_creation(service_proxy_->get_operating_zone_id(), zone_id, object_id);
         }
+        if(stub_needs_add_ref)
+            service_proxy_->add_ref(zone_id_, object_id_); 
+        if(service_proxy_needs_add_ref)
+            service_proxy_->add_external_ref();
     }
     object_proxy::~object_proxy() 
     { 
@@ -19,6 +27,7 @@ namespace rpc
             telemetry_service->on_object_proxy_deletion(service_proxy_->get_operating_zone_id(), zone_id_, object_id_);
         }
         service_proxy_->release(zone_id_, object_id_); 
+        //service_proxy_->release_external_ref();
         service_proxy_ = nullptr;
     }
 
