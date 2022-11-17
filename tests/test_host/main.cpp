@@ -31,7 +31,7 @@ using namespace marshalled_tests;
 #ifdef _WIN32 // windows
 auto enclave_path = "./marshal_test_enclave.signed.dll";
 #else         // Linux
-auto enclave_path = "./libmarshal_test_enclave.signed.so"
+auto enclave_path = "./libmarshal_test_enclave.signed.so";
 #endif
 
 rpc::weak_ptr<rpc::service> current_host_service;
