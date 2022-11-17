@@ -102,7 +102,7 @@ int main()
 
                         // register implementation to the root service and held by a stub
                         // note! There is a memory leak if the interface_descriptor object is not bound to a proxy
-                        host_encap = root_service->encapsulate_out_param(root_service->get_zone_id(), hst);
+                        host_encap = rpc::create_interface_stub(*root_service, hst);
 
                         // simple test to check that we can get a useful local interface based on type and object id
                         auto example_from_cast = root_service->get_local_interface<yyy::i_host>(host_encap.object_id);
@@ -114,7 +114,7 @@ int main()
                         rpc::shared_ptr<yyy::i_example> remote_example(new example(telemetry_service));
 
                         example_encap
-                            = child_service->encapsulate_out_param(child_service->get_zone_id(), remote_example);
+                            = rpc::create_interface_stub(*child_service, remote_example);
 
                         // simple test to check that we can get a usefule local interface based on type and object id
                         auto example_from_cast
@@ -123,10 +123,10 @@ int main()
                     }
 
                     rpc::shared_ptr<yyy::i_host> i_host_ptr;
-                    ASSERT(!service_proxy_to_host->create_proxy(host_encap, i_host_ptr, false, false));
+                    ASSERT(!rpc::create_interface_proxy(service_proxy_to_host, host_encap, i_host_ptr));
 
                     rpc::shared_ptr<yyy::i_example> i_example_ptr;
-                    ASSERT(!service_proxy_to_child->create_proxy(example_encap, i_example_ptr, false, false));
+                    ASSERT(!rpc::create_interface_proxy(service_proxy_to_child, example_encap, i_example_ptr));
 
                     rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
                     int err_code = i_example_ptr->create_foo(i_foo_ptr);

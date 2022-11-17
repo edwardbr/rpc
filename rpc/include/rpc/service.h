@@ -43,8 +43,6 @@ namespace rpc
         service(uint64_t zone_id = generate_new_zone_id()) : zone_id_(zone_id){}
         virtual ~service();
 
-        // this function is needed by services where there is no shared pointer to this object, and its lifetime
-        virtual void cleanup();
         virtual bool check_is_empty() const;
         uint64_t get_zone_id() const {return zone_id_;}
         void set_zone_id(uint64_t zone_id){zone_id_ = zone_id;}
@@ -100,9 +98,15 @@ namespace rpc
         {
             parent_service_ = parent_service;
         }
-        virtual void cleanup() override;
         bool check_is_empty() const override;
         uint64_t get_root_object_id() const;
         rpc::shared_ptr<service_proxy> get_zone_proxy(uint64_t originating_zone_id, uint64_t zone_id, bool& new_proxy_added) override;
     };
+
+
+    template<class T> 
+    rpc::interface_descriptor create_interface_stub(rpc::service& serv, const rpc::shared_ptr<T>& iface)
+    {
+        return serv.encapsulate_out_param(serv.get_zone_id(), iface);       
+    }
 }

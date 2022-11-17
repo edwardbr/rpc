@@ -33,9 +33,6 @@ namespace rpc
         template<class T> rpc::interface_descriptor encapsulate_in_param(const rpc::shared_ptr<T>& iface, rpc::shared_ptr<rpc::object_stub>& stub);
         template<class T> rpc::interface_descriptor encapsulate_out_param(uint64_t originating_zone_id, const rpc::shared_ptr<T>& iface);
 
-        template<class T>
-        uint64_t get_interface_zone_id(const rpc::shared_ptr<T>& iface);
-
         template<class T1, class T2>
         friend rpc::shared_ptr<T1> dynamic_pointer_cast(const shared_ptr<T2>& from) noexcept;
         friend service;
@@ -394,27 +391,7 @@ namespace rpc
         return operating_service->encapsulate_out_param(originating_zone_id, iface);
     }
 
-    template<class T>
-    uint64_t proxy_base::get_interface_zone_id(const rpc::shared_ptr<T>& iface)
-    {
-        if(!iface)
-            return 0;
-        //fist check if this shared pointer is a remote one
-        auto impl = static_cast<rpc::proxy_impl<T>*>(iface->query_interface(T::id));
-        if(impl)
-        {
-            return impl->object_proxy_->get_zone_id();
-        }
-        //else get the zone id of the service that runs this zone or enclave
-        return object_proxy_->get_service_proxy()->get_operating_zone_id();
-    }
-
-    template<class T> int get_interface(const rpc::interface_descriptor& descriptor, const rpc::shared_ptr<service_proxy>& svp, rpc::shared_ptr<T>& iface)
-    {
-        auto proxy = rpc::object_proxy::create(descriptor.object_id, descriptor.zone_id, svp, true, true);
-        return proxy->query_interface(iface);
-    }
-
+    //do not use directly it is for the interface generator use rpc::create_proxy if you want to get a proxied pointer to a remote implementation
     template<class T> 
     int get_interface(rpc::service& serv, uint64_t originating_zone_id, const rpc::interface_descriptor& encap, rpc::shared_ptr<T>& iface)
     {
@@ -438,10 +415,16 @@ namespace rpc
         return ret;
     }
 
+    //do not use directly it is for the interface generator use rpc::create_interface_proxy if you want to get a proxied pointer to a remote implementation
     template<class T> 
     int recieve_interface(const rpc::shared_ptr<rpc::service_proxy>& service_proxy, const rpc::interface_descriptor& encap, rpc::shared_ptr<T>& iface)
     {
         return service_proxy->create_proxy(encap, iface, false, true);
     }
 
+    template<class T> 
+    int create_interface_proxy(const rpc::shared_ptr<rpc::service_proxy>& service_proxy, const rpc::interface_descriptor& encap, rpc::shared_ptr<T>& iface)
+    {
+        return service_proxy->create_proxy(encap, iface, false, false);
+    }
 }

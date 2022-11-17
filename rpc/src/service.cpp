@@ -26,11 +26,6 @@ namespace rpc
     service::~service() 
     {
         LOG("~service",100);
-        cleanup();
-    }
-
-    void service::cleanup()
-    {
         object_id_generator = 0;
         // to do: assert that there are no more object_stubs in memory
         assert(check_is_empty());
@@ -371,10 +366,7 @@ namespace rpc
             parent_service_->release_external_ref();
             parent_service_ = nullptr;
         }
-    }
 
-    void child_service::cleanup()
-    {
         // clean up the zone root pointer
         if (root_stub_)
         {
@@ -382,9 +374,7 @@ namespace rpc
             if(stub)
                 release(zone_id_, stub->get_id());
             root_stub_.reset();
-        }
-
-        service::cleanup();
+        }        
     }
 
     bool child_service::check_is_empty() const
