@@ -50,27 +50,8 @@ namespace rpc
             auto ret = rpc::shared_ptr<local_service_proxy>(new local_service_proxy(serv, operating_zone_service, telemetry_service));
             auto pthis = rpc::static_pointer_cast<service_proxy>(ret);
             ret->weak_this_ = pthis;
+            ret->add_external_ref();
             return ret;
-        }
-
-        template<class T> 
-        int create_proxy(   rpc::encapsulated_interface encap, 
-                            rpc::shared_ptr<T>& val,
-                            bool stub_needs_add_ref,
-                            bool service_proxy_needs_add_ref)
-        {
-            rpc::shared_ptr<object_proxy> op;
-            auto local_service = service_.lock();
-            if(local_service && (local_service->get_zone_id() == encap.zone_id))
-            {
-                val = local_service->template get_local_interface<T>(encap.object_id);
-                if(!val)
-                {
-                    return rpc::error::OBJECT_NOT_FOUND();
-                }
-                return rpc::error::OK();
-            }
-            return service_proxy::create_proxy(encap, val, stub_needs_add_ref, service_proxy_needs_add_ref);
         }
 
         int send(uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_,
@@ -163,27 +144,8 @@ namespace rpc
             auto pthis = rpc::static_pointer_cast<service_proxy>(ret);
             ret->weak_this_ = pthis;
             operating_zone_service->add_zone_proxy(pthis);
+            ret->add_external_ref();
             return ret;
-        }
-
-        template<class T> 
-        int create_proxy(   rpc::encapsulated_interface encap, 
-                            rpc::shared_ptr<T>& val,
-                            bool stub_needs_add_ref,
-                            bool service_proxy_needs_add_ref)
-        {
-            rpc::shared_ptr<object_proxy> op;
-            auto local_service = service_.lock();
-            if(local_service && (local_service->get_zone_id() == encap.zone_id))
-            {
-                val = local_service->template get_local_interface<T>(encap.object_id);
-                if(!val)
-                {
-                    return rpc::error::OBJECT_NOT_FOUND();
-                }
-                return rpc::error::OK();
-            }
-            return service_proxy::create_proxy(encap, val, stub_needs_add_ref, service_proxy_needs_add_ref);
         }
 
         int send(uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_,

@@ -30,8 +30,8 @@ namespace rpc
         virtual ~proxy_base()
         {}
 
-        template<class T> rpc::encapsulated_interface encapsulate_in_param(const rpc::shared_ptr<T>& iface, rpc::shared_ptr<rpc::object_stub>& stub);
-        template<class T> rpc::encapsulated_interface encapsulate_out_param(uint64_t originating_zone_id, const rpc::shared_ptr<T>& iface);
+        template<class T> rpc::interface_descriptor encapsulate_in_param(const rpc::shared_ptr<T>& iface, rpc::shared_ptr<rpc::object_stub>& stub);
+        template<class T> rpc::interface_descriptor encapsulate_out_param(uint64_t originating_zone_id, const rpc::shared_ptr<T>& iface);
 
         template<class T>
         uint64_t get_interface_zone_id(const rpc::shared_ptr<T>& iface);
@@ -304,7 +304,7 @@ namespace rpc
         const rpc::i_telemetry_service* get_telemetry_service(){return telemetry_service_;}
 
         template<class T> 
-        int create_proxy(   rpc::encapsulated_interface encap, 
+        int create_proxy(   rpc::interface_descriptor encap, 
                             rpc::shared_ptr<T>& val,
                             bool stub_needs_add_ref,
                             bool service_proxy_needs_add_ref)
@@ -356,7 +356,7 @@ namespace rpc
 
     //declared here as object_proxy and service_proxy is not fully defined in the body of proxy_base
     template<class T>
-    encapsulated_interface proxy_base::encapsulate_in_param(const rpc::shared_ptr<T>& iface, rpc::shared_ptr<rpc::object_stub>& stub)
+    interface_descriptor proxy_base::encapsulate_in_param(const rpc::shared_ptr<T>& iface, rpc::shared_ptr<rpc::object_stub>& stub)
     {
         if(!iface)
             return {0,0};
@@ -376,7 +376,7 @@ namespace rpc
 
     //declared here as object_proxy and service_proxy is not fully defined in the body of proxy_base
     template<class T>
-    encapsulated_interface proxy_base::encapsulate_out_param(uint64_t originating_zone_id, const rpc::shared_ptr<T>& iface)
+    interface_descriptor proxy_base::encapsulate_out_param(uint64_t originating_zone_id, const rpc::shared_ptr<T>& iface)
     {
         if(!iface)
             return {0,0};
@@ -409,14 +409,14 @@ namespace rpc
         return object_proxy_->get_service_proxy()->get_operating_zone_id();
     }
 
-    template<class T> int get_interface(const rpc::encapsulated_interface& descriptor, const rpc::shared_ptr<service_proxy>& svp, rpc::shared_ptr<T>& iface)
+    template<class T> int get_interface(const rpc::interface_descriptor& descriptor, const rpc::shared_ptr<service_proxy>& svp, rpc::shared_ptr<T>& iface)
     {
         auto proxy = rpc::object_proxy::create(descriptor.object_id, descriptor.zone_id, svp, true, true);
         return proxy->query_interface(iface);
     }
 
     template<class T> 
-    int get_interface(rpc::service& serv, uint64_t originating_zone_id, const rpc::encapsulated_interface& encap, rpc::shared_ptr<T>& iface)
+    int get_interface(rpc::service& serv, uint64_t originating_zone_id, const rpc::interface_descriptor& encap, rpc::shared_ptr<T>& iface)
     {
         if(serv.get_zone_id() == encap.zone_id)
         {
@@ -439,7 +439,7 @@ namespace rpc
     }
 
     template<class T> 
-    int recieve_interface(const rpc::shared_ptr<rpc::service_proxy>& service_proxy, const rpc::encapsulated_interface& encap, rpc::shared_ptr<T>& iface)
+    int recieve_interface(const rpc::shared_ptr<rpc::service_proxy>& service_proxy, const rpc::interface_descriptor& encap, rpc::shared_ptr<T>& iface)
     {
         return service_proxy->create_proxy(encap, iface, false, true);
     }

@@ -108,25 +108,31 @@ namespace rpc
         }
     }
 
-    encapsulated_interface service::find_or_create_stub(uint64_t originating_zone_id, rpc::casting_interface* iface,
+    interface_descriptor service::get_proxy_stub_descriptor(uint64_t originating_zone_id, rpc::casting_interface* iface,
                                         std::function<rpc::shared_ptr<i_interface_stub>(rpc::shared_ptr<object_stub>)> fn)
     {
         rpc::shared_ptr<object_stub> stub;
-        return find_or_create_stub(originating_zone_id, iface, fn, true, stub);
+        return get_proxy_stub_descriptor(originating_zone_id, iface, fn, true, stub);
     }
 
-    encapsulated_interface service::find_or_create_stub(uint64_t originating_zone_id, rpc::casting_interface* iface,
+    //this is a key function that returns an interface descriptor
+    //for wrapping an implementation to a local object inside a stub where needed
+    //or if the interface is a proxy to add ref it
+    interface_descriptor service::get_proxy_stub_descriptor(uint64_t originating_zone_id, rpc::casting_interface* iface,
                                         std::function<rpc::shared_ptr<i_interface_stub>(rpc::shared_ptr<object_stub>)> fn,
                                         bool add_ref,
                                         rpc::shared_ptr<object_stub>& stub)
     {
-        auto proxy_base = iface->query_proxy_base();
+        proxy_base* proxy_base = nullptr;
+        if(originating_zone_id)//a proxy with no zone id makes no sense
+        {
+            proxy_base = iface->query_proxy_base();
+        }
         if(proxy_base)
         {
             auto object_proxy = proxy_base->get_object_proxy();
             if(add_ref && originating_zone_id != object_proxy->get_zone_id())
             {
-                assert(originating_zone_id);
                 auto zone_proxy = object_proxy->get_service_proxy();
                 zone_proxy->add_ref(object_proxy->get_zone_id(), object_proxy->get_object_id());
             }
@@ -135,36 +141,26 @@ namespace rpc
 
         std::lock_guard g(insert_control);
         auto* pointer = iface->get_address();
-        auto item = wrapped_object_to_stub.find(pointer);
-        if (item == wrapped_object_to_stub.end())
         {
-            auto id = generate_new_object_id();
-            stub = rpc::shared_ptr<object_stub>(new object_stub(id, *this));
-            rpc::shared_ptr<i_interface_stub> interface_stub = fn(stub);
-            stub->add_interface(interface_stub);
-            wrapped_object_to_stub[pointer] = stub;
-            stubs[id] = stub;
-            stub->on_added_to_zone(stub);
-            stub->add_ref();
-            return {id, get_zone_id()};
+            //find the stub by its address
+            auto item = wrapped_object_to_stub.find(pointer);
+            if (item != wrapped_object_to_stub.end())
+            {
+                auto obj = item->second.lock();
+                obj->add_ref();
+                return {obj->get_id(), obj->get_zone().get_zone_id()};
+            }
         }
-        auto obj = item->second.lock();
-        obj->add_ref();
-        return {obj->get_id(), obj->get_zone().get_zone_id()};
-    }
-
-    int service::add_object(const rpc::shared_ptr<object_stub>& stub)
-    {
-        std::lock_guard g(insert_control);
-        auto* pointer = stub->get_castable_interface()->get_address();
-        assert(wrapped_object_to_stub.find(pointer) == wrapped_object_to_stub.end());
-        auto stub_id = stub->get_id();
-        assert(stubs.find(stub_id) == stubs.end());
+        //else create a stub
+        auto id = generate_new_object_id();
+        stub = rpc::shared_ptr<object_stub>(new object_stub(id, *this));
+        rpc::shared_ptr<i_interface_stub> interface_stub = fn(stub);
+        stub->add_interface(interface_stub);
         wrapped_object_to_stub[pointer] = stub;
-        stubs[stub_id] = stub;
+        stubs[id] = stub;
         stub->on_added_to_zone(stub);
         stub->add_ref();
-        return error::OK();
+        return {id, get_zone_id()};
     }
 
     rpc::weak_ptr<object_stub> service::get_object(uint64_t object_id) const
@@ -324,12 +320,7 @@ namespace rpc
         assert(other_zones.find(service_proxy->get_zone_id()) == other_zones.end());
         other_zones[service_proxy->get_zone_id()] = service_proxy;
     }
-    /*void service::add_zone_proxy(const rpc::shared_ptr<service_proxy>& service_proxy, uint64_t zone_id)
-    {
-        assert(zone_id != zone_id_);
-        std::lock_guard g(insert_control);
-        other_zones[zone_id] = service_proxy;
-    }*/
+
     rpc::shared_ptr<service_proxy> service::get_zone_proxy(uint64_t originating_zone_id, uint64_t zone_id, bool& new_proxy_added)
     {
         new_proxy_added = false;

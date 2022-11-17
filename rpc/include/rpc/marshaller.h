@@ -23,22 +23,22 @@ namespace rpc
         virtual uint64_t release(uint64_t zone_id, uint64_t object_id) = 0;
     };
 
-    struct encapsulated_interface
+    struct interface_descriptor
     {
-        encapsulated_interface() :
+        interface_descriptor() :
             object_id{0},
             zone_id{0}
         {}
         
-        encapsulated_interface(uint64_t obj_id, uint64_t zn_id) : 
+        interface_descriptor(uint64_t obj_id, uint64_t zn_id) : 
             object_id{obj_id},
             zone_id{zn_id}
         {}
-        encapsulated_interface(const encapsulated_interface& other) = default;
-        encapsulated_interface(encapsulated_interface&& other) = default;
+        interface_descriptor(const interface_descriptor& other) = default;
+        interface_descriptor(interface_descriptor&& other) = default;
         
-        encapsulated_interface& operator= (const encapsulated_interface& other) = default;
-        encapsulated_interface& operator= (encapsulated_interface&& other) = default;
+        interface_descriptor& operator= (const interface_descriptor& other) = default;
+        interface_descriptor& operator= (interface_descriptor&& other) = default;
 
         uint64_t object_id;
         uint64_t zone_id;
@@ -46,7 +46,7 @@ namespace rpc
         template<typename Ar>
 		void serialize(Ar &ar)
 		{
-			ar & YAS_OBJECT_NVP("encapsulated_interface"
+			ar & YAS_OBJECT_NVP("interface_descriptor"
 			  ,("object_id", object_id)
 			  ,("zone_id", zone_id)
 			);

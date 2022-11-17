@@ -51,21 +51,21 @@ namespace rpc
         static uint64_t generate_new_zone_id() { return ++zone_count; }
         uint64_t generate_new_object_id() const { return ++object_id_generator; }
 
-        template<class T> rpc::encapsulated_interface encapsulate_in_param(const rpc::shared_ptr<T>& iface, rpc::shared_ptr<rpc::object_stub>& stub);
-        template<class T> rpc::encapsulated_interface encapsulate_out_param(uint64_t originating_zone_id, const rpc::shared_ptr<T>& iface);
+        template<class T> rpc::interface_descriptor encapsulate_in_param(const rpc::shared_ptr<T>& iface, rpc::shared_ptr<rpc::object_stub>& stub);
+        template<class T> rpc::interface_descriptor encapsulate_out_param(uint64_t originating_zone_id, const rpc::shared_ptr<T>& iface);
 
         int send(uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_,
                         const char* in_buf_, std::vector<char>& out_buf_) override;
 
-        encapsulated_interface find_or_create_stub(uint64_t originating_zone_id, rpc::casting_interface* pointer,
+        interface_descriptor get_proxy_stub_descriptor(uint64_t originating_zone_id, rpc::casting_interface* pointer,
                                  std::function<rpc::shared_ptr<i_interface_stub>(rpc::shared_ptr<object_stub>)> fn,
                                 bool add_ref,
                                  rpc::shared_ptr<object_stub>& stub);
 
-        encapsulated_interface find_or_create_stub(uint64_t originating_zone_id, rpc::casting_interface* pointer,
+        interface_descriptor get_proxy_stub_descriptor(uint64_t originating_zone_id, rpc::casting_interface* pointer,
                                  std::function<rpc::shared_ptr<i_interface_stub>(rpc::shared_ptr<object_stub>)> fn);
                                  
-        int add_object(const rpc::shared_ptr<object_stub>& stub);
+        //int add_object(const rpc::shared_ptr<object_stub>& stub);
         rpc::weak_ptr<object_stub> get_object(uint64_t object_id) const;
 
         int try_cast(uint64_t zone_id, uint64_t object_id, uint64_t interface_id) override;
@@ -99,23 +99,6 @@ namespace rpc
         void set_parent(const rpc::shared_ptr<rpc::service_proxy>& parent_service)
         {
             parent_service_ = parent_service;
-        }
-
-        template<class T, class Stub, class obj_stub = object_stub> 
-        void create_stub(const rpc::shared_ptr<T>& root_ob, uint64_t* stub_id = nullptr)
-        {
-            assert(check_is_empty());
-
-            auto id = generate_new_object_id();
-            auto os = rpc::shared_ptr<obj_stub>(new obj_stub(id, *this));
-            root_stub_ = rpc::static_pointer_cast<i_interface_stub>(Stub::create(root_ob, os));
-            os->add_interface(root_stub_);
-            add_object(os);
-            
-            if(stub_id)
-            {
-                *stub_id = id;
-            }
         }
         virtual void cleanup() override;
         bool check_is_empty() const override;

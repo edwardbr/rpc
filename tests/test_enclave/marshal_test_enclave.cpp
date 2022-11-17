@@ -132,7 +132,7 @@ enclave_telemetry_service telemetry_service;
 
 rpc::shared_ptr<rpc::child_service> rpc_server;
 
-int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t child_zone_id, uint64_t* root_object_id)
+int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t child_zone_id, uint64_t* example_object_id)
 {
     //create a zone service for the enclave
     rpc_server = rpc::make_shared<rpc::child_service>(child_zone_id); 
@@ -142,7 +142,9 @@ int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t child_zone_id, uin
 
     //create the root object
     rpc::shared_ptr<yyy::i_example> ex(new example(p_telemetry_service));
-    rpc_server->create_stub<yyy::i_example, yyy::i_example_stub>(ex, root_object_id);
+    
+    auto example_encap = rpc_server->encapsulate_out_param(rpc_server->get_zone_id(), ex);
+    *example_object_id = example_encap.object_id;
 
     return rpc::error::OK();
 }
