@@ -27,7 +27,6 @@ namespace rpc
         {
             telemetry_service->on_service_proxy_deletion("enclave_service_proxy", get_operating_zone_id(), get_zone_id());
         }
-        enclave_owner_ = nullptr;
     }
 
     enclave_service_proxy::enclave_owner::~enclave_owner()
@@ -55,7 +54,8 @@ namespace rpc
             sgx_destroy_enclave(eid_);
             return rpc::error::TRANSPORT_ERROR();
         }
-        
+        if (err_code)
+            return err_code;      
         //class takes ownership of the enclave
         enclave_owner_ = std::make_shared<enclave_owner>(eid_);
         if (err_code)

@@ -72,7 +72,7 @@ int main()
     }
 
     // an inprocess marshalling of an object
-    /*do
+   /* do
     {
         host_telemetry_service tm;
         telemetry_service = &tm;
@@ -97,9 +97,9 @@ int main()
                         auto example_from_cast = branch_service->get_local_interface<yyy::i_example>(stub_id);
                         assert(example_from_cast == remote_ex);
                     }
-
+{
                     rpc::shared_ptr<yyy::i_example> i_example_ptr;
-                    ASSERT(!local_child_service_proxy->create_proxy({stub_id, branch_service->get_zone_id()}, i_example_ptr, false, false));
+                    ASSERT(!service_proxy->create_proxy({stub_id, branch_service->get_zone_id()}, i_example_ptr, false, false));
 
                     rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
                     int err_code = i_example_ptr->create_foo(i_foo_ptr);
@@ -108,7 +108,7 @@ int main()
                         std::cout << "create_foo failed\n";
                         break;
                     }
-
+}
                     ASSERT(!i_foo_ptr->do_something_in_val(33));
                     standard_tests(*i_foo_ptr, true, telemetry_service);
 

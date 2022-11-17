@@ -411,7 +411,7 @@ namespace rpc
 
     template<class T> int get_interface(const rpc::encapsulated_interface& descriptor, const rpc::shared_ptr<service_proxy>& svp, rpc::shared_ptr<T>& iface)
     {
-        auto proxy = rpc::object_proxy::create(descriptor.object_id, descriptor.zone_id, svp, true);
+        auto proxy = rpc::object_proxy::create(descriptor.object_id, descriptor.zone_id, svp, true, true);
         return proxy->query_interface(iface);
     }
 

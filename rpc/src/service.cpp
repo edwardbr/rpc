@@ -4,6 +4,18 @@
 #include "rpc/stub.h"
 #include "rpc/proxy.h"
 
+#define LOG_STR(str, sz)
+
+/*#ifdef _IN_ENCLAVE
+#define LOG_STR(str, sz)
+#else
+#define LOG_STR(str, sz) log_str(str, sz)
+extern "C"
+{
+    void log_str(const char* str, size_t sz);
+}
+#endif*/
+
 namespace rpc
 {
     ////////////////////////////////////////////////////////////////////////////
@@ -37,12 +49,12 @@ namespace rpc
             if(!stub)
             {
                 auto message = std::string("service ") + std::to_string(get_zone_id()) + std::string(", object stub ") + std::to_string(item.first) + std::string(" has been released but not deregisted in the service suspected unclean shutdown");
-                LOG(message.data(), message.size());
+                LOG_STR(message.data(), message.size());
             }
             else
             {
                 auto message = std::string("service ") + std::to_string(get_zone_id()) + std::string(", object stub ") + std::to_string(item.first) + std::string(" has not been deregisted in the service suspected unclean shutdown");
-                LOG(message.data(), message.size());
+                LOG_STR(message.data(), message.size());
             }
             success = false;
         }
@@ -52,12 +64,12 @@ namespace rpc
             if(!stub)
             {
                 auto message = std::string("service ") + std::to_string(get_zone_id()) + std::string(", wrapped_object has been released but not deregisted in the service suspected unclean shutdown");
-                LOG(message.data(), message.size());
+                LOG_STR(message.data(), message.size());
             }
             else
             {
                 auto message = std::string("service ") + std::to_string(get_zone_id()) + std::string(", wrapped_object ") + std::to_string(stub->get_id()) + std::string(" has not been deregisted in the service suspected unclean shutdown");
-                LOG(message.data(), message.size());
+                LOG_STR(message.data(), message.size());
             }
             success = false;
         }
