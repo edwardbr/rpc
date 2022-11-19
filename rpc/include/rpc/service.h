@@ -88,7 +88,7 @@ namespace rpc
         rpc::shared_ptr<i_interface_stub> root_stub_;
         rpc::shared_ptr<rpc::service_proxy> parent_service_;
     public:
-        child_service(uint64_t zone_id) : 
+        child_service(uint64_t zone_id = generate_new_zone_id()) : 
             service(zone_id)
         {}
 

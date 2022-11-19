@@ -271,40 +271,44 @@ namespace rpc
         }
         else
         {
-            std::lock_guard l(insert_control);
-            auto item = stubs.find(object_id);
-            if (item == stubs.end())
+            rpc::shared_ptr<rpc::object_stub> stub;
+            //these scope brackets are needed as otherwise there will be a recursive lock on a mutex in rare cases
             {
-                return std::numeric_limits<uint64_t>::max();
-            }
-
-            auto stub = item->second.lock();
-
-            if (!stub)
-                return std::numeric_limits<uint64_t>::max();
-            uint64_t count = stub->release();
-            if(!count)
-            {
+                std::lock_guard l(insert_control);
+                auto item = stubs.find(object_id);
+                if (item == stubs.end())
                 {
-                    stubs.erase(item);
+                    return std::numeric_limits<uint64_t>::max();
                 }
-                {
-                    auto* pointer = stub->get_castable_interface()->get_address();
-                    auto it = wrapped_object_to_stub.find(pointer);
-                    if(it != wrapped_object_to_stub.end())
-                    {
-                        wrapped_object_to_stub.erase(it);
-                    }
-                    else
-                    {
-                        assert(false);
-                        return std::numeric_limits<uint64_t>::max();
-                    }
-                }
-                stub->reset();        
-            }
 
-            return count;
+                stub = item->second.lock();
+
+                if (!stub)
+                    return std::numeric_limits<uint64_t>::max();
+                uint64_t count = stub->release();
+                if(!count)
+                {
+                    {
+                        stubs.erase(item);
+                    }
+                    {
+                        auto* pointer = stub->get_castable_interface()->get_address();
+                        auto it = wrapped_object_to_stub.find(pointer);
+                        if(it != wrapped_object_to_stub.end())
+                        {
+                            wrapped_object_to_stub.erase(it);
+                        }
+                        else
+                        {
+                            assert(false);
+                            return std::numeric_limits<uint64_t>::max();
+                        }
+                    }
+                    stub->reset();        
+                }
+
+                return count;
+            }
         }
     }
 
@@ -363,7 +367,7 @@ namespace rpc
         #ifdef _DEBUG
             parent_service_->set_operating_zone_service_released();
         #endif
-            parent_service_->release_external_ref();
+//            parent_service_->release_external_ref();
             parent_service_ = nullptr;
         }
 
@@ -411,6 +415,7 @@ namespace rpc
             proxy = parent_service_->clone_for_zone(zone_id);
             new_proxy_added = true;
             add_zone_proxy(proxy);
+            proxy->add_external_ref();
         }
         return proxy;
     }
