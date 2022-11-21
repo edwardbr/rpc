@@ -31,10 +31,6 @@ class host_telemetry_service : public rpc::i_telemetry_service
 
     struct interface_proxy_id
     {
-        interface_proxy_id() = default;
-        interface_proxy_id(const interface_proxy_id&) = default;
-        interface_proxy_id(interface_proxy_id&&) = default;
-
         bool operator == (const interface_proxy_id& other) const
         {
         return  originating_zone_id == other.originating_zone_id &&
@@ -61,10 +57,6 @@ class host_telemetry_service : public rpc::i_telemetry_service
 
     struct impl
     {
-        impl() = default;
-        impl(const impl&) = default;
-        impl(impl&&) = default;
-        
         bool operator == (const impl& other) const
         {
         return  interface_id == other.interface_id &&
