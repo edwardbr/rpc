@@ -245,7 +245,9 @@ namespace rpc
         virtual ~service_proxy()
         {
             auto operating_zone_service = operating_zone_service_.lock();
+#ifndef TOLERATE_LEAKY_RPC_SERVICES
             assert(operating_zone_service != nullptr || operating_zone_service_released);
+#endif
             if(operating_zone_service)
             {
                 operating_zone_service->remove_zone_proxy(zone_id_);

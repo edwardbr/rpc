@@ -6,6 +6,7 @@
 
 #define LOG_STR(str, sz)
 
+//logging temporarily disabled will be fixed later
 /*#ifdef _IN_ENCLAVE
 #define LOG_STR(str, sz)
 #else
