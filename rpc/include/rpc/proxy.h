@@ -30,11 +30,8 @@ namespace rpc
         virtual ~proxy_base()
         {}
 
-        template<class T>
-        encapsulated_interface encapsulate_outbound_interfaces(const rpc::shared_ptr<T>& iface, bool add_ref);
-
-        template<class T>
-        uint64_t get_interface_zone_id(const rpc::shared_ptr<T>& iface);
+        template<class T> rpc::interface_descriptor encapsulate_in_param(const rpc::shared_ptr<T>& iface, rpc::shared_ptr<rpc::object_stub>& stub);
+        template<class T> rpc::interface_descriptor encapsulate_out_param(uint64_t originating_zone_id, const rpc::shared_ptr<T>& iface);
 
         template<class T1, class T2>
         friend rpc::shared_ptr<T1> dynamic_pointer_cast(const shared_ptr<T2>& from) noexcept;
@@ -79,15 +76,22 @@ namespace rpc
 
         // note the interface pointer may change if there is already an interface inserted successfully
         void register_interface(uint64_t interface_id, rpc::weak_ptr<proxy_base>& value);
-        object_proxy(uint64_t object_id, uint64_t zone_id, rpc::shared_ptr<service_proxy> service_proxy);
+        object_proxy(   uint64_t object_id, 
+                        uint64_t zone_id, 
+                        rpc::shared_ptr<service_proxy> service_proxy,
+                        bool stub_needs_add_ref,
+                        bool service_proxy_needs_add_ref);
 
         int try_cast(uint64_t interface_id);
 
     public:
-        static rpc::shared_ptr<object_proxy> create(uint64_t object_id, uint64_t zone_id,
-                                                    const rpc::shared_ptr<service_proxy>& service_proxy)
+        static rpc::shared_ptr<object_proxy> create(uint64_t object_id, 
+                                                    uint64_t zone_id,
+                                                    const rpc::shared_ptr<service_proxy>& service_proxy,
+                                                    bool stub_needs_add_ref,
+                                                    bool service_proxy_needs_add_ref)
         {
-            rpc::shared_ptr<object_proxy> ret(new object_proxy(object_id, zone_id, service_proxy));
+            rpc::shared_ptr<object_proxy> ret(new object_proxy(object_id, zone_id, service_proxy, stub_needs_add_ref, service_proxy_needs_add_ref));
             ret->weak_this_ = ret;
             return ret;
         }
@@ -201,40 +205,37 @@ namespace rpc
     {
         std::unordered_map<uint64_t, rpc::weak_ptr<object_proxy>> proxies;
         std::mutex insert_control;
-        rpc::weak_ptr<service> service_;
         uint64_t zone_id_ = 0;
         uint64_t operating_zone_id = 0;
         rpc::weak_ptr<service> operating_zone_service_;
+        rpc::shared_ptr<service_proxy> dependent_services_lock_;
+        std::atomic<int> dependent_services_count_ = 0;
         const rpc::i_telemetry_service* const telemetry_service_ = nullptr;
-        bool allow_local_cast_ = true;
+        #ifdef _DEBUG
+        bool operating_zone_service_released = false;
+        #endif
 
     protected:
 
-        service_proxy(  const rpc::shared_ptr<service>& serv, 
-                        const rpc::shared_ptr<service>& operating_zone_service,
-                        const rpc::i_telemetry_service* telemetry_service) : 
-            service_(serv), 
-            zone_id_(serv->get_zone_id()),
-            operating_zone_id(operating_zone_service ? operating_zone_service->get_zone_id() : 0),
-            operating_zone_service_(operating_zone_service),
-            telemetry_service_(telemetry_service)
-        {}
-        service_proxy(  uint64_t zone_id, 
+        service_proxy(  uint64_t zone_id,
                         const rpc::shared_ptr<service>& operating_zone_service,
                         const rpc::i_telemetry_service* telemetry_service) : 
             zone_id_(zone_id),
             operating_zone_id(operating_zone_service ? operating_zone_service->get_zone_id() : 0),
             operating_zone_service_(operating_zone_service),
             telemetry_service_(telemetry_service)
-        {}
+        {
+            assert(operating_zone_service != nullptr);
+        }
 
         service_proxy( const service_proxy& other) : 
-                service_(other.service_),
                 zone_id_(other.zone_id_),
                 operating_zone_id(other.operating_zone_id),
                 operating_zone_service_(other.operating_zone_service_),
-                telemetry_service_(other.telemetry_service_)
+                telemetry_service_(other.telemetry_service_),
+                dependent_services_count_(0)
         {
+            assert(operating_zone_service_.lock() != nullptr);
         }
 
         mutable rpc::weak_ptr<service_proxy> weak_this_;
@@ -243,11 +244,52 @@ namespace rpc
     public:
         virtual ~service_proxy()
         {
-            auto srv = service_.lock();
-            if(srv)
+            auto operating_zone_service = operating_zone_service_.lock();
+#ifndef TOLERATE_LEAKY_RPC_SERVICES
+            assert(operating_zone_service != nullptr || operating_zone_service_released);
+#endif
+            if(operating_zone_service)
             {
-                srv->remove_zone_proxy(zone_id_);
+                operating_zone_service->remove_zone_proxy(zone_id_);
             }
+        }
+        #ifdef _DEBUG
+        void set_operating_zone_service_released()
+        {
+            operating_zone_service_released = true;
+        }
+        #endif
+        
+        void add_external_ref()
+        {
+            std::lock_guard g(insert_control);
+            auto count = ++dependent_services_count_;
+            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
+            {
+                telemetry_service->on_service_proxy_add_external_ref("service_proxy", operating_zone_id, zone_id_, count);
+            }            
+            assert(count >= 1);
+            if(count == 1)
+            {
+                assert(!dependent_services_lock_);
+                dependent_services_lock_ = weak_this_.lock();
+            }            
+        }
+
+        void release_external_ref()
+        {
+            std::lock_guard g(insert_control);
+            auto count = --dependent_services_count_;
+            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
+            {
+                telemetry_service->on_service_proxy_release_external_ref("service_proxy", operating_zone_id, zone_id_, count);
+            }            
+            assert(count >= 0);
+            if(count == 0)
+            {
+                assert(dependent_services_lock_);
+                dependent_services_lock_ = nullptr;
+            }            
         }
 
         virtual rpc::shared_ptr<service_proxy> clone_for_zone(uint64_t zone_id) = 0;
@@ -255,52 +297,53 @@ namespace rpc
         rpc::shared_ptr<service_proxy> shared_from_this() { return rpc::shared_ptr<service_proxy>(weak_this_); }
         rpc::shared_ptr<service_proxy const> shared_from_this() const { return rpc::shared_ptr<service_proxy const>(weak_this_); }
 
-        rpc::shared_ptr<service> get_service() const {return service_.lock();}
         uint64_t get_zone_id() const {return zone_id_;}
         uint64_t get_operating_zone_id() const {return operating_zone_id;}
         rpc::shared_ptr<service> get_operating_zone_service() const {return operating_zone_service_.lock();}
         const rpc::i_telemetry_service* get_telemetry_service(){return telemetry_service_;}
 
-        //when you have multiple rpc::services in the same memory address space and you want to use a marshalled pointer 
-        //between them (e.g. for testing) rather than a local pointer setting to false will prevent this
-        void set_allow_local_cast(bool cast){allow_local_cast_ = cast;}
-
         template<class T> 
-        int create_proxy(rpc::encapsulated_interface encap, rpc::shared_ptr<T>& val)
+        int create_proxy(   rpc::interface_descriptor encap, 
+                            rpc::shared_ptr<T>& val,
+                            bool stub_needs_add_ref,
+                            bool service_proxy_needs_add_ref)
         {
+            if(encap.object_id == 0 || encap.zone_id == 0)
+                return rpc::error::OK();
+
             rpc::shared_ptr<object_proxy> op;
-            if(allow_local_cast_)
+            rpc::shared_ptr<service_proxy> service_proxy;
+            auto serv = get_operating_zone_service();
+            if(serv->get_zone_id() == encap.zone_id)
             {
-                auto local_service = service_.lock();
-                if(local_service && (local_service->get_zone_id() == encap.zone_id))
-                {
-                    val = local_service->template get_local_interface<T>(encap.object_id);
-                    if(!val)
-                    {
-                        return rpc::error::OBJECT_NOT_FOUND();
-                    }
-                    return rpc::error::OK();
-                }
+                val = serv->get_local_interface<T>(encap.object_id);
+                if(!val)
+                    return rpc::error::OBJECT_NOT_FOUND();
+                return rpc::error::OK();
             }
 
-            rpc::shared_ptr<service_proxy> service_proxy;
+            bool new_proxy_added = false;
             if(get_zone_id() != encap.zone_id)
             {
                 auto operating_zone_service = get_operating_zone_service();
-                service_proxy = operating_zone_service->get_zone_proxy(zone_id_, encap.zone_id);
+                service_proxy = operating_zone_service->get_zone_proxy(zone_id_, encap.zone_id, new_proxy_added);
             }
             else
             {
                 service_proxy = shared_from_this();
             }
 
-            std::lock_guard l(service_proxy->insert_control);
-            auto item = service_proxy->proxies.find(encap.object_id);
-            if (item != service_proxy->proxies.end())
-                op = item->second.lock();
-            else
             {
-                op = object_proxy::create(encap.object_id, encap.zone_id, service_proxy);
+                std::lock_guard l(service_proxy->insert_control);
+                auto item = service_proxy->proxies.find(encap.object_id);
+                if (item != service_proxy->proxies.end())
+                {
+                    op = item->second.lock();
+                }
+            }
+            if(!op)
+            {
+                op = object_proxy::create(encap.object_id, encap.zone_id, service_proxy, stub_needs_add_ref, new_proxy_added ? false : service_proxy_needs_add_ref);
                 service_proxy->proxies[encap.object_id] = op;
             }
             return op->query_interface(val, false);
@@ -312,7 +355,7 @@ namespace rpc
 
     //declared here as object_proxy and service_proxy is not fully defined in the body of proxy_base
     template<class T>
-    encapsulated_interface proxy_base::encapsulate_outbound_interfaces(const rpc::shared_ptr<T>& iface, bool add_ref)
+    interface_descriptor proxy_base::encapsulate_in_param(const rpc::shared_ptr<T>& iface, rpc::shared_ptr<rpc::object_stub>& stub)
     {
         if(!iface)
             return {0,0};
@@ -327,27 +370,63 @@ namespace rpc
         }
 
         //else encapsulate away
-        return operating_service->encapsulate_outbound_interfaces(iface, add_ref);
+        return operating_service->encapsulate_in_param(iface, stub);
     }
 
+    //declared here as object_proxy and service_proxy is not fully defined in the body of proxy_base
     template<class T>
-    uint64_t proxy_base::get_interface_zone_id(const rpc::shared_ptr<T>& iface)
+    interface_descriptor proxy_base::encapsulate_out_param(uint64_t originating_zone_id, const rpc::shared_ptr<T>& iface)
     {
         if(!iface)
-            return 0;
-        //fist check if this shared pointer is a remote one
-        auto impl = static_cast<rpc::proxy_impl<T>*>(iface->query_interface(T::id));
-        if(impl)
+            return {0,0};
+            
+        auto operating_service = object_proxy_->get_service_proxy()->get_operating_zone_service();
+
+        //this is to check that an interface is belonging to another zone and not the operating zone
+        auto proxy = iface->query_proxy_base();
+        if(proxy && proxy->get_object_proxy()->get_zone_id() != operating_service->get_zone_id())
         {
-            return impl->object_proxy_->get_zone_id();
+            return {proxy->get_object_proxy()->get_object_id(), proxy->get_object_proxy()->get_zone_id()};
         }
-        //else get the zone id of the service that runs this zone or enclave
-        return object_proxy_->get_service_proxy()->get_operating_zone_id();
+
+        //else encapsulate away
+        return operating_service->encapsulate_out_param(originating_zone_id, iface);
     }
 
-    template<class T> int get_interface(const rpc::encapsulated_interface& descriptor, const rpc::shared_ptr<service_proxy>& svp, rpc::shared_ptr<T>& iface)
+    //do not use directly it is for the interface generator use rpc::create_proxy if you want to get a proxied pointer to a remote implementation
+    template<class T> 
+    int get_interface(rpc::service& serv, uint64_t originating_zone_id, const rpc::interface_descriptor& encap, rpc::shared_ptr<T>& iface)
     {
-        auto proxy = rpc::object_proxy::create(descriptor.object_id, descriptor.zone_id, svp);
-        return proxy->query_interface(iface);
+        if(serv.get_zone_id() == encap.zone_id)
+        {
+            iface = serv.get_local_interface<T>(encap.object_id);
+            return rpc::error::OK();
+        }
+        bool new_proxy_added = false;
+        auto remote_service_proxy_ = serv.get_zone_proxy(originating_zone_id, encap.zone_id, new_proxy_added);
+        if(!remote_service_proxy_)
+            return rpc::error::ZONE_NOT_FOUND();
+        auto ret = remote_service_proxy_->create_proxy(encap, iface, true, false);
+        if(ret)
+            return ret;
+        if(new_proxy_added)
+        {
+            //this is silly we should not be addrefing in the first place
+            remote_service_proxy_->release_external_ref();
+        }
+        return ret;
+    }
+
+    //do not use directly it is for the interface generator use rpc::create_interface_proxy if you want to get a proxied pointer to a remote implementation
+    template<class T> 
+    int recieve_interface(const rpc::shared_ptr<rpc::service_proxy>& service_proxy, const rpc::interface_descriptor& encap, rpc::shared_ptr<T>& iface)
+    {
+        return service_proxy->create_proxy(encap, iface, false, true);
+    }
+
+    template<class T> 
+    int create_interface_proxy(const rpc::shared_ptr<rpc::service_proxy>& service_proxy, const rpc::interface_descriptor& encap, rpc::shared_ptr<T>& iface)
+    {
+        return service_proxy->create_proxy(encap, iface, false, false);
     }
 }

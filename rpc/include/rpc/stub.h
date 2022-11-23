@@ -43,7 +43,10 @@ namespace rpc
         void reset(){p_this.reset();}
 
         // this is called once the lifetime management needs to be activated
-        void on_added_to_zone(shared_ptr<object_stub> stub) { p_this = stub; }
+        void on_added_to_zone(shared_ptr<object_stub> stub) 
+        { 
+            p_this = stub; 
+        }
 
         service& get_zone() const { return zone_; }
 
@@ -56,6 +59,7 @@ namespace rpc
 
         uint64_t add_ref();
         uint64_t release();
+        void release_from_service();
     };
 
     class i_interface_stub

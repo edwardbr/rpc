@@ -76,6 +76,11 @@ namespace rpc
         sgx_status_t status = ::add_ref_host(&ret, zone_id, object_id);
         if (status)
             return std::numeric_limits<uint64_t>::max();
+        
+        if(ret != std::numeric_limits<uint64_t>::max())
+        {
+            add_external_ref();
+        }
         return ret;
     }
 
@@ -90,6 +95,10 @@ namespace rpc
         sgx_status_t status = ::release_host(&ret, zone_id, object_id);
         if (status)
             return std::numeric_limits<uint64_t>::max();
+        if(ret != std::numeric_limits<uint64_t>::max())
+        {
+            release_external_ref();
+        }   
         return ret;
     }
 }

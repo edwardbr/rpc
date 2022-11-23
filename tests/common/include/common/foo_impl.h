@@ -39,18 +39,18 @@ namespace marshalled_tests
         int callback(int val) override
         {            
             log(std::string("callback ") + std::to_string(val));
-            return 0;
+            return rpc::error::OK();
         }
         error_code blob_test(const std::vector<uint8_t>& inval, std::vector<uint8_t>& out_val) override
         {
             log(std::string("baz blob_test ") + std::to_string(inval.size()));
             out_val = inval;
-            return 0;
+            return rpc::error::OK();
         }
         error_code do_something_else(int val) override
         {
             log(std::string("baz do_something_else"));
-            return 0;
+            return rpc::error::OK();
         }
     };
 
@@ -64,6 +64,8 @@ namespace marshalled_tests
                 return static_cast<const xxx::i_foo*>(this); 
             return nullptr;
         }
+
+        rpc::shared_ptr<xxx::i_baz> cached_;
     public:
         foo(const rpc::i_telemetry_service* telemetry) : telemetry_(telemetry)
         {
@@ -78,159 +80,161 @@ namespace marshalled_tests
         error_code do_something_in_val(int val) override
         {
             log(std::string("got ") + std::to_string(val));
-            return 0;
+            return rpc::error::OK();
         }
         error_code do_something_in_ref(const int& val) override
         {
             log(std::string("got ") + std::to_string(val));
-            return 0;
+            return rpc::error::OK();
         }
         error_code do_something_in_by_val_ref(const int& val) override
         {
             log(std::string("got ") + std::to_string(val));
-            return 0;
+            return rpc::error::OK();
         }
         error_code do_something_in_move_ref(int&& val) override
         {
             log(std::string("got ") + std::to_string(val));
-            return 0;
+            return rpc::error::OK();
         }
         error_code do_something_in_ptr(const int* val) override
         {
             log(std::string("got ") + std::to_string(*val));
-            return 0;
+            return rpc::error::OK();
         }
         error_code do_something_out_val(int& val) override
         {
             val = 33;
-            return 0;
+            return rpc::error::OK();
         };
         error_code do_something_out_ptr_ref(int*& val) override
         {
             val = new int(33);
-            return 0;
+            return rpc::error::OK();
         }
         error_code do_something_out_ptr_ptr(int** val) override
         {
             *val = new int(33);
-            return 0;
+            return rpc::error::OK();
         }
         error_code do_something_in_out_ref(int& val) override
         {
             log(std::string("got ") + std::to_string(val));
             val = 33;
-            return 0;
+            return rpc::error::OK();
         }
         error_code give_something_complicated_val(const xxx::something_complicated val) override
         {
             log(std::string("got ") + std::to_string(val.int_val));
-            return 0;
+            return rpc::error::OK();
         }
         error_code give_something_complicated_ref(const xxx::something_complicated& val) override
         {
             log(std::string("got ") + std::to_string(val.int_val));
-            return 0;
+            return rpc::error::OK();
         }
         error_code give_something_complicated_ref_val(const xxx::something_complicated& val) override
         {
             log(std::string("got ") + std::to_string(val.int_val));
-            return 0;
+            return rpc::error::OK();
         }
         error_code give_something_complicated_move_ref(xxx::something_complicated&& val) override
         {
             log(std::string("got ") + std::to_string(val.int_val));
-            return 0;
+            return rpc::error::OK();
         }
         error_code give_something_complicated_ptr(const xxx::something_complicated* val) override
         {
             log(std::string("got ") + std::to_string(val->int_val));
-            return 0;
+            return rpc::error::OK();
         }
         error_code recieve_something_complicated_ref(xxx::something_complicated& val) override
         {
             val = xxx::something_complicated {33, "22"};
-            return 0;
+            return rpc::error::OK();
         }
         error_code recieve_something_complicated_ptr(xxx::something_complicated*& val) override
         {
             val = new xxx::something_complicated {33, "22"};
-            return 0;
+            return rpc::error::OK();
         }
         error_code recieve_something_complicated_in_out_ref(xxx::something_complicated& val) override
         {
             log(std::string("got ") + std::to_string(val.int_val));
             val.int_val = 33;
-            return 0;
+            return rpc::error::OK();
         }
         error_code give_something_more_complicated_val(const xxx::something_more_complicated val) override
         {
             log(std::string("got ") + val.map_val.begin()->first);
-            return 0;
+            return rpc::error::OK();
         }
         error_code give_something_more_complicated_ref(const xxx::something_more_complicated& val) override
         {
             log(std::string("got ") + val.map_val.begin()->first);
-            return 0;
+            return rpc::error::OK();
         }
         error_code give_something_more_complicated_move_ref(xxx::something_more_complicated&& val) override
         {
             log(std::string("got ") + val.map_val.begin()->first);
-            return 0;
+            return rpc::error::OK();
         }
         error_code give_something_more_complicated_ref_val(const xxx::something_more_complicated& val) override
         {
             log(std::string("got ") + val.map_val.begin()->first);
-            return 0;
+            return rpc::error::OK();
         }
         error_code give_something_more_complicated_ptr(const xxx::something_more_complicated* val) override
         {
             log(std::string("got ") + val->map_val.begin()->first);
-            return 0;
+            return rpc::error::OK();
         }
         error_code recieve_something_more_complicated_ref(xxx::something_more_complicated& val) override
         {
             val.map_val["22"] = xxx::something_complicated {33, "22"};
-            return 0;
+            return rpc::error::OK();
         }
         error_code recieve_something_more_complicated_ptr(xxx::something_more_complicated*& val) override
         {
             val = new xxx::something_more_complicated();
             val->map_val["22"] = xxx::something_complicated {33, "22"};
-            return 0;
+            return rpc::error::OK();
         }
         error_code recieve_something_more_complicated_in_out_ref(xxx::something_more_complicated& val) override
         {
             log(std::string("got ") + val.map_val.begin()->first);
             val.map_val["22"] = xxx::something_complicated {33, "23"};
-            return 0;
+            return rpc::error::OK();
         }
         error_code do_multi_val(int val1, int val2) override
         {
             log(std::string("got ") + std::to_string(val1));
-            return 0;
+            return rpc::error::OK();
         }
         error_code do_multi_complicated_val(const xxx::something_more_complicated val1, const xxx::something_more_complicated val2) override
         {
             log(std::string("got ") + val1.map_val.begin()->first);
-            return 0;
+            return rpc::error::OK();
         }
 
         error_code recieve_interface(rpc::shared_ptr<i_foo>& val) override
         {
             val = rpc::shared_ptr<xxx::i_foo>(new foo(telemetry_));
             auto val1 = rpc::dynamic_pointer_cast<xxx::i_bar>(val);
-            return 0;
+            return rpc::error::OK();
         }
 
         error_code give_interface(rpc::shared_ptr<xxx::i_baz> baz) override
         {
             baz->callback(22);
             auto val1 = rpc::dynamic_pointer_cast<xxx::i_bar>(baz);
-            return 0;
+            return rpc::error::OK();
         }
 
         error_code call_baz_interface(const rpc::shared_ptr<xxx::i_baz>& val) override
         {
+            if(!val)
+                return rpc::error::OK();
             val->callback(22);
             auto val1 = rpc::dynamic_pointer_cast<xxx::i_baz>(val);
 //#sgx dynamic cast in an enclave this fails
@@ -249,14 +253,31 @@ namespace marshalled_tests
             std::fill(in_val.begin(), in_val.end(), 42);
             val->blob_test(in_val, out_val);
             assert(in_val == out_val);
-            return 0;
+            return rpc::error::OK();
         }        
 
         
         error_code create_baz_interface(rpc::shared_ptr<xxx::i_baz>& val) override
         {
             val = rpc::shared_ptr<xxx::i_baz>(new baz(telemetry_));
-            return 0;
+            return rpc::error::OK();
+        }
+                
+        error_code get_null_interface(rpc::shared_ptr<xxx::i_baz>& val) override
+        {
+            val = nullptr;
+            return rpc::error::OK();
+        }
+    
+        error_code set_interface(const rpc::shared_ptr<xxx::i_baz>& val) override
+        {
+            cached_ = val;
+            return rpc::error::OK();
+        }
+        error_code get_interface(rpc::shared_ptr<xxx::i_baz>& val) override
+        {
+            val = cached_;
+            return rpc::error::OK();
         }
     };
 
@@ -289,17 +310,17 @@ namespace marshalled_tests
 
         error_code do_something_else(int val) override
         {
-            return 0;
+            return rpc::error::OK();
         }
         int callback(int val) override
         {            
             log(std::string("callback ") + std::to_string(val));
-            return 0;
+            return rpc::error::OK();
         }
         error_code blob_test(const std::vector<uint8_t>& inval, std::vector<uint8_t>& out_val) override
         {
             out_val = inval;
-            return 0;
+            return rpc::error::OK();
         }
     };
 
@@ -328,19 +349,55 @@ namespace marshalled_tests
         error_code create_multiple_inheritance(rpc::shared_ptr<xxx::i_baz>& target) override
         {
             target = rpc::shared_ptr<xxx::i_baz>(new multiple_inheritance(telemetry_));
-            return 0;
+            return rpc::error::OK();
         }
 
         error_code create_foo(rpc::shared_ptr<xxx::i_foo>& target) override
         {
             target = rpc::shared_ptr<xxx::i_foo>(new foo(telemetry_));
-            return 0;
+            return rpc::error::OK();
         }
 
         error_code add(int a, int b, int& c) override
         {
             c = a + b;
-            return 0;
+            return rpc::error::OK();
         }
+        
+        error_code call_create_enclave(const rpc::shared_ptr<yyy::i_host>& host) override
+        {
+            return call_create_enclave_val(host);
+        }
+        error_code call_create_enclave_val(rpc::shared_ptr<yyy::i_host> host) override
+        {
+            if(!host)
+                return rpc::error::INVALID_DATA();
+            rpc::shared_ptr<marshalled_tests::yyy::i_example> target;
+            host->create_enclave(target);
+            if(!target)
+                return rpc::error::INVALID_DATA();
+//            target = nullptr;
+            int outval = 0;
+            auto ret = target->add(1,2, outval);
+            if(ret != rpc::error::OK())
+                return ret;
+            if(outval != 3)
+                return rpc::error::INVALID_DATA();
+            return rpc::error::OK();
+        }
+
+        error_code recieve_interface(rpc::shared_ptr<xxx::i_foo>& val) override
+        {
+            val = rpc::shared_ptr<xxx::i_foo>(new foo(telemetry_));
+            auto val1 = rpc::dynamic_pointer_cast<xxx::i_bar>(val);
+            return rpc::error::OK();
+        }
+         error_code give_interface(const rpc::shared_ptr<xxx::i_baz> baz) override
+        {
+            baz->callback(22);
+            auto val1 = rpc::dynamic_pointer_cast<xxx::i_bar>(baz);
+            return rpc::error::OK();
+        }
+
     };
 }

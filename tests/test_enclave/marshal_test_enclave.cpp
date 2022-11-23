@@ -112,6 +112,16 @@ public:
         on_proxy_send_host(name, originating_zone_id, zone_id, object_id, interface_id, method_id);
     }
 
+    void on_service_proxy_add_external_ref(const char* name, uint64_t originating_zone_id, uint64_t zone_id, int ref_count) const
+    {
+        ::on_service_proxy_add_external_ref(name, originating_zone_id, zone_id, ref_count);
+    }
+
+    void on_service_proxy_release_external_ref(const char* name, uint64_t originating_zone_id, uint64_t zone_id, int ref_count) const
+    {
+        ::on_service_proxy_release_external_ref(name, originating_zone_id, zone_id, ref_count);
+    }
+
     virtual void message(rpc::i_telemetry_service::level_enum level, const char* message) const
     {
         message_host(level, message);
@@ -122,7 +132,7 @@ enclave_telemetry_service telemetry_service;
 
 rpc::shared_ptr<rpc::child_service> rpc_server;
 
-int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t child_zone_id, uint64_t* root_object_id)
+int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t child_zone_id, uint64_t* example_object_id)
 {
     //create a zone service for the enclave
     rpc_server = rpc::make_shared<rpc::child_service>(child_zone_id); 
@@ -132,7 +142,9 @@ int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t child_zone_id, uin
 
     //create the root object
     rpc::shared_ptr<yyy::i_example> ex(new example(p_telemetry_service));
-    rpc_server->create_stub<yyy::i_example, yyy::i_example_stub>(ex, root_object_id);
+    
+    auto example_encap = rpc::create_interface_stub(*rpc_server, ex);
+    *example_object_id = example_encap.object_id;
 
     return rpc::error::OK();
 }
