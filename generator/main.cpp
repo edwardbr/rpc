@@ -63,7 +63,9 @@ int main(const int argc, char* argv[])
         string rootIdl;
         string headerPath;
         string proxyPath;
+        string proxyHeaderPath;
         string stubPath;
+        string stubHeaderPath;
         string mockPath;
         string output_path;
         std::vector<std::string> namespaces;
@@ -77,7 +79,9 @@ int main(const int argc, char* argv[])
 			clipp::required("-p", "--output_path").doc("base output path") & clipp::value("output_path",output_path),
 			clipp::required("-h", "--header").doc("the generated header relative filename") & clipp::value("header",headerPath),
 			clipp::required("-x", "--proxy").doc("the generated proxy relative filename") & clipp::value("proxy",proxyPath),
+            clipp::parameter("-y", "--proxy_header").doc("the generated proxy header relative filename") & clipp::value("proxy_header",proxyHeaderPath),
 			clipp::required("-s", "--stub").doc("the generated stub relative filename") & clipp::value("stub",stubPath),
+            clipp::parameter("-t", "--stub_header").doc("the generated stub header relative filename") & clipp::value("stub_header",stubHeaderPath),
 			clipp::option("-m", "--mock").doc("the generated mock relative filename") & clipp::value("mock",mockPath),
 			clipp::repeatable(clipp::option("-p", "--path") & clipp::value("path",include_paths)).doc("locations of include files used by the idl"),
 			clipp::option("-n","--namespace").doc("namespace of the generated interface") & clipp::value("namespace",namespaces),
@@ -187,14 +191,16 @@ int main(const int argc, char* argv[])
 
         auto header_path = std::filesystem::path(output_path) / "include" / headerPath;
         auto proxy_path = std::filesystem::path(output_path) / "src" / proxyPath;
-        auto proxy_header_path = std::filesystem::path(output_path) / "src" / (proxyPath + ".h");
+        auto proxy_header_path = std::filesystem::path(output_path) / "src" / (proxyHeaderPath.size() ? proxyHeaderPath : (proxyPath + ".h"));
         auto stub_path = std::filesystem::path(output_path) / "src" / stubPath;
-        auto stub_header_path = std::filesystem::path(output_path) / "src" / (stubPath + ".h");
+        auto stub_header_path = std::filesystem::path(output_path) / "src" / (stubHeaderPath.size() ? stubHeaderPath : (stubPath + ".h"));
         auto mock_path = std::filesystem::path(output_path) / "include" / mockPath;
 
         std::filesystem::create_directories(header_path.parent_path());
         std::filesystem::create_directories(proxy_path.parent_path());
+        std::filesystem::create_directories(proxy_header_path.parent_path());
         std::filesystem::create_directories(stub_path.parent_path());
+        std::filesystem::create_directories(stub_header_path.parent_path());
         if (mockPath.length())
             std::filesystem::create_directories(mock_path.parent_path());
 
