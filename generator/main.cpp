@@ -189,11 +189,14 @@ int main(const int argc, char* argv[])
         string interfaces_stub_header_data;
         string interfaces_mock_data;
 
+        proxyHeaderPath = proxyHeaderPath.size() ? proxyHeaderPath : (proxyPath + ".h");
+        stubHeaderPath = stubHeaderPath.size() ? stubHeaderPath : (stubPath + ".h");
+
         auto header_path = std::filesystem::path(output_path) / "include" / headerPath;
         auto proxy_path = std::filesystem::path(output_path) / "src" / proxyPath;
-        auto proxy_header_path = std::filesystem::path(output_path) / "src" / (proxyHeaderPath.size() ? proxyHeaderPath : (proxyPath + ".h"));
+        auto proxy_header_path = std::filesystem::path(output_path) / "src" / proxyHeaderPath;
         auto stub_path = std::filesystem::path(output_path) / "src" / stubPath;
-        auto stub_header_path = std::filesystem::path(output_path) / "src" / (stubHeaderPath.size() ? stubHeaderPath : (stubPath + ".h"));
+        auto stub_header_path = std::filesystem::path(output_path) / "src" / stubHeaderPath;
         auto mock_path = std::filesystem::path(output_path) / "include" / mockPath;
 
         std::filesystem::create_directories(header_path.parent_path());
@@ -240,7 +243,7 @@ int main(const int argc, char* argv[])
         {
             enclave_marshaller::synchronous_generator::write_files(true, *objects, header_stream, proxy_stream,
                                                                    proxy_header_stream, stub_stream, stub_header_stream, 
-                                                                   namespaces, headerPath, proxyPath + ".h", stubPath + ".h", imports);
+                                                                   namespaces, headerPath, proxyHeaderPath, stubHeaderPath, imports);
 
             header_stream << ends;
             proxy_stream << ends;
