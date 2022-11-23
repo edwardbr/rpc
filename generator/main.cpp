@@ -180,12 +180,16 @@ int main(const int argc, char* argv[])
 
         string interfaces_h_data;
         string interfaces_proxy_data;
+        string interfaces_proxy_header_data;
         string interfaces_stub_data;
+        string interfaces_stub_header_data;
         string interfaces_mock_data;
 
         auto header_path = std::filesystem::path(output_path) / "include" / headerPath;
         auto proxy_path = std::filesystem::path(output_path) / "src" / proxyPath;
+        auto proxy_header_path = std::filesystem::path(output_path) / "src" / (proxyPath + ".h");
         auto stub_path = std::filesystem::path(output_path) / "src" / stubPath;
+        auto stub_header_path = std::filesystem::path(output_path) / "src" / (stubPath + ".h");
         auto mock_path = std::filesystem::path(output_path) / "include" / mockPath;
 
         std::filesystem::create_directories(header_path.parent_path());
@@ -203,8 +207,14 @@ int main(const int argc, char* argv[])
             ifstream proxy_fs(proxy_path);
             std::getline(proxy_fs, interfaces_proxy_data, '\0');
 
+            ifstream proxy_header_fs(proxy_header_path);
+            std::getline(proxy_fs, interfaces_proxy_header_data, '\0');
+
             ifstream stub_fs(stub_path);
             std::getline(stub_fs, interfaces_stub_data, '\0');
+
+            ifstream stub_header_fs(stub_header_path);
+            std::getline(stub_header_fs, interfaces_stub_header_data, '\0');
 
             if (mockPath.length())
             {
@@ -215,17 +225,22 @@ int main(const int argc, char* argv[])
 
         std::stringstream header_stream;
         std::stringstream proxy_stream;
+        std::stringstream proxy_header_stream;
         std::stringstream stub_stream;
+        std::stringstream stub_header_stream;
         std::stringstream mock_stream;
 
         // do the generation to the ostrstreams
         {
             enclave_marshaller::synchronous_generator::write_files(true, *objects, header_stream, proxy_stream,
-                                                                   stub_stream, namespaces, headerPath, imports);
+                                                                   proxy_header_stream, stub_stream, stub_header_stream, 
+                                                                   namespaces, headerPath, proxyPath + ".h", stubPath + ".h", imports);
 
             header_stream << ends;
             proxy_stream << ends;
+            proxy_header_stream << ends;
             stub_stream << ends;
+            stub_header_stream << ends;
             if (mockPath.length())
             {
                 enclave_marshaller::synchronous_mock_generator::write_files(true, *objects, mock_stream, namespaces,
@@ -245,10 +260,20 @@ int main(const int argc, char* argv[])
             ofstream file(proxy_path);
             file << proxy_stream.str();
         }
+        if (is_dfferent(proxy_header_stream, interfaces_proxy_header_data))
+        {
+            ofstream file(proxy_header_path);
+            file << proxy_header_stream.str();
+        }
         if (is_dfferent(stub_stream, interfaces_stub_data))
         {
             ofstream file(stub_path);
             file << stub_stream.str();
+        }
+        if (is_dfferent(stub_header_stream, interfaces_stub_header_data))
+        {
+            ofstream file(stub_header_path);
+            file << stub_header_stream.str();
         }
         if (mockPath.length())
         {
