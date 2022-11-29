@@ -465,7 +465,7 @@ namespace rpc
             return false;
         }
 
-        long use_count() const noexcept { return __shared_owners_.load(std::memory_order::memory_order_relaxed) + 1; }
+        long use_count() const noexcept { return __shared_owners_.load(std::memory_order_relaxed) + 1; }
     };
 
     class __shared_weak_count : private __shared_count

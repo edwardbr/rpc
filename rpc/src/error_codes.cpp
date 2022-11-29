@@ -9,7 +9,6 @@ namespace rpc
         int offset_val_is_negative = true;
 
         int OK(){return OK_val;}
-        int MIN(){return offset_val + (offset_val_is_negative ? - 1 : 1);}
         int OUT_OF_MEMORY(){return offset_val + (offset_val_is_negative ? - 1 : 1);}
         int NEED_MORE_MEMORY(){return offset_val + (offset_val_is_negative ? - 2 : 2);}
         int SECURITY_ERROR(){return offset_val + (offset_val_is_negative ? - 3 : 3);}
@@ -21,9 +20,10 @@ namespace rpc
         int ZONE_NOT_SUPPORTED(){return offset_val + (offset_val_is_negative ? - 9 : 9);}
         int ZONE_NOT_INITIALISED(){return offset_val + (offset_val_is_negative ? - 10 : 10);}
         int ZONE_NOT_FOUND(){return offset_val + (offset_val_is_negative ? - 11 : 11);}
-        int OBJECT_NOT_FOUND(){return offset_val + (offset_val_is_negative ? - 12 : 12);}//dont forget to update max if this not max any more
+        int OBJECT_NOT_FOUND(){return offset_val + (offset_val_is_negative ? - 12 : 12);}//dont forget to update MIN & MAX if new values
 
-        int MAX(){return offset_val + (offset_val_is_negative ? - 12 : 12);}
+        int MIN(){return offset_val + (offset_val_is_negative ? -12 : 1);}
+        int MAX(){return offset_val + (offset_val_is_negative ? -1 : 12);}
 
         void set_OK_val(int val){OK_val = val;}
         void set_offset_val(int val){offset_val = val;}

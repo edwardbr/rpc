@@ -36,7 +36,7 @@ namespace rpc
         // threads, and have them all get copied at once.  The argument
         // also doesn't apply for __release_shared, because an outstanding
         // weak_ptr::lock() could read / modify the shared count.
-        if (__shared_weak_owners_.load(std::memory_order::memory_order_acquire) == 0)
+        if (__shared_weak_owners_.load(std::memory_order_acquire) == 0)
         {
             // no need to do this store, because we are about
             // to destroy everything.
@@ -48,7 +48,7 @@ namespace rpc
     }
     __shared_weak_count* __shared_weak_count::lock() noexcept
     {
-        long object_owners = __shared_owners_.load(std::memory_order::memory_order_seq_cst);
+        long object_owners = __shared_owners_.load(std::memory_order_seq_cst);
         while (object_owners != -1)
         {            
             if (__shared_owners_.compare_exchange_weak(object_owners, object_owners + 1))
