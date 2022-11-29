@@ -1,6 +1,8 @@
 #include <host_telemetry_service.h>
 #include <spdlog/spdlog.h>
 
+#include "gtest/gtest.h"
+
 host_telemetry_service::~host_telemetry_service()
 {
     spdlog::info("orphaned services {}", services.size());
@@ -27,6 +29,7 @@ host_telemetry_service::~host_telemetry_service()
     {
         spdlog::error("system is NOT healthy!");
     }
+    EXPECT_TRUE(is_heathy);
 }
 
 void host_telemetry_service::on_service_creation(const char* name, uint64_t zone_id) const

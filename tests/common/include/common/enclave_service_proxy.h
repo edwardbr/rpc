@@ -30,7 +30,7 @@ namespace rpc
             {
                 telemetry_service->on_service_proxy_creation("enclave_service_proxy", ret->get_operating_zone_id(), ret->get_zone_id());
             }
-            ret->add_external_ref();
+            get_operating_zone_service()->inner_add_zone_proxy(ret);
             return ret;
         }
         std::shared_ptr<enclave_owner> enclave_owner_;
@@ -42,6 +42,7 @@ namespace rpc
         template<class T>
         static int create(uint64_t zone_id, std::string filename, const rpc::shared_ptr<service>& operating_zone_service, rpc::shared_ptr<T>& root_object, const rpc::i_telemetry_service* telemetry_service)
         {
+            assert(operating_zone_service);
             auto ret = rpc::shared_ptr<enclave_service_proxy>(new enclave_service_proxy(zone_id, filename, operating_zone_service, telemetry_service));
             auto pthis = rpc::static_pointer_cast<service_proxy>(ret);
 

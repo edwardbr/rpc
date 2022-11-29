@@ -39,6 +39,7 @@ namespace rpc
         // hard lock on the root object
         mutable std::mutex insert_control;
         rpc::shared_ptr<casting_interface> get_castable_interface(uint64_t object_id, uint64_t interface_id);
+
     public:
         service(uint64_t zone_id = generate_new_zone_id()) : zone_id_(zone_id){}
         virtual ~service();
@@ -71,6 +72,7 @@ namespace rpc
         void release_local_stub(const rpc::shared_ptr<rpc::object_stub>& stub);
         uint64_t release(uint64_t zone_id, uint64_t object_id) override;
 
+        void inner_add_zone_proxy(const rpc::shared_ptr<service_proxy>& service_proxy);
         virtual void add_zone_proxy(const rpc::shared_ptr<service_proxy>& zone);
         virtual rpc::shared_ptr<service_proxy> get_zone_proxy(uint64_t originating_zone_id, uint64_t zone_id, bool& new_proxy_added);
         virtual void remove_zone_proxy(uint64_t zone_id);
@@ -78,6 +80,8 @@ namespace rpc
         {
             return rpc::static_pointer_cast<T>(get_castable_interface(object_id, T::id));
         }
+
+        friend service_proxy;
     };
 
     //Child services need to maintain the lifetime of the root object in its zone 
@@ -87,6 +91,7 @@ namespace rpc
         //the enclave service lifetime is managed by the transport functions 
         rpc::shared_ptr<i_interface_stub> root_stub_;
         rpc::shared_ptr<rpc::service_proxy> parent_service_;
+        bool child_does_not_use_parents_interface_ = false;
     public:
         child_service(uint64_t zone_id = generate_new_zone_id()) : 
             service(zone_id)
@@ -94,10 +99,7 @@ namespace rpc
 
         virtual ~child_service();
 
-        void set_parent(const rpc::shared_ptr<rpc::service_proxy>& parent_service)
-        {
-            parent_service_ = parent_service;
-        }
+        void set_parent(const rpc::shared_ptr<rpc::service_proxy>& parent_service, bool child_does_not_use_parents_interface);
         bool check_is_empty() const override;
         uint64_t get_root_object_id() const;
         rpc::shared_ptr<service_proxy> get_zone_proxy(uint64_t originating_zone_id, uint64_t zone_id, bool& new_proxy_added) override;

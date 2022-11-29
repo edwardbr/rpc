@@ -27,7 +27,6 @@ namespace rpc
             telemetry_service->on_object_proxy_deletion(service_proxy_->get_operating_zone_id(), zone_id_, object_id_);
         }
         service_proxy_->release(zone_id_, object_id_); 
-        //service_proxy_->release_external_ref();
         service_proxy_ = nullptr;
     }
 

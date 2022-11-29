@@ -4,6 +4,7 @@ cmake_minimum_required(VERSION 3.0.0)
 add_executable(marshal_test_host 
     main.cpp
     host_telemetry_service.cpp
+    telemetry_handler.cpp
     )
 
 target_compile_definitions(marshal_test_host PRIVATE ${HOST_DEFINES})
@@ -39,4 +40,5 @@ target_link_directories(marshal_test_host PUBLIC ${SGX_LIBRARY_PATH})
 set_property(TARGET marshal_test_host PROPERTY COMPILE_PDB_NAME marshal_test_host) 
 
 
+gtest_discover_tests(marshal_test_host)
 

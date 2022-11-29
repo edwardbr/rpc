@@ -19,6 +19,31 @@ namespace rpc
         }
     }
 
+    rpc::shared_ptr<service_proxy> host_service_proxy::create(uint64_t host_zone_id, const rpc::shared_ptr<rpc::child_service>& operating_zone_service, const rpc::i_telemetry_service* telemetry_service)
+    {
+        auto ret = rpc::shared_ptr<host_service_proxy>(new host_service_proxy(host_zone_id, operating_zone_service, telemetry_service));
+        auto pthis = rpc::static_pointer_cast<service_proxy>(ret);
+        ret->weak_this_ = pthis;
+        operating_zone_service->add_zone_proxy(ret);
+        ret->add_external_ref();
+        operating_zone_service->set_parent(pthis, false);
+        return pthis;
+    }
+
+    rpc::shared_ptr<service_proxy> host_service_proxy::clone_for_zone(uint64_t zone_id)
+    {
+        auto ret = rpc::make_shared<host_service_proxy>(*this);
+        ret->set_zone_id(zone_id);
+        ret->weak_this_ = ret;
+        if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
+        {
+            telemetry_service->on_service_proxy_creation("host_service_proxy cloned", ret->get_operating_zone_id(), ret->get_zone_id());
+        }
+        get_operating_zone_service()->inner_add_zone_proxy(ret);
+        return ret;
+    }
+
+
     host_service_proxy::~host_service_proxy()
     {
         if (auto* telemetry_service = get_telemetry_service(); telemetry_service)

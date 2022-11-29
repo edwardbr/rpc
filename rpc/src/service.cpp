@@ -4,19 +4,18 @@
 #include "rpc/stub.h"
 #include "rpc/proxy.h"
 
-#define LOG_STR(str, sz)
-
-//logging temporarily disabled will be fixed later
-/*#ifdef _IN_ENCLAVE
-#define LOG_STR(str, sz)
-#else
-#define LOG_STR(str, sz) log_str(str, sz)
-extern "C"
-{
-    void log_str(const char* str, size_t sz);
-}
-#endif*/
-
+#ifndef LOG_STR_DEFINED
+# ifdef USE_RPC_TEST_LOGGING
+#  define LOG_STR(str, sz) log_str(str, sz)
+   extern "C"
+   {
+       void log_str(const char* str, size_t sz);
+   }
+# else
+#  define LOG_STR(str, sz)
+# endif
+#define LOG_STR_DEFINED
+#endif
 namespace rpc
 {
     ////////////////////////////////////////////////////////////////////////////
@@ -65,6 +64,22 @@ namespace rpc
             else
             {
                 auto message = std::string("service ") + std::to_string(get_zone_id()) + std::string(", wrapped_object ") + std::to_string(stub->get_id()) + std::string(" has not been deregisted in the service suspected unclean shutdown");
+                LOG_STR(message.data(), message.size());
+            }
+            success = false;
+        }
+
+        for(auto item : other_zones)
+        {
+            auto svcproxy =  item.second.lock();
+            if(!svcproxy)
+            {
+                auto message = std::string("service ") + std::to_string(get_zone_id()) + std::string(", proxy ") + std::to_string(item.first) + std::string(", has been released but not deregisted in the service");
+                LOG_STR(message.data(), message.size());
+            }
+            else
+            {
+                auto message = std::string("service ") + std::to_string(get_zone_id()) + std::string(", proxy ") + std::to_string(item.first) + std::string(" has not been released in the service suspected unclean shutdown");
                 LOG_STR(message.data(), message.size());
             }
             success = false;
@@ -272,8 +287,11 @@ namespace rpc
         }
         else
         {
+
+            bool reset_stub = false;
             rpc::shared_ptr<rpc::object_stub> stub;
-            //these scope brackets are needed as otherwise there will be a recursive lock on a mutex in rare cases
+            uint64_t count = 0;
+            //these scope brackets are needed as otherwise there will be a recursive lock on a mutex in rare cases when the stub is reset
             {
                 std::lock_guard l(insert_control);
                 auto item = stubs.find(object_id);
@@ -286,7 +304,7 @@ namespace rpc
 
                 if (!stub)
                     return std::numeric_limits<uint64_t>::max();
-                uint64_t count = stub->release();
+                count = stub->release();
                 if(!count)
                 {
                     {
@@ -306,43 +324,58 @@ namespace rpc
                         }
                     }
                     stub->reset();        
+                    reset_stub = true;
                 }
-
-                return count;
             }
+            
+            if(reset_stub)
+                stub->reset();        
+
+            return count;
         }
+    }
+    
+
+    void service::inner_add_zone_proxy(const rpc::shared_ptr<service_proxy>& service_proxy)
+    {
+        assert(service_proxy->get_zone_id() != zone_id_);
+        assert(other_zones.find(service_proxy->get_zone_id()) == other_zones.end());
+        other_zones[service_proxy->get_zone_id()] = service_proxy;
     }
 
     void service::add_zone_proxy(const rpc::shared_ptr<service_proxy>& service_proxy)
     {
         assert(service_proxy->get_zone_id() != zone_id_);
         std::lock_guard g(insert_control);
-        assert(other_zones.find(service_proxy->get_zone_id()) == other_zones.end());
-        other_zones[service_proxy->get_zone_id()] = service_proxy;
+        inner_add_zone_proxy(service_proxy);
     }
 
     rpc::shared_ptr<service_proxy> service::get_zone_proxy(uint64_t originating_zone_id, uint64_t zone_id, bool& new_proxy_added)
     {
         new_proxy_added = false;
         std::lock_guard g(insert_control);
+
+        //find if we have one
         auto item = other_zones.find(zone_id);
         if (item != other_zones.end())
             return item->second.lock();
+
+        //if not perhaps we can make one from the proxy of the originating call    
         if(originating_zone_id == 0)
             return nullptr;
         item = other_zones.find(originating_zone_id);
-        if (item != other_zones.end())
-        {
-            auto originating_proxy = item->second.lock();
-            if(!originating_proxy)
-                return nullptr;
-            auto proxy = originating_proxy->clone_for_zone(zone_id);
-            other_zones[zone_id] = proxy;
-            new_proxy_added = true;
-            return proxy;
-        }
-        return nullptr;
+        if (item == other_zones.end())
+            return nullptr;
+        auto originating_proxy = item->second.lock();
+        if(!originating_proxy)
+            return nullptr;
+        new_proxy_added = true;
+    
+        auto proxy = originating_proxy->clone_for_zone(zone_id);
+        proxy->add_external_ref();
+        return proxy;
     }
+
     void service::remove_zone_proxy(uint64_t zone_id)
     {
         std::lock_guard g(insert_control);
@@ -360,16 +393,23 @@ namespace rpc
         return interface_stub->get_castable_interface();
     }
 
+    void child_service::set_parent(const rpc::shared_ptr<rpc::service_proxy>& parent_service, bool child_does_not_use_parents_interface)
+    {
+        if(parent_service_ && child_does_not_use_parents_interface_)
+            parent_service_->release_external_ref();
+        parent_service_ = parent_service;
+        child_does_not_use_parents_interface_ = child_does_not_use_parents_interface;
+    }
+
     child_service::~child_service()
     {
         if(parent_service_)
         {
-            remove_zone_proxy(parent_service_->get_zone_id());
         #ifdef _DEBUG
             parent_service_->set_operating_zone_service_released();
         #endif
-//            parent_service_->release_external_ref();
-            parent_service_ = nullptr;
+            remove_zone_proxy(parent_service_->get_zone_id());
+            set_parent(nullptr, false);
         }
 
         // clean up the zone root pointer
@@ -402,22 +442,15 @@ namespace rpc
 
     rpc::shared_ptr<service_proxy> child_service::get_zone_proxy(uint64_t originating_zone_id, uint64_t zone_id, bool& new_proxy_added)
     {
-        new_proxy_added = false;
-        rpc::shared_ptr<service_proxy> proxy;
+        auto proxy = service::get_zone_proxy(originating_zone_id, zone_id, new_proxy_added);
+        if(proxy)
+            return proxy;
+
         {
             std::lock_guard g(insert_control);
-            auto item = other_zones.find(zone_id);
-            if (item != other_zones.end())
-                proxy = item->second.lock();
-        }
-
-        if(!proxy)
-        {
             proxy = parent_service_->clone_for_zone(zone_id);
             new_proxy_added = true;
-            add_zone_proxy(proxy);
-            proxy->add_external_ref();
+            return proxy;
         }
-        return proxy;
     }
 }
