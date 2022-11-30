@@ -6,7 +6,6 @@
 
 #include "trusted/enclave_marshal_test_t.h"
 
-
 namespace rpc
 {
     host_service_proxy::host_service_proxy(uint64_t host_zone_id, const rpc::shared_ptr<service>& operating_zone_service,
@@ -19,14 +18,14 @@ namespace rpc
         }
     }
 
-    rpc::shared_ptr<service_proxy> host_service_proxy::create(uint64_t host_zone_id, const rpc::shared_ptr<rpc::child_service>& operating_zone_service, const rpc::i_telemetry_service* telemetry_service)
+    rpc::shared_ptr<service_proxy> host_service_proxy::create(uint64_t host_zone_id, uint64_t host_id, const rpc::shared_ptr<rpc::child_service>& operating_zone_service, const rpc::i_telemetry_service* telemetry_service)
     {
         auto ret = rpc::shared_ptr<host_service_proxy>(new host_service_proxy(host_zone_id, operating_zone_service, telemetry_service));
         auto pthis = rpc::static_pointer_cast<service_proxy>(ret);
         ret->weak_this_ = pthis;
         operating_zone_service->add_zone_proxy(ret);
         ret->add_external_ref();
-        operating_zone_service->set_parent(pthis, false);
+        operating_zone_service->set_parent(pthis, host_id ? false : true);
         return pthis;
     }
 

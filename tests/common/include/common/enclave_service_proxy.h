@@ -17,7 +17,7 @@ namespace rpc
             ~enclave_owner();
         };
 
-        enclave_service_proxy(uint64_t zone_id, std::string filename, const rpc::shared_ptr<service>& operating_zone_service, const rpc::i_telemetry_service* telemetry_service);
+        enclave_service_proxy(uint64_t zone_id, std::string filename, const rpc::shared_ptr<service>& operating_zone_service, uint64_t host_id, const rpc::i_telemetry_service* telemetry_service);
         int initialise_enclave(rpc::shared_ptr<object_proxy>& proxy);
 
        
@@ -36,14 +36,20 @@ namespace rpc
         std::shared_ptr<enclave_owner> enclave_owner_;
         uint64_t eid_ = 0;        
         std::string filename_;
+        uint64_t host_id_ = 0;
     public:
         enclave_service_proxy(const enclave_service_proxy& other) = default;
 
-        template<class T>
-        static int create(uint64_t zone_id, std::string filename, const rpc::shared_ptr<service>& operating_zone_service, rpc::shared_ptr<T>& root_object, const rpc::i_telemetry_service* telemetry_service)
+        template<class Owner, class Child>
+        static int create(uint64_t zone_id, std::string filename, rpc::shared_ptr<service>& operating_zone_service, const rpc::shared_ptr<Owner>& owner, rpc::shared_ptr<Child>& root_object, const rpc::i_telemetry_service* telemetry_service)
         {
             assert(operating_zone_service);
-            auto ret = rpc::shared_ptr<enclave_service_proxy>(new enclave_service_proxy(zone_id, filename, operating_zone_service, telemetry_service));
+
+            uint64_t owner_id = 0;
+            if(owner)
+                owner_id = rpc::create_interface_stub(*operating_zone_service, owner).object_id;
+
+            auto ret = rpc::shared_ptr<enclave_service_proxy>(new enclave_service_proxy(zone_id, filename, operating_zone_service, owner_id, telemetry_service));
             auto pthis = rpc::static_pointer_cast<service_proxy>(ret);
 
             ret->weak_this_ = pthis;

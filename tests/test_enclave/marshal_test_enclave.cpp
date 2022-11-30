@@ -132,15 +132,24 @@ enclave_telemetry_service telemetry_service;
 
 rpc::shared_ptr<rpc::child_service> rpc_server;
 
-int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t child_zone_id, uint64_t* example_object_id)
+int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t host_id, uint64_t child_zone_id, uint64_t* example_object_id)
 {
     //create a zone service for the enclave
     rpc_server = rpc::make_shared<rpc::child_service>(child_zone_id); 
     const rpc::i_telemetry_service* p_telemetry_service = &telemetry_service;
-    auto host_proxy = rpc::host_service_proxy::create(host_zone_id, rpc_server, p_telemetry_service);
+    auto host_proxy = rpc::host_service_proxy::create(host_zone_id, host_id, rpc_server, p_telemetry_service);
+
+    rpc::shared_ptr<yyy::i_host> host;
+    
+    if(host_id)
+    {
+        auto err_code = rpc::create_interface_proxy<yyy::i_host>(host_proxy, {host_id, host_zone_id}, host);
+        if(err_code != rpc::error::OK())
+            return err_code;
+    }
 
     //create the root object
-    rpc::shared_ptr<yyy::i_example> ex(new example(p_telemetry_service));
+    rpc::shared_ptr<yyy::i_example> ex(new example(p_telemetry_service, host));
     
     auto example_encap = rpc::create_interface_stub(*rpc_server, ex);
     *example_object_id = example_encap.object_id;

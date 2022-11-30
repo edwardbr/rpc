@@ -327,6 +327,7 @@ namespace marshalled_tests
     class example : public yyy::i_example
     {
         const rpc::i_telemetry_service* telemetry_ = nullptr;
+        rpc::shared_ptr<yyy::i_host> host_;
         void* get_address() const override { return (void*)this; }
         const rpc::casting_interface* query_interface(uint64_t interface_id) const override 
         { 
@@ -335,7 +336,9 @@ namespace marshalled_tests
             return nullptr;
         }
     public:
-        example(const rpc::i_telemetry_service* telemetry) : telemetry_(telemetry)
+        example(const rpc::i_telemetry_service* telemetry, rpc::shared_ptr<yyy::i_host> host) : 
+            telemetry_(telemetry), 
+            host_(host)
         {
             if(telemetry_)
                 telemetry_->on_impl_creation("example", yyy::i_example::id);

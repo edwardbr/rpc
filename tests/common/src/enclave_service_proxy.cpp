@@ -11,9 +11,10 @@
 namespace rpc
 {
 #ifndef _IN_ENCLAVE
-    enclave_service_proxy::enclave_service_proxy(uint64_t zone_id, std::string filename, const rpc::shared_ptr<service>& operating_zone_service, const rpc::i_telemetry_service* telemetry_service)
+    enclave_service_proxy::enclave_service_proxy(uint64_t zone_id, std::string filename, const rpc::shared_ptr<service>& operating_zone_service, uint64_t host_id, const rpc::i_telemetry_service* telemetry_service)
         : service_proxy(zone_id, operating_zone_service, telemetry_service)
         , filename_(filename)
+        , host_id_(host_id)
     {
         if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
         {
@@ -48,7 +49,7 @@ namespace rpc
             return rpc::error::TRANSPORT_ERROR();
         int err_code = error::OK();
         uint64_t object_id = 0;
-        status = marshal_test_init_enclave(eid_, &err_code, get_operating_zone_id(), get_zone_id(), &object_id);
+        status = marshal_test_init_enclave(eid_, &err_code, get_operating_zone_id(), host_id_, get_zone_id(), &object_id);
         if (status)
         {
             sgx_destroy_enclave(eid_);

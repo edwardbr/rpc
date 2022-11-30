@@ -70,7 +70,9 @@ rpc::weak_ptr<rpc::service> current_host_service;
 const rpc::i_telemetry_service* telemetry_service = nullptr;
 int* zone_gen = nullptr;
 
-class host : public yyy::i_host
+class host : 
+    public yyy::i_host,
+    public rpc::enable_shared_from_this<host>
 {
     void* get_address() const override { return (void*)this; }
     const rpc::casting_interface* query_interface(uint64_t interface_id) const override
@@ -81,8 +83,13 @@ class host : public yyy::i_host
     }
     error_code create_enclave(rpc::shared_ptr<yyy::i_example>& target) override
     {
-        auto err_code = rpc::enclave_service_proxy::create(++(*zone_gen), enclave_path, current_host_service.lock(),
-                                                           target, telemetry_service);
+        auto err_code = rpc::enclave_service_proxy::create(
+            ++(*zone_gen), 
+            enclave_path, 
+            current_host_service.lock(),
+            rpc::shared_ptr<yyy::i_host>(), //shared_from_this(),
+            target, 
+            telemetry_service);
         return err_code;
     };
 };
@@ -95,6 +102,7 @@ struct in_memory_setup
     rpc::shared_ptr<yyy::i_example> i_example_ptr;
 
     const bool has_enclave = false;
+    bool use_host_in_child = false;
 
     int zone_gen_ = 0;
 
@@ -104,7 +112,7 @@ struct in_memory_setup
         tm = rpc::make_shared<host_telemetry_service>();
         {
             i_host_ptr = rpc::shared_ptr<yyy::i_host> (new host());
-            i_example_ptr = rpc::shared_ptr<yyy::i_example> (new example(tm.get()));
+            i_example_ptr = rpc::shared_ptr<yyy::i_example> (new example(tm.get(), use_host_in_child ? i_host_ptr : nullptr));
         }
     }
 
@@ -114,6 +122,13 @@ struct in_memory_setup
         i_example_ptr = nullptr;
         tm = nullptr;
         zone_gen = nullptr;
+    }
+};
+struct in_memory_setup_with_host_in_enclave : public in_memory_setup
+{
+    in_memory_setup_with_host_in_enclave() : in_memory_setup()
+    {
+        use_host_in_child = true;
     }
 };
 
@@ -127,6 +142,7 @@ struct inproc_setup
     rpc::shared_ptr<yyy::i_example> i_example_ptr;
 
     const bool has_enclave = true;
+    bool use_host_in_child = false;
 
     int zone_gen_ = 0;
 
@@ -164,7 +180,7 @@ struct inproc_setup
 
         {
             // create the example object implementation
-            rpc::shared_ptr<yyy::i_example> remote_example(new example(tm.get()));
+            rpc::shared_ptr<yyy::i_example> remote_example(new example(tm.get(), use_host_in_child ? i_host_ptr : nullptr));
 
             example_encap
                 = rpc::create_interface_stub(*child_service, remote_example);
@@ -202,7 +218,7 @@ struct inproc_setup
         auto service_proxy_to_child = rpc::local_child_service_proxy::create(new_service, root_service, tm.get());
 
         // create the example object implementation
-        rpc::shared_ptr<yyy::i_example> remote_example(new example(tm.get()));
+        rpc::shared_ptr<yyy::i_example> remote_example(new example(tm.get(), use_host_in_child ? i_host_ptr : nullptr));
 
         rpc::interface_descriptor example_encap
             = rpc::create_interface_stub(*new_service, remote_example);
@@ -218,6 +234,14 @@ struct inproc_setup
     }
 };
 
+struct inproc_setup_with_host_in_enclave : public inproc_setup
+{
+    inproc_setup_with_host_in_enclave() : inproc_setup()
+    {
+        use_host_in_child = true;
+    }
+};
+
 struct enclave_setup
 {
     rpc::shared_ptr<host_telemetry_service> tm;
@@ -227,6 +251,7 @@ struct enclave_setup
     rpc::shared_ptr<yyy::i_example> i_example_ptr;
 
     const bool has_enclave = true;
+    bool use_host_in_child = false;
 
     int zone_gen_ = 0;
 
@@ -236,11 +261,18 @@ struct enclave_setup
         tm = rpc::make_shared<host_telemetry_service>();
         root_service = rpc::make_shared<rpc::service>(++zone_gen_);
         current_host_service = root_service;
-
-        auto err_code = rpc::enclave_service_proxy::create(++zone_gen_, enclave_path, root_service, i_example_ptr,
-                                                        tm.get());
-        ASSERT(!err_code);
+        
         i_host_ptr = rpc::shared_ptr<yyy::i_host> (new host());
+
+        auto err_code = rpc::enclave_service_proxy::create(
+            ++zone_gen_, 
+            enclave_path, 
+            root_service, 
+            use_host_in_child ? i_host_ptr : nullptr, 
+            i_example_ptr,
+            tm.get());
+
+        ASSERT(!err_code);
     }
 
     virtual void TearDown()
@@ -255,10 +287,23 @@ struct enclave_setup
     rpc::shared_ptr<yyy::i_example> create_new_zone()
     {
         rpc::shared_ptr<yyy::i_example> example_relay_ptr;
-        auto err_code = rpc::enclave_service_proxy::create(++zone_gen_, enclave_path, root_service, example_relay_ptr,
-                                                              telemetry_service);
+        auto err_code = rpc::enclave_service_proxy::create(
+            ++zone_gen_, 
+            enclave_path, 
+            root_service, 
+            use_host_in_child ? i_host_ptr : nullptr, 
+            example_relay_ptr,
+            telemetry_service);
         ASSERT(!err_code);
         return example_relay_ptr;
+    }
+};
+
+struct enclave_setup_with_host_in_enclave : public enclave_setup
+{
+    enclave_setup_with_host_in_enclave() : enclave_setup()
+    {
+        use_host_in_child = true;
     }
 };
 
@@ -278,7 +323,13 @@ class type_test :
     }    
 };
 
-typedef Types<in_memory_setup, inproc_setup, enclave_setup> local_implementations;
+typedef Types<
+    in_memory_setup, 
+    in_memory_setup_with_host_in_enclave, 
+    inproc_setup, 
+    inproc_setup_with_host_in_enclave, 
+    enclave_setup, 
+    enclave_setup_with_host_in_enclave> local_implementations;
 TYPED_TEST_SUITE(type_test, local_implementations);
 
 TYPED_TEST(type_test, initialisation_test)
@@ -317,7 +368,11 @@ template <class T>
 using remote_type_test = type_test<T>;
 
 
-typedef Types<inproc_setup, enclave_setup> remote_implementations;
+typedef Types<
+    inproc_setup, 
+    inproc_setup_with_host_in_enclave, 
+    enclave_setup, 
+    enclave_setup_with_host_in_enclave> remote_implementations;
 TYPED_TEST_SUITE(remote_type_test, remote_implementations);
 
 TYPED_TEST(remote_type_test, remote_standard_tests)
