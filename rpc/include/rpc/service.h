@@ -68,7 +68,7 @@ namespace rpc
         rpc::weak_ptr<object_stub> get_object(uint64_t object_id) const;
 
         int try_cast(uint64_t zone_id, uint64_t object_id, uint64_t interface_id) override;
-        uint64_t add_ref(uint64_t zone_id, uint64_t object_id) override;
+        uint64_t add_ref(uint64_t zone_id, uint64_t object_id, bool out_param) override;
         void release_local_stub(const rpc::shared_ptr<rpc::object_stub>& stub);
         uint64_t release(uint64_t zone_id, uint64_t object_id) override;
 

@@ -145,7 +145,7 @@ namespace rpc
             if(add_ref && originating_zone_id != object_proxy->get_zone_id())
             {
                 auto zone_proxy = object_proxy->get_service_proxy();
-                zone_proxy->add_ref(object_proxy->get_zone_id(), object_proxy->get_object_id());
+                zone_proxy->add_ref(object_proxy->get_zone_id(), object_proxy->get_object_id(), false);
             }
             return {object_proxy->get_object_id(), object_proxy->get_zone_id()};
         }
@@ -214,7 +214,7 @@ namespace rpc
         }
     }
 
-    uint64_t service::add_ref(uint64_t zone_id, uint64_t object_id)
+    uint64_t service::add_ref(uint64_t zone_id, uint64_t object_id, bool out_param)
     {
         if(zone_id != get_zone_id())
         {
@@ -231,7 +231,7 @@ namespace rpc
             {
                 return std::numeric_limits<uint64_t>::max();
             }
-            return other_zone->add_ref(zone_id, object_id);
+            return other_zone->add_ref(zone_id, object_id, out_param);
         }
         else
         {

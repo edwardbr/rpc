@@ -10,34 +10,34 @@ void log(const std::string& data)
 
 namespace marshalled_tests
 {
-    class baz : 
-        public xxx::i_baz,
-        public xxx::i_bar
+    class baz : public xxx::i_baz, public xxx::i_bar
     {
         const rpc::i_telemetry_service* telemetry_ = nullptr;
         void* get_address() const override { return (void*)this; }
-        const rpc::casting_interface* query_interface(uint64_t interface_id) const override 
-        { 
-            if(xxx::i_baz::id == interface_id)
-                return static_cast<const xxx::i_baz*>(this); 
-            if(xxx::i_bar::id == interface_id)
-                return static_cast<const xxx::i_bar*>(this); 
+        const rpc::casting_interface* query_interface(uint64_t interface_id) const override
+        {
+            if (xxx::i_baz::id == interface_id)
+                return static_cast<const xxx::i_baz*>(this);
+            if (xxx::i_bar::id == interface_id)
+                return static_cast<const xxx::i_bar*>(this);
             return nullptr;
         }
+
     public:
-        baz(const rpc::i_telemetry_service* telemetry) : telemetry_(telemetry)
+        baz(const rpc::i_telemetry_service* telemetry)
+            : telemetry_(telemetry)
         {
-            if(telemetry_)
+            if (telemetry_)
                 telemetry_->on_impl_creation("baz", xxx::i_baz::id);
         }
 
         virtual ~baz()
         {
-            if(telemetry_)
+            if (telemetry_)
                 telemetry_->on_impl_deletion("baz", xxx::i_baz::id);
         }
         int callback(int val) override
-        {            
+        {
             log(std::string("callback ") + std::to_string(val));
             return rpc::error::OK();
         }
@@ -58,23 +58,25 @@ namespace marshalled_tests
     {
         const rpc::i_telemetry_service* telemetry_ = nullptr;
         void* get_address() const override { return (void*)this; }
-        const rpc::casting_interface* query_interface(uint64_t interface_id) const override 
-        { 
-            if(xxx::i_foo::id == interface_id)
-                return static_cast<const xxx::i_foo*>(this); 
+        const rpc::casting_interface* query_interface(uint64_t interface_id) const override
+        {
+            if (xxx::i_foo::id == interface_id)
+                return static_cast<const xxx::i_foo*>(this);
             return nullptr;
         }
 
         rpc::shared_ptr<xxx::i_baz> cached_;
+
     public:
-        foo(const rpc::i_telemetry_service* telemetry) : telemetry_(telemetry)
+        foo(const rpc::i_telemetry_service* telemetry)
+            : telemetry_(telemetry)
         {
-            if(telemetry_)
+            if (telemetry_)
                 telemetry_->on_impl_creation("foo", xxx::i_foo::id);
         }
         virtual ~foo()
         {
-            if(telemetry_)
+            if (telemetry_)
                 telemetry_->on_impl_deletion("foo", xxx::i_foo::id);
         }
         error_code do_something_in_val(int val) override
@@ -211,7 +213,8 @@ namespace marshalled_tests
             log(std::string("got ") + std::to_string(val1));
             return rpc::error::OK();
         }
-        error_code do_multi_complicated_val(const xxx::something_more_complicated val1, const xxx::something_more_complicated val2) override
+        error_code do_multi_complicated_val(const xxx::something_more_complicated val1,
+                                            const xxx::something_more_complicated val2) override
         {
             log(std::string("got ") + val1.map_val.begin()->first);
             return rpc::error::OK();
@@ -233,42 +236,41 @@ namespace marshalled_tests
 
         error_code call_baz_interface(const rpc::shared_ptr<xxx::i_baz>& val) override
         {
-            if(!val)
+            if (!val)
                 return rpc::error::OK();
             val->callback(22);
             auto val1 = rpc::dynamic_pointer_cast<xxx::i_baz>(val);
-//#sgx dynamic cast in an enclave this fails
+            // #sgx dynamic cast in an enclave this fails
             auto val2 = rpc::dynamic_pointer_cast<xxx::i_bar>(val);
 
-            std::vector<uint8_t> in_val{1,2,3,4};
+            std::vector<uint8_t> in_val {1, 2, 3, 4};
             std::vector<uint8_t> out_val;
 
             val->blob_test(in_val, out_val);
             assert(in_val == out_val);
 
-            //this should trigger NEED_MORE_MEMORY signal requiring more out param data to be provided to the called 
-            //the out param data is temporarily cached and given over when enough memory has been provided, without
-            //recalling the implementation
+            // this should trigger NEED_MORE_MEMORY signal requiring more out param data to be provided to the called
+            // the out param data is temporarily cached and given over when enough memory has been provided, without
+            // recalling the implementation
             in_val.resize(100000);
             std::fill(in_val.begin(), in_val.end(), 42);
             val->blob_test(in_val, out_val);
             assert(in_val == out_val);
             return rpc::error::OK();
-        }        
+        }
 
-        
         error_code create_baz_interface(rpc::shared_ptr<xxx::i_baz>& val) override
         {
             val = rpc::shared_ptr<xxx::i_baz>(new baz(telemetry_));
             return rpc::error::OK();
         }
-                
+
         error_code get_null_interface(rpc::shared_ptr<xxx::i_baz>& val) override
         {
             val = nullptr;
             return rpc::error::OK();
         }
-    
+
         error_code set_interface(const rpc::shared_ptr<xxx::i_baz>& val) override
         {
             cached_ = val;
@@ -281,39 +283,36 @@ namespace marshalled_tests
         }
     };
 
-    class multiple_inheritance : 
-        public xxx::i_bar,
-        public xxx::i_baz
+    class multiple_inheritance : public xxx::i_bar, public xxx::i_baz
     {
         const rpc::i_telemetry_service* telemetry_ = nullptr;
-        
+
         void* get_address() const override { return (void*)this; }
-        const rpc::casting_interface* query_interface(uint64_t interface_id) const override 
-        { 
-            if(xxx::i_bar::id == interface_id)
-                return static_cast<const xxx::i_bar*>(this); 
-            if(xxx::i_baz::id == interface_id)
-                return static_cast<const xxx::i_baz*>(this); 
+        const rpc::casting_interface* query_interface(uint64_t interface_id) const override
+        {
+            if (xxx::i_bar::id == interface_id)
+                return static_cast<const xxx::i_bar*>(this);
+            if (xxx::i_baz::id == interface_id)
+                return static_cast<const xxx::i_baz*>(this);
             return nullptr;
         }
+
     public:
-        multiple_inheritance(const rpc::i_telemetry_service* telemetry) : telemetry_(telemetry)
+        multiple_inheritance(const rpc::i_telemetry_service* telemetry)
+            : telemetry_(telemetry)
         {
-            if(telemetry_)
+            if (telemetry_)
                 telemetry_->on_impl_creation("multiple_inheritance", xxx::i_bar::id);
         }
         virtual ~multiple_inheritance()
         {
-            if(telemetry_)
+            if (telemetry_)
                 telemetry_->on_impl_deletion("multiple_inheritance", xxx::i_bar::id);
         }
 
-        error_code do_something_else(int val) override
-        {
-            return rpc::error::OK();
-        }
+        error_code do_something_else(int val) override { return rpc::error::OK(); }
         int callback(int val) override
-        {            
+        {
             log(std::string("callback ") + std::to_string(val));
             return rpc::error::OK();
         }
@@ -329,26 +328,27 @@ namespace marshalled_tests
         const rpc::i_telemetry_service* telemetry_ = nullptr;
         rpc::shared_ptr<yyy::i_host> host_;
         void* get_address() const override { return (void*)this; }
-        const rpc::casting_interface* query_interface(uint64_t interface_id) const override 
-        { 
-            if(yyy::i_example::id == interface_id)
-                return static_cast<const yyy::i_example*>(this); 
+        const rpc::casting_interface* query_interface(uint64_t interface_id) const override
+        {
+            if (yyy::i_example::id == interface_id)
+                return static_cast<const yyy::i_example*>(this);
             return nullptr;
         }
+
     public:
-        example(const rpc::i_telemetry_service* telemetry, rpc::shared_ptr<yyy::i_host> host) : 
-            telemetry_(telemetry), 
-            host_(host)
+        example(const rpc::i_telemetry_service* telemetry, rpc::shared_ptr<yyy::i_host> host)
+            : telemetry_(telemetry)
+            , host_(host)
         {
-            if(telemetry_)
+            if (telemetry_)
                 telemetry_->on_impl_creation("example", yyy::i_example::id);
         }
         virtual ~example()
         {
-            if(telemetry_)
+            if (telemetry_)
                 telemetry_->on_impl_deletion("example", yyy::i_example::id);
         }
-        
+
         error_code create_multiple_inheritance(rpc::shared_ptr<xxx::i_baz>& target) override
         {
             target = rpc::shared_ptr<xxx::i_baz>(new multiple_inheritance(telemetry_));
@@ -366,26 +366,66 @@ namespace marshalled_tests
             c = a + b;
             return rpc::error::OK();
         }
-        
+
         error_code call_create_enclave(const rpc::shared_ptr<yyy::i_host>& host) override
         {
             return call_create_enclave_val(host);
         }
         error_code call_create_enclave_val(rpc::shared_ptr<yyy::i_host> host) override
         {
-            if(!host)
+            if (!host)
                 return rpc::error::INVALID_DATA();
             rpc::shared_ptr<marshalled_tests::yyy::i_example> target;
             host->create_enclave(target);
-            if(!target)
+            if (!target)
                 return rpc::error::INVALID_DATA();
-//            target = nullptr;
+            //            target = nullptr;
             int outval = 0;
-            auto ret = target->add(1,2, outval);
-            if(ret != rpc::error::OK())
+            auto ret = target->add(1, 2, outval);
+            if (ret != rpc::error::OK())
                 return ret;
-            if(outval != 3)
+            if (outval != 3)
                 return rpc::error::INVALID_DATA();
+            return rpc::error::OK();
+        }
+
+        error_code call_host_create_enclave_and_throw_away() override
+        {
+            if (!host_)
+                return rpc::error::INVALID_DATA();
+            rpc::shared_ptr<i_example> target;
+            host_->create_enclave(target);
+            return rpc::error::OK();
+        }
+
+        error_code call_host_create_enclave(rpc::shared_ptr<i_example>& target) override
+        {
+            if (!host_)
+                return rpc::error::INVALID_DATA();
+            host_->create_enclave(target);
+            return rpc::error::OK();
+        }
+
+        // live app registry, it should have sole responsibility for the long term storage of app shared ptrs
+        error_code call_host_look_up_app(const std::string& name, rpc::shared_ptr<i_example>& app) override
+        {
+            if (!host_)
+                return rpc::error::INVALID_DATA();
+            host_->look_up_app(name, app);
+            return rpc::error::OK();
+        }
+        error_code call_host_set_app(const std::string& name, const rpc::shared_ptr<i_example>& app) override
+        {
+            if (!host_)
+                return rpc::error::INVALID_DATA();
+            host_->set_app(name, app);
+            return rpc::error::OK();
+        }
+        error_code call_host_unload_app(const std::string& name) override
+        {
+            if (!host_)
+                return rpc::error::INVALID_DATA();
+            host_->unload_app(name);
             return rpc::error::OK();
         }
 
@@ -395,12 +435,11 @@ namespace marshalled_tests
             auto val1 = rpc::dynamic_pointer_cast<xxx::i_bar>(val);
             return rpc::error::OK();
         }
-         error_code give_interface(const rpc::shared_ptr<xxx::i_baz> baz) override
+        error_code give_interface(const rpc::shared_ptr<xxx::i_baz> baz) override
         {
             baz->callback(22);
             auto val1 = rpc::dynamic_pointer_cast<xxx::i_bar>(baz);
             return rpc::error::OK();
         }
-
     };
 }

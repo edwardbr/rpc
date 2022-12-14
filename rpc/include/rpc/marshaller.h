@@ -19,7 +19,7 @@ namespace rpc
                                 const char* in_buf_, std::vector<char>& out_buf_)
             = 0;
         virtual int try_cast(uint64_t zone_id, uint64_t object_id, uint64_t interface_id) = 0;
-        virtual uint64_t add_ref(uint64_t zone_id, uint64_t object_id) = 0;
+        virtual uint64_t add_ref(uint64_t zone_id, uint64_t object_id, bool out_param) = 0;
         virtual uint64_t release(uint64_t zone_id, uint64_t object_id) = 0;
     };
 

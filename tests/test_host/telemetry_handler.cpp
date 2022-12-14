@@ -51,14 +51,14 @@ extern "C"
         int ret = root_service->try_cast(zone_id, object_id, interface_id);
         return ret;
     }
-    uint64_t add_ref_host(uint64_t zone_id, uint64_t object_id)
+    uint64_t add_ref_host(uint64_t zone_id, uint64_t object_id, char out_param)
     {
         auto root_service = current_host_service.lock();
         if (!root_service)
         {
             return rpc::error::TRANSPORT_ERROR();
         }
-        return root_service->add_ref(zone_id, object_id);
+        return root_service->add_ref(zone_id, object_id, out_param);
     }
     uint64_t release_host(uint64_t zone_id, uint64_t object_id)
     {

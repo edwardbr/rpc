@@ -13,10 +13,23 @@ namespace yyy
         error_code give_interface([in]const rpc::shared_ptr<xxx::i_baz> val);//can be null
         error_code call_create_enclave_val(rpc::shared_ptr<i_host> host);//can be null
         error_code call_create_enclave(const rpc::shared_ptr<i_host>& host);//can be null
+
+        error_code call_host_create_enclave_and_throw_away();
+        error_code call_host_create_enclave([out] rpc::shared_ptr<i_example>& target);
+
+        //live app registry, it should have sole responsibility for the long term storage of app shared ptrs
+        error_code call_host_look_up_app(const std::string& name, [out] rpc::shared_ptr<i_example>& app);
+        error_code call_host_set_app(const std::string& name, [in] const rpc::shared_ptr<i_example>& app);
+        error_code call_host_unload_app(const std::string& name);
     };
 
     interface i_host
     {
-        error_code create_enclave([out, by_value] rpc::shared_ptr<i_example>& target);
-    };
+        error_code create_enclave([out] rpc::shared_ptr<i_example>& target);
+
+        //live app registry, it should have sole responsibility for the long term storage of app shared ptrs
+        error_code look_up_app(const std::string& name, [out] rpc::shared_ptr<i_example>& app);
+        error_code set_app(const std::string& name, [in] const rpc::shared_ptr<i_example>& app);
+        error_code unload_app(const std::string& name);
+  };
 } 

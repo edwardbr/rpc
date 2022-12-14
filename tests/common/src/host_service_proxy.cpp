@@ -89,7 +89,7 @@ namespace rpc
         return err_code;
     }
 
-    uint64_t host_service_proxy::add_ref(uint64_t zone_id, uint64_t object_id)
+    uint64_t host_service_proxy::add_ref(uint64_t zone_id, uint64_t object_id, bool out_param)
     {
         if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
         {
@@ -97,11 +97,11 @@ namespace rpc
                                                         zone_id, object_id);
         }
         uint64_t ret = 0;
-        sgx_status_t status = ::add_ref_host(&ret, zone_id, object_id);
+        sgx_status_t status = ::add_ref_host(&ret, zone_id, object_id, out_param ? 1 : 0);
         if (status)
             return std::numeric_limits<uint64_t>::max();
         
-        if(ret != std::numeric_limits<uint64_t>::max())
+        if(!out_param && ret != std::numeric_limits<uint64_t>::max())
         {
             add_external_ref();
         }

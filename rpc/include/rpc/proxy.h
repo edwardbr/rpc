@@ -390,7 +390,7 @@ namespace rpc
         return operating_service->encapsulate_out_param(originating_zone_id, iface);
     }
 
-    //do not use directly it is for the interface generator use rpc::create_proxy if you want to get a proxied pointer to a remote implementation
+    //do not use directly it is for the interface generator use rpc::create_interface_proxy if you want to get a proxied pointer to a remote implementation
     template<class T> 
     int get_interface(rpc::service& serv, uint64_t originating_zone_id, const rpc::interface_descriptor& encap, rpc::shared_ptr<T>& iface)
     {

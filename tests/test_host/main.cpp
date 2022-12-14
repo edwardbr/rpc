@@ -74,6 +74,11 @@ class host :
     public yyy::i_host,
     public rpc::enable_shared_from_this<host>
 {
+
+  	//perhaps this should be an unsorted list but map is easier to debug for now
+    std::map<std::string, rpc::shared_ptr<yyy::i_example>> cached_apps_; 
+    std::mutex cached_apps_mux_;
+
     void* get_address() const override { return (void*)this; }
     const rpc::casting_interface* query_interface(uint64_t interface_id) const override
     {
@@ -81,17 +86,48 @@ class host :
             return static_cast<const yyy::i_host*>(this);
         return nullptr;
     }
+
+public:
     error_code create_enclave(rpc::shared_ptr<yyy::i_example>& target) override
     {
+        rpc::shared_ptr<yyy::i_host> host = shared_from_this();
         auto err_code = rpc::enclave_service_proxy::create(
             ++(*zone_gen), 
             enclave_path, 
             current_host_service.lock(),
-            rpc::shared_ptr<yyy::i_host>(), //shared_from_this(),
+            host,
             target, 
             telemetry_service);
         return err_code;
     };
+
+    //live app registry, it should have sole responsibility for the long term storage of app shared ptrs
+    error_code look_up_app(const std::string& app_name, rpc::shared_ptr<yyy::i_example>& app)
+    {
+        std::scoped_lock lock(cached_apps_mux_);
+        auto it = cached_apps_.find(app_name);
+        if(it == cached_apps_.end())
+        {
+            return rpc::error::OBJECT_NOT_FOUND();
+        }
+        app = it->second;
+        return rpc::error::OK();
+    }
+
+    error_code set_app(const std::string& name, const rpc::shared_ptr<yyy::i_example>& app)
+    {
+        std::scoped_lock lock(cached_apps_mux_);
+        
+        cached_apps_[name] = app;
+        return rpc::error::OK();
+    }
+
+    error_code unload_app(const std::string& name)
+    {
+        std::scoped_lock lock(cached_apps_mux_);
+        cached_apps_.erase(name);
+        return rpc::error::OK();
+    }
 };
 
 struct in_memory_setup
@@ -110,9 +146,10 @@ struct in_memory_setup
     {   
         zone_gen = &zone_gen_;
         tm = rpc::make_shared<host_telemetry_service>();
+        telemetry_service = tm.get();
         {
             i_host_ptr = rpc::shared_ptr<yyy::i_host> (new host());
-            i_example_ptr = rpc::shared_ptr<yyy::i_example> (new example(tm.get(), use_host_in_child ? i_host_ptr : nullptr));
+            i_example_ptr = rpc::shared_ptr<yyy::i_example> (new example(telemetry_service, use_host_in_child ? i_host_ptr : nullptr));
         }
     }
 
@@ -120,6 +157,7 @@ struct in_memory_setup
     {
         i_host_ptr = nullptr;
         i_example_ptr = nullptr;
+        telemetry_service = nullptr;
         tm = nullptr;
         zone_gen = nullptr;
     }
@@ -150,6 +188,7 @@ struct inproc_setup
     {
         zone_gen = &zone_gen_;
         tm = rpc::make_shared<host_telemetry_service>();
+        telemetry_service = tm.get();
         root_service = rpc::make_shared<rpc::service>(++zone_gen_);
         current_host_service = root_service;
         child_service = rpc::make_shared<rpc::child_service>(++zone_gen_);
@@ -159,11 +198,11 @@ struct inproc_setup
 
         // create a proxy to the rpc::service hosting the child service
         auto service_proxy_to_host
-            = rpc::local_service_proxy::create(root_service, child_service, tm.get(), false);
+            = rpc::local_service_proxy::create(root_service, child_service, telemetry_service, false);
 
         // create a proxy to the rpc::service that contains the example object
         auto service_proxy_to_child
-            = rpc::local_child_service_proxy::create(child_service, root_service, tm.get());
+            = rpc::local_child_service_proxy::create(child_service, root_service, telemetry_service);
 
         {
             // create a host implementation object
@@ -178,9 +217,11 @@ struct inproc_setup
             EXPECT_EQ(example_from_cast, hst);
         }
 
+        ASSERT(!rpc::create_interface_proxy(service_proxy_to_host, host_encap, i_host_ptr));
+
         {
             // create the example object implementation
-            rpc::shared_ptr<yyy::i_example> remote_example(new example(tm.get(), use_host_in_child ? i_host_ptr : nullptr));
+            rpc::shared_ptr<yyy::i_example> remote_example(new example(telemetry_service, use_host_in_child ? i_host_ptr : nullptr));
 
             example_encap
                 = rpc::create_interface_stub(*child_service, remote_example);
@@ -191,8 +232,6 @@ struct inproc_setup
             EXPECT_EQ(example_from_cast, remote_example);
         }
 
-        ASSERT(!rpc::create_interface_proxy(service_proxy_to_host, host_encap, i_host_ptr));
-
         ASSERT(!rpc::create_interface_proxy(service_proxy_to_child, example_encap, i_example_ptr));
     }
 
@@ -202,6 +241,7 @@ struct inproc_setup
         child_service = nullptr;
         i_host_ptr = nullptr;
         root_service = nullptr;
+        telemetry_service = nullptr;
         tm = nullptr;
         zone_gen = nullptr;
     }
@@ -212,13 +252,13 @@ struct inproc_setup
         
         // create a proxy to the rpc::service hosting the child service
         auto service_proxy_to_host
-            = rpc::local_service_proxy::create(root_service, new_service, tm.get(), true);
+            = rpc::local_service_proxy::create(root_service, new_service, telemetry_service, true);
 
         // create a proxy to the rpc::service that contains the example object
-        auto service_proxy_to_child = rpc::local_child_service_proxy::create(new_service, root_service, tm.get());
+        auto service_proxy_to_child = rpc::local_child_service_proxy::create(new_service, root_service, telemetry_service);
 
         // create the example object implementation
-        rpc::shared_ptr<yyy::i_example> remote_example(new example(tm.get(), use_host_in_child ? i_host_ptr : nullptr));
+        rpc::shared_ptr<yyy::i_example> remote_example(new example(telemetry_service, use_host_in_child ? i_host_ptr : nullptr));
 
         rpc::interface_descriptor example_encap
             = rpc::create_interface_stub(*new_service, remote_example);
@@ -259,6 +299,7 @@ struct enclave_setup
     {
         zone_gen = &zone_gen_;
         tm = rpc::make_shared<host_telemetry_service>();
+        telemetry_service = tm.get();
         root_service = rpc::make_shared<rpc::service>(++zone_gen_);
         current_host_service = root_service;
         
@@ -270,7 +311,7 @@ struct enclave_setup
             root_service, 
             use_host_in_child ? i_host_ptr : nullptr, 
             i_example_ptr,
-            tm.get());
+            telemetry_service);
 
         ASSERT(!err_code);
     }
@@ -280,6 +321,7 @@ struct enclave_setup
         i_example_ptr = nullptr;
         i_host_ptr = nullptr;
         root_service = nullptr;
+        telemetry_service = nullptr;
         tm = nullptr;
         zone_gen = nullptr;
     }
@@ -338,16 +380,15 @@ TYPED_TEST(type_test, initialisation_test)
 
 TYPED_TEST(type_test, standard_tests)
 {
-    auto* tm = this->lib_.tm.get();
-    foo f(tm);
-    standard_tests(f, this->lib_.has_enclave, tm);
+    foo f(telemetry_service);
+    standard_tests(f, this->lib_.has_enclave, telemetry_service);
 }
 
 
 
 TYPED_TEST(type_test, dyanmic_cast_tests)
 {
-    auto f = rpc::shared_ptr<xxx::i_foo>(new foo(this->lib_.tm.get()));
+    auto f = rpc::shared_ptr<xxx::i_foo>(new foo(telemetry_service));
 
     rpc::shared_ptr<marshalled_tests::xxx::i_baz> baz;
     ASSERT_EQ(f->create_baz_interface(baz), 0);
@@ -384,15 +425,26 @@ TYPED_TEST(remote_type_test, remote_standard_tests)
 
 TYPED_TEST(remote_type_test, remote_tests)
 {    
-    auto* tm = this->lib_.tm.get();
-    remote_tests(this->lib_.i_example_ptr, tm);
+    remote_tests(this->lib_.i_example_ptr, telemetry_service);
 }
-
 
 TYPED_TEST(remote_type_test, create_new_zone)
 {
     rpc::shared_ptr<xxx::i_foo> i_foo_relay_ptr;
     auto example_relay_ptr = this->lib_.create_new_zone();
+}
+
+TYPED_TEST(remote_type_test, create_new_zone_releasing_host_then_running_on_other_enclave)
+{
+    rpc::shared_ptr<xxx::i_foo> i_foo_relay_ptr;
+    auto example_relay_ptr = this->lib_.create_new_zone();
+    example_relay_ptr->create_foo(i_foo_relay_ptr);
+    standard_tests(*i_foo_relay_ptr, true, telemetry_service);
+
+    rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
+    ASSERT_EQ(this->lib_.i_example_ptr->create_foo(i_foo_ptr), 0);
+    example_relay_ptr = nullptr;
+    standard_tests(*i_foo_ptr, true, telemetry_service);    
 }
 
 TYPED_TEST(remote_type_test, dyanmic_cast_tests)
@@ -443,7 +495,7 @@ TYPED_TEST(remote_type_test, check_for_multiple_sets)
     rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
     ASSERT_EQ(this->lib_.i_example_ptr->create_foo(i_foo_ptr), 0);
 
-    auto b = rpc::make_shared<marshalled_tests::baz>(this->lib_.tm.get());
+    auto b = rpc::make_shared<marshalled_tests::baz>(telemetry_service);
     // set
     i_foo_ptr->set_interface(b);
     // reset
@@ -460,7 +512,7 @@ TYPED_TEST(remote_type_test, check_for_interface_storage)
     ASSERT_EQ(this->lib_.i_example_ptr->create_foo(i_foo_ptr), 0);
 
     rpc::shared_ptr<marshalled_tests::xxx::i_baz> c;
-    auto b = rpc::make_shared<marshalled_tests::baz>(this->lib_.tm.get());
+    auto b = rpc::make_shared<marshalled_tests::baz>(telemetry_service);
     i_foo_ptr->set_interface(b);
     i_foo_ptr->get_interface(c);
     i_foo_ptr->set_interface(nullptr);
@@ -470,8 +522,79 @@ TYPED_TEST(remote_type_test, check_for_interface_storage)
 TYPED_TEST(remote_type_test, check_for_set_multiple_inheritance)
 {
     auto ret = this->lib_.i_example_ptr->give_interface(
-        rpc::shared_ptr<xxx::i_baz>(new multiple_inheritance(this->lib_.tm.get())));
+        rpc::shared_ptr<xxx::i_baz>(new multiple_inheritance(telemetry_service)));
     assert(ret == rpc::error::OK());
+}
+
+
+
+TYPED_TEST(remote_type_test, host_test)
+{    
+    auto h = rpc::make_shared<host>();
+
+    rpc::shared_ptr<marshalled_tests::yyy::i_example> target;
+    rpc::shared_ptr<marshalled_tests::yyy::i_example> target2;
+    h->create_enclave(target);
+    ASSERT_NE(target, nullptr);
+
+    ASSERT_EQ(h->set_app("target", target), rpc::error::OK());
+    ASSERT_EQ(h->look_up_app("target", target2), rpc::error::OK());
+    ASSERT_EQ(h->unload_app("target"), rpc::error::OK());
+    target = nullptr;
+    target2 = nullptr;
+
+}
+
+
+
+TEST(enclave_setup_with_host_in_enclave, host_test_indirect)
+{  
+
+    auto tm = rpc::make_shared<host_telemetry_service>();
+    telemetry_service = tm.get();
+
+    rpc::shared_ptr<rpc::service> root_service;
+    rpc::shared_ptr<yyy::i_host> i_host_ptr;
+    rpc::shared_ptr<yyy::i_example> i_example_ptr;
+
+    int zone_gen_ = 0;
+    zone_gen = &zone_gen_;
+
+    root_service = rpc::make_shared<rpc::service>(++zone_gen_);
+    current_host_service = root_service;
+    
+    i_host_ptr = rpc::shared_ptr<yyy::i_host> (new host());
+
+    auto err_code = rpc::enclave_service_proxy::create(
+        ++zone_gen_, 
+        enclave_path, 
+        root_service, 
+        i_host_ptr, 
+        i_example_ptr,
+        telemetry_service);
+
+    ASSERT(!err_code);
+
+    rpc::shared_ptr<marshalled_tests::yyy::i_example> target;
+    rpc::shared_ptr<marshalled_tests::yyy::i_example> target2;
+
+    //ASSERT_EQ(i_example_ptr->call_host_create_enclave_and_throw_away(), rpc::error::OK());
+    ASSERT_EQ(i_example_ptr->call_host_create_enclave(target), rpc::error::OK());
+    ASSERT_NE(target, nullptr);
+/*
+    ASSERT_EQ(i_example_ptr->call_host_set_app("target", target), rpc::error::OK());
+    ASSERT_EQ(i_example_ptr->call_host_look_up_app("target", target2), rpc::error::OK());
+    ASSERT_EQ(i_example_ptr->call_host_unload_app("target"), rpc::error::OK());*/
+    target = nullptr;
+    target2 = nullptr;
+    i_example_ptr = nullptr;
+    i_host_ptr = nullptr;
+
+
+    root_service = nullptr;
+    telemetry_service = nullptr;
+    tm = nullptr;
+    zone_gen = nullptr;
 }
 
 TYPED_TEST(remote_type_test, check_for_call_enclave_zone)

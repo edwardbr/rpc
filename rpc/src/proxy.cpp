@@ -16,7 +16,7 @@ namespace rpc
             telemetry_service->on_object_proxy_creation(service_proxy_->get_operating_zone_id(), zone_id, object_id);
         }
         if(stub_needs_add_ref)
-            service_proxy_->add_ref(zone_id_, object_id_); 
+            service_proxy_->add_ref(zone_id_, object_id_, false); 
         if(service_proxy_needs_add_ref)
             service_proxy_->add_external_ref();
     }

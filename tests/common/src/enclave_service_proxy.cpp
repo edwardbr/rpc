@@ -36,7 +36,7 @@ namespace rpc
         sgx_destroy_enclave(eid_);
     }
 
-    int enclave_service_proxy::initialise_enclave(rpc::shared_ptr<object_proxy>& proxy)
+    int enclave_service_proxy::initialise_enclave(uint64_t& object_id)
     {
         sgx_launch_token_t token = {0};
         int updated = 0;
@@ -48,7 +48,6 @@ namespace rpc
         if (status)
             return rpc::error::TRANSPORT_ERROR();
         int err_code = error::OK();
-        uint64_t object_id = 0;
         status = marshal_test_init_enclave(eid_, &err_code, get_operating_zone_id(), host_id_, get_zone_id(), &object_id);
         if (status)
         {
@@ -57,11 +56,11 @@ namespace rpc
         }
         if (err_code)
             return err_code;      
+        
         //class takes ownership of the enclave
         enclave_owner_ = std::make_shared<enclave_owner>(eid_);
         if (err_code)
             return err_code;
-        proxy = object_proxy::create(object_id, get_zone_id(), shared_from_this(), false, false);
         return rpc::error::OK();
     }
 
@@ -106,7 +105,7 @@ namespace rpc
         return err_code;
     }
 
-    uint64_t enclave_service_proxy::add_ref(uint64_t zone_id, uint64_t object_id)
+    uint64_t enclave_service_proxy::add_ref(uint64_t zone_id, uint64_t object_id, bool out_param)
     {
         if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
         {
@@ -114,12 +113,12 @@ namespace rpc
                                                         object_id);
         }
         uint64_t ret = 0;
-        sgx_status_t status = ::add_ref_enclave(eid_, &ret, zone_id, object_id);
+        sgx_status_t status = ::add_ref_enclave(eid_, &ret, zone_id, object_id, out_param);
         if (status)
         {
             return std::numeric_limits<uint64_t>::max();
         }
-        if(ret != std::numeric_limits<uint64_t>::max())
+        if(!out_param && ret != std::numeric_limits<uint64_t>::max())
         {
             add_external_ref();
         }

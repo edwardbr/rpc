@@ -18,7 +18,7 @@ namespace rpc
         };
 
         enclave_service_proxy(uint64_t zone_id, std::string filename, const rpc::shared_ptr<service>& operating_zone_service, uint64_t host_id, const rpc::i_telemetry_service* telemetry_service);
-        int initialise_enclave(rpc::shared_ptr<object_proxy>& proxy);
+        int initialise_enclave(uint64_t& object_id);
 
        
         rpc::shared_ptr<service_proxy> clone_for_zone(uint64_t zone_id) override
@@ -54,11 +54,11 @@ namespace rpc
 
             ret->weak_this_ = pthis;
 
-            rpc::shared_ptr<object_proxy> proxy;
-            int err_code = ret->initialise_enclave(proxy);
+            uint64_t object_id = 0;
+            int err_code = ret->initialise_enclave(object_id);
             if(err_code)
                 return err_code;
-            auto error = proxy->query_interface(root_object);
+            auto error = rpc::create_interface_proxy(ret, {object_id, zone_id}, root_object);
             if(error != rpc::error::OK())
                 return error;
             operating_zone_service->add_zone_proxy(ret);
@@ -72,7 +72,7 @@ namespace rpc
         int send(uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_,
                         const char* in_buf_, std::vector<char>& out_buf_) override;
         int try_cast(uint64_t zone_id, uint64_t object_id, uint64_t interface_id) override;
-        uint64_t add_ref(uint64_t zone_id, uint64_t object_id) override;
+        uint64_t add_ref(uint64_t zone_id, uint64_t object_id, bool out_param) override;
         uint64_t release(uint64_t zone_id, uint64_t object_id) override;
     };
 }
