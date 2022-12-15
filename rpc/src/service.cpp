@@ -142,12 +142,15 @@ namespace rpc
         if(proxy_base)
         {
             auto object_proxy = proxy_base->get_object_proxy();
-            if(add_ref && originating_zone_id != object_proxy->get_zone_id())
+            auto object_zone_id = object_proxy->get_zone_id();
+            auto object_id = object_proxy->get_object_id();
+            if(add_ref && originating_zone_id != object_zone_id)
             {
                 auto zone_proxy = object_proxy->get_service_proxy();
-                zone_proxy->add_ref(object_proxy->get_zone_id(), object_proxy->get_object_id(), false);
+                auto cloned_from_zone_id = zone_proxy->get_cloned_from_zone_id();
+                zone_proxy->add_ref(object_zone_id, object_id, originating_zone_id == cloned_from_zone_id);
             }
-            return {object_proxy->get_object_id(), object_proxy->get_zone_id()};
+            return {object_id, object_zone_id};
         }
 
         std::lock_guard g(insert_control);

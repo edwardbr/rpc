@@ -206,6 +206,7 @@ namespace rpc
         std::unordered_map<uint64_t, rpc::weak_ptr<object_proxy>> proxies;
         std::mutex insert_control;
         uint64_t zone_id_ = 0;
+        uint64_t cloned_from_zone_id_ = 0;
         uint64_t operating_zone_id = 0;
         rpc::weak_ptr<service> operating_zone_service_;
         rpc::shared_ptr<service_proxy> dependent_services_lock_;
@@ -239,7 +240,11 @@ namespace rpc
         }
 
         mutable rpc::weak_ptr<service_proxy> weak_this_;
-        void set_zone_id(uint64_t zone_id) {zone_id_ = zone_id;}
+        void set_zone_id(uint64_t zone_id) 
+        {
+            cloned_from_zone_id_ = zone_id_;
+            zone_id_ = zone_id;
+        }
 
     public:
         virtual ~service_proxy()
@@ -296,6 +301,7 @@ namespace rpc
 
         uint64_t get_zone_id() const {return zone_id_;}
         uint64_t get_operating_zone_id() const {return operating_zone_id;}
+        uint64_t get_cloned_from_zone_id() const {return cloned_from_zone_id_;}
         rpc::shared_ptr<service> get_operating_zone_service() const {return operating_zone_service_.lock();}
         const rpc::i_telemetry_service* get_telemetry_service(){return telemetry_service_;}
 
@@ -311,7 +317,7 @@ namespace rpc
             rpc::shared_ptr<object_proxy> op;
             rpc::shared_ptr<service_proxy> service_proxy;
             auto serv = get_operating_zone_service();
-            if(serv->get_zone_id() == encap.zone_id)
+            if(operating_zone_id == encap.zone_id)
             {
                 val = serv->get_local_interface<T>(encap.object_id);
                 if(!val)
@@ -320,7 +326,7 @@ namespace rpc
             }
 
             bool new_proxy_added = false;
-            if(get_zone_id() != encap.zone_id)
+            if(zone_id_ != encap.zone_id)
             {
                 auto operating_zone_service = get_operating_zone_service();
                 service_proxy = operating_zone_service->get_zone_proxy(zone_id_, encap.zone_id, new_proxy_added);
@@ -340,7 +346,7 @@ namespace rpc
             }
             if(!op)
             {
-                op = object_proxy::create(encap.object_id, encap.zone_id, service_proxy, stub_needs_add_ref, new_proxy_added ? false : service_proxy_needs_add_ref);
+                op = object_proxy::create(encap.object_id, encap.zone_id, service_proxy, stub_needs_add_ref, new_proxy_added ? false : (service_proxy_needs_add_ref && (encap.zone_id == zone_id_)));
                 service_proxy->proxies[encap.object_id] = op;
             }
             return op->query_interface(val, false);

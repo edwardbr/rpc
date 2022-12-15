@@ -97,7 +97,7 @@ namespace rpc
                                                         zone_id, object_id);
         }
         uint64_t ret = 0;
-        sgx_status_t status = ::add_ref_host(&ret, zone_id, object_id, out_param ? 1 : 0);
+        sgx_status_t status = ::add_ref_host(&ret, zone_id, object_id, 0/*out_param ? 1 : 0*/);
         if (status)
             return std::numeric_limits<uint64_t>::max();
         
