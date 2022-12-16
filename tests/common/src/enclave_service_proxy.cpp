@@ -113,7 +113,7 @@ namespace rpc
                                                         object_id);
         }
         uint64_t ret = 0;
-        sgx_status_t status = ::add_ref_enclave(eid_, &ret, zone_id, object_id, out_param);
+        sgx_status_t status = ::add_ref_enclave(eid_, &ret, zone_id, object_id);
         if (status)
         {
             return std::numeric_limits<uint64_t>::max();
