@@ -88,6 +88,7 @@ class host :
     }
 
 public:
+    ~host(){}
     error_code create_enclave(rpc::shared_ptr<yyy::i_example>& target) override
     {
         rpc::shared_ptr<yyy::i_host> host = shared_from_this();
@@ -108,7 +109,7 @@ public:
         auto it = cached_apps_.find(app_name);
         if(it == cached_apps_.end())
         {
-            return rpc::error::OBJECT_NOT_FOUND();
+            return rpc::error::OK();
         }
         app = it->second;
         return rpc::error::OK();
@@ -545,13 +546,116 @@ TYPED_TEST(remote_type_test, host_test)
 
 }
 
+TYPED_TEST(remote_type_test, check_for_call_enclave_zone)
+{
+    auto h = rpc::make_shared<host>();
+    auto ret = this->lib_.i_example_ptr->call_create_enclave_val(h);
+    assert(ret == rpc::error::OK());
+}
+
+/*TYPED_TEST(remote_type_test, check_for_call_inproc_zone)
+{
+    auto h = rpc::make_shared<host>();
+    auto ret = this->lib_.i_example_ptr->call_create_enclave_val(h);
+    assert(ret == rpc::error::OK());
+}*/
 
 
-TEST(enclave_setup_with_host_in_enclave, host_test_indirect)
+
+TEST(enclave_setup_with_host_in_enclave, call_host_create_enclave_and_throw_away)
 {  
 
     auto tm = rpc::make_shared<host_telemetry_service>();
     telemetry_service = tm.get();
+    bool run_standard_tests = false;
+
+    rpc::shared_ptr<rpc::service> root_service;
+    rpc::shared_ptr<yyy::i_host> i_host_ptr;
+    rpc::shared_ptr<yyy::i_example> i_example_ptr;
+
+    int zone_gen_ = 0;
+    zone_gen = &zone_gen_;
+
+    root_service = rpc::make_shared<rpc::service>(++zone_gen_);
+    current_host_service = root_service;
+    
+    i_host_ptr = rpc::shared_ptr<yyy::i_host> (new host());
+
+    auto err_code = rpc::enclave_service_proxy::create(
+        ++zone_gen_, 
+        enclave_path, 
+        root_service, 
+        i_host_ptr, 
+        i_example_ptr,
+        telemetry_service);
+
+    ASSERT(!err_code);
+
+    ASSERT_EQ(i_example_ptr->call_host_create_enclave_and_throw_away(run_standard_tests), rpc::error::OK());
+    i_example_ptr = nullptr;
+    i_host_ptr = nullptr;
+
+
+    root_service = nullptr;
+    telemetry_service = nullptr;
+    tm = nullptr;
+    zone_gen = nullptr;
+}
+
+
+
+
+TEST(enclave_setup_with_host_in_enclave, call_host_create_enclave)
+{  
+    auto tm = rpc::make_shared<host_telemetry_service>();
+    telemetry_service = tm.get();
+    bool run_standard_tests = false;
+
+    rpc::shared_ptr<rpc::service> root_service;
+    rpc::shared_ptr<yyy::i_host> i_host_ptr;
+    rpc::shared_ptr<yyy::i_example> i_example_ptr;
+
+    int zone_gen_ = 0;
+    zone_gen = &zone_gen_;
+
+    root_service = rpc::make_shared<rpc::service>(++zone_gen_);
+    current_host_service = root_service;
+    
+    i_host_ptr = rpc::shared_ptr<yyy::i_host> (new host());
+
+    auto err_code = rpc::enclave_service_proxy::create(
+        ++zone_gen_, 
+        enclave_path, 
+        root_service, 
+        i_host_ptr, 
+        i_example_ptr,
+        telemetry_service);
+
+    ASSERT(!err_code);
+
+    rpc::shared_ptr<marshalled_tests::yyy::i_example> target;
+
+    ASSERT_EQ(i_example_ptr->call_host_create_enclave(target, run_standard_tests), rpc::error::OK());
+    ASSERT_NE(target, nullptr);
+
+    target = nullptr;
+    i_example_ptr = nullptr;
+    i_host_ptr = nullptr;
+
+
+    root_service = nullptr;
+    telemetry_service = nullptr;
+    tm = nullptr;
+    zone_gen = nullptr;
+}
+
+
+
+TEST(enclave_setup_with_host_in_enclave, call_host_look_up_app)
+{  
+    auto tm = rpc::make_shared<host_telemetry_service>();
+    telemetry_service = tm.get();
+    bool run_standard_tests = false;
 
     rpc::shared_ptr<rpc::service> root_service;
     rpc::shared_ptr<yyy::i_host> i_host_ptr;
@@ -578,13 +682,12 @@ TEST(enclave_setup_with_host_in_enclave, host_test_indirect)
     rpc::shared_ptr<marshalled_tests::yyy::i_example> target;
     rpc::shared_ptr<marshalled_tests::yyy::i_example> target2;
 
-    //ASSERT_EQ(i_example_ptr->call_host_create_enclave_and_throw_away(), rpc::error::OK());
-    ASSERT_EQ(i_example_ptr->call_host_create_enclave(target), rpc::error::OK());
+    ASSERT_EQ(i_example_ptr->call_host_create_enclave(target, run_standard_tests), rpc::error::OK());
     ASSERT_NE(target, nullptr);
-/*
-    ASSERT_EQ(i_example_ptr->call_host_set_app("target", target), rpc::error::OK());
-    ASSERT_EQ(i_example_ptr->call_host_look_up_app("target", target2), rpc::error::OK());
-    ASSERT_EQ(i_example_ptr->call_host_unload_app("target"), rpc::error::OK());*/
+
+    //ASSERT_EQ(i_example_ptr->call_host_set_app("target", target), rpc::error::OK());
+    ASSERT_EQ(i_example_ptr->call_host_look_up_app("target", target2, run_standard_tests), rpc::error::OK());
+    //ASSERT_EQ(i_example_ptr->call_host_unload_app("target"), rpc::error::OK());
     target = nullptr;
     target2 = nullptr;
     i_example_ptr = nullptr;
@@ -597,16 +700,316 @@ TEST(enclave_setup_with_host_in_enclave, host_test_indirect)
     zone_gen = nullptr;
 }
 
-TYPED_TEST(remote_type_test, check_for_call_enclave_zone)
-{
-    auto h = rpc::make_shared<host>();
-    auto ret = this->lib_.i_example_ptr->call_create_enclave_val(h);
-    assert(ret == rpc::error::OK());
+
+TEST(enclave_setup_with_host_in_enclave, call_host_look_up_app_unload_app)
+{  
+    auto tm = rpc::make_shared<host_telemetry_service>();
+    telemetry_service = tm.get();
+    bool run_standard_tests = false;
+
+    rpc::shared_ptr<rpc::service> root_service;
+    rpc::shared_ptr<yyy::i_host> i_host_ptr;
+    rpc::shared_ptr<yyy::i_example> i_example_ptr;
+
+    int zone_gen_ = 0;
+    zone_gen = &zone_gen_;
+
+    root_service = rpc::make_shared<rpc::service>(++zone_gen_);
+    current_host_service = root_service;
+    
+    i_host_ptr = rpc::shared_ptr<yyy::i_host> (new host());
+
+    auto err_code = rpc::enclave_service_proxy::create(
+        ++zone_gen_, 
+        enclave_path, 
+        root_service, 
+        i_host_ptr, 
+        i_example_ptr,
+        telemetry_service);
+
+    ASSERT(!err_code);
+
+    rpc::shared_ptr<marshalled_tests::yyy::i_example> target;
+    rpc::shared_ptr<marshalled_tests::yyy::i_example> target2;
+
+    ASSERT_EQ(i_example_ptr->call_host_create_enclave(target, run_standard_tests), rpc::error::OK());
+    ASSERT_NE(target, nullptr);
+
+    //ASSERT_EQ(i_example_ptr->call_host_set_app("target", target), rpc::error::OK());
+    ASSERT_EQ(i_example_ptr->call_host_look_up_app("target", target2, run_standard_tests), rpc::error::OK());
+    ASSERT_EQ(i_example_ptr->call_host_unload_app("target"), rpc::error::OK());
+    target = nullptr;
+    target2 = nullptr;
+    i_example_ptr = nullptr;
+    i_host_ptr = nullptr;
+
+
+    root_service = nullptr;
+    telemetry_service = nullptr;
+    tm = nullptr;
+    zone_gen = nullptr;
 }
 
-/*TYPED_TEST(remote_type_test, check_for_call_inproc_zone)
-{
-    auto h = rpc::make_shared<host>();
-    auto ret = this->lib_.i_example_ptr->call_create_enclave_val(h);
-    assert(ret == rpc::error::OK());
-}*/
+
+TEST(enclave_setup_with_host_in_enclave, call_host_look_set_app)
+{  
+    auto tm = rpc::make_shared<host_telemetry_service>();
+    telemetry_service = tm.get();
+    bool run_standard_tests = false;
+
+    rpc::shared_ptr<rpc::service> root_service;
+    rpc::shared_ptr<yyy::i_host> i_host_ptr;
+    rpc::shared_ptr<yyy::i_example> i_example_ptr;
+
+    int zone_gen_ = 0;
+    zone_gen = &zone_gen_;
+
+    root_service = rpc::make_shared<rpc::service>(++zone_gen_);
+    current_host_service = root_service;
+    
+    i_host_ptr = rpc::shared_ptr<yyy::i_host> (new host());
+
+    auto err_code = rpc::enclave_service_proxy::create(
+        ++zone_gen_, 
+        enclave_path, 
+        root_service, 
+        i_host_ptr, 
+        i_example_ptr,
+        telemetry_service);
+
+    ASSERT(!err_code);
+
+    rpc::shared_ptr<marshalled_tests::yyy::i_example> target;
+    rpc::shared_ptr<marshalled_tests::yyy::i_example> target2;
+
+    ASSERT_EQ(i_example_ptr->call_host_create_enclave(target, run_standard_tests), rpc::error::OK());
+    ASSERT_NE(target, nullptr);
+
+    ASSERT_EQ(i_example_ptr->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
+    telemetry_service->message(rpc::i_telemetry_service::info, "call_host_unload_app");
+    //ASSERT_EQ(i_example_ptr->call_host_look_up_app("target", target2), rpc::error::OK());
+    ASSERT_EQ(i_example_ptr->call_host_unload_app("target"), rpc::error::OK());
+    target = nullptr;
+    target2 = nullptr;
+    i_example_ptr = nullptr;
+    i_host_ptr = nullptr;
+
+
+    root_service = nullptr;
+    telemetry_service = nullptr;
+    tm = nullptr;
+    zone_gen = nullptr;
+}
+
+
+TEST(enclave_setup_with_host_in_enclave, call_host_look_up_app_not_return)
+{  
+    auto tm = rpc::make_shared<host_telemetry_service>();
+    telemetry_service = tm.get();
+    bool run_standard_tests = false;
+
+    rpc::shared_ptr<rpc::service> root_service;
+    rpc::shared_ptr<yyy::i_host> i_host_ptr;
+    rpc::shared_ptr<yyy::i_example> i_example_ptr;
+
+    int zone_gen_ = 0;
+    zone_gen = &zone_gen_;
+
+    root_service = rpc::make_shared<rpc::service>(++zone_gen_);
+    current_host_service = root_service;
+    
+    i_host_ptr = rpc::shared_ptr<yyy::i_host> (new host());
+
+    auto err_code = rpc::enclave_service_proxy::create(
+        ++zone_gen_, 
+        enclave_path, 
+        root_service, 
+        i_host_ptr, 
+        i_example_ptr,
+        telemetry_service);
+
+    ASSERT(!err_code);
+
+    rpc::shared_ptr<marshalled_tests::yyy::i_example> target;
+    rpc::shared_ptr<marshalled_tests::yyy::i_example> target2;
+
+    ASSERT_EQ(i_example_ptr->call_host_create_enclave(target, run_standard_tests), rpc::error::OK());
+    ASSERT_NE(target, nullptr);
+
+    ASSERT_EQ(i_example_ptr->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
+    telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return");
+    ASSERT_EQ(i_example_ptr->call_host_look_up_app_not_return("target", run_standard_tests), rpc::error::OK());
+    telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return complete");
+    ASSERT_EQ(i_example_ptr->call_host_unload_app("target"), rpc::error::OK());
+    target = nullptr;
+    target2 = nullptr;
+    telemetry_service->message(rpc::i_telemetry_service::info, "app released");
+    i_example_ptr = nullptr;
+    i_host_ptr = nullptr;
+
+
+    root_service = nullptr;
+    telemetry_service = nullptr;
+    tm = nullptr;
+    zone_gen = nullptr;
+}
+
+TEST(enclave_setup_with_host_in_enclave, call_host_fullmonty)
+{  
+    auto tm = rpc::make_shared<host_telemetry_service>();
+    telemetry_service = tm.get();
+    bool run_standard_tests = false;
+
+    rpc::shared_ptr<rpc::service> root_service;
+    rpc::shared_ptr<yyy::i_host> i_host_ptr;
+    rpc::shared_ptr<yyy::i_example> i_example_ptr;
+
+    int zone_gen_ = 0;
+    zone_gen = &zone_gen_;
+
+    root_service = rpc::make_shared<rpc::service>(++zone_gen_);
+    current_host_service = root_service;
+    
+    i_host_ptr = rpc::shared_ptr<yyy::i_host> (new host());
+
+    auto err_code = rpc::enclave_service_proxy::create(
+        ++zone_gen_, 
+        enclave_path, 
+        root_service, 
+        i_host_ptr, 
+        i_example_ptr,
+        telemetry_service);
+
+    ASSERT(!err_code);
+
+    rpc::shared_ptr<marshalled_tests::yyy::i_example> target;
+    rpc::shared_ptr<marshalled_tests::yyy::i_example> target2;
+
+    ASSERT_EQ(i_example_ptr->call_host_create_enclave(target, run_standard_tests), rpc::error::OK());
+    ASSERT_NE(target, nullptr);
+
+    ASSERT_EQ(i_example_ptr->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
+    telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app");
+    ASSERT_EQ(i_example_ptr->call_host_look_up_app("target", target2, run_standard_tests), rpc::error::OK());
+    telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app complete");
+    ASSERT_EQ(i_example_ptr->call_host_unload_app("target"), rpc::error::OK());
+    ASSERT_EQ(target, target2);
+    target = nullptr;
+    target2 = nullptr;
+    telemetry_service->message(rpc::i_telemetry_service::info, "app released");
+    i_example_ptr = nullptr;
+    i_host_ptr = nullptr;
+
+
+    root_service = nullptr;
+    telemetry_service = nullptr;
+    tm = nullptr;
+    zone_gen = nullptr;
+}
+
+
+
+
+
+TEST(enclave_setup_with_host_in_enclave, call_host_look_up_app_not_return_delete)
+{  
+    auto tm = rpc::make_shared<host_telemetry_service>();
+    telemetry_service = tm.get();
+    bool run_standard_tests = false;
+
+    rpc::shared_ptr<rpc::service> root_service;
+    rpc::shared_ptr<yyy::i_host> i_host_ptr;
+    rpc::shared_ptr<yyy::i_example> i_example_ptr;
+
+    int zone_gen_ = 0;
+    zone_gen = &zone_gen_;
+
+    root_service = rpc::make_shared<rpc::service>(++zone_gen_);
+    current_host_service = root_service;
+    
+    i_host_ptr = rpc::shared_ptr<yyy::i_host> (new host());
+
+    auto err_code = rpc::enclave_service_proxy::create(
+        ++zone_gen_, 
+        enclave_path, 
+        root_service, 
+        i_host_ptr, 
+        i_example_ptr,
+        telemetry_service);
+
+    ASSERT(!err_code);
+
+    rpc::shared_ptr<marshalled_tests::yyy::i_example> target;
+    rpc::shared_ptr<marshalled_tests::yyy::i_example> target2;
+
+    ASSERT_EQ(i_example_ptr->call_host_create_enclave(target, run_standard_tests), rpc::error::OK());
+    ASSERT_NE(target, nullptr);
+
+    ASSERT_EQ(i_example_ptr->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
+    telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return");
+    ASSERT_EQ(i_example_ptr->call_host_look_up_app_not_return_and_delete("target", run_standard_tests), rpc::error::OK());
+    telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return complete");
+    target = nullptr;
+    target2 = nullptr;
+    telemetry_service->message(rpc::i_telemetry_service::info, "app released");
+    i_example_ptr = nullptr;
+    i_host_ptr = nullptr;
+
+
+    root_service = nullptr;
+    telemetry_service = nullptr;
+    tm = nullptr;
+    zone_gen = nullptr;
+}
+
+TEST(enclave_setup_with_host_in_enclave, call_host_fullmonty_delete)
+{  
+    auto tm = rpc::make_shared<host_telemetry_service>();
+    telemetry_service = tm.get();
+    bool run_standard_tests = false;
+
+    rpc::shared_ptr<rpc::service> root_service;
+    rpc::shared_ptr<yyy::i_host> i_host_ptr;
+    rpc::shared_ptr<yyy::i_example> i_example_ptr;
+
+    int zone_gen_ = 0;
+    zone_gen = &zone_gen_;
+
+    root_service = rpc::make_shared<rpc::service>(++zone_gen_);
+    current_host_service = root_service;
+    
+    i_host_ptr = rpc::shared_ptr<yyy::i_host> (new host());
+
+    auto err_code = rpc::enclave_service_proxy::create(
+        ++zone_gen_, 
+        enclave_path, 
+        root_service, 
+        i_host_ptr, 
+        i_example_ptr,
+        telemetry_service);
+
+    ASSERT(!err_code);
+
+    rpc::shared_ptr<marshalled_tests::yyy::i_example> target;
+    rpc::shared_ptr<marshalled_tests::yyy::i_example> target2;
+
+    ASSERT_EQ(i_example_ptr->call_host_create_enclave(target, run_standard_tests), rpc::error::OK());
+    ASSERT_NE(target, nullptr);
+
+    ASSERT_EQ(i_example_ptr->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
+    telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_and_delete");
+    ASSERT_EQ(i_example_ptr->call_host_look_up_app_and_delete("target", target2, run_standard_tests), rpc::error::OK());
+    telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_and_delete complete");
+    ASSERT_EQ(target, target2);
+    target = nullptr;
+    target2 = nullptr;
+    telemetry_service->message(rpc::i_telemetry_service::info, "app released");
+    i_example_ptr = nullptr;
+    i_host_ptr = nullptr;
+
+
+    root_service = nullptr;
+    telemetry_service = nullptr;
+    tm = nullptr;
+    zone_gen = nullptr;
+}

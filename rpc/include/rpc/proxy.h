@@ -344,7 +344,14 @@ namespace rpc
                     op = item->second.lock();
                 }
             }
-            if(!op)
+            if(op)
+            {//this monstrosity needs to be fixed as part of a general state machine implementation 
+                if(!new_proxy_added && !stub_needs_add_ref && service_proxy_needs_add_ref && (encap.zone_id != zone_id_))
+                {
+                    service_proxy->release(encap.zone_id, encap.object_id);
+                }
+            }
+            else
             {
                 op = object_proxy::create(encap.object_id, encap.zone_id, service_proxy, stub_needs_add_ref, new_proxy_added ? false : (service_proxy_needs_add_ref && (encap.zone_id == zone_id_)));
                 service_proxy->proxies[encap.object_id] = op;

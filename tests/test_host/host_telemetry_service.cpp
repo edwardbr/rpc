@@ -246,5 +246,5 @@ void host_telemetry_service::on_interface_proxy_send(const char* name, uint64_t 
 
 void host_telemetry_service::message(level_enum level, const char* message) const
 {
-    spdlog::log((spdlog::level::level_enum)level, "message {}", message);
+    spdlog::log((spdlog::level::level_enum)level, "{}", message);
 }

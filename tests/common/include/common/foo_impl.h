@@ -376,7 +376,9 @@ namespace marshalled_tests
             if (!host)
                 return rpc::error::INVALID_DATA();
             rpc::shared_ptr<marshalled_tests::yyy::i_example> target;
-            host->create_enclave(target);
+            auto err = host->create_enclave(target);
+            if(err != rpc::error::OK())
+                return err;
             if (!target)
                 return rpc::error::INVALID_DATA();
             //            target = nullptr;
@@ -389,43 +391,201 @@ namespace marshalled_tests
             return rpc::error::OK();
         }
 
-        error_code call_host_create_enclave_and_throw_away() override
+        error_code call_host_create_enclave_and_throw_away(bool run_standard_tests) override
         {
             if (!host_)
                 return rpc::error::INVALID_DATA();
             rpc::shared_ptr<i_example> target;
-            host_->create_enclave(target);
+            auto err = host_->create_enclave(target);
+            if(err != rpc::error::OK())
+                return err;
+            if (!target)
+                return rpc::error::INVALID_DATA();
+            if(run_standard_tests)
+            {
+                int sum = 0;
+                err = target->add(1,2, sum);
+                if(err != rpc::error::OK())
+                    return err;
+                if(sum != 3)
+                    return rpc::error::INVALID_DATA();
+            }
             return rpc::error::OK();
         }
 
-        error_code call_host_create_enclave(rpc::shared_ptr<i_example>& target) override
+        error_code call_host_create_enclave(rpc::shared_ptr<i_example>& target, bool run_standard_tests) override
         {
             if (!host_)
                 return rpc::error::INVALID_DATA();
-            host_->create_enclave(target);
+            auto err = host_->create_enclave(target);
+            if(err != rpc::error::OK())
+                return err;
+            if (!target)
+                return rpc::error::INVALID_DATA();
+            if(run_standard_tests)
+            {
+                int sum = 0;
+                err = target->add(1,2, sum);
+                if(err != rpc::error::OK())
+                    return err;
+                if(sum != 3)
+                    return rpc::error::INVALID_DATA();
+            }
             return rpc::error::OK();
         }
+
+        error_code call_host_look_up_app_not_return(const std::string& name, bool run_standard_tests)
+        {
+            if (!host_)
+                return rpc::error::INVALID_DATA();
+
+            rpc::shared_ptr<i_example> app;
+            {
+                if (telemetry_)
+                    telemetry_->message(rpc::i_telemetry_service::info, "look_up_app");
+
+                auto err = host_->look_up_app(name, app);
+
+                if (telemetry_)
+                    telemetry_->message(rpc::i_telemetry_service::info, "look_up_app complete");
+                if(err != rpc::error::OK())
+                    return err;
+            }
+            if (telemetry_)
+                telemetry_->message(rpc::i_telemetry_service::info, "app released");
+            if(run_standard_tests && app)
+            {
+                int sum = 0;
+                auto err = app->add(1,2, sum);
+                if(err != rpc::error::OK())
+                    return err;
+                if(sum != 3)
+                    return rpc::error::INVALID_DATA();
+            }
+            return rpc::error::OK();
+        }  
 
         // live app registry, it should have sole responsibility for the long term storage of app shared ptrs
-        error_code call_host_look_up_app(const std::string& name, rpc::shared_ptr<i_example>& app) override
+        error_code call_host_look_up_app(const std::string& name, rpc::shared_ptr<i_example>& app, bool run_standard_tests) override
         {
             if (!host_)
                 return rpc::error::INVALID_DATA();
-            host_->look_up_app(name, app);
+
+            {
+                if (telemetry_)
+                    telemetry_->message(rpc::i_telemetry_service::info, "look_up_app");
+
+                auto err = host_->look_up_app(name, app);
+
+                if (telemetry_)
+                    telemetry_->message(rpc::i_telemetry_service::info, "look_up_app complete");
+
+                if(err != rpc::error::OK())
+                    return err;
+            }
+
+            if(run_standard_tests && app)
+            {
+                int sum = 0;
+                auto err = app->add(1,2, sum);
+                if(err != rpc::error::OK())
+                    return err;
+                if(sum != 3)
+                    return rpc::error::INVALID_DATA();
+            }
             return rpc::error::OK();
         }
-        error_code call_host_set_app(const std::string& name, const rpc::shared_ptr<i_example>& app) override
+
+        error_code call_host_look_up_app_not_return_and_delete(const std::string& name, bool run_standard_tests)
         {
             if (!host_)
                 return rpc::error::INVALID_DATA();
-            host_->set_app(name, app);
+
+            rpc::shared_ptr<i_example> app;
+            {
+                rpc::shared_ptr<i_example> app;
+                if (telemetry_)
+                    telemetry_->message(rpc::i_telemetry_service::info, "look_up_app");
+
+                auto err = host_->look_up_app(name, app);
+                host_->unload_app(name);
+
+                if (telemetry_)
+                    telemetry_->message(rpc::i_telemetry_service::info, "look_up_app complete");
+                if(err != rpc::error::OK())
+                    return err;
+                if(run_standard_tests && app)
+                {
+                    int sum = 0;
+                    auto err = app->add(1,2, sum);
+                    if(err != rpc::error::OK())
+                        return err;
+                    if(sum != 3)
+                        return rpc::error::INVALID_DATA();
+                }
+            }
+            if (telemetry_)
+                telemetry_->message(rpc::i_telemetry_service::info, "app released");
+            return rpc::error::OK();
+        }  
+        
+        error_code call_host_look_up_app_and_delete(const std::string& name, rpc::shared_ptr<i_example>& app, bool run_standard_tests) override
+        {
+            if (!host_)
+                return rpc::error::INVALID_DATA();
+
+            {
+                if (telemetry_)
+                    telemetry_->message(rpc::i_telemetry_service::info, "look_up_app");
+
+                auto err = host_->look_up_app(name, app);
+                host_->unload_app(name);
+
+                if (telemetry_)
+                    telemetry_->message(rpc::i_telemetry_service::info, "look_up_app complete");
+
+                if(err != rpc::error::OK())
+                    return err;
+            }
+
+            if(run_standard_tests && app)
+            {
+                int sum = 0;
+                auto err = app->add(1,2, sum);
+                if(err != rpc::error::OK())
+                    return err;
+                if(sum != 3)
+                    return rpc::error::INVALID_DATA();
+            }
+            return rpc::error::OK();
+        }
+
+
+        error_code call_host_set_app(const std::string& name, const rpc::shared_ptr<i_example>& app, bool run_standard_tests) override
+        {
+            if (!host_)
+                return rpc::error::INVALID_DATA();
+            auto err = host_->set_app(name, app);
+            if(err != rpc::error::OK())
+                return err;
+            if(run_standard_tests && app)
+            {
+                int sum = 0;
+                err = app->add(1,2, sum);
+                if(err != rpc::error::OK())
+                    return err;
+                if(sum != 3)
+                    return rpc::error::INVALID_DATA();
+            }
             return rpc::error::OK();
         }
         error_code call_host_unload_app(const std::string& name) override
         {
             if (!host_)
                 return rpc::error::INVALID_DATA();
-            host_->unload_app(name);
+            auto err = host_->unload_app(name);
+            if(err != rpc::error::OK())
+                return err;
             return rpc::error::OK();
         }
 
