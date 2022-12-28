@@ -20,6 +20,19 @@ namespace rpc
         if(service_proxy_needs_add_ref)
             service_proxy_->add_external_ref();
     }
+
+    rpc::shared_ptr<object_proxy> object_proxy::create(uint64_t object_id, 
+                                            uint64_t zone_id,
+                                            const rpc::shared_ptr<service_proxy>& service_proxy,
+                                            bool stub_needs_add_ref,
+                                            bool service_proxy_needs_add_ref)
+    {
+        rpc::shared_ptr<object_proxy> ret(new object_proxy(object_id, zone_id, service_proxy, stub_needs_add_ref, service_proxy_needs_add_ref));
+        ret->weak_this_ = ret;
+        service_proxy->add_object_proxy(ret);
+        return ret;
+    }
+
     object_proxy::~object_proxy() 
     { 
         if(auto* telemetry_service = service_proxy_->get_telemetry_service();telemetry_service)

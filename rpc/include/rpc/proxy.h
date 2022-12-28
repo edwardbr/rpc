@@ -89,12 +89,7 @@ namespace rpc
                                                     uint64_t zone_id,
                                                     const rpc::shared_ptr<service_proxy>& service_proxy,
                                                     bool stub_needs_add_ref,
-                                                    bool service_proxy_needs_add_ref)
-        {
-            rpc::shared_ptr<object_proxy> ret(new object_proxy(object_id, zone_id, service_proxy, stub_needs_add_ref, service_proxy_needs_add_ref));
-            ret->weak_this_ = ret;
-            return ret;
-        }
+                                                    bool service_proxy_needs_add_ref);
 
         virtual ~object_proxy();
 
@@ -291,6 +286,9 @@ namespace rpc
             {
                 assert(dependent_services_lock_);
                 dependent_services_lock_ = nullptr;
+                auto service = operating_zone_service_.lock();
+                if(service)
+                    service->remove_zone_proxy(zone_id_);
             }            
         }
 
@@ -304,6 +302,13 @@ namespace rpc
         uint64_t get_cloned_from_zone_id() const {return cloned_from_zone_id_;}
         rpc::shared_ptr<service> get_operating_zone_service() const {return operating_zone_service_.lock();}
         const rpc::i_telemetry_service* get_telemetry_service(){return telemetry_service_;}
+        void add_object_proxy(rpc::shared_ptr<object_proxy> op)
+        {
+            std::lock_guard l(insert_control);
+//this check needs to exist
+//            assert(proxies.find(op->get_object_id()) == proxies.end());
+            proxies[op->get_object_id()] = op;
+        }
 
         template<class T> 
         int create_proxy(   rpc::interface_descriptor encap, 
@@ -354,7 +359,6 @@ namespace rpc
             else
             {
                 op = object_proxy::create(encap.object_id, encap.zone_id, service_proxy, stub_needs_add_ref, new_proxy_added ? false : (service_proxy_needs_add_ref && (encap.zone_id == zone_id_)));
-                service_proxy->proxies[encap.object_id] = op;
             }
             return op->query_interface(val, false);
         }

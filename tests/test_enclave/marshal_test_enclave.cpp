@@ -224,9 +224,9 @@ int try_cast_enclave(uint64_t zone_id, uint64_t object_id, uint64_t interface_id
     return ret;
 }
 
-uint64_t add_ref_enclave(uint64_t zone_id, uint64_t object_id, char out_param)
+uint64_t add_ref_enclave(uint64_t zone_id, uint64_t object_id)
 {
-    return rpc_server->add_ref(zone_id, object_id, out_param);
+    return rpc_server->add_ref(zone_id, object_id, false);
 }
 
 uint64_t release_enclave(uint64_t zone_id, uint64_t object_id)
