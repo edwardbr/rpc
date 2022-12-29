@@ -45,12 +45,6 @@ namespace rpc
             {
                 telemetry_service->on_service_proxy_deletion("local_service_proxy", get_operating_zone_id(), get_zone_id());
             }
-            auto svc = get_operating_zone_service();
-
-            if(svc)
-            {
-                svc->remove_zone_proxy(get_zone_id());
-            }
         }
 
         //if there is no use of a local_service_proxy in the zone requires_parent_release must be set to true so that the zones service can clean things ups

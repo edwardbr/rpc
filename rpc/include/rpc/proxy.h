@@ -244,6 +244,7 @@ namespace rpc
     public:
         virtual ~service_proxy()
         {
+            assert(proxies.empty());
             auto operating_zone_service = operating_zone_service_.lock();
             if(operating_zone_service)
             {
@@ -286,9 +287,6 @@ namespace rpc
             {
                 assert(dependent_services_lock_);
                 dependent_services_lock_ = nullptr;
-                auto service = operating_zone_service_.lock();
-                if(service)
-                    service->remove_zone_proxy(zone_id_);
             }            
         }
 
@@ -305,8 +303,7 @@ namespace rpc
         void add_object_proxy(rpc::shared_ptr<object_proxy> op)
         {
             std::lock_guard l(insert_control);
-//this check needs to exist
-//            assert(proxies.find(op->get_object_id()) == proxies.end());
+            assert(proxies.find(op->get_object_id()) == proxies.end());
             proxies[op->get_object_id()] = op;
         }
 
@@ -317,6 +314,14 @@ namespace rpc
             if(item == proxies.end())
                 return nullptr;
             return item->second.lock();            
+        }
+
+        void remove_object_proxy(uint64_t object_id)
+        {
+            std::lock_guard l(insert_control);
+            auto item = proxies.find(object_id);
+            assert(item  != proxies.end());
+            proxies.erase(item);       
         }
 
         friend service;

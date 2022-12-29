@@ -374,7 +374,15 @@ namespace rpc
     void service::remove_zone_proxy(uint64_t zone_id)
     {
         std::lock_guard g(insert_control);
-        other_zones.erase(zone_id);
+        auto item = other_zones.find(zone_id);
+        if (item == other_zones.end())
+        {
+            assert(false);
+        }
+        else
+        {
+            other_zones.erase(item);
+        }
     }
 
     rpc::shared_ptr<casting_interface> service::get_castable_interface(uint64_t object_id, uint64_t interface_id)
