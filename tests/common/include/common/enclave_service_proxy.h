@@ -58,7 +58,7 @@ namespace rpc
             int err_code = ret->initialise_enclave(object_id);
             if(err_code)
                 return err_code;
-            auto error = rpc::create_interface_proxy(ret, {object_id, zone_id}, root_object);
+            auto error = rpc::demarshall_interface_proxy(ret, {object_id, zone_id}, root_object);
             if(error != rpc::error::OK())
                 return error;
             operating_zone_service->add_zone_proxy(ret);

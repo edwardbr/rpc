@@ -30,8 +30,8 @@ namespace rpc
         virtual ~proxy_base()
         {}
 
-        template<class T> rpc::interface_descriptor encapsulate_in_param(const rpc::shared_ptr<T>& iface, rpc::shared_ptr<rpc::object_stub>& stub);
-        template<class T> rpc::interface_descriptor encapsulate_out_param(uint64_t originating_zone_id, const rpc::shared_ptr<T>& iface);
+        template<class T> rpc::interface_descriptor proxy_bind_in_param(const rpc::shared_ptr<T>& iface, rpc::shared_ptr<rpc::object_stub>& stub);
+        template<class T> rpc::interface_descriptor stub_bind_out_param(uint64_t originating_zone_id, const rpc::shared_ptr<T>& iface);
 
         template<class T1, class T2>
         friend rpc::shared_ptr<T1> dynamic_pointer_cast(const shared_ptr<T2>& from) noexcept;
@@ -310,57 +310,13 @@ namespace rpc
             proxies[op->get_object_id()] = op;
         }
 
-        template<class T> 
-        int create_proxy(   rpc::interface_descriptor encap, 
-                            rpc::shared_ptr<T>& val,
-                            bool stub_needs_add_ref,
-                            bool service_proxy_needs_add_ref)
+        rpc::shared_ptr<object_proxy> get_object_proxy(uint64_t object_id)
         {
-            if(encap.object_id == 0 || encap.zone_id == 0)
-                return rpc::error::OK();
-
-            rpc::shared_ptr<object_proxy> op;
-            rpc::shared_ptr<service_proxy> service_proxy;
-            auto serv = get_operating_zone_service();
-            if(operating_zone_id == encap.zone_id)
-            {
-                val = serv->get_local_interface<T>(encap.object_id);
-                if(!val)
-                    return rpc::error::OBJECT_NOT_FOUND();
-                return rpc::error::OK();
-            }
-
-            bool new_proxy_added = false;
-            if(zone_id_ != encap.zone_id)
-            {
-                auto operating_zone_service = get_operating_zone_service();
-                service_proxy = operating_zone_service->get_zone_proxy(zone_id_, encap.zone_id, new_proxy_added);
-            }
-            else
-            {
-                service_proxy = shared_from_this();
-            }
-
-            {
-                std::lock_guard l(service_proxy->insert_control);
-                auto item = service_proxy->proxies.find(encap.object_id);
-                if (item != service_proxy->proxies.end())
-                {
-                    op = item->second.lock();
-                }
-            }
-            if(op)
-            {//this monstrosity needs to be fixed as part of a general state machine implementation 
-                if(!new_proxy_added && !stub_needs_add_ref && service_proxy_needs_add_ref && (encap.zone_id != zone_id_))
-                {
-                    service_proxy->release(encap.zone_id, encap.object_id);
-                }
-            }
-            else
-            {
-                op = object_proxy::create(encap.object_id, encap.zone_id, service_proxy, stub_needs_add_ref, new_proxy_added ? false : (service_proxy_needs_add_ref && (encap.zone_id == zone_id_)));
-            }
-            return op->query_interface(val, false);
+            std::lock_guard l(insert_control);
+            auto item = proxies.find(object_id);
+            if(item == proxies.end())
+                return nullptr;
+            return item->second.lock();            
         }
 
         friend service;
@@ -369,7 +325,7 @@ namespace rpc
 
     //declared here as object_proxy and service_proxy is not fully defined in the body of proxy_base
     template<class T>
-    interface_descriptor proxy_base::encapsulate_in_param(const rpc::shared_ptr<T>& iface, rpc::shared_ptr<rpc::object_stub>& stub)
+    interface_descriptor proxy_base::proxy_bind_in_param(const rpc::shared_ptr<T>& iface, rpc::shared_ptr<rpc::object_stub>& stub)
     {
         if(!iface)
             return {0,0};
@@ -384,12 +340,46 @@ namespace rpc
         }
 
         //else encapsulate away
-        return operating_service->encapsulate_in_param(iface, stub);
+        return operating_service->proxy_bind_in_param(iface, stub);
+    }
+
+    //do not use directly it is for the interface generator use rpc::create_interface_proxy if you want to get a proxied pointer to a remote implementation
+    template<class T> 
+    int stub_bind_in_param(rpc::service& serv, uint64_t originating_zone_id, const rpc::interface_descriptor& encap, rpc::shared_ptr<T>& iface)
+    {
+        //if we have a null object id then return a null ptr
+        if(encap.object_id == 0 || encap.zone_id == 0)
+        {
+            return rpc::error::OK();
+        }
+        //if it is local to this service then just get the relevant stub
+        else if(serv.get_zone_id() == encap.zone_id)
+        {
+            iface = serv.get_local_interface<T>(encap.object_id);
+            if(!iface)
+                return rpc::error::OBJECT_NOT_FOUND();
+            return rpc::error::OK();
+        }
+        else
+        {
+            //get the right  service proxy
+            //if the zone is different lookup or clone the right proxy
+            bool new_proxy_added = false;
+            auto service_proxy = serv.get_zone_proxy(originating_zone_id, encap.zone_id, new_proxy_added);
+
+            rpc::shared_ptr<object_proxy> op = service_proxy->get_object_proxy(encap.object_id);
+            if(!op)
+            {
+                op = object_proxy::create(encap.object_id, encap.zone_id, service_proxy, true, false);
+            }
+            auto ret = op->query_interface(iface, false);        
+            return ret;
+        }        
     }
 
     //declared here as object_proxy and service_proxy is not fully defined in the body of proxy_base
     template<class T>
-    interface_descriptor proxy_base::encapsulate_out_param(uint64_t originating_zone_id, const rpc::shared_ptr<T>& iface)
+    interface_descriptor proxy_base::stub_bind_out_param(uint64_t originating_zone_id, const rpc::shared_ptr<T>& iface)
     {
         if(!iface)
             return {0,0};
@@ -404,43 +394,88 @@ namespace rpc
         }
 
         //else encapsulate away
-        return operating_service->encapsulate_out_param(originating_zone_id, iface);
+        return operating_service->stub_bind_out_param(originating_zone_id, iface);
     }
 
     //do not use directly it is for the interface generator use rpc::create_interface_proxy if you want to get a proxied pointer to a remote implementation
     template<class T> 
-    int get_interface(rpc::service& serv, uint64_t originating_zone_id, const rpc::interface_descriptor& encap, rpc::shared_ptr<T>& iface)
+    int proxy_bind_out_param(const rpc::shared_ptr<rpc::service_proxy>& sp, const rpc::interface_descriptor& encap, rpc::shared_ptr<T>& val)
     {
-        if(serv.get_zone_id() == encap.zone_id)
+        //if we have a null object id then return a null ptr
+        if(encap.object_id == 0 || encap.zone_id == 0)
+            return rpc::error::OK();
+
+        auto service_proxy = sp;
+        auto serv = service_proxy->get_operating_zone_service();
+
+        //if it is local to this service then just get the relevant stub
+        if(serv->get_zone_id() == encap.zone_id)
         {
-            iface = serv.get_local_interface<T>(encap.object_id);
+            val = serv->get_local_interface<T>(encap.object_id);
+            if(!val)
+                return rpc::error::OBJECT_NOT_FOUND();
             return rpc::error::OK();
         }
+
+        //get the right  service proxy
         bool new_proxy_added = false;
-        auto remote_service_proxy_ = serv.get_zone_proxy(originating_zone_id, encap.zone_id, new_proxy_added);
-        if(!remote_service_proxy_)
-            return rpc::error::ZONE_NOT_FOUND();
-        auto ret = remote_service_proxy_->create_proxy(encap, iface, true, false);
-        if(ret)
-            return ret;
-        if(new_proxy_added)
+        if(service_proxy->get_zone_id() != encap.zone_id)
         {
-            //this is silly we should not be addrefing in the first place
-            remote_service_proxy_->release_external_ref();
+            //if the zone is different lookup or clone the right proxy
+            service_proxy = serv->get_zone_proxy(service_proxy->get_zone_id(), encap.zone_id, new_proxy_added);
+            if(service_proxy && new_proxy_added)
+                service_proxy->add_external_ref();
         }
-        return ret;
+
+        rpc::shared_ptr<object_proxy> op = service_proxy->get_object_proxy(encap.object_id);
+        if(op)
+        {//this monstrosity needs to be fixed as part of a general state machine implementation 
+            if(!new_proxy_added && (encap.zone_id != sp->get_zone_id()))
+            {
+                service_proxy->release(encap.zone_id, encap.object_id);
+            }
+        }
+        else
+        {
+            op = object_proxy::create(encap.object_id, encap.zone_id, service_proxy, false, new_proxy_added ? false : (encap.zone_id == sp->get_zone_id()));
+        }
+        return op->query_interface(val, false);
     }
 
-    //do not use directly it is for the interface generator use rpc::create_interface_proxy if you want to get a proxied pointer to a remote implementation
     template<class T> 
-    int recieve_interface(const rpc::shared_ptr<rpc::service_proxy>& service_proxy, const rpc::interface_descriptor& encap, rpc::shared_ptr<T>& iface)
+    int demarshall_interface_proxy(const rpc::shared_ptr<rpc::service_proxy>& sp, const rpc::interface_descriptor& encap, rpc::shared_ptr<T>& val)
     {
-        return service_proxy->create_proxy(encap, iface, false, true);
-    }
+        //if we have a null object id then return a null ptr
+        if(encap.object_id == 0 || encap.zone_id == 0)
+            return rpc::error::OK();
 
-    template<class T> 
-    int create_interface_proxy(const rpc::shared_ptr<rpc::service_proxy>& service_proxy, const rpc::interface_descriptor& encap, rpc::shared_ptr<T>& iface)
-    {
-        return service_proxy->create_proxy(encap, iface, false, false);
+        auto service_proxy = sp;
+        auto serv = service_proxy->get_operating_zone_service();
+
+        //if it is local to this service then just get the relevant stub
+        if(serv->get_zone_id() == encap.zone_id)
+        {
+            val = serv->get_local_interface<T>(encap.object_id);
+            if(!val)
+                return rpc::error::OBJECT_NOT_FOUND();
+            return rpc::error::OK();
+        }
+
+        //get the right  service proxy
+        bool new_proxy_added = false;
+        if(service_proxy->get_zone_id() != encap.zone_id)
+        {
+            //if the zone is different lookup or clone the right proxy
+            service_proxy = serv->get_zone_proxy(service_proxy->get_zone_id(), encap.zone_id, new_proxy_added);
+            if(service_proxy && new_proxy_added)
+                service_proxy->add_external_ref();
+        }
+
+        rpc::shared_ptr<object_proxy> op = service_proxy->get_object_proxy(encap.object_id);
+        if(!op)
+        {
+            op = object_proxy::create(encap.object_id, encap.zone_id, service_proxy, false, false);
+        }
+        return op->query_interface(val, false);
     }
 }

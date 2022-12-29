@@ -143,7 +143,7 @@ int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t host_id, uint64_t 
     
     if(host_id)
     {
-        auto err_code = rpc::create_interface_proxy<yyy::i_host>(host_proxy, {host_id, host_zone_id}, host);
+        auto err_code = rpc::demarshall_interface_proxy<yyy::i_host>(host_proxy, {host_id, host_zone_id}, host);
         if(err_code != rpc::error::OK())
             return err_code;
     }

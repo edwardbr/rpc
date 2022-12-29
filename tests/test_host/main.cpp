@@ -218,7 +218,7 @@ struct inproc_setup
             EXPECT_EQ(example_from_cast, hst);
         }
 
-        ASSERT(!rpc::create_interface_proxy(service_proxy_to_host, host_encap, i_host_ptr));
+        ASSERT(!rpc::demarshall_interface_proxy(service_proxy_to_host, host_encap, i_host_ptr));
 
         {
             // create the example object implementation
@@ -233,7 +233,7 @@ struct inproc_setup
             EXPECT_EQ(example_from_cast, remote_example);
         }
 
-        ASSERT(!rpc::create_interface_proxy(service_proxy_to_child, example_encap, i_example_ptr));
+        ASSERT(!rpc::demarshall_interface_proxy(service_proxy_to_child, example_encap, i_example_ptr));
     }
 
     virtual void TearDown()
@@ -270,7 +270,7 @@ struct inproc_setup
         EXPECT_EQ(example_from_cast, remote_example);
 
         rpc::shared_ptr<yyy::i_example> example_relay_ptr;
-        ASSERT(!rpc::create_interface_proxy(service_proxy_to_child, example_encap, example_relay_ptr));                
+        ASSERT(!rpc::demarshall_interface_proxy(service_proxy_to_child, example_encap, example_relay_ptr));                
         return example_relay_ptr;
     }
 };

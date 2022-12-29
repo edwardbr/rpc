@@ -119,13 +119,6 @@ namespace rpc
         }
     }
 
-    interface_descriptor service::get_proxy_stub_descriptor(uint64_t originating_zone_id, rpc::casting_interface* iface,
-                                        std::function<rpc::shared_ptr<i_interface_stub>(rpc::shared_ptr<object_stub>)> fn)
-    {
-        rpc::shared_ptr<object_stub> stub;
-        return get_proxy_stub_descriptor(originating_zone_id, iface, fn, true, stub);
-    }
-
     //this is a key function that returns an interface descriptor
     //for wrapping an implementation to a local object inside a stub where needed
     //or if the interface is a proxy to add ref it
@@ -372,10 +365,9 @@ namespace rpc
         auto originating_proxy = item->second.lock();
         if(!originating_proxy)
             return nullptr;
-        new_proxy_added = true;
-    
+
         auto proxy = originating_proxy->clone_for_zone(zone_id);
-        proxy->add_external_ref();
+        new_proxy_added = true;
         return proxy;
     }
 
