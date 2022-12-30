@@ -29,11 +29,7 @@ namespace rpc
         service& zone_;
 
     public:
-        object_stub(uint64_t id, service& zone)
-            : id_(id)
-            , zone_(zone)
-        {
-        }
+        object_stub(uint64_t id, service& zone);
         ~object_stub();
         uint64_t get_id() const
         {

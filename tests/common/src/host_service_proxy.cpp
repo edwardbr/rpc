@@ -60,7 +60,13 @@ namespace rpc
             = ::call_host(&err_code, originating_zone_id, zone_id, object_id, interface_id, method_id, in_size_, in_buf_, out_buf_.size(), out_buf_.data(), &data_out_sz);
 
         if (status)
+        {
+            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
+            {
+                telemetry_service->message(rpc::i_telemetry_service::err, "call_host failed");
+            }
             return rpc::error::TRANSPORT_ERROR();
+        }
 
         if (err_code == rpc::error::NEED_MORE_MEMORY())
         {
@@ -70,7 +76,13 @@ namespace rpc
             status
                 = ::call_host(&err_code, originating_zone_id, zone_id, object_id, interface_id, method_id, in_size_, in_buf_, out_buf_.size(), out_buf_.data(), &data_out_sz);
             if (status)
+            {
+                if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
+                {
+                    telemetry_service->message(rpc::i_telemetry_service::err, "call_host failed");
+                }
                 return rpc::error::TRANSPORT_ERROR();
+            }
         }
         return err_code;
     }
@@ -85,7 +97,13 @@ namespace rpc
         int err_code = 0;
         sgx_status_t status = ::try_cast_host(&err_code, zone_id, object_id, interface_id);
         if (status)
+        {
+            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
+            {
+                telemetry_service->message(rpc::i_telemetry_service::err, "try_cast failed");
+            }
             return rpc::error::TRANSPORT_ERROR();
+        }
         return err_code;
     }
 
@@ -99,7 +117,13 @@ namespace rpc
         uint64_t ret = 0;
         sgx_status_t status = ::add_ref_host(&ret, zone_id, object_id);
         if (status)
+        {
+            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
+            {
+                telemetry_service->message(rpc::i_telemetry_service::err, "add_ref_host failed");
+            }
             return std::numeric_limits<uint64_t>::max();
+        }
         
         if(!out_param && ret != std::numeric_limits<uint64_t>::max())
         {
@@ -118,7 +142,13 @@ namespace rpc
         uint64_t ret = 0;
         sgx_status_t status = ::release_host(&ret, zone_id, object_id);
         if (status)
+        {
+            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
+            {
+                telemetry_service->message(rpc::i_telemetry_service::err, "release_host failed");
+            }
             return std::numeric_limits<uint64_t>::max();
+        }
         if(ret != std::numeric_limits<uint64_t>::max())
         {
             release_external_ref();

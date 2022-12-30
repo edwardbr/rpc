@@ -290,6 +290,8 @@ namespace rpc
             }            
         }
 
+        std::unordered_map<uint64_t, rpc::weak_ptr<object_proxy>> get_proxies(){return proxies;}
+
         virtual rpc::shared_ptr<service_proxy> clone_for_zone(uint64_t zone_id) = 0;
 
         rpc::shared_ptr<service_proxy> shared_from_this() { return rpc::shared_ptr<service_proxy>(weak_this_); }

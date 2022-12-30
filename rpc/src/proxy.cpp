@@ -1,5 +1,19 @@
 #include "rpc/proxy.h"
 
+
+#ifndef LOG_STR_DEFINED
+# ifdef USE_RPC_TEST_LOGGING
+#  define LOG_STR(str, sz) log_str(str, sz)
+   extern "C"
+   {
+       void log_str(const char* str, size_t sz);
+   }
+# else
+#  define LOG_STR(str, sz)
+# endif
+#define LOG_STR_DEFINED
+#endif
+
 namespace rpc
 {
     object_proxy::object_proxy( uint64_t object_id, 
@@ -15,6 +29,13 @@ namespace rpc
         {
             telemetry_service->on_object_proxy_creation(service_proxy_->get_operating_zone_id(), zone_id, object_id);
         }
+
+        auto message = std::string("object_proxy::object_proxy zone ") + std::to_string(zone_id) 
+        + std::string(", object_id ") + std::to_string(object_id)
+        + std::string(", operating_zone_id ") + std::to_string(service_proxy->get_operating_zone_id())
+        + std::string(", cloned from ") + std::to_string(service_proxy->get_cloned_from_zone_id());
+        LOG_STR(message.c_str(), message.size());
+
         if(stub_needs_add_ref)
             service_proxy_->add_ref(zone_id_, object_id_, false); 
         if(service_proxy_needs_add_ref)
@@ -39,7 +60,14 @@ namespace rpc
         {
             telemetry_service->on_object_proxy_deletion(service_proxy_->get_operating_zone_id(), zone_id_, object_id_);
         }
-        service_proxy_->remove_object_proxy(get_object_id());
+
+        auto message = std::string("object_proxy::~object_proxy zone ") + std::to_string(zone_id_) 
+        + std::string(", object_id ") + std::to_string(object_id_)
+        + std::string(", operating_zone_id ") + std::to_string(service_proxy_->get_operating_zone_id())
+        + std::string(", cloned from ") + std::to_string(service_proxy_->get_cloned_from_zone_id());
+        LOG_STR(message.c_str(), message.size());
+
+        service_proxy_->remove_object_proxy(object_id_);
         service_proxy_->release(zone_id_, object_id_); 
         service_proxy_ = nullptr;
     }

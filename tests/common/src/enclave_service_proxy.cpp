@@ -46,11 +46,21 @@ namespace rpc
             auto status = sgx_create_enclave(filename_.data(), 1, &token, &updated, &eid_, NULL);
         #endif
         if (status)
+        {
+            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
+            {
+                telemetry_service->message(rpc::i_telemetry_service::err, "sgx_create_enclavea failed");
+            }
             return rpc::error::TRANSPORT_ERROR();
+        }
         int err_code = error::OK();
         status = marshal_test_init_enclave(eid_, &err_code, get_operating_zone_id(), host_id_, get_zone_id(), &object_id);
         if (status)
         {
+            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
+            {
+                telemetry_service->message(rpc::i_telemetry_service::err, "marshal_test_init_enclave failed");
+            }
             sgx_destroy_enclave(eid_);
             return rpc::error::TRANSPORT_ERROR();
         }
@@ -76,7 +86,13 @@ namespace rpc
                                              out_buf_.size(), out_buf_.data(), &data_out_sz, &tls);
 
         if (status)
+        {
+            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
+            {
+                telemetry_service->message(rpc::i_telemetry_service::err, "call_enclave failed");
+            }
             return rpc::error::TRANSPORT_ERROR();
+        }
 
         if (err_code == rpc::error::NEED_MORE_MEMORY())
         {
@@ -85,7 +101,13 @@ namespace rpc
             status = ::call_enclave(eid_, &err_code, originating_zone_id, zone_id, object_id, interface_id, method_id, in_size_, in_buf_,
                                     out_buf_.size(), out_buf_.data(), &data_out_sz, &tls);
             if (status)
+            {
+                if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
+                {
+                    telemetry_service->message(rpc::i_telemetry_service::err, "call_enclave failed");
+                }
                 return rpc::error::TRANSPORT_ERROR();
+            }
         }
 
         return err_code;
@@ -101,7 +123,13 @@ namespace rpc
         int err_code = 0;
         sgx_status_t status = ::try_cast_enclave(eid_, &err_code, zone_id, object_id, interface_id);
         if (status)
+        {
+            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
+            {
+                telemetry_service->message(rpc::i_telemetry_service::err, "try_cast_enclave failed");
+            }
             return rpc::error::TRANSPORT_ERROR();
+        }
         return err_code;
     }
 
@@ -116,6 +144,10 @@ namespace rpc
         sgx_status_t status = ::add_ref_enclave(eid_, &ret, zone_id, object_id);
         if (status)
         {
+            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
+            {
+                telemetry_service->message(rpc::i_telemetry_service::err, "add_ref_enclave failed");
+            }
             return std::numeric_limits<uint64_t>::max();
         }
         if(!out_param && ret != std::numeric_limits<uint64_t>::max())
@@ -135,7 +167,13 @@ namespace rpc
         uint64_t ret = 0;
         sgx_status_t status = ::release_enclave(eid_, &ret, zone_id, object_id);
         if (status)
+        {
+            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
+            {
+                telemetry_service->message(rpc::i_telemetry_service::err, "release_enclave failed");
+            }
             return std::numeric_limits<uint64_t>::max();
+        }
         if(ret != std::numeric_limits<uint64_t>::max())
         {
             release_external_ref();

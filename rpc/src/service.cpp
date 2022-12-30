@@ -44,12 +44,12 @@ namespace rpc
             if(!stub)
             {
                 auto message = std::string("service ") + std::to_string(get_zone_id()) + std::string(", object stub ") + std::to_string(item.first) + std::string(" has been released but not deregisted in the service suspected unclean shutdown");
-                LOG_STR(message.data(), message.size());
+                LOG_STR(message.c_str(), message.size());
             }
             else
             {
                 auto message = std::string("service ") + std::to_string(get_zone_id()) + std::string(", object stub ") + std::to_string(item.first) + std::string(" has not been released, there is a strong pointer maintaining a positive reference count suspected unclean shutdown");
-                LOG_STR(message.data(), message.size());
+                LOG_STR(message.c_str(), message.size());
             }
             success = false;
         }
@@ -59,12 +59,12 @@ namespace rpc
             if(!stub)
             {
                 auto message = std::string("service ") + std::to_string(get_zone_id()) + std::string(", wrapped_object has been released but not deregisted in the service suspected unclean shutdown");
-                LOG_STR(message.data(), message.size());
+                LOG_STR(message.c_str(), message.size());
             }
             else
             {
                 auto message = std::string("service ") + std::to_string(get_zone_id()) + std::string(", wrapped_object ") + std::to_string(stub->get_id()) + std::string(" has not been deregisted in the service suspected unclean shutdown");
-                LOG_STR(message.data(), message.size());
+                LOG_STR(message.c_str(), message.size());
             }
             success = false;
         }
@@ -75,12 +75,30 @@ namespace rpc
             if(!svcproxy)
             {
                 auto message = std::string("service ") + std::to_string(get_zone_id()) + std::string(", proxy ") + std::to_string(item.first) + std::string(", has been released but not deregisted in the service");
-                LOG_STR(message.data(), message.size());
+                LOG_STR(message.c_str(), message.size());
             }
             else
             {
-                auto message = std::string("service ") + std::to_string(get_zone_id()) + std::string(", proxy ") + std::to_string(item.first) + std::string(" has not been released in the service suspected unclean shutdown");
-                LOG_STR(message.data(), message.size());
+                auto message = std::string("service ") + std::to_string(get_zone_id()) 
+                + std::string(", proxy ") + std::to_string(svcproxy->get_operating_zone_id())
+                + std::string(", cloned from ") + std::to_string(svcproxy->get_cloned_from_zone_id()) 
+                + std::string(" has not been released in the service suspected unclean shutdown");
+                LOG_STR(message.c_str(), message.size());
+
+                for(auto proxy : svcproxy->get_proxies())
+                {
+                    auto op = proxy.second.lock();
+                    if(op)
+                    {
+                        auto message = std::string("has object_proxy ") + std::to_string(op->get_object_id());
+                        LOG_STR(message.c_str(), message.size());
+                    }
+                    else
+                    {
+                        auto message = std::string("has null object_proxy");
+                        LOG_STR(message.c_str(), message.size());
+                    }
+                }
             }
             success = false;
         }

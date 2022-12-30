@@ -127,7 +127,7 @@ public:
         message_host(level, message);
     }
 };
-
+ 
 enclave_telemetry_service telemetry_service;
 
 rpc::shared_ptr<rpc::child_service> rpc_server;

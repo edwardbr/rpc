@@ -1,11 +1,38 @@
 #include "rpc/stub.h"
 #include "rpc/service.h"
 
+#ifndef LOG_STR_DEFINED
+# ifdef USE_RPC_TEST_LOGGING
+#  define LOG_STR(str, sz) log_str(str, sz)
+   extern "C"
+   {
+       void log_str(const char* str, size_t sz);
+   }
+# else
+#  define LOG_STR(str, sz)
+# endif
+#define LOG_STR_DEFINED
+#endif
+
 namespace rpc
 {
+    object_stub::object_stub(uint64_t id, service& zone)
+        : id_(id)
+        , zone_(zone)
+    {
+#ifdef USE_RPC_TEST_LOGGING
+        auto message = std::string("object_stub::object_stub zone ") + std::to_string(zone_.get_zone_id()) 
+        + std::string(", object_id ") + std::to_string(id_);
+        LOG_STR(message.c_str(), message.size());
+#endif
+    }
     object_stub::~object_stub()
     {
-        LOG("~object_stub",100);
+#ifdef USE_RPC_TEST_LOGGING
+        auto message = std::string("object_stub::~object_stub zone ") + std::to_string(zone_.get_zone_id()) 
+        + std::string(", object_id ") + std::to_string(id_);
+        LOG_STR(message.c_str(), message.size());
+#endif
     }
 
     rpc::shared_ptr<rpc::casting_interface> object_stub::get_castable_interface() const
