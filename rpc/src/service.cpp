@@ -171,9 +171,9 @@ namespace rpc
             auto item = wrapped_object_to_stub.find(pointer);
             if (item != wrapped_object_to_stub.end())
             {
-                auto obj = item->second.lock();
-                obj->add_ref();
-                return {obj->get_id(), obj->get_zone().get_zone_id()};
+                stub = item->second.lock();
+                stub->add_ref();
+                return {stub->get_id(), stub->get_zone().get_zone_id()};
             }
         }
         //else create a stub
