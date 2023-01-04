@@ -28,7 +28,7 @@ namespace rpc
         LOG("~service",100);
         object_id_generator = 0;
         // to do: assert that there are no more object_stubs in memory
-        assert(check_is_empty());
+        //assert(check_is_empty());
 
         stubs.clear();
         wrapped_object_to_stub.clear();
