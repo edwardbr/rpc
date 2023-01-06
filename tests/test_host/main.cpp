@@ -103,7 +103,7 @@ public:
     };
 
     //live app registry, it should have sole responsibility for the long term storage of app shared ptrs
-    error_code look_up_app(const std::string& app_name, rpc::shared_ptr<yyy::i_example>& app)
+    error_code look_up_app(const std::string& app_name, rpc::shared_ptr<yyy::i_example>& app) override
     {
         std::scoped_lock lock(cached_apps_mux_);
         auto it = cached_apps_.find(app_name);
@@ -115,7 +115,7 @@ public:
         return rpc::error::OK();
     }
 
-    error_code set_app(const std::string& name, const rpc::shared_ptr<yyy::i_example>& app)
+    error_code set_app(const std::string& name, const rpc::shared_ptr<yyy::i_example>& app) override
     {
         std::scoped_lock lock(cached_apps_mux_);
         
@@ -123,7 +123,7 @@ public:
         return rpc::error::OK();
     }
 
-    error_code unload_app(const std::string& name)
+    error_code unload_app(const std::string& name) override
     {
         std::scoped_lock lock(cached_apps_mux_);
         cached_apps_.erase(name);
