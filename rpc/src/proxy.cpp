@@ -2,7 +2,7 @@
 
 
 #ifndef LOG_STR_DEFINED
-# ifdef USE_RPC_TEST_LOGGING
+# ifdef USE_RPC_LOGGING
 #  define LOG_STR(str, sz) log_str(str, sz)
    extern "C"
    {
