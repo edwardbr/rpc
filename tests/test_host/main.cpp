@@ -92,10 +92,11 @@ public:
     error_code create_enclave(rpc::shared_ptr<yyy::i_example>& target) override
     {
         rpc::shared_ptr<yyy::i_host> host = shared_from_this();
+        auto serv = current_host_service.lock();
         auto err_code = rpc::enclave_service_proxy::create(
             ++(*zone_gen), 
             enclave_path, 
-            current_host_service.lock(),
+            serv,
             host,
             target, 
             telemetry_service);
