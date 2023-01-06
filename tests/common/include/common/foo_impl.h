@@ -434,7 +434,7 @@ namespace marshalled_tests
             return rpc::error::OK();
         }
 
-        error_code call_host_look_up_app_not_return(const std::string& name, bool run_standard_tests)
+        error_code call_host_look_up_app_not_return(const std::string& name, bool run_standard_tests) override
         {
             if (!host_)
                 return rpc::error::INVALID_DATA();
@@ -496,7 +496,7 @@ namespace marshalled_tests
             return rpc::error::OK();
         }
 
-        error_code call_host_look_up_app_not_return_and_delete(const std::string& name, bool run_standard_tests)
+        error_code call_host_look_up_app_not_return_and_delete(const std::string& name, bool run_standard_tests) override
         {
             if (!host_)
                 return rpc::error::INVALID_DATA();
