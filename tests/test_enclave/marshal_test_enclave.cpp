@@ -137,12 +137,12 @@ int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t host_id, uint64_t 
     //create a zone service for the enclave
     rpc_server = rpc::make_shared<rpc::child_service>(child_zone_id); 
     const rpc::i_telemetry_service* p_telemetry_service = &telemetry_service;
-    auto host_proxy = rpc::host_service_proxy::create(host_zone_id, host_id, rpc_server, p_telemetry_service);
 
     rpc::shared_ptr<yyy::i_host> host;
     
     if(host_id)
     {
+        auto host_proxy = rpc::host_service_proxy::create(host_zone_id, host_id, rpc_server, p_telemetry_service);
         auto err_code = rpc::demarshall_interface_proxy<yyy::i_host>(host_proxy, {host_id, host_zone_id}, host);
         if(err_code != rpc::error::OK())
             return err_code;

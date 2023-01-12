@@ -442,12 +442,12 @@ namespace marshalled_tests
             rpc::shared_ptr<i_example> app;
             {
                 if (telemetry_)
-                    telemetry_->message(rpc::i_telemetry_service::info, "look_up_app");
+                    telemetry_->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return");
 
                 auto err = host_->look_up_app(name, app);
 
                 if (telemetry_)
-                    telemetry_->message(rpc::i_telemetry_service::info, "look_up_app complete");
+                    telemetry_->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return complete");
                 if(err != rpc::error::OK())
                     return err;
             }
@@ -505,13 +505,13 @@ namespace marshalled_tests
             {
                 rpc::shared_ptr<i_example> app;
                 if (telemetry_)
-                    telemetry_->message(rpc::i_telemetry_service::info, "look_up_app");
+                    telemetry_->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return_and_delete");
 
                 auto err = host_->look_up_app(name, app);
                 host_->unload_app(name);
 
                 if (telemetry_)
-                    telemetry_->message(rpc::i_telemetry_service::info, "look_up_app complete");
+                    telemetry_->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return_and_delete complete");
                 if(err != rpc::error::OK())
                     return err;
                 if(run_standard_tests && app)
@@ -536,13 +536,13 @@ namespace marshalled_tests
 
             {
                 if (telemetry_)
-                    telemetry_->message(rpc::i_telemetry_service::info, "look_up_app");
+                    telemetry_->message(rpc::i_telemetry_service::info, "call_host_look_up_app_and_delete");
 
                 auto err = host_->look_up_app(name, app);
                 host_->unload_app(name);
 
                 if (telemetry_)
-                    telemetry_->message(rpc::i_telemetry_service::info, "look_up_app complete");
+                    telemetry_->message(rpc::i_telemetry_service::info, "call_host_look_up_app_and_delete complete");
 
                 if(err != rpc::error::OK())
                     return err;

@@ -426,9 +426,6 @@ namespace rpc
     {
         if(parent_service_)
         {
-        #ifdef _DEBUG
-            parent_service_->set_operating_zone_service_released();
-        #endif
             remove_zone_proxy(parent_service_->get_zone_id());
             set_parent(nullptr, false);
         }
@@ -467,11 +464,13 @@ namespace rpc
         if(proxy)
             return proxy;
 
+        if(parent_service_)
         {
             std::lock_guard g(insert_control);
             proxy = parent_service_->clone_for_zone(zone_id);
             new_proxy_added = true;
             return proxy;
         }
+        return nullptr;
     }
 }

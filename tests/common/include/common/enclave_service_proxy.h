@@ -19,20 +19,9 @@ namespace rpc
 
         enclave_service_proxy(uint64_t zone_id, std::string filename, const rpc::shared_ptr<service>& operating_zone_service, uint64_t host_id, const rpc::i_telemetry_service* telemetry_service);
         int initialise_enclave(uint64_t& object_id);
-
        
-        rpc::shared_ptr<service_proxy> clone_for_zone(uint64_t zone_id) override
-        {
-            auto ret = rpc::make_shared<enclave_service_proxy>(*this);
-            ret->set_zone_id(zone_id);
-            ret->weak_this_ = ret;
-            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
-            {
-                telemetry_service->on_service_proxy_creation("enclave_service_proxy", ret->get_operating_zone_id(), ret->get_zone_id());
-            }
-            get_operating_zone_service()->inner_add_zone_proxy(ret);
-            return ret;
-        }
+        rpc::shared_ptr<service_proxy> deep_copy_for_clone() override {return rpc::make_shared<enclave_service_proxy>(*this);}
+        
         std::shared_ptr<enclave_owner> enclave_owner_;
         uint64_t eid_ = 0;        
         std::string filename_;

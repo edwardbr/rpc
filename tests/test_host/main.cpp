@@ -427,7 +427,7 @@ TYPED_TEST(remote_type_test, remote_standard_tests)
 
 TYPED_TEST(remote_type_test, remote_tests)
 {    
-    remote_tests(this->lib_.i_example_ptr, telemetry_service);
+    remote_tests(this->lib_.use_host_in_child, this->lib_.i_example_ptr, telemetry_service);
 }
 
 TYPED_TEST(remote_type_test, create_new_zone)
@@ -494,6 +494,8 @@ TYPED_TEST(remote_type_test, check_for_null_interface)
 
 TYPED_TEST(remote_type_test, check_for_multiple_sets)
 {
+    if(!this->lib_.use_host_in_child)
+        return;
     rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
     ASSERT_EQ(this->lib_.i_example_ptr->create_foo(i_foo_ptr), 0);
 
@@ -510,6 +512,9 @@ TYPED_TEST(remote_type_test, check_for_multiple_sets)
 
 TYPED_TEST(remote_type_test, check_for_interface_storage)
 {
+    if(!this->lib_.use_host_in_child)
+        return;
+        
     rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
     ASSERT_EQ(this->lib_.i_example_ptr->create_foo(i_foo_ptr), 0);
 
@@ -523,6 +528,8 @@ TYPED_TEST(remote_type_test, check_for_interface_storage)
 
 TYPED_TEST(remote_type_test, check_for_set_multiple_inheritance)
 {
+    if(!this->lib_.use_host_in_child)
+        return;
     auto ret = this->lib_.i_example_ptr->give_interface(
         rpc::shared_ptr<xxx::i_baz>(new multiple_inheritance(telemetry_service)));
     assert(ret == rpc::error::OK());
@@ -549,6 +556,8 @@ TYPED_TEST(remote_type_test, host_test)
 
 TYPED_TEST(remote_type_test, check_for_call_enclave_zone)
 {
+    if(!this->lib_.use_host_in_child)
+        return;
     auto h = rpc::make_shared<host>();
     auto ret = this->lib_.i_example_ptr->call_create_enclave_val(h);
     assert(ret == rpc::error::OK());

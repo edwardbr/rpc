@@ -207,9 +207,6 @@ namespace rpc
         rpc::shared_ptr<service_proxy> dependent_services_lock_;
         std::atomic<int> dependent_services_count_ = 0;
         const rpc::i_telemetry_service* const telemetry_service_ = nullptr;
-        #ifdef _DEBUG
-        bool operating_zone_service_released = false;
-        #endif
 
     protected:
 
@@ -224,7 +221,7 @@ namespace rpc
             assert(operating_zone_service != nullptr);
         }
 
-        service_proxy( const service_proxy& other) : 
+        service_proxy(const service_proxy& other) : 
                 zone_id_(other.zone_id_),
                 operating_zone_id(other.operating_zone_id),
                 operating_zone_service_(other.operating_zone_service_),
@@ -251,12 +248,6 @@ namespace rpc
                 operating_zone_service->remove_zone_proxy(zone_id_);
             }
         }
-        #ifdef _DEBUG
-        void set_operating_zone_service_released()
-        {
-            operating_zone_service_released = true;
-        }
-        #endif
         
         void add_external_ref()
         {
@@ -292,7 +283,19 @@ namespace rpc
 
         std::unordered_map<uint64_t, rpc::weak_ptr<object_proxy>> get_proxies(){return proxies;}
 
-        virtual rpc::shared_ptr<service_proxy> clone_for_zone(uint64_t zone_id) = 0;
+        virtual rpc::shared_ptr<service_proxy> deep_copy_for_clone() = 0;
+        rpc::shared_ptr<service_proxy> clone_for_zone(uint64_t zone_id)
+        {
+            auto ret = deep_copy_for_clone();
+            ret->set_zone_id(zone_id);
+            ret->weak_this_ = ret;
+            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
+            {
+                telemetry_service->on_service_proxy_creation("enclave_service_proxy", ret->get_operating_zone_id(), ret->get_zone_id());
+            }
+            get_operating_zone_service()->inner_add_zone_proxy(ret);
+            return ret;
+        }
 
         rpc::shared_ptr<service_proxy> shared_from_this() { return rpc::shared_ptr<service_proxy>(weak_this_); }
         rpc::shared_ptr<service_proxy const> shared_from_this() const { return rpc::shared_ptr<service_proxy const>(weak_this_); }
@@ -373,6 +376,8 @@ namespace rpc
             //if the zone is different lookup or clone the right proxy
             bool new_proxy_added = false;
             auto service_proxy = serv.get_zone_proxy(originating_zone_id, encap.zone_id, new_proxy_added);
+            if(!service_proxy)
+                return rpc::error::OBJECT_NOT_FOUND();
 
             rpc::shared_ptr<object_proxy> op = service_proxy->get_object_proxy(encap.object_id);
             if(!op)
@@ -436,8 +441,10 @@ namespace rpc
 
         rpc::shared_ptr<object_proxy> op = service_proxy->get_object_proxy(encap.object_id);
         if(op)
-        {//this monstrosity needs to be fixed as part of a general state machine implementation 
-            if(!new_proxy_added && (encap.zone_id != sp->get_zone_id()))
+        {
+            //as this is an out parameter the callee will be doing an add ref if the object proxy is already found we can do a release
+            assert(!new_proxy_added);
+            if(encap.zone_id != sp->get_zone_id())
             {
                 service_proxy->release(encap.zone_id, encap.object_id);
             }

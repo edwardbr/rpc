@@ -22,19 +22,8 @@ namespace rpc
                 telemetry_service->on_service_proxy_creation("local_service_proxy", get_operating_zone_id(), get_zone_id());
             }
         }
-        rpc::shared_ptr<service_proxy> clone_for_zone(uint64_t zone_id) override
-        {
-            auto ret = rpc::make_shared<local_service_proxy>(*this);
-            ret->set_zone_id(zone_id);
-            ret->weak_this_ = ret;
-            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
-            {
-                telemetry_service->on_service_proxy_creation("local_service_proxy", ret->get_operating_zone_id(), ret->get_zone_id());
-            }
-            
-            get_operating_zone_service()->inner_add_zone_proxy(ret);
-            return ret;
-        }
+
+        rpc::shared_ptr<service_proxy> deep_copy_for_clone() override {return rpc::make_shared<local_service_proxy>(*this);}
 
     public:
         local_service_proxy(const local_service_proxy& other) = default;
@@ -123,19 +112,7 @@ namespace rpc
             }
         }
 
-        rpc::shared_ptr<service_proxy> clone_for_zone(uint64_t zone_id) override
-        {
-            auto ret = rpc::make_shared<local_child_service_proxy>(*this);
-            ret->set_zone_id(zone_id);
-            ret->weak_this_ = ret;
-            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
-            {
-                telemetry_service->on_service_proxy_creation("local_child_service_proxy", ret->get_operating_zone_id(), ret->get_zone_id());
-            }
-
-            get_operating_zone_service()->inner_add_zone_proxy(ret);
-            return ret;
-        }
+        rpc::shared_ptr<service_proxy> deep_copy_for_clone() override {return rpc::make_shared<local_child_service_proxy>(*this);}
 
     public:
         local_child_service_proxy(const local_child_service_proxy& other) = default;

@@ -153,7 +153,7 @@ namespace marshalled_tests
         }
     }
 
-    void remote_tests(rpc::shared_ptr<yyy::i_example> example_ptr, const rpc::i_telemetry_service* telemetry_service)
+    void remote_tests(bool use_host_in_child, rpc::shared_ptr<yyy::i_example> example_ptr, const rpc::i_telemetry_service* telemetry_service)
     {
         int val = 0;
         example_ptr->add(1, 2, val);
@@ -180,8 +180,11 @@ namespace marshalled_tests
                 other_foo->do_something_in_val(22);
             }
 
-            rpc::shared_ptr<xxx::i_baz> b(new baz(telemetry_service));
-            err_code = foo->call_baz_interface(b);
+            if(use_host_in_child)
+            {
+                rpc::shared_ptr<xxx::i_baz> b(new baz(telemetry_service));
+                err_code = foo->call_baz_interface(b);
+            }
         }
         {
             rpc::shared_ptr<xxx::i_baz> i_baz_ptr;

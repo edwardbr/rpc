@@ -9,7 +9,7 @@ namespace rpc
     {
         host_service_proxy(uint64_t host_zone_id, const rpc::shared_ptr<service>& operating_zone_service, const rpc::i_telemetry_service* telemetry_service);
 
-        rpc::shared_ptr<service_proxy> clone_for_zone(uint64_t zone_id) override;
+        rpc::shared_ptr<service_proxy> deep_copy_for_clone() override {return rpc::make_shared<host_service_proxy>(*this);}
 
     public:
         host_service_proxy(const host_service_proxy& other) = default;
