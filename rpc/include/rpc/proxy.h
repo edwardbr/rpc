@@ -50,7 +50,8 @@ namespace rpc
         
         virtual void* get_address() const override
         {
-            return (T*)this;
+            assert(false);
+            return (T*)get_object_proxy().get();
         }   
         rpc::proxy_base* query_proxy_base() const override 
         { 
