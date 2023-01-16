@@ -445,7 +445,7 @@ namespace rpc
         {
             //as this is an out parameter the callee will be doing an add ref if the object proxy is already found we can do a release
             assert(!new_proxy_added);
-            if(encap.zone_id != sp->get_zone_id())
+            if(encap.zone_id != service_proxy->get_zone_id())
             {
                 service_proxy->release(encap.zone_id, encap.object_id);
             }
