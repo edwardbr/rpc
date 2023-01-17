@@ -1707,6 +1707,7 @@ element_type*>::value>> shared_ptr(unique_ptr<_Yp, _Dp>&& __r) : __ptr_(__r.get(
     template<class _Tp, class _Up>
     inline shared_ptr<_Tp> static_pointer_cast(const shared_ptr<_Up>& __r) noexcept
     {
+        //only work with local polymorphic types
         return shared_ptr<_Tp>(__r, static_cast<typename shared_ptr<_Tp>::element_type*>(__r.get()));
     }
 
@@ -1719,6 +1720,7 @@ element_type*>::value>> shared_ptr(unique_ptr<_Yp, _Dp>&& __r) : __ptr_(__r.get(
     template<class _Tp, class _Up> shared_ptr<_Tp> reinterpret_pointer_cast(const shared_ptr<_Up>& __r)
     noexcept
     {
+        //only work with local polymorphic types
         return shared_ptr<_Tp>(__r, reinterpret_cast<typename shared_ptr<_Tp>::element_type*>(__r.get()));
     }
 
@@ -2142,6 +2144,11 @@ element_type*>::value>> shared_ptr(unique_ptr<_Yp, _Dp>&& __r) : __ptr_(__r.get(
         }
         auto ob = proxy_->get_object_proxy();
         shared_ptr<T1> ret;
+        //note this magic function will return a shared pointer to a new interface proxy
+        //its refernce count will not be the same as the "from" pointers value, symanticlly it 
+        //behaves the same as with normal dynamic_pointer_cast in that you can use this function to
+        //cast back to the original.  Hoever static_pointer_cast in this case will not work, for
+        //remote interfaces.
         ob->template query_interface<T1>(ret);
         return ret;
     }
