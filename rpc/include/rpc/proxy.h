@@ -292,7 +292,7 @@ namespace rpc
             ret->weak_this_ = ret;
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
             {
-                telemetry_service->on_service_proxy_creation("enclave_service_proxy", ret->get_operating_zone_id(), ret->get_zone_id());
+                telemetry_service->on_service_proxy_creation("service_proxy", ret->get_operating_zone_id(), ret->get_zone_id());
             }
             get_operating_zone_service()->inner_add_zone_proxy(ret);
             return ret;
@@ -445,10 +445,7 @@ namespace rpc
         {
             //as this is an out parameter the callee will be doing an add ref if the object proxy is already found we can do a release
             assert(!new_proxy_added);
-            if(encap.zone_id != service_proxy->get_zone_id())
-            {
-                service_proxy->release(encap.zone_id, encap.object_id);
-            }
+            service_proxy->release(encap.zone_id, encap.object_id);
         }
         else
         {
