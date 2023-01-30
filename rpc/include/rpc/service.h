@@ -52,12 +52,12 @@ namespace rpc
         object generate_new_object_id() const { return {++object_id_generator}; }
 
         template<class T> rpc::interface_descriptor proxy_bind_in_param(const rpc::shared_ptr<T>& iface, rpc::shared_ptr<rpc::object_stub>& stub);
-        template<class T> rpc::interface_descriptor stub_bind_out_param(caller_channel_zone caller_channel_zone_id, const rpc::shared_ptr<T>& iface);
+        template<class T> rpc::interface_descriptor stub_bind_out_param(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, const rpc::shared_ptr<T>& iface);
 
         int send(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, destination_zone destination_zone_id, object object_id, interface_ordinal interface_id, method method_id, size_t in_size_,
                         const char* in_buf_, std::vector<char>& out_buf_) override;
 
-        interface_descriptor get_proxy_stub_descriptor(caller_channel_zone caller_channel_zone_id, rpc::casting_interface* pointer,
+        interface_descriptor get_proxy_stub_descriptor(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, rpc::casting_interface* pointer,
                                  std::function<rpc::shared_ptr<i_interface_stub>(rpc::shared_ptr<object_stub>)> fn,
                                 bool add_ref,
                                  rpc::shared_ptr<object_stub>& stub);
@@ -107,6 +107,6 @@ namespace rpc
     template<class T> 
     rpc::interface_descriptor create_interface_stub(rpc::service& serv, const rpc::shared_ptr<T>& iface)
     {
-        return serv.stub_bind_out_param(serv.get_zone_id().as_caller_channel(), iface);       
+        return serv.stub_bind_out_param(caller_channel_zone(), serv.get_zone_id().as_caller(), iface);       
     }
 }

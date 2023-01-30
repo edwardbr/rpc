@@ -93,6 +93,8 @@ namespace rpc
     {
         caller_zone() = default;
         caller_zone(const type_id<CallerZoneId>& other) : type_id<CallerZoneId>(other){}
+        
+        type_id<CallerChannelZoneId> as_caller_channel() const {return {id};}   
     };
 
     //the zone that initiated the call

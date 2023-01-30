@@ -32,7 +32,7 @@ namespace rpc
         {}
 
         template<class T> rpc::interface_descriptor proxy_bind_in_param(const rpc::shared_ptr<T>& iface, rpc::shared_ptr<rpc::object_stub>& stub);
-        template<class T> rpc::interface_descriptor stub_bind_out_param(caller_channel_zone caller_channel_zone_id, const rpc::shared_ptr<T>& iface);
+        template<class T> rpc::interface_descriptor stub_bind_out_param(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, const rpc::shared_ptr<T>& iface);
 
         template<class T1, class T2>
         friend rpc::shared_ptr<T1> dynamic_pointer_cast(const shared_ptr<T2>& from) noexcept;
@@ -308,6 +308,7 @@ namespace rpc
         destination_zone get_destination_zone_id() const {return destination_zone_id_;}
         //the intermediate zone where this proxy is calling
         destination_channel_zone get_destination_channel_zone_id() const {return destination_channel_zone_;}
+        caller_zone get_caller_zone_id() const {return caller_zone_id_;}
 
         //the service that this proxy lives in
         rpc::shared_ptr<service> get_operating_zone_service() const {return operating_zone_service_.lock();}
@@ -401,7 +402,7 @@ namespace rpc
 
     //declared here as object_proxy and service_proxy is not fully defined in the body of proxy_base
     template<class T>
-    interface_descriptor proxy_base::stub_bind_out_param(caller_channel_zone caller_channel_zone_id, const rpc::shared_ptr<T>& iface)
+    interface_descriptor proxy_base::stub_bind_out_param(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, const rpc::shared_ptr<T>& iface)
     {
         if(!iface)
             return {0,0};
@@ -416,7 +417,7 @@ namespace rpc
         }
 
         //else encapsulate away
-        return operating_service->stub_bind_out_param(caller_channel_zone_id, iface);
+        return operating_service->stub_bind_out_param(caller_channel_zone_id, caller_zone_id, iface);
     }
 
     //do not use directly it is for the interface generator use rpc::create_interface_proxy if you want to get a proxied pointer to a remote implementation
@@ -487,7 +488,11 @@ namespace rpc
         if(service_proxy->get_destination_zone_id() != encap.destination_zone_id)
         {
             //if the zone is different lookup or clone the right proxy
-            service_proxy = serv->get_zone_proxy(service_proxy->get_destination_zone_id().as_caller_channel(), caller_zone_id, encap.destination_zone_id, new_proxy_added);
+            service_proxy = serv->get_zone_proxy(
+                caller_zone_id.as_caller_channel(), 
+                caller_zone_id, 
+                encap.destination_zone_id, 
+                new_proxy_added);
             if(service_proxy && new_proxy_added)
                 service_proxy->add_external_ref();
         }

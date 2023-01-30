@@ -28,7 +28,8 @@ namespace rpc
         LOG("~service",100);
         object_id_generator = 0;
         // to do: assert that there are no more object_stubs in memory
-        //assert(check_is_empty());
+        bool is_empty = check_is_empty();
+        //assert(is_empty);
 
         stubs.clear();
         wrapped_object_to_stub.clear();
@@ -80,7 +81,7 @@ namespace rpc
             else
             {
                 auto message = std::string("service ") + std::to_string(get_zone_id()) 
-                + std::string(", proxy ") + std::to_string(svcproxy->get_zone_id())
+                + std::string(", proxy ") + std::to_string(svcproxy->get_destination_zone_id())
                 + std::string(", cloned from ") + std::to_string(svcproxy->get_destination_channel_zone_id()) 
                 + std::string(" has not been released in the service suspected unclean shutdown");
                 LOG_STR(message.c_str(), message.size());
@@ -140,13 +141,13 @@ namespace rpc
     //this is a key function that returns an interface descriptor
     //for wrapping an implementation to a local object inside a stub where needed
     //or if the interface is a proxy to add ref it
-    interface_descriptor service::get_proxy_stub_descriptor(caller_channel_zone caller_channel_zone_id, rpc::casting_interface* iface,
+    interface_descriptor service::get_proxy_stub_descriptor(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, rpc::casting_interface* iface,
                                         std::function<rpc::shared_ptr<i_interface_stub>(rpc::shared_ptr<object_stub>)> fn,
                                         bool add_ref,
                                         rpc::shared_ptr<object_stub>& stub)
     {
         proxy_base* proxy_base = nullptr;
-        if(caller_channel_zone_id.is_set())//a proxy with no zone id makes no sense
+        if(caller_channel_zone_id.is_set() || caller_zone_id.is_set())
         {
             proxy_base = iface->query_proxy_base();
         }
@@ -276,7 +277,10 @@ namespace rpc
                     wrapped_object_to_stub.erase(it);
                 }
                 else
+                {
+                    //if you get here make sure that get_address is defined in the most derived class
                     assert(false);
+                }
             }
             stub->reset();        
         }
@@ -366,7 +370,11 @@ namespace rpc
         inner_add_zone_proxy(service_proxy);
     }
 
-    rpc::shared_ptr<service_proxy> service::get_zone_proxy(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, destination_zone destination_zone_id, bool& new_proxy_added)
+    rpc::shared_ptr<service_proxy> service::get_zone_proxy(
+        caller_channel_zone caller_channel_zone_id, 
+        caller_zone caller_zone_id, 
+        destination_zone destination_zone_id, 
+        bool& new_proxy_added)
     {
         new_proxy_added = false;
         std::lock_guard g(insert_control);
@@ -376,7 +384,7 @@ namespace rpc
         if (item != other_zones.end())
             return item->second.lock();
 
-        //if not perhaps we can make one from the proxy of the calling zone
+        //if not we can make one from the proxy of the calling zone
         if(caller_channel_zone_id == 0)
             return nullptr;
         item = other_zones.find(caller_channel_zone_id.as_destination());
