@@ -80,8 +80,8 @@ namespace rpc
             else
             {
                 auto message = std::string("service ") + std::to_string(get_zone_id()) 
-                + std::string(", proxy ") + std::to_string(svcproxy->get_operating_zone_id())
-                + std::string(", cloned from ") + std::to_string(svcproxy->get_cloned_from_zone_id()) 
+                + std::string(", proxy ") + std::to_string(svcproxy->get_zone_id())
+                + std::string(", cloned from ") + std::to_string(svcproxy->get_destination_channel_zone_id()) 
                 + std::string(" has not been released in the service suspected unclean shutdown");
                 LOG_STR(message.c_str(), message.size());
 
@@ -158,7 +158,7 @@ namespace rpc
             if(add_ref && caller_channel_zone_id != destination_zone_id.as_caller_channel())
             {
                 auto destination_zone = object_proxy->get_service_proxy();
-                auto cloned_from_zone_id = destination_zone->get_cloned_from_zone_id();
+                auto cloned_from_zone_id = destination_zone->get_destination_channel_zone_id();
                 if(zone_id_.as_destination() != destination_zone_id)
                     destination_zone->add_external_ref();
                 destination_zone->add_ref(destination_zone_id, object_id, get_zone_id().as_caller());
@@ -376,17 +376,17 @@ namespace rpc
         if (item != other_zones.end())
             return item->second.lock();
 
-        //if not perhaps we can make one from the proxy of the originating call    
+        //if not perhaps we can make one from the proxy of the calling zone
         if(caller_channel_zone_id == 0)
             return nullptr;
         item = other_zones.find(caller_channel_zone_id.as_destination());
         if (item == other_zones.end())
             return nullptr;
-        auto originating_proxy = item->second.lock();
-        if(!originating_proxy)
+        auto calling_proxy = item->second.lock();
+        if(!calling_proxy)
             return nullptr;
 
-        auto proxy = originating_proxy->clone_for_zone(destination_zone_id, caller_zone_id);
+        auto proxy = calling_proxy->clone_for_zone(destination_zone_id, caller_zone_id);
         new_proxy_added = true;
         return proxy;
     }

@@ -273,7 +273,7 @@ namespace enclave_marshaller
 				if(__rpc_ret == rpc::error::OK() && {1}_object_.destination_zone_id.is_set() && {1}_object_.object_id.is_set())
                 {{
                     auto& zone_ = target_stub_.lock()->get_zone();
-                    __rpc_ret = rpc::stub_bind_in_param(zone_, originating_zone_id, caller_zone_id, {1}_object_, {1});
+                    __rpc_ret = rpc::stub_bind_in_param(zone_, caller_channel_zone_id, caller_zone_id, {1}_object_, {1});
                 }}
 )__",
                                    object_type, name);
@@ -312,7 +312,7 @@ namespace enclave_marshaller
             case STUB_PARAM_CAST:
                 return name;
             case PROXY_VALUE_RETURN:
-                return fmt::format("rpc::proxy_bind_out_param(__rpc_sp, {0}_, __rpc_sp->get_operating_zone_id().as_caller(), {0});", name);
+                return fmt::format("rpc::proxy_bind_out_param(__rpc_sp, {0}_, __rpc_sp->get_zone_id().as_caller(), {0});", name);
             case PROXY_OUT_DECLARATION:
                 return fmt::format("rpc::interface_descriptor {}_;", name);
             case STUB_ADD_REF_OUT_PREDECLARE:
@@ -320,7 +320,7 @@ namespace enclave_marshaller
                     "rpc::interface_descriptor {0}_;", name);
             case STUB_ADD_REF_OUT:
                 return fmt::format(
-                    "{0}_ = zone_.stub_bind_out_param(originating_zone_id, {0});", name);
+                    "{0}_ = zone_.stub_bind_out_param(caller_channel_zone_id, {0});", name);
             case STUB_MARSHALL_OUT:
                 return fmt::format("  ,(\"_{}\", {}_)", count, name);
             default:
@@ -585,7 +585,7 @@ namespace enclave_marshaller
                   "__rpc_sp->get_telemetry_service();telemetry_service)");
             proxy("     {{");
             proxy("     telemetry_service->on_interface_proxy_creation(\"{0}_proxy\", "
-                  "__rpc_sp->get_operating_zone_id(), "
+                  "__rpc_sp->get_zone_id(), "
                   "__rpc_sp->get_destination_zone_id(), get_object_proxy()->get_object_id(), "
                   "{{{0}_proxy::id}});",
                   interface_name);
@@ -601,7 +601,7 @@ namespace enclave_marshaller
                   "__rpc_sp->get_telemetry_service();telemetry_service)");
             proxy("     {{");
             proxy("     telemetry_service->on_interface_proxy_deletion(\"{0}_proxy\", "
-                  "__rpc_sp->get_operating_zone_id(), "
+                  "__rpc_sp->get_zone_id(), "
                   "__rpc_sp->get_destination_zone_id(), get_object_proxy()->get_object_id(), "
                   "{{{0}_proxy::id}});",
                   interface_name);
@@ -620,7 +620,7 @@ namespace enclave_marshaller
                   interface_name);
             proxy("");
 
-            stub("int {0}_stub::call(rpc::caller_channel_zone originating_zone_id, rpc::caller_zone caller_zone_id, rpc::method method_id, size_t in_size_, const char* in_buf_, std::vector<char>& "
+            stub("int {0}_stub::call(rpc::caller_channel_zone caller_channel_zone_id, rpc::caller_zone caller_zone_id, rpc::method method_id, size_t in_size_, const char* in_buf_, std::vector<char>& "
                  "out_buf_)", interface_name);
             stub("{{");
 
@@ -681,7 +681,7 @@ namespace enclave_marshaller
                           "__rpc_sp->get_telemetry_service();telemetry_service)");
                     proxy("{{");
                     proxy("telemetry_service->on_interface_proxy_send(\"{0}_proxy\", "
-                          "__rpc_sp->get_operating_zone_id(), "
+                          "__rpc_sp->get_zone_id(), "
                           "__rpc_sp->get_destination_zone_id(), "
                           "get_object_proxy()->get_object_id(), {{{0}_proxy::id}}, {{{1}}});",
                           interface_name, function_count);
@@ -1050,7 +1050,7 @@ namespace enclave_marshaller
 
             stub("rpc::weak_ptr<rpc::object_stub> get_object_stub() const override {{ return target_stub_;}}");
             stub("void* get_pointer() const override {{ return __rpc_target_.get();}}");
-            stub("int call(rpc::caller_channel_zone originating_zone_id, rpc::caller_zone caller_zone_id, rpc::method method_id, size_t in_size_, const char* in_buf_, std::vector<char>& "
+            stub("int call(rpc::caller_channel_zone caller_channel_zone_id, rpc::caller_zone caller_zone_id, rpc::method method_id, size_t in_size_, const char* in_buf_, std::vector<char>& "
                  "out_buf_) override;");
             stub("int cast(rpc::interface_ordinal interface_id, rpc::shared_ptr<rpc::i_interface_stub>& new_stub) override;");
             stub("}};");
@@ -1248,7 +1248,7 @@ namespace enclave_marshaller
                    "iface, rpc::shared_ptr<rpc::object_stub>& stub);",
                    ns, interface_name);
             header("template<> rpc::interface_descriptor "
-                   "rpc::service::stub_bind_out_param(caller_channel_zone originating_zone_id, const rpc::shared_ptr<{}{}>& "
+                   "rpc::service::stub_bind_out_param(caller_channel_zone caller_channel_zone_id, const rpc::shared_ptr<{}{}>& "
                    "iface);",
                    ns, interface_name);
         }
@@ -1292,7 +1292,7 @@ namespace enclave_marshaller
             stub("}}, false, stub);");
             stub("}}");
             
-            stub("template<> rpc::interface_descriptor rpc::service::stub_bind_out_param(caller_channel_zone originating_zone_id, const rpc::shared_ptr<{}{}>& iface)",
+            stub("template<> rpc::interface_descriptor rpc::service::stub_bind_out_param(caller_channel_zone caller_channel_zone_id, const rpc::shared_ptr<{}{}>& iface)",
                  ns, interface_name);
             stub("{{");
             stub("if(!iface)");
@@ -1302,7 +1302,7 @@ namespace enclave_marshaller
 
             stub("rpc::shared_ptr<rpc::object_stub> stub;");
 
-            stub("return get_proxy_stub_descriptor(originating_zone_id, iface.get(), [&](const rpc::shared_ptr<rpc::object_stub>& stub) -> "
+            stub("return get_proxy_stub_descriptor(caller_channel_zone_id, iface.get(), [&](const rpc::shared_ptr<rpc::object_stub>& stub) -> "
                  "rpc::shared_ptr<rpc::i_interface_stub>{{");
             stub("return rpc::static_pointer_cast<rpc::i_interface_stub>({}{}_stub::create(iface, stub));", ns,
                  interface_name);

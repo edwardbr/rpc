@@ -32,7 +32,7 @@ namespace rpc
         {}
 
         template<class T> rpc::interface_descriptor proxy_bind_in_param(const rpc::shared_ptr<T>& iface, rpc::shared_ptr<rpc::object_stub>& stub);
-        template<class T> rpc::interface_descriptor stub_bind_out_param(caller_channel_zone originating_zone_id, const rpc::shared_ptr<T>& iface);
+        template<class T> rpc::interface_descriptor stub_bind_out_param(caller_channel_zone caller_channel_zone_id, const rpc::shared_ptr<T>& iface);
 
         template<class T1, class T2>
         friend rpc::shared_ptr<T1> dynamic_pointer_cast(const shared_ptr<T2>& from) noexcept;
@@ -72,7 +72,7 @@ namespace rpc
         object object_id_;
         rpc::shared_ptr<service_proxy> service_proxy_;
         std::unordered_map<interface_ordinal, rpc::weak_ptr<proxy_base>> proxy_map;
-        std::mutex insert_control;
+        std::mutex insert_control_;
         mutable rpc::weak_ptr<object_proxy> weak_this_;
 
         // note the interface pointer may change if there is already an interface inserted successfully
@@ -104,7 +104,7 @@ namespace rpc
 
         size_t get_proxy_count()
         {
-            std::lock_guard guard(insert_control);
+            std::lock_guard guard(insert_control_);
             return proxy_map.size();
         }
 
@@ -126,7 +126,7 @@ namespace rpc
             };
 
             { // scope for the lock
-                std::lock_guard guard(insert_control);
+                std::lock_guard guard(insert_control_);
                 if(T::id == 0)
                 {
                     return rpc::error::OK();
@@ -155,7 +155,7 @@ namespace rpc
                 }
             }
             { // another scope for the lock
-                std::lock_guard guard(insert_control);
+                std::lock_guard guard(insert_control_);
 
                 // check again...
                 auto item = proxy_map.find({T::id});
@@ -197,8 +197,9 @@ namespace rpc
     class service_proxy : 
         public i_marshaller
     {
-        std::unordered_map<object, rpc::weak_ptr<object_proxy>> proxies;
-        std::mutex insert_control;
+        std::unordered_map<object, rpc::weak_ptr<object_proxy>> proxies_;
+        std::mutex insert_control_;
+
         destination_zone destination_zone_id_ = {0};
         destination_channel_zone destination_channel_zone_ = {0};
         caller_zone caller_zone_id_ = {0};
@@ -232,7 +233,7 @@ namespace rpc
         }
 
         mutable rpc::weak_ptr<service_proxy> weak_this_;
-        void set_zone_id(destination_zone destination_zone_id) 
+        void set_destination_zone_id(destination_zone destination_zone_id) 
         {
             destination_channel_zone_ = destination_zone_id_.as_destination_channel();
             destination_zone_id_ = destination_zone_id;
@@ -241,7 +242,7 @@ namespace rpc
     public:
         virtual ~service_proxy()
         {
-            assert(proxies.empty());
+            assert(proxies_.empty());
             auto operating_zone_service = operating_zone_service_.lock();
             if(operating_zone_service)
             {
@@ -251,7 +252,7 @@ namespace rpc
         
         void add_external_ref()
         {
-            std::lock_guard g(insert_control);
+            std::lock_guard g(insert_control_);
             auto count = ++dependent_services_count_;
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
             {
@@ -267,7 +268,7 @@ namespace rpc
 
         void release_external_ref()
         {
-            std::lock_guard g(insert_control);
+            std::lock_guard g(insert_control_);
             auto count = --dependent_services_count_;
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
             {
@@ -281,13 +282,13 @@ namespace rpc
             }            
         }
 
-        std::unordered_map<object, rpc::weak_ptr<object_proxy>> get_proxies(){return proxies;}
+        std::unordered_map<object, rpc::weak_ptr<object_proxy>> get_proxies(){return proxies_;}
 
         virtual rpc::shared_ptr<service_proxy> deep_copy_for_clone() = 0;
         rpc::shared_ptr<service_proxy> clone_for_zone(destination_zone destination_zone_id, caller_zone caller_zone_id)
         {
             auto ret = deep_copy_for_clone();
-            ret->set_zone_id(destination_zone_id);
+            ret->set_destination_zone_id(destination_zone_id);
             ret->caller_zone_id_ = caller_zone_id;
             ret->weak_this_ = ret;
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
@@ -301,33 +302,41 @@ namespace rpc
         rpc::shared_ptr<service_proxy> shared_from_this() { return rpc::shared_ptr<service_proxy>(weak_this_); }
         rpc::shared_ptr<service_proxy const> shared_from_this() const { return rpc::shared_ptr<service_proxy const>(weak_this_); }
 
+        //the zone where this proxy is created
+        zone get_zone_id() const {return operating_zone_service_.lock()->get_zone_id();}
+        //the ultimate zone where this proxy is calling
         destination_zone get_destination_zone_id() const {return destination_zone_id_;}
-        zone get_operating_zone_id() const {return operating_zone_service_.lock()->get_zone_id();}
-        destination_channel_zone get_cloned_from_zone_id() const {return destination_channel_zone_;}
+        //the intermediate zone where this proxy is calling
+        destination_channel_zone get_destination_channel_zone_id() const {return destination_channel_zone_;}
+
+        //the service that this proxy lives in
         rpc::shared_ptr<service> get_operating_zone_service() const {return operating_zone_service_.lock();}
+
+        //for low level logging of rpc
         const rpc::i_telemetry_service* get_telemetry_service(){return telemetry_service_;}
+
         void add_object_proxy(rpc::shared_ptr<object_proxy> op)
         {
-            std::lock_guard l(insert_control);
-            assert(proxies.find(op->get_object_id()) == proxies.end());
-            proxies[op->get_object_id()] = op;
+            std::lock_guard l(insert_control_);
+            assert(proxies_.find(op->get_object_id()) == proxies_.end());
+            proxies_[op->get_object_id()] = op;
         }
 
         rpc::shared_ptr<object_proxy> get_object_proxy(object object_id)
         {
-            std::lock_guard l(insert_control);
-            auto item = proxies.find(object_id);
-            if(item == proxies.end())
+            std::lock_guard l(insert_control_);
+            auto item = proxies_.find(object_id);
+            if(item == proxies_.end())
                 return nullptr;
             return item->second.lock();            
         }
 
         void remove_object_proxy(object object_id)
         {
-            std::lock_guard l(insert_control);
-            auto item = proxies.find(object_id);
-            assert(item  != proxies.end());
-            proxies.erase(item);       
+            std::lock_guard l(insert_control_);
+            auto item = proxies_.find(object_id);
+            assert(item  != proxies_.end());
+            proxies_.erase(item);       
         }
 
         friend service;
@@ -356,7 +365,7 @@ namespace rpc
 
     //do not use directly it is for the interface generator use rpc::create_interface_proxy if you want to get a proxied pointer to a remote implementation
     template<class T> 
-    int stub_bind_in_param(rpc::service& serv, caller_channel_zone originating_zone_id, caller_zone caller_zone_id, const rpc::interface_descriptor& encap, rpc::shared_ptr<T>& iface)
+    int stub_bind_in_param(rpc::service& serv, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, const rpc::interface_descriptor& encap, rpc::shared_ptr<T>& iface)
     {
         //if we have a null object id then return a null ptr
         if(encap.object_id == 0 || encap.destination_zone_id == 0)
@@ -376,7 +385,7 @@ namespace rpc
             //get the right  service proxy
             //if the zone is different lookup or clone the right proxy
             bool new_proxy_added = false;
-            auto service_proxy = serv.get_zone_proxy(originating_zone_id, caller_zone_id, {encap.destination_zone_id}, new_proxy_added);
+            auto service_proxy = serv.get_zone_proxy(caller_channel_zone_id, caller_zone_id, {encap.destination_zone_id}, new_proxy_added);
             if(!service_proxy)
                 return rpc::error::OBJECT_NOT_FOUND();
 
@@ -392,7 +401,7 @@ namespace rpc
 
     //declared here as object_proxy and service_proxy is not fully defined in the body of proxy_base
     template<class T>
-    interface_descriptor proxy_base::stub_bind_out_param(caller_channel_zone originating_zone_id, const rpc::shared_ptr<T>& iface)
+    interface_descriptor proxy_base::stub_bind_out_param(caller_channel_zone caller_channel_zone_id, const rpc::shared_ptr<T>& iface)
     {
         if(!iface)
             return {0,0};
@@ -407,7 +416,7 @@ namespace rpc
         }
 
         //else encapsulate away
-        return operating_service->stub_bind_out_param(originating_zone_id, iface);
+        return operating_service->stub_bind_out_param(caller_channel_zone_id, iface);
     }
 
     //do not use directly it is for the interface generator use rpc::create_interface_proxy if you want to get a proxied pointer to a remote implementation

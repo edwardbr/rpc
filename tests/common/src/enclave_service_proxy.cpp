@@ -18,7 +18,7 @@ namespace rpc
     {
         if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
         {
-            telemetry_service->on_service_proxy_creation("enclave_service_proxy", get_operating_zone_id(), get_destination_zone_id());
+            telemetry_service->on_service_proxy_creation("enclave_service_proxy", get_zone_id(), get_destination_zone_id());
         }
     }
 
@@ -26,7 +26,7 @@ namespace rpc
     {
         if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
         {
-            telemetry_service->on_service_proxy_deletion("enclave_service_proxy", get_operating_zone_id(), get_destination_zone_id());
+            telemetry_service->on_service_proxy_deletion("enclave_service_proxy", get_zone_id(), get_destination_zone_id());
         }
     }
 
@@ -54,7 +54,7 @@ namespace rpc
             return rpc::error::TRANSPORT_ERROR();
         }
         int err_code = error::OK();
-        status = marshal_test_init_enclave(eid_, &err_code, get_operating_zone_id().get_val(), host_id_.get_val(), get_destination_zone_id().get_val(), &(object_id.get_ref()));
+        status = marshal_test_init_enclave(eid_, &err_code, get_zone_id().get_val(), host_id_.get_val(), get_destination_zone_id().get_val(), &(object_id.get_ref()));
         if (status)
         {
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
@@ -74,7 +74,7 @@ namespace rpc
         return rpc::error::OK();
     }
 
-    int enclave_service_proxy::send(caller_channel_zone originating_zone_id, caller_zone caller_zone_id, destination_zone destination_zone_id, object object_id, interface_ordinal interface_id, method method_id,
+    int enclave_service_proxy::send(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, destination_zone destination_zone_id, object object_id, interface_ordinal interface_id, method method_id,
                                            size_t in_size_, const char* in_buf_, std::vector<char>& out_buf_)
     {
         if(destination_zone_id != get_destination_zone_id())
@@ -82,7 +82,7 @@ namespace rpc
         int err_code = 0;
         size_t data_out_sz = 0;
         void* tls = nullptr;
-        sgx_status_t status = ::call_enclave(eid_, &err_code, originating_zone_id.get_val(), caller_zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), interface_id.get_val(), method_id.get_val(), in_size_, in_buf_,
+        sgx_status_t status = ::call_enclave(eid_, &err_code, caller_channel_zone_id.get_val(), caller_zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), interface_id.get_val(), method_id.get_val(), in_size_, in_buf_,
                                              out_buf_.size(), out_buf_.data(), &data_out_sz, &tls);
 
         if (status)
@@ -98,7 +98,7 @@ namespace rpc
         {
             // data too small reallocate memory and try again
             out_buf_.resize(data_out_sz);
-            status = ::call_enclave(eid_, &err_code, originating_zone_id.get_val(), caller_zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), interface_id.get_val(), method_id.get_val(), in_size_, in_buf_,
+            status = ::call_enclave(eid_, &err_code, caller_channel_zone_id.get_val(), caller_zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), interface_id.get_val(), method_id.get_val(), in_size_, in_buf_,
                                     out_buf_.size(), out_buf_.data(), &data_out_sz, &tls);
             if (status)
             {
@@ -117,7 +117,7 @@ namespace rpc
     {
         if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
         {
-            telemetry_service->on_service_proxy_try_cast("enclave_service_proxy", get_operating_zone_id(), destination_zone_id,
+            telemetry_service->on_service_proxy_try_cast("enclave_service_proxy", get_zone_id(), destination_zone_id,
                                                             object_id, interface_id);
         }
         int err_code = 0;
@@ -137,7 +137,7 @@ namespace rpc
     {
         if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
         {
-            telemetry_service->on_service_proxy_add_ref("enclave_service_proxy", get_operating_zone_id(), destination_zone_id,
+            telemetry_service->on_service_proxy_add_ref("enclave_service_proxy", get_zone_id(), destination_zone_id,
                                                         object_id, caller_zone_id);
         }
         uint64_t ret = 0;
@@ -157,7 +157,7 @@ namespace rpc
     {
         if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
         {
-            telemetry_service->on_service_proxy_release("enclave_service_proxy", get_operating_zone_id(), destination_zone_id,
+            telemetry_service->on_service_proxy_release("enclave_service_proxy", get_zone_id(), destination_zone_id,
                                                         object_id, caller_zone_id);
         }
         uint64_t ret = 0;

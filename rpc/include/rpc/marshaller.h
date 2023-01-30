@@ -17,7 +17,7 @@ namespace rpc
     class i_marshaller
     {
     public:
-        virtual int send(caller_channel_zone originating_zone_id, caller_zone caller_zone_id, destination_zone destination_zone_id, object object_id, interface_ordinal interface_id, method method_id, size_t in_size_,
+        virtual int send(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, destination_zone destination_zone_id, object object_id, interface_ordinal interface_id, method method_id, size_t in_size_,
                                 const char* in_buf_, std::vector<char>& out_buf_)
             = 0;
         virtual int try_cast(destination_zone destination_zone_id, object object_id, interface_ordinal interface_id) = 0;

@@ -39,25 +39,25 @@ public:
     {
         on_service_deletion_host(name, zone_id.get_val());
     }
-    virtual void on_service_proxy_creation(const char* name, rpc::zone originating_zone_id, rpc::destination_zone destination_zone_id) const
+    virtual void on_service_proxy_creation(const char* name, rpc::zone caller_channel_zone_id, rpc::destination_zone destination_zone_id) const
     {
-        on_service_proxy_creation_host(name, originating_zone_id.get_val(), destination_zone_id.get_val());
+        on_service_proxy_creation_host(name, caller_channel_zone_id.get_val(), destination_zone_id.get_val());
     }
-    virtual void on_service_proxy_deletion(const char* name, rpc::zone originating_zone_id, rpc::destination_zone destination_zone_id) const
+    virtual void on_service_proxy_deletion(const char* name, rpc::zone caller_channel_zone_id, rpc::destination_zone destination_zone_id) const
     {
-        on_service_proxy_deletion_host(name, originating_zone_id.get_val(), destination_zone_id.get_val());
+        on_service_proxy_deletion_host(name, caller_channel_zone_id.get_val(), destination_zone_id.get_val());
     }
-    virtual void on_service_proxy_try_cast(const char* name, rpc::zone originating_zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::interface_ordinal interface_id) const
+    virtual void on_service_proxy_try_cast(const char* name, rpc::zone caller_channel_zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::interface_ordinal interface_id) const
     {
-        on_service_proxy_try_cast_host(name, originating_zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), interface_id.get_val());
+        on_service_proxy_try_cast_host(name, caller_channel_zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), interface_id.get_val());
     }
-    virtual void on_service_proxy_add_ref(const char* name, rpc::zone originating_zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::caller_zone caller_zone_id) const
+    virtual void on_service_proxy_add_ref(const char* name, rpc::zone caller_channel_zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::caller_zone caller_zone_id) const
     {
-        on_service_proxy_add_ref_host(name, originating_zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), caller_zone_id.get_val());
+        on_service_proxy_add_ref_host(name, caller_channel_zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), caller_zone_id.get_val());
     }
-    virtual void on_service_proxy_release(const char* name, rpc::zone originating_zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::caller_zone caller_zone_id) const
+    virtual void on_service_proxy_release(const char* name, rpc::zone caller_channel_zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::caller_zone caller_zone_id) const
     {
-        on_service_proxy_release_host(name, originating_zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), caller_zone_id.get_val());
+        on_service_proxy_release_host(name, caller_channel_zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), caller_zone_id.get_val());
     }
 
     virtual void on_impl_creation(const char* name, rpc::interface_ordinal interface_id) const
@@ -99,17 +99,17 @@ public:
         on_object_proxy_deletion_host(operating_zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val());
     }
 
-    virtual void on_interface_proxy_creation(const char* name, rpc::zone originating_zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::interface_ordinal interface_id) const
+    virtual void on_interface_proxy_creation(const char* name, rpc::zone caller_channel_zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::interface_ordinal interface_id) const
     {
-        on_proxy_creation_host(name, originating_zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), interface_id.get_val());
+        on_proxy_creation_host(name, caller_channel_zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), interface_id.get_val());
     }
-    virtual void on_interface_proxy_deletion(const char* name, rpc::zone originating_zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::interface_ordinal interface_id) const
+    virtual void on_interface_proxy_deletion(const char* name, rpc::zone caller_channel_zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::interface_ordinal interface_id) const
     {
-        on_proxy_deletion_host(name, originating_zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), interface_id.get_val());
+        on_proxy_deletion_host(name, caller_channel_zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), interface_id.get_val());
     }
-    virtual void on_interface_proxy_send(const char* name, rpc::zone originating_zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::interface_ordinal interface_id, rpc::method method_id) const
+    virtual void on_interface_proxy_send(const char* name, rpc::zone caller_channel_zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::interface_ordinal interface_id, rpc::method method_id) const
     {
-        on_proxy_send_host(name, originating_zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), interface_id.get_val(), method_id.get_val());
+        on_proxy_send_host(name, caller_channel_zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), interface_id.get_val(), method_id.get_val());
     }
 
     void on_service_proxy_add_external_ref(const char* name, rpc::zone operating_zone_id, rpc::destination_zone destination_zone_id, int ref_count, rpc::caller_zone caller_zone_id) const
@@ -163,7 +163,7 @@ void marshal_test_destroy_enclave()
 }
 
 int call_enclave(
-    uint64_t originating_zone_id,
+    uint64_t caller_channel_zone_id,
     uint64_t caller_zone_id,
     uint64_t zone_id, 
     uint64_t object_id, 
@@ -204,7 +204,7 @@ int call_enclave(
     }
 
     std::vector<char> tmp;
-    int ret = rpc_server->send({originating_zone_id}, {caller_zone_id}, {zone_id}, {object_id}, {interface_id}, {method_id}, sz_int, data_in, tmp);
+    int ret = rpc_server->send({caller_channel_zone_id}, {caller_zone_id}, {zone_id}, {object_id}, {interface_id}, {method_id}, sz_int, data_in, tmp);
     if(ret >= rpc::error::MIN() && ret <= rpc::error::MAX())
         return ret;
 

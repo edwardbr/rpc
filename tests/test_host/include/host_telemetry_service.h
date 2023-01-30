@@ -64,12 +64,12 @@ class host_telemetry_service : public rpc::i_telemetry_service
     {
         bool operator == (const interface_proxy_id& other) const
         {
-        return  originating_zone_id == other.originating_zone_id &&
+        return  caller_channel_zone_id == other.caller_channel_zone_id &&
                 destination_zone_id == other.destination_zone_id &&
                 object_id == other.object_id &&
                 interface_id == other.interface_id;
         }
-        rpc::zone originating_zone_id = {0};
+        rpc::zone caller_channel_zone_id = {0};
         rpc::destination_zone destination_zone_id = {0};
         rpc::object object_id = {0};
         rpc::interface_ordinal interface_id = {0};
@@ -79,7 +79,7 @@ class host_telemetry_service : public rpc::i_telemetry_service
     {
         std::size_t operator()(interface_proxy_id const& s) const noexcept
         {
-            std::size_t h1 = std::hash<uint64_t>{}(s.originating_zone_id.id);
+            std::size_t h1 = std::hash<uint64_t>{}(s.caller_channel_zone_id.id);
             std::size_t h2 = std::hash<uint64_t>{}(s.destination_zone_id.id);
             std::size_t h3 = std::hash<uint64_t>{}(s.object_id.id);
             return h1 ^ (h2 << 1) ^ (h3 << 2); // or use boost::hash_combine
@@ -122,13 +122,13 @@ public:
 
     virtual void on_service_creation(const char* name, rpc::zone zone_id) const override;
     virtual void on_service_deletion(const char* name, rpc::zone zone_id) const override;
-    virtual void on_service_proxy_creation(const char* name, rpc::zone originating_zone_id, rpc::destination_zone destination_zone_id) const override;
-    virtual void on_service_proxy_deletion(const char* name, rpc::zone originating_zone_id, rpc::destination_zone destination_zone_id) const override;
-    virtual void on_service_proxy_try_cast(const char* name, rpc::zone originating_zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::interface_ordinal interface_id) const override;
-    virtual void on_service_proxy_add_ref(const char* name, rpc::zone originating_zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::caller_zone caller_zone_id) const override;
-    virtual void on_service_proxy_release(const char* name, rpc::zone originating_zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::caller_zone caller_zone_id) const override;  
-    virtual void on_service_proxy_add_external_ref(const char* name, rpc::zone originating_zone_id, rpc::destination_zone destination_zone_id, int ref_count, rpc::caller_zone caller_zone_id) const override;
-    virtual void on_service_proxy_release_external_ref(const char* name, rpc::zone originating_zone_id, rpc::destination_zone destination_zone_id, int ref_count, rpc::caller_zone caller_zone_id) const override;  
+    virtual void on_service_proxy_creation(const char* name, rpc::zone caller_channel_zone_id, rpc::destination_zone destination_zone_id) const override;
+    virtual void on_service_proxy_deletion(const char* name, rpc::zone caller_channel_zone_id, rpc::destination_zone destination_zone_id) const override;
+    virtual void on_service_proxy_try_cast(const char* name, rpc::zone caller_channel_zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::interface_ordinal interface_id) const override;
+    virtual void on_service_proxy_add_ref(const char* name, rpc::zone caller_channel_zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::caller_zone caller_zone_id) const override;
+    virtual void on_service_proxy_release(const char* name, rpc::zone caller_channel_zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::caller_zone caller_zone_id) const override;  
+    virtual void on_service_proxy_add_external_ref(const char* name, rpc::zone caller_channel_zone_id, rpc::destination_zone destination_zone_id, int ref_count, rpc::caller_zone caller_zone_id) const override;
+    virtual void on_service_proxy_release_external_ref(const char* name, rpc::zone caller_channel_zone_id, rpc::destination_zone destination_zone_id, int ref_count, rpc::caller_zone caller_zone_id) const override;  
 
     virtual void on_impl_creation(const char* name, rpc::interface_ordinal interface_id) const override;
     virtual void on_impl_deletion(const char* name, rpc::interface_ordinal interface_id) const override;
@@ -139,12 +139,12 @@ public:
     virtual void on_stub_add_ref(rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::interface_ordinal interface_id, uint64_t count, rpc::caller_zone caller_zone_id) const override;
     virtual void on_stub_release(rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::interface_ordinal interface_id, uint64_t count, rpc::caller_zone caller_zone_id) const override;
 
-    virtual void on_object_proxy_creation(rpc::zone originating_zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id) const override;
-    virtual void on_object_proxy_deletion(rpc::zone originating_zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id) const override;
+    virtual void on_object_proxy_creation(rpc::zone caller_channel_zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id) const override;
+    virtual void on_object_proxy_deletion(rpc::zone caller_channel_zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id) const override;
 
-    virtual void on_interface_proxy_creation(const char* name, rpc::zone originating_zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::interface_ordinal interface_id) const override;
-    virtual void on_interface_proxy_deletion(const char* name, rpc::zone originating_zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::interface_ordinal interface_id) const override;
-    virtual void on_interface_proxy_send(const char* name, rpc::zone originating_zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::interface_ordinal interface_id, rpc::method method_id) const override;
+    virtual void on_interface_proxy_creation(const char* name, rpc::zone caller_channel_zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::interface_ordinal interface_id) const override;
+    virtual void on_interface_proxy_deletion(const char* name, rpc::zone caller_channel_zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::interface_ordinal interface_id) const override;
+    virtual void on_interface_proxy_send(const char* name, rpc::zone caller_channel_zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::interface_ordinal interface_id, rpc::method method_id) const override;
 
     void message(level_enum level, const char* message) const override;  
 

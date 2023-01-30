@@ -52,12 +52,12 @@ namespace rpc
         object generate_new_object_id() const { return {++object_id_generator}; }
 
         template<class T> rpc::interface_descriptor proxy_bind_in_param(const rpc::shared_ptr<T>& iface, rpc::shared_ptr<rpc::object_stub>& stub);
-        template<class T> rpc::interface_descriptor stub_bind_out_param(caller_channel_zone originating_zone_id, const rpc::shared_ptr<T>& iface);
+        template<class T> rpc::interface_descriptor stub_bind_out_param(caller_channel_zone caller_channel_zone_id, const rpc::shared_ptr<T>& iface);
 
-        int send(caller_channel_zone originating_zone_id, caller_zone caller_zone_id, destination_zone destination_zone_id, object object_id, interface_ordinal interface_id, method method_id, size_t in_size_,
+        int send(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, destination_zone destination_zone_id, object object_id, interface_ordinal interface_id, method method_id, size_t in_size_,
                         const char* in_buf_, std::vector<char>& out_buf_) override;
 
-        interface_descriptor get_proxy_stub_descriptor(caller_channel_zone originating_zone_id, rpc::casting_interface* pointer,
+        interface_descriptor get_proxy_stub_descriptor(caller_channel_zone caller_channel_zone_id, rpc::casting_interface* pointer,
                                  std::function<rpc::shared_ptr<i_interface_stub>(rpc::shared_ptr<object_stub>)> fn,
                                 bool add_ref,
                                  rpc::shared_ptr<object_stub>& stub);
@@ -72,7 +72,7 @@ namespace rpc
 
         void inner_add_zone_proxy(const rpc::shared_ptr<service_proxy>& service_proxy);
         virtual void add_zone_proxy(const rpc::shared_ptr<service_proxy>& zone);
-        virtual rpc::shared_ptr<service_proxy> get_zone_proxy(caller_channel_zone originating_zone_id, caller_zone caller_zone_id, destination_zone destination_zone_id, bool& new_proxy_added);
+        virtual rpc::shared_ptr<service_proxy> get_zone_proxy(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, destination_zone destination_zone_id, bool& new_proxy_added);
         virtual void remove_zone_proxy(destination_zone destination_zone_id);
         template<class T> rpc::shared_ptr<T> get_local_interface(object object_id)
         {
@@ -100,7 +100,7 @@ namespace rpc
         void set_parent(const rpc::shared_ptr<rpc::service_proxy>& parent_service, bool child_does_not_use_parents_interface);
         bool check_is_empty() const override;
         object get_root_object_id() const;
-        rpc::shared_ptr<service_proxy> get_zone_proxy(caller_channel_zone originating_zone_id, caller_zone caller_zone_id, destination_zone destination_zone_id, bool& new_proxy_added) override;
+        rpc::shared_ptr<service_proxy> get_zone_proxy(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, destination_zone destination_zone_id, bool& new_proxy_added) override;
     };
 
 
