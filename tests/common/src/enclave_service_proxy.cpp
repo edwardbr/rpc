@@ -12,7 +12,7 @@ namespace rpc
 {
 #ifndef _IN_ENCLAVE
     enclave_service_proxy::enclave_service_proxy(destination_zone zone_id, std::string filename, const rpc::shared_ptr<service>& operating_zone_service, object host_id, const rpc::i_telemetry_service* telemetry_service)
-        : service_proxy(zone_id, operating_zone_service, {*operating_zone_service->get_zone_id()}, telemetry_service)
+        : service_proxy(zone_id, operating_zone_service, operating_zone_service->get_zone_id().as_caller(), telemetry_service)
         , filename_(filename)
         , host_id_(host_id)
     {
@@ -54,7 +54,7 @@ namespace rpc
             return rpc::error::TRANSPORT_ERROR();
         }
         int err_code = error::OK();
-        status = marshal_test_init_enclave(eid_, &err_code, *get_operating_zone_id(), *host_id_, *get_zone_id(), &(object_id.get_ref()));
+        status = marshal_test_init_enclave(eid_, &err_code, get_operating_zone_id().get_val(), host_id_.get_val(), get_zone_id().get_val(), &(object_id.get_ref()));
         if (status)
         {
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
@@ -82,7 +82,7 @@ namespace rpc
         int err_code = 0;
         size_t data_out_sz = 0;
         void* tls = nullptr;
-        sgx_status_t status = ::call_enclave(eid_, &err_code, *originating_zone_id, *caller_zone_id, *zone_id, *object_id, *interface_id, *method_id, in_size_, in_buf_,
+        sgx_status_t status = ::call_enclave(eid_, &err_code, originating_zone_id.get_val(), caller_zone_id.get_val(), zone_id.get_val(), object_id.get_val(), interface_id.get_val(), method_id.get_val(), in_size_, in_buf_,
                                              out_buf_.size(), out_buf_.data(), &data_out_sz, &tls);
 
         if (status)
@@ -98,7 +98,7 @@ namespace rpc
         {
             // data too small reallocate memory and try again
             out_buf_.resize(data_out_sz);
-            status = ::call_enclave(eid_, &err_code, *originating_zone_id, *caller_zone_id, *zone_id, *object_id, *interface_id, *method_id, in_size_, in_buf_,
+            status = ::call_enclave(eid_, &err_code, originating_zone_id.get_val(), caller_zone_id.get_val(), zone_id.get_val(), object_id.get_val(), interface_id.get_val(), method_id.get_val(), in_size_, in_buf_,
                                     out_buf_.size(), out_buf_.data(), &data_out_sz, &tls);
             if (status)
             {
@@ -121,7 +121,7 @@ namespace rpc
                                                             object_id, interface_id);
         }
         int err_code = 0;
-        sgx_status_t status = ::try_cast_enclave(eid_, &err_code, *zone_id, *object_id, *interface_id);
+        sgx_status_t status = ::try_cast_enclave(eid_, &err_code, zone_id.get_val(), object_id.get_val(), interface_id.get_val());
         if (status)
         {
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
@@ -141,7 +141,7 @@ namespace rpc
                                                         object_id, caller_zone_id);
         }
         uint64_t ret = 0;
-        sgx_status_t status = ::add_ref_enclave(eid_, &ret, *zone_id, *object_id, *caller_zone_id);
+        sgx_status_t status = ::add_ref_enclave(eid_, &ret, zone_id.get_val(), object_id.get_val(), caller_zone_id.get_val());
         if (status)
         {
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
@@ -161,7 +161,7 @@ namespace rpc
                                                         object_id, caller_zone_id);
         }
         uint64_t ret = 0;
-        sgx_status_t status = ::release_enclave(eid_, &ret, *zone_id, *object_id, *caller_zone_id);
+        sgx_status_t status = ::release_enclave(eid_, &ret, zone_id.get_val(), object_id.get_val(), caller_zone_id.get_val());
         if (status)
         {
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)

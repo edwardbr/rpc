@@ -17,9 +17,9 @@ namespace marshalled_tests
         void* get_address() const override { return (void*)this; }
         const rpc::casting_interface* query_interface(rpc::interface_ordinal interface_id) const override
         {
-            if (xxx::i_baz::id == *interface_id)
+            if (xxx::i_baz::id == interface_id.get_val())
                 return static_cast<const xxx::i_baz*>(this);
-            if (xxx::i_bar::id == *interface_id)
+            if (xxx::i_bar::id == interface_id.get_val())
                 return static_cast<const xxx::i_bar*>(this);
             return nullptr;
         }
@@ -61,7 +61,7 @@ namespace marshalled_tests
         void* get_address() const override { return (void*)this; }
         const rpc::casting_interface* query_interface(rpc::interface_ordinal interface_id) const override
         {
-            if (xxx::i_foo::id == *interface_id)
+            if (xxx::i_foo::id == interface_id.get_val())
                 return static_cast<const xxx::i_foo*>(this);
             return nullptr;
         }
@@ -291,9 +291,9 @@ namespace marshalled_tests
         void* get_address() const override { return (void*)this; }
         const rpc::casting_interface* query_interface(rpc::interface_ordinal interface_id) const override
         {
-            if (xxx::i_bar::id == *interface_id)
+            if (xxx::i_bar::id == interface_id.get_val())
                 return static_cast<const xxx::i_bar*>(this);
-            if (xxx::i_baz::id == *interface_id)
+            if (xxx::i_baz::id == interface_id.get_val())
                 return static_cast<const xxx::i_baz*>(this);
             return nullptr;
         }
@@ -331,7 +331,7 @@ namespace marshalled_tests
         void* get_address() const override { return (void*)this; }
         const rpc::casting_interface* query_interface(rpc::interface_ordinal interface_id) const override
         {
-            if (yyy::i_example::id == *interface_id)
+            if (yyy::i_example::id == interface_id.get_val())
                 return static_cast<const yyy::i_example*>(this);
             return nullptr;
         }

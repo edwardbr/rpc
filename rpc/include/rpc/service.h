@@ -107,6 +107,6 @@ namespace rpc
     template<class T> 
     rpc::interface_descriptor create_interface_stub(rpc::service& serv, const rpc::shared_ptr<T>& iface)
     {
-        return serv.stub_bind_out_param({*serv.get_zone_id()}, iface);       
+        return serv.stub_bind_out_param(serv.get_zone_id().as_caller_channel(), iface);       
     }
 }

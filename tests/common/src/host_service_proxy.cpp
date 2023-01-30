@@ -10,7 +10,7 @@ namespace rpc
 {
     host_service_proxy::host_service_proxy(destination_zone host_zone_id, const rpc::shared_ptr<service>& operating_zone_service,
                         const rpc::i_telemetry_service* telemetry_service)
-        : service_proxy(host_zone_id, operating_zone_service, {*operating_zone_service->get_zone_id()}, telemetry_service)
+        : service_proxy(host_zone_id, operating_zone_service, operating_zone_service->get_zone_id().as_caller(), telemetry_service)
     {
         if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
         {
@@ -43,7 +43,7 @@ namespace rpc
         int err_code = 0;
         size_t data_out_sz = 0;
         sgx_status_t status
-            = ::call_host(&err_code, *originating_zone_id, *caller_zone_id, *zone_id, *object_id, *interface_id, *method_id, in_size_, in_buf_, out_buf_.size(), out_buf_.data(), &data_out_sz);
+            = ::call_host(&err_code, originating_zone_id.get_val(), caller_zone_id.get_val(), zone_id.get_val(), object_id.get_val(), interface_id.get_val(), method_id.get_val(), in_size_, in_buf_, out_buf_.size(), out_buf_.data(), &data_out_sz);
 
         if (status)
         {
@@ -60,7 +60,7 @@ namespace rpc
             //data too small reallocate memory and try again
 
             status
-                = ::call_host(&err_code, *originating_zone_id, *caller_zone_id, *zone_id, *object_id, *interface_id, *method_id, in_size_, in_buf_, out_buf_.size(), out_buf_.data(), &data_out_sz);
+                = ::call_host(&err_code, originating_zone_id.get_val(), caller_zone_id.get_val(), zone_id.get_val(), object_id.get_val(), interface_id.get_val(), method_id.get_val(), in_size_, in_buf_, out_buf_.size(), out_buf_.data(), &data_out_sz);
             if (status)
             {
                 if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
@@ -81,7 +81,7 @@ namespace rpc
                                                             zone_id, object_id, interface_id);
         }
         int err_code = 0;
-        sgx_status_t status = ::try_cast_host(&err_code, *zone_id, *object_id, *interface_id);
+        sgx_status_t status = ::try_cast_host(&err_code, zone_id.get_val(), object_id.get_val(), interface_id.get_val());
         if (status)
         {
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
@@ -101,7 +101,7 @@ namespace rpc
                                                         zone_id, object_id, caller_zone_id);
         }
         uint64_t ret = 0;
-        sgx_status_t status = ::add_ref_host(&ret, *zone_id, *object_id, *caller_zone_id);
+        sgx_status_t status = ::add_ref_host(&ret, zone_id.get_val(), object_id.get_val(), caller_zone_id.get_val());
         if (status)
         {
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
@@ -121,7 +121,7 @@ namespace rpc
                                                         zone_id, object_id, caller_zone_id);
         }
         uint64_t ret = 0;
-        sgx_status_t status = ::release_host(&ret, *zone_id, *object_id, *caller_zone_id);
+        sgx_status_t status = ::release_host(&ret, zone_id.get_val(), object_id.get_val(), caller_zone_id.get_val());
         if (status)
         {
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)

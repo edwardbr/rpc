@@ -16,9 +16,10 @@ namespace rpc
         type_id(const type_id<Type>& initial_id) = default;
 
         //getter
-        uint64_t operator()() const {return id;}
-        uint64_t operator*() const {return id;}
-        uint64_t& get_ref() {return id;}
+        constexpr uint64_t operator()() const {return id;}
+        //uint64_t operator*() const {return id;}
+        constexpr uint64_t get_val() const {return id;}//only for c calls
+        uint64_t& get_ref() {return id;}//for c calls
 
         //setter
         void operator=(uint64_t val) {id = val;}
@@ -26,17 +27,17 @@ namespace rpc
 
         //setter
 //        bool operator==(uint64_t val) const {return id == val;}
-        bool operator==(const type_id<Type>& val) const {return id == val.id;}
+        constexpr bool operator==(const type_id<Type>& val) const {return id == val.id;}
 
         //setter
 //        bool operator!=(uint64_t val) const {return id != val;}
-        bool operator!=(const type_id<Type>& val) const {return id != val.id;}
+        constexpr bool operator!=(const type_id<Type>& val) const {return id != val.id;}
 
         //less
-        bool operator<(uint64_t val) const {return id < val;}
-        bool operator<(const uint64_t& val) const {return id < val;}
+        constexpr bool operator<(uint64_t val) const {return id < val;}
+        constexpr bool operator<(const uint64_t& val) const {return id < val;}
 
-        bool is_set() const noexcept
+        constexpr bool is_set() const noexcept
         {
             return id != 0;
         }
@@ -48,8 +49,6 @@ namespace rpc
     struct DestinationZoneId{};
     //a zone that calls are made to get through to the destincation zone
     struct DestinationChannelZoneId{};
-
-    struct OperatingZoneId{};
 
     //the zone that initiates a call
     struct CallerZoneId{};
@@ -69,8 +68,10 @@ namespace rpc
     {
         zone() = default;
         zone(const type_id<ZoneId>& other) : type_id<ZoneId>(other){}
+
         type_id<DestinationZoneId> as_destination() const {return {id};}        
-        type_id<CallerZoneId> as_caller() const {return {id};}        
+        type_id<CallerZoneId> as_caller() const {return {id};}              
+        type_id<CallerChannelZoneId> as_caller_channel() const {return {id};}        
     };
 
     struct destination_zone : public type_id<DestinationZoneId>
@@ -78,6 +79,9 @@ namespace rpc
         destination_zone() = default;
         destination_zone(const type_id<DestinationZoneId>& other) : type_id<DestinationZoneId>(other){}
 
+        type_id<DestinationChannelZoneId> as_destination_channel() const {return {id};}        
+        type_id<CallerZoneId> as_caller() const {return {id};}        
+        type_id<CallerChannelZoneId> as_caller_channel() const {return {id};}   
     };
 
     //the zone that a service proxy was cloned from
@@ -93,7 +97,6 @@ namespace rpc
     {
         caller_zone() = default;
         caller_zone(const type_id<CallerZoneId>& other) : type_id<CallerZoneId>(other){}
-
     };
 
     //the zone that initiated the call
@@ -102,23 +105,41 @@ namespace rpc
         caller_channel_zone() = default;
         caller_channel_zone(const type_id<CallerChannelZoneId>& other) : type_id<CallerChannelZoneId>(other){}
 
+        type_id<DestinationZoneId> as_destination() const {return {id};}     //this one is wierd, its for cloning service proxies
     };
 
 
     //an id for objects unique to each zone
     struct ObjectId{};
     struct object : public type_id<ObjectId>
-    {};
+    {
+        object() = default;
+        object(const type_id<ObjectId>& other) : type_id<ObjectId>(other){}
+    };
 
     //an id for interfaces
     struct InterfaceId{};
     struct interface_ordinal : public type_id<InterfaceId> //cant use the name interface
-    {};
+    {
+        constexpr interface_ordinal() = default;
+        constexpr interface_ordinal(const type_id<InterfaceId>& other) : type_id<InterfaceId>(other){}
+    };
 
     //an id for method ordinals
     struct MethodId{};
     struct method : public type_id<MethodId>
-    {};
+    {
+        method() = default;
+        method(const type_id<MethodId>& other) : type_id<MethodId>(other){}
+    };
+}
+
+namespace std
+{
+    template<typename Type>
+    inline std::string to_string(rpc::type_id<Type> _Val) {
+        return std::to_string(_Val.get_val());
+    }
 }
 
 template<>

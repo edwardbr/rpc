@@ -41,7 +41,7 @@ namespace enclave_marshaller
             header("public:");
             header("const rpc::casting_interface* query_interface(rpc::interface_ordinal interface_id) const override ");
             header("{{");
-            header("if({0}::id == *interface_id)", interface_name);
+            header("if({0}::id == interface_id.get_val())", interface_name);
             header("return static_cast<const {0}*>(this); ",interface_name);
             header("return nullptr;");
             header("}}");            

@@ -312,7 +312,7 @@ namespace enclave_marshaller
             case STUB_PARAM_CAST:
                 return name;
             case PROXY_VALUE_RETURN:
-                return fmt::format("rpc::proxy_bind_out_param(__rpc_sp, {0}_, {{{{*__rpc_sp->get_operating_zone_id()}}}}, {0});", name);
+                return fmt::format("rpc::proxy_bind_out_param(__rpc_sp, {0}_, __rpc_sp->get_operating_zone_id().as_caller(), {0});", name);
             case PROXY_OUT_DECLARATION:
                 return fmt::format("rpc::interface_descriptor {}_;", name);
             case STUB_ADD_REF_OUT_PREDECLARE:
@@ -634,7 +634,7 @@ namespace enclave_marshaller
 
             if (has_methods)
             {
-                stub("switch(*method_id)");
+                stub("switch(method_id.get_val())");
                 stub("{{");
 
                 int function_count = 1;

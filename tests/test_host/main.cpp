@@ -82,7 +82,7 @@ class host :
     void* get_address() const override { return (void*)this; }
     const rpc::casting_interface* query_interface(rpc::interface_ordinal interface_id) const override
     {
-        if (yyy::i_host::id == *interface_id)
+        if (yyy::i_host::id == interface_id.get_val())
             return static_cast<const yyy::i_host*>(this);
         return nullptr;
     }
@@ -215,11 +215,11 @@ struct inproc_setup
             host_encap = rpc::create_interface_stub(*root_service, hst);
 
             // simple test to check that we can get a useful local interface based on type and object id
-            auto example_from_cast = root_service->get_local_interface<yyy::i_host>({host_encap.object_id});
+            auto example_from_cast = root_service->get_local_interface<yyy::i_host>(host_encap.object_id);
             EXPECT_EQ(example_from_cast, hst);
         }
 
-        ASSERT(!rpc::demarshall_interface_proxy(service_proxy_to_host, host_encap, {*child_service->get_zone_id()}, i_host_ptr));
+        ASSERT(!rpc::demarshall_interface_proxy(service_proxy_to_host, host_encap,  child_service->get_zone_id().as_caller(), i_host_ptr));
 
         {
             // create the example object implementation
@@ -230,11 +230,11 @@ struct inproc_setup
 
             // simple test to check that we can get a usefule local interface based on type and object id
             auto example_from_cast
-                = child_service->get_local_interface<yyy::i_example>({example_encap.object_id});
+                = child_service->get_local_interface<yyy::i_example>(example_encap.object_id);
             EXPECT_EQ(example_from_cast, remote_example);
         }
 
-        ASSERT(!rpc::demarshall_interface_proxy(service_proxy_to_child, example_encap, {*root_service->get_zone_id()}, i_example_ptr));
+        ASSERT(!rpc::demarshall_interface_proxy(service_proxy_to_child, example_encap, root_service->get_zone_id().as_caller(), i_example_ptr));
     }
 
     virtual void TearDown()
@@ -267,11 +267,11 @@ struct inproc_setup
 
         // simple test to check that we can get a usefule local interface based on type and object id
         auto example_from_cast
-            = new_service->get_local_interface<yyy::i_example>({example_encap.object_id});
+            = new_service->get_local_interface<yyy::i_example>(example_encap.object_id);
         EXPECT_EQ(example_from_cast, remote_example);
 
         rpc::shared_ptr<yyy::i_example> example_relay_ptr;
-        ASSERT(!rpc::demarshall_interface_proxy(service_proxy_to_child, example_encap, {*root_service->get_zone_id()}, example_relay_ptr));                
+        ASSERT(!rpc::demarshall_interface_proxy(service_proxy_to_child, example_encap, root_service->get_zone_id().as_caller(), example_relay_ptr));                
         return example_relay_ptr;
     }
 };

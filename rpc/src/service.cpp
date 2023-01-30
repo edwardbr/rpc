@@ -43,12 +43,12 @@ namespace rpc
             auto stub =  item.second.lock();
             if(!stub)
             {
-                auto message = std::string("service ") + std::to_string(*get_zone_id()) + std::string(", object stub ") + std::to_string(*item.first) + std::string(" has been released but not deregisted in the service suspected unclean shutdown");
+                auto message = std::string("service ") + std::to_string(get_zone_id()) + std::string(", object stub ") + std::to_string(item.first) + std::string(" has been released but not deregisted in the service suspected unclean shutdown");
                 LOG_STR(message.c_str(), message.size());
             }
             else
             {
-                auto message = std::string("service ") + std::to_string(*get_zone_id()) + std::string(", object stub ") + std::to_string(*item.first) + std::string(" has not been released, there is a strong pointer maintaining a positive reference count suspected unclean shutdown");
+                auto message = std::string("service ") + std::to_string(get_zone_id()) + std::string(", object stub ") + std::to_string(item.first) + std::string(" has not been released, there is a strong pointer maintaining a positive reference count suspected unclean shutdown");
                 LOG_STR(message.c_str(), message.size());
             }
             success = false;
@@ -58,12 +58,12 @@ namespace rpc
             auto stub =  item.second.lock();
             if(!stub)
             {
-                auto message = std::string("service ") + std::to_string(*get_zone_id()) + std::string(", wrapped_object has been released but not deregisted in the service suspected unclean shutdown");
+                auto message = std::string("service ") + std::to_string(get_zone_id()) + std::string(", wrapped_object has been released but not deregisted in the service suspected unclean shutdown");
                 LOG_STR(message.c_str(), message.size());
             }
             else
             {
-                auto message = std::string("service ") + std::to_string(*get_zone_id()) + std::string(", wrapped_object ") + std::to_string(*stub->get_id()) + std::string(" has not been deregisted in the service suspected unclean shutdown");
+                auto message = std::string("service ") + std::to_string(get_zone_id()) + std::string(", wrapped_object ") + std::to_string(stub->get_id()) + std::string(" has not been deregisted in the service suspected unclean shutdown");
                 LOG_STR(message.c_str(), message.size());
             }
             success = false;
@@ -74,14 +74,14 @@ namespace rpc
             auto svcproxy =  item.second.lock();
             if(!svcproxy)
             {
-                auto message = std::string("service ") + std::to_string(*get_zone_id()) + std::string(", proxy ") + std::to_string(item.first.id) + std::string(", has been released but not deregisted in the service");
+                auto message = std::string("service ") + std::to_string(get_zone_id()) + std::string(", proxy ") + std::to_string(item.first.id) + std::string(", has been released but not deregisted in the service");
                 LOG_STR(message.c_str(), message.size());
             }
             else
             {
-                auto message = std::string("service ") + std::to_string(*get_zone_id()) 
-                + std::string(", proxy ") + std::to_string(*svcproxy->get_operating_zone_id())
-                + std::string(", cloned from ") + std::to_string(*svcproxy->get_cloned_from_zone_id()) 
+                auto message = std::string("service ") + std::to_string(get_zone_id()) 
+                + std::string(", proxy ") + std::to_string(svcproxy->get_operating_zone_id())
+                + std::string(", cloned from ") + std::to_string(svcproxy->get_cloned_from_zone_id()) 
                 + std::string(" has not been released in the service suspected unclean shutdown");
                 LOG_STR(message.c_str(), message.size());
 
@@ -90,7 +90,7 @@ namespace rpc
                     auto op = proxy.second.lock();
                     if(op)
                     {
-                        auto message = std::string("has object_proxy ") + std::to_string(*op->get_object_id());
+                        auto message = std::string("has object_proxy ") + std::to_string(op->get_object_id());
                         LOG_STR(message.c_str(), message.size());
                     }
                     else
@@ -105,10 +105,10 @@ namespace rpc
         return success;
     }
 
-    int service::send(caller_channel_zone originating_zone_id, caller_zone caller_zone_id, destination_zone zone_id, object object_id, interface_ordinal interface_id, method method_id, size_t in_size_,
+    int service::send(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, destination_zone zone_id, object object_id, interface_ordinal interface_id, method method_id, size_t in_size_,
                              const char* in_buf_, std::vector<char>& out_buf_)
     {
-        if(*zone_id != *get_zone_id())
+        if(zone_id != get_zone_id().as_destination())
         {
             rpc::shared_ptr<service_proxy> other_zone;
             {
@@ -123,7 +123,7 @@ namespace rpc
             {
                 return rpc::error::ZONE_NOT_SUPPORTED();
             }
-            return other_zone->send({*get_zone_id()}, caller_zone_id, zone_id, object_id, interface_id, method_id, in_size_, in_buf_, out_buf_);
+            return other_zone->send(get_zone_id().as_caller_channel(), caller_zone_id, zone_id, object_id, interface_id, method_id, in_size_, in_buf_, out_buf_);
         }
         else
         {
@@ -133,37 +133,37 @@ namespace rpc
             {
                 return rpc::error::INVALID_DATA();
             }
-            return stub->call(originating_zone_id, caller_zone_id, interface_id, method_id, in_size_, in_buf_, out_buf_);
+            return stub->call(caller_channel_zone_id, caller_zone_id, interface_id, method_id, in_size_, in_buf_, out_buf_);
         }
     }
 
     //this is a key function that returns an interface descriptor
     //for wrapping an implementation to a local object inside a stub where needed
     //or if the interface is a proxy to add ref it
-    interface_descriptor service::get_proxy_stub_descriptor(caller_channel_zone originating_zone_id, rpc::casting_interface* iface,
+    interface_descriptor service::get_proxy_stub_descriptor(caller_channel_zone caller_channel_zone_id, rpc::casting_interface* iface,
                                         std::function<rpc::shared_ptr<i_interface_stub>(rpc::shared_ptr<object_stub>)> fn,
                                         bool add_ref,
                                         rpc::shared_ptr<object_stub>& stub)
     {
         proxy_base* proxy_base = nullptr;
-        if(*originating_zone_id)//a proxy with no zone id makes no sense
+        if(caller_channel_zone_id.is_set())//a proxy with no zone id makes no sense
         {
             proxy_base = iface->query_proxy_base();
         }
         if(proxy_base)
         {
             auto object_proxy = proxy_base->get_object_proxy();
-            auto object_zone_id = object_proxy->get_zone_id();
+            auto destination_zone_id = object_proxy->get_zone_id();
             auto object_id = object_proxy->get_object_id();
-            if(add_ref && *originating_zone_id != *object_zone_id)
+            if(add_ref && caller_channel_zone_id != destination_zone_id.as_caller_channel())
             {
                 auto destination_zone = object_proxy->get_service_proxy();
                 auto cloned_from_zone_id = destination_zone->get_cloned_from_zone_id();
-                if(*zone_id_ != *object_zone_id && *object_zone_id != *originating_zone_id)
+                if(zone_id_.as_destination() != destination_zone_id)
                     destination_zone->add_external_ref();
-                destination_zone->add_ref(object_zone_id, object_id, {*get_zone_id()});
+                destination_zone->add_ref(destination_zone_id, object_id, get_zone_id().as_caller());
             }
-            return {object_id, object_zone_id};
+            return {object_id, destination_zone_id};
         }
 
         std::lock_guard g(insert_control);
@@ -175,7 +175,7 @@ namespace rpc
             {
                 stub = item->second.lock();
                 stub->add_ref();
-                return {stub->get_id(), {*get_zone_id()}};
+                return {stub->get_id(), get_zone_id().as_destination()};
             }
         }
         //else create a stub
@@ -187,7 +187,7 @@ namespace rpc
         stubs[id] = stub;
         stub->on_added_to_zone(stub);
         stub->add_ref();
-        return {id, {*get_zone_id()}};
+        return {id, get_zone_id().as_destination()};
     }
 
     rpc::weak_ptr<object_stub> service::get_object(object object_id) const
@@ -203,7 +203,7 @@ namespace rpc
     }
     int service::try_cast(destination_zone zone_id, object object_id, interface_ordinal interface_id)
     {
-        if(*zone_id != *get_zone_id())
+        if(zone_id != get_zone_id().as_destination())
         {
             rpc::shared_ptr<service_proxy> other_zone;
             {
@@ -232,7 +232,7 @@ namespace rpc
 
     uint64_t service::add_ref(destination_zone zone_id, object object_id, caller_zone caller_zone_id)
     {
-        if(*zone_id != *get_zone_id())
+        if(zone_id != get_zone_id().as_destination())
         {
             rpc::shared_ptr<service_proxy> other_zone;
             {
@@ -284,7 +284,7 @@ namespace rpc
 
     uint64_t service::release(destination_zone zone_id, object object_id, caller_zone caller_zone_id)
     {
-        if(*zone_id != *get_zone_id())
+        if(zone_id != get_zone_id().as_destination())
         {
             rpc::shared_ptr<service_proxy> other_zone;
             {
@@ -354,19 +354,19 @@ namespace rpc
 
     void service::inner_add_zone_proxy(const rpc::shared_ptr<service_proxy>& service_proxy)
     {
-        assert(*service_proxy->get_zone_id() != *zone_id_);
+        assert(service_proxy->get_zone_id() != zone_id_.as_destination());
         assert(other_zones.find(service_proxy->get_zone_id()) == other_zones.end());
         other_zones[service_proxy->get_zone_id()] = service_proxy;
     }
 
     void service::add_zone_proxy(const rpc::shared_ptr<service_proxy>& service_proxy)
     {
-        assert(*service_proxy->get_zone_id() != *zone_id_);
+        assert(service_proxy->get_zone_id() != zone_id_.as_destination());
         std::lock_guard g(insert_control);
         inner_add_zone_proxy(service_proxy);
     }
 
-    rpc::shared_ptr<service_proxy> service::get_zone_proxy(caller_channel_zone originating_zone_id, caller_zone caller_zone_id, destination_zone zone_id, bool& new_proxy_added)
+    rpc::shared_ptr<service_proxy> service::get_zone_proxy(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, destination_zone zone_id, bool& new_proxy_added)
     {
         new_proxy_added = false;
         std::lock_guard g(insert_control);
@@ -377,16 +377,16 @@ namespace rpc
             return item->second.lock();
 
         //if not perhaps we can make one from the proxy of the originating call    
-        if(originating_zone_id == 0)
+        if(caller_channel_zone_id == 0)
             return nullptr;
-        item = other_zones.find({*originating_zone_id});
+        item = other_zones.find(caller_channel_zone_id.as_destination());
         if (item == other_zones.end())
             return nullptr;
         auto originating_proxy = item->second.lock();
         if(!originating_proxy)
             return nullptr;
 
-        auto proxy = originating_proxy->clone_for_zone({*zone_id}, caller_zone_id);
+        auto proxy = originating_proxy->clone_for_zone(zone_id, caller_zone_id);
         new_proxy_added = true;
         return proxy;
     }
@@ -437,7 +437,7 @@ namespace rpc
         {
             auto stub = root_stub_->get_object_stub().lock();
             if(stub)
-                release({*zone_id_}, stub->get_id(), {*zone_id_});
+                release(zone_id_.as_destination(), stub->get_id(), zone_id_.as_caller());
             root_stub_.reset();
         }        
     }
@@ -460,9 +460,9 @@ namespace rpc
         return stub->get_id();
     }
 
-    rpc::shared_ptr<service_proxy> child_service::get_zone_proxy(caller_channel_zone originating_zone_id, caller_zone caller_zone_id, destination_zone zone_id, bool& new_proxy_added)
+    rpc::shared_ptr<service_proxy> child_service::get_zone_proxy(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, destination_zone zone_id, bool& new_proxy_added)
     {
-        auto proxy = service::get_zone_proxy(originating_zone_id, caller_zone_id, zone_id, new_proxy_added);
+        auto proxy = service::get_zone_proxy(caller_channel_zone_id, caller_zone_id, zone_id, new_proxy_added);
         if(proxy)
             return proxy;
 
