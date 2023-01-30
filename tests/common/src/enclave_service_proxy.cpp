@@ -11,7 +11,7 @@
 namespace rpc
 {
 #ifndef _IN_ENCLAVE
-    enclave_service_proxy::enclave_service_proxy(zone_proxy zone_id, std::string filename, const rpc::shared_ptr<service>& operating_zone_service, object host_id, const rpc::i_telemetry_service* telemetry_service)
+    enclave_service_proxy::enclave_service_proxy(destination_zone zone_id, std::string filename, const rpc::shared_ptr<service>& operating_zone_service, object host_id, const rpc::i_telemetry_service* telemetry_service)
         : service_proxy(zone_id, operating_zone_service, {*operating_zone_service->get_zone_id()}, telemetry_service)
         , filename_(filename)
         , host_id_(host_id)
@@ -74,7 +74,7 @@ namespace rpc
         return rpc::error::OK();
     }
 
-    int enclave_service_proxy::send(originator originating_zone_id, caller caller_zone_id, zone_proxy zone_id, object object_id, interface_ordinal interface_id, method method_id,
+    int enclave_service_proxy::send(caller_channel_zone originating_zone_id, caller_zone caller_zone_id, destination_zone zone_id, object object_id, interface_ordinal interface_id, method method_id,
                                            size_t in_size_, const char* in_buf_, std::vector<char>& out_buf_)
     {
         if(zone_id != get_zone_id())
@@ -113,7 +113,7 @@ namespace rpc
         return err_code;
     }
 
-    int enclave_service_proxy::try_cast(zone_proxy zone_id, object object_id, interface_ordinal interface_id)
+    int enclave_service_proxy::try_cast(destination_zone zone_id, object object_id, interface_ordinal interface_id)
     {
         if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
         {
@@ -133,7 +133,7 @@ namespace rpc
         return err_code;
     }
 
-    uint64_t enclave_service_proxy::add_ref(zone_proxy zone_id, object object_id, caller caller_zone_id)
+    uint64_t enclave_service_proxy::add_ref(destination_zone zone_id, object object_id, caller_zone caller_zone_id)
     {
         if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
         {
@@ -153,7 +153,7 @@ namespace rpc
         return ret;
     }
 
-    uint64_t enclave_service_proxy::release(zone_proxy zone_id, object object_id, caller caller_zone_id)
+    uint64_t enclave_service_proxy::release(destination_zone zone_id, object object_id, caller_zone caller_zone_id)
     {
         if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
         {

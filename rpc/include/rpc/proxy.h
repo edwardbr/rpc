@@ -32,7 +32,7 @@ namespace rpc
         {}
 
         template<class T> rpc::interface_descriptor proxy_bind_in_param(const rpc::shared_ptr<T>& iface, rpc::shared_ptr<rpc::object_stub>& stub);
-        template<class T> rpc::interface_descriptor stub_bind_out_param(originator originating_zone_id, const rpc::shared_ptr<T>& iface);
+        template<class T> rpc::interface_descriptor stub_bind_out_param(caller_channel_zone originating_zone_id, const rpc::shared_ptr<T>& iface);
 
         template<class T1, class T2>
         friend rpc::shared_ptr<T1> dynamic_pointer_cast(const shared_ptr<T2>& from) noexcept;
@@ -97,7 +97,7 @@ namespace rpc
 
         rpc::shared_ptr<service_proxy> get_service_proxy() const { return service_proxy_; }
         object get_object_id() const {return {object_id_};}
-        zone_proxy get_zone_id() const;
+        destination_zone get_zone_id() const;
 
         int send(interface_ordinal interface_id, method method_id, size_t in_size_, const char* in_buf_,
                         std::vector<char>& out_buf_);
@@ -187,7 +187,7 @@ namespace rpc
 		{}
 		virtual ~optimistic_proxy_impl() = default;
 		object get_object_id() const { return object_id_; }
-		zone_proxy get_zone_id() const { return zone_id_; }
+		destination_zone get_zone_id() const { return zone_id_; }
 		rpc::weak_ptr<service_proxy> get_service_proxy() const { return service_proxy_; }
 	};
 
@@ -199,10 +199,10 @@ namespace rpc
     {
         std::unordered_map<object, rpc::weak_ptr<object_proxy>> proxies;
         std::mutex insert_control;
-        zone_proxy zone_id_ = {0};
-        cloned_zone cloned_from_zone_id_ = {0};
+        destination_zone zone_id_ = {0};
+        destination_channel_zone destination_channel_zone_ = {0};
         zone operating_zone_id = {0};
-        caller caller_zone_id_ = {0};
+        caller_zone caller_zone_id_ = {0};
         rpc::weak_ptr<service> operating_zone_service_;
         rpc::shared_ptr<service_proxy> dependent_services_lock_;
         std::atomic<int> dependent_services_count_ = 0;
@@ -210,9 +210,9 @@ namespace rpc
 
     protected:
 
-        service_proxy(  zone_proxy zone_id,
+        service_proxy(  destination_zone zone_id,
                         const rpc::shared_ptr<service>& operating_zone_service,
-                        caller caller_zone_id,
+                        caller_zone caller_zone_id,
                         const rpc::i_telemetry_service* telemetry_service) : 
             zone_id_(zone_id),
             operating_zone_id({operating_zone_service ? *operating_zone_service->get_zone_id() : 0}),
@@ -235,9 +235,9 @@ namespace rpc
         }
 
         mutable rpc::weak_ptr<service_proxy> weak_this_;
-        void set_zone_id(zone_proxy zone_id) 
+        void set_zone_id(destination_zone zone_id) 
         {
-            cloned_from_zone_id_ = {*zone_id_};
+            destination_channel_zone_ = {*zone_id_};
             zone_id_ = zone_id;
         }
 
@@ -287,7 +287,7 @@ namespace rpc
         std::unordered_map<object, rpc::weak_ptr<object_proxy>> get_proxies(){return proxies;}
 
         virtual rpc::shared_ptr<service_proxy> deep_copy_for_clone() = 0;
-        rpc::shared_ptr<service_proxy> clone_for_zone(zone_proxy zone_id, caller caller_zone_id)
+        rpc::shared_ptr<service_proxy> clone_for_zone(destination_zone zone_id, caller_zone caller_zone_id)
         {
             auto ret = deep_copy_for_clone();
             ret->set_zone_id(zone_id);
@@ -304,9 +304,9 @@ namespace rpc
         rpc::shared_ptr<service_proxy> shared_from_this() { return rpc::shared_ptr<service_proxy>(weak_this_); }
         rpc::shared_ptr<service_proxy const> shared_from_this() const { return rpc::shared_ptr<service_proxy const>(weak_this_); }
 
-        zone_proxy get_zone_id() const {return zone_id_;}
+        destination_zone get_zone_id() const {return zone_id_;}
         zone get_operating_zone_id() const {return operating_zone_id;}
-        cloned_zone get_cloned_from_zone_id() const {return cloned_from_zone_id_;}
+        destination_channel_zone get_cloned_from_zone_id() const {return destination_channel_zone_;}
         rpc::shared_ptr<service> get_operating_zone_service() const {return operating_zone_service_.lock();}
         const rpc::i_telemetry_service* get_telemetry_service(){return telemetry_service_;}
         void add_object_proxy(rpc::shared_ptr<object_proxy> op)
@@ -342,7 +342,7 @@ namespace rpc
     interface_descriptor proxy_base::proxy_bind_in_param(const rpc::shared_ptr<T>& iface, rpc::shared_ptr<rpc::object_stub>& stub)
     {
         if(!iface)
-            return {0,0};
+            return interface_descriptor();
             
         auto operating_service = object_proxy_->get_service_proxy()->get_operating_zone_service();
 
@@ -350,7 +350,7 @@ namespace rpc
         auto proxy = iface->query_proxy_base();
         if(proxy && *proxy->get_object_proxy()->get_zone_id() != *operating_service->get_zone_id())
         {
-            return {*proxy->get_object_proxy()->get_object_id(), *proxy->get_object_proxy()->get_zone_id()};
+            return {proxy->get_object_proxy()->get_object_id(), proxy->get_object_proxy()->get_zone_id()};
         }
 
         //else encapsulate away
@@ -359,15 +359,15 @@ namespace rpc
 
     //do not use directly it is for the interface generator use rpc::create_interface_proxy if you want to get a proxied pointer to a remote implementation
     template<class T> 
-    int stub_bind_in_param(rpc::service& serv, originator originating_zone_id, caller caller_zone_id, const rpc::interface_descriptor& encap, rpc::shared_ptr<T>& iface)
+    int stub_bind_in_param(rpc::service& serv, caller_channel_zone originating_zone_id, caller_zone caller_zone_id, const rpc::interface_descriptor& encap, rpc::shared_ptr<T>& iface)
     {
         //if we have a null object id then return a null ptr
-        if(encap.object_id == 0 || encap.zone_id == 0)
+        if(encap.object_id == 0 || encap.destination_zone_id == 0)
         {
             return rpc::error::OK();
         }
         //if it is local to this service then just get the relevant stub
-        else if(serv.get_zone_id() == encap.zone_id)
+        else if(serv.get_zone_id().as_destination() == encap.destination_zone_id)
         {
             iface = serv.get_local_interface<T>({encap.object_id});
             if(!iface)
@@ -379,7 +379,7 @@ namespace rpc
             //get the right  service proxy
             //if the zone is different lookup or clone the right proxy
             bool new_proxy_added = false;
-            auto service_proxy = serv.get_zone_proxy(originating_zone_id, {caller_zone_id}, {encap.zone_id}, new_proxy_added);
+            auto service_proxy = serv.get_zone_proxy(originating_zone_id, {caller_zone_id}, {encap.destination_zone_id}, new_proxy_added);
             if(!service_proxy)
                 return rpc::error::OBJECT_NOT_FOUND();
 
@@ -395,7 +395,7 @@ namespace rpc
 
     //declared here as object_proxy and service_proxy is not fully defined in the body of proxy_base
     template<class T>
-    interface_descriptor proxy_base::stub_bind_out_param(originator originating_zone_id, const rpc::shared_ptr<T>& iface)
+    interface_descriptor proxy_base::stub_bind_out_param(caller_channel_zone originating_zone_id, const rpc::shared_ptr<T>& iface)
     {
         if(!iface)
             return {0,0};
@@ -415,17 +415,17 @@ namespace rpc
 
     //do not use directly it is for the interface generator use rpc::create_interface_proxy if you want to get a proxied pointer to a remote implementation
     template<class T> 
-    int proxy_bind_out_param(const rpc::shared_ptr<rpc::service_proxy>& sp, const rpc::interface_descriptor& encap, caller caller_zone_id, rpc::shared_ptr<T>& val)
+    int proxy_bind_out_param(const rpc::shared_ptr<rpc::service_proxy>& sp, const rpc::interface_descriptor& encap, caller_zone caller_zone_id, rpc::shared_ptr<T>& val)
     {
         //if we have a null object id then return a null ptr
-        if(encap.object_id == 0 || encap.zone_id == 0)
+        if(!encap.object_id.is_set() || !encap.destination_zone_id.is_set())
             return rpc::error::OK();
 
         auto service_proxy = sp;
         auto serv = service_proxy->get_operating_zone_service();
 
         //if it is local to this service then just get the relevant stub
-        if(serv->get_zone_id() == encap.zone_id)
+        if(encap.destination_zone_id == serv->get_zone_id().as_destination())
         {
             val = serv->get_local_interface<T>({encap.object_id});
             if(!val)
@@ -435,10 +435,10 @@ namespace rpc
 
         //get the right  service proxy
         bool new_proxy_added = false;
-        if(service_proxy->get_zone_id() != encap.zone_id)
+        if(service_proxy->get_zone_id() != encap.destination_zone_id)
         {
             //if the zone is different lookup or clone the right proxy
-            service_proxy = serv->get_zone_proxy({*service_proxy->get_zone_id()}, caller_zone_id, {encap.zone_id}, new_proxy_added);
+            service_proxy = serv->get_zone_proxy({*service_proxy->get_zone_id()}, caller_zone_id, {encap.destination_zone_id}, new_proxy_added);
             if(service_proxy && new_proxy_added)
                 service_proxy->add_external_ref();
         }
@@ -448,27 +448,27 @@ namespace rpc
         {
             //as this is an out parameter the callee will be doing an add ref if the object proxy is already found we can do a release
             assert(!new_proxy_added);
-            service_proxy->release({encap.zone_id}, {encap.object_id}, caller_zone_id);
+            service_proxy->release({encap.destination_zone_id}, {encap.object_id}, caller_zone_id);
         }
         else
         {
-            op = object_proxy::create({encap.object_id}, service_proxy, false, new_proxy_added ? false : (encap.zone_id == *sp->get_zone_id()));
+            op = object_proxy::create({encap.object_id}, service_proxy, false, new_proxy_added ? false : (encap.destination_zone_id == *sp->get_zone_id()));
         }
         return op->query_interface(val, false);
     }
 
     template<class T> 
-    int demarshall_interface_proxy(const rpc::shared_ptr<rpc::service_proxy>& sp, const rpc::interface_descriptor& encap, caller caller_zone_id, rpc::shared_ptr<T>& val)
+    int demarshall_interface_proxy(const rpc::shared_ptr<rpc::service_proxy>& sp, const rpc::interface_descriptor& encap, caller_zone caller_zone_id, rpc::shared_ptr<T>& val)
     {
         //if we have a null object id then return a null ptr
-        if(encap.object_id == 0 || encap.zone_id == 0)
+        if(encap.object_id == 0 || encap.destination_zone_id == 0)
             return rpc::error::OK();
 
         auto service_proxy = sp;
         auto serv = service_proxy->get_operating_zone_service();
 
         //if it is local to this service then just get the relevant stub
-        if(serv->get_zone_id() == encap.zone_id)
+        if(serv->get_zone_id().as_destination() == encap.destination_zone_id)
         {
             val = serv->get_local_interface<T>({encap.object_id});
             if(!val)
@@ -478,10 +478,10 @@ namespace rpc
 
         //get the right  service proxy
         bool new_proxy_added = false;
-        if(service_proxy->get_zone_id() != encap.zone_id)
+        if(service_proxy->get_zone_id() != encap.destination_zone_id)
         {
             //if the zone is different lookup or clone the right proxy
-            service_proxy = serv->get_zone_proxy({*service_proxy->get_zone_id()}, {caller_zone_id}, {encap.zone_id}, new_proxy_added);
+            service_proxy = serv->get_zone_proxy({*service_proxy->get_zone_id()}, {caller_zone_id}, {encap.destination_zone_id}, new_proxy_added);
             if(service_proxy && new_proxy_added)
                 service_proxy->add_external_ref();
         }
@@ -489,7 +489,7 @@ namespace rpc
         rpc::shared_ptr<object_proxy> op = service_proxy->get_object_proxy({encap.object_id});
         if(!op)
         {
-            op = object_proxy::create({encap.object_id}, service_proxy, false, false);
+            op = object_proxy::create(encap.object_id, service_proxy, false, false);
         }
         return op->query_interface(val, false);
     }

@@ -17,24 +17,24 @@ namespace rpc
     class i_marshaller
     {
     public:
-        virtual int send(originator originating_zone_id, caller caller_zone_id, zone_proxy zone_id, object object_id, interface_ordinal interface_id, method method_id, size_t in_size_,
+        virtual int send(caller_channel_zone originating_zone_id, caller_zone caller_zone_id, destination_zone zone_id, object object_id, interface_ordinal interface_id, method method_id, size_t in_size_,
                                 const char* in_buf_, std::vector<char>& out_buf_)
             = 0;
-        virtual int try_cast(zone_proxy zone_id, object object_id, interface_ordinal interface_id) = 0;
-        virtual uint64_t add_ref(zone_proxy zone_id, object object_id, caller caller_zone_id) = 0;
-        virtual uint64_t release(zone_proxy zone_id, object object_id, caller caller_zone_id) = 0;
+        virtual int try_cast(destination_zone zone_id, object object_id, interface_ordinal interface_id) = 0;
+        virtual uint64_t add_ref(destination_zone zone_id, object object_id, caller_zone caller_zone_id) = 0;
+        virtual uint64_t release(destination_zone zone_id, object object_id, caller_zone caller_zone_id) = 0;
     };
 
     struct interface_descriptor
     {
         interface_descriptor() :
             object_id{0},
-            zone_id{0}
+            destination_zone_id{0}
         {}
         
-        interface_descriptor(uint64_t obj_id, uint64_t zn_id) : 
+        interface_descriptor(object obj_id, destination_zone dest_zone_id) : 
             object_id{obj_id},
-            zone_id{zn_id}
+            destination_zone_id{dest_zone_id}
         {}
         interface_descriptor(const interface_descriptor& other) = default;
         interface_descriptor(interface_descriptor&& other) = default;
@@ -42,15 +42,15 @@ namespace rpc
         interface_descriptor& operator= (const interface_descriptor& other) = default;
         interface_descriptor& operator= (interface_descriptor&& other) = default;
 
-        uint64_t object_id;
-        uint64_t zone_id;
+        object object_id;
+        destination_zone destination_zone_id;
         
         template<typename Ar>
 		void serialize(Ar &ar)
 		{
 			ar & YAS_OBJECT_NVP("interface_descriptor"
-			  ,("object_id", object_id)
-			  ,("zone_id", zone_id)
+			  ,("object_id", object_id.id)
+			  ,("zone_id", destination_zone_id.id)
 			);
 		}
     };

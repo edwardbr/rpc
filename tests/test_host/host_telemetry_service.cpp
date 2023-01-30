@@ -60,13 +60,13 @@ void host_telemetry_service::on_service_deletion(const char* name, rpc::zone zon
         spdlog::info("on_service_deletion name {} zone_id {}", name, *zone_id);
     }
 }
-void host_telemetry_service::on_service_proxy_creation(const char* name, rpc::zone originating_zone_id, rpc::zone_proxy zone_id) const
+void host_telemetry_service::on_service_proxy_creation(const char* name, rpc::zone originating_zone_id, rpc::destination_zone zone_id) const
 {
     std::lock_guard g(mux);
     service_proxies.emplace(orig_zone{originating_zone_id, *zone_id}, name_count{name, 1});
     spdlog::info("new service_proxy name {} originating_zone_id {} zone_id {}", name, *originating_zone_id, *zone_id);
 }
-void host_telemetry_service::on_service_proxy_deletion(const char* name, rpc::zone originating_zone_id, rpc::zone_proxy zone_id) const
+void host_telemetry_service::on_service_proxy_deletion(const char* name, rpc::zone originating_zone_id, rpc::destination_zone zone_id) const
 {
     std::lock_guard g(mux);
     auto found = service_proxies.find(orig_zone{originating_zone_id, *zone_id});
@@ -87,25 +87,25 @@ void host_telemetry_service::on_service_proxy_deletion(const char* name, rpc::zo
         spdlog::info("on_service_proxy_deletion name {} originating_zone_id {} zone_id {}", name, *originating_zone_id, *zone_id);
     }        
 }
-void host_telemetry_service::on_service_proxy_try_cast(const char* name, rpc::zone originating_zone_id, rpc::zone_proxy zone_id, rpc::object object_id, rpc::interface_ordinal interface_id) const
+void host_telemetry_service::on_service_proxy_try_cast(const char* name, rpc::zone originating_zone_id, rpc::destination_zone zone_id, rpc::object object_id, rpc::interface_ordinal interface_id) const
 {
     spdlog::info("service_proxy cast name {} originating_zone_id {} zone_id {} object_id {} interface_id {}", name, *originating_zone_id, *zone_id, *object_id, *interface_id);
 }
-void host_telemetry_service::on_service_proxy_add_ref(const char* name, rpc::zone originating_zone_id, rpc::zone_proxy zone_id, rpc::object object_id, rpc::caller caller_zone_id) const
+void host_telemetry_service::on_service_proxy_add_ref(const char* name, rpc::zone originating_zone_id, rpc::destination_zone zone_id, rpc::object object_id, rpc::caller_zone caller_zone_id) const
 {
     spdlog::info("service_proxy add_ref name {} originating_zone_id {} zone_id {} object_id {}", name, *originating_zone_id, *zone_id, *object_id, *caller_zone_id);
 }
-void host_telemetry_service::on_service_proxy_release(const char* name, rpc::zone originating_zone_id, rpc::zone_proxy zone_id, rpc::object object_id, rpc::caller caller_zone_id) const
+void host_telemetry_service::on_service_proxy_release(const char* name, rpc::zone originating_zone_id, rpc::destination_zone zone_id, rpc::object object_id, rpc::caller_zone caller_zone_id) const
 {
     spdlog::info("service_proxy release name {} originating_zone_id {} zone_id {} object_id {}", name, *originating_zone_id, *zone_id, *object_id, *caller_zone_id);
 }
 
-void host_telemetry_service::on_service_proxy_add_external_ref(const char* name, rpc::zone originating_zone_id, rpc::zone_proxy zone_id, int ref_count, rpc::caller caller_zone_id) const
+void host_telemetry_service::on_service_proxy_add_external_ref(const char* name, rpc::zone originating_zone_id, rpc::destination_zone zone_id, int ref_count, rpc::caller_zone caller_zone_id) const
 {
     spdlog::info("service_proxy add_external_ref name {} originating_zone_id {} zone_id {} ref_count {}", name, *originating_zone_id, *zone_id, ref_count, *caller_zone_id);
 }
 
-void host_telemetry_service::on_service_proxy_release_external_ref(const char* name, rpc::zone originating_zone_id, rpc::zone_proxy zone_id, int ref_count, rpc::caller caller_zone_id) const
+void host_telemetry_service::on_service_proxy_release_external_ref(const char* name, rpc::zone originating_zone_id, rpc::destination_zone zone_id, int ref_count, rpc::caller_zone caller_zone_id) const
 {
     spdlog::info("service_proxy release_external_ref name {} originating_zone_id {} zone_id {} ref_count {}", name, *originating_zone_id, *zone_id, ref_count, *caller_zone_id);
 }
@@ -177,22 +177,22 @@ void host_telemetry_service::on_stub_send(rpc::zone zone_id, rpc::object object_
 {
     spdlog::info("stub send zone_id {} object_id {} interface_id {} method_id {}", *zone_id, *object_id, *interface_id, *method_id);
 }
-void host_telemetry_service::on_stub_add_ref(rpc::zone_proxy zone_id, rpc::object object_id, rpc::interface_ordinal interface_id, uint64_t count, rpc::caller caller_zone_id) const
+void host_telemetry_service::on_stub_add_ref(rpc::destination_zone zone_id, rpc::object object_id, rpc::interface_ordinal interface_id, uint64_t count, rpc::caller_zone caller_zone_id) const
 {
     spdlog::info("stub addref zone_id {} object_id {} interface_id {} count {}", *zone_id, *object_id, *interface_id, count);
 }
-void host_telemetry_service::on_stub_release(rpc::zone_proxy zone_id, rpc::object object_id, rpc::interface_ordinal interface_id, uint64_t count, rpc::caller caller_zone_id) const
+void host_telemetry_service::on_stub_release(rpc::destination_zone zone_id, rpc::object object_id, rpc::interface_ordinal interface_id, uint64_t count, rpc::caller_zone caller_zone_id) const
 {
     spdlog::info("stub release zone_id {} object_id {} interface_id {} count {}", *zone_id, *object_id, *interface_id, count);
 }
 
-void host_telemetry_service::on_object_proxy_creation(rpc::zone originating_zone_id, rpc::zone_proxy zone_id, rpc::object object_id) const
+void host_telemetry_service::on_object_proxy_creation(rpc::zone originating_zone_id, rpc::destination_zone zone_id, rpc::object object_id) const
 {
     std::lock_guard g(mux);
     object_proxies.emplace(interface_proxy_id{originating_zone_id, *zone_id, *object_id, 0}, 1);
     spdlog::info("new object_proxy zone_id {} object_id {}", *zone_id, *object_id);
 }
-void host_telemetry_service::on_object_proxy_deletion(rpc::zone originating_zone_id, rpc::zone_proxy zone_id, rpc::object object_id) const
+void host_telemetry_service::on_object_proxy_deletion(rpc::zone originating_zone_id, rpc::destination_zone zone_id, rpc::object object_id) const
 {
     std::lock_guard g(mux);
     auto found = object_proxies.find(interface_proxy_id{originating_zone_id, *zone_id, *object_id, 0});
@@ -213,13 +213,13 @@ void host_telemetry_service::on_object_proxy_deletion(rpc::zone originating_zone
     }
 }
 
-void host_telemetry_service::on_interface_proxy_creation(const char* name, rpc::zone originating_zone_id, rpc::zone_proxy zone_id, rpc::object object_id, rpc::interface_ordinal interface_id) const
+void host_telemetry_service::on_interface_proxy_creation(const char* name, rpc::zone originating_zone_id, rpc::destination_zone zone_id, rpc::object object_id, rpc::interface_ordinal interface_id) const
 {
     std::lock_guard g(mux);
     interface_proxies.emplace(interface_proxy_id{originating_zone_id, *zone_id, *object_id, *interface_id}, name_count{name, 1});
     spdlog::info("new interface_proxy name {} originating_zone_id {} zone_id {} object_id {} interface_id {}", name, *originating_zone_id, *zone_id, *object_id, *interface_id);
 }
-void host_telemetry_service::on_interface_proxy_deletion(const char* name, rpc::zone originating_zone_id, rpc::zone_proxy zone_id, rpc::object object_id, rpc::interface_ordinal interface_id) const
+void host_telemetry_service::on_interface_proxy_deletion(const char* name, rpc::zone originating_zone_id, rpc::destination_zone zone_id, rpc::object object_id, rpc::interface_ordinal interface_id) const
 {
     std::lock_guard g(mux);
     auto found = interface_proxies.find(interface_proxy_id{originating_zone_id, *zone_id, *object_id, *interface_id});
@@ -239,7 +239,7 @@ void host_telemetry_service::on_interface_proxy_deletion(const char* name, rpc::
         spdlog::info("on_interface_proxy_deletion name {} originating_zone_id {} zone_id {} object_id {}", name, *originating_zone_id, *zone_id, *object_id);
     }
 }
-void host_telemetry_service::on_interface_proxy_send(const char* name, rpc::zone originating_zone_id, rpc::zone_proxy zone_id, rpc::object object_id, rpc::interface_ordinal interface_id, rpc::method method_id) const
+void host_telemetry_service::on_interface_proxy_send(const char* name, rpc::zone originating_zone_id, rpc::destination_zone zone_id, rpc::object object_id, rpc::interface_ordinal interface_id, rpc::method method_id) const
 {
     spdlog::info("interface_proxy send name {} originating_zone_id {} zone_id {} object_id {} interface_id {} method_id {}", name, *originating_zone_id, *zone_id, *object_id, *interface_id, *method_id);
 }

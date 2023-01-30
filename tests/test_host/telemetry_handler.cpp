@@ -80,30 +80,30 @@ extern "C"
         if (telemetry_service)
             telemetry_service->on_service_deletion(name, zone_id);
     }
-    void on_service_proxy_creation_host(const char* name, rpc::zone originating_zone_id, rpc::zone_proxy zone_id)
+    void on_service_proxy_creation_host(const char* name, rpc::zone originating_zone_id, rpc::destination_zone zone_id)
     {
         if (telemetry_service)
             telemetry_service->on_service_proxy_creation(name, originating_zone_id, zone_id);
     }
-    void on_service_proxy_deletion_host(const char* name, rpc::zone originating_zone_id, rpc::zone_proxy zone_id)
+    void on_service_proxy_deletion_host(const char* name, rpc::zone originating_zone_id, rpc::destination_zone zone_id)
     {
         if (telemetry_service)
             telemetry_service->on_service_proxy_deletion(name, originating_zone_id, zone_id);
     }
-    void on_service_proxy_try_cast_host(const char* name, rpc::zone originating_zone_id, rpc::zone_proxy zone_id,
+    void on_service_proxy_try_cast_host(const char* name, rpc::zone originating_zone_id, rpc::destination_zone zone_id,
                                         rpc::object object_id, rpc::interface_ordinal interface_id)
     {
         if (telemetry_service)
             telemetry_service->on_service_proxy_try_cast(name, originating_zone_id, zone_id, object_id, interface_id);
     }
-    void on_service_proxy_add_ref_host(const char* name, rpc::zone originating_zone_id, rpc::zone_proxy zone_id,
-                                       rpc::object object_id, rpc::caller caller_zone_id)
+    void on_service_proxy_add_ref_host(const char* name, rpc::zone originating_zone_id, rpc::destination_zone zone_id,
+                                       rpc::object object_id, rpc::caller_zone caller_zone_id)
     {
         if (telemetry_service)
             telemetry_service->on_service_proxy_add_ref(name, originating_zone_id, zone_id, object_id, caller_zone_id);
     }
-    void on_service_proxy_release_host(const char* name, rpc::zone originating_zone_id, rpc::zone_proxy zone_id,
-                                       rpc::object object_id, rpc::caller caller_zone_id)
+    void on_service_proxy_release_host(const char* name, rpc::zone originating_zone_id, rpc::destination_zone zone_id,
+                                       rpc::object object_id, rpc::caller_zone caller_zone_id)
     {
         if (telemetry_service)
             telemetry_service->on_service_proxy_release(name, {originating_zone_id}, {zone_id}, object_id, caller_zone_id);
@@ -135,41 +135,41 @@ extern "C"
         if (telemetry_service)
             telemetry_service->on_stub_send(zone_id, object_id, interface_id, method_id);
     }
-    void on_stub_add_ref_host(rpc::zone_proxy zone_id, rpc::object object_id, rpc::interface_ordinal interface_id, uint64_t count, rpc::caller caller_zone_id)
+    void on_stub_add_ref_host(rpc::destination_zone zone_id, rpc::object object_id, rpc::interface_ordinal interface_id, uint64_t count, rpc::caller_zone caller_zone_id)
     {
         if (telemetry_service)
             telemetry_service->on_stub_add_ref(zone_id, object_id, interface_id, count, caller_zone_id);
     }
-    void on_stub_release_host(rpc::zone_proxy zone_id, rpc::object object_id, rpc::interface_ordinal interface_id, uint64_t count, rpc::caller caller_zone_id)
+    void on_stub_release_host(rpc::destination_zone zone_id, rpc::object object_id, rpc::interface_ordinal interface_id, uint64_t count, rpc::caller_zone caller_zone_id)
     {
         if (telemetry_service)
             telemetry_service->on_stub_release(zone_id, object_id, interface_id, count, caller_zone_id);
     }
 
-    void on_object_proxy_creation_host(rpc::zone originating_zone_id, rpc::zone_proxy zone_id, rpc::object object_id)
+    void on_object_proxy_creation_host(rpc::zone originating_zone_id, rpc::destination_zone zone_id, rpc::object object_id)
     {
         if (telemetry_service)
             telemetry_service->on_object_proxy_creation({originating_zone_id}, {zone_id}, object_id);
     }
-    void on_object_proxy_deletion_host(rpc::zone originating_zone_id, rpc::zone_proxy zone_id, rpc::object object_id)
+    void on_object_proxy_deletion_host(rpc::zone originating_zone_id, rpc::destination_zone zone_id, rpc::object object_id)
     {
         if (telemetry_service)
             telemetry_service->on_object_proxy_deletion({originating_zone_id}, {zone_id}, object_id);
     }
 
-    void on_proxy_creation_host(const char* name, rpc::zone originating_zone_id, rpc::zone_proxy zone_id, rpc::object object_id,
+    void on_proxy_creation_host(const char* name, rpc::zone originating_zone_id, rpc::destination_zone zone_id, rpc::object object_id,
                                 rpc::interface_ordinal interface_id)
     {
         if (telemetry_service)
             telemetry_service->on_interface_proxy_creation(name, {originating_zone_id}, {zone_id}, object_id, interface_id);
     }
-    void on_proxy_deletion_host(const char* name, rpc::zone originating_zone_id, rpc::zone_proxy zone_id, rpc::object object_id,
+    void on_proxy_deletion_host(const char* name, rpc::zone originating_zone_id, rpc::destination_zone zone_id, rpc::object object_id,
                                 rpc::interface_ordinal interface_id)
     {
         if (telemetry_service)
             telemetry_service->on_interface_proxy_deletion(name, {originating_zone_id}, {zone_id}, object_id, interface_id);
     }
-    void on_proxy_send_host(const char* name, rpc::zone originating_zone_id, rpc::zone_proxy zone_id, rpc::object object_id,
+    void on_proxy_send_host(const char* name, rpc::zone originating_zone_id, rpc::destination_zone zone_id, rpc::object object_id,
                             rpc::interface_ordinal interface_id, rpc::method method_id)
     {
         if (telemetry_service)
@@ -177,14 +177,14 @@ extern "C"
                                                        method_id);
     }
 
-    void on_service_proxy_add_external_ref(const char* name, rpc::zone originating_zone_id, rpc::zone_proxy zone_id,
-                                           int ref_count, rpc::caller caller_zone_id)
+    void on_service_proxy_add_external_ref(const char* name, rpc::zone originating_zone_id, rpc::destination_zone zone_id,
+                                           int ref_count, rpc::caller_zone caller_zone_id)
     {
         if (telemetry_service)
             telemetry_service->on_service_proxy_add_external_ref(name, {originating_zone_id}, {zone_id}, ref_count, caller_zone_id);
     }
-    void on_service_proxy_release_external_ref(const char* name, rpc::zone originating_zone_id, rpc::zone_proxy zone_id,
-                                               int ref_count, rpc::caller caller_zone_id)
+    void on_service_proxy_release_external_ref(const char* name, rpc::zone originating_zone_id, rpc::destination_zone zone_id,
+                                               int ref_count, rpc::caller_zone caller_zone_id)
     {
         if (telemetry_service)
             telemetry_service->on_service_proxy_release_external_ref(name, {originating_zone_id}, {zone_id}, ref_count, caller_zone_id);

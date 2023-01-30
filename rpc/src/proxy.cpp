@@ -89,7 +89,7 @@ namespace rpc
         return service_proxy_->try_cast(service_proxy_->get_zone_id(), object_id_, interface_id);
     }
 
-    zone_proxy object_proxy::get_zone_id() const 
+    destination_zone object_proxy::get_zone_id() const 
     {
         return service_proxy_->get_zone_id();
     }

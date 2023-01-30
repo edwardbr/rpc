@@ -39,23 +39,23 @@ public:
     {
         on_service_deletion_host(name, *zone_id);
     }
-    virtual void on_service_proxy_creation(const char* name, rpc::zone originating_zone_id, rpc::zone_proxy zone_id) const
+    virtual void on_service_proxy_creation(const char* name, rpc::zone originating_zone_id, rpc::destination_zone zone_id) const
     {
         on_service_proxy_creation_host(name, *originating_zone_id, *zone_id);
     }
-    virtual void on_service_proxy_deletion(const char* name, rpc::zone originating_zone_id, rpc::zone_proxy zone_id) const
+    virtual void on_service_proxy_deletion(const char* name, rpc::zone originating_zone_id, rpc::destination_zone zone_id) const
     {
         on_service_proxy_deletion_host(name, *originating_zone_id, *zone_id);
     }
-    virtual void on_service_proxy_try_cast(const char* name, rpc::zone originating_zone_id, rpc::zone_proxy zone_id, rpc::object object_id, rpc::interface_ordinal interface_id) const
+    virtual void on_service_proxy_try_cast(const char* name, rpc::zone originating_zone_id, rpc::destination_zone zone_id, rpc::object object_id, rpc::interface_ordinal interface_id) const
     {
         on_service_proxy_try_cast_host(name, *originating_zone_id, *zone_id, *object_id, *interface_id);
     }
-    virtual void on_service_proxy_add_ref(const char* name, rpc::zone originating_zone_id, rpc::zone_proxy zone_id, rpc::object object_id, rpc::caller caller_zone_id) const
+    virtual void on_service_proxy_add_ref(const char* name, rpc::zone originating_zone_id, rpc::destination_zone zone_id, rpc::object object_id, rpc::caller_zone caller_zone_id) const
     {
         on_service_proxy_add_ref_host(name, *originating_zone_id, *zone_id, *object_id, *caller_zone_id);
     }
-    virtual void on_service_proxy_release(const char* name, rpc::zone originating_zone_id, rpc::zone_proxy zone_id, rpc::object object_id, rpc::caller caller_zone_id) const
+    virtual void on_service_proxy_release(const char* name, rpc::zone originating_zone_id, rpc::destination_zone zone_id, rpc::object object_id, rpc::caller_zone caller_zone_id) const
     {
         on_service_proxy_release_host(name, *originating_zone_id, *zone_id, *object_id, *caller_zone_id);
     }
@@ -81,43 +81,43 @@ public:
     {
         on_stub_send_host(*zone_id, *object_id, *interface_id, *method_id);
     }
-    virtual void on_stub_add_ref(rpc::zone_proxy zone_id, rpc::object object_id, rpc::interface_ordinal interface_id, uint64_t count, rpc::caller caller_zone_id) const
+    virtual void on_stub_add_ref(rpc::destination_zone zone_id, rpc::object object_id, rpc::interface_ordinal interface_id, uint64_t count, rpc::caller_zone caller_zone_id) const
     {
         on_stub_add_ref_host(*zone_id, *object_id, *interface_id, count, *caller_zone_id);
     }
-    virtual void on_stub_release(rpc::zone_proxy zone_id, rpc::object object_id, rpc::interface_ordinal interface_id, uint64_t count, rpc::caller caller_zone_id) const
+    virtual void on_stub_release(rpc::destination_zone zone_id, rpc::object object_id, rpc::interface_ordinal interface_id, uint64_t count, rpc::caller_zone caller_zone_id) const
     {
         on_stub_release_host(*zone_id, *object_id, *interface_id, count, *caller_zone_id);
     }
 
-    virtual void on_object_proxy_creation(rpc::zone operating_zone_id, rpc::zone_proxy zone_id, rpc::object object_id) const
+    virtual void on_object_proxy_creation(rpc::zone operating_zone_id, rpc::destination_zone zone_id, rpc::object object_id) const
     {
         on_object_proxy_creation_host(*operating_zone_id, *zone_id, *object_id);
     }
-    virtual void on_object_proxy_deletion(rpc::zone operating_zone_id, rpc::zone_proxy zone_id, rpc::object object_id) const
+    virtual void on_object_proxy_deletion(rpc::zone operating_zone_id, rpc::destination_zone zone_id, rpc::object object_id) const
     {
         on_object_proxy_deletion_host(*operating_zone_id, *zone_id, *object_id);
     }
 
-    virtual void on_interface_proxy_creation(const char* name, rpc::zone originating_zone_id, rpc::zone_proxy zone_id, rpc::object object_id, rpc::interface_ordinal interface_id) const
+    virtual void on_interface_proxy_creation(const char* name, rpc::zone originating_zone_id, rpc::destination_zone zone_id, rpc::object object_id, rpc::interface_ordinal interface_id) const
     {
         on_proxy_creation_host(name, *originating_zone_id, *zone_id, *object_id, *interface_id);
     }
-    virtual void on_interface_proxy_deletion(const char* name, rpc::zone originating_zone_id, rpc::zone_proxy zone_id, rpc::object object_id, rpc::interface_ordinal interface_id) const
+    virtual void on_interface_proxy_deletion(const char* name, rpc::zone originating_zone_id, rpc::destination_zone zone_id, rpc::object object_id, rpc::interface_ordinal interface_id) const
     {
         on_proxy_deletion_host(name, *originating_zone_id, *zone_id, *object_id, *interface_id);
     }
-    virtual void on_interface_proxy_send(const char* name, rpc::zone originating_zone_id, rpc::zone_proxy zone_id, rpc::object object_id, rpc::interface_ordinal interface_id, rpc::method method_id) const
+    virtual void on_interface_proxy_send(const char* name, rpc::zone originating_zone_id, rpc::destination_zone zone_id, rpc::object object_id, rpc::interface_ordinal interface_id, rpc::method method_id) const
     {
         on_proxy_send_host(name, *originating_zone_id, *zone_id, *object_id, *interface_id, *method_id);
     }
 
-    void on_service_proxy_add_external_ref(const char* name, rpc::zone operating_zone_id, rpc::zone_proxy zone_id, int ref_count, rpc::caller caller_zone_id) const
+    void on_service_proxy_add_external_ref(const char* name, rpc::zone operating_zone_id, rpc::destination_zone zone_id, int ref_count, rpc::caller_zone caller_zone_id) const
     {
         ::on_service_proxy_add_external_ref(name, *operating_zone_id, *zone_id, ref_count, *caller_zone_id);
     }
 
-    void on_service_proxy_release_external_ref(const char* name, rpc::zone operating_zone_id, rpc::zone_proxy zone_id, int ref_count, rpc::caller caller_zone_id) const
+    void on_service_proxy_release_external_ref(const char* name, rpc::zone operating_zone_id, rpc::destination_zone zone_id, int ref_count, rpc::caller_zone caller_zone_id) const
     {
         ::on_service_proxy_release_external_ref(name, *operating_zone_id, *zone_id, ref_count, *caller_zone_id);
     }
@@ -143,7 +143,7 @@ int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t host_id, uint64_t 
     if(host_id)
     {
         auto host_proxy = rpc::host_service_proxy::create({host_zone_id}, {host_id}, rpc_server, p_telemetry_service);
-        auto err_code = rpc::demarshall_interface_proxy<yyy::i_host>(host_proxy, {host_id, host_zone_id}, {child_zone_id}, host);
+        auto err_code = rpc::demarshall_interface_proxy<yyy::i_host>(host_proxy, {{host_id}, {host_zone_id}}, {child_zone_id}, host);
         if(err_code != rpc::error::OK())
             return err_code;
     }
@@ -152,7 +152,7 @@ int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t host_id, uint64_t 
     rpc::shared_ptr<yyy::i_example> ex(new example(p_telemetry_service, host));
     
     auto example_encap = rpc::create_interface_stub(*rpc_server, ex);
-    *example_object_id = example_encap.object_id;
+    *example_object_id = *example_encap.object_id;
 
     return rpc::error::OK();
 }

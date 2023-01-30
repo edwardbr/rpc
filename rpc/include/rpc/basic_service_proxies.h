@@ -52,12 +52,12 @@ namespace rpc
             return ret;
         }
 
-        int send(originator originating_zone_id, caller caller_zone_id, zone_proxy zone_id, object object_id, interface_ordinal interface_id, method method_id, size_t in_size_,
+        int send(caller_channel_zone originating_zone_id, caller_zone caller_zone_id, destination_zone zone_id, object object_id, interface_ordinal interface_id, method method_id, size_t in_size_,
                  const char* in_buf_, std::vector<char>& out_buf_) override
         {
             return service_.lock()->send(originating_zone_id, caller_zone_id, zone_id, object_id, interface_id, method_id, in_size_, in_buf_, out_buf_);
         }
-        int try_cast(zone_proxy zone_id, object object_id, interface_ordinal interface_id) override
+        int try_cast(destination_zone zone_id, object object_id, interface_ordinal interface_id) override
         {
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
             {
@@ -66,7 +66,7 @@ namespace rpc
             }
             return service_.lock()->try_cast(zone_id, object_id, interface_id);
         }
-        uint64_t add_ref(zone_proxy zone_id, object object_id, caller caller_zone_id) override
+        uint64_t add_ref(destination_zone zone_id, object object_id, caller_zone caller_zone_id) override
         {
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
             {
@@ -76,7 +76,7 @@ namespace rpc
             auto ret = service_.lock()->add_ref(zone_id, object_id, caller_zone_id);
             return ret;
         }
-        uint64_t release(zone_proxy zone_id, object object_id, caller caller_zone_id) override
+        uint64_t release(destination_zone zone_id, object object_id, caller_zone caller_zone_id) override
         {
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
             {
@@ -129,12 +129,12 @@ namespace rpc
             return ret;
         }
 
-        int send(originator originating_zone_id, caller caller_zone_id, zone_proxy zone_id, object object_id, interface_ordinal interface_id, method method_id, size_t in_size_,
+        int send(caller_channel_zone originating_zone_id, caller_zone caller_zone_id, destination_zone zone_id, object object_id, interface_ordinal interface_id, method method_id, size_t in_size_,
                  const char* in_buf_, std::vector<char>& out_buf_) override
         {
             return service_->send(originating_zone_id, caller_zone_id, zone_id, object_id, interface_id, method_id, in_size_, in_buf_, out_buf_);
         }
-        int try_cast(zone_proxy zone_id, object object_id, interface_ordinal interface_id) override
+        int try_cast(destination_zone zone_id, object object_id, interface_ordinal interface_id) override
         {
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
             {
@@ -143,7 +143,7 @@ namespace rpc
             }
             return service_->try_cast(zone_id, object_id, interface_id);
         }
-        uint64_t add_ref(zone_proxy zone_id, object object_id, caller caller_zone_id) override
+        uint64_t add_ref(destination_zone zone_id, object object_id, caller_zone caller_zone_id) override
         {
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
             {
@@ -153,7 +153,7 @@ namespace rpc
             auto ret = service_->add_ref(zone_id, object_id, caller_zone_id);
             return ret;
         }
-        uint64_t release(zone_proxy zone_id, object object_id, caller caller_zone_id) override
+        uint64_t release(destination_zone zone_id, object object_id, caller_zone caller_zone_id) override
         {
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
             {

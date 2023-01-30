@@ -22,50 +22,88 @@ namespace rpc
 
         //setter
         void operator=(uint64_t val) {id = val;}
-        void operator=(type_id<Type> val) {id = val.id;}
+        void operator=(const type_id<Type>& val) {id = val.id;}
 
         //setter
-        bool operator==(uint64_t val) const {return id == val;}
-        bool operator==(type_id<Type> val) const {return id == val.id;}
+//        bool operator==(uint64_t val) const {return id == val;}
+        bool operator==(const type_id<Type>& val) const {return id == val.id;}
 
         //setter
-        bool operator!=(uint64_t val) const {return id != val;}
-        bool operator!=(type_id<Type> val) const {return id != val.id;}
+//        bool operator!=(uint64_t val) const {return id != val;}
+        bool operator!=(const type_id<Type>& val) const {return id != val.id;}
 
         //less
         bool operator<(uint64_t val) const {return id < val;}
         bool operator<(const uint64_t& val) const {return id < val;}
+
+        bool is_set() const noexcept
+        {
+            return id != 0;
+        }
     };
 
     //the actual zone that a service is running on
-    //or the zone that a service_proxy is pointing to
     struct ZoneId{};
-    struct zone : public type_id<ZoneId>
-    {};
+    //the zone that is the ultimate zone for this call
+    struct DestinationZoneId{};
+    //a zone that calls are made to get through to the destincation zone
+    struct DestinationChannelZoneId{};
 
-    struct ServiceProxyId{};
-    struct zone_proxy : public type_id<ServiceProxyId>
-    {};
+    struct OperatingZoneId{};
+
+    //the zone that initiates a call
+    struct CallerZoneId{};
+    //a zone that channels calls from a caller
+    struct CallerChannelZoneId{};
+
+    struct zone;
+    struct destination_zone;
+    struct destination_channel_zone;
+    struct operating_zone;
+    struct caller_zone;
+    struct caller_channel_zone;
+    struct caller_channel_zone;
+
+
+    struct zone : public type_id<ZoneId>
+    {
+        zone() = default;
+        zone(const type_id<ZoneId>& other) : type_id<ZoneId>(other){}
+        type_id<DestinationZoneId> as_destination() const {return {id};}        
+        type_id<CallerZoneId> as_caller() const {return {id};}        
+    };
+
+    struct destination_zone : public type_id<DestinationZoneId>
+    {
+        destination_zone() = default;
+        destination_zone(const type_id<DestinationZoneId>& other) : type_id<DestinationZoneId>(other){}
+
+    };
 
     //the zone that a service proxy was cloned from
-    struct ClonedFromZoneId{};
-    struct cloned_zone : public type_id<ClonedFromZoneId>
-    {};
+    struct destination_channel_zone : public type_id<DestinationChannelZoneId>
+    {
+        destination_channel_zone() = default;
+        destination_channel_zone(const type_id<DestinationChannelZoneId>& other) : type_id<DestinationChannelZoneId>(other){}
 
-    //the zone that a service proxy is operating on
-    struct OperatingZoneId{};
-    struct operating_zone : public type_id<OperatingZoneId>
-    {};
+    };
 
     //the zone that initiated the call
-    struct CallerId{};
-    struct caller : public type_id<CallerId>
-    {};
+    struct caller_zone : public type_id<CallerZoneId>
+    {
+        caller_zone() = default;
+        caller_zone(const type_id<CallerZoneId>& other) : type_id<CallerZoneId>(other){}
 
-    //the zone that passed that the call into this zone from the caller, you may have a chain of zones so the caller zone id may be different zone from the originator
-    struct OriginatorId{};
-    struct originator : public type_id<OriginatorId>
-    {};
+    };
+
+    //the zone that initiated the call
+    struct caller_channel_zone : public type_id<CallerChannelZoneId>
+    {
+        caller_channel_zone() = default;
+        caller_channel_zone(const type_id<CallerChannelZoneId>& other) : type_id<CallerChannelZoneId>(other){}
+
+    };
+
 
     //an id for objects unique to each zone
     struct ObjectId{};
@@ -94,9 +132,9 @@ struct std::hash<rpc::zone>
 };
 
 template<>
-struct std::hash<rpc::cloned_zone> 
+struct std::hash<rpc::destination_zone> 
 {
-    auto operator() (const rpc::cloned_zone& item) const noexcept 
+    auto operator() (const rpc::destination_zone& item) const noexcept 
     {
         return (std::size_t)item.id;
 
@@ -104,18 +142,9 @@ struct std::hash<rpc::cloned_zone>
 };
 
 template<>
-struct std::hash<rpc::operating_zone> 
+struct std::hash<rpc::destination_channel_zone> 
 {
-    auto operator() (const rpc::operating_zone& item) const noexcept 
-    {
-        return (std::size_t)item.id;
-    }
-};
-
-template<>
-struct std::hash<rpc::caller> 
-{
-    auto operator() (const rpc::caller& item) const noexcept 
+    auto operator() (const rpc::destination_channel_zone& item) const noexcept 
     {
         return (std::size_t)item.id;
 
@@ -123,9 +152,19 @@ struct std::hash<rpc::caller>
 };
 
 template<>
-struct std::hash<rpc::originator> 
+struct std::hash<rpc::caller_zone> 
 {
-    auto operator() (const rpc::originator& item) const noexcept 
+    auto operator() (const rpc::caller_zone& item) const noexcept 
+    {
+        return (std::size_t)item.id;
+
+    }
+};
+
+template<>
+struct std::hash<rpc::caller_channel_zone> 
+{
+    auto operator() (const rpc::caller_channel_zone& item) const noexcept 
     {
         return (std::size_t)item.id;
 

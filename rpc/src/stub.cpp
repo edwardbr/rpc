@@ -55,7 +55,7 @@ namespace rpc
         return res->second;
     }
 
-    int object_stub::call(originator originating_zone_id, caller caller_zone_id, interface_ordinal interface_id, method method_id, size_t in_size_, const char* in_buf_,
+    int object_stub::call(caller_channel_zone originating_zone_id, caller_zone caller_zone_id, interface_ordinal interface_id, method method_id, size_t in_size_, const char* in_buf_,
                                  std::vector<char>& out_buf_)
     {
         rpc::shared_ptr<i_interface_stub> stub;

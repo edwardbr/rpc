@@ -8,7 +8,7 @@
 
 namespace rpc
 {
-    host_service_proxy::host_service_proxy(zone_proxy host_zone_id, const rpc::shared_ptr<service>& operating_zone_service,
+    host_service_proxy::host_service_proxy(destination_zone host_zone_id, const rpc::shared_ptr<service>& operating_zone_service,
                         const rpc::i_telemetry_service* telemetry_service)
         : service_proxy(host_zone_id, operating_zone_service, {*operating_zone_service->get_zone_id()}, telemetry_service)
     {
@@ -18,7 +18,7 @@ namespace rpc
         }
     }
 
-    rpc::shared_ptr<service_proxy> host_service_proxy::create(zone_proxy host_zone_id, object host_id, const rpc::shared_ptr<rpc::child_service>& operating_zone_service, const rpc::i_telemetry_service* telemetry_service)
+    rpc::shared_ptr<service_proxy> host_service_proxy::create(destination_zone host_zone_id, object host_id, const rpc::shared_ptr<rpc::child_service>& operating_zone_service, const rpc::i_telemetry_service* telemetry_service)
     {
         auto ret = rpc::shared_ptr<host_service_proxy>(new host_service_proxy(host_zone_id, operating_zone_service, telemetry_service));
         auto pthis = rpc::static_pointer_cast<service_proxy>(ret);
@@ -37,7 +37,7 @@ namespace rpc
         }
     }
 
-    int host_service_proxy::send(originator originating_zone_id, caller caller_zone_id, zone_proxy zone_id, object object_id, interface_ordinal interface_id, method method_id, size_t in_size_,
+    int host_service_proxy::send(caller_channel_zone originating_zone_id, caller_zone caller_zone_id, destination_zone zone_id, object object_id, interface_ordinal interface_id, method method_id, size_t in_size_,
                                        const char* in_buf_, std::vector<char>& out_buf_)
     {
         int err_code = 0;
@@ -73,7 +73,7 @@ namespace rpc
         return err_code;
     }
 
-    int host_service_proxy::try_cast(zone_proxy zone_id, object object_id, interface_ordinal interface_id)
+    int host_service_proxy::try_cast(destination_zone zone_id, object object_id, interface_ordinal interface_id)
     {
         if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
         {
@@ -93,7 +93,7 @@ namespace rpc
         return err_code;
     }
 
-    uint64_t host_service_proxy::add_ref(zone_proxy zone_id, object object_id, caller caller_zone_id)
+    uint64_t host_service_proxy::add_ref(destination_zone zone_id, object object_id, caller_zone caller_zone_id)
     {
         if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
         {
@@ -113,7 +113,7 @@ namespace rpc
         return ret;
     }
 
-    uint64_t host_service_proxy::release(zone_proxy zone_id, object object_id, caller caller_zone_id)
+    uint64_t host_service_proxy::release(destination_zone zone_id, object object_id, caller_zone caller_zone_id)
     {
         if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
         {
