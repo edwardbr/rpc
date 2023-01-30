@@ -25,17 +25,17 @@ namespace rpc
     {
         if(auto* telemetry_service = service_proxy_->get_telemetry_service();telemetry_service)
         {
-            telemetry_service->on_object_proxy_creation(service_proxy_->get_operating_zone_id(), service_proxy_->get_zone_id(), object_id);
+            telemetry_service->on_object_proxy_creation(service_proxy_->get_operating_zone_id(), service_proxy_->get_destination_zone_id(), object_id);
         }
 
-        auto message = std::string("object_proxy::object_proxy zone ") + std::to_string(service_proxy_->get_zone_id().get_val()) 
+        auto message = std::string("object_proxy::object_proxy zone ") + std::to_string(service_proxy_->get_destination_zone_id().get_val()) 
         + std::string(", object_id ") + std::to_string(object_id.get_val())
         + std::string(", operating_zone_id ") + std::to_string(service_proxy->get_operating_zone_id().get_val())
         + std::string(", cloned from ") + std::to_string(service_proxy->get_cloned_from_zone_id().get_val());
         LOG_STR(message.c_str(), message.size());
 
         if(stub_needs_add_ref)
-            service_proxy_->add_ref(service_proxy_->get_zone_id(), object_id_, service_proxy_->get_operating_zone_id().as_caller()); 
+            service_proxy_->add_ref(service_proxy_->get_destination_zone_id(), object_id_, service_proxy_->get_operating_zone_id().as_caller()); 
         if(service_proxy_needs_add_ref)
             service_proxy_->add_external_ref();
     }
@@ -55,17 +55,17 @@ namespace rpc
     { 
         if(auto* telemetry_service = service_proxy_->get_telemetry_service();telemetry_service)
         {
-            telemetry_service->on_object_proxy_deletion(service_proxy_->get_operating_zone_id(), service_proxy_->get_zone_id(), object_id_);
+            telemetry_service->on_object_proxy_deletion(service_proxy_->get_operating_zone_id(), service_proxy_->get_destination_zone_id(), object_id_);
         }
 
-        auto message = std::string("object_proxy::~object_proxy zone ") + std::to_string(service_proxy_->get_zone_id().get_val()) 
+        auto message = std::string("object_proxy::~object_proxy zone ") + std::to_string(service_proxy_->get_destination_zone_id().get_val()) 
         + std::string(", object_id ") + std::to_string(object_id_.get_val())
         + std::string(", operating_zone_id ") + std::to_string(service_proxy_->get_operating_zone_id().get_val())
         + std::string(", cloned from ") + std::to_string(service_proxy_->get_cloned_from_zone_id().get_val());
         LOG_STR(message.c_str(), message.size());
 
         service_proxy_->remove_object_proxy(object_id_);
-        service_proxy_->release(service_proxy_->get_zone_id(), object_id_, service_proxy_->get_operating_zone_id().as_caller()); 
+        service_proxy_->release(service_proxy_->get_destination_zone_id(), object_id_, service_proxy_->get_operating_zone_id().as_caller()); 
         service_proxy_ = nullptr;
     }
 
@@ -75,7 +75,7 @@ namespace rpc
         return service_proxy_->send(
             caller_channel_zone(), 
             service_proxy_->get_operating_zone_id().as_caller(), 
-            service_proxy_->get_zone_id(), 
+            service_proxy_->get_destination_zone_id(), 
             object_id_, 
             interface_id, 
             method_id, 
@@ -86,11 +86,11 @@ namespace rpc
 
     int object_proxy::try_cast(interface_ordinal interface_id)
     {
-        return service_proxy_->try_cast(service_proxy_->get_zone_id(), object_id_, interface_id);
+        return service_proxy_->try_cast(service_proxy_->get_destination_zone_id(), object_id_, interface_id);
     }
 
-    destination_zone object_proxy::get_zone_id() const 
+    destination_zone object_proxy::get_destination_zone_id() const 
     {
-        return service_proxy_->get_zone_id();
+        return service_proxy_->get_destination_zone_id();
     }
 }

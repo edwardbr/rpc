@@ -153,7 +153,7 @@ namespace rpc
         if(proxy_base)
         {
             auto object_proxy = proxy_base->get_object_proxy();
-            auto destination_zone_id = object_proxy->get_zone_id();
+            auto destination_zone_id = object_proxy->get_destination_zone_id();
             auto object_id = object_proxy->get_object_id();
             if(add_ref && caller_channel_zone_id != destination_zone_id.as_caller_channel())
             {
@@ -354,14 +354,14 @@ namespace rpc
 
     void service::inner_add_zone_proxy(const rpc::shared_ptr<service_proxy>& service_proxy)
     {
-        assert(service_proxy->get_zone_id() != zone_id_.as_destination());
-        assert(other_zones.find(service_proxy->get_zone_id()) == other_zones.end());
-        other_zones[service_proxy->get_zone_id()] = service_proxy;
+        assert(service_proxy->get_destination_zone_id() != zone_id_.as_destination());
+        assert(other_zones.find(service_proxy->get_destination_zone_id()) == other_zones.end());
+        other_zones[service_proxy->get_destination_zone_id()] = service_proxy;
     }
 
     void service::add_zone_proxy(const rpc::shared_ptr<service_proxy>& service_proxy)
     {
-        assert(service_proxy->get_zone_id() != zone_id_.as_destination());
+        assert(service_proxy->get_destination_zone_id() != zone_id_.as_destination());
         std::lock_guard g(insert_control);
         inner_add_zone_proxy(service_proxy);
     }
@@ -428,7 +428,7 @@ namespace rpc
     {
         if(parent_service_)
         {
-            remove_zone_proxy(parent_service_->get_zone_id());
+            remove_zone_proxy(parent_service_->get_destination_zone_id());
             set_parent(nullptr, false);
         }
 

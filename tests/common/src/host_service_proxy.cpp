@@ -14,7 +14,7 @@ namespace rpc
     {
         if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
         {
-            telemetry_service->on_service_proxy_creation("host_service_proxy", get_operating_zone_id(), get_zone_id());
+            telemetry_service->on_service_proxy_creation("host_service_proxy", get_operating_zone_id(), get_destination_zone_id());
         }
     }
 
@@ -33,7 +33,7 @@ namespace rpc
     {
         if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
         {
-            telemetry_service->on_service_proxy_deletion("host_service_proxy", get_operating_zone_id(), get_zone_id());
+            telemetry_service->on_service_proxy_deletion("host_service_proxy", get_operating_zone_id(), get_destination_zone_id());
         }
     }
 

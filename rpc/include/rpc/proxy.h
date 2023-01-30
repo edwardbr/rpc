@@ -97,7 +97,7 @@ namespace rpc
 
         rpc::shared_ptr<service_proxy> get_service_proxy() const { return service_proxy_; }
         object get_object_id() const {return {object_id_};}
-        destination_zone get_zone_id() const;
+        destination_zone get_destination_zone_id() const;
 
         int send(interface_ordinal interface_id, method method_id, size_t in_size_, const char* in_buf_,
                         std::vector<char>& out_buf_);
@@ -292,7 +292,7 @@ namespace rpc
             ret->weak_this_ = ret;
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
             {
-                telemetry_service->on_service_proxy_creation("service_proxy", operating_zone_service_.lock()->get_zone_id(), ret->get_zone_id());
+                telemetry_service->on_service_proxy_creation("service_proxy", operating_zone_service_.lock()->get_zone_id(), ret->get_destination_zone_id());
             }
             get_operating_zone_service()->inner_add_zone_proxy(ret);
             return ret;
@@ -301,7 +301,7 @@ namespace rpc
         rpc::shared_ptr<service_proxy> shared_from_this() { return rpc::shared_ptr<service_proxy>(weak_this_); }
         rpc::shared_ptr<service_proxy const> shared_from_this() const { return rpc::shared_ptr<service_proxy const>(weak_this_); }
 
-        destination_zone get_zone_id() const {return destination_zone_id_;}
+        destination_zone get_destination_zone_id() const {return destination_zone_id_;}
         zone get_operating_zone_id() const {return operating_zone_service_.lock()->get_zone_id();}
         destination_channel_zone get_cloned_from_zone_id() const {return destination_channel_zone_;}
         rpc::shared_ptr<service> get_operating_zone_service() const {return operating_zone_service_.lock();}
@@ -345,9 +345,9 @@ namespace rpc
 
         //this is to check that an interface is belonging to another zone and not the operating zone
         auto proxy = iface->query_proxy_base();
-        if(proxy && proxy->get_object_proxy()->get_zone_id() != operating_service->get_zone_id().as_destination())
+        if(proxy && proxy->get_object_proxy()->get_destination_zone_id() != operating_service->get_zone_id().as_destination())
         {
-            return {proxy->get_object_proxy()->get_object_id(), proxy->get_object_proxy()->get_zone_id()};
+            return {proxy->get_object_proxy()->get_object_id(), proxy->get_object_proxy()->get_destination_zone_id()};
         }
 
         //else encapsulate away
@@ -432,10 +432,10 @@ namespace rpc
 
         //get the right  service proxy
         bool new_proxy_added = false;
-        if(service_proxy->get_zone_id() != encap.destination_zone_id)
+        if(service_proxy->get_destination_zone_id() != encap.destination_zone_id)
         {
             //if the zone is different lookup or clone the right proxy
-            service_proxy = serv->get_zone_proxy(service_proxy->get_zone_id().as_caller_channel(), caller_zone_id, {encap.destination_zone_id}, new_proxy_added);
+            service_proxy = serv->get_zone_proxy(service_proxy->get_destination_zone_id().as_caller_channel(), caller_zone_id, {encap.destination_zone_id}, new_proxy_added);
             if(service_proxy && new_proxy_added)
                 service_proxy->add_external_ref();
         }
@@ -449,7 +449,7 @@ namespace rpc
         }
         else
         {
-            op = object_proxy::create(encap.object_id, service_proxy, false, new_proxy_added ? false : (encap.destination_zone_id == sp->get_zone_id()));
+            op = object_proxy::create(encap.object_id, service_proxy, false, new_proxy_added ? false : (encap.destination_zone_id == sp->get_destination_zone_id()));
         }
         return op->query_interface(val, false);
     }
@@ -475,10 +475,10 @@ namespace rpc
 
         //get the right  service proxy
         bool new_proxy_added = false;
-        if(service_proxy->get_zone_id() != encap.destination_zone_id)
+        if(service_proxy->get_destination_zone_id() != encap.destination_zone_id)
         {
             //if the zone is different lookup or clone the right proxy
-            service_proxy = serv->get_zone_proxy(service_proxy->get_zone_id().as_caller_channel(), caller_zone_id, encap.destination_zone_id, new_proxy_added);
+            service_proxy = serv->get_zone_proxy(service_proxy->get_destination_zone_id().as_caller_channel(), caller_zone_id, encap.destination_zone_id, new_proxy_added);
             if(service_proxy && new_proxy_added)
                 service_proxy->add_external_ref();
         }
