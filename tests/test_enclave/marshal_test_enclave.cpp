@@ -39,25 +39,25 @@ public:
     {
         on_service_deletion_host(name, zone_id.get_val());
     }
-    virtual void on_service_proxy_creation(const char* name, rpc::zone originating_zone_id, rpc::destination_zone zone_id) const
+    virtual void on_service_proxy_creation(const char* name, rpc::zone originating_zone_id, rpc::destination_zone destination_zone_id) const
     {
-        on_service_proxy_creation_host(name, originating_zone_id.get_val(), zone_id.get_val());
+        on_service_proxy_creation_host(name, originating_zone_id.get_val(), destination_zone_id.get_val());
     }
-    virtual void on_service_proxy_deletion(const char* name, rpc::zone originating_zone_id, rpc::destination_zone zone_id) const
+    virtual void on_service_proxy_deletion(const char* name, rpc::zone originating_zone_id, rpc::destination_zone destination_zone_id) const
     {
-        on_service_proxy_deletion_host(name, originating_zone_id.get_val(), zone_id.get_val());
+        on_service_proxy_deletion_host(name, originating_zone_id.get_val(), destination_zone_id.get_val());
     }
-    virtual void on_service_proxy_try_cast(const char* name, rpc::zone originating_zone_id, rpc::destination_zone zone_id, rpc::object object_id, rpc::interface_ordinal interface_id) const
+    virtual void on_service_proxy_try_cast(const char* name, rpc::zone originating_zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::interface_ordinal interface_id) const
     {
-        on_service_proxy_try_cast_host(name, originating_zone_id.get_val(), zone_id.get_val(), object_id.get_val(), interface_id.get_val());
+        on_service_proxy_try_cast_host(name, originating_zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), interface_id.get_val());
     }
-    virtual void on_service_proxy_add_ref(const char* name, rpc::zone originating_zone_id, rpc::destination_zone zone_id, rpc::object object_id, rpc::caller_zone caller_zone_id) const
+    virtual void on_service_proxy_add_ref(const char* name, rpc::zone originating_zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::caller_zone caller_zone_id) const
     {
-        on_service_proxy_add_ref_host(name, originating_zone_id.get_val(), zone_id.get_val(), object_id.get_val(), caller_zone_id.get_val());
+        on_service_proxy_add_ref_host(name, originating_zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), caller_zone_id.get_val());
     }
-    virtual void on_service_proxy_release(const char* name, rpc::zone originating_zone_id, rpc::destination_zone zone_id, rpc::object object_id, rpc::caller_zone caller_zone_id) const
+    virtual void on_service_proxy_release(const char* name, rpc::zone originating_zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::caller_zone caller_zone_id) const
     {
-        on_service_proxy_release_host(name, originating_zone_id.get_val(), zone_id.get_val(), object_id.get_val(), caller_zone_id.get_val());
+        on_service_proxy_release_host(name, originating_zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), caller_zone_id.get_val());
     }
 
     virtual void on_impl_creation(const char* name, rpc::interface_ordinal interface_id) const
@@ -81,45 +81,45 @@ public:
     {
         on_stub_send_host(zone_id.get_val(), object_id.get_val(), interface_id.get_val(), method_id.get_val());
     }
-    virtual void on_stub_add_ref(rpc::destination_zone zone_id, rpc::object object_id, rpc::interface_ordinal interface_id, uint64_t count, rpc::caller_zone caller_zone_id) const
+    virtual void on_stub_add_ref(rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::interface_ordinal interface_id, uint64_t count, rpc::caller_zone caller_zone_id) const
     {
-        on_stub_add_ref_host(zone_id.get_val(), object_id.get_val(), interface_id.get_val(), count, caller_zone_id.get_val());
+        on_stub_add_ref_host(destination_zone_id.get_val(), object_id.get_val(), interface_id.get_val(), count, caller_zone_id.get_val());
     }
-    virtual void on_stub_release(rpc::destination_zone zone_id, rpc::object object_id, rpc::interface_ordinal interface_id, uint64_t count, rpc::caller_zone caller_zone_id) const
+    virtual void on_stub_release(rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::interface_ordinal interface_id, uint64_t count, rpc::caller_zone caller_zone_id) const
     {
-        on_stub_release_host(zone_id.get_val(), object_id.get_val(), interface_id.get_val(), count, caller_zone_id.get_val());
-    }
-
-    virtual void on_object_proxy_creation(rpc::zone operating_zone_id, rpc::destination_zone zone_id, rpc::object object_id) const
-    {
-        on_object_proxy_creation_host(operating_zone_id.get_val(), zone_id.get_val(), object_id.get_val());
-    }
-    virtual void on_object_proxy_deletion(rpc::zone operating_zone_id, rpc::destination_zone zone_id, rpc::object object_id) const
-    {
-        on_object_proxy_deletion_host(operating_zone_id.get_val(), zone_id.get_val(), object_id.get_val());
+        on_stub_release_host(destination_zone_id.get_val(), object_id.get_val(), interface_id.get_val(), count, caller_zone_id.get_val());
     }
 
-    virtual void on_interface_proxy_creation(const char* name, rpc::zone originating_zone_id, rpc::destination_zone zone_id, rpc::object object_id, rpc::interface_ordinal interface_id) const
+    virtual void on_object_proxy_creation(rpc::zone operating_zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id) const
     {
-        on_proxy_creation_host(name, originating_zone_id.get_val(), zone_id.get_val(), object_id.get_val(), interface_id.get_val());
+        on_object_proxy_creation_host(operating_zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val());
     }
-    virtual void on_interface_proxy_deletion(const char* name, rpc::zone originating_zone_id, rpc::destination_zone zone_id, rpc::object object_id, rpc::interface_ordinal interface_id) const
+    virtual void on_object_proxy_deletion(rpc::zone operating_zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id) const
     {
-        on_proxy_deletion_host(name, originating_zone_id.get_val(), zone_id.get_val(), object_id.get_val(), interface_id.get_val());
-    }
-    virtual void on_interface_proxy_send(const char* name, rpc::zone originating_zone_id, rpc::destination_zone zone_id, rpc::object object_id, rpc::interface_ordinal interface_id, rpc::method method_id) const
-    {
-        on_proxy_send_host(name, originating_zone_id.get_val(), zone_id.get_val(), object_id.get_val(), interface_id.get_val(), method_id.get_val());
+        on_object_proxy_deletion_host(operating_zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val());
     }
 
-    void on_service_proxy_add_external_ref(const char* name, rpc::zone operating_zone_id, rpc::destination_zone zone_id, int ref_count, rpc::caller_zone caller_zone_id) const
+    virtual void on_interface_proxy_creation(const char* name, rpc::zone originating_zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::interface_ordinal interface_id) const
     {
-        ::on_service_proxy_add_external_ref(name, operating_zone_id.get_val(), zone_id.get_val(), ref_count, caller_zone_id.get_val());
+        on_proxy_creation_host(name, originating_zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), interface_id.get_val());
+    }
+    virtual void on_interface_proxy_deletion(const char* name, rpc::zone originating_zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::interface_ordinal interface_id) const
+    {
+        on_proxy_deletion_host(name, originating_zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), interface_id.get_val());
+    }
+    virtual void on_interface_proxy_send(const char* name, rpc::zone originating_zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::interface_ordinal interface_id, rpc::method method_id) const
+    {
+        on_proxy_send_host(name, originating_zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), interface_id.get_val(), method_id.get_val());
     }
 
-    void on_service_proxy_release_external_ref(const char* name, rpc::zone operating_zone_id, rpc::destination_zone zone_id, int ref_count, rpc::caller_zone caller_zone_id) const
+    void on_service_proxy_add_external_ref(const char* name, rpc::zone operating_zone_id, rpc::destination_zone destination_zone_id, int ref_count, rpc::caller_zone caller_zone_id) const
     {
-        ::on_service_proxy_release_external_ref(name, operating_zone_id.get_val(), zone_id.get_val(), ref_count, caller_zone_id.get_val());
+        ::on_service_proxy_add_external_ref(name, operating_zone_id.get_val(), destination_zone_id.get_val(), ref_count, caller_zone_id.get_val());
+    }
+
+    void on_service_proxy_release_external_ref(const char* name, rpc::zone operating_zone_id, rpc::destination_zone destination_zone_id, int ref_count, rpc::caller_zone caller_zone_id) const
+    {
+        ::on_service_proxy_release_external_ref(name, operating_zone_id.get_val(), destination_zone_id.get_val(), ref_count, caller_zone_id.get_val());
     }
 
     virtual void message(rpc::i_telemetry_service::level_enum level, const char* message) const
