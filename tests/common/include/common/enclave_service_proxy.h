@@ -17,37 +17,37 @@ namespace rpc
             ~enclave_owner();
         };
 
-        enclave_service_proxy(uint64_t zone_id, std::string filename, const rpc::shared_ptr<service>& operating_zone_service, uint64_t host_id, const rpc::i_telemetry_service* telemetry_service);
-        int initialise_enclave(uint64_t& object_id);
+        enclave_service_proxy(zone_proxy zone_id, std::string filename, const rpc::shared_ptr<service>& operating_zone_service, object host_id, const rpc::i_telemetry_service* telemetry_service);
+        int initialise_enclave(object& object_id);
        
         rpc::shared_ptr<service_proxy> deep_copy_for_clone() override {return rpc::make_shared<enclave_service_proxy>(*this);}
         
         std::shared_ptr<enclave_owner> enclave_owner_;
         uint64_t eid_ = 0;        
         std::string filename_;
-        uint64_t host_id_ = 0;
+        object host_id_ = {0};
     public:
         enclave_service_proxy(const enclave_service_proxy& other) = default;
 
         template<class Owner, class Child>
-        static int create(uint64_t zone_id, std::string filename, rpc::shared_ptr<service>& operating_zone_service, const rpc::shared_ptr<Owner>& owner, rpc::shared_ptr<Child>& root_object, const rpc::i_telemetry_service* telemetry_service)
+        static int create(zone zone_id, std::string filename, rpc::shared_ptr<service>& operating_zone_service, const rpc::shared_ptr<Owner>& owner, rpc::shared_ptr<Child>& root_object, const rpc::i_telemetry_service* telemetry_service)
         {
             assert(operating_zone_service);
 
-            uint64_t owner_id = 0;
+            object owner_id = {0};
             if(owner)
-                owner_id = rpc::create_interface_stub(*operating_zone_service, owner).object_id;
+                owner_id = {rpc::create_interface_stub(*operating_zone_service, owner).object_id};
 
-            auto ret = rpc::shared_ptr<enclave_service_proxy>(new enclave_service_proxy(zone_id, filename, operating_zone_service, owner_id, telemetry_service));
+            auto ret = rpc::shared_ptr<enclave_service_proxy>(new enclave_service_proxy({*zone_id}, filename, operating_zone_service, owner_id, telemetry_service));
             auto pthis = rpc::static_pointer_cast<service_proxy>(ret);
 
             ret->weak_this_ = pthis;
 
-            uint64_t object_id = 0;
+            object object_id = {0};
             int err_code = ret->initialise_enclave(object_id);
             if(err_code)
                 return err_code;
-            auto error = rpc::demarshall_interface_proxy(ret, {object_id, zone_id}, root_object);
+            auto error = rpc::demarshall_interface_proxy(ret, {object_id.id, zone_id.id}, {*operating_zone_service->get_zone_id()}, root_object);
             if(error != rpc::error::OK())
                 return error;
             operating_zone_service->add_zone_proxy(ret);
@@ -58,10 +58,10 @@ namespace rpc
         virtual ~enclave_service_proxy();
 
 
-        int send(uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_,
+        int send(originator originating_zone_id, caller caller_zone_id, zone_proxy zone_id, object object_id, interface_ordinal interface_id, method method_id, size_t in_size_,
                         const char* in_buf_, std::vector<char>& out_buf_) override;
-        int try_cast(uint64_t zone_id, uint64_t object_id, uint64_t interface_id) override;
-        uint64_t add_ref(uint64_t zone_id, uint64_t object_id, bool out_param) override;
-        uint64_t release(uint64_t zone_id, uint64_t object_id) override;
+        int try_cast(zone_proxy zone_id, object object_id, interface_ordinal interface_id) override;
+        uint64_t add_ref(zone_proxy zone_id, object object_id, caller caller_zone_id) override;
+        uint64_t release(zone_proxy zone_id, object object_id, caller caller_zone_id) override;
     };
 }

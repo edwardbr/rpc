@@ -7,6 +7,8 @@
 
 #include <yas/count_streams.hpp>
 #include <yas/serialize.hpp>
+
+#include <rpc/types.h>
 #include <rpc/error_codes.h>
 
 namespace rpc
@@ -15,12 +17,12 @@ namespace rpc
     class i_marshaller
     {
     public:
-        virtual int send(uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_,
+        virtual int send(originator originating_zone_id, caller caller_zone_id, zone_proxy zone_id, object object_id, interface_ordinal interface_id, method method_id, size_t in_size_,
                                 const char* in_buf_, std::vector<char>& out_buf_)
             = 0;
-        virtual int try_cast(uint64_t zone_id, uint64_t object_id, uint64_t interface_id) = 0;
-        virtual uint64_t add_ref(uint64_t zone_id, uint64_t object_id, bool out_param) = 0;
-        virtual uint64_t release(uint64_t zone_id, uint64_t object_id) = 0;
+        virtual int try_cast(zone_proxy zone_id, object object_id, interface_ordinal interface_id) = 0;
+        virtual uint64_t add_ref(zone_proxy zone_id, object object_id, caller caller_zone_id) = 0;
+        virtual uint64_t release(zone_proxy zone_id, object object_id, caller caller_zone_id) = 0;
     };
 
     struct interface_descriptor

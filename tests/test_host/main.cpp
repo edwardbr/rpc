@@ -68,7 +68,7 @@ auto enclave_path = "./libmarshal_test_enclave.signed.so";
 rpc::weak_ptr<rpc::service> current_host_service;
 
 const rpc::i_telemetry_service* telemetry_service = nullptr;
-int* zone_gen = nullptr;
+uint64_t* zone_gen = nullptr;
 
 class host : 
     public yyy::i_host,
@@ -80,9 +80,9 @@ class host :
     std::mutex cached_apps_mux_;
 
     void* get_address() const override { return (void*)this; }
-    const rpc::casting_interface* query_interface(uint64_t interface_id) const override
+    const rpc::casting_interface* query_interface(rpc::interface_ordinal interface_id) const override
     {
-        if (yyy::i_host::id == interface_id)
+        if (yyy::i_host::id == *interface_id)
             return static_cast<const yyy::i_host*>(this);
         return nullptr;
     }
@@ -94,7 +94,7 @@ public:
         rpc::shared_ptr<yyy::i_host> host = shared_from_this();
         auto serv = current_host_service.lock();
         auto err_code = rpc::enclave_service_proxy::create(
-            ++(*zone_gen), 
+            {++(*zone_gen)}, 
             enclave_path, 
             serv,
             host,
@@ -142,7 +142,7 @@ struct in_memory_setup
     const bool has_enclave = false;
     bool use_host_in_child = false;
 
-    int zone_gen_ = 0;
+    uint64_t zone_gen_ = 0;
 
     virtual void SetUp()
     {   
@@ -184,16 +184,16 @@ struct inproc_setup
     const bool has_enclave = true;
     bool use_host_in_child = false;
 
-    int zone_gen_ = 0;
+    uint64_t zone_gen_ = 0;
 
     virtual void SetUp()
     {
         zone_gen = &zone_gen_;
         tm = rpc::make_shared<host_telemetry_service>();
         telemetry_service = tm.get();
-        root_service = rpc::make_shared<rpc::service>(++zone_gen_);
+        root_service = rpc::make_shared<rpc::service>(rpc::zone{++zone_gen_});
         current_host_service = root_service;
-        child_service = rpc::make_shared<rpc::child_service>(++zone_gen_);
+        child_service = rpc::make_shared<rpc::child_service>(rpc::zone{++zone_gen_});
 
         rpc::interface_descriptor host_encap {};
         rpc::interface_descriptor example_encap {};
@@ -215,11 +215,11 @@ struct inproc_setup
             host_encap = rpc::create_interface_stub(*root_service, hst);
 
             // simple test to check that we can get a useful local interface based on type and object id
-            auto example_from_cast = root_service->get_local_interface<yyy::i_host>(host_encap.object_id);
+            auto example_from_cast = root_service->get_local_interface<yyy::i_host>({host_encap.object_id});
             EXPECT_EQ(example_from_cast, hst);
         }
 
-        ASSERT(!rpc::demarshall_interface_proxy(service_proxy_to_host, host_encap, i_host_ptr));
+        ASSERT(!rpc::demarshall_interface_proxy(service_proxy_to_host, host_encap, {*child_service->get_zone_id()}, i_host_ptr));
 
         {
             // create the example object implementation
@@ -230,11 +230,11 @@ struct inproc_setup
 
             // simple test to check that we can get a usefule local interface based on type and object id
             auto example_from_cast
-                = child_service->get_local_interface<yyy::i_example>(example_encap.object_id);
+                = child_service->get_local_interface<yyy::i_example>({example_encap.object_id});
             EXPECT_EQ(example_from_cast, remote_example);
         }
 
-        ASSERT(!rpc::demarshall_interface_proxy(service_proxy_to_child, example_encap, i_example_ptr));
+        ASSERT(!rpc::demarshall_interface_proxy(service_proxy_to_child, example_encap, {*root_service->get_zone_id()}, i_example_ptr));
     }
 
     virtual void TearDown()
@@ -250,7 +250,7 @@ struct inproc_setup
 
     rpc::shared_ptr<yyy::i_example> create_new_zone()
     {        
-        rpc::shared_ptr<rpc::child_service> new_service = rpc::make_shared<rpc::child_service>(++zone_gen_);
+        rpc::shared_ptr<rpc::child_service> new_service = rpc::make_shared<rpc::child_service>(rpc::zone{++zone_gen_});
         
         // create a proxy to the rpc::service hosting the child service
         auto service_proxy_to_host
@@ -267,11 +267,11 @@ struct inproc_setup
 
         // simple test to check that we can get a usefule local interface based on type and object id
         auto example_from_cast
-            = new_service->get_local_interface<yyy::i_example>(example_encap.object_id);
+            = new_service->get_local_interface<yyy::i_example>({example_encap.object_id});
         EXPECT_EQ(example_from_cast, remote_example);
 
         rpc::shared_ptr<yyy::i_example> example_relay_ptr;
-        ASSERT(!rpc::demarshall_interface_proxy(service_proxy_to_child, example_encap, example_relay_ptr));                
+        ASSERT(!rpc::demarshall_interface_proxy(service_proxy_to_child, example_encap, {*root_service->get_zone_id()}, example_relay_ptr));                
         return example_relay_ptr;
     }
 };
@@ -295,20 +295,20 @@ struct enclave_setup
     const bool has_enclave = true;
     bool use_host_in_child = false;
 
-    int zone_gen_ = 0;
+    uint64_t zone_gen_ = 0;
 
     virtual void SetUp()
     {
         zone_gen = &zone_gen_;
         tm = rpc::make_shared<host_telemetry_service>();
         telemetry_service = tm.get();
-        root_service = rpc::make_shared<rpc::service>(++zone_gen_);
+        root_service = rpc::make_shared<rpc::service>(rpc::zone{++zone_gen_});
         current_host_service = root_service;
         
         i_host_ptr = rpc::shared_ptr<yyy::i_host> (new host());
 
         auto err_code = rpc::enclave_service_proxy::create(
-            ++zone_gen_, 
+            {++zone_gen_}, 
             enclave_path, 
             root_service, 
             use_host_in_child ? i_host_ptr : nullptr, 
@@ -332,7 +332,7 @@ struct enclave_setup
     {
         rpc::shared_ptr<yyy::i_example> example_relay_ptr;
         auto err_code = rpc::enclave_service_proxy::create(
-            ++zone_gen_, 
+            {++zone_gen_}, 
             enclave_path, 
             root_service, 
             use_host_in_child ? i_host_ptr : nullptr, 
@@ -583,16 +583,16 @@ TEST(enclave_setup_with_host_in_enclave, call_host_create_enclave_and_throw_away
     rpc::shared_ptr<yyy::i_host> i_host_ptr;
     rpc::shared_ptr<yyy::i_example> i_example_ptr;
 
-    int zone_gen_ = 0;
+    uint64_t zone_gen_ = 0;
     zone_gen = &zone_gen_;
 
-    root_service = rpc::make_shared<rpc::service>(++zone_gen_);
+    root_service = rpc::make_shared<rpc::service>(rpc::zone{++zone_gen_});
     current_host_service = root_service;
     
     i_host_ptr = rpc::shared_ptr<yyy::i_host> (new host());
 
     auto err_code = rpc::enclave_service_proxy::create(
-        ++zone_gen_, 
+        {++zone_gen_}, 
         enclave_path, 
         root_service, 
         i_host_ptr, 
@@ -625,16 +625,16 @@ TEST(enclave_setup_with_host_in_enclave, call_host_create_enclave)
     rpc::shared_ptr<yyy::i_host> i_host_ptr;
     rpc::shared_ptr<yyy::i_example> i_example_ptr;
 
-    int zone_gen_ = 0;
+    uint64_t zone_gen_ = 0;
     zone_gen = &zone_gen_;
 
-    root_service = rpc::make_shared<rpc::service>(++zone_gen_);
+    root_service = rpc::make_shared<rpc::service>(rpc::zone{++zone_gen_});
     current_host_service = root_service;
     
     i_host_ptr = rpc::shared_ptr<yyy::i_host> (new host());
 
     auto err_code = rpc::enclave_service_proxy::create(
-        ++zone_gen_, 
+        {++zone_gen_}, 
         enclave_path, 
         root_service, 
         i_host_ptr, 
@@ -671,16 +671,16 @@ TEST(enclave_setup_with_host_in_enclave, call_host_look_up_app)
     rpc::shared_ptr<yyy::i_host> i_host_ptr;
     rpc::shared_ptr<yyy::i_example> i_example_ptr;
 
-    int zone_gen_ = 0;
+    uint64_t zone_gen_ = 0;
     zone_gen = &zone_gen_;
 
-    root_service = rpc::make_shared<rpc::service>(++zone_gen_);
+    root_service = rpc::make_shared<rpc::service>(rpc::zone{++zone_gen_});
     current_host_service = root_service;
     
     i_host_ptr = rpc::shared_ptr<yyy::i_host> (new host());
 
     auto err_code = rpc::enclave_service_proxy::create(
-        ++zone_gen_, 
+        {++zone_gen_}, 
         enclave_path, 
         root_service, 
         i_host_ptr, 
@@ -721,16 +721,16 @@ TEST(enclave_setup_with_host_in_enclave, call_host_look_up_app_unload_app)
     rpc::shared_ptr<yyy::i_host> i_host_ptr;
     rpc::shared_ptr<yyy::i_example> i_example_ptr;
 
-    int zone_gen_ = 0;
+    uint64_t zone_gen_ = 0;
     zone_gen = &zone_gen_;
 
-    root_service = rpc::make_shared<rpc::service>(++zone_gen_);
+    root_service = rpc::make_shared<rpc::service>(rpc::zone{++zone_gen_});
     current_host_service = root_service;
     
     i_host_ptr = rpc::shared_ptr<yyy::i_host> (new host());
 
     auto err_code = rpc::enclave_service_proxy::create(
-        ++zone_gen_, 
+        {++zone_gen_}, 
         enclave_path, 
         root_service, 
         i_host_ptr, 
@@ -771,16 +771,16 @@ TEST(enclave_setup_with_host_in_enclave, call_host_look_set_app)
     rpc::shared_ptr<yyy::i_host> i_host_ptr;
     rpc::shared_ptr<yyy::i_example> i_example_ptr;
 
-    int zone_gen_ = 0;
+    uint64_t zone_gen_ = 0;
     zone_gen = &zone_gen_;
 
-    root_service = rpc::make_shared<rpc::service>(++zone_gen_);
+    root_service = rpc::make_shared<rpc::service>(rpc::zone{++zone_gen_});
     current_host_service = root_service;
     
     i_host_ptr = rpc::shared_ptr<yyy::i_host> (new host());
 
     auto err_code = rpc::enclave_service_proxy::create(
-        ++zone_gen_, 
+        {++zone_gen_}, 
         enclave_path, 
         root_service, 
         i_host_ptr, 
@@ -822,16 +822,16 @@ TEST(enclave_setup_with_host_in_enclave, call_host_look_up_app_not_return)
     rpc::shared_ptr<yyy::i_host> i_host_ptr;
     rpc::shared_ptr<yyy::i_example> i_example_ptr;
 
-    int zone_gen_ = 0;
+    uint64_t zone_gen_ = 0;
     zone_gen = &zone_gen_;
 
-    root_service = rpc::make_shared<rpc::service>(++zone_gen_);
+    root_service = rpc::make_shared<rpc::service>(rpc::zone{++zone_gen_});
     current_host_service = root_service;
     
     i_host_ptr = rpc::shared_ptr<yyy::i_host> (new host());
 
     auto err_code = rpc::enclave_service_proxy::create(
-        ++zone_gen_, 
+        {++zone_gen_}, 
         enclave_path, 
         root_service, 
         i_host_ptr, 
@@ -874,16 +874,16 @@ TEST(enclave_setup_with_host_in_enclave, call_host_fullmonty)
     rpc::shared_ptr<yyy::i_host> i_host_ptr;
     rpc::shared_ptr<yyy::i_example> i_example_ptr;
 
-    int zone_gen_ = 0;
+    uint64_t zone_gen_ = 0;
     zone_gen = &zone_gen_;
 
-    root_service = rpc::make_shared<rpc::service>(++zone_gen_);
+    root_service = rpc::make_shared<rpc::service>(rpc::zone{++zone_gen_});
     current_host_service = root_service;
     
     i_host_ptr = rpc::shared_ptr<yyy::i_host> (new host());
 
     auto err_code = rpc::enclave_service_proxy::create(
-        ++zone_gen_, 
+        {++zone_gen_}, 
         enclave_path, 
         root_service, 
         i_host_ptr, 
@@ -931,16 +931,16 @@ TEST(enclave_setup_with_host_in_enclave, call_host_look_up_app_not_return_delete
     rpc::shared_ptr<yyy::i_host> i_host_ptr;
     rpc::shared_ptr<yyy::i_example> i_example_ptr;
 
-    int zone_gen_ = 0;
+    uint64_t zone_gen_ = 0;
     zone_gen = &zone_gen_;
 
-    root_service = rpc::make_shared<rpc::service>(++zone_gen_);
+    root_service = rpc::make_shared<rpc::service>(rpc::zone{++zone_gen_});
     current_host_service = root_service;
     
     i_host_ptr = rpc::shared_ptr<yyy::i_host> (new host());
 
     auto err_code = rpc::enclave_service_proxy::create(
-        ++zone_gen_, 
+        {++zone_gen_}, 
         enclave_path, 
         root_service, 
         i_host_ptr, 
@@ -982,16 +982,16 @@ TEST(enclave_setup_with_host_in_enclave, call_host_fullmonty_delete)
     rpc::shared_ptr<yyy::i_host> i_host_ptr;
     rpc::shared_ptr<yyy::i_example> i_example_ptr;
 
-    int zone_gen_ = 0;
+    uint64_t zone_gen_ = 0;
     zone_gen = &zone_gen_;
 
-    root_service = rpc::make_shared<rpc::service>(++zone_gen_);
+    root_service = rpc::make_shared<rpc::service>(rpc::zone{++zone_gen_});
     current_host_service = root_service;
     
     i_host_ptr = rpc::shared_ptr<yyy::i_host> (new host());
 
     auto err_code = rpc::enclave_service_proxy::create(
-        ++zone_gen_, 
+        {++zone_gen_}, 
         enclave_path, 
         root_service, 
         i_host_ptr, 

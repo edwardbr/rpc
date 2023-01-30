@@ -16,7 +16,7 @@
 
 namespace rpc
 {
-    object_stub::object_stub(uint64_t id, service& zone)
+    object_stub::object_stub(object id, service& zone)
         : id_(id)
         , zone_(zone)
     {
@@ -47,7 +47,7 @@ namespace rpc
         stub_map[iface->get_interface_id()] = iface;
     }
 
-    rpc::shared_ptr<i_interface_stub> object_stub::get_interface(uint64_t interface_id)
+    rpc::shared_ptr<i_interface_stub> object_stub::get_interface(interface_ordinal interface_id)
     {
         auto res = stub_map.find(interface_id);
         if(res == stub_map.end())
@@ -55,7 +55,7 @@ namespace rpc
         return res->second;
     }
 
-    int object_stub::call(uint64_t originating_zone_id, uint64_t interface_id, uint64_t method_id, size_t in_size_, const char* in_buf_,
+    int object_stub::call(originator originating_zone_id, caller caller_zone_id, interface_ordinal interface_id, method method_id, size_t in_size_, const char* in_buf_,
                                  std::vector<char>& out_buf_)
     {
         rpc::shared_ptr<i_interface_stub> stub;
@@ -68,12 +68,12 @@ namespace rpc
         }
         if(stub)
         {
-            return stub->call(originating_zone_id, method_id, in_size_, in_buf_, out_buf_);
+            return stub->call(originating_zone_id, caller_zone_id, method_id, in_size_, in_buf_, out_buf_);
         }        
         return rpc::error::INVALID_DATA();
     }
 
-    int object_stub::try_cast(uint64_t interface_id)
+    int object_stub::try_cast(interface_ordinal interface_id)
     {
         int ret = rpc::error::OK();
         auto item = stub_map.find(interface_id);

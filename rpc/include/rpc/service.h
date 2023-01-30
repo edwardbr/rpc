@@ -8,6 +8,7 @@
 #include <assert.h>
 #include <atomic>
 
+#include <rpc/types.h>
 #include <rpc/marshaller.h>
 #include <rpc/remote_pointer.h>
 #include <rpc/casting_interface.h>
@@ -26,56 +27,56 @@ namespace rpc
     {
     protected:
         static std::atomic<uint64_t> zone_count;
-        uint64_t zone_id_ = 0;
+        zone zone_id_ = {0};
         mutable std::atomic<uint64_t> object_id_generator = 0;
 
         // map object_id's to stubs
-        std::unordered_map<uint64_t, rpc::weak_ptr<object_stub>> stubs;
+        std::unordered_map<object, rpc::weak_ptr<object_stub>> stubs;
         // map wrapped objects pointers to stubs
         std::map<void*, rpc::weak_ptr<object_stub>> wrapped_object_to_stub;
 
-        std::map<uint64_t, rpc::weak_ptr<service_proxy>> other_zones;
+        std::unordered_map<uint64_t, rpc::weak_ptr<service_proxy>> other_zones;
 
         // hard lock on the root object
         mutable std::mutex insert_control;
-        rpc::shared_ptr<casting_interface> get_castable_interface(uint64_t object_id, uint64_t interface_id);
+        rpc::shared_ptr<casting_interface> get_castable_interface(object object_id, interface_ordinal interface_id);
 
     public:
-        service(uint64_t zone_id = generate_new_zone_id()) : zone_id_(zone_id){}
+        explicit service(zone zone_id = generate_new_zone_id()) : zone_id_(zone_id){}
         virtual ~service();
 
         virtual bool check_is_empty() const;
-        uint64_t get_zone_id() const {return zone_id_;}
-        void set_zone_id(uint64_t zone_id){zone_id_ = zone_id;}
-        static uint64_t generate_new_zone_id() { return ++zone_count; }
-        uint64_t generate_new_object_id() const { return ++object_id_generator; }
+        zone get_zone_id() const {return zone_id_;}
+        void set_zone_id(zone zone_id){zone_id_ = zone_id;}
+        static zone generate_new_zone_id() { return {++zone_count}; }
+        object generate_new_object_id() const { return {++object_id_generator}; }
 
         template<class T> rpc::interface_descriptor proxy_bind_in_param(const rpc::shared_ptr<T>& iface, rpc::shared_ptr<rpc::object_stub>& stub);
-        template<class T> rpc::interface_descriptor stub_bind_out_param(uint64_t originating_zone_id, const rpc::shared_ptr<T>& iface);
+        template<class T> rpc::interface_descriptor stub_bind_out_param(originator originating_zone_id, const rpc::shared_ptr<T>& iface);
 
-        int send(uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id, uint64_t interface_id, uint64_t method_id, size_t in_size_,
+        int send(originator originating_zone_id, caller caller_zone_id, zone_proxy zone_id, object object_id, interface_ordinal interface_id, method method_id, size_t in_size_,
                         const char* in_buf_, std::vector<char>& out_buf_) override;
 
-        interface_descriptor get_proxy_stub_descriptor(uint64_t originating_zone_id, rpc::casting_interface* pointer,
+        interface_descriptor get_proxy_stub_descriptor(originator originating_zone_id, rpc::casting_interface* pointer,
                                  std::function<rpc::shared_ptr<i_interface_stub>(rpc::shared_ptr<object_stub>)> fn,
                                 bool add_ref,
                                  rpc::shared_ptr<object_stub>& stub);
                                  
         //int add_object(const rpc::shared_ptr<object_stub>& stub);
-        rpc::weak_ptr<object_stub> get_object(uint64_t object_id) const;
+        rpc::weak_ptr<object_stub> get_object(object object_id) const;
 
-        int try_cast(uint64_t zone_id, uint64_t object_id, uint64_t interface_id) override;
-        uint64_t add_ref(uint64_t zone_id, uint64_t object_id, bool out_param) override;
+        int try_cast(zone_proxy zone_id, object object_id, interface_ordinal interface_id) override;
+        uint64_t add_ref(zone_proxy zone_id, object object_id, caller caller_zone_id) override;
         void release_local_stub(const rpc::shared_ptr<rpc::object_stub>& stub);
-        uint64_t release(uint64_t zone_id, uint64_t object_id) override;
+        uint64_t release(zone_proxy zone_id, object object_id, caller caller_zone_id) override;
 
         void inner_add_zone_proxy(const rpc::shared_ptr<service_proxy>& service_proxy);
         virtual void add_zone_proxy(const rpc::shared_ptr<service_proxy>& zone);
-        virtual rpc::shared_ptr<service_proxy> get_zone_proxy(uint64_t originating_zone_id, uint64_t zone_id, bool& new_proxy_added);
-        virtual void remove_zone_proxy(uint64_t zone_id);
-        template<class T> rpc::shared_ptr<T> get_local_interface(uint64_t object_id)
+        virtual rpc::shared_ptr<service_proxy> get_zone_proxy(originator originating_zone_id, caller caller_zone_id, zone_proxy zone_id, bool& new_proxy_added);
+        virtual void remove_zone_proxy(zone_proxy zone_id);
+        template<class T> rpc::shared_ptr<T> get_local_interface(object object_id)
         {
-            return rpc::static_pointer_cast<T>(get_castable_interface(object_id, T::id));
+            return rpc::static_pointer_cast<T>(get_castable_interface(object_id, {T::id}));
         }
 
         friend service_proxy;
@@ -90,7 +91,7 @@ namespace rpc
         rpc::shared_ptr<rpc::service_proxy> parent_service_;
         bool child_does_not_use_parents_interface_ = false;
     public:
-        child_service(uint64_t zone_id = generate_new_zone_id()) : 
+        explicit child_service(zone zone_id = generate_new_zone_id()) : 
             service(zone_id)
         {}
 
@@ -98,14 +99,14 @@ namespace rpc
 
         void set_parent(const rpc::shared_ptr<rpc::service_proxy>& parent_service, bool child_does_not_use_parents_interface);
         bool check_is_empty() const override;
-        uint64_t get_root_object_id() const;
-        rpc::shared_ptr<service_proxy> get_zone_proxy(uint64_t originating_zone_id, uint64_t zone_id, bool& new_proxy_added) override;
+        object get_root_object_id() const;
+        rpc::shared_ptr<service_proxy> get_zone_proxy(originator originating_zone_id, caller caller_zone_id, zone_proxy zone_id, bool& new_proxy_added) override;
     };
 
 
     template<class T> 
     rpc::interface_descriptor create_interface_stub(rpc::service& serv, const rpc::shared_ptr<T>& iface)
     {
-        return serv.stub_bind_out_param(serv.get_zone_id(), iface);       
+        return serv.stub_bind_out_param({*serv.get_zone_id()}, iface);       
     }
 }

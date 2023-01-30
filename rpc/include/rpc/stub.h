@@ -7,6 +7,7 @@
 #include <assert.h>
 #include <atomic>
 
+#include <rpc/types.h>
 #include <rpc/marshaller.h>
 #include <rpc/remote_pointer.h>
 #include <rpc/casting_interface.h>
@@ -21,17 +22,17 @@ namespace rpc
 
     class object_stub
     {
-        uint64_t id_ = 0;
+        object id_ = {0};
         // stubs have stong pointers
-        std::unordered_map<uint64_t, shared_ptr<i_interface_stub>> stub_map;
+        std::unordered_map<interface_ordinal, shared_ptr<i_interface_stub>> stub_map;
         shared_ptr<object_stub> p_this;
         std::atomic<uint64_t> reference_count = 0;
         service& zone_;
 
     public:
-        object_stub(uint64_t id, service& zone);
+        object_stub(object id, service& zone);
         ~object_stub();
-        uint64_t get_id() const
+        object get_id() const
         {
             return id_; 
         }
@@ -46,12 +47,12 @@ namespace rpc
 
         service& get_zone() const { return zone_; }
 
-        int call(uint64_t originating_zone_id, uint64_t interface_id, uint64_t method_id, size_t in_size_, const char* in_buf_,
+        int call(originator originating_zone_id, caller caller_zone_id, interface_ordinal interface_id, method method_id, size_t in_size_, const char* in_buf_,
                         std::vector<char>& out_buf_);
-        int try_cast(uint64_t interface_id);
+        int try_cast(interface_ordinal interface_id);
 
         void add_interface(const shared_ptr<i_interface_stub>& iface);
-        shared_ptr<i_interface_stub> get_interface(uint64_t interface_id);
+        shared_ptr<i_interface_stub> get_interface(interface_ordinal interface_id);
 
         uint64_t add_ref();
         uint64_t release();
@@ -61,10 +62,10 @@ namespace rpc
     class i_interface_stub
     {
     public:
-        virtual uint64_t get_interface_id() const = 0;
-        virtual int call(uint64_t originating_zone_id, uint64_t method_id, size_t in_size_, const char* in_buf_, std::vector<char>& out_buf_)
+        virtual interface_ordinal get_interface_id() const = 0;
+        virtual int call(originator originating_zone_id, caller caller_zone_id, method method_id, size_t in_size_, const char* in_buf_, std::vector<char>& out_buf_)
             = 0;
-        virtual int cast(uint64_t interface_id, shared_ptr<i_interface_stub>& new_stub) = 0;
+        virtual int cast(interface_ordinal interface_id, shared_ptr<i_interface_stub>& new_stub) = 0;
         virtual weak_ptr<object_stub> get_object_stub() const = 0;
         virtual void* get_pointer() const = 0;
         virtual shared_ptr<casting_interface> get_castable_interface() const = 0;

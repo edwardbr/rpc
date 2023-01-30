@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include <rpc/types.h>
 
 //copied from spdlog
 #define I_TELEMETRY_LEVEL_TRACE 0
@@ -28,31 +29,32 @@ namespace rpc
         };
         virtual ~i_telemetry_service() = default;
 
-        virtual void on_service_creation(const char* name, uint64_t zone_id) const = 0;
-        virtual void on_service_deletion(const char* name, uint64_t zone_id) const = 0;
-        virtual void on_service_proxy_creation(const char* name, uint64_t originating_zone_id, uint64_t zone_id) const = 0;
-        virtual void on_service_proxy_deletion(const char* name, uint64_t originating_zone_id, uint64_t zone_id) const = 0;
-        virtual void on_service_proxy_try_cast(const char* name, uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id, uint64_t interface_id) const = 0;
-        virtual void on_service_proxy_add_ref(const char* name, uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id) const = 0;
-        virtual void on_service_proxy_release(const char* name, uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id) const = 0;  
-        virtual void on_service_proxy_add_external_ref(const char* name, uint64_t originating_zone_id, uint64_t zone_id, int ref_count) const = 0;
-        virtual void on_service_proxy_release_external_ref(const char* name, uint64_t originating_zone_id, uint64_t zone_id, int ref_count) const = 0;  
+        virtual void on_service_creation(const char* name, zone zone_id) const = 0;
+        virtual void on_service_deletion(const char* name, zone zone_id) const = 0;
 
-        virtual void on_impl_creation(const char* name, uint64_t interface_id) const = 0;
-        virtual void on_impl_deletion(const char* name, uint64_t interface_id) const = 0;
+        virtual void on_service_proxy_creation(const char* name, zone originating_zone_id, zone_proxy zone_id) const = 0;
+        virtual void on_service_proxy_deletion(const char* name, zone originating_zone_id, zone_proxy zone_id) const = 0;
+        virtual void on_service_proxy_try_cast(const char* name, zone originating_zone_id, zone_proxy zone_id, object object_id, interface_ordinal interface_id) const = 0;
+        virtual void on_service_proxy_add_ref(const char* name, zone originating_zone_id, zone_proxy zone_id, object object_id, caller caller_zone_id) const = 0;
+        virtual void on_service_proxy_release(const char* name, zone originating_zone_id, zone_proxy zone_id, object object_id, caller caller_zone_id) const = 0;  
+        virtual void on_service_proxy_add_external_ref(const char* name, zone originating_zone_id, zone_proxy zone_id, int ref_count, caller caller_zone_id) const = 0;
+        virtual void on_service_proxy_release_external_ref(const char* name, zone originating_zone_id, zone_proxy zone_id, int ref_count, caller caller_zone_id) const = 0;  
 
-        virtual void on_stub_creation(const char* name, uint64_t zone_id, uint64_t object_id, uint64_t interface_id) const = 0;    
-        virtual void on_stub_deletion(const char* name, uint64_t zone_id, uint64_t object_id, uint64_t interface_id) const = 0;
-        virtual void on_stub_send(uint64_t zone_id, uint64_t object_id, uint64_t interface_id, uint64_t method_id) const = 0;
-        virtual void on_stub_add_ref(uint64_t zone_id, uint64_t object_id, uint64_t interface_id, uint64_t count) const = 0;
-        virtual void on_stub_release(uint64_t zone_id, uint64_t object_id, uint64_t interface_id, uint64_t count) const = 0;
+        virtual void on_impl_creation(const char* name, interface_ordinal interface_id) const = 0;
+        virtual void on_impl_deletion(const char* name, interface_ordinal interface_id) const = 0;
 
-        virtual void on_object_proxy_creation(uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id) const = 0;
-        virtual void on_object_proxy_deletion(uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id) const = 0;
+        virtual void on_stub_creation(const char* name, zone zone_id, object object_id, interface_ordinal interface_id) const = 0;    
+        virtual void on_stub_deletion(const char* name, zone zone_id, object object_id, interface_ordinal interface_id) const = 0;
+        virtual void on_stub_send(zone zone_id, object object_id, interface_ordinal interface_id, method method_id) const = 0;
+        virtual void on_stub_add_ref(rpc::zone_proxy zone_id, rpc::object object_id, rpc::interface_ordinal interface_id, uint64_t count, caller caller_zone_id) const = 0;
+        virtual void on_stub_release(rpc::zone_proxy zone_id, rpc::object object_id, rpc::interface_ordinal interface_id, uint64_t count, caller caller_zone_id) const = 0;
 
-        virtual void on_interface_proxy_creation(const char* name, uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id, uint64_t interface_id) const = 0;
-        virtual void on_interface_proxy_deletion(const char* name, uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id, uint64_t interface_id) const = 0;
-        virtual void on_interface_proxy_send(const char* name, uint64_t originating_zone_id, uint64_t zone_id, uint64_t object_id, uint64_t interface_id, uint64_t method_id) const = 0;
+        virtual void on_object_proxy_creation(zone originating_zone_id, zone_proxy zone_id, object object_id) const = 0;
+        virtual void on_object_proxy_deletion(zone originating_zone_id, zone_proxy zone_id, object object_id) const = 0;
+
+        virtual void on_interface_proxy_creation(const char* name, zone originating_zone_id, zone_proxy zone_id, object object_id, interface_ordinal interface_id) const = 0;
+        virtual void on_interface_proxy_deletion(const char* name, zone originating_zone_id, zone_proxy zone_id, object object_id, interface_ordinal interface_id) const = 0;
+        virtual void on_interface_proxy_send(const char* name, zone originating_zone_id, zone_proxy zone_id, object object_id, interface_ordinal interface_id, method method_id) const = 0;
 
         virtual void message(level_enum level, const char* message) const = 0;  
     };

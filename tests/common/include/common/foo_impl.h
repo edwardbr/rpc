@@ -1,6 +1,7 @@
 #pragma once
 
 #include <example/example.h>
+#include <rpc/types.h>
 #include <rpc/i_telemetry_service.h>
 
 void log(const std::string& data)
@@ -14,11 +15,11 @@ namespace marshalled_tests
     {
         const rpc::i_telemetry_service* telemetry_ = nullptr;
         void* get_address() const override { return (void*)this; }
-        const rpc::casting_interface* query_interface(uint64_t interface_id) const override
+        const rpc::casting_interface* query_interface(rpc::interface_ordinal interface_id) const override
         {
-            if (xxx::i_baz::id == interface_id)
+            if (xxx::i_baz::id == *interface_id)
                 return static_cast<const xxx::i_baz*>(this);
-            if (xxx::i_bar::id == interface_id)
+            if (xxx::i_bar::id == *interface_id)
                 return static_cast<const xxx::i_bar*>(this);
             return nullptr;
         }
@@ -28,13 +29,13 @@ namespace marshalled_tests
             : telemetry_(telemetry)
         {
             if (telemetry_)
-                telemetry_->on_impl_creation("baz", xxx::i_baz::id);
+                telemetry_->on_impl_creation("baz", {xxx::i_baz::id});
         }
 
         virtual ~baz()
         {
             if (telemetry_)
-                telemetry_->on_impl_deletion("baz", xxx::i_baz::id);
+                telemetry_->on_impl_deletion("baz", {xxx::i_baz::id});
         }
         int callback(int val) override
         {
@@ -58,9 +59,9 @@ namespace marshalled_tests
     {
         const rpc::i_telemetry_service* telemetry_ = nullptr;
         void* get_address() const override { return (void*)this; }
-        const rpc::casting_interface* query_interface(uint64_t interface_id) const override
+        const rpc::casting_interface* query_interface(rpc::interface_ordinal interface_id) const override
         {
-            if (xxx::i_foo::id == interface_id)
+            if (xxx::i_foo::id == *interface_id)
                 return static_cast<const xxx::i_foo*>(this);
             return nullptr;
         }
@@ -72,12 +73,12 @@ namespace marshalled_tests
             : telemetry_(telemetry)
         {
             if (telemetry_)
-                telemetry_->on_impl_creation("foo", xxx::i_foo::id);
+                telemetry_->on_impl_creation("foo", {xxx::i_foo::id});
         }
         virtual ~foo()
         {
             if (telemetry_)
-                telemetry_->on_impl_deletion("foo", xxx::i_foo::id);
+                telemetry_->on_impl_deletion("foo", {xxx::i_foo::id});
         }
         error_code do_something_in_val(int val) override
         {
@@ -288,11 +289,11 @@ namespace marshalled_tests
         const rpc::i_telemetry_service* telemetry_ = nullptr;
 
         void* get_address() const override { return (void*)this; }
-        const rpc::casting_interface* query_interface(uint64_t interface_id) const override
+        const rpc::casting_interface* query_interface(rpc::interface_ordinal interface_id) const override
         {
-            if (xxx::i_bar::id == interface_id)
+            if (xxx::i_bar::id == *interface_id)
                 return static_cast<const xxx::i_bar*>(this);
-            if (xxx::i_baz::id == interface_id)
+            if (xxx::i_baz::id == *interface_id)
                 return static_cast<const xxx::i_baz*>(this);
             return nullptr;
         }
@@ -302,12 +303,12 @@ namespace marshalled_tests
             : telemetry_(telemetry)
         {
             if (telemetry_)
-                telemetry_->on_impl_creation("multiple_inheritance", xxx::i_bar::id);
+                telemetry_->on_impl_creation("multiple_inheritance", {xxx::i_bar::id});
         }
         virtual ~multiple_inheritance()
         {
             if (telemetry_)
-                telemetry_->on_impl_deletion("multiple_inheritance", xxx::i_bar::id);
+                telemetry_->on_impl_deletion("multiple_inheritance", {xxx::i_bar::id});
         }
 
         error_code do_something_else(int val) override { return rpc::error::OK(); }
@@ -328,9 +329,9 @@ namespace marshalled_tests
         const rpc::i_telemetry_service* telemetry_ = nullptr;
         rpc::shared_ptr<yyy::i_host> host_;
         void* get_address() const override { return (void*)this; }
-        const rpc::casting_interface* query_interface(uint64_t interface_id) const override
+        const rpc::casting_interface* query_interface(rpc::interface_ordinal interface_id) const override
         {
-            if (yyy::i_example::id == interface_id)
+            if (yyy::i_example::id == *interface_id)
                 return static_cast<const yyy::i_example*>(this);
             return nullptr;
         }
@@ -341,12 +342,12 @@ namespace marshalled_tests
             , host_(host)
         {
             if (telemetry_)
-                telemetry_->on_impl_creation("example", yyy::i_example::id);
+                telemetry_->on_impl_creation("example", {yyy::i_example::id});
         }
         virtual ~example()
         {
             if (telemetry_)
-                telemetry_->on_impl_deletion("example", yyy::i_example::id);
+                telemetry_->on_impl_deletion("example", {yyy::i_example::id});
         }
 
         error_code create_multiple_inheritance(rpc::shared_ptr<xxx::i_baz>& target) override

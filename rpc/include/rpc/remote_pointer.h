@@ -2134,7 +2134,7 @@ element_type*>::value>> shared_ptr(unique_ptr<_Yp, _Dp>&& __r) : __ptr_(__r.get(
     template<class T1, class T2>
     [[nodiscard]] inline shared_ptr<T1> dynamic_pointer_cast(const shared_ptr<T2>& from) noexcept
     {
-        auto* ptr = const_cast<T1*>(static_cast<const T1*>(from->query_interface(T1::id)));
+        auto* ptr = const_cast<T1*>(static_cast<const T1*>(from->query_interface({T1::id})));
         if (ptr)
             return shared_ptr<T1>(from, ptr);
         auto proxy_ = from->query_proxy_base();
