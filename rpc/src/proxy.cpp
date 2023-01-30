@@ -35,7 +35,7 @@ namespace rpc
         LOG_STR(message.c_str(), message.size());
 
         if(stub_needs_add_ref)
-            service_proxy_->add_ref(service_proxy_->get_destination_zone_id(), object_id_, service_proxy_->get_zone_id().as_caller()); 
+            service_proxy_->add_ref(service_proxy_->get_destination_zone_id(), object_id_, service_proxy_->get_zone_id().as_caller(), false); 
         if(service_proxy_needs_add_ref)
             service_proxy_->add_external_ref();
     }

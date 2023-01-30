@@ -66,14 +66,18 @@ namespace rpc
             }
             return service_.lock()->try_cast(destination_zone_id, object_id, interface_id);
         }
-        uint64_t add_ref(destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id) override
+        uint64_t add_ref(destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id, bool out_param) override
         {
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
             {
                 telemetry_service->on_service_proxy_add_ref("local_service_proxy", get_zone_id(), destination_zone_id,
                                                             object_id, caller_zone_id);
             }
-            auto ret = service_.lock()->add_ref(destination_zone_id, object_id, caller_zone_id);
+            auto ret = service_.lock()->add_ref(destination_zone_id, object_id, caller_zone_id, false);    
+            if(!out_param && ret != std::numeric_limits<uint64_t>::max())
+            {
+                add_external_ref();
+            }
             return ret;
         }
         uint64_t release(destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id) override
@@ -84,6 +88,10 @@ namespace rpc
                                                             object_id, caller_zone_id);
             }
             auto ret = service_.lock()->release(destination_zone_id, object_id, caller_zone_id);
+            if(ret != std::numeric_limits<uint64_t>::max())
+            {
+                release_external_ref();
+            }  
             return ret;
         }
     };
@@ -143,14 +151,18 @@ namespace rpc
             }
             return service_->try_cast(destination_zone_id, object_id, interface_id);
         }
-        uint64_t add_ref(destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id) override
+        uint64_t add_ref(destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id, bool out_param) override
         {
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
             {
                 telemetry_service->on_service_proxy_add_ref("local_child_service_proxy", get_zone_id(),
                                                             destination_zone_id, object_id, caller_zone_id);
             }
-            auto ret = service_->add_ref(destination_zone_id, object_id, caller_zone_id);
+            auto ret = service_->add_ref(destination_zone_id, object_id, caller_zone_id, false);    
+            if(!out_param && ret != std::numeric_limits<uint64_t>::max())
+            {
+                add_external_ref();
+            }
             return ret;
         }
         uint64_t release(destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id) override
@@ -161,6 +173,10 @@ namespace rpc
                                                             destination_zone_id, object_id, caller_zone_id);
             }
             auto ret = service_->release(destination_zone_id, object_id, caller_zone_id);
+            if(ret != std::numeric_limits<uint64_t>::max())
+            {
+                release_external_ref();
+            }  
             return ret;            
         }
     };

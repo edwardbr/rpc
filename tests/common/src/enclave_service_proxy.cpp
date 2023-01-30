@@ -133,7 +133,7 @@ namespace rpc
         return err_code;
     }
 
-    uint64_t enclave_service_proxy::add_ref(destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id)
+    uint64_t enclave_service_proxy::add_ref(destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id, bool out_param)
     {
         if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
         {
@@ -149,6 +149,10 @@ namespace rpc
                 telemetry_service->message(rpc::i_telemetry_service::err, "add_ref_enclave failed");
             }
             return std::numeric_limits<uint64_t>::max();
+        }        
+        if(!out_param && ret != std::numeric_limits<uint64_t>::max())
+        {
+            add_external_ref();
         }
         return ret;
     }
@@ -170,6 +174,10 @@ namespace rpc
             }
             return std::numeric_limits<uint64_t>::max();
         }
+        if(ret != std::numeric_limits<uint64_t>::max())
+        {
+            release_external_ref();
+        }  
         return ret;
     }
 #endif

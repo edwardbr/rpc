@@ -200,6 +200,7 @@ namespace rpc
         std::unordered_map<object, rpc::weak_ptr<object_proxy>> proxies_;
         std::mutex insert_control_;
 
+        zone zone_id_ = {0};
         destination_zone destination_zone_id_ = {0};
         destination_channel_zone destination_channel_zone_ = {0};
         caller_zone caller_zone_id_ = {0};
@@ -214,6 +215,7 @@ namespace rpc
                         const rpc::shared_ptr<service>& operating_zone_service,
                         caller_zone caller_zone_id,
                         const rpc::i_telemetry_service* telemetry_service) : 
+            zone_id_(operating_zone_service->get_zone_id()),
             destination_zone_id_(destination_zone_id),
             operating_zone_service_(operating_zone_service),
             caller_zone_id_(caller_zone_id),
@@ -223,6 +225,7 @@ namespace rpc
         }
 
         service_proxy(const service_proxy& other) : 
+                zone_id_(other.zone_id_),
                 destination_zone_id_(other.destination_zone_id_),
                 operating_zone_service_(other.operating_zone_service_),
                 caller_zone_id_(other.caller_zone_id_),
@@ -256,7 +259,7 @@ namespace rpc
             auto count = ++dependent_services_count_;
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
             {
-                telemetry_service->on_service_proxy_add_external_ref("service_proxy", operating_zone_service_.lock()->get_zone_id(), destination_zone_id_, count, caller_zone_id_);
+                telemetry_service->on_service_proxy_add_external_ref("service_proxy", zone_id_, destination_zone_id_, count, caller_zone_id_);
             }            
             assert(count >= 1);
             if(count == 1)
@@ -272,7 +275,7 @@ namespace rpc
             auto count = --dependent_services_count_;
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
             {
-                telemetry_service->on_service_proxy_release_external_ref("service_proxy", operating_zone_service_.lock()->get_zone_id(), destination_zone_id_, count, caller_zone_id_);
+                telemetry_service->on_service_proxy_release_external_ref("service_proxy", zone_id_, destination_zone_id_, count, caller_zone_id_);
             }            
             assert(count >= 0);
             if(count == 0)
@@ -293,7 +296,7 @@ namespace rpc
             ret->weak_this_ = ret;
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
             {
-                telemetry_service->on_service_proxy_creation("service_proxy", operating_zone_service_.lock()->get_zone_id(), ret->get_destination_zone_id());
+                telemetry_service->on_service_proxy_creation("service_proxy", zone_id_, ret->get_destination_zone_id());
             }
             get_operating_zone_service()->inner_add_zone_proxy(ret);
             return ret;
@@ -303,7 +306,7 @@ namespace rpc
         rpc::shared_ptr<service_proxy const> shared_from_this() const { return rpc::shared_ptr<service_proxy const>(weak_this_); }
 
         //the zone where this proxy is created
-        zone get_zone_id() const {return operating_zone_service_.lock()->get_zone_id();}
+        zone get_zone_id() const {return zone_id_;}
         //the ultimate zone where this proxy is calling
         destination_zone get_destination_zone_id() const {return destination_zone_id_;}
         //the intermediate zone where this proxy is calling

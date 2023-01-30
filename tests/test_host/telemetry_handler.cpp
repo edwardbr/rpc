@@ -58,7 +58,7 @@ extern "C"
         {
             return rpc::error::TRANSPORT_ERROR();
         }
-        return root_service->add_ref({zone_id}, {object_id}, {caller_zone_id});
+        return root_service->add_ref({zone_id}, {object_id}, {caller_zone_id}, false);
     }
     uint64_t release_host(uint64_t zone_id, uint64_t object_id, uint64_t caller_zone_id)
     {

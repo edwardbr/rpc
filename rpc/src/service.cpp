@@ -159,10 +159,10 @@ namespace rpc
             if(add_ref && caller_channel_zone_id != destination_zone_id.as_caller_channel())
             {
                 auto destination_zone = object_proxy->get_service_proxy();
-                auto cloned_from_zone_id = destination_zone->get_destination_channel_zone_id();
+                auto destination_channel_zone_id = destination_zone->get_destination_channel_zone_id();
                 if(zone_id_.as_destination() != destination_zone_id)
                     destination_zone->add_external_ref();
-                destination_zone->add_ref(destination_zone_id, object_id, get_zone_id().as_caller());
+                destination_zone->add_ref(destination_zone_id, object_id, get_zone_id().as_caller(), false/*caller_zone_id == destination_channel_zone_id*/);
             }
             return {object_id, destination_zone_id};
         }
@@ -231,7 +231,7 @@ namespace rpc
         }
     }
 
-    uint64_t service::add_ref(destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id)
+    uint64_t service::add_ref(destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id, bool out_param)
     {
         if(destination_zone_id != get_zone_id().as_destination())
         {
@@ -248,7 +248,7 @@ namespace rpc
             {
                 return std::numeric_limits<uint64_t>::max();
             }
-            return other_zone->add_ref(destination_zone_id, object_id, caller_zone_id);
+            return other_zone->add_ref(destination_zone_id, object_id, caller_zone_id, false);
         }
         else
         {

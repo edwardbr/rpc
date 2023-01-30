@@ -21,7 +21,7 @@ namespace rpc
                                 const char* in_buf_, std::vector<char>& out_buf_)
             = 0;
         virtual int try_cast(destination_zone destination_zone_id, object object_id, interface_ordinal interface_id) = 0;
-        virtual uint64_t add_ref(destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id) = 0;
+        virtual uint64_t add_ref(destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id, bool out_param) = 0;
         virtual uint64_t release(destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id) = 0;
     };
 
