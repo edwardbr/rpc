@@ -16,8 +16,6 @@ namespace rpc
         type_id(const type_id<Type>& initial_id) = default;
 
         //getter
-        constexpr uint64_t operator()() const {return id;}
-        //uint64_t operator*() const {return id;}
         constexpr uint64_t get_val() const {return id;}//only for c calls
         uint64_t& get_ref() {return id;}//for c calls
 
@@ -26,11 +24,9 @@ namespace rpc
         void operator=(const type_id<Type>& val) {id = val.id;}
 
         //setter
-//        bool operator==(uint64_t val) const {return id == val;}
         constexpr bool operator==(const type_id<Type>& val) const {return id == val.id;}
 
         //setter
-//        bool operator!=(uint64_t val) const {return id != val;}
         constexpr bool operator!=(const type_id<Type>& val) const {return id != val.id;}
 
         //less
