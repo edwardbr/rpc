@@ -284,10 +284,22 @@ namespace rpc
                 {
                     other_zone = found->second.lock();
                 }
-                else
+                
+                if(!other_zone)
                 {
                     found = other_zones.find({destination_zone_id, get_zone_id().as_caller()});
                     if(found != other_zones.end())
+                    {
+                        auto tmp = found->second.lock();
+                        other_zone = tmp->clone_for_zone(destination_zone_id, caller_zone_id);
+                        zone_cloned = true;
+                    }
+                }
+
+                if(!other_zone)
+                {
+                    auto found = other_zones.lower_bound({destination_zone_id, {0}});
+                    if(found != other_zones.end() && found->first.dest == destination_zone_id)
                     {
                         auto tmp = found->second.lock();
                         other_zone = tmp->clone_for_zone(destination_zone_id, caller_zone_id);

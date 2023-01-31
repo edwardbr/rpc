@@ -223,6 +223,7 @@ namespace rpc
         service_proxy(const service_proxy& other) : 
                 zone_id_(other.zone_id_),
                 destination_zone_id_(other.destination_zone_id_),
+                destination_channel_zone_(destination_channel_zone_),
                 operating_zone_service_(other.operating_zone_service_),
                 caller_zone_id_(other.caller_zone_id_),
                 telemetry_service_(other.telemetry_service_),
@@ -234,7 +235,8 @@ namespace rpc
         mutable rpc::weak_ptr<service_proxy> weak_this_;
         void set_destination_zone_id(destination_zone destination_zone_id) 
         {
-            destination_channel_zone_ = destination_zone_id_.as_destination_channel();
+            if(!destination_channel_zone_.is_set())
+                destination_channel_zone_ = destination_zone_id_.as_destination_channel();
             destination_zone_id_ = destination_zone_id;
         }
 
