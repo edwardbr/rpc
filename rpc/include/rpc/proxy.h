@@ -394,6 +394,7 @@ namespace rpc
             if(!op)
             {
                 op = object_proxy::create(encap.object_id, service_proxy);
+//shouldnt service_proxy->get_zone_id().as_caller() be service_proxy->get_caller_id()?
                 service_proxy->add_ref(service_proxy->get_destination_zone_id(), encap.object_id, service_proxy->get_zone_id().as_caller(), !new_proxy_added); 
             }
             auto ret = op->query_interface(iface, false);        
@@ -446,6 +447,7 @@ namespace rpc
         if(service_proxy->get_destination_zone_id() != encap.destination_zone_id)
         {
             //if the zone is different lookup or clone the right proxy
+            //the fist parameter looks wonky but it is the zone from where this object came
             service_proxy = serv->get_zone_proxy(service_proxy->get_destination_zone_id().as_caller_channel(), caller_zone_id, {encap.destination_zone_id}, new_proxy_added);
         }
 
@@ -460,7 +462,8 @@ namespace rpc
         {
             //else we create an object_proxy and add ref to the service proxy as it has a new object to monitor
             op = object_proxy::create(encap.object_id, service_proxy);
-            service_proxy->add_external_ref();
+            if(!new_proxy_added)
+                service_proxy->add_external_ref();
         }
         return op->query_interface(val, false);
     }

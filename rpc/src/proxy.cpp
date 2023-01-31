@@ -56,6 +56,8 @@ namespace rpc
         LOG_STR(message.c_str(), message.size());
 
         service_proxy_->remove_object_proxy(object_id_);
+        //assert(service_proxy_->get_caller_zone_id() == service_proxy_->get_zone_id().as_caller());
+        //shouldnt service_proxy->get_zone_id().as_caller() be service_proxy->get_caller_id()?
         service_proxy_->release(service_proxy_->get_destination_zone_id(), object_id_, service_proxy_->get_zone_id().as_caller()); 
         service_proxy_ = nullptr;
     }
@@ -64,8 +66,8 @@ namespace rpc
                                   std::vector<char>& out_buf_)
     {
         return service_proxy_->send(
-            service_proxy_->get_zone_id().as_caller_channel(), 
-            service_proxy_->get_caller_zone_id(), 
+            caller_channel_zone(), 
+            service_proxy_->get_zone_id().as_caller(), 
             service_proxy_->get_destination_zone_id(), 
             object_id_, 
             interface_id, 

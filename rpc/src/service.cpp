@@ -165,7 +165,21 @@ namespace rpc
                 && caller_channel_zone_id.as_destination_channel() == destination_channel_zone_id)
                 needs_external_add_ref = false;
     
-            destination_zone->add_ref(destination_zone_id, object_id, get_zone_id().as_caller(), needs_external_add_ref);
+            rpc::shared_ptr<service_proxy> other_zone = destination_zone;
+            if(destination_zone->get_caller_zone_id() != caller_zone_id)
+            {
+                auto found = other_zones.find({destination_zone_id, caller_zone_id});//we dont need to get caller id for this
+                if(found != other_zones.end())
+                {
+                    other_zone = found->second.lock();
+                }
+                else
+                {
+                    other_zone = destination_zone->clone_for_zone(destination_zone_id, caller_zone_id);
+                    needs_external_add_ref = false;
+                }
+            }
+            other_zone->add_ref(destination_zone_id, object_id, caller_zone_id, needs_external_add_ref);
         }
  
         return {object_id, destination_zone_id};
