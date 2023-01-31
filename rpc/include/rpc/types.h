@@ -32,6 +32,7 @@ namespace rpc
         //less
         constexpr bool operator<(uint64_t val) const {return id < val;}
         constexpr bool operator<(const uint64_t& val) const {return id < val;}
+        constexpr bool operator<(const type_id<Type>& val) const {return id < val.id;}
 
         constexpr bool is_set() const noexcept
         {

@@ -20,7 +20,7 @@ namespace rpc
         {
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
             {
-                telemetry_service->on_service_proxy_creation("local_service_proxy", get_zone_id(), get_destination_zone_id());
+                telemetry_service->on_service_proxy_creation("local_service_proxy", get_zone_id(), get_destination_zone_id(), operating_zone_service->get_zone_id().as_caller());
             }
         }
 
@@ -33,7 +33,7 @@ namespace rpc
         {
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
             {
-                telemetry_service->on_service_proxy_deletion("local_service_proxy", get_zone_id(), get_destination_zone_id());
+                telemetry_service->on_service_proxy_deletion("local_service_proxy", get_zone_id(), get_destination_zone_id(), get_caller_zone_id());
             }
         }
 
@@ -100,12 +100,12 @@ namespace rpc
         local_child_service_proxy(const rpc::shared_ptr<service>& serv,
                                   const rpc::shared_ptr<service>& operating_zone_service,
                                   const rpc::i_telemetry_service* telemetry_service)
-            : service_proxy(serv->get_zone_id().as_destination(), operating_zone_service, serv->get_zone_id().as_caller(), telemetry_service),
+            : service_proxy(serv->get_zone_id().as_destination(), operating_zone_service, operating_zone_service->get_zone_id().as_caller(), telemetry_service),
             service_(serv)
         {
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
             {
-                telemetry_service->on_service_proxy_creation("local_child_service_proxy", get_zone_id(), get_destination_zone_id());
+                telemetry_service->on_service_proxy_creation("local_child_service_proxy", get_zone_id(), get_destination_zone_id(), operating_zone_service->get_zone_id().as_caller());
             }
         }
 
@@ -117,7 +117,7 @@ namespace rpc
         {
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
             {
-                telemetry_service->on_service_proxy_deletion("local_child_service_proxy", get_zone_id(), get_destination_zone_id());
+                telemetry_service->on_service_proxy_deletion("local_child_service_proxy", get_zone_id(), get_destination_zone_id(), get_caller_zone_id());
             }
         }
         static rpc::shared_ptr<local_child_service_proxy> create(const rpc::shared_ptr<service>& serv,

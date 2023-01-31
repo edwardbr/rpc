@@ -245,7 +245,7 @@ namespace rpc
             auto operating_zone_service = operating_zone_service_.lock();
             if(operating_zone_service)
             {
-                operating_zone_service->remove_zone_proxy(destination_zone_id_);
+                operating_zone_service->remove_zone_proxy(destination_zone_id_, caller_zone_id_);
             }
         }
         
@@ -292,9 +292,10 @@ namespace rpc
             ret->weak_this_ = ret;
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
             {
-                telemetry_service->on_service_proxy_creation("service_proxy", zone_id_, ret->get_destination_zone_id());
+                telemetry_service->on_service_proxy_creation("service_proxy", zone_id_, ret->get_destination_zone_id(), caller_zone_id);
             }
             get_operating_zone_service()->inner_add_zone_proxy(ret);
+            ret->add_external_ref();
             return ret;
         }
 
@@ -446,8 +447,6 @@ namespace rpc
         {
             //if the zone is different lookup or clone the right proxy
             service_proxy = serv->get_zone_proxy(service_proxy->get_destination_zone_id().as_caller_channel(), caller_zone_id, {encap.destination_zone_id}, new_proxy_added);
-            if(service_proxy && new_proxy_added)
-                service_proxy->add_external_ref();
         }
 
         rpc::shared_ptr<object_proxy> op = service_proxy->get_object_proxy(encap.object_id);
@@ -459,11 +458,9 @@ namespace rpc
         }
         else
         {
+            //else we create an object_proxy and add ref to the service proxy as it has a new object to monitor
             op = object_proxy::create(encap.object_id, service_proxy);
-            if(!new_proxy_added && encap.destination_zone_id == sp->get_destination_zone_id())
-            {
-                service_proxy->add_external_ref();
-            }
+            service_proxy->add_external_ref();
         }
         return op->query_interface(val, false);
     }
@@ -497,8 +494,6 @@ namespace rpc
                 caller_zone_id, 
                 encap.destination_zone_id, 
                 new_proxy_added);
-            if(service_proxy && new_proxy_added)
-                service_proxy->add_external_ref();
         }
 
         rpc::shared_ptr<object_proxy> op = service_proxy->get_object_proxy(encap.object_id);

@@ -23,7 +23,7 @@ namespace rpc
     {
         if(auto* telemetry_service = service_proxy_->get_telemetry_service();telemetry_service)
         {
-            telemetry_service->on_object_proxy_creation(service_proxy_->get_zone_id(), service_proxy_->get_destination_zone_id(), object_id);
+            telemetry_service->on_object_proxy_creation(service_proxy_->get_zone_id(), service_proxy_->get_destination_zone_id(), object_id, service_proxy->get_caller_zone_id());
         }
 
         auto message = std::string("object_proxy::object_proxy zone ") + std::to_string(service_proxy_->get_destination_zone_id().get_val()) 
@@ -46,7 +46,7 @@ namespace rpc
     { 
         if(auto* telemetry_service = service_proxy_->get_telemetry_service();telemetry_service)
         {
-            telemetry_service->on_object_proxy_deletion(service_proxy_->get_zone_id(), service_proxy_->get_destination_zone_id(), object_id_);
+            telemetry_service->on_object_proxy_deletion(service_proxy_->get_zone_id(), service_proxy_->get_destination_zone_id(), object_id_, service_proxy_->get_caller_zone_id());
         }
 
         auto message = std::string("object_proxy::~object_proxy zone ") + std::to_string(service_proxy_->get_destination_zone_id().get_val()) 
@@ -64,8 +64,8 @@ namespace rpc
                                   std::vector<char>& out_buf_)
     {
         return service_proxy_->send(
-            caller_channel_zone(), 
-            service_proxy_->get_zone_id().as_caller(), 
+            service_proxy_->get_zone_id().as_caller_channel(), 
+            service_proxy_->get_caller_zone_id(), 
             service_proxy_->get_destination_zone_id(), 
             object_id_, 
             interface_id, 

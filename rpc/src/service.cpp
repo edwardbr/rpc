@@ -29,7 +29,7 @@ namespace rpc
         object_id_generator = 0;
         // to do: assert that there are no more object_stubs in memory
         bool is_empty = check_is_empty();
-        //assert(is_empty);
+        assert(is_empty);
 
         stubs.clear();
         wrapped_object_to_stub.clear();
@@ -75,7 +75,7 @@ namespace rpc
             auto svcproxy =  item.second.lock();
             if(!svcproxy)
             {
-                auto message = std::string("service ") + std::to_string(get_zone_id()) + std::string(", proxy ") + std::to_string(item.first.id) + std::string(", has been released but not deregisted in the service");
+                auto message = std::string("service ") + std::to_string(get_zone_id()) + std::string(", proxy ") + std::to_string(item.first.dest.id) + std::string(", has been released but not deregisted in the service");
                 LOG_STR(message.c_str(), message.size());
             }
             else
@@ -114,7 +114,7 @@ namespace rpc
             rpc::shared_ptr<service_proxy> other_zone;
             {
                 std::lock_guard g(insert_control);
-                auto found = other_zones.find(destination_zone_id);
+                auto found = other_zones.find({destination_zone_id, caller_zone_id});
                 if(found != other_zones.end())
                 {
                     other_zone = found->second.lock();
@@ -122,6 +122,7 @@ namespace rpc
             }
             if(!other_zone)
             {
+                assert(false);
                 return rpc::error::ZONE_NOT_SUPPORTED();
             }
             return other_zone->send(get_zone_id().as_caller_channel(), caller_zone_id, destination_zone_id, object_id, interface_id, method_id, in_size_, in_buf_, out_buf_);
@@ -149,22 +150,23 @@ namespace rpc
         //check to see if the source and destination come from the same direction
         if(    caller_zone_id.is_set() 
             && destination_zone_id.is_set() 
-            && caller_zone_id == destination_zone_id.as_caller())
-            needs_external_add_ref = false;
-        else if(caller_zone_id.is_set() 
-            && destination_channel_zone_id.is_set() 
-            && caller_zone_id.as_destination_channel() == destination_channel_zone_id)
-            needs_external_add_ref = false;
-        else if(caller_channel_zone_id.is_set() 
-            && destination_zone_id.is_set() 
-            && caller_channel_zone_id.as_destination() == destination_zone_id)
-            needs_external_add_ref = false;
-        else if(caller_channel_zone_id.is_set() 
-            && destination_channel_zone_id.is_set() 
-            && caller_channel_zone_id.as_destination_channel() == destination_channel_zone_id)
-            needs_external_add_ref = false;
- 
-        destination_zone->add_ref(destination_zone_id, object_id, get_zone_id().as_caller(), needs_external_add_ref);
+            && caller_zone_id != destination_zone_id.as_caller())
+        {
+            if(caller_zone_id.is_set() 
+                && destination_channel_zone_id.is_set() 
+                && caller_zone_id.as_destination_channel() == destination_channel_zone_id)
+                needs_external_add_ref = false;
+            else if(caller_channel_zone_id.is_set() 
+                && destination_zone_id.is_set() 
+                && caller_channel_zone_id.as_destination() == destination_zone_id)
+                needs_external_add_ref = false;
+            else if(caller_channel_zone_id.is_set() 
+                && destination_channel_zone_id.is_set() 
+                && caller_channel_zone_id.as_destination_channel() == destination_channel_zone_id)
+                needs_external_add_ref = false;
+    
+            destination_zone->add_ref(destination_zone_id, object_id, get_zone_id().as_caller(), needs_external_add_ref);
+        }
  
         return {object_id, destination_zone_id};
     }    
@@ -232,7 +234,7 @@ namespace rpc
             rpc::shared_ptr<service_proxy> other_zone;
             {
                 std::lock_guard g(insert_control);
-                auto found = other_zones.find(destination_zone_id);
+                auto found = other_zones.find({destination_zone_id, get_zone_id().as_caller()});//we dont need to get caller id for this
                 if(found != other_zones.end())
                 {
                     other_zone = found->second.lock();
@@ -240,6 +242,7 @@ namespace rpc
             }
             if(!other_zone)
             {
+                assert(false);
                 return rpc::error::ZONE_NOT_SUPPORTED();
             }
             return other_zone->try_cast(destination_zone_id, object_id, interface_id);
@@ -259,26 +262,41 @@ namespace rpc
         if(destination_zone_id != get_zone_id().as_destination())
         {
             rpc::shared_ptr<service_proxy> other_zone;
+            bool zone_cloned = false;
             {
                 std::lock_guard g(insert_control);
-                auto found = other_zones.find(destination_zone_id);
+                auto found = other_zones.find({destination_zone_id, caller_zone_id});
                 if(found != other_zones.end())
                 {
                     other_zone = found->second.lock();
                 }
+                else
+                {
+                    found = other_zones.find({destination_zone_id, get_zone_id().as_caller()});
+                    if(found != other_zones.end())
+                    {
+                        auto tmp = found->second.lock();
+                        other_zone = tmp->clone_for_zone(destination_zone_id, caller_zone_id);
+                        zone_cloned = true;
+                    }
+                }
             }
             if(!other_zone)
             {
+                assert(false);
                 return std::numeric_limits<uint64_t>::max();
             }
-            return other_zone->add_ref(destination_zone_id, object_id, caller_zone_id, false);
+            return other_zone->add_ref(destination_zone_id, object_id, caller_zone_id, !zone_cloned);
         }
         else
         {
             rpc::weak_ptr<object_stub> weak_stub = get_object(object_id);
             auto stub = weak_stub.lock();
             if (!stub)
+            {
+                assert(false);
                 return std::numeric_limits<uint64_t>::max();
+            }
             return stub->add_ref();
         }
     }
@@ -316,7 +334,7 @@ namespace rpc
             rpc::shared_ptr<service_proxy> other_zone;
             {
                 std::lock_guard g(insert_control);
-                auto found = other_zones.find(destination_zone_id);
+                auto found = other_zones.find({destination_zone_id, caller_zone_id});
                 if(found != other_zones.end())
                 {
                     other_zone = found->second.lock();
@@ -324,6 +342,7 @@ namespace rpc
             }
             if(!other_zone)
             {
+                assert(false);
                 return std::numeric_limits<uint64_t>::max();
             }
             return other_zone->release(destination_zone_id, object_id, caller_zone_id);
@@ -340,13 +359,17 @@ namespace rpc
                 auto item = stubs.find(object_id);
                 if (item == stubs.end())
                 {
+                    assert(false);
                     return std::numeric_limits<uint64_t>::max();
                 }
 
                 stub = item->second.lock();
 
                 if (!stub)
+                {
+                    assert(false);
                     return std::numeric_limits<uint64_t>::max();
+                }
                 count = stub->release();
                 if(!count)
                 {
@@ -382,8 +405,8 @@ namespace rpc
     void service::inner_add_zone_proxy(const rpc::shared_ptr<service_proxy>& service_proxy)
     {
         assert(service_proxy->get_destination_zone_id() != zone_id_.as_destination());
-        assert(other_zones.find(service_proxy->get_destination_zone_id()) == other_zones.end());
-        other_zones[service_proxy->get_destination_zone_id()] = service_proxy;
+        assert(other_zones.find({service_proxy->get_destination_zone_id(), service_proxy->get_caller_zone_id()}) == other_zones.end());
+        other_zones[{service_proxy->get_destination_zone_id(), service_proxy->get_caller_zone_id()}] = service_proxy;
     }
 
     void service::add_zone_proxy(const rpc::shared_ptr<service_proxy>& service_proxy)
@@ -403,21 +426,21 @@ namespace rpc
         std::lock_guard g(insert_control);
 
         //find if we have one
-        auto item = other_zones.find(destination_zone_id);
+        auto item = other_zones.find({destination_zone_id, caller_zone_id});
         if (item != other_zones.end())
             return item->second.lock();
 
         //if not we can make one from the proxy of the calling zone
         if(caller_zone_id.is_set())
         {
-            item = other_zones.find(caller_zone_id.as_destination());
+            item = other_zones.find({caller_zone_id.as_destination(), get_zone_id().as_caller()});
         }
         //or if not we can make one from the proxy of the calling channel zone
         if (item == other_zones.end())
         {
             if(!caller_channel_zone_id.is_set())
                 return nullptr;
-            item = other_zones.find(caller_channel_zone_id.as_destination());
+            item = other_zones.find({caller_channel_zone_id.as_destination(), get_zone_id().as_caller()});
         }
         if (item == other_zones.end())
             return nullptr;
@@ -431,10 +454,10 @@ namespace rpc
         return proxy;
     }
 
-    void service::remove_zone_proxy(destination_zone destination_zone_id)
+    void service::remove_zone_proxy(destination_zone destination_zone_id, caller_zone caller_zone_id)
     {
         std::lock_guard g(insert_control);
-        auto item = other_zones.find(destination_zone_id);
+        auto item = other_zones.find({destination_zone_id, caller_zone_id});
         if (item == other_zones.end())
         {
             assert(false);
@@ -468,7 +491,7 @@ namespace rpc
     {
         if(parent_service_)
         {
-            remove_zone_proxy(parent_service_->get_destination_zone_id());
+            remove_zone_proxy(parent_service_->get_destination_zone_id(), get_zone_id().as_caller());
             set_parent(nullptr, false);
         }
 

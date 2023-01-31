@@ -18,7 +18,7 @@ namespace rpc
     {
         if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
         {
-            telemetry_service->on_service_proxy_creation("enclave_service_proxy", get_zone_id(), get_destination_zone_id());
+            telemetry_service->on_service_proxy_creation("enclave_service_proxy", get_zone_id(), get_destination_zone_id(), get_caller_zone_id());
         }
     }
 
@@ -26,7 +26,7 @@ namespace rpc
     {
         if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
         {
-            telemetry_service->on_service_proxy_deletion("enclave_service_proxy", get_zone_id(), get_destination_zone_id());
+            telemetry_service->on_service_proxy_deletion("enclave_service_proxy", get_zone_id(), get_destination_zone_id(), get_caller_zone_id());
         }
     }
 

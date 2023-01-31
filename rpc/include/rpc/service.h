@@ -35,7 +35,19 @@ namespace rpc
         // map wrapped objects pointers to stubs
         std::map<void*, rpc::weak_ptr<object_stub>> wrapped_object_to_stub;
 
-        std::unordered_map<destination_zone, rpc::weak_ptr<service_proxy>> other_zones;
+        struct zone_route
+        {
+            destination_zone dest;
+            caller_zone source;
+            constexpr bool operator<(const zone_route& val) const 
+            {
+                if(dest == val.dest)
+                    return source < val.source;
+                return dest < val.dest;
+            }
+        };
+
+        std::map<zone_route, rpc::weak_ptr<service_proxy>> other_zones;
 
         // hard lock on the root object
         mutable std::mutex insert_control;
@@ -74,7 +86,7 @@ namespace rpc
         void inner_add_zone_proxy(const rpc::shared_ptr<service_proxy>& service_proxy);
         virtual void add_zone_proxy(const rpc::shared_ptr<service_proxy>& zone);
         virtual rpc::shared_ptr<service_proxy> get_zone_proxy(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, destination_zone destination_zone_id, bool& new_proxy_added);
-        virtual void remove_zone_proxy(destination_zone destination_zone_id);
+        virtual void remove_zone_proxy(destination_zone destination_zone_id, caller_zone caller_zone_id);
         template<class T> rpc::shared_ptr<T> get_local_interface(object object_id)
         {
             return rpc::static_pointer_cast<T>(get_castable_interface(object_id, {T::id}));
