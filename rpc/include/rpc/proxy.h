@@ -75,18 +75,16 @@ namespace rpc
         std::mutex insert_control_;
         mutable rpc::weak_ptr<object_proxy> weak_this_;
 
+        object_proxy(object object_id, rpc::shared_ptr<service_proxy> service_proxy);
+
         // note the interface pointer may change if there is already an interface inserted successfully
         void register_interface(interface_ordinal interface_id, rpc::weak_ptr<proxy_base>& value);
-        object_proxy(   object object_id, 
-                        rpc::shared_ptr<service_proxy> service_proxy,
-                        bool stub_needs_add_ref);
 
         int try_cast(interface_ordinal interface_id);
 
     public:
         static rpc::shared_ptr<object_proxy> create(object object_id,
-                                                    const rpc::shared_ptr<service_proxy>& service_proxy,
-                                                    bool stub_needs_add_ref);
+                                                    const rpc::shared_ptr<service_proxy>& service_proxy);
 
         virtual ~object_proxy();
 
@@ -394,9 +392,8 @@ namespace rpc
             rpc::shared_ptr<object_proxy> op = service_proxy->get_object_proxy(encap.object_id);
             if(!op)
             {
-                op = object_proxy::create(encap.object_id, service_proxy, true);
-                if(!new_proxy_added/* && caller_zone_id != service_proxy->get_destination_zone_id().as_caller()*/)
-                    service_proxy->add_external_ref();
+                op = object_proxy::create(encap.object_id, service_proxy);
+                service_proxy->add_ref(service_proxy->get_destination_zone_id(), encap.object_id, service_proxy->get_zone_id().as_caller(), !new_proxy_added); 
             }
             auto ret = op->query_interface(iface, false);        
             return ret;
@@ -462,7 +459,7 @@ namespace rpc
         }
         else
         {
-            op = object_proxy::create(encap.object_id, service_proxy, false);
+            op = object_proxy::create(encap.object_id, service_proxy);
             if(!new_proxy_added && encap.destination_zone_id == sp->get_destination_zone_id())
             {
                 service_proxy->add_external_ref();
@@ -507,7 +504,7 @@ namespace rpc
         rpc::shared_ptr<object_proxy> op = service_proxy->get_object_proxy(encap.object_id);
         if(!op)
         {
-            op = object_proxy::create(encap.object_id, service_proxy, false);
+            op = object_proxy::create(encap.object_id, service_proxy);
         }
         return op->query_interface(val, false);
     }

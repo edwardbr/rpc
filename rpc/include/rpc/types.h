@@ -95,6 +95,7 @@ namespace rpc
         caller_zone(const type_id<CallerZoneId>& other) : type_id<CallerZoneId>(other){}
         
         type_id<CallerChannelZoneId> as_caller_channel() const {return {id};}   
+        type_id<DestinationZoneId> as_destination() const {return {id};}     //this one is wierd, its for cloning service proxies
         type_id<DestinationChannelZoneId> as_destination_channel() const {return {id};}   
     };
 

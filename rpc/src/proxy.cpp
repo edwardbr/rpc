@@ -17,8 +17,7 @@
 namespace rpc
 {
     object_proxy::object_proxy( object object_id, 
-                                rpc::shared_ptr<service_proxy> service_proxy,
-                                bool stub_needs_add_ref)
+                                rpc::shared_ptr<service_proxy> service_proxy)
         : object_id_(object_id)
         , service_proxy_(service_proxy)
     {
@@ -32,16 +31,12 @@ namespace rpc
         + std::string(", operating_zone_id ") + std::to_string(service_proxy->get_zone_id().get_val())
         + std::string(", cloned from ") + std::to_string(service_proxy->get_destination_channel_zone_id().get_val());
         LOG_STR(message.c_str(), message.size());
-
-        if(stub_needs_add_ref)
-            service_proxy_->add_ref(service_proxy_->get_destination_zone_id(), object_id_, service_proxy_->get_zone_id().as_caller(), false); 
     }
 
     rpc::shared_ptr<object_proxy> object_proxy::create(object object_id, 
-                                            const rpc::shared_ptr<service_proxy>& service_proxy,
-                                            bool stub_needs_add_ref)
+                                            const rpc::shared_ptr<service_proxy>& service_proxy)
     {
-        rpc::shared_ptr<object_proxy> ret(new object_proxy(object_id, service_proxy, stub_needs_add_ref));
+        rpc::shared_ptr<object_proxy> ret(new object_proxy(object_id, service_proxy));
         ret->weak_this_ = ret;
         service_proxy->add_object_proxy(ret);
         return ret;

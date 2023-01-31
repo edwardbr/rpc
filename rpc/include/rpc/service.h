@@ -57,6 +57,7 @@ namespace rpc
         int send(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, destination_zone destination_zone_id, object object_id, interface_ordinal interface_id, method method_id, size_t in_size_,
                         const char* in_buf_, std::vector<char>& out_buf_) override;
 
+        interface_descriptor get_proxy_descriptor(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, rpc::proxy_base* base);
         interface_descriptor get_proxy_stub_descriptor(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, rpc::casting_interface* pointer,
                                  std::function<rpc::shared_ptr<i_interface_stub>(rpc::shared_ptr<object_stub>)> fn,
                                 bool add_ref,

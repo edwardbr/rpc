@@ -138,6 +138,37 @@ namespace rpc
         }
     }
 
+    interface_descriptor service::get_proxy_descriptor(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, rpc::proxy_base* base)
+    {
+        auto object_proxy = base->get_object_proxy();
+        auto destination_zone = object_proxy->get_service_proxy();
+        auto destination_zone_id = destination_zone->get_destination_zone_id();
+        auto destination_channel_zone_id = destination_zone->get_destination_channel_zone_id();
+        auto object_id = object_proxy->get_object_id();
+        bool needs_external_add_ref = true;
+        //check to see if the source and destination come from the same direction
+        if(    caller_zone_id.is_set() 
+            && destination_zone_id.is_set() 
+            && caller_zone_id == destination_zone_id.as_caller())
+            needs_external_add_ref = false;
+        else if(caller_zone_id.is_set() 
+            && destination_channel_zone_id.is_set() 
+            && caller_zone_id.as_destination_channel() == destination_channel_zone_id)
+            needs_external_add_ref = false;
+        else if(caller_channel_zone_id.is_set() 
+            && destination_zone_id.is_set() 
+            && caller_channel_zone_id.as_destination() == destination_zone_id)
+            needs_external_add_ref = false;
+        else if(caller_channel_zone_id.is_set() 
+            && destination_channel_zone_id.is_set() 
+            && caller_channel_zone_id.as_destination_channel() == destination_channel_zone_id)
+            needs_external_add_ref = false;
+ 
+        destination_zone->add_ref(destination_zone_id, object_id, get_zone_id().as_caller(), needs_external_add_ref);
+ 
+        return {object_id, destination_zone_id};
+    }    
+
     //this is a key function that returns an interface descriptor
     //for wrapping an implementation to a local object inside a stub where needed
     //or if the interface is a proxy to add ref it
@@ -155,36 +186,7 @@ namespace rpc
             }
             if(proxy_base)
             {
-                auto object_proxy = proxy_base->get_object_proxy();
-                auto destination_zone = object_proxy->get_service_proxy();
-                auto destination_zone_id = destination_zone->get_destination_zone_id();
-                auto destination_channel_zone_id = destination_zone->get_destination_channel_zone_id();
-                auto object_id = object_proxy->get_object_id();
-                bool needs_external_add_ref = true;
-                //check to see if the source and destination are not the same
-                if(    caller_zone_id.is_set() 
-                    && destination_zone_id.is_set() 
-                    && caller_zone_id == destination_zone_id.as_caller())
-                    needs_external_add_ref = false;
-                else if(caller_zone_id.is_set() 
-                    && destination_channel_zone_id.is_set() 
-                    && caller_zone_id.as_destination_channel() == destination_channel_zone_id)
-                    needs_external_add_ref = false;
-                else if(caller_channel_zone_id.is_set() 
-                    && destination_zone_id.is_set() 
-                    && caller_channel_zone_id.as_destination() == destination_zone_id)
-                    needs_external_add_ref = false;
-                else if(caller_channel_zone_id.is_set() 
-                    && destination_channel_zone_id.is_set() 
-                    && caller_channel_zone_id.as_destination_channel() == destination_channel_zone_id)
-                    needs_external_add_ref = false;
-//                if(caller_channel_zone_id != destination_zone_id.as_caller_channel())
-                {
-                    if(needs_external_add_ref)
-                        destination_zone->add_external_ref();
-                    destination_zone->add_ref(destination_zone_id, object_id, get_zone_id().as_caller(), false);
-                }
-                return {object_id, destination_zone_id};
+                return get_proxy_descriptor(caller_channel_zone_id, caller_zone_id, proxy_base);
             }
         }
 
@@ -406,11 +408,20 @@ namespace rpc
             return item->second.lock();
 
         //if not we can make one from the proxy of the calling zone
-        if(caller_channel_zone_id == 0)
-            return nullptr;
-        item = other_zones.find(caller_channel_zone_id.as_destination());
+        if(caller_zone_id.is_set())
+        {
+            item = other_zones.find(caller_zone_id.as_destination());
+        }
+        //or if not we can make one from the proxy of the calling channel zone
+        if (item == other_zones.end())
+        {
+            if(!caller_channel_zone_id.is_set())
+                return nullptr;
+            item = other_zones.find(caller_channel_zone_id.as_destination());
+        }
         if (item == other_zones.end())
             return nullptr;
+
         auto calling_proxy = item->second.lock();
         if(!calling_proxy)
             return nullptr;
