@@ -146,25 +146,46 @@ namespace rpc
                                         bool add_ref,
                                         rpc::shared_ptr<object_stub>& stub)
     {
-        proxy_base* proxy_base = nullptr;
-        if(caller_channel_zone_id.is_set() || caller_zone_id.is_set())
+        if(add_ref)
         {
-            proxy_base = iface->query_proxy_base();
-        }
-        if(proxy_base)
-        {
-            auto object_proxy = proxy_base->get_object_proxy();
-            auto destination_zone_id = object_proxy->get_destination_zone_id();
-            auto object_id = object_proxy->get_object_id();
-            if(add_ref && caller_channel_zone_id != destination_zone_id.as_caller_channel())
+            proxy_base* proxy_base = nullptr;
+            if(caller_channel_zone_id.is_set() || caller_zone_id.is_set())
             {
-                auto destination_zone = object_proxy->get_service_proxy();
-                auto destination_channel_zone_id = destination_zone->get_destination_channel_zone_id();
-                if(zone_id_.as_destination() != destination_zone_id)
-                    destination_zone->add_external_ref();
-                destination_zone->add_ref(destination_zone_id, object_id, get_zone_id().as_caller(), false/*caller_zone_id == destination_channel_zone_id*/);
+                proxy_base = iface->query_proxy_base();
             }
-            return {object_id, destination_zone_id};
+            if(proxy_base)
+            {
+                auto object_proxy = proxy_base->get_object_proxy();
+                auto destination_zone = object_proxy->get_service_proxy();
+                auto destination_zone_id = destination_zone->get_destination_zone_id();
+                auto destination_channel_zone_id = destination_zone->get_destination_channel_zone_id();
+                auto object_id = object_proxy->get_object_id();
+                bool needs_external_add_ref = true;
+                //check to see if the source and destination are not the same
+                if(    caller_zone_id.is_set() 
+                    && destination_zone_id.is_set() 
+                    && caller_zone_id == destination_zone_id.as_caller())
+                    needs_external_add_ref = false;
+                else if(caller_zone_id.is_set() 
+                    && destination_channel_zone_id.is_set() 
+                    && caller_zone_id.as_destination_channel() == destination_channel_zone_id)
+                    needs_external_add_ref = false;
+                else if(caller_channel_zone_id.is_set() 
+                    && destination_zone_id.is_set() 
+                    && caller_channel_zone_id.as_destination() == destination_zone_id)
+                    needs_external_add_ref = false;
+                else if(caller_channel_zone_id.is_set() 
+                    && destination_channel_zone_id.is_set() 
+                    && caller_channel_zone_id.as_destination_channel() == destination_channel_zone_id)
+                    needs_external_add_ref = false;
+//                if(caller_channel_zone_id != destination_zone_id.as_caller_channel())
+                {
+                    if(needs_external_add_ref)
+                        destination_zone->add_external_ref();
+                    destination_zone->add_ref(destination_zone_id, object_id, get_zone_id().as_caller(), false);
+                }
+                return {object_id, destination_zone_id};
+            }
         }
 
         std::lock_guard g(insert_control);
@@ -231,7 +252,7 @@ namespace rpc
         }
     }
 
-    uint64_t service::add_ref(destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id, bool out_param)
+    uint64_t service::add_ref(destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id, bool proxy_add_ref)
     {
         if(destination_zone_id != get_zone_id().as_destination())
         {

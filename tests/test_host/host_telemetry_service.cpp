@@ -35,7 +35,7 @@ host_telemetry_service::~host_telemetry_service()
     {
         spdlog::error("system is NOT healthy!");
     }
-    //EXPECT_TRUE(is_heathy);
+    EXPECT_TRUE(is_heathy);
 }
 
 void host_telemetry_service::on_service_creation(const char* name, rpc::zone zone_id) const
