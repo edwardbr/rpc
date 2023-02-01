@@ -433,8 +433,7 @@ namespace rpc
         if(!encap.object_id.is_set() || !encap.destination_zone_id.is_set())
             return rpc::error::OK();
 
-        auto service_proxy = sp;
-        auto serv = service_proxy->get_operating_zone_service();
+        auto serv = sp->get_operating_zone_service();
 
         //if it is local to this service then just get the relevant stub
         if(encap.destination_zone_id == serv->get_zone_id().as_destination())
@@ -447,7 +446,8 @@ namespace rpc
 
         //get the right  service proxy
         bool new_proxy_added = false;
-        if(service_proxy->get_destination_zone_id() != encap.destination_zone_id)
+        auto service_proxy = sp;
+        if(sp->get_destination_zone_id() != encap.destination_zone_id)
         {
             //if the zone is different lookup or clone the right proxy
             //the fist parameter looks wonky but it is the zone from where this object came
@@ -465,7 +465,7 @@ namespace rpc
         {
             //else we create an object_proxy and add ref to the service proxy as it has a new object to monitor
             op = object_proxy::create(encap.object_id, service_proxy);
-            if(!new_proxy_added)
+            if(!new_proxy_added && sp->get_destination_zone_id() == encap.destination_zone_id)
                 service_proxy->add_external_ref();
         }
         return op->query_interface(val, false);

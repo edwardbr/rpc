@@ -142,45 +142,58 @@ namespace rpc
     interface_descriptor service::get_proxy_descriptor(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, rpc::proxy_base* base)
     {
         auto object_proxy = base->get_object_proxy();
-        auto destination_zone = object_proxy->get_service_proxy();
-        auto destination_zone_id = destination_zone->get_destination_zone_id();
-        auto destination_channel_zone_id = destination_zone->get_destination_channel_zone_id();
+        auto object_service_proxy = object_proxy->get_service_proxy();
+        auto object_service_proxy_caller =  object_service_proxy->get_caller_zone_id();
+        auto destination_zone_id = object_service_proxy->get_destination_zone_id();
+        auto destination_channel_zone_id = object_service_proxy->get_destination_channel_zone_id();
         auto object_id = object_proxy->get_object_id();
         bool needs_external_add_ref = true;
+        bool object_is_returned_to_creator = false;
+
         //check to see if the source and destination come from the same direction
         if(    caller_zone_id.is_set() 
             && destination_zone_id.is_set() 
-            && caller_zone_id != destination_zone_id.as_caller())
+            && caller_zone_id == destination_zone_id.as_caller())
+            return {object_id, destination_zone_id}; //nothing to do as the destinaton is the same as the source
+        
+        if((
+                caller_zone_id.is_set() 
+                && destination_channel_zone_id.is_set() 
+                && caller_zone_id.as_destination_channel() == destination_channel_zone_id
+            ) 
+            ||
+            (
+                caller_channel_zone_id.is_set() 
+                && destination_channel_zone_id.is_set() 
+                && caller_channel_zone_id.as_destination_channel() == destination_channel_zone_id
+            ))
         {
-            if(caller_zone_id.is_set() 
-                && destination_channel_zone_id.is_set() 
-                && caller_zone_id.as_destination_channel() == destination_channel_zone_id)
-                needs_external_add_ref = false;
-            else if(caller_channel_zone_id.is_set() 
-                && destination_zone_id.is_set() 
-                && caller_channel_zone_id.as_destination() == destination_zone_id)
-                needs_external_add_ref = false;
-            else if(caller_channel_zone_id.is_set() 
-                && destination_channel_zone_id.is_set() 
-                && caller_channel_zone_id.as_destination_channel() == destination_channel_zone_id)
-                needs_external_add_ref = false;
-    
-            rpc::shared_ptr<service_proxy> other_zone = destination_zone;
-            if(destination_zone->get_caller_zone_id() != caller_zone_id)
-            {
-                auto found = other_zones.find({destination_zone_id, caller_zone_id});//we dont need to get caller id for this
-                if(found != other_zones.end())
-                {
-                    other_zone = found->second.lock();
-                }
-                else
-                {
-                    other_zone = destination_zone->clone_for_zone(destination_zone_id, caller_zone_id, caller_channel_zone_id);
-                    needs_external_add_ref = false;
-                }
-            }
-            other_zone->add_ref(destination_zone_id, object_id, caller_zone_id, needs_external_add_ref);
+            needs_external_add_ref = false;
+            object_is_returned_to_creator = true;
         }
+        else if(caller_channel_zone_id.is_set() 
+            && destination_zone_id.is_set() 
+            && caller_channel_zone_id.as_destination() == destination_zone_id)
+        {
+            needs_external_add_ref = false;
+        }
+
+        rpc::shared_ptr<service_proxy> other_zone = object_service_proxy;
+        auto found = other_zones.find({destination_zone_id, caller_zone_id});//we dont need to get caller id for this
+        if(found != other_zones.end())
+        {
+            other_zone = found->second.lock();
+        }
+        else
+        {
+            //if the pointer is being passed back dont clone in this zone
+            if(!object_is_returned_to_creator)
+            {
+                other_zone = object_service_proxy->clone_for_zone(destination_zone_id, caller_zone_id, caller_channel_zone_id);
+            }
+            needs_external_add_ref = false;
+        }
+        other_zone->add_ref(destination_zone_id, object_id, caller_zone_id, needs_external_add_ref);
  
         return {object_id, destination_zone_id};
     }    
