@@ -8,9 +8,9 @@
 
 namespace rpc
 {
-    host_service_proxy::host_service_proxy(destination_zone host_zone_id, const rpc::shared_ptr<service>& operating_zone_service,
+    host_service_proxy::host_service_proxy(destination_zone host_zone_id, const rpc::shared_ptr<service>& svc,
                         const rpc::i_telemetry_service* telemetry_service)
-        : service_proxy(host_zone_id, operating_zone_service, operating_zone_service->get_zone_id().as_caller(), telemetry_service)
+        : service_proxy(host_zone_id, svc, svc->get_zone_id().as_caller(), telemetry_service)
     {
         if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
         {
@@ -18,14 +18,14 @@ namespace rpc
         }
     }
 
-    rpc::shared_ptr<service_proxy> host_service_proxy::create(destination_zone host_zone_id, object host_id, const rpc::shared_ptr<rpc::child_service>& operating_zone_service, const rpc::i_telemetry_service* telemetry_service)
+    rpc::shared_ptr<service_proxy> host_service_proxy::create(destination_zone host_zone_id, object host_id, const rpc::shared_ptr<rpc::child_service>& svc, const rpc::i_telemetry_service* telemetry_service)
     {
-        auto ret = rpc::shared_ptr<host_service_proxy>(new host_service_proxy(host_zone_id, operating_zone_service, telemetry_service));
+        auto ret = rpc::shared_ptr<host_service_proxy>(new host_service_proxy(host_zone_id, svc, telemetry_service));
         auto pthis = rpc::static_pointer_cast<service_proxy>(ret);
         ret->weak_this_ = pthis;
-        operating_zone_service->add_zone_proxy(ret);
+        svc->add_zone_proxy(ret);
         ret->add_external_ref();
-        operating_zone_service->set_parent(pthis, host_id.id ? false : true);
+        svc->set_parent(pthis, host_id.id ? false : true);
         return pthis;
     }
 

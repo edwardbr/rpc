@@ -11,8 +11,8 @@
 namespace rpc
 {
 #ifndef _IN_ENCLAVE
-    enclave_service_proxy::enclave_service_proxy(destination_zone destination_zone_id, std::string filename, const rpc::shared_ptr<service>& operating_zone_service, object host_id, const rpc::i_telemetry_service* telemetry_service)
-        : service_proxy(destination_zone_id, operating_zone_service, operating_zone_service->get_zone_id().as_caller(), telemetry_service)
+    enclave_service_proxy::enclave_service_proxy(destination_zone destination_zone_id, std::string filename, const rpc::shared_ptr<service>& svc, object host_id, const rpc::i_telemetry_service* telemetry_service)
+        : service_proxy(destination_zone_id, svc, svc->get_zone_id().as_caller(), telemetry_service)
         , filename_(filename)
         , host_id_(host_id)
     {

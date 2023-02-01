@@ -17,7 +17,7 @@ namespace rpc
             ~enclave_owner();
         };
 
-        enclave_service_proxy(destination_zone destination_zone_id, std::string filename, const rpc::shared_ptr<service>& operating_zone_service, object host_id, const rpc::i_telemetry_service* telemetry_service);
+        enclave_service_proxy(destination_zone destination_zone_id, std::string filename, const rpc::shared_ptr<service>& svc, object host_id, const rpc::i_telemetry_service* telemetry_service);
         int initialise_enclave(object& object_id);
        
         rpc::shared_ptr<service_proxy> deep_copy_for_clone() override {return rpc::make_shared<enclave_service_proxy>(*this);}
@@ -30,15 +30,15 @@ namespace rpc
         enclave_service_proxy(const enclave_service_proxy& other) = default;
 
         template<class Owner, class Child>
-        static int create(destination_zone destination_zone_id, std::string filename, rpc::shared_ptr<service>& operating_zone_service, const rpc::shared_ptr<Owner>& owner, rpc::shared_ptr<Child>& root_object, const rpc::i_telemetry_service* telemetry_service)
+        static int create(destination_zone destination_zone_id, std::string filename, rpc::shared_ptr<service>& svc, const rpc::shared_ptr<Owner>& owner, rpc::shared_ptr<Child>& root_object, const rpc::i_telemetry_service* telemetry_service)
         {
-            assert(operating_zone_service);
+            assert(svc);
 
             object owner_id = {0};
             if(owner)
-                owner_id = {rpc::create_interface_stub(*operating_zone_service, owner).object_id};
+                owner_id = {rpc::create_interface_stub(*svc, owner).object_id};
 
-            auto ret = rpc::shared_ptr<enclave_service_proxy>(new enclave_service_proxy(destination_zone_id, filename, operating_zone_service, owner_id, telemetry_service));
+            auto ret = rpc::shared_ptr<enclave_service_proxy>(new enclave_service_proxy(destination_zone_id, filename, svc, owner_id, telemetry_service));
             auto pthis = rpc::static_pointer_cast<service_proxy>(ret);
 
             ret->weak_this_ = pthis;
@@ -47,10 +47,10 @@ namespace rpc
             int err_code = ret->initialise_enclave(object_id);
             if(err_code)
                 return err_code;
-            auto error = rpc::demarshall_interface_proxy(ret, {object_id, destination_zone_id}, operating_zone_service->get_zone_id().as_caller(), root_object);
+            auto error = rpc::demarshall_interface_proxy(ret, {object_id, destination_zone_id}, svc->get_zone_id().as_caller(), root_object);
             if(error != rpc::error::OK())
                 return error;
-            operating_zone_service->add_zone_proxy(ret);
+            svc->add_zone_proxy(ret);
             ret->add_external_ref();
             return rpc::error::OK();
         }

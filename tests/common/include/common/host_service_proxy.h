@@ -7,14 +7,14 @@ namespace rpc
     //This is for enclaves to call the host 
     class host_service_proxy : public service_proxy
     {
-        host_service_proxy(destination_zone host_zone_id, const rpc::shared_ptr<service>& operating_zone_service, const rpc::i_telemetry_service* telemetry_service);
+        host_service_proxy(destination_zone host_zone_id, const rpc::shared_ptr<service>& svc, const rpc::i_telemetry_service* telemetry_service);
 
         rpc::shared_ptr<service_proxy> deep_copy_for_clone() override {return rpc::make_shared<host_service_proxy>(*this);}
 
     public:
         host_service_proxy(const host_service_proxy& other) = default;
 
-        static rpc::shared_ptr<service_proxy> create(destination_zone host_zone_id, object host_id, const rpc::shared_ptr<rpc::child_service>& operating_zone_service, const rpc::i_telemetry_service* telemetry_service);
+        static rpc::shared_ptr<service_proxy> create(destination_zone host_zone_id, object host_id, const rpc::shared_ptr<rpc::child_service>& svc, const rpc::i_telemetry_service* telemetry_service);
 
     public:
         virtual ~host_service_proxy();

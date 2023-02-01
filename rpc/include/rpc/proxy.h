@@ -200,7 +200,7 @@ namespace rpc
         destination_zone destination_zone_id_ = {0};
         destination_channel_zone destination_channel_zone_ = {0};
         caller_zone caller_zone_id_ = {0};
-        rpc::weak_ptr<service> operating_zone_service_;
+        rpc::weak_ptr<service> service_;
         rpc::shared_ptr<service_proxy> dependent_services_lock_;
         std::atomic<int> dependent_services_count_ = 0;
         const rpc::i_telemetry_service* const telemetry_service_ = nullptr;
@@ -208,46 +208,40 @@ namespace rpc
     protected:
 
         service_proxy(  destination_zone destination_zone_id,
-                        const rpc::shared_ptr<service>& operating_zone_service,
+                        const rpc::shared_ptr<service>& svc,
                         caller_zone caller_zone_id,
                         const rpc::i_telemetry_service* telemetry_service) : 
-            zone_id_(operating_zone_service->get_zone_id()),
+            zone_id_(svc->get_zone_id()),
             destination_zone_id_(destination_zone_id),
-            operating_zone_service_(operating_zone_service),
+            service_(svc),
             caller_zone_id_(caller_zone_id),
             telemetry_service_(telemetry_service)
         {
-            assert(operating_zone_service != nullptr);
+            assert(svc != nullptr);
         }
 
         service_proxy(const service_proxy& other) : 
                 zone_id_(other.zone_id_),
                 destination_zone_id_(other.destination_zone_id_),
-                destination_channel_zone_(destination_channel_zone_),
-                operating_zone_service_(other.operating_zone_service_),
+                destination_channel_zone_(other.destination_channel_zone_),
+                service_(other.service_),
                 caller_zone_id_(other.caller_zone_id_),
                 telemetry_service_(other.telemetry_service_),
                 dependent_services_count_(0)
         {
-            assert(operating_zone_service_.lock() != nullptr);
+            assert(service_.lock() != nullptr);
         }
 
         mutable rpc::weak_ptr<service_proxy> weak_this_;
-        void set_destination_zone_id(destination_zone destination_zone_id) 
-        {
-            if(!destination_channel_zone_.is_set())
-                destination_channel_zone_ = destination_zone_id_.as_destination_channel();
-            destination_zone_id_ = destination_zone_id;
-        }
 
     public:
         virtual ~service_proxy()
         {
             assert(proxies_.empty());
-            auto operating_zone_service = operating_zone_service_.lock();
-            if(operating_zone_service)
+            auto svc = service_.lock();
+            if(svc)
             {
-                operating_zone_service->remove_zone_proxy(destination_zone_id_, caller_zone_id_);
+                svc->remove_zone_proxy(destination_zone_id_, caller_zone_id_);
             }
         }
         
@@ -286,11 +280,18 @@ namespace rpc
         std::unordered_map<object, rpc::weak_ptr<object_proxy>> get_proxies(){return proxies_;}
 
         virtual rpc::shared_ptr<service_proxy> deep_copy_for_clone() = 0;
-        rpc::shared_ptr<service_proxy> clone_for_zone(destination_zone destination_zone_id, caller_zone caller_zone_id)
+        rpc::shared_ptr<service_proxy> clone_for_zone(destination_zone destination_zone_id, caller_zone caller_zone_id, caller_channel_zone caller_channel_zone_id)
         {
+            assert(!(caller_zone_id_ == caller_zone_id && destination_zone_id_ == destination_zone_id));
             auto ret = deep_copy_for_clone();
-            ret->set_destination_zone_id(destination_zone_id);
             ret->caller_zone_id_ = caller_zone_id;
+            if(destination_zone_id_ != destination_zone_id)
+            {
+                ret->destination_zone_id_ = destination_zone_id;
+                if(!ret->destination_channel_zone_.is_set())
+                    ret->destination_channel_zone_ = destination_zone_id_.as_destination_channel();
+            }
+
             ret->weak_this_ = ret;
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
             {
@@ -313,7 +314,7 @@ namespace rpc
         caller_zone get_caller_zone_id() const {return caller_zone_id_;}
 
         //the service that this proxy lives in
-        rpc::shared_ptr<service> get_operating_zone_service() const {return operating_zone_service_.lock();}
+        rpc::shared_ptr<service> get_operating_zone_service() const {return service_.lock();}
 
         //for low level logging of rpc
         const rpc::i_telemetry_service* get_telemetry_service(){return telemetry_service_;}
