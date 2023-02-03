@@ -2,7 +2,9 @@
 
 #include <example/example.h>
 #include <rpc/types.h>
+#include <rpc/proxy.h>
 #include <rpc/i_telemetry_service.h>
+#include <rpc/basic_service_proxies.h>
 
 void log(const std::string& data)
 {
@@ -360,6 +362,31 @@ namespace marshalled_tests
         {
             target = rpc::shared_ptr<xxx::i_foo>(new foo(telemetry_));
             return rpc::error::OK();
+        }
+
+        error_code create_example_in_subordnate_zone(rpc::shared_ptr<yyy::i_example>& target, uint64_t new_zone_id)
+        {
+            //warning this is not something I would like to see in production code
+            if(!host_)
+                return rpc::error::ZONE_NOT_SUPPORTED();
+
+            auto proxy_ = host_->query_proxy_base();
+            if (!proxy_)
+                return rpc::error::ZONE_NOT_SUPPORTED();
+
+            auto ob = proxy_->get_object_proxy();
+            auto service = ob->get_service_proxy()->get_operating_zone_service();
+            //end warning
+
+
+            auto child_service = rpc::make_shared<rpc::child_service>(rpc::zone{new_zone_id});
+            auto service_proxy_to_child = rpc::local_child_service_proxy::create(child_service, service, telemetry_);
+            // create the example object implementation
+            rpc::shared_ptr<yyy::i_example> remote_example(new example(telemetry_, host_));
+
+            rpc::interface_descriptor example_encap = rpc::create_interface_stub(*child_service, remote_example);
+
+            return rpc::demarshall_interface_proxy(service_proxy_to_child, example_encap, service->get_zone_id().as_caller(), target);
         }
 
         error_code add(int a, int b, int& c) override

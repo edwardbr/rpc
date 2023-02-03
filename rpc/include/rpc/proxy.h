@@ -241,7 +241,7 @@ namespace rpc
             auto svc = service_.lock();
             if(svc)
             {
-                svc->remove_zone_proxy(destination_zone_id_, caller_zone_id_);
+                svc->remove_zone_proxy(destination_zone_id_, caller_zone_id_, destination_channel_zone_);
             }
         }
         

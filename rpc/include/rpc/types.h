@@ -76,6 +76,7 @@ namespace rpc
         destination_zone() = default;
         destination_zone(const type_id<DestinationZoneId>& other) : type_id<DestinationZoneId>(other){}
 
+        type_id<ZoneId> as_zone() const {return {id};}        
         type_id<DestinationChannelZoneId> as_destination_channel() const {return {id};}        
         type_id<CallerZoneId> as_caller() const {return {id};}        
         type_id<CallerChannelZoneId> as_caller_channel() const {return {id};}   
@@ -87,6 +88,8 @@ namespace rpc
         destination_channel_zone() = default;
         destination_channel_zone(const type_id<DestinationChannelZoneId>& other) : type_id<DestinationChannelZoneId>(other){}
 
+        type_id<DestinationZoneId> as_destination() const {return {id};}     
+        type_id<CallerChannelZoneId> as_caller_channel() const {return {id};}   
     };
 
     //the zone that initiated the call

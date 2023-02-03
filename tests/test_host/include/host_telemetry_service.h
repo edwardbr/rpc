@@ -42,12 +42,12 @@ class host_telemetry_service : public rpc::i_telemetry_service
 
     struct orig_zone
     {
-        rpc::zone operating_zone_id = {0};
-        rpc::destination_zone proxy_zone_id = {0};
+        rpc::zone zone_id = {0};
+        rpc::destination_zone destination_zone_id = {0};
         rpc::caller_zone caller_zone_id = {0};
         bool operator == (const orig_zone& other) const
         {
-            return operating_zone_id == other.operating_zone_id && proxy_zone_id == other.proxy_zone_id && caller_zone_id == other.caller_zone_id;
+            return zone_id == other.zone_id && destination_zone_id == other.destination_zone_id && caller_zone_id == other.caller_zone_id;
         }  
     };
 
@@ -55,8 +55,8 @@ class host_telemetry_service : public rpc::i_telemetry_service
     {
         std::size_t operator()(orig_zone const& s) const noexcept
         {
-            std::size_t h1 = std::hash<uint64_t>{}(s.operating_zone_id.id);
-            std::size_t h2 = std::hash<uint64_t>{}(s.proxy_zone_id.id);
+            std::size_t h1 = std::hash<uint64_t>{}(s.zone_id.id);
+            std::size_t h2 = std::hash<uint64_t>{}(s.destination_zone_id.id);
             std::size_t h3 = std::hash<uint64_t>{}(s.caller_zone_id.id);
             return h1 ^ (h2 << 1) ^ (h3 << 2); // or use boost::hash_combine
         }

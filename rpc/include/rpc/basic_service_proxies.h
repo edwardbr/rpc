@@ -20,7 +20,7 @@ namespace rpc
         {
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
             {
-                telemetry_service->on_service_proxy_creation("local_service_proxy", get_zone_id(), get_destination_zone_id(), svc->get_zone_id().as_caller());
+                telemetry_service->on_service_proxy_creation("local_service_proxy", get_zone_id(), get_destination_zone_id(), get_caller_zone_id());
             }
         }
 
@@ -73,7 +73,11 @@ namespace rpc
                 telemetry_service->on_service_proxy_add_ref("local_service_proxy", get_zone_id(), destination_zone_id,
                                                             object_id, caller_zone_id);
             }
-            auto ret = destination_service_.lock()->add_ref(destination_zone_id, object_id, caller_zone_id, proxy_add_ref);    
+            auto ret = destination_service_.lock()->add_ref(destination_zone_id, object_id, caller_zone_id, proxy_add_ref);            
+            if(proxy_add_ref && ret != std::numeric_limits<uint64_t>::max())
+            {
+                add_external_ref();
+            }
             return ret;
         }
         uint64_t release(destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id) override
@@ -154,7 +158,11 @@ namespace rpc
                 telemetry_service->on_service_proxy_add_ref("local_child_service_proxy", get_zone_id(),
                                                             destination_zone_id, object_id, caller_zone_id);
             }
-            auto ret = destination_service_->add_ref(destination_zone_id, object_id, caller_zone_id, proxy_add_ref);    
+            auto ret = destination_service_->add_ref(destination_zone_id, object_id, caller_zone_id, proxy_add_ref);            
+            if(proxy_add_ref && ret != std::numeric_limits<uint64_t>::max())
+            {
+                add_external_ref();
+            }
             return ret;
         }
         uint64_t release(destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id) override

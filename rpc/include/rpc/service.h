@@ -86,7 +86,7 @@ namespace rpc
         void inner_add_zone_proxy(const rpc::shared_ptr<service_proxy>& service_proxy);
         virtual void add_zone_proxy(const rpc::shared_ptr<service_proxy>& zone);
         virtual rpc::shared_ptr<service_proxy> get_zone_proxy(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, destination_zone destination_zone_id, bool& new_proxy_added);
-        virtual void remove_zone_proxy(destination_zone destination_zone_id, caller_zone caller_zone_id);
+        virtual void remove_zone_proxy(destination_zone destination_zone_id, caller_zone caller_zone_id, destination_channel_zone destination_channel_zone_id);
         template<class T> rpc::shared_ptr<T> get_local_interface(object object_id)
         {
             return rpc::static_pointer_cast<T>(get_castable_interface(object_id, {T::id}));
