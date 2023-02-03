@@ -26,9 +26,9 @@ namespace rpc
             telemetry_service->on_object_proxy_creation(service_proxy_->get_zone_id(), service_proxy_->get_destination_zone_id(), object_id, service_proxy->get_caller_zone_id());
         }
 
-        auto message = std::string("object_proxy::object_proxy zone ") + std::to_string(service_proxy_->get_destination_zone_id().get_val()) 
+        auto message = std::string("object_proxy::object_proxy destination zone ") + std::to_string(service_proxy_->get_destination_zone_id().get_val()) 
         + std::string(", object_id ") + std::to_string(object_id.get_val())
-        + std::string(", operating_zone_id ") + std::to_string(service_proxy->get_zone_id().get_val())
+        + std::string(", zone_id ") + std::to_string(service_proxy->get_zone_id().get_val())
         + std::string(", cloned from ") + std::to_string(service_proxy->get_destination_channel_zone_id().get_val());
         LOG_STR(message.c_str(), message.size());
     }
@@ -51,7 +51,7 @@ namespace rpc
 
         auto message = std::string("object_proxy::~object_proxy zone ") + std::to_string(service_proxy_->get_destination_zone_id().get_val()) 
         + std::string(", object_id ") + std::to_string(object_id_.get_val())
-        + std::string(", operating_zone_id ") + std::to_string(service_proxy_->get_zone_id().get_val())
+        + std::string(", zone_id ") + std::to_string(service_proxy_->get_zone_id().get_val())
         + std::string(", cloned from ") + std::to_string(service_proxy_->get_destination_channel_zone_id().get_val());
         LOG_STR(message.c_str(), message.size());
 

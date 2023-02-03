@@ -299,6 +299,7 @@ namespace rpc
             }
             get_operating_zone_service()->inner_add_zone_proxy(ret);
             ret->add_external_ref();
+            //add_external_ref();//as this zone is a channel to the new zone it needs to be kept alive
             return ret;
         }
 
@@ -450,8 +451,9 @@ namespace rpc
         if(sp->get_destination_zone_id() != encap.destination_zone_id)
         {
             //if the zone is different lookup or clone the right proxy
-            //the fist parameter looks wonky but it is the zone from where this object came
-            service_proxy = serv->get_zone_proxy(service_proxy->get_destination_zone_id().as_caller_channel(), caller_zone_id, {encap.destination_zone_id}, new_proxy_added);
+            //the service proxy is where the object came from so it should be used as the new caller channel for this returned object
+            auto caller_channel_zone_id = sp->get_destination_zone_id().as_caller_channel(); 
+            service_proxy = serv->get_zone_proxy(caller_channel_zone_id, caller_zone_id, {encap.destination_zone_id}, new_proxy_added);
         }
 
         rpc::shared_ptr<object_proxy> op = service_proxy->get_object_proxy(encap.object_id);
@@ -496,7 +498,7 @@ namespace rpc
         {
             //if the zone is different lookup or clone the right proxy
             service_proxy = serv->get_zone_proxy(
-                caller_zone_id.as_caller_channel(), 
+                {0}, 
                 caller_zone_id, 
                 encap.destination_zone_id, 
                 new_proxy_added);
