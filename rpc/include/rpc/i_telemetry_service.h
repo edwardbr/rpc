@@ -49,8 +49,8 @@ namespace rpc
         virtual void on_stub_add_ref(rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::interface_ordinal interface_id, uint64_t count, caller_zone caller_zone_id) const = 0;
         virtual void on_stub_release(rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::interface_ordinal interface_id, uint64_t count, caller_zone caller_zone_id) const = 0;
 
-        virtual void on_object_proxy_creation(zone zone_id, destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id) const = 0;
-        virtual void on_object_proxy_deletion(zone zone_id, destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id) const = 0;
+        virtual void on_object_proxy_creation(zone zone_id, destination_zone destination_zone_id, object object_id) const = 0;
+        virtual void on_object_proxy_deletion(zone zone_id, destination_zone destination_zone_id, object object_id) const = 0;
 
         virtual void on_interface_proxy_creation(const char* name, zone zone_id, destination_zone destination_zone_id, object object_id, interface_ordinal interface_id) const = 0;
         virtual void on_interface_proxy_deletion(const char* name, zone zone_id, destination_zone destination_zone_id, object object_id, interface_ordinal interface_id) const = 0;

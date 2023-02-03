@@ -90,11 +90,11 @@ public:
         on_stub_release_host(destination_zone_id.get_val(), object_id.get_val(), interface_id.get_val(), count, caller_zone_id.get_val());
     }
 
-    virtual void on_object_proxy_creation(rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::caller_zone caller_zone_id) const
+    virtual void on_object_proxy_creation(rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id) const
     {
         on_object_proxy_creation_host(zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val());
     }
-    virtual void on_object_proxy_deletion(rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::caller_zone caller_zone_id) const
+    virtual void on_object_proxy_deletion(rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id) const
     {
         on_object_proxy_deletion_host(zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val());
     }

@@ -146,15 +146,15 @@ extern "C"
             telemetry_service->on_stub_release(destination_zone_id, object_id, interface_id, count, caller_zone_id);
     }
 
-    void on_object_proxy_creation_host(rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::caller_zone caller_zone_id)
+    void on_object_proxy_creation_host(rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id)
     {
         if (telemetry_service)
-            telemetry_service->on_object_proxy_creation(zone_id, destination_zone_id, object_id, caller_zone_id);
+            telemetry_service->on_object_proxy_creation(zone_id, destination_zone_id, object_id);
     }
-    void on_object_proxy_deletion_host(rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::caller_zone caller_zone_id)
+    void on_object_proxy_deletion_host(rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id)
     {
         if (telemetry_service)
-            telemetry_service->on_object_proxy_deletion(zone_id, destination_zone_id, object_id, caller_zone_id);
+            telemetry_service->on_object_proxy_deletion(zone_id, destination_zone_id, object_id);
     }
 
     void on_proxy_creation_host(const char* name, rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id,

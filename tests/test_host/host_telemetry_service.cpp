@@ -256,30 +256,30 @@ void host_telemetry_service::on_stub_release(rpc::destination_zone destination_z
     }
 }
 
-void host_telemetry_service::on_object_proxy_creation(rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::caller_zone caller_zone_id) const
+void host_telemetry_service::on_object_proxy_creation(rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id) const
 {
     std::lock_guard g(mux);
     object_proxies.emplace(interface_proxy_id{zone_id, destination_zone_id, object_id, 0}, 1);
-    spdlog::info("new object_proxy zone_id {} destination_zone_id {} caller_zone_id {} object_id {}", zone_id.get_val(), destination_zone_id.get_val(), caller_zone_id.get_val(), object_id.get_val());
+    spdlog::info("new object_proxy zone_id {} destination_zone_id {} object_id {}", zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val());
 }
-void host_telemetry_service::on_object_proxy_deletion(rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::caller_zone caller_zone_id) const
+void host_telemetry_service::on_object_proxy_deletion(rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id) const
 {
     std::lock_guard g(mux);
     auto found = object_proxies.find(interface_proxy_id{zone_id, destination_zone_id, object_id, 0});
     if(found == object_proxies.end())
     {
-        spdlog::error("rpc::object proxy not found zone_id {} destination_zone_id {} caller_zone_id {} object_id {}", zone_id.get_val(), destination_zone_id.get_val(), caller_zone_id.get_val(), object_id.get_val());
+        spdlog::error("rpc::object proxy not found zone_id {} destination_zone_id {} object_id {}", zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val());
     }
     else if(found->second == 1)
     {
         object_proxies.erase(found);
-        spdlog::info("object_proxy deleted zone_id {} destination_zone_id {} caller_zone_id {} object_id {}", zone_id.get_val(), destination_zone_id.get_val(), caller_zone_id.get_val(), object_id.get_val());
+        spdlog::info("object_proxy deleted zone_id {} destination_zone_id {} object_id {}", zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val());
     }
     else
     {            
         found->second--;
-        spdlog::error("rpc::object proxy still being used! zone_id {} destination_zone_id {} caller_zone_id {} object_id {}", zone_id.get_val(), destination_zone_id.get_val(), caller_zone_id.get_val(), object_id.get_val());
-        spdlog::info("on_object_proxy_deletion zone_id {} destination_zone_id {} caller_zone_id {} object_id {}", zone_id.get_val(), destination_zone_id.get_val(), caller_zone_id.get_val(), object_id.get_val());
+        spdlog::error("rpc::object proxy still being used! zone_id {} destination_zone_id {} object_id {}", zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val());
+        spdlog::info("on_object_proxy_deletion zone_id {} destination_zone_id {} object_id {}", zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val());
     }
 }
 
