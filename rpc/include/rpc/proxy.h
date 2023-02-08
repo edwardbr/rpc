@@ -299,7 +299,6 @@ namespace rpc
             }
             get_operating_zone_service()->inner_add_zone_proxy(ret);
             ret->add_external_ref();
-            //add_external_ref();//as this zone is a channel to the new zone it needs to be kept alive
             return ret;
         }
 
