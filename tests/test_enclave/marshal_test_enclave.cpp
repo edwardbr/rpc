@@ -149,7 +149,7 @@ int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t host_id, uint64_t 
     }
 
     //create the root rpc::object
-    rpc::shared_ptr<yyy::i_example> ex(new example(p_telemetry_service, host));
+    rpc::shared_ptr<yyy::i_example> ex(new example(p_telemetry_service, rpc_server, host));
     
     auto example_encap = rpc::create_interface_stub(*rpc_server, ex);
     *example_object_id = example_encap.object_id.get_val();

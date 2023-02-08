@@ -65,17 +65,17 @@ namespace enclave_marshaller
             switch (option)
             {
             case PROXY_MARSHALL_IN:
-                return fmt::format("  ,(\"_{}\", {})", count, name);
+                return fmt::format("  ,(\"{0}\", {0})", name);
             case PROXY_MARSHALL_OUT:
-                return fmt::format("  ,(\"_{}\", {})", count, name);
+                return fmt::format("  ,(\"{0}\", {0})", name);
             case STUB_DEMARSHALL_DECLARATION:
                 return fmt::format("{} {}_", object_type, name);
             case STUB_MARSHALL_IN:
-                return fmt::format("  ,(\"_{}\", {}_)", count, name);
+                return fmt::format("  ,(\"{0}\", {0}_)", name);
             case STUB_PARAM_CAST:
                 return fmt::format("{}_", name);
             case STUB_MARSHALL_OUT:
-                return fmt::format("  ,(\"_{}\", {}_)", count, name);
+                return fmt::format("  ,(\"{0}\", {0}_)", name);
             default:
                 return "";
             }
@@ -95,13 +95,13 @@ namespace enclave_marshaller
             switch (option)
             {
             case PROXY_MARSHALL_IN:
-                return fmt::format("  ,(\"_{}\", {})", count, name);
+                return fmt::format("  ,(\"{0}\", {0})", name);
             case PROXY_MARSHALL_OUT:
-                return fmt::format("  ,(\"_{}\", {})", count, name);
+                return fmt::format("  ,(\"{0}\", {0})", name);
             case STUB_DEMARSHALL_DECLARATION:
                 return fmt::format("{} {}_{{}}", object_type, name);
             case STUB_MARSHALL_IN:
-                return fmt::format("  ,(\"_{}\", {}_)", count, name);
+                return fmt::format("  ,(\"{0}\", {0}_)", name);
             case STUB_PARAM_CAST:
                 return fmt::format("{}_", name);
             default:
@@ -126,17 +126,17 @@ namespace enclave_marshaller
             switch (option)
             {
             case PROXY_MARSHALL_IN:
-                return fmt::format("  ,(\"_{}\", {})", count, name);
+                return fmt::format("  ,(\"{0}\", {0})", name);
             case PROXY_MARSHALL_OUT:
-                return fmt::format("  ,(\"_{}\", {})", count, name);
+                return fmt::format("  ,(\"{0}\", {0})", name);
             case STUB_DEMARSHALL_DECLARATION:
                 return fmt::format("{} {}_", object_type, name);
             case STUB_MARSHALL_IN:
-                return fmt::format("  ,(\"_{}\", {}_)", count, name);
+                return fmt::format("  ,(\"{0}\", {0}_)", name);
             case STUB_PARAM_CAST:
                 return fmt::format("std::move({}_)", name);
             case STUB_MARSHALL_OUT:
-                return fmt::format("  ,(\"_{}\", {}_)", count, name);
+                return fmt::format("  ,(\"{0}\", {0}_)", name);
             default:
                 return "";
             }
@@ -155,13 +155,13 @@ namespace enclave_marshaller
             switch (option)
             {
             case PROXY_MARSHALL_IN:
-                return fmt::format("  ,(\"_{}\", (uint64_t){})", count, name);
+                return fmt::format("  ,(\"{0}\", (uint64_t){0})", name);
             case PROXY_MARSHALL_OUT:
                 return fmt::format("  ,(\"_{}\", (uint64_t) {})", count, name);
             case STUB_DEMARSHALL_DECLARATION:
                 return fmt::format("uint64_t {}_", name);
             case STUB_MARSHALL_IN:
-                return fmt::format("  ,(\"_{}\", {}_)", count, name);
+                return fmt::format("  ,(\"{0}\", {0}_)", name);
             case STUB_PARAM_CAST:
                 return fmt::format("({}*){}_", object_type, name);
             default:
@@ -182,9 +182,9 @@ namespace enclave_marshaller
             switch (option)
             {
             case PROXY_MARSHALL_IN:
-                return fmt::format("  ,(\"_{}\", {}_)", count, name);
+                return fmt::format("  ,(\"{0}\", {0}_)", name);
             case PROXY_MARSHALL_OUT:
-                return fmt::format("  ,(\"_{}\", {}_)", count, name);
+                return fmt::format("  ,(\"{0}\", {0}_)", name);
             case STUB_DEMARSHALL_DECLARATION:
                 return fmt::format("{}* {}_ = nullptr", object_type, name);
             case STUB_PARAM_CAST:
@@ -210,9 +210,9 @@ namespace enclave_marshaller
             switch (option)
             {
             case PROXY_MARSHALL_IN:
-                return fmt::format("  ,(\"_{}\", {}_)", count, name);
+                return fmt::format("  ,(\"{0}\", {0}_)", name);
             case PROXY_MARSHALL_OUT:
-                return fmt::format("  ,(\"_{}\", {}_)", count, name);
+                return fmt::format("  ,(\"{0}\", {0}_)", name);
             case STUB_DEMARSHALL_DECLARATION:
                 return fmt::format("{}* {}_ = nullptr", object_type, name);
             case STUB_PARAM_CAST:
@@ -252,7 +252,7 @@ namespace enclave_marshaller
                 return ret;
             }
             case PROXY_MARSHALL_OUT:
-                return fmt::format("  ,(\"_{}\", {}_)", count, name);
+                return fmt::format("  ,(\"{0}\", {0}_)", name);
 
             case PROXY_CLEAN_IN:
                 return fmt::format("if({0}_stub_) {0}_stub_->release_from_service();", name);
@@ -280,7 +280,7 @@ namespace enclave_marshaller
             case STUB_PARAM_CAST:
                 return fmt::format("{}", name);
             case STUB_MARSHALL_OUT:
-                return fmt::format("  ,(\"_{}\", (uint64_t){})", count, name);
+                return fmt::format("  ,(\"{0}\", (uint64_t){0})", name);
             case PROXY_VALUE_RETURN:
             case PROXY_OUT_DECLARATION:
                 return fmt::format("  rpc::interface_descriptor {}_;", name);
@@ -300,9 +300,9 @@ namespace enclave_marshaller
             case PROXY_PREPARE_IN:
                 return fmt::format("rpc::shared_ptr<rpc::object_stub> {}_stub_;", name);
             case PROXY_MARSHALL_IN:
-                return fmt::format("  ,(\"_{}\", {})", count, name);
+                return fmt::format("  ,(\"{0}\", {0})", name);
             case PROXY_MARSHALL_OUT:
-                return fmt::format("  ,(\"_{}\", {}_)", count, name);
+                return fmt::format("  ,(\"{0}\", {0}_)", name);
 
             case PROXY_CLEAN_IN:
                 return fmt::format("if({0}_stub_) {0}_stub_->release_from_service();", name);
@@ -320,9 +320,9 @@ namespace enclave_marshaller
                     "rpc::interface_descriptor {0}_;", name);
             case STUB_ADD_REF_OUT:
                 return fmt::format(
-                    "{0}_ = zone_.stub_bind_out_param(caller_channel_zone_id, caller_zone_id, {0});", name);
+                    "{0}_ = zone_.stub_bind_out_param(caller_channel_zone_id, caller_zone_id, {0});\n__rpc_returned_objects.push_back({0}_);", name);
             case STUB_MARSHALL_OUT:
-                return fmt::format("  ,(\"_{}\", {}_)", count, name);
+                return fmt::format("  ,(\"{0}\", {0}_)", name);
             default:
                 return "";
             }
@@ -579,34 +579,36 @@ namespace enclave_marshaller
             proxy("{{");
             proxy("{}_proxy(rpc::shared_ptr<rpc::object_proxy> object_proxy) : ", interface_name);
             proxy("  rpc::proxy_impl<{}>(object_proxy)", interface_name);
-            proxy("  {{");
-            proxy("  auto __rpc_sp = get_object_proxy()->get_service_proxy();");
-            proxy("     if(auto* telemetry_service = "
+            proxy("{{");
+            proxy("auto __rpc_op = get_object_proxy();");
+            proxy("auto __rpc_sp = __rpc_op->get_service_proxy();");
+            proxy("   if(auto* telemetry_service = "
                   "__rpc_sp->get_telemetry_service();telemetry_service)");
-            proxy("     {{");
-            proxy("     telemetry_service->on_interface_proxy_creation(\"{0}_proxy\", "
+            proxy("   {{");
+            proxy("   telemetry_service->on_interface_proxy_creation(\"{0}_proxy\", "
                   "__rpc_sp->get_zone_id(), "
-                  "__rpc_sp->get_destination_zone_id(), get_object_proxy()->get_object_id(), "
+                  "__rpc_sp->get_destination_zone_id(), __rpc_op->get_object_id(), "
                   "{{{0}_proxy::id}});",
                   interface_name);
-            proxy("     }}");
-            proxy("  }}");
+            proxy("}}");
+            proxy("}}");
             proxy("mutable rpc::weak_ptr<{}_proxy> weak_this_;", interface_name);
             proxy("public:");
             proxy("");
             proxy("virtual ~{}_proxy()", interface_name);
-            proxy("  {{");
-            proxy("     auto __rpc_sp = get_object_proxy()->get_service_proxy();");
-            proxy("     if(auto* telemetry_service = "
+            proxy("{{");
+            proxy("auto __rpc_op = get_object_proxy();");
+            proxy("auto __rpc_sp = __rpc_op->get_service_proxy();");
+            proxy("if(auto* telemetry_service = "
                   "__rpc_sp->get_telemetry_service();telemetry_service)");
-            proxy("     {{");
-            proxy("     telemetry_service->on_interface_proxy_deletion(\"{0}_proxy\", "
+            proxy("{{");
+            proxy("telemetry_service->on_interface_proxy_deletion(\"{0}_proxy\", "
                   "__rpc_sp->get_zone_id(), "
-                  "__rpc_sp->get_destination_zone_id(), get_object_proxy()->get_object_id(), "
+                  "__rpc_sp->get_destination_zone_id(), __rpc_op->get_object_id(), "
                   "{{{0}_proxy::id}});",
                   interface_name);
-            proxy("     }}");
-            proxy("  }}");
+            proxy("}}");
+            proxy("}}");
             proxy("[[nodiscard]] static rpc::shared_ptr<{}> create(const rpc::shared_ptr<rpc::object_proxy>& "
                   "object_proxy)",
                   interface_name);
@@ -621,7 +623,7 @@ namespace enclave_marshaller
             proxy("");
 
             stub("int {0}_stub::call(rpc::caller_channel_zone caller_channel_zone_id, rpc::caller_zone caller_zone_id, rpc::method method_id, size_t in_size_, const char* in_buf_, std::vector<char>& "
-                 "out_buf_)", interface_name);
+                 "__rpc_out_buf)", interface_name);
             stub("{{");
 
             bool has_methods = false;
@@ -676,14 +678,15 @@ namespace enclave_marshaller
 
                     bool has_inparams = false;
 
-                    proxy("auto __rpc_sp = get_object_proxy()->get_service_proxy();");
+                    proxy("auto __rpc_op = get_object_proxy();");
+                    proxy("auto __rpc_sp = __rpc_op->get_service_proxy();");
                     proxy("if(auto* telemetry_service = "
                           "__rpc_sp->get_telemetry_service();telemetry_service)");
                     proxy("{{");
                     proxy("telemetry_service->on_interface_proxy_send(\"{0}_proxy\", "
                           "__rpc_sp->get_zone_id(), "
                           "__rpc_sp->get_destination_zone_id(), "
-                          "get_object_proxy()->get_object_id(), {{{0}_proxy::id}}, {{{1}}});",
+                          "__rpc_op->get_object_id(), {{{0}_proxy::id}}, {{{1}}});",
                           interface_name, function_count);
                     proxy("}}");
 
@@ -705,6 +708,8 @@ namespace enclave_marshaller
                         }
                     }
 
+                    proxy("std::vector<char> __rpc_in_buf;");                    
+
                     if (has_inparams)
                     {
                         proxy("//PROXY_PREPARE_IN");
@@ -722,8 +727,7 @@ namespace enclave_marshaller
                             count++;
                         }
                         
-                        proxy("//PROXY_MARSHALL_IN");
-                        proxy("const auto in_ = yas::save<yas::mem|yas::binary|yas::no_header>(YAS_OBJECT_NVP(");
+                        proxy("const auto __rpc_yas_mapping = YAS_OBJECT_NVP(");
                         proxy("  \"in\"");
 
                         stub("//STUB_MARSHALL_IN");
@@ -758,17 +762,18 @@ namespace enclave_marshaller
                             }
                             count++;
                         }
-
-                        proxy("  ));");
+                        proxy("  );");
+                        proxy("yas::count_ostream __rpc_counter;");
+                        proxy("yas::binary_oarchive<yas::count_ostream, yas::mem|yas::binary|yas::no_header> __rpc_oa(__rpc_counter);");
+                        proxy("__rpc_oa(__rpc_yas_mapping);");
+                        proxy("__rpc_in_buf.resize(__rpc_counter.total_size);");
+                        proxy("yas::mem_ostream __rpc_writer(__rpc_in_buf.data(), __rpc_counter.total_size);");
+                        proxy("yas::save<yas::mem|yas::binary|yas::no_header>(__rpc_writer, __rpc_yas_mapping);");
                         stub("  ));");
                     }
-                    else
-                    {
-                        proxy("const yas::shared_buffer in_;");
-                    }
 
-                    proxy("std::vector<char> out_buf_(24); //max size using short string optimisation");
-                    proxy("{} __rpc_ret = get_object_proxy()->send({{{}::id}}, {{{}}}, in_.size, in_.data.get(), out_buf_);",
+                    proxy("std::vector<char> __rpc_out_buf(24); //max size using short string optimisation");
+                    proxy("{} __rpc_ret = __rpc_op->send({{{}::id}}, {{{}}}, __rpc_in_buf.size(), __rpc_in_buf.data(), __rpc_out_buf);",
                           function.get_return_type(), interface_name, function_count);
                     proxy("if(__rpc_ret >= rpc::error::MIN() && __rpc_ret <= rpc::error::MAX())");
                     proxy("{{");
@@ -791,6 +796,7 @@ namespace enclave_marshaller
                     }
 
                     stub("//STUB_PARAM_CAST");
+                    stub("std::vector<rpc::interface_descriptor> __rpc_returned_objects;");
                     stub("if(__rpc_ret == rpc::error::OK())");
                     stub("{{");
                     stub.print_tabs();
@@ -876,15 +882,16 @@ namespace enclave_marshaller
                     {
                         uint64_t count = 1;
                         proxy("//PROXY_MARSHALL_OUT");
-                        proxy("yas::load<yas::mem|yas::binary|yas::no_header>(yas::intrusive_buffer{{out_buf_.data(), "
-                              "out_buf_.size()}}, YAS_OBJECT_NVP(");
+                        proxy("std::vector<rpc::interface_descriptor> __rpc_returned_objects;");
+                        proxy("yas::load<yas::mem|yas::binary|yas::no_header>(yas::intrusive_buffer{{__rpc_out_buf.data(), "
+                              "__rpc_out_buf.size()}}, YAS_OBJECT_NVP(");
                         proxy("  \"out\"");
-                        proxy("  ,(\"_{}\", __rpc_ret)", count);
+                        proxy("  ,(\"__returned_objects\", __rpc_returned_objects)");
 
                         stub("//STUB_MARSHALL_OUT");
-                        stub("const auto yas_mapping_ = YAS_OBJECT_NVP(");
+                        stub("const auto __rpc_yas_mapping = YAS_OBJECT_NVP(");
                         stub("  \"out\"");
-                        stub("  ,(\"_{}\", __rpc_ret)", count);
+                        stub("  ,(\"__returned_objects\", __rpc_returned_objects)");
 
                         for (auto& parameter : function.get_parameters())
                         {
@@ -906,12 +913,12 @@ namespace enclave_marshaller
 
                     stub("  );");
 
-                    stub("yas::count_ostream counter_;");
-                    stub("yas::binary_oarchive<yas::count_ostream, yas::mem|yas::binary|yas::no_header> oa(counter_);");
-                    stub("oa(yas_mapping_);");
-                    stub("out_buf_.resize(counter_.total_size);");
-                    stub("yas::mem_ostream writer_(out_buf_.data(), counter_.total_size);");
-                    stub("yas::save<yas::mem|yas::binary|yas::no_header>(writer_, yas_mapping_);");
+                    stub("yas::count_ostream __rpc_counter;");
+                    stub("yas::binary_oarchive<yas::count_ostream, yas::mem|yas::binary|yas::no_header> __rpc_oa(__rpc_counter);");
+                    stub("__rpc_oa(__rpc_yas_mapping);");
+                    stub("__rpc_out_buf.resize(__rpc_counter.total_size);");
+                    stub("yas::mem_ostream __rpc_writer(__rpc_out_buf.data(), __rpc_counter.total_size);");
+                    stub("yas::save<yas::mem|yas::binary|yas::no_header>(__rpc_writer, __rpc_yas_mapping);");
                     stub("return __rpc_ret;");
 
                     proxy("//PROXY_VALUE_RETURN");
@@ -1051,7 +1058,7 @@ namespace enclave_marshaller
             stub("rpc::weak_ptr<rpc::object_stub> get_object_stub() const override {{ return target_stub_;}}");
             stub("void* get_pointer() const override {{ return __rpc_target_.get();}}");
             stub("int call(rpc::caller_channel_zone caller_channel_zone_id, rpc::caller_zone caller_zone_id, rpc::method method_id, size_t in_size_, const char* in_buf_, std::vector<char>& "
-                 "out_buf_) override;");
+                 "__rpc_out_buf) override;");
             stub("int cast(rpc::interface_ordinal interface_id, rpc::shared_ptr<rpc::i_interface_stub>& new_stub) override;");
             stub("}};");
             stub("");            

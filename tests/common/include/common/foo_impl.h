@@ -330,6 +330,8 @@ namespace marshalled_tests
     {
         const rpc::i_telemetry_service* telemetry_ = nullptr;
         rpc::shared_ptr<yyy::i_host> host_;
+        rpc::weak_ptr<rpc::child_service> this_service_;
+
         void* get_address() const override { return (void*)this; }
         const rpc::casting_interface* query_interface(rpc::interface_ordinal interface_id) const override
         {
@@ -339,9 +341,10 @@ namespace marshalled_tests
         }
 
     public:
-        example(const rpc::i_telemetry_service* telemetry, rpc::shared_ptr<yyy::i_host> host)
+        example(const rpc::i_telemetry_service* telemetry, rpc::shared_ptr<rpc::child_service> this_service, rpc::shared_ptr<yyy::i_host> host)
             : telemetry_(telemetry)
             , host_(host)
+            , this_service_(this_service)
         {
             if (telemetry_)
                 telemetry_->on_impl_creation("example", {yyy::i_example::id});
@@ -366,27 +369,21 @@ namespace marshalled_tests
 
         error_code create_example_in_subordnate_zone(rpc::shared_ptr<yyy::i_example>& target, uint64_t new_zone_id)
         {
-            //warning this is not something I would like to see in production code
-            if(!host_)
-                return rpc::error::ZONE_NOT_SUPPORTED();
-
-            auto proxy_ = host_->query_proxy_base();
-            if (!proxy_)
-                return rpc::error::ZONE_NOT_SUPPORTED();
-
-            auto ob = proxy_->get_object_proxy();
-            auto service = ob->get_service_proxy()->get_operating_zone_service();
-            //end warning
-
-
+            auto this_service = this_service_.lock();
             auto child_service = rpc::make_shared<rpc::child_service>(rpc::zone{new_zone_id});
-            auto service_proxy_to_child = rpc::local_child_service_proxy::create(child_service, service, telemetry_);
-            // create the example object implementation
-            rpc::shared_ptr<yyy::i_example> remote_example(new example(telemetry_, host_));
+            auto service_proxy_to_child = rpc::local_child_service_proxy::create(child_service, this_service, telemetry_);
+
+            // create the example object implementation with a recursive chain of services
+            rpc::shared_ptr<yyy::i_example> remote_example(new example(telemetry_, child_service, host_));
 
             rpc::interface_descriptor example_encap = rpc::create_interface_stub(*child_service, remote_example);
 
-            return rpc::demarshall_interface_proxy(service_proxy_to_child, example_encap, service->get_zone_id().as_caller(), target);
+            auto service_proxy_to_this_zone = rpc::local_service_proxy::create(this_service, child_service, telemetry_, false);
+            //service_proxy_to_this_zone->add_external_ref();
+            child_service->set_parent(service_proxy_to_this_zone, true);
+
+
+            return rpc::demarshall_interface_proxy(service_proxy_to_child, example_encap, this_service->get_zone_id().as_caller(), target);
         }
 
         error_code add(int a, int b, int& c) override

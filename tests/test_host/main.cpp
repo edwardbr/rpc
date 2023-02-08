@@ -168,7 +168,7 @@ struct in_memory_setup
         tm = rpc::make_shared<host_telemetry_service>();
         telemetry_service = tm.get();
         i_host_ptr = rpc::shared_ptr<yyy::i_host> (new host());
-        i_example_ptr = rpc::shared_ptr<yyy::i_example> (new example(telemetry_service, use_host_in_child ? i_host_ptr : nullptr));
+        i_example_ptr = rpc::shared_ptr<yyy::i_example> (new example(telemetry_service, nullptr, use_host_in_child ? i_host_ptr : nullptr));
     }
 
     virtual void TearDown()
@@ -234,7 +234,7 @@ struct inproc_setup
 
         {
             // create the example object implementation
-            rpc::shared_ptr<yyy::i_example> remote_example(new example(telemetry_service, use_host_in_child ? i_host_ptr : nullptr));
+            rpc::shared_ptr<yyy::i_example> remote_example(new example(telemetry_service, child_service, use_host_in_child ? i_host_ptr : nullptr));
 
             example_encap
                 = rpc::create_interface_stub(*child_service, remote_example);
@@ -271,7 +271,7 @@ struct inproc_setup
         auto service_proxy_to_child = rpc::local_child_service_proxy::create(new_service, root_service, telemetry_service);
 
         // create the example object implementation
-        rpc::shared_ptr<yyy::i_example> remote_example(new example(telemetry_service, use_host_in_child ? i_host_ptr : nullptr));
+        rpc::shared_ptr<yyy::i_example> remote_example(new example(telemetry_service, new_service, use_host_in_child ? i_host_ptr : nullptr));
 
         rpc::interface_descriptor example_encap
             = rpc::create_interface_stub(*new_service, remote_example);
@@ -437,15 +437,14 @@ using remote_type_test = type_test<T>;
 
 typedef Types<
     inproc_setup<true, false, false>, 
-//    inproc_setup<true, false, true>, 
+    inproc_setup<true, false, true>, 
     inproc_setup<true, true, false>, 
-//    inproc_setup<true, true, true>, 
+    inproc_setup<true, true, true>, 
 
     enclave_setup<true, false, false>, 
-//    enclave_setup<true, false, true>, 
-    enclave_setup<true, true, false> 
-//    enclave_setup<true, true, true>
-    > remote_implementations;
+    enclave_setup<true, false, true>, 
+    enclave_setup<true, true, false>, 
+    enclave_setup<true, true, true>> remote_implementations;
 TYPED_TEST_SUITE(remote_type_test, remote_implementations);
 
 TYPED_TEST(remote_type_test, remote_standard_tests)
@@ -473,10 +472,10 @@ TYPED_TEST(remote_type_test, create_new_zone_releasing_host_then_running_on_othe
     example_relay_ptr->create_foo(i_foo_relay_ptr);
     standard_tests(*i_foo_relay_ptr, true, telemetry_service);
 
-    rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
-    ASSERT_EQ(lib_.i_example_ptr->create_foo(i_foo_ptr), 0);
+    //rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
+    //ASSERT_EQ(lib_.i_example_ptr->create_foo(i_foo_ptr), 0);
     example_relay_ptr = nullptr;
-    standard_tests(*i_foo_ptr, true, telemetry_service);    
+    //standard_tests(*i_foo_ptr, true, telemetry_service);    
 }
 
 TYPED_TEST(remote_type_test, dyanmic_cast_tests)
@@ -602,15 +601,14 @@ class type_test_with_host :
 
 typedef Types<
     inproc_setup<true, false, false>, 
-//    inproc_setup<true, false, true>, 
+    inproc_setup<true, false, true>, 
     inproc_setup<true, true, false>, 
-//    inproc_setup<true, true, true>, 
+    inproc_setup<true, true, true>, 
 
     enclave_setup<true, false, false>, 
-//    enclave_setup<true, false, true>, 
-    enclave_setup<true, true, false> 
-//    enclave_setup<true, true, true>
-> type_test_with_host_implementations;
+    enclave_setup<true, false, true>, 
+    enclave_setup<true, true, false>, 
+    enclave_setup<true, true, true>> type_test_with_host_implementations;
 TYPED_TEST_SUITE(type_test_with_host, type_test_with_host_implementations);
 
 

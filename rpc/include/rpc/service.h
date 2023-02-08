@@ -114,12 +114,16 @@ namespace rpc
         bool check_is_empty() const override;
         object get_root_object_id() const;
         rpc::shared_ptr<service_proxy> get_zone_proxy(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, destination_zone destination_zone_id, bool& new_proxy_added) override;
+
+        uint64_t add_ref(destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id, bool proxy_add_ref) override;
     };
 
 
     template<class T> 
     rpc::interface_descriptor create_interface_stub(rpc::service& serv, const rpc::shared_ptr<T>& iface)
     {
-        return serv.stub_bind_out_param(caller_channel_zone(), serv.get_zone_id().as_caller(), iface);       
+        caller_channel_zone empty_caller_channel_zone = {};
+        caller_zone caller_zone_id = serv.get_zone_id().as_caller();
+        return serv.stub_bind_out_param(empty_caller_channel_zone, caller_zone_id, iface);       
     }
 }
