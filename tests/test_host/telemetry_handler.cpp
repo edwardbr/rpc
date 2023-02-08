@@ -15,9 +15,18 @@ extern "C"
         puts(str);
     }
 
-    int call_host(uint64_t caller_channel_zone_id, uint64_t caller_zone_id, uint64_t zone_id, uint64_t object_id, uint64_t interface_id,
-                  rpc::method method_id, size_t sz_int, const char* data_in, size_t sz_out, char* data_out,
-                  size_t* data_out_sz)
+    int call_host(
+        uint64_t caller_channel_zone_id
+        , uint64_t caller_zone_id
+        , uint64_t destination_zone_id
+        , uint64_t object_id
+        , uint64_t interface_id
+        , uint64_t method_id
+        , size_t sz_int
+        , const char* data_in
+        , size_t sz_out
+        , char* data_out
+        , size_t* data_out_sz)
     {
         thread_local std::vector<char> out_buf;
 
@@ -29,7 +38,7 @@ extern "C"
         }
         if (out_buf.empty())
         {
-            int ret = root_service->send({caller_channel_zone_id}, {caller_zone_id}, {zone_id}, {object_id}, {interface_id}, {method_id}, sz_int,
+            int ret = root_service->send({caller_channel_zone_id}, {caller_zone_id}, {destination_zone_id}, {object_id}, {interface_id}, {method_id}, sz_int,
                                          data_in, out_buf);
             if (ret >= rpc::error::MIN() && ret <= rpc::error::MAX())
                 return ret;

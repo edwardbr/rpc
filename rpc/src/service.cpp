@@ -132,10 +132,14 @@ namespace rpc
             auto ret = other_zone->send(get_zone_id().as_caller_channel(), caller_zone_id, destination_zone_id, object_id, interface_id, method_id, in_size_, in_buf_, out_buf_);
 
             std::vector<rpc::interface_descriptor> returned_objects;
-            yas::load<yas::mem|yas::binary|yas::no_header>(yas::intrusive_buffer{out_buf_.data(), out_buf_.size()}, YAS_OBJECT_NVP(
-                "out"
-                ,("__returned_objects", returned_objects)
-                ));      
+            if(!(ret >= rpc::error::MIN() && ret <= rpc::error::MAX()))
+            {
+                yas::load<yas::mem|yas::binary|yas::no_header>(yas::intrusive_buffer{out_buf_.data(), out_buf_.size()}, YAS_OBJECT_NVP(
+                    "out"
+                    ,("__returned_objects", returned_objects)
+                    ,("__return_value", ret)
+                    ));      
+            }
             if(!returned_objects.empty())  
             {
                 for(auto& item : returned_objects)

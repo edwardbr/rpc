@@ -78,7 +78,8 @@ namespace rpc
                                            size_t in_size_, const char* in_buf_, std::vector<char>& out_buf_)
     {
         if(destination_zone_id != get_destination_zone_id())
-            return rpc::error::ZONE_NOT_SUPPORTED();        
+            return rpc::error::ZONE_NOT_SUPPORTED();   
+                 
         int err_code = 0;
         size_t data_out_sz = 0;
         void* tls = nullptr;

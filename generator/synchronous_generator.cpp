@@ -887,11 +887,13 @@ namespace enclave_marshaller
                               "__rpc_out_buf.size()}}, YAS_OBJECT_NVP(");
                         proxy("  \"out\"");
                         proxy("  ,(\"__returned_objects\", __rpc_returned_objects)");
+                        proxy("  ,(\"__return_value\", __rpc_ret)");
 
                         stub("//STUB_MARSHALL_OUT");
                         stub("const auto __rpc_yas_mapping = YAS_OBJECT_NVP(");
                         stub("  \"out\"");
                         stub("  ,(\"__returned_objects\", __rpc_returned_objects)");
+                        stub("  ,(\"__return_value\", __rpc_ret)");
 
                         for (auto& parameter : function.get_parameters())
                         {

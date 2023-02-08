@@ -212,7 +212,7 @@ int call_enclave(
     if(*data_out_sz <= sz_out)
     {
         memcpy(data_out, tmp.data(), *data_out_sz);
-        return rpc::error::OK();
+        return ret;
     }
 
     retry_buf = new std::vector<char>(std::move(tmp));

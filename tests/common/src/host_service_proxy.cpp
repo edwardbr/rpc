@@ -40,6 +40,9 @@ namespace rpc
     int host_service_proxy::send(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, destination_zone destination_zone_id, object object_id, interface_ordinal interface_id, method method_id, size_t in_size_,
                                        const char* in_buf_, std::vector<char>& out_buf_)
     {
+        if(destination_zone_id != get_destination_zone_id())
+            return rpc::error::ZONE_NOT_SUPPORTED();  
+
         int err_code = 0;
         size_t data_out_sz = 0;
         sgx_status_t status

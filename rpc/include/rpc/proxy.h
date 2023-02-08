@@ -258,6 +258,7 @@ namespace rpc
             {
                 assert(!dependent_services_lock_);
                 dependent_services_lock_ = weak_this_.lock();
+                assert(dependent_services_lock_);
             }            
         }
 
