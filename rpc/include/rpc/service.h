@@ -80,12 +80,12 @@ namespace rpc
 
         int try_cast(destination_zone destination_zone_id, object object_id, interface_ordinal interface_id) override;
         uint64_t add_ref(destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id, bool proxy_add_ref) override;
-        void release_local_stub(const rpc::shared_ptr<rpc::object_stub>& stub);
+        uint64_t release_local_stub(const rpc::shared_ptr<rpc::object_stub>& stub);
         uint64_t release(destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id) override;
 
         void inner_add_zone_proxy(const rpc::shared_ptr<service_proxy>& service_proxy);
         virtual void add_zone_proxy(const rpc::shared_ptr<service_proxy>& zone);
-        virtual rpc::shared_ptr<service_proxy> get_zone_proxy(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, destination_zone destination_zone_id, bool& new_proxy_added);
+        virtual rpc::shared_ptr<service_proxy> get_zone_proxy(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, destination_zone destination_zone_id, caller_zone new_caller_zone_id, bool& new_proxy_added);
         virtual void remove_zone_proxy(destination_zone destination_zone_id, caller_zone caller_zone_id, destination_channel_zone destination_channel_zone_id);
         template<class T> rpc::shared_ptr<T> get_local_interface(object object_id)
         {
@@ -113,7 +113,7 @@ namespace rpc
         void set_parent(const rpc::shared_ptr<rpc::service_proxy>& parent_service, bool child_does_not_use_parents_interface);
         bool check_is_empty() const override;
         object get_root_object_id() const;
-        rpc::shared_ptr<service_proxy> get_zone_proxy(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, destination_zone destination_zone_id, bool& new_proxy_added) override;
+        rpc::shared_ptr<service_proxy> get_zone_proxy(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, destination_zone destination_zone_id, caller_zone new_caller_zone_id, bool& new_proxy_added) override;
 
         uint64_t add_ref(destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id, bool proxy_add_ref) override;
     };

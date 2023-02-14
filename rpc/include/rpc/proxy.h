@@ -196,7 +196,7 @@ namespace rpc
         std::unordered_map<object, rpc::weak_ptr<object_proxy>> proxies_;
         std::mutex insert_control_;
 
-        zone zone_id_ = {0};
+        const zone zone_id_;
         destination_zone destination_zone_id_ = {0};
         destination_channel_zone destination_channel_zone_ = {0};
         caller_zone caller_zone_id_ = {0};
@@ -387,10 +387,11 @@ namespace rpc
         }
         else
         {
+            auto zone_id = serv.get_zone_id();
             //get the right  service proxy
             //if the zone is different lookup or clone the right proxy
             bool new_proxy_added = false;
-            auto service_proxy = serv.get_zone_proxy(caller_channel_zone_id, caller_zone_id, {encap.destination_zone_id}, new_proxy_added);
+            auto service_proxy = serv.get_zone_proxy(caller_channel_zone_id, caller_zone_id, encap.destination_zone_id, zone_id.as_caller(), new_proxy_added);
             if(!service_proxy)
                 return rpc::error::OBJECT_NOT_FOUND();
 
@@ -399,7 +400,7 @@ namespace rpc
             {
                 op = object_proxy::create(encap.object_id, service_proxy);
 //shouldnt service_proxy->get_zone_id().as_caller() be service_proxy->get_caller_id()?
-                service_proxy->add_ref(service_proxy->get_destination_zone_id(), encap.object_id, service_proxy->get_zone_id().as_caller(), !new_proxy_added); 
+                service_proxy->add_ref(encap.destination_zone_id, encap.object_id, zone_id.as_caller(), !new_proxy_added); 
             }
             auto ret = op->query_interface(iface, false);        
             return ret;
@@ -439,9 +440,18 @@ namespace rpc
         //if it is local to this service then just get the relevant stub
         if(encap.destination_zone_id == serv->get_zone_id().as_destination())
         {
-            val = serv->get_local_interface<T>(encap.object_id);
-            if(!val)
+            auto ob = serv->get_object(encap.object_id).lock();
+            if(!ob)
                 return rpc::error::OBJECT_NOT_FOUND();
+
+            auto count = serv->release_local_stub(ob);
+            assert(count);
+
+            auto interface_stub = ob->get_interface({T::id});
+            if(!interface_stub)
+                return rpc::error::INVALID_INTERFACE_ID();
+
+            val = rpc::static_pointer_cast<T>(interface_stub->get_castable_interface());
             return rpc::error::OK();
         }
 
@@ -453,7 +463,7 @@ namespace rpc
             //if the zone is different lookup or clone the right proxy
             //the service proxy is where the object came from so it should be used as the new caller channel for this returned object
             auto caller_channel_zone_id = sp->get_destination_zone_id().as_caller_channel(); 
-            service_proxy = serv->get_zone_proxy(caller_channel_zone_id, caller_zone_id, {encap.destination_zone_id}, new_proxy_added);
+            service_proxy = serv->get_zone_proxy(caller_channel_zone_id, caller_zone_id, {encap.destination_zone_id}, sp->get_zone_id().as_caller(), new_proxy_added);
         }
 
         rpc::shared_ptr<object_proxy> op = service_proxy->get_object_proxy(encap.object_id);
@@ -501,6 +511,7 @@ namespace rpc
                 {0}, 
                 caller_zone_id, 
                 encap.destination_zone_id, 
+                caller_zone_id,
                 new_proxy_added);
         }
 

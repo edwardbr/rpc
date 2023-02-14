@@ -68,9 +68,14 @@ void host_telemetry_service::on_service_deletion(const char* name, rpc::zone zon
 }
 void host_telemetry_service::on_service_proxy_creation(const char* name, rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::caller_zone caller_zone_id) const
 {
-    std::lock_guard g(mux);
-    service_proxies.emplace(orig_zone{zone_id, destination_zone_id, caller_zone_id}, name_count{name, 1});
     spdlog::info("new service_proxy name {} zone_id {} destination_zone_id {} caller_zone_id {}", name, zone_id.get_val(), destination_zone_id.get_val(), caller_zone_id.get_val());
+
+    std::lock_guard g(mux);
+    auto found = service_proxies.find(orig_zone{zone_id, destination_zone_id, caller_zone_id});
+    if(found == service_proxies.end())
+    {
+        service_proxies.emplace(orig_zone{zone_id, destination_zone_id, caller_zone_id}, name_count{name, 1});
+    }
 }
 
 void host_telemetry_service::on_service_proxy_deletion(const char* name, rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::caller_zone caller_zone_id) const
@@ -104,7 +109,8 @@ void host_telemetry_service::on_service_proxy_add_ref(const char* name, rpc::zon
     auto found = service_proxies.find(orig_zone{zone_id, destination_zone_id, caller_zone_id});
     if(found == service_proxies.end())
     {
-        spdlog::error("object add_ref not found name {} zone_id {} destination_zone_id {} caller_zone_id {}", name, zone_id.get_val(), destination_zone_id.get_val(), caller_zone_id.get_val());
+        //service_proxies.emplace(orig_zone{zone_id, destination_zone_id, caller_zone_id}, name_count{name, 1});
+        spdlog::info("object add_ref name with proxy added {} zone_id {} destination_zone_id {} caller_zone_id {}", name, zone_id.get_val(), destination_zone_id.get_val(), caller_zone_id.get_val());
     }
     else
     {

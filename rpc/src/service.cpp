@@ -144,8 +144,21 @@ namespace rpc
             {
                 for(auto& item : returned_objects)
                 {
-                    if( item.destination_zone_id == caller_channel_zone_id.as_destination()
-                        || item.destination_zone_id == caller_zone_id.as_destination())
+                    if(zone_id_.as_destination() == item.destination_zone_id)
+                    {
+                        /*auto found = other_zones.find({destination_zone_id, caller_zone_id});
+                        if(found != other_zones.end())
+                        {
+                            found->second.lock()->release_external_ref();
+                        }*/
+                    }
+                    else if( 
+                        item.destination_zone_id.is_set() 
+                        && 
+                        (
+                            (caller_channel_zone_id.is_set() && item.destination_zone_id == caller_channel_zone_id.as_destination())
+                            || (caller_zone_id.is_set() && item.destination_zone_id == caller_zone_id.as_destination())
+                        ))
                     {                        
                         //do nothing not our problem the object belongs to the caller and its channel lifetime symantics does not apply
                     }
@@ -189,55 +202,40 @@ namespace rpc
     {
         auto object_proxy = base->get_object_proxy();
         auto object_service_proxy = object_proxy->get_service_proxy();
-        auto object_service_proxy_caller =  object_service_proxy->get_caller_zone_id();
         auto destination_zone_id = object_service_proxy->get_destination_zone_id();
         auto destination_channel_zone_id = object_service_proxy->get_destination_channel_zone_id();
         auto object_id = object_proxy->get_object_id();
-        bool needs_external_add_ref = true;
-        bool object_is_returned_to_creator = false;
 
-        //check to see if the source and destination come from the same direction
-        if(    caller_zone_id.is_set() 
-            && destination_zone_id.is_set() 
-            && caller_zone_id == destination_zone_id.as_caller())
-            return {object_id, destination_zone_id}; //nothing to do as the destinaton is the same as the source
-        
-        if((
-                caller_zone_id.is_set() 
-                && destination_channel_zone_id.is_set() 
-                && caller_zone_id.as_destination_channel() == destination_channel_zone_id
-            ) 
-            ||
-            (
-                caller_channel_zone_id.is_set() 
-                && destination_channel_zone_id.is_set() 
-                && caller_channel_zone_id.as_destination_channel() == destination_channel_zone_id
-            ))
-        {
-            needs_external_add_ref = false;
-            object_is_returned_to_creator = true;
-        }
-        else if(caller_channel_zone_id.is_set() 
-            && destination_zone_id.is_set() 
-            && caller_channel_zone_id.as_destination() == destination_zone_id)
-        {
-            needs_external_add_ref = false;
-        }
+        assert(caller_zone_id.is_set());
+        assert(destination_zone_id.is_set());
+
+        uint64_t object_channel = caller_channel_zone_id.is_set() ? caller_channel_zone_id.id : caller_zone_id.id;
+        assert(object_channel);
+
+        uint64_t destination_channel = destination_channel_zone_id.is_set() ? destination_channel_zone_id.id : destination_zone_id.id;
+        assert(destination_channel);
 
         rpc::shared_ptr<service_proxy> other_zone = object_service_proxy;
-        auto found = other_zones.find({destination_zone_id, caller_zone_id});//we dont need to get caller id for this
-        if(found != other_zones.end())
+        bool needs_external_add_ref = true;
+
+        //check to see if the source and destination come from the same direction
+        if(object_channel == destination_channel)
         {
-            other_zone = found->second.lock();
+            //Dont external_add_ref the local service proxy as we are return to source no channel is required
+            needs_external_add_ref = false;
         }
         else
         {
-            //if the pointer is being passed back dont clone in this zone
-            if(!object_is_returned_to_creator)
+            auto found = other_zones.find({destination_zone_id, caller_zone_id});//we dont need to get caller id for this
+            if(found != other_zones.end())
+            {
+                other_zone = found->second.lock();
+            }
+            else
             {
                 other_zone = object_service_proxy->clone_for_zone(destination_zone_id, caller_zone_id, caller_channel_zone_id);
+                needs_external_add_ref = false;
             }
-            needs_external_add_ref = false;
         }
         other_zone->add_ref(destination_zone_id, object_id, caller_zone_id, needs_external_add_ref);
  
@@ -375,7 +373,7 @@ namespace rpc
         }
     }
 
-    void service::release_local_stub(const rpc::shared_ptr<rpc::object_stub>& stub)
+    uint64_t service::release_local_stub(const rpc::shared_ptr<rpc::object_stub>& stub)
     {
         std::lock_guard l(insert_control);
         uint64_t count = stub->release();
@@ -399,6 +397,7 @@ namespace rpc
             }
             stub->reset();        
         }
+        return count;
     }
 
     uint64_t service::release(destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id)
@@ -496,36 +495,54 @@ namespace rpc
         caller_channel_zone caller_channel_zone_id, 
         caller_zone caller_zone_id, 
         destination_zone destination_zone_id, 
+        caller_zone new_caller_zone_id, 
         bool& new_proxy_added)
     {
         new_proxy_added = false;
         std::lock_guard g(insert_control);
 
         //find if we have one
-        auto item = other_zones.find({destination_zone_id, caller_zone_id});
+        auto item = other_zones.find({destination_zone_id, new_caller_zone_id});
         if (item != other_zones.end())
             return item->second.lock();
 
-        //if not we can make one from the proxy of the calling zone
-        if(caller_zone_id.is_set())
+        item = other_zones.lower_bound({destination_zone_id, {0}});
+
+        //if not we can make one from the proxy of the calling channel zone
+        //this zone knows nothing about the destination zone however the caller channel zone will know how to connect to it
+        if (item == other_zones.end() && caller_channel_zone_id.is_set())
         {
-            item = other_zones.find({caller_zone_id.as_destination(), get_zone_id().as_caller()});
-        }
-        //or if not we can make one from the proxy of the calling channel zone
-        if (item == other_zones.end())
-        {
-            if(!caller_channel_zone_id.is_set())
+            item = other_zones.lower_bound({caller_channel_zone_id.as_destination(), {0}});
+            if (item == other_zones.end() || item->first.dest != caller_channel_zone_id.as_destination())
+            {
+                assert(false); //something is wrong the caller channel should always be valid if specified
                 return nullptr;
-            item = other_zones.find({caller_channel_zone_id.as_destination(), get_zone_id().as_caller()});
+            }
+        }
+        //or if not we can make one from the proxy of the calling  zone
+        if(item == other_zones.end() && caller_zone_id.is_set())
+        {
+            item = other_zones.lower_bound({caller_zone_id.as_destination(), {0}});
+            if (item == other_zones.end() || item->first.dest != caller_zone_id.as_destination())
+            {
+                assert(false); //something is wrong the caller should always be valid if specified
+                return nullptr;
+            }
         }
         if (item == other_zones.end())
+        {
+            assert(false); //something is wrong we should not get here
             return nullptr;
+        }
 
         auto calling_proxy = item->second.lock();
         if(!calling_proxy)
+        {
+            assert(!"Race condition"); //we have a race condition
             return nullptr;
+        }
 
-        auto proxy = calling_proxy->clone_for_zone(destination_zone_id, caller_zone_id, caller_channel_zone_id);
+        auto proxy = calling_proxy->clone_for_zone(destination_zone_id, new_caller_zone_id, caller_channel_zone_id);
         new_proxy_added = true;
         return proxy;
     }
@@ -617,9 +634,9 @@ namespace rpc
         return stub->get_id();
     }
 
-    rpc::shared_ptr<service_proxy> child_service::get_zone_proxy(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, destination_zone destination_zone_id, bool& new_proxy_added)
+    rpc::shared_ptr<service_proxy> child_service::get_zone_proxy(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, destination_zone destination_zone_id, caller_zone new_caller_zone_id, bool& new_proxy_added)
     {
-        auto proxy = service::get_zone_proxy(caller_channel_zone_id, caller_zone_id, destination_zone_id, new_proxy_added);
+        auto proxy = service::get_zone_proxy(caller_channel_zone_id, caller_zone_id, destination_zone_id, new_caller_zone_id, new_proxy_added);
         if(proxy)
             return proxy;
 

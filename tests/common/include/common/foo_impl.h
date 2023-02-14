@@ -367,6 +367,12 @@ namespace marshalled_tests
             return rpc::error::OK();
         }
 
+        error_code create_baz(rpc::shared_ptr<xxx::i_baz>& target) override
+        {
+            target = rpc::shared_ptr<xxx::i_baz>(new baz(telemetry_));
+            return rpc::error::OK();            
+        }
+
         error_code create_example_in_subordnate_zone(rpc::shared_ptr<yyy::i_example>& target, uint64_t new_zone_id)
         {
             auto this_service = this_service_.lock();
@@ -624,6 +630,12 @@ namespace marshalled_tests
         {
             baz->callback(22);
             auto val1 = rpc::dynamic_pointer_cast<xxx::i_bar>(baz);
+            return rpc::error::OK();
+        }
+
+        error_code send_interface_back(const rpc::shared_ptr<xxx::i_baz>& input, rpc::shared_ptr<xxx::i_baz>& output) override
+        {
+            output = input;
             return rpc::error::OK();
         }
     };

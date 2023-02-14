@@ -592,6 +592,89 @@ TYPED_TEST(remote_type_test, check_for_call_enclave_zone)
     assert(ret == rpc::error::OK());
 }
 
+TYPED_TEST(remote_type_test, check_identity)
+{
+    if(!lib_.use_host_in_child)
+        return;
+
+    rpc::shared_ptr<marshalled_tests::xxx::i_baz> output;
+
+    rpc::shared_ptr<yyy::i_example> new_zone;
+    //lib_.i_example_ptr //first level
+    ASSERT_EQ(lib_.i_example_ptr->create_example_in_subordnate_zone(new_zone, ++(*zone_gen)), rpc::error::OK()); //second level
+
+    rpc::shared_ptr<yyy::i_example> new_new_zone;
+    ASSERT_EQ(new_zone->create_example_in_subordnate_zone(new_new_zone, ++(*zone_gen)), rpc::error::OK()); //third level
+
+    auto new_zone_fork = lib_.create_new_zone();//second level
+
+    auto base_baz = rpc::shared_ptr<xxx::i_baz>(new baz(telemetry_service));
+
+    rpc::shared_ptr<xxx::i_baz> new_baz;
+    new_zone->create_baz(new_baz);
+
+    rpc::shared_ptr<xxx::i_baz> new_new_baz;
+    new_new_zone->create_baz(new_new_baz);
+
+    rpc::shared_ptr<xxx::i_baz> new_baz_fork;
+    new_zone_fork->create_baz(new_baz_fork);
+
+    // topology looks like this now flinging bazes around these nodes to ensure that the identity of bazes is the same
+    // *
+    //  \
+    //   *   *
+    //    \ /
+    //     h
+
+
+    auto input = base_baz;
+
+    /*ASSERT_EQ(lib_.i_example_ptr->send_interface_back(input, output), rpc::error::OK());
+    ASSERT_EQ(input, output);
+    
+    ASSERT_EQ(new_zone->send_interface_back(input, output), rpc::error::OK());
+    ASSERT_EQ(input, output);    
+
+    ASSERT_EQ(new_new_zone->send_interface_back(input, output), rpc::error::OK());
+    ASSERT_EQ(input, output); */   
+
+    input = new_baz;
+
+    /*ASSERT_EQ(lib_.i_example_ptr->send_interface_back(input, output), rpc::error::OK());
+    ASSERT_EQ(input, output);
+    
+    ASSERT_EQ(new_zone->send_interface_back(input, output), rpc::error::OK());
+    ASSERT_EQ(input, output);  */ 
+
+    ASSERT_EQ(new_new_zone->send_interface_back(input, output), rpc::error::OK());
+    ASSERT_EQ(input, output);    
+
+
+    /*input = new_new_baz;
+
+    ASSERT_EQ(lib_.i_example_ptr->send_interface_back(input, output), rpc::error::OK());
+    ASSERT_EQ(input, output);
+    
+    ASSERT_EQ(new_zone->send_interface_back(input, output), rpc::error::OK());
+    ASSERT_EQ(input, output);    
+
+    ASSERT_EQ(new_new_zone->send_interface_back(input, output), rpc::error::OK());
+    ASSERT_EQ(input, output);    
+
+
+    input = new_baz_fork;
+
+    ASSERT_EQ(lib_.i_example_ptr->send_interface_back(input, output), rpc::error::OK());
+    ASSERT_EQ(input, output);
+    
+    ASSERT_EQ(new_zone->send_interface_back(input, output), rpc::error::OK());
+    ASSERT_EQ(input, output);    
+
+    ASSERT_EQ(new_new_zone->send_interface_back(input, output), rpc::error::OK());
+    ASSERT_EQ(input, output);    */
+
+}
+
 template <class T>
 class type_test_with_host : 
     public type_test<T>
