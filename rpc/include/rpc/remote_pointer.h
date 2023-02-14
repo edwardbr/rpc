@@ -113,58 +113,6 @@ namespace rpc
         _Pointer __ptr_;
     };
 
-    template<class _Tp, class _Up> struct __has_rebind
-    {
-    private:
-        struct __two
-        {
-            char __lx;
-            char __lxx;
-        };
-        template<class _Xp> static __two __test(...);
-        template<class _Xp> static char __test(typename _Xp::template rebind<_Up>* = 0);
-
-    public:
-        static const bool value = sizeof(__test<_Tp>(0)) == 1;
-    };
-
-    template<class _Tp, class _Up, bool = __has_rebind<_Tp, _Up>::value> struct __has_rebind_other
-    {
-    private:
-        struct __two
-        {
-            char __lx;
-            char __lxx;
-        };
-        template<class _Xp> static __two __test(...);
-        template<class _Xp> static char __test(typename _Xp::template rebind<_Up>::other* = 0);
-
-    public:
-        static const bool value = sizeof(__test<_Tp>(0)) == 1;
-    };
-
-    template<class _Tp, class _Up> struct __has_rebind_other<_Tp, _Up, false>
-    {
-        static const bool value = false;
-    };
-
-    template<class _Tp, class _Up, bool = __has_rebind_other<_Tp, _Up>::value> struct __allocator_traits_rebind
-    {
-        typedef typename _Tp::template rebind<_Up>::other type;
-    };
-
-    template<template<class, class...> class _Alloc, class _Tp, class... _Args, class _Up>
-    struct __allocator_traits_rebind<_Alloc<_Tp, _Args...>, _Up, true>
-    {
-        typedef typename _Alloc<_Tp, _Args...>::template rebind<_Up>::other type;
-    };
-
-    template<template<class, class...> class _Alloc, class _Tp, class... _Args, class _Up>
-    struct __allocator_traits_rebind<_Alloc<_Tp, _Args...>, _Up, false>
-    {
-        typedef _Alloc<_Up, _Args...> type;
-    };
-
     struct __value_init_tag {};
 
     template<class _Tp, int _Idx, bool _CanBeEmptyBase = std::is_empty<_Tp>::value && !__libcpp_is_final<_Tp>::value>
@@ -384,34 +332,7 @@ namespace rpc
 
         void operator()(pointer __p) noexcept { __alloc_traits::deallocate(__alloc_, __p, __s_); }
     };
-
-// NOTE: Relaxed and acq/rel atomics (for increment and decrement respectively)
-// should be sufficient for thread safety.
-// See https://llvm.org/PR22803
-#if defined(__clang__) && __has_builtin(__atomic_add_fetch) && defined(__ATOMIC_RELAXED) && defined(__ATOMIC_ACQ_REL)
-#define _LIBCPP_HAS_BUILTIN_ATOMIC_SUPPORT
-#elif defined(_LIBCPP_COMPILER_GCC)
-#define _LIBCPP_HAS_BUILTIN_ATOMIC_SUPPORT
-#endif*/
-
-    template<class _Tp> inline _Tp __libcpp_atomic_refcount_increment(_Tp& __t) noexcept
-    {
-#if defined(_LIBCPP_HAS_BUILTIN_ATOMIC_SUPPORT) && !defined(_LIBCPP_HAS_NO_THREADS)
-        return __atomic_add_fetch(&__t, 1, __ATOMIC_RELAXED);
-#else
-        return __t += 1;
-#endif
-    }
-
-    template<class _Tp> inline _Tp __libcpp_atomic_refcount_decrement(_Tp& __t) noexcept
-    {
-#if defined(_LIBCPP_HAS_BUILTIN_ATOMIC_SUPPORT) && !defined(_LIBCPP_HAS_NO_THREADS)
-        return __atomic_add_fetch(&__t, -1, __ATOMIC_ACQ_REL);
-#else
-        return __t -= 1;
-#endif
-    }
-
+*/
     class bad_weak_ptr : public std::exception
     {
     public:
@@ -483,11 +404,6 @@ namespace rpc
         virtual ~__shared_weak_count();
 
     public:
-#if defined(_LIBCPP_BUILDING_LIBRARY) && defined(_LIBCPP_DEPRECATED_ABI_LEGACY_LIBRARY_DEFINITIONS_FOR_INLINE_FUNCTIONS)
-        void __add_shared() noexcept;
-        void __add_weak() noexcept;
-        void __release_shared() noexcept;
-#else
 
         void __add_shared() noexcept { __shared_count::__add_shared(); }
 
@@ -498,7 +414,7 @@ namespace rpc
             if (__shared_count::__release_shared())
                 __release_weak();
         }
-#endif
+
         void __release_weak() noexcept;
 
         long use_count() const noexcept { return __shared_count::use_count(); }
@@ -544,7 +460,7 @@ namespace rpc
     template<class _Tp, class _Dp, class _Alloc>
     void __shared_ptr_pointer<_Tp, _Dp, _Alloc>::__on_zero_shared_weak() noexcept
     {
-        typedef typename __allocator_traits_rebind<_Alloc, __shared_ptr_pointer>::type _Al;
+        typedef typename std::allocator_traits<_Alloc>::template rebind_alloc<__shared_ptr_pointer> _Al;
         typedef std::allocator_traits<_Al> _ATraits;
         typedef std::pointer_traits<typename _ATraits::pointer> _PTraits;
 
@@ -560,7 +476,7 @@ namespace rpc
             : __storage_(std::move(__a))
         {
 #if _LIBCPP_STD_VER > 17
-            using _TpAlloc = typename __allocator_traits_rebind<_Alloc, _Tp>::type;
+            using _TpAlloc = typename std::allocator_traits<_Alloc>::template rebind_alloc<_Tp>;
             _TpAlloc __tmp(*__get_alloc());
             std::allocator_traits<_TpAlloc>::construct(__tmp, __get_elem(), std::forward<_Args>(__args)...);
 #else
@@ -576,7 +492,7 @@ namespace rpc
         virtual void __on_zero_shared() noexcept
         {
 #if _LIBCPP_STD_VER > 17
-            using _TpAlloc = typename __allocator_traits_rebind<_Alloc, _Tp>::type;
+            using _TpAlloc = typename std::allocator_traits<_Alloc>::template rebind_alloc<_Tp>;
             _TpAlloc __tmp(*__get_alloc());
             std::allocator_traits<_TpAlloc>::destroy(__tmp, __get_elem());
 #else
@@ -586,7 +502,7 @@ namespace rpc
 
         virtual void __on_zero_shared_weak() noexcept
         {
-            using _ControlBlockAlloc = typename __allocator_traits_rebind<_Alloc, __shared_ptr_emplace>::type;
+            using _ControlBlockAlloc = typename std::allocator_traits<_Alloc>::template rebind_alloc<__shared_ptr_emplace>;
             using _ControlBlockPointer = typename std::allocator_traits<_ControlBlockAlloc>::pointer;
             _ControlBlockAlloc __tmp(*__get_alloc());
             __storage_.~_Storage();
@@ -1241,7 +1157,7 @@ namespace rpc
             {
 #endif // _LIBCPP_NO_EXCEPTIONS
                 typedef __shared_ptr_pointer<_Yp*, _Dp, _Alloc> _CntrlBlk;
-                typedef typename __allocator_traits_rebind<_Alloc, _CntrlBlk>::type _A2;
+                typedef typename std::allocator_traits<_Alloc>::template rebind_alloc<_CntrlBlk> _A2;
                 typedef std::__allocator_destructor<_A2> _D2;
                 _A2 __a2(__a);
                 std::unique_ptr<_CntrlBlk, _D2> __hold2(__a2.allocate(1), _D2(__a2, 1));
@@ -1299,7 +1215,7 @@ namespace rpc
             {
 #endif // _LIBCPP_NO_EXCEPTIONS
                 typedef __shared_ptr_pointer<std::nullptr_t, _Dp, _Alloc> _CntrlBlk;
-                typedef typename __allocator_traits_rebind<_Alloc, _CntrlBlk>::type _A2;
+                typedef typename std::allocator_traits<_Alloc>::template rebind_alloc<_CntrlBlk> _A2;
                 typedef std::__allocator_destructor<_A2> _D2;
                 _A2 __a2(__a);
                 std::unique_ptr<_CntrlBlk, _D2> __hold2(__a2.allocate(1), _D2(__a2, 1));
@@ -1586,7 +1502,7 @@ element_type*>::value>> shared_ptr(unique_ptr<_Yp, _Dp>&& __r) : __ptr_(__r.get(
     shared_ptr<_Tp> allocate_shared(const _Alloc& __a, _Args&&... __args)
     {
         using _ControlBlock = __shared_ptr_emplace<_Tp, _Alloc>;
-        using _ControlBlockAllocator = typename __allocator_traits_rebind<_Alloc, _ControlBlock>::type;
+        using _ControlBlockAllocator = typename std::allocator_traits<_Alloc>::template rebind_alloc<_ControlBlock>;
         __allocation_guard<_ControlBlockAllocator> __guard(__a, 1);
         ::new ((void*)std::addressof(*__guard.__get())) _ControlBlock(__a, std::forward<_Args>(__args)...);
         auto __control_block = __guard.__release_ptr();

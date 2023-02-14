@@ -43,7 +43,7 @@ namespace rpc
             //__libcpp_atomic_store(&__shared_weak_owners_, -1, _AO_Release);
             __on_zero_shared_weak();
         }
-        else if (__libcpp_atomic_refcount_decrement(__shared_weak_owners_) == -1)
+        else if (--__shared_weak_owners_ == -1)
             __on_zero_shared_weak();
     }
     __shared_weak_count* __shared_weak_count::lock() noexcept
