@@ -361,7 +361,7 @@ namespace rpc
                         }
                         else
                         {
-                            dest_zone == get_parent();
+                            dest_zone = get_parent();
                             assert(dest_zone);
                             dest_zone->add_external_ref();
                         }

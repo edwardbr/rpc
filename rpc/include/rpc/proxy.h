@@ -418,7 +418,7 @@ namespace rpc
     interface_descriptor proxy_base::stub_bind_out_param(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, const rpc::shared_ptr<T>& iface)
     {
         if(!iface)
-            return {0,0};
+            return {{0},{0}};
             
         auto operating_service = object_proxy_->get_service_proxy()->get_operating_zone_service();
 
