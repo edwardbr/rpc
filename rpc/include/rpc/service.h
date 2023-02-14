@@ -118,7 +118,7 @@ namespace rpc
         virtual ~child_service();
 
         void set_parent(const rpc::shared_ptr<rpc::service_proxy>& parent_service, bool child_does_not_use_parents_interface);
-        virtual rpc::shared_ptr<rpc::service_proxy> get_parent() const {return parent_service_;}
+        rpc::shared_ptr<rpc::service_proxy> get_parent() const override {return parent_service_;}
         bool check_is_empty() const override;
         object get_root_object_id() const;
         rpc::shared_ptr<service_proxy> get_zone_proxy(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, destination_zone destination_zone_id, caller_zone new_caller_zone_id, bool& new_proxy_added) override;

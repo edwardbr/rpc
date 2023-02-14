@@ -170,7 +170,7 @@ namespace rpc
 
 	//this bundle of joy implements a non locking pointer where if the remote object is not there
     //it will return an error without crashing
-	template<class T> class optimistic_proxy_impl : public T
+	/*template<class T> class optimistic_proxy_impl : public T
 	{
 		object object_id_;
 		zone destination_zone_id_;
@@ -185,7 +185,7 @@ namespace rpc
 		object get_object_id() const { return object_id_; }
 		destination_zone get_zone_id() const { return destination_zone_id_; }
 		rpc::weak_ptr<service_proxy> get_service_proxy() const { return service_proxy_; }
-	};
+	};*/
 
     // the class that encapsulates an environment or zone
     // only host code can use this class directly other enclaves *may* have access to the i_service_proxy derived interface
