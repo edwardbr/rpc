@@ -7,6 +7,7 @@
 #include <mutex>
 #include <assert.h>
 #include <atomic>
+#include <limits>
 
 #include <rpc/types.h>
 #include <rpc/marshaller.h>
@@ -19,6 +20,8 @@ namespace rpc
     class object_stub;
     class service;
     class service_proxy;
+
+    const object dummy_object_id = {std::numeric_limits<uint64_t>::max()};
     
     // responsible for all object lifetimes created within the zone
     class service : 
@@ -62,24 +65,28 @@ namespace rpc
         void set_zone_id(zone zone_id){zone_id_ = zone_id;}
         static zone generate_new_zone_id() { return {++zone_count}; }
         object generate_new_object_id() const { return {++object_id_generator}; }
+        virtual rpc::shared_ptr<rpc::service_proxy> get_parent() const {return nullptr;}
 
-        template<class T> rpc::interface_descriptor proxy_bind_in_param(const rpc::shared_ptr<T>& iface, rpc::shared_ptr<rpc::object_stub>& stub);
-        template<class T> rpc::interface_descriptor stub_bind_out_param(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, const rpc::shared_ptr<T>& iface);
+        template<class T> std::function<shared_ptr<i_interface_stub>(const shared_ptr<object_stub>& stub)> create_interface_stub(const shared_ptr<T>& iface);
+        template<class T> interface_descriptor proxy_bind_in_param(const shared_ptr<T>& iface, shared_ptr<object_stub>& stub);
+        template<class T> interface_descriptor stub_bind_out_param(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, const shared_ptr<T>& iface);
 
         int send(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, destination_zone destination_zone_id, object object_id, interface_ordinal interface_id, method method_id, size_t in_size_,
                         const char* in_buf_, std::vector<char>& out_buf_) override;
 
-        interface_descriptor get_proxy_descriptor(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, rpc::proxy_base* base);
-        interface_descriptor get_proxy_stub_descriptor(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, rpc::casting_interface* pointer,
-                                 std::function<rpc::shared_ptr<i_interface_stub>(rpc::shared_ptr<object_stub>)> fn,
-                                bool add_ref,
-                                 rpc::shared_ptr<object_stub>& stub);
+        interface_descriptor prepare_out_param(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, rpc::proxy_base* base);
+        interface_descriptor get_proxy_stub_descriptor(caller_channel_zone caller_channel_zone_id, 
+                                                        caller_zone caller_zone_id, 
+                                                        rpc::casting_interface* pointer,
+                                                        std::function<rpc::shared_ptr<i_interface_stub>(rpc::shared_ptr<object_stub>)> fn,
+                                                        bool outcall,
+                                                        rpc::shared_ptr<object_stub>& stub);
                                  
         //int add_object(const rpc::shared_ptr<object_stub>& stub);
         rpc::weak_ptr<object_stub> get_object(object object_id) const;
 
         int try_cast(destination_zone destination_zone_id, object object_id, interface_ordinal interface_id) override;
-        uint64_t add_ref(destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id, bool proxy_add_ref) override;
+        uint64_t add_ref(destination_channel_zone destination_channel_zone_id, destination_zone destination_zone_id, object object_id, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, add_ref_channel build_out_param_channel, bool proxy_add_ref) override;
         uint64_t release_local_stub(const rpc::shared_ptr<rpc::object_stub>& stub);
         uint64_t release(destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id) override;
 
@@ -111,11 +118,10 @@ namespace rpc
         virtual ~child_service();
 
         void set_parent(const rpc::shared_ptr<rpc::service_proxy>& parent_service, bool child_does_not_use_parents_interface);
+        virtual rpc::shared_ptr<rpc::service_proxy> get_parent() const {return parent_service_;}
         bool check_is_empty() const override;
         object get_root_object_id() const;
         rpc::shared_ptr<service_proxy> get_zone_proxy(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, destination_zone destination_zone_id, caller_zone new_caller_zone_id, bool& new_proxy_added) override;
-
-        uint64_t add_ref(destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id, bool proxy_add_ref) override;
     };
 
 
@@ -124,6 +130,13 @@ namespace rpc
     {
         caller_channel_zone empty_caller_channel_zone = {};
         caller_zone caller_zone_id = serv.get_zone_id().as_caller();
-        return serv.stub_bind_out_param(empty_caller_channel_zone, caller_zone_id, iface);       
+
+        if(!iface)
+        {
+            return {{0},{0}};
+        }
+        rpc::shared_ptr<rpc::object_stub> stub;
+        auto factory = serv.create_interface_stub(iface);
+        return serv.get_proxy_stub_descriptor(empty_caller_channel_zone, caller_zone_id, iface.get(), factory, false, stub);
     }
 }

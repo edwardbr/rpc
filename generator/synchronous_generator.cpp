@@ -1286,6 +1286,17 @@ namespace enclave_marshaller
             proxy("}}");
             proxy("");
 
+            
+            stub("template<> std::function<rpc::shared_ptr<rpc::i_interface_stub>(const rpc::shared_ptr<rpc::object_stub>& stub)> rpc::service::create_interface_stub(const rpc::shared_ptr<{}{}>& iface)",
+                 ns, interface_name);
+            stub("{{");
+            stub("return [&](const rpc::shared_ptr<rpc::object_stub>& stub) -> "
+                 "rpc::shared_ptr<rpc::i_interface_stub>{{");
+            stub("return rpc::static_pointer_cast<rpc::i_interface_stub>({}{}_stub::create(iface, stub));", ns,
+                 interface_name);
+            stub("}};");
+            stub("}}");
+
             stub("template<> rpc::interface_descriptor rpc::service::proxy_bind_in_param(const rpc::shared_ptr<{}{}>& iface, rpc::shared_ptr<rpc::object_stub>& stub)",
                  ns, interface_name);
             stub("{{");
@@ -1294,11 +1305,8 @@ namespace enclave_marshaller
             stub("return {{{{0}},{{0}}}};");
             stub("}}");
 
-            stub("return get_proxy_stub_descriptor({{0}}, {{0}}, iface.get(), [&](const rpc::shared_ptr<rpc::object_stub>& stub) -> "
-                 "rpc::shared_ptr<rpc::i_interface_stub>{{");
-            stub("return rpc::static_pointer_cast<rpc::i_interface_stub>({}{}_stub::create(iface, stub));", ns,
-                 interface_name);
-            stub("}}, false, stub);");
+            stub("auto factory = create_interface_stub(iface);");
+            stub("return get_proxy_stub_descriptor({{0}}, {{0}}, iface.get(), factory, false, stub);");
             stub("}}");
             
             stub("template<> rpc::interface_descriptor rpc::service::stub_bind_out_param(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, const rpc::shared_ptr<{}{}>& iface)",
@@ -1311,11 +1319,8 @@ namespace enclave_marshaller
 
             stub("rpc::shared_ptr<rpc::object_stub> stub;");
 
-            stub("return get_proxy_stub_descriptor(caller_channel_zone_id, caller_zone_id, iface.get(), [&](const rpc::shared_ptr<rpc::object_stub>& stub) -> "
-                 "rpc::shared_ptr<rpc::i_interface_stub>{{");
-            stub("return rpc::static_pointer_cast<rpc::i_interface_stub>({}{}_stub::create(iface, stub));", ns,
-                 interface_name);
-            stub("}}, true, stub);");
+            stub("auto factory = create_interface_stub(iface);");
+            stub("return get_proxy_stub_descriptor(caller_channel_zone_id, caller_zone_id, iface.get(), factory, true, stub);");
             stub("}}");
         }
 

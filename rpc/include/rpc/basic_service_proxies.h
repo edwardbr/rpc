@@ -66,14 +66,14 @@ namespace rpc
             }
             return destination_service_.lock()->try_cast(destination_zone_id, object_id, interface_id);
         }
-        uint64_t add_ref(destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id, bool proxy_add_ref) override
+        uint64_t add_ref(destination_channel_zone destination_channel_zone_id, destination_zone destination_zone_id, object object_id, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, add_ref_channel build_out_param_channel, bool proxy_add_ref) override
         {
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
             {
                 telemetry_service->on_service_proxy_add_ref("local_service_proxy", get_zone_id(), destination_zone_id,
                                                             object_id, caller_zone_id);
             }
-            auto ret = destination_service_.lock()->add_ref(destination_zone_id, object_id, caller_zone_id, proxy_add_ref);            
+            auto ret = destination_service_.lock()->add_ref(destination_channel_zone_id, destination_zone_id, object_id, caller_channel_zone_id, caller_zone_id, build_out_param_channel, proxy_add_ref);            
             if(proxy_add_ref && ret != std::numeric_limits<uint64_t>::max())
             {
                 add_external_ref();
@@ -151,14 +151,14 @@ namespace rpc
             }
             return destination_service_->try_cast(destination_zone_id, object_id, interface_id);
         }
-        uint64_t add_ref(destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id, bool proxy_add_ref) override
+        uint64_t add_ref(destination_channel_zone destination_channel_zone_id, destination_zone destination_zone_id, object object_id, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, add_ref_channel build_out_param_channel, bool proxy_add_ref) override
         {
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
             {
                 telemetry_service->on_service_proxy_add_ref("local_child_service_proxy", get_zone_id(),
                                                             destination_zone_id, object_id, caller_zone_id);
             }
-            auto ret = destination_service_->add_ref(destination_zone_id, object_id, caller_zone_id, proxy_add_ref);            
+            auto ret = destination_service_->add_ref(destination_channel_zone_id, destination_zone_id, object_id, caller_channel_zone_id, caller_zone_id, build_out_param_channel, proxy_add_ref);            
             if(proxy_add_ref && ret != std::numeric_limits<uint64_t>::max())
             {
                 add_external_ref();

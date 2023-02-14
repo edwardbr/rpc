@@ -60,14 +60,14 @@ extern "C"
         int ret = root_service->try_cast({zone_id}, {object_id}, {interface_id});
         return ret;
     }
-    uint64_t add_ref_host(uint64_t zone_id, uint64_t object_id, uint64_t caller_zone_id)
+    uint64_t add_ref_host(uint64_t destination_channel_zone_id, uint64_t destination_zone_id, uint64_t object_id, uint64_t caller_channel_zone_id, uint64_t caller_zone_id, char build_out_param_channel)
     {
         auto root_service = current_host_service.lock();
         if (!root_service)
         {
             return rpc::error::TRANSPORT_ERROR();
         }
-        return root_service->add_ref({zone_id}, {object_id}, {caller_zone_id}, false);
+        return root_service->add_ref({destination_channel_zone_id}, {destination_zone_id}, {object_id}, {caller_channel_zone_id}, {caller_zone_id}, static_cast<rpc::add_ref_channel>(build_out_param_channel), false);
     }
     uint64_t release_host(uint64_t zone_id, uint64_t object_id, uint64_t caller_zone_id)
     {

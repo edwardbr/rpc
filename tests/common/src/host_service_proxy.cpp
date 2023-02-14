@@ -96,7 +96,7 @@ namespace rpc
         return err_code;
     }
 
-    uint64_t host_service_proxy::add_ref(destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id, bool proxy_add_ref)
+    uint64_t host_service_proxy::add_ref(destination_channel_zone destination_channel_zone_id, destination_zone destination_zone_id, object object_id, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, add_ref_channel build_out_param_channel, bool proxy_add_ref)
     {
         if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
         {
@@ -104,7 +104,7 @@ namespace rpc
                                                         destination_zone_id, object_id, caller_zone_id);
         }
         uint64_t ret = 0;
-        sgx_status_t status = ::add_ref_host(&ret, destination_zone_id.get_val(), object_id.get_val(), caller_zone_id.get_val());
+        sgx_status_t status = ::add_ref_host(&ret, destination_channel_zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), caller_channel_zone_id.get_val(), caller_zone_id.get_val(), (std::uint8_t)build_out_param_channel);
         if (status)
         {
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)

@@ -66,7 +66,8 @@ namespace rpc
         zone() = default;
         zone(const type_id<ZoneId>& other) : type_id<ZoneId>(other){}
 
-        type_id<DestinationZoneId> as_destination() const {return {id};}        
+        type_id<DestinationZoneId> as_destination() const {return {id};}    
+        type_id<DestinationChannelZoneId> as_destination_channel() const {return {id};}       
         type_id<CallerZoneId> as_caller() const {return {id};}              
         type_id<CallerChannelZoneId> as_caller_channel() const {return {id};}        
     };

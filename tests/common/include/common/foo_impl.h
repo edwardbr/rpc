@@ -635,6 +635,7 @@ namespace marshalled_tests
 
         error_code send_interface_back(const rpc::shared_ptr<xxx::i_baz>& input, rpc::shared_ptr<xxx::i_baz>& output) override
         {
+            telemetry_->message(rpc::i_telemetry_service::info, "send_interface_back");
             output = input;
             return rpc::error::OK();
         }

@@ -399,8 +399,14 @@ namespace rpc
             if(!op)
             {
                 op = object_proxy::create(encap.object_id, service_proxy);
-//shouldnt service_proxy->get_zone_id().as_caller() be service_proxy->get_caller_id()?
-                service_proxy->add_ref(encap.destination_zone_id, encap.object_id, zone_id.as_caller(), !new_proxy_added); 
+                service_proxy->add_ref(
+                    service_proxy->get_destination_channel_zone_id()
+                    , encap.destination_zone_id
+                    , encap.object_id
+                    , {0}
+                    , zone_id.as_caller()// this zone will now be the caller to this object
+                    , rpc::add_ref_channel::normal
+                    , !new_proxy_added); 
             }
             auto ret = op->query_interface(iface, false);        
             return ret;
@@ -477,8 +483,8 @@ namespace rpc
         {
             //else we create an object_proxy and add ref to the service proxy as it has a new object to monitor
             op = object_proxy::create(encap.object_id, service_proxy);
-            if(!new_proxy_added && sp->get_destination_zone_id() == encap.destination_zone_id)
-                service_proxy->add_external_ref();
+            /*if(!new_proxy_added && sp->get_destination_zone_id() == encap.destination_zone_id)
+                service_proxy->add_external_ref();*/
         }
         return op->query_interface(val, false);
     }
@@ -514,6 +520,15 @@ namespace rpc
                 caller_zone_id,
                 new_proxy_added);
         }
+
+        service_proxy->add_ref(
+            service_proxy->get_destination_channel_zone_id(), 
+            service_proxy->get_destination_zone_id(), 
+            {dummy_object_id}, 
+            {0}, 
+            serv->get_zone_id().as_caller(), 
+            rpc::add_ref_channel::build_destination_route, 
+            false);
 
         rpc::shared_ptr<object_proxy> op = service_proxy->get_object_proxy(encap.object_id);
         if(!op)
