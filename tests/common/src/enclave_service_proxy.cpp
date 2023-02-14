@@ -99,6 +99,7 @@ namespace rpc
         {
             // data too small reallocate memory and try again
             out_buf_.resize(data_out_sz);
+            
             status = ::call_enclave(eid_, &err_code, caller_channel_zone_id.get_val(), caller_zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), interface_id.get_val(), method_id.get_val(), in_size_, in_buf_,
                                     out_buf_.size(), out_buf_.data(), &data_out_sz, &tls);
             if (status)
@@ -109,6 +110,12 @@ namespace rpc
                 }
                 return rpc::error::TRANSPORT_ERROR();
             }
+
+            //recover err_code from the out buffer
+            yas::load<yas::mem|yas::binary|yas::no_header>(yas::intrusive_buffer{out_buf_.data(), out_buf_.size()}, YAS_OBJECT_NVP(
+            "out"
+            ,("__return_value", err_code)
+            ));      
         }
 
         return err_code;
@@ -123,12 +130,21 @@ namespace rpc
         }
         int err_code = 0;
         sgx_status_t status = ::try_cast_enclave(eid_, &err_code, destination_zone_id.get_val(), object_id.get_val(), interface_id.get_val());
+        if(status == SGX_ERROR_ECALL_NOT_ALLOWED)
+        {
+            auto task = std::thread([&]()
+            {
+                status = ::try_cast_enclave(eid_, &err_code, destination_zone_id.get_val(), object_id.get_val(), interface_id.get_val());
+            });
+            task.join();
+        }
         if (status)
         {
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
             {
                 telemetry_service->message(rpc::i_telemetry_service::err, "try_cast_enclave failed");
             }
+            assert(false);
             return rpc::error::TRANSPORT_ERROR();
         }
         return err_code;
@@ -143,12 +159,21 @@ namespace rpc
         }
         uint64_t ret = 0;
         sgx_status_t status = ::add_ref_enclave(eid_, &ret, destination_channel_zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), caller_channel_zone_id.get_val(), caller_zone_id.get_val(), (uint8_t)build_out_param_channel);
+        if(status == SGX_ERROR_ECALL_NOT_ALLOWED)
+        {
+            auto task = std::thread([&]()
+            {
+                status = ::add_ref_enclave(eid_, &ret, destination_channel_zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), caller_channel_zone_id.get_val(), caller_zone_id.get_val(), (uint8_t)build_out_param_channel);
+            });
+            task.join();
+        }
         if (status)
         {
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
             {
                 telemetry_service->message(rpc::i_telemetry_service::err, "add_ref_enclave failed");
             }
+            assert(false);
             return std::numeric_limits<uint64_t>::max();
         }        
         if(proxy_add_ref && ret != std::numeric_limits<uint64_t>::max())
@@ -167,6 +192,14 @@ namespace rpc
         }
         uint64_t ret = 0;
         sgx_status_t status = ::release_enclave(eid_, &ret, destination_zone_id.get_val(), object_id.get_val(), caller_zone_id.get_val());
+        if(status == SGX_ERROR_ECALL_NOT_ALLOWED)
+        {
+            auto task = std::thread([&]()
+            {
+                status = ::release_enclave(eid_, &ret, destination_zone_id.get_val(), object_id.get_val(), caller_zone_id.get_val());
+            });
+            task.join();
+        }
         if (status)
         {
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)

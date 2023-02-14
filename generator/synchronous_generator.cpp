@@ -320,7 +320,7 @@ namespace enclave_marshaller
                     "rpc::interface_descriptor {0}_;", name);
             case STUB_ADD_REF_OUT:
                 return fmt::format(
-                    "{0}_ = zone_.stub_bind_out_param(caller_channel_zone_id, caller_zone_id, {0});\n__rpc_returned_objects.push_back({0}_);", name);
+                    "{0}_ = zone_.stub_bind_out_param(caller_channel_zone_id, caller_zone_id, {0});", name);
             case STUB_MARSHALL_OUT:
                 return fmt::format("  ,(\"{0}\", {0}_)", name);
             default:
@@ -796,7 +796,6 @@ namespace enclave_marshaller
                     }
 
                     stub("//STUB_PARAM_CAST");
-                    stub("std::vector<rpc::interface_descriptor> __rpc_returned_objects;");
                     stub("if(__rpc_ret == rpc::error::OK())");
                     stub("{{");
                     stub.print_tabs();
@@ -882,17 +881,14 @@ namespace enclave_marshaller
                     {
                         uint64_t count = 1;
                         proxy("//PROXY_MARSHALL_OUT");
-                        proxy("std::vector<rpc::interface_descriptor> __rpc_returned_objects;");
                         proxy("yas::load<yas::mem|yas::binary|yas::no_header>(yas::intrusive_buffer{{__rpc_out_buf.data(), "
                               "__rpc_out_buf.size()}}, YAS_OBJECT_NVP(");
                         proxy("  \"out\"");
-                        proxy("  ,(\"__returned_objects\", __rpc_returned_objects)");
                         proxy("  ,(\"__return_value\", __rpc_ret)");
 
                         stub("//STUB_MARSHALL_OUT");
                         stub("const auto __rpc_yas_mapping = YAS_OBJECT_NVP(");
                         stub("  \"out\"");
-                        stub("  ,(\"__returned_objects\", __rpc_returned_objects)");
                         stub("  ,(\"__return_value\", __rpc_ret)");
 
                         for (auto& parameter : function.get_parameters())

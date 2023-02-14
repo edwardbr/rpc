@@ -59,11 +59,10 @@ namespace rpc
 
         if (err_code == rpc::error::NEED_MORE_MEMORY())
         {
-            out_buf_.resize(data_out_sz);
             //data too small reallocate memory and try again
+            out_buf_.resize(data_out_sz);
 
-            status
-                = ::call_host(&err_code, caller_channel_zone_id.get_val(), caller_zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), interface_id.get_val(), method_id.get_val(), in_size_, in_buf_, out_buf_.size(), out_buf_.data(), &data_out_sz);
+            status = ::call_host(&err_code, caller_channel_zone_id.get_val(), caller_zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), interface_id.get_val(), method_id.get_val(), in_size_, in_buf_, out_buf_.size(), out_buf_.data(), &data_out_sz);
             if (status)
             {
                 if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
@@ -72,6 +71,12 @@ namespace rpc
                 }
                 return rpc::error::TRANSPORT_ERROR();
             }
+
+            //recover err_code from the out buffer
+            yas::load<yas::mem|yas::binary|yas::no_header>(yas::intrusive_buffer{out_buf_.data(), out_buf_.size()}, YAS_OBJECT_NVP(
+            "out"
+            ,("__return_value", err_code)
+            )); 
         }
         return err_code;
     }
