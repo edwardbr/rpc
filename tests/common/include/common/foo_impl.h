@@ -373,7 +373,7 @@ namespace marshalled_tests
             return rpc::error::OK();            
         }
 
-        error_code create_example_in_subordnate_zone(rpc::shared_ptr<yyy::i_example>& target, uint64_t new_zone_id)
+        error_code create_example_in_subordnate_zone(rpc::shared_ptr<yyy::i_example>& target, uint64_t new_zone_id) override
         {
             auto this_service = this_service_.lock();
             auto child_service = rpc::make_shared<rpc::child_service>(rpc::zone{new_zone_id});

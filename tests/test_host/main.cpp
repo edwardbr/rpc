@@ -370,14 +370,14 @@ class type_test :
     T lib_;
 
     void SetUp() override {
-        lib_.SetUp();
+        this->lib_.SetUp();
     }
     void TearDown() override {
-        lib_.TearDown();
+        this->lib_.TearDown();
     }    
 };
 
-typedef Types<
+using local_implementations = ::testing::Types<
     in_memory_setup<false>, 
     in_memory_setup<true>, 
     inproc_setup<false, false, false>, 
@@ -397,7 +397,7 @@ typedef Types<
     enclave_setup<true, false, false>, 
     enclave_setup<true, false, true>, 
     enclave_setup<true, true, false>, 
-    enclave_setup<true, true, true>> local_implementations;
+    enclave_setup<true, true, true>>;
 TYPED_TEST_SUITE(type_test, local_implementations);
 
 TYPED_TEST(type_test, initialisation_test)
@@ -407,7 +407,8 @@ TYPED_TEST(type_test, initialisation_test)
 TYPED_TEST(type_test, standard_tests)
 {
     foo f(telemetry_service);
-    standard_tests(f, lib_.has_enclave, telemetry_service);
+    
+    standard_tests(f, this->lib_.has_enclave, telemetry_service);
 }
 
 
@@ -450,30 +451,30 @@ TYPED_TEST_SUITE(remote_type_test, remote_implementations);
 TYPED_TEST(remote_type_test, remote_standard_tests)
 {    
     rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
-    ASSERT_EQ(lib_.i_example_ptr->create_foo(i_foo_ptr), 0);
+    ASSERT_EQ(this->lib_.i_example_ptr->create_foo(i_foo_ptr), 0);
     standard_tests(*i_foo_ptr, true, telemetry_service);
 }
 
 TYPED_TEST(remote_type_test, remote_tests)
 {    
-    remote_tests(lib_.use_host_in_child, lib_.i_example_ptr, telemetry_service);
+    remote_tests(this->lib_.use_host_in_child, this->lib_.i_example_ptr, telemetry_service);
 }
 
 TYPED_TEST(remote_type_test, create_new_zone)
 {
     rpc::shared_ptr<xxx::i_foo> i_foo_relay_ptr;
-    auto example_relay_ptr = lib_.create_new_zone();
+    auto example_relay_ptr = this->lib_.create_new_zone();
 }
 
 TYPED_TEST(remote_type_test, create_new_zone_releasing_host_then_running_on_other_enclave)
 {
     rpc::shared_ptr<xxx::i_foo> i_foo_relay_ptr;
-    auto example_relay_ptr = lib_.create_new_zone();
+    auto example_relay_ptr = this->lib_.create_new_zone();
     example_relay_ptr->create_foo(i_foo_relay_ptr);
     standard_tests(*i_foo_relay_ptr, true, telemetry_service);
 
     //rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
-    //ASSERT_EQ(lib_.i_example_ptr->create_foo(i_foo_ptr), 0);
+    //ASSERT_EQ(this->lib_.i_example_ptr->create_foo(i_foo_ptr), 0);
     example_relay_ptr = nullptr;
     //standard_tests(*i_foo_ptr, true, telemetry_service);    
 }
@@ -481,7 +482,7 @@ TYPED_TEST(remote_type_test, create_new_zone_releasing_host_then_running_on_othe
 TYPED_TEST(remote_type_test, dyanmic_cast_tests)
 {
     rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
-    ASSERT_EQ(lib_.i_example_ptr->create_foo(i_foo_ptr), 0);
+    ASSERT_EQ(this->lib_.i_example_ptr->create_foo(i_foo_ptr), 0);
 
     rpc::shared_ptr<marshalled_tests::xxx::i_baz> baz;
     i_foo_ptr->create_baz_interface(baz);
@@ -500,10 +501,10 @@ TYPED_TEST(remote_type_test, dyanmic_cast_tests)
 TYPED_TEST(remote_type_test, bounce_baz_between_two_interfaces)
 {
     rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
-    ASSERT_EQ(lib_.i_example_ptr->create_foo(i_foo_ptr), 0);
+    ASSERT_EQ(this->lib_.i_example_ptr->create_foo(i_foo_ptr), 0);
 
     rpc::shared_ptr<xxx::i_foo> i_foo_relay_ptr;
-    auto example_relay_ptr = lib_.create_new_zone();
+    auto example_relay_ptr = this->lib_.create_new_zone();
     example_relay_ptr->create_foo(i_foo_relay_ptr);
 
     rpc::shared_ptr<marshalled_tests::xxx::i_baz> baz;
@@ -515,7 +516,7 @@ TYPED_TEST(remote_type_test, bounce_baz_between_two_interfaces)
 TYPED_TEST(remote_type_test, check_for_null_interface)
 {
     rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
-    ASSERT_EQ(lib_.i_example_ptr->create_foo(i_foo_ptr), 0);
+    ASSERT_EQ(this->lib_.i_example_ptr->create_foo(i_foo_ptr), 0);
     rpc::shared_ptr<marshalled_tests::xxx::i_baz> c;
     i_foo_ptr->get_interface(c);
     assert(c == nullptr);
@@ -523,10 +524,10 @@ TYPED_TEST(remote_type_test, check_for_null_interface)
 
 TYPED_TEST(remote_type_test, check_for_multiple_sets)
 {
-    if(!lib_.use_host_in_child)
+    if(!this->lib_.use_host_in_child)
         return;
     rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
-    ASSERT_EQ(lib_.i_example_ptr->create_foo(i_foo_ptr), 0);
+    ASSERT_EQ(this->lib_.i_example_ptr->create_foo(i_foo_ptr), 0);
 
     auto b = rpc::make_shared<marshalled_tests::baz>(telemetry_service);
     // set
@@ -541,11 +542,11 @@ TYPED_TEST(remote_type_test, check_for_multiple_sets)
 
 TYPED_TEST(remote_type_test, check_for_interface_storage)
 {
-    if(!lib_.use_host_in_child)
+    if(!this->lib_.use_host_in_child)
         return;
         
     rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
-    ASSERT_EQ(lib_.i_example_ptr->create_foo(i_foo_ptr), 0);
+    ASSERT_EQ(this->lib_.i_example_ptr->create_foo(i_foo_ptr), 0);
 
     rpc::shared_ptr<marshalled_tests::xxx::i_baz> c;
     auto b = rpc::make_shared<marshalled_tests::baz>(telemetry_service);
@@ -557,9 +558,9 @@ TYPED_TEST(remote_type_test, check_for_interface_storage)
 
 TYPED_TEST(remote_type_test, check_for_set_multiple_inheritance)
 {
-    if(!lib_.use_host_in_child)
+    if(!this->lib_.use_host_in_child)
         return;
-    auto ret = lib_.i_example_ptr->give_interface(
+    auto ret = this->lib_.i_example_ptr->give_interface(
         rpc::shared_ptr<xxx::i_baz>(new multiple_inheritance(telemetry_service)));
     assert(ret == rpc::error::OK());
 }
@@ -585,28 +586,28 @@ TYPED_TEST(remote_type_test, host_test)
 
 TYPED_TEST(remote_type_test, check_for_call_enclave_zone)
 {
-    if(!lib_.use_host_in_child)
+    if(!this->lib_.use_host_in_child)
         return;
     auto h = rpc::make_shared<host>();
-    auto ret = lib_.i_example_ptr->call_create_enclave_val(h);
+    auto ret = this->lib_.i_example_ptr->call_create_enclave_val(h);
     assert(ret == rpc::error::OK());
 }
 
 TYPED_TEST(remote_type_test, check_identity)
 {
-    if(!lib_.use_host_in_child)
+    if(!this->lib_.use_host_in_child)
         return;
 
     rpc::shared_ptr<marshalled_tests::xxx::i_baz> output;
 
     rpc::shared_ptr<yyy::i_example> new_zone;
-    //lib_.i_example_ptr //first level
-    ASSERT_EQ(lib_.i_example_ptr->create_example_in_subordnate_zone(new_zone, ++(*zone_gen)), rpc::error::OK()); //second level
+    //this->lib_.i_example_ptr //first level
+    ASSERT_EQ(this->lib_.i_example_ptr->create_example_in_subordnate_zone(new_zone, ++(*zone_gen)), rpc::error::OK()); //second level
 
     rpc::shared_ptr<yyy::i_example> new_new_zone;
     ASSERT_EQ(new_zone->create_example_in_subordnate_zone(new_new_zone, ++(*zone_gen)), rpc::error::OK()); //third level
 
-    auto new_zone_fork = lib_.create_new_zone();//second level
+    auto new_zone_fork = this->lib_.create_new_zone();//second level
 
     auto base_baz = rpc::shared_ptr<xxx::i_baz>(new baz(telemetry_service));
 
@@ -620,18 +621,18 @@ TYPED_TEST(remote_type_test, check_identity)
     new_zone_fork->create_baz(new_baz_fork);
 
     // topology looks like this now flinging bazes around these nodes to ensure that the identity of bazes is the same
-    // *4     
-    //  \     
-    //   *3   
-    //    \     
-    //     *2  *5
-    //      \ /
-    //       1 
+    // *4                           #
+    //  \                           #
+    //   *3                         #
+    //    \                         #
+    //     *2  *5                   #
+    //      \ /                     #
+    //       1                      #
 
 
     auto input = base_baz;
 
-    ASSERT_EQ(lib_.i_example_ptr->send_interface_back(input, output), rpc::error::OK());
+    ASSERT_EQ(this->lib_.i_example_ptr->send_interface_back(input, output), rpc::error::OK());
     ASSERT_EQ(input, output);
     
     ASSERT_EQ(new_zone->send_interface_back(input, output), rpc::error::OK());
@@ -642,7 +643,7 @@ TYPED_TEST(remote_type_test, check_identity)
 
     input = new_baz;
 
-    ASSERT_EQ(lib_.i_example_ptr->send_interface_back(input, output), rpc::error::OK());
+    ASSERT_EQ(this->lib_.i_example_ptr->send_interface_back(input, output), rpc::error::OK());
     ASSERT_EQ(input, output);
     
     ASSERT_EQ(new_zone->send_interface_back(input, output), rpc::error::OK());
@@ -654,7 +655,7 @@ TYPED_TEST(remote_type_test, check_identity)
 
     input = new_new_baz;
 
-    ASSERT_EQ(lib_.i_example_ptr->send_interface_back(input, output), rpc::error::OK());
+    ASSERT_EQ(this->lib_.i_example_ptr->send_interface_back(input, output), rpc::error::OK());
     ASSERT_EQ(input, output);
     
     ASSERT_EQ(new_zone->send_interface_back(input, output), rpc::error::OK());
@@ -666,30 +667,30 @@ TYPED_TEST(remote_type_test, check_identity)
 
     input = new_baz_fork;
     
-    // *z2   *i5
-    //  \  /
-    //   h1
+    // *z2   *i5                 #
+    //  \  /                     #
+    //   h1                      #
 
-    ASSERT_EQ(lib_.i_example_ptr->send_interface_back(input, output), rpc::error::OK());
+    ASSERT_EQ(this->lib_.i_example_ptr->send_interface_back(input, output), rpc::error::OK());
     ASSERT_EQ(input, output);
     
-    // *z3     
-    //  \     
-    //   *2   *i5
-    //    \ /
-    //     h1
+    // *z3                       #
+    //  \                        #
+    //   *2   *i5                #
+    //    \ /                    #
+    //     h1                    #
     
     ASSERT_EQ(new_zone->send_interface_back(input, output), rpc::error::OK());
     ASSERT_EQ(input, output);   
 
         
-    // *z4     
-    //  \     
-    //   *3   
-    //    \     
-    //     *2  *i5
-    //      \ /
-    //       h1 
+    // *z4                          #
+    //  \                           #
+    //   *3                         #
+    //    \                         #
+    //     *2  *i5                  #
+    //      \ /                     #
+    //       h1                     #
 
     ASSERT_EQ(new_new_zone->send_interface_back(input, output), rpc::error::OK());
     ASSERT_EQ(input, output); 
@@ -719,7 +720,7 @@ TYPED_TEST_SUITE(type_test_with_host, type_test_with_host_implementations);
 TYPED_TEST(type_test_with_host, call_host_create_enclave_and_throw_away)
 {  
     bool run_standard_tests = false;
-    ASSERT_EQ(lib_.i_example_ptr->call_host_create_enclave_and_throw_away(run_standard_tests), rpc::error::OK());
+    ASSERT_EQ(this->lib_.i_example_ptr->call_host_create_enclave_and_throw_away(run_standard_tests), rpc::error::OK());
 }
 
 TYPED_TEST(type_test_with_host, call_host_create_enclave)
@@ -727,7 +728,7 @@ TYPED_TEST(type_test_with_host, call_host_create_enclave)
     bool run_standard_tests = false;
     rpc::shared_ptr<marshalled_tests::yyy::i_example> target;
 
-    ASSERT_EQ(lib_.i_example_ptr->call_host_create_enclave(target, run_standard_tests), rpc::error::OK());
+    ASSERT_EQ(this->lib_.i_example_ptr->call_host_create_enclave(target, run_standard_tests), rpc::error::OK());
     ASSERT_NE(target, nullptr);
 }
 
@@ -736,14 +737,14 @@ TYPED_TEST(type_test_with_host, look_up_app_and_return_with_nothing)
     bool run_standard_tests = false;
     rpc::shared_ptr<marshalled_tests::yyy::i_example> target;
 
-    ASSERT_EQ(lib_.i_example_ptr->call_host_look_up_app("target", target, run_standard_tests), rpc::error::OK());
+    ASSERT_EQ(this->lib_.i_example_ptr->call_host_look_up_app("target", target, run_standard_tests), rpc::error::OK());
     ASSERT_EQ(target, nullptr);
 }
 
 
 TYPED_TEST(type_test_with_host, call_host_unload_app_not_there)
 {  
-    ASSERT_EQ(lib_.i_example_ptr->call_host_unload_app("target"), rpc::error::OK());
+    ASSERT_EQ(this->lib_.i_example_ptr->call_host_unload_app("target"), rpc::error::OK());
 }
 
 
@@ -752,12 +753,12 @@ TYPED_TEST(type_test_with_host, call_host_look_up_app_unload_app)
     bool run_standard_tests = false;
     rpc::shared_ptr<marshalled_tests::yyy::i_example> target;
 
-    ASSERT_EQ(lib_.i_example_ptr->call_host_create_enclave(target, run_standard_tests), rpc::error::OK());
+    ASSERT_EQ(this->lib_.i_example_ptr->call_host_create_enclave(target, run_standard_tests), rpc::error::OK());
     ASSERT_NE(target, nullptr);
 
-    ASSERT_EQ(lib_.i_example_ptr->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
+    ASSERT_EQ(this->lib_.i_example_ptr->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
     telemetry_service->message(rpc::i_telemetry_service::info, "call_host_unload_app");
-    ASSERT_EQ(lib_.i_example_ptr->call_host_unload_app("target"), rpc::error::OK());
+    ASSERT_EQ(this->lib_.i_example_ptr->call_host_unload_app("target"), rpc::error::OK());
     target = nullptr;
 }
 
@@ -767,14 +768,14 @@ TYPED_TEST(type_test_with_host, call_host_look_up_app_not_return)
     bool run_standard_tests = false;
     rpc::shared_ptr<marshalled_tests::yyy::i_example> target;
 
-    ASSERT_EQ(lib_.i_example_ptr->call_host_create_enclave(target, run_standard_tests), rpc::error::OK());
+    ASSERT_EQ(this->lib_.i_example_ptr->call_host_create_enclave(target, run_standard_tests), rpc::error::OK());
     ASSERT_NE(target, nullptr);
 
-    ASSERT_EQ(lib_.i_example_ptr->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
+    ASSERT_EQ(this->lib_.i_example_ptr->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
     telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return");
-    ASSERT_EQ(lib_.i_example_ptr->call_host_look_up_app_not_return("target", run_standard_tests), rpc::error::OK());
+    ASSERT_EQ(this->lib_.i_example_ptr->call_host_look_up_app_not_return("target", run_standard_tests), rpc::error::OK());
     telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return complete");
-    ASSERT_EQ(lib_.i_example_ptr->call_host_unload_app("target"), rpc::error::OK());
+    ASSERT_EQ(this->lib_.i_example_ptr->call_host_unload_app("target"), rpc::error::OK());
     target = nullptr;
     telemetry_service->message(rpc::i_telemetry_service::info, "app released");
 }
@@ -785,14 +786,14 @@ TYPED_TEST(type_test_with_host, create_store_fetch_delete)
     rpc::shared_ptr<marshalled_tests::yyy::i_example> target;
     rpc::shared_ptr<marshalled_tests::yyy::i_example> target2;
 
-    ASSERT_EQ(lib_.i_example_ptr->call_host_create_enclave(target, run_standard_tests), rpc::error::OK());
+    ASSERT_EQ(this->lib_.i_example_ptr->call_host_create_enclave(target, run_standard_tests), rpc::error::OK());
     ASSERT_NE(target, nullptr);
 
-    ASSERT_EQ(lib_.i_example_ptr->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
+    ASSERT_EQ(this->lib_.i_example_ptr->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
     telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app");
-    ASSERT_EQ(lib_.i_example_ptr->call_host_look_up_app("target", target2, run_standard_tests), rpc::error::OK());
+    ASSERT_EQ(this->lib_.i_example_ptr->call_host_look_up_app("target", target2, run_standard_tests), rpc::error::OK());
     telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app complete");
-    ASSERT_EQ(lib_.i_example_ptr->call_host_unload_app("target"), rpc::error::OK());
+    ASSERT_EQ(this->lib_.i_example_ptr->call_host_unload_app("target"), rpc::error::OK());
     ASSERT_EQ(target, target2);
     target = nullptr;
     target2 = nullptr;
@@ -804,12 +805,12 @@ TYPED_TEST(type_test_with_host, create_store_not_return_delete)
     bool run_standard_tests = false;
     rpc::shared_ptr<marshalled_tests::yyy::i_example> target;
 
-    ASSERT_EQ(lib_.i_example_ptr->call_host_create_enclave(target, run_standard_tests), rpc::error::OK());
+    ASSERT_EQ(this->lib_.i_example_ptr->call_host_create_enclave(target, run_standard_tests), rpc::error::OK());
     ASSERT_NE(target, nullptr);
 
-    ASSERT_EQ(lib_.i_example_ptr->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
+    ASSERT_EQ(this->lib_.i_example_ptr->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
     telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return");
-    ASSERT_EQ(lib_.i_example_ptr->call_host_look_up_app_not_return_and_delete("target", run_standard_tests), rpc::error::OK());
+    ASSERT_EQ(this->lib_.i_example_ptr->call_host_look_up_app_not_return_and_delete("target", run_standard_tests), rpc::error::OK());
     telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return complete");
     target = nullptr;
     telemetry_service->message(rpc::i_telemetry_service::info, "app released");
@@ -821,12 +822,12 @@ TYPED_TEST(type_test_with_host, create_store_delete)
     rpc::shared_ptr<marshalled_tests::yyy::i_example> target;
     rpc::shared_ptr<marshalled_tests::yyy::i_example> target2;
 
-    ASSERT_EQ(lib_.i_example_ptr->call_host_create_enclave(target, run_standard_tests), rpc::error::OK());
+    ASSERT_EQ(this->lib_.i_example_ptr->call_host_create_enclave(target, run_standard_tests), rpc::error::OK());
     ASSERT_NE(target, nullptr);
 
-    ASSERT_EQ(lib_.i_example_ptr->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
+    ASSERT_EQ(this->lib_.i_example_ptr->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
     telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_and_delete");
-    ASSERT_EQ(lib_.i_example_ptr->call_host_look_up_app_and_delete("target", target2, run_standard_tests), rpc::error::OK());
+    ASSERT_EQ(this->lib_.i_example_ptr->call_host_look_up_app_and_delete("target", target2, run_standard_tests), rpc::error::OK());
     telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_and_delete complete");
     ASSERT_EQ(target, target2);
     target = nullptr;
@@ -837,5 +838,5 @@ TYPED_TEST(type_test_with_host, create_store_delete)
 TYPED_TEST(type_test_with_host, create_subordinate_zone)
 {  
     rpc::shared_ptr<yyy::i_example> target;
-    ASSERT_EQ(lib_.i_example_ptr->create_example_in_subordnate_zone(target, ++(*zone_gen)), rpc::error::OK());
+    ASSERT_EQ(this->lib_.i_example_ptr->create_example_in_subordnate_zone(target, ++(*zone_gen)), rpc::error::OK());
 }

@@ -1,11 +1,11 @@
 #include "common/enclave_service_proxy.h"
 
 #ifndef _IN_ENCLAVE
+#include <thread>
+
 #include <sgx_urts.h>
 #include <sgx_capable.h>
-
 #include <untrusted/enclave_marshal_test_u.h>
-
 #endif
 
 namespace rpc
