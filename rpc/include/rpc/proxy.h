@@ -405,7 +405,7 @@ namespace rpc
                     , encap.object_id
                     , {0}
                     , zone_id.as_caller()// this zone will now be the caller to this object
-                    , rpc::add_ref_channel::normal
+                    , rpc::add_ref_options::normal
                     , !new_proxy_added); 
             }
             auto ret = op->query_interface(iface, false);        
@@ -527,7 +527,7 @@ namespace rpc
             {dummy_object_id}, 
             {0}, 
             serv->get_zone_id().as_caller(), 
-            rpc::add_ref_channel::build_destination_route, 
+            rpc::add_ref_options::build_destination_route, 
             false);
 
         rpc::shared_ptr<object_proxy> op = service_proxy->get_object_proxy(encap.object_id);

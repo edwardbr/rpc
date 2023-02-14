@@ -101,7 +101,7 @@ namespace rpc
         return err_code;
     }
 
-    uint64_t host_service_proxy::add_ref(destination_channel_zone destination_channel_zone_id, destination_zone destination_zone_id, object object_id, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, add_ref_channel build_out_param_channel, bool proxy_add_ref)
+    uint64_t host_service_proxy::add_ref(destination_channel_zone destination_channel_zone_id, destination_zone destination_zone_id, object object_id, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, add_ref_options build_out_param_channel, bool proxy_add_ref)
     {
         if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
         {

@@ -66,7 +66,7 @@ namespace rpc
             }
             return destination_service_.lock()->try_cast(destination_zone_id, object_id, interface_id);
         }
-        uint64_t add_ref(destination_channel_zone destination_channel_zone_id, destination_zone destination_zone_id, object object_id, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, add_ref_channel build_out_param_channel, bool proxy_add_ref) override
+        uint64_t add_ref(destination_channel_zone destination_channel_zone_id, destination_zone destination_zone_id, object object_id, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, add_ref_options build_out_param_channel, bool proxy_add_ref) override
         {
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
             {
@@ -151,7 +151,7 @@ namespace rpc
             }
             return destination_service_->try_cast(destination_zone_id, object_id, interface_id);
         }
-        uint64_t add_ref(destination_channel_zone destination_channel_zone_id, destination_zone destination_zone_id, object object_id, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, add_ref_channel build_out_param_channel, bool proxy_add_ref) override
+        uint64_t add_ref(destination_channel_zone destination_channel_zone_id, destination_zone destination_zone_id, object object_id, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, add_ref_options build_out_param_channel, bool proxy_add_ref) override
         {
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
             {

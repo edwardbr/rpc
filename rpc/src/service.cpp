@@ -165,7 +165,7 @@ namespace rpc
             //caller and destination are in the same channel let them fork where necessary
             //note the caller_channel_zone_id is 0 as both the caller and the destination are in from the same direction so any other value is wrong
             //Dont external_add_ref the local service proxy as we are return to source no channel is required
-            object_service_proxy->add_ref({0}, destination_zone_id, object_id, {0}, caller_zone_id, rpc::add_ref_channel::build_caller_route | rpc::add_ref_channel::build_destination_route, false);
+            object_service_proxy->add_ref({0}, destination_zone_id, object_id, {0}, caller_zone_id, rpc::add_ref_options::build_caller_route | rpc::add_ref_options::build_destination_route, false);
         }
         else
         {
@@ -183,7 +183,7 @@ namespace rpc
 
             //the fork is here so we need to add ref the destination normally with caller info
             //note the caller_channel_zone_id is is this zones id as the caller came from a route via this node
-            destination_zone->add_ref(destination_channel_zone_id, destination_zone_id, object_id, get_zone_id().as_caller_channel(), caller_zone_id, rpc::add_ref_channel::build_destination_route, false);
+            destination_zone->add_ref(destination_channel_zone_id, destination_zone_id, object_id, get_zone_id().as_caller_channel(), caller_zone_id, rpc::add_ref_options::build_destination_route, false);
             
             //and the caller with destination info
             found = other_zones.find({{object_channel}, zone_id_.as_caller()});//we dont need to get caller id for this
@@ -191,7 +191,7 @@ namespace rpc
             auto caller_zone = found->second.lock();
             assert(caller_zone);
             //note the caller_channel_zone_id is 0 as the caller came from this route 
-            caller_zone->add_ref(zone_id_.as_destination_channel(), destination_zone_id, object_id, {0}, caller_zone_id, rpc::add_ref_channel::build_caller_route, false);
+            caller_zone->add_ref(zone_id_.as_destination_channel(), destination_zone_id, object_id, {0}, caller_zone_id, rpc::add_ref_options::build_caller_route, false);
         }
  
         return {object_id, destination_zone_id};
@@ -254,7 +254,7 @@ namespace rpc
                     caller_zone = get_parent();
                 assert(caller_zone);
                 //note the caller_channel_zone_id is 0 as the caller came from this route 
-                caller_zone->add_ref({0}, zone_id_.as_destination(), stub->get_id(), {0}, caller_zone_id, rpc::add_ref_channel::build_caller_route, false);        
+                caller_zone->add_ref({0}, zone_id_.as_destination(), stub->get_id(), {0}, caller_zone_id, rpc::add_ref_options::build_caller_route, false);        
             }
         }
         return {stub->get_id(), get_zone_id().as_destination()};
@@ -301,14 +301,14 @@ namespace rpc
         }
     }
 
-    uint64_t service::add_ref(destination_channel_zone destination_channel_zone_id, destination_zone destination_zone_id, object object_id, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, add_ref_channel build_out_param_channel, bool proxy_add_ref)
+    uint64_t service::add_ref(destination_channel_zone destination_channel_zone_id, destination_zone destination_zone_id, object object_id, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, add_ref_options build_out_param_channel, bool proxy_add_ref)
 {
         auto dest_channel = destination_channel_zone_id.is_set() ? destination_channel_zone_id.get_val() : destination_zone_id.get_val();
         auto caller_channel = caller_channel_zone_id.is_set() ? caller_channel_zone_id.id : caller_zone_id.id;
 
         if(destination_zone_id != get_zone_id().as_destination())
         {
-            auto build_channel = !!(build_out_param_channel & add_ref_channel::build_destination_route) || !!(build_out_param_channel & add_ref_channel::build_caller_route);
+            auto build_channel = !!(build_out_param_channel & add_ref_options::build_destination_route) || !!(build_out_param_channel & add_ref_options::build_caller_route);
             if(dest_channel == caller_channel && build_channel)
             {
                 //we are here as we are passing the buck to the zone that knows to either splits or terminates this zone has no refcount issues to deal with
@@ -368,10 +368,10 @@ namespace rpc
                     }
 
                     if(caller_zone_id == zone_id_.as_caller())
-                        build_out_param_channel = build_out_param_channel ^ add_ref_channel::build_caller_route; //strip out this bit
+                        build_out_param_channel = build_out_param_channel ^ add_ref_options::build_caller_route; //strip out this bit
 
 
-                    if(!!(build_out_param_channel & add_ref_channel::build_caller_route))
+                    if(!!(build_out_param_channel & add_ref_options::build_caller_route))
                     {
                         found = other_zones.lower_bound({{caller_channel}, {0}});
                         if(found != other_zones.end() && found->first.dest.get_val() == caller_channel)
@@ -389,7 +389,7 @@ namespace rpc
                     do
                     {
                         //this more fiddly check is to route calls to a parent node that knows more about this
-                        if(dest_zone && caller_zone && build_out_param_channel == (add_ref_channel::build_caller_route | add_ref_channel::build_destination_route))
+                        if(dest_zone && caller_zone && build_out_param_channel == (add_ref_options::build_caller_route | add_ref_options::build_destination_route))
                         {
                             auto dc = dest_zone->get_destination_channel_zone_id().is_set() ? dest_zone->get_destination_channel_zone_id().get_val() : dest_zone->get_destination_zone_id().get_val();
                             auto cc = caller_zone->get_destination_channel_zone_id().is_set() ? caller_zone->get_destination_channel_zone_id().get_val() : caller_zone->get_destination_zone_id().get_val();
@@ -402,12 +402,12 @@ namespace rpc
                         }
 
                         //then call the add ref to the destination
-                        if(!!(build_out_param_channel & add_ref_channel::build_destination_route))
-                            dest_zone->add_ref({0}, destination_zone_id, object_id, get_zone_id().as_caller_channel(), caller_zone_id, add_ref_channel::build_destination_route, false);
+                        if(!!(build_out_param_channel & add_ref_options::build_destination_route))
+                            dest_zone->add_ref({0}, destination_zone_id, object_id, get_zone_id().as_caller_channel(), caller_zone_id, add_ref_options::build_destination_route, false);
 
                         //back fill the ref count to the caller
-                        if(!!(build_out_param_channel & add_ref_channel::build_caller_route))
-                            caller_zone->add_ref(zone_id_.as_destination_channel(), destination_zone_id, object_id, caller_channel_zone_id, caller_zone_id, add_ref_channel::build_caller_route, false);
+                        if(!!(build_out_param_channel & add_ref_options::build_caller_route))
+                            caller_zone->add_ref(zone_id_.as_destination_channel(), destination_zone_id, object_id, caller_channel_zone_id, caller_zone_id, add_ref_options::build_caller_route, false);
                     }while(false);
                 }
                 if(release_dest_zone)
@@ -451,7 +451,7 @@ namespace rpc
         else
         {
             //find the caller
-            if(zone_id_.as_caller() != caller_zone_id && !!(build_out_param_channel & add_ref_channel::build_caller_route))
+            if(zone_id_.as_caller() != caller_zone_id && !!(build_out_param_channel & add_ref_options::build_caller_route))
             {
                 rpc::shared_ptr<service_proxy> caller_zone;
                 {
@@ -468,7 +468,7 @@ namespace rpc
                     }
                     assert(caller_zone);
                 }
-                caller_zone->add_ref({0},destination_zone_id, object_id, {}, caller_zone_id, add_ref_channel::build_caller_route, false);
+                caller_zone->add_ref({0},destination_zone_id, object_id, {}, caller_zone_id, add_ref_options::build_caller_route, false);
             }
             if(object_id == dummy_object_id)
             {

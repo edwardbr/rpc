@@ -729,11 +729,15 @@ namespace enclave_marshaller
                         
                         proxy("const auto __rpc_yas_mapping = YAS_OBJECT_NVP(");
                         proxy("  \"in\"");
+                        proxy("  ,(\"__rpc_version\", rpc::get_version())");
 
                         stub("//STUB_MARSHALL_IN");
+                        stub("uint8_t __rpc_version = 0;");
                         stub("yas::intrusive_buffer in(in_buf_, in_size_);");
                         stub("yas::load<yas::mem|yas::binary|yas::no_header>(in, YAS_OBJECT_NVP(");
                         stub("  \"in\"");
+                        stub("  ,(\"__rpc_version\", __rpc_version)");
+					  
 
                         count = 1;
                         for (auto& parameter : function.get_parameters())
@@ -770,6 +774,8 @@ namespace enclave_marshaller
                         proxy("yas::mem_ostream __rpc_writer(__rpc_in_buf.data(), __rpc_counter.total_size);");
                         proxy("yas::save<yas::mem|yas::binary|yas::no_header>(__rpc_writer, __rpc_yas_mapping);");
                         stub("  ));");
+                        stub("if(__rpc_version != rpc::get_version())");
+                        stub("  return rpc::error::INVALID_VERSION();");
                     }
 
                     proxy("std::vector<char> __rpc_out_buf(24); //max size using short string optimisation");
@@ -1565,6 +1571,7 @@ namespace enclave_marshaller
             header("#include <string>");
             header("#include <array>");
 
+            header("#include <rpc/version.h>");
             header("#include <rpc/marshaller.h>");
             header("#include <rpc/service.h>");
             header("#include <rpc/error_codes.h>");

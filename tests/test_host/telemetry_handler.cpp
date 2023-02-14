@@ -67,7 +67,7 @@ extern "C"
         {
             return rpc::error::TRANSPORT_ERROR();
         }
-        return root_service->add_ref({destination_channel_zone_id}, {destination_zone_id}, {object_id}, {caller_channel_zone_id}, {caller_zone_id}, static_cast<rpc::add_ref_channel>(build_out_param_channel), false);
+        return root_service->add_ref({destination_channel_zone_id}, {destination_zone_id}, {object_id}, {caller_channel_zone_id}, {caller_zone_id}, static_cast<rpc::add_ref_options>(build_out_param_channel), false);
     }
     uint64_t release_host(uint64_t zone_id, uint64_t object_id, uint64_t caller_zone_id)
     {

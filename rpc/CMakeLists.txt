@@ -13,6 +13,7 @@ add_library(marshaller_enclave
     src/service.cpp
     src/stub.cpp
     src/error_codes.cpp
+    src/version.cpp
     )
 
 target_compile_definitions(marshaller_enclave 
@@ -48,6 +49,7 @@ add_library(marshaller_host
     src/service.cpp
     src/stub.cpp
     src/error_codes.cpp
+    src/version.cpp
     )
 
 
