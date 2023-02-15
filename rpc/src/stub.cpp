@@ -2,7 +2,7 @@
 #include "rpc/service.h"
 
 #ifndef LOG_STR_DEFINED
-# ifdef USE_RPC_LOGGING
+# ifdef RPC_USE_LOGGING
 #  define LOG_STR(str, sz) log_str(str, sz)
    extern "C"
    {
@@ -20,7 +20,7 @@ namespace rpc
         : id_(id)
         , zone_(zone)
     {
-#ifdef USE_RPC_LOGGING
+#ifdef RPC_USE_LOGGING
         auto message = std::string("object_stub::object_stub zone ") + std::to_string(zone_.get_zone_id()) 
         + std::string(", object_id ") + std::to_string(id_);
         LOG_STR(message.c_str(), message.size());
@@ -28,7 +28,7 @@ namespace rpc
     }
     object_stub::~object_stub()
     {
-#ifdef USE_RPC_LOGGING
+#ifdef RPC_USE_LOGGING
         auto message = std::string("object_stub::~object_stub zone ") + std::to_string(zone_.get_zone_id()) 
         + std::string(", object_id ") + std::to_string(id_);
         LOG_STR(message.c_str(), message.size());

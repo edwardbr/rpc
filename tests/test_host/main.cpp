@@ -1,16 +1,19 @@
 #include <iostream>
 #include <unordered_map>
 
+#ifdef RPC_BUILD_SGX
 #include <sgx_urts.h>
 #include <sgx_quote.h>
 #include <sgx_capable.h>
 #include <sgx_uae_epid.h>
 #include <sgx_eid.h>
+
 #include "untrusted/enclave_marshal_test_u.h"
+#include <common/enclave_service_proxy.h>
+#endif
 
 #include <common/foo_impl.h>
 #include <common/tests.h>
-#include <common/enclave_service_proxy.h>
 
 #include <example/example.h>
 
@@ -32,6 +35,13 @@
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 
+extern "C" {
+#ifdef _IN_ENCLAVE
+sgx_status_t __cdecl log_str(const char* str, size_t sz);
+#else
+void __cdecl log_str(const char* str, size_t sz);
+#endif
+}
 
 // This list should be kept sorted.
 using testing::Action;
@@ -110,6 +120,8 @@ public:
     {
         rpc::shared_ptr<yyy::i_host> host = shared_from_this();
         auto serv = current_host_service.lock();
+
+#ifdef RPC_BUILD_SGX        
         auto err_code = rpc::enclave_service_proxy::create(
             {++(*zone_gen)}, 
             enclave_path, 
@@ -118,6 +130,23 @@ public:
             target, 
             telemetry_service);
         return err_code;
+#else
+        auto this_service = current_host_service.lock();
+        auto child_service = rpc::make_shared<rpc::child_service>(rpc::zone{++(*zone_gen)});
+        auto service_proxy_to_child = rpc::local_child_service_proxy::create(child_service, this_service, telemetry_service);
+
+        // create the example object implementation with a recursive chain of services
+        rpc::shared_ptr<yyy::i_example> remote_example(new example(telemetry_service, child_service, host));
+
+        rpc::interface_descriptor example_encap = rpc::create_interface_stub(*child_service, remote_example);
+
+        auto service_proxy_to_this_zone = rpc::local_service_proxy::create(this_service, child_service, telemetry_service, false);
+        //service_proxy_to_this_zone->add_external_ref();
+        child_service->set_parent(service_proxy_to_this_zone, true);
+
+
+        return rpc::demarshall_interface_proxy(service_proxy_to_child, example_encap, this_service->get_zone_id().as_caller(), target);
+#endif
     };
 
     //live app registry, it should have sole responsibility for the long term storage of app shared ptrs
@@ -294,6 +323,7 @@ struct inproc_setup
     }
 };
 
+#ifdef RPC_BUILD_SGX        
 template<bool UseHostInChild, bool RunStandardTests, bool CreateNewZoneThenCreateSubordinatedZone>
 struct enclave_setup
 {
@@ -361,6 +391,7 @@ struct enclave_setup
         return ptr;
     }
 };
+#endif
 
 template <class T>
 class type_test : 
@@ -378,26 +409,29 @@ class type_test :
 };
 
 using local_implementations = ::testing::Types<
-    in_memory_setup<false>, 
-    in_memory_setup<true>, 
-    inproc_setup<false, false, false>, 
-    inproc_setup<false, false, true>, 
-    inproc_setup<false, true, false>, 
-    inproc_setup<false, true, true>, 
-    inproc_setup<true, false, false>, 
-    inproc_setup<true, false, true>, 
-    inproc_setup<true, true, false>, 
-    inproc_setup<true, true, true>, 
+    in_memory_setup<false> 
+    , in_memory_setup<true> 
+    , inproc_setup<false, false, false> 
+    , inproc_setup<false, false, true> 
+    , inproc_setup<false, true, false> 
+    , inproc_setup<false, true, true> 
+    , inproc_setup<true, false, false> 
+    , inproc_setup<true, false, true> 
+    , inproc_setup<true, true, false> 
+    , inproc_setup<true, true, true> 
 
 
-    enclave_setup<false, false, false>, 
-    enclave_setup<false, false, true>, 
-    enclave_setup<false, true, false>, 
-    enclave_setup<false, true, true>, 
-    enclave_setup<true, false, false>, 
-    enclave_setup<true, false, true>, 
-    enclave_setup<true, true, false>, 
-    enclave_setup<true, true, true>>;
+#ifdef RPC_BUILD_SGX        
+    , enclave_setup<false, false, false>
+    , enclave_setup<false, false, true> 
+    , enclave_setup<false, true, false> 
+    , enclave_setup<false, true, true> 
+    , enclave_setup<true, false, false> 
+    , enclave_setup<true, false, true> 
+    , enclave_setup<true, true, false> 
+    , enclave_setup<true, true, true>
+#endif
+    >;
 TYPED_TEST_SUITE(type_test, local_implementations);
 
 TYPED_TEST(type_test, initialisation_test)
@@ -437,15 +471,18 @@ using remote_type_test = type_test<T>;
 
 
 typedef Types<
-    inproc_setup<true, false, false>, 
-    inproc_setup<true, false, true>, 
-    inproc_setup<true, true, false>, 
-    inproc_setup<true, true, true>, 
+    inproc_setup<true, false, false>
+    , inproc_setup<true, false, true> 
+    , inproc_setup<true, true, false> 
+    , inproc_setup<true, true, true> 
 
-    enclave_setup<true, false, false>, 
-    enclave_setup<true, false, true>, 
-    enclave_setup<true, true, false>, 
-    enclave_setup<true, true, true>> remote_implementations;
+#ifdef RPC_BUILD_SGX        
+    , enclave_setup<true, false, false>
+    , enclave_setup<true, false, true> 
+    , enclave_setup<true, true, false> 
+    , enclave_setup<true, true, true>
+#endif
+    > remote_implementations;
 TYPED_TEST_SUITE(remote_type_test, remote_implementations);
 
 TYPED_TEST(remote_type_test, remote_standard_tests)
@@ -705,15 +742,18 @@ class type_test_with_host :
 };
 
 typedef Types<
-    inproc_setup<true, false, false>, 
-    inproc_setup<true, false, true>, 
-    inproc_setup<true, true, false>, 
-    inproc_setup<true, true, true>, 
+    inproc_setup<true, false, false>
+    , inproc_setup<true, false, true> 
+    , inproc_setup<true, true, false> 
+    , inproc_setup<true, true, true> 
 
-    enclave_setup<true, false, false>, 
-    enclave_setup<true, false, true>, 
-    enclave_setup<true, true, false>, 
-    enclave_setup<true, true, true>> type_test_with_host_implementations;
+#ifdef RPC_BUILD_SGX        
+    , enclave_setup<true, false, false>
+    , enclave_setup<true, false, true> 
+    , enclave_setup<true, true, false> 
+    , enclave_setup<true, true, true>
+#endif
+    > type_test_with_host_implementations;
 TYPED_TEST_SUITE(type_test_with_host, type_test_with_host_implementations);
 
 

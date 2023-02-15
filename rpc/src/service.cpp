@@ -9,7 +9,7 @@
 #include "rpc/proxy.h"
 
 #ifndef LOG_STR_DEFINED
-# ifdef USE_RPC_LOGGING
+# ifdef RPC_USE_LOGGING
 #  define LOG_STR(str, sz) log_str(str, sz)
    extern "C"
    {

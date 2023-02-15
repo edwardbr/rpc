@@ -17,9 +17,13 @@ target_include_directories(rpc_test
   PRIVATE 
     ${HOST_INCLUDES})
 
-target_link_libraries(rpc_test 
+  if(${RPC_BUILD_SGX})
+    set(MARSHAL_TEST_EDL_HOST marshal_test_edl_host)
+  endif()
+  
+  target_link_libraries(rpc_test 
   PUBLIC 
-    marshal_test_edl_host
+    ${MARSHAL_TEST_EDL_HOST}
     common_host
     example_interface
     

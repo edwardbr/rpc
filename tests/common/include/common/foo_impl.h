@@ -6,6 +6,14 @@
 #include <rpc/i_telemetry_service.h>
 #include <rpc/basic_service_proxies.h>
 
+extern "C" {
+#ifdef _IN_ENCLAVE
+sgx_status_t __cdecl log_str(const char* str, size_t sz);
+#else
+void __cdecl log_str(const char* str, size_t sz);
+#endif
+}
+
 void log(const std::string& data)
 {
     log_str(data.data(), data.size() + 1);

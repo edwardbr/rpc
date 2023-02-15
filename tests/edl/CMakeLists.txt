@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.12)
 
+if(${RPC_BUILD_SGX})
 host_edl_library(
   marshal_test_edl_host
   enclave_marshal_test.edl
@@ -19,3 +20,4 @@ enclave_edl_library(
   ""
 )
 set_property(TARGET marshal_test_edl_enclave PROPERTY COMPILE_PDB_NAME marshal_test_edl_enclave)   
+endif()

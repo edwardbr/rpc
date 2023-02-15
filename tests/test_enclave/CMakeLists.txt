@@ -5,7 +5,7 @@ message("marshal_test_enclave")
 # ##############################################################################
 # marshal_test_enclave
 
-if(${BUILD_ENCLAVE})
+if(${RPC_BUILD_SGX})
   add_enclave_library(marshal_test_enclave
   SRCS
       marshal_test_enclave.cpp

@@ -20,7 +20,9 @@ function(EnclaveMarshaller
   #split out multivalue variables
   cmake_parse_arguments("params" "${options}" "${singleValueArgs}" "${multiValueArgs}" ${ARGN})
 
-  cmake_path(APPEND base_dir ${idl} OUTPUT_VARIABLE idl)
+  set(tmp_path ${base_dir}/${idl})
+  file(TO_CMAKE_PATH ${tmp_path} idl)
+  #cmake_path(APPEND base_dir ${idl} OUTPUT_VARIABLE idl)
 
   set(full_header_path ${output_path}/include/${header})
   set(full_proxy_path ${output_path}/src/${proxy})
