@@ -5,13 +5,20 @@ Remote Procedure Calls for modern C++
 This library implements an RPC solution that reflects modern C++ concepts.  It is intended for developers that want a pure C++ experience and supports C++ types natively, and all other languages communicate with this library using JSON or some other generic protocol.  
 
 ## What are Remote Procedure Calls?
-RPC has been around for decades targeting mainly the C programming language and was very popular in the 80's and 90's before falling out of favour with XML rpc, SOAP and REST.
+Remote procedure calls allow applications to talk each other without getting snarled up in underlying communication protocols.  The transport and the end user programming API's are treated as separate concerns.  
+### In a nutshell
+In other words you can easily make an API that is accessible from another machine, dll, arena or embedded device and not think about serialization.
+### A bit of history
+RPC has been around for decades targeting mainly the C programming language and was very popular in the 80's and 90's. The technology reached its zenith with the arrival of (D)COM from Microsoft and CORBA from a consortium of other companies.  Unfortunately both organizations hated each other and with their closed source attitudes people fell out of love with them in favour with XMLRPC, SOAP and REST as the new sexy kids on the block.  
 
-RPC calls are function calls that pretend to be function calls that run code locally when in fact the calls are serialized up and sent to a different location such as a remote machine, where the parameters are unpacked and the function call is made.  The return values are then sent back in a similar manner back to the caller, with the caller potentially unaware that the call was made on a remote location.
+RPC though is a valuable solution for all solutions, however historically it did not offer direct answers for working over insecure networks, partly because of the short sighted intransigence and secrecy of various organizations.  People are coming off from some of these aging fads and are returning to higher performance solutions such as this.
 
-Typically the caller calls the function with the same signature as the implementation into a 'proxy' the proxy then packages up the call and sends it to the intended target.  The target then calls a 'stub' that unpacks the request and calls the function on the callers behalf.
+### Yes but what are they?
+RPC calls are function calls that pretend to run code locally, when in fact the calls are serialized up and sent to a different location such as a remote machine, where the parameters are unpacked and the function call is made.  The return values are then sent back in a similar manner back to the caller, with the caller potentially unaware that the call was made on a remote location.
 
-To do this the target object needs to implement a set of agreed functions, known as an interface, or in C++ speak a pure abstract virtual base class.  These interfaces are then defined in a language not dissimilar to C++ header files called Interface Definition Language files with an extension of *.idl.
+Typically the caller calls the function with the same signature as the implementation through a 'proxy', The proxy then packages up the call and sends it to the intended target.  The target then calls a 'stub' that unpacks the request and calls the function on the callers behalf.
+
+To do this the intended destination object needs to implement a set of agreed functions.  These functions collectively are known as interfaces, or in C++ speak a pure abstract virtual base classes.  These interfaces are then defined in a language not dissimilar to C++ header files called Interface Definition Language files with an extension of *.idl.
 
 A code generator then reads this idl and generates pure C++ headers containing virtual base classes that implementors need to satisfy as well as proxy and stub code.
 
@@ -19,17 +26,17 @@ The only thing left to do is to implement code that uses a particular transport 
 
 ## Use cases
 
-Although RPC is mainly intended to communicate between machines it can also be used for:
  * In-process calls.
- * In-process calls between two different memory arenas.
+ * In-process calls between different memory arenas.
  * To other applications on the same machine.
- * To embedded devices
+ * To embedded devices.
+ * To remote devices on a private network or the Internet.
 
-It builds on the principals of (D)COM and CORBA from the 90's. However all interactions are done with smart pointers based on STL std::shared_ptr etc.
-
-As with all RPC an interface definition file is required.  In this case we use files with a .idl extension, protocol buffers and flat buffers have their own formats, however this library uses an idl that closely matches modern C++ header files. 
+## Design
 
 This idl format supports structures, interfaces, namespaces and basic STL type objects including string, map, vector, optional, variant.
+
+TODO...
 
 ## Feature pipelines
 
