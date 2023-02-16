@@ -83,8 +83,8 @@ Alternatively you can set them explicitly from the .vscode/settings.json file
 Also for viewing idl files more easily install the "Microsoft MIDL and Mozilla WebIDL syntax highlighting" extension to get some highlighting support.
 
 Currently tested on Compilers:
-Clang 10+ 
-GCC 9.4
-Visual Studio 2017
+ * Clang 10+ 
+ * GCC 9.4
+ * Visual Studio 2017
 
 Though strongly suggest upgrading to the latest version of these compilers
