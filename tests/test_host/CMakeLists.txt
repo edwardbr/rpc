@@ -40,10 +40,7 @@ target_include_directories(rpc_test
 target_compile_options(rpc_test PRIVATE ${HOST_COMPILE_OPTIONS})
 target_link_options(rpc_test PRIVATE ${HOST_LINK_EXE_OPTIONS})
 target_link_directories(rpc_test PUBLIC ${SGX_LIBRARY_PATH})
-target_link_options(rpc_test BEFORE PUBLIC "/LIBPATH:C:\\PROGRA~2\\Intel\\INTELS~1\\bin\\x64\\Debug")
 set_property(TARGET rpc_test PROPERTY COMPILE_PDB_NAME rpc_test) 
-
-message(rpc_test PUBLIC ${SGX_LIBRARY_PATH})
 
 gtest_discover_tests(rpc_test)
 
