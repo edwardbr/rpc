@@ -41,6 +41,7 @@ TODO...
 ## Feature pipelines
 
 This initial version uses synchronous calls only, however on the pipeline it is planned to work with coroutines.
+This solution currently only supports error codes, exception based error handling is to be implemented at some date.
 
 Currently it has adaptors for
  * in memory calls
