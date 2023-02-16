@@ -1,5 +1,3 @@
-# Copyright 2021 Secretarium Ltd <contact@secretarium.org>
-
 # FindPackage cmake file for Intel SGX SDK
 
 cmake_minimum_required(VERSION 2.8.8)
@@ -7,24 +5,35 @@ include(CMakeParseArguments)
 
 set(SGX_FOUND "NO")
 
-if(EXISTS SGX_DIR)
-  set(SGX_PATH ${SGX_DIR})
-elseif(EXISTS SGX_ROOT)
-  set(SGX_PATH ${SGX_ROOT})
-elseif(EXISTS $ENV{SGX_SDK})
-  set(SGX_PATH $ENV{SGX_SDK})
-elseif(EXISTS $ENV{SGX_DIR})
-  set(SGX_PATH $ENV{SGX_DIR})
-elseif(EXISTS $ENV{SGX_ROOT})
-  set(SGX_PATH $ENV{SGX_ROOT})
+if(DEFINED SGX_DIR)
+  set(SGX_PATH_SOURCE "CMake variable SGX_DIR")
+  set(SGX_PATH "${SGX_DIR}")
+elseif(DEFINED SGX_ROOT)
+  set(SGX_PATH_SOURCE "CMake variable SGX_ROOT")
+  set(SGX_PATH "${SGX_ROOT}")
+elseif(DEFINED ENV{SGX_SDK})
+  set(SGX_PATH_SOURCE "environment variable SGX_SDK")
+  set(SGX_PATH "$ENV{SGX_SDK}")
+elseif(DEFINED ENV{SGX_DIR})
+  set(SGX_PATH_SOURCE "environment variable SGX_DIR")
+  set(SGX_PATH "$ENV{SGX_DIR}")
+elseif(DEFINED ENV{SGX_ROOT})
+  set(SGX_PATH_SOURCE "environment variable SGX_ROOT")
+  set(SGX_PATH "$ENV{SGX_ROOT}")
 else()
   if(WIN32)
-    message("windows")
+    set(SGX_PATH_SOURCE "default for Windows")
     set(SGX_PATH "C:/PROGRA~2/Intel/INTELS~1")
   else() # Linux
-    message("linux")
+    set(SGX_PATH_SOURCE "default for Linux")
     set(SGX_PATH "/opt/intel/sgxsdk")
   endif()
+endif()
+
+if(NOT EXISTS ${SGX_PATH})
+  message(FATAL_ERROR "Intel SGX SDK at '${SGX_PATH}' provided through ${SGX_PATH_SOURCE} does not exist")
+else()
+  message("Using Intel SGX SDK at '${SGX_PATH}' provided through ${SGX_PATH_SOURCE}")
 endif()
 
 if(WIN32)
@@ -53,19 +62,23 @@ else() # Linux
       set(SGX_ENCLAVE_SIGNER ${SGX_PATH}/bin/x64/sgx_sign)
       set(SGX_EDGER8R ${SGX_PATH}/bin/x64/sgx_edger8r)
   endif()
+  # MGS the code below needs to be reviewed. It could be working fine but it may duplicate definitions.
+  string(REPLACE ";" " " EXTRA_COMPILE_OPTIONS_STR "${EXTRA_COMPILE_OPTIONS}")
   if(SGX_MODE STREQUAL "debug")
     if(${BUILD_TYPE} STREQUAL "release") # SimulationOptimized aka SimulationPrerelease
-      set(SGX_COMMON_CFLAGS "${SGX_COMMON_CFLAGS} -O2 -DNDEBUG -UEDEBUG")
+      set(SGX_COMMON_CFLAGS "${SGX_COMMON_CFLAGS} -O2 ${EXTRA_COMPILE_OPTIONS_STR} -DNDEBUG -UEDEBUG")
     else() # Debug
-      set(SGX_COMMON_CFLAGS "${SGX_COMMON_CFLAGS} -O0 -g -UNDEBUG -UEDEBUG")
+      set(SGX_COMMON_CFLAGS "${SGX_COMMON_CFLAGS} -O0 ${EXTRA_COMPILE_OPTIONS_STR} -UNDEBUG -UEDEBUG")
     endif()
   elseif(SGX_MODE STREQUAL "prerelease")
-    set(SGX_COMMON_CFLAGS "${SGX_COMMON_CFLAGS} -O2 -DNDEBUG -DEDEBUG")
+    set(SGX_COMMON_CFLAGS "${SGX_COMMON_CFLAGS} -O2 ${EXTRA_COMPILE_OPTIONS_STR} -DNDEBUG -DEDEBUG")
   elseif(SGX_MODE STREQUAL "release")
-    set(SGX_COMMON_CFLAGS "${SGX_COMMON_CFLAGS} -O2 -DNDEBUG -UEDEBUG")
+    set(SGX_COMMON_CFLAGS "${SGX_COMMON_CFLAGS} -O2 ${EXTRA_COMPILE_OPTIONS_STR} -DNDEBUG -UEDEBUG")
   else()
     message(FATAL_ERROR "SGX_MODE ${SGX_MODE} is not debug, prerelease or release.")
   endif()
+  #
+  message("SGX_COMMON_CFLAGS ${SGX_COMMON_CFLAGS}")
 
   set(ENCLAVE_INC_FLAGS -I${SGX_INCLUDE_DIR} -I${SGX_TLIBC_INCLUDE_DIR} -I${SGX_LIBCXX_INCLUDE_DIR})
   set(ENCLAVE_C_FLAGS "${SGX_COMMON_CFLAGS} -nostdinc -fvisibility=hidden -fpie -fstack-protector-strong")
@@ -123,6 +136,15 @@ if(SGX_FOUND)
       ${SGX_TSVC_LIB}.lib
       ${SGX_TCRYPTO_LIB}.lib
       ${SGX_HEADER_ONLY_LIBS})
+  else()
+    # check if __assert_fail is defined (related to debug compilation), so that we don't define it again
+    execute_process(COMMAND sh -c "nm --defined-only ${SGX_LIBRARY_DIR}/libsgx_tcxx.a | grep __assert_fail >/dev/null" RESULT_VARIABLE GREP_STATUS)
+    if(GREP_STATUS EQUAL 0)
+      message("libsgx_tcxx.a defines __assert_fail, define SGX_SDK_CONTAINS_DEBUG_INFORMATION")
+      set(SGX_SDK_CONTAINS_DEBUG_INFORMATION ON)
+    else()
+      message("libsgx_tcxx.a does not define __assert_fail")
+    endif()
   endif()
 
   set(APP_INC_FLAGS "-I${SGX_INCLUDE_DIR}")
@@ -378,9 +400,10 @@ if(SGX_FOUND)
       COMMAND cmake -E copy_if_different ${EDL_U_C} ${EDL_UT_C}
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 
-    add_custom_target(${target}-create-header ALL DEPENDS ${EDL_UT_H}) # Used to avoid problems when in cyclic references e.g. add_dependencies(runtime_edl_host secretarium_bft_raft_edl_host-create-header)
+    add_custom_target(${target}-create-header ALL DEPENDS ${EDL_UT_H}) # Used to avoid problems when in cyclic references 
 
     add_library(${target} STATIC ${EDL_UT_H} ${EDL_UT_C})
+    add_dependencies(${target} ${target}-create-header)
     #set_target_properties(${target} PROPERTIES COMPILE_FLAGS ${ENCLAVE_C_FLAGS})
     set(INCLUDE_PATHS ${CMAKE_CURRENT_BINARY_DIR} ${HOST_SGX_INCLUDE_DIRS} ${edl_include_path})
     separate_arguments(INCLUDE_PATHS)
@@ -392,7 +415,6 @@ if(SGX_FOUND)
     )
     target_compile_definitions(${target} PRIVATE ${HOST_DEFINES})
     target_compile_options(${target} PRIVATE ${HOST_COMPILE_OPTIONS})
-
     set_property(
       DIRECTORY
       APPEND
@@ -523,7 +545,7 @@ if(SGX_FOUND)
       if(WIN32)
         set(OUTPUT_NAME "${target}.signed.dll")
       else()
-        set(OUTPUT_NAME "${target}.signed.so")
+        set(OUTPUT_NAME "lib${target}.signed.so")
       endif()
     else()
       set(OUTPUT_NAME ${SGX_OUTPUT})
@@ -533,6 +555,7 @@ if(SGX_FOUND)
 
     get_target_property(OUTPUT_DIR ${target} LIBRARY_OUTPUT_DIRECTORY)
     set(${target}_sign_OUTPUT_NAME ${OUTPUT_DIR}/${OUTPUT_NAME} CACHE STRING "signed target file name")
+    # TODO: "release" targets needs to be reviewed for Linux!
     if(SGX_HW AND SGX_MODE STREQUAL "release")
       add_custom_command(TARGET ${target} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E cmake_echo_color --cyan "First step ${SGX_ENCLAVE_SIGNER} signing $<TARGET_FILE:${target}>"

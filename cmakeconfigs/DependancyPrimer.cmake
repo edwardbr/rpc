@@ -1,5 +1,3 @@
-# Copyright 2021 Secretarium Ltd <contact@secretarium.org>
-
 # formatted using cmake-format
 cmake_minimum_required(VERSION 3.12)
 
@@ -12,7 +10,6 @@ if(NOT DEPENDANCIES_LOADED)
   option(RPC_BUILD_SGX "build enclave code" OFF)
   option(RPC_BUILD_TEST "build test code" ON)
   option(RPC_USE_LOGGING "turn on rpc logging" OFF)
-  option(RPC_GIT_SUBMODULE "Check submodules during build" ON)
   option(FORCE_DEBUG_INFORMATION "force inclusion of debug information" OFF)
 
   message("BUILD_TYPE ${BUILD_TYPE}")
@@ -23,13 +20,12 @@ if(NOT DEPENDANCIES_LOADED)
   message("RPC_BUILD_SGX ${RPC_BUILD_SGX}")
   message("RPC_BUILD_TEST ${RPC_BUILD_TEST}")
   message("RPC_USE_LOGGING ${RPC_USE_LOGGING}")
-  message("RPC_GIT_SUBMODULE ${RPC_GIT_SUBMODULE}")
 
-  if(RPC_BUILD_SGX STREQUAL RPC_BUILD_SGX)
+  if(${RPC_BUILD_SGX} STREQUAL ON)
     set(RPC_BUILD_SGX_FLAG RPC_BUILD_SGX)
   else()
     set(RPC_BUILD_SGX_FLAG)
-  endif()   
+  endif()
 
   set(WARNING_LEVEL 3)
   set(WARNINGS_AS_ERRORS ON)
@@ -53,50 +49,6 @@ if(NOT DEPENDANCIES_LOADED)
     set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/output)
     set(CMAKE_COMPILE_PDB_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/output)
     set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/output)
-  endif()
-
-  # ############################################################################
-  # load the submodules
-  message("submodules")
-
-  find_package(Git QUIET)
-
-  if(RPC_GIT_SUBMODULE)
-    if(GIT_FOUND)
-      # Update submodules as needed
-      message(STATUS "Cmakeconfig dependancy Submodule init")
-      execute_process(
-        COMMAND ${GIT_EXECUTABLE} submodule init
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/cmakeconfigs
-        RESULT_VARIABLE GIT_SUBMOD_INIT_RESULT)
-
-      if(NOT GIT_SUBMOD_INIT_RESULT EQUAL "0")
-        message(FATAL_ERROR "submodule init")
-      endif()
-
-      message(STATUS "Cmakeconfig dependancy submodule update")
-      execute_process(
-        COMMAND ${GIT_EXECUTABLE} submodule update
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/cmakeconfigs
-        RESULT_VARIABLE GIT_SUBMOD_RESULT)
-
-      if(NOT GIT_SUBMOD_RESULT EQUAL "0")
-        message(
-          FATAL_ERROR
-          "git submodule update failed with ${GIT_SUBMOD_RESULT}, please checkout submodules"
-        )
-      endif()
-
-      message(clipp "${CMAKE_CURRENT_LIST_DIR}/../submodules/clipp/CMakeLists.txt")
-
-      if(NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/../submodules/clipp/CMakeLists.txt"
-        OR NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/../submodules/fmt/CMakeLists.txt")
-        message(
-          FATAL_ERROR
-          "The submodules were not downloaded! failed. Please update submodules and try again."
-        )
-      endif()
-    endif()
   endif()
 
   # ############################################################################
@@ -195,26 +147,13 @@ if(NOT DEPENDANCIES_LOADED)
         set(WARNING_FLAG /W${WARNING_LEVEL} /WX-)
       endif(WARNINGS_AS_ERRORS)
 
-      set(DEFAULT_LOG_LEVEL "spdlog::level::info")
-
-      if(RPC_USE_LOGGING)
-        set(USE_RPC_LOGGING_FLAG RPC_USE_LOGGING)
-      else()
-        set(USE_RPC_LOGGING_FLAG)
-      endif()
-
-      cmake_path(SET TEMP_DIR NORMALIZE "c:/temp/")
-      cmake_path(SET RUNTIME_DIR NORMALIZE "c:/Secretarium/Runtime/")
       set(SHARED_DEFINES
         ENCLAVE_STATUS=sgx_status_t
         ENCLAVE_OK=SGX_SUCCESS
         _LIB
         NOMINMAX
-        DEFAULT_LOG_LEVEL=${DEFAULT_LOG_LEVEL}
         ${BUILD_TEST_FLAG}
-        TEMP_DIR="${TEMP_DIR}"
-        RUNTIME_DIR="${RUNTIME_DIR}"
-        ${USE_RPC_LOGGING_FLAG}
+        ${RPC_USE_LOGGING_FLAG}
         ${RPC_BUILD_SGX_FLAG})
       set(SHARED_HOST_DEFINES ${SHARED_DEFINES} WIN32 _WINDOWS)
       set(SHARED_ENCLAVE_DEFINES ${SHARED_DEFINES} _IN_ENCLAVE)
@@ -348,8 +287,6 @@ if(NOT DEPENDANCIES_LOADED)
       # *include_directories(BEFORE SYSTEM "/usr/lib/llvm-10/include/c++/v1")
 
       # *set(DESTDIR ${CMAKE_BINARY_DIR}/tmp)
-      cmake_path(SET TEMP_DIR NORMALIZE "/tmp/")
-      cmake_path(SET RUNTIME_DIR NORMALIZE "/var/secretarium/runtime/")
 
       message("SGX_SDK_CONTAINS_DEBUG_INFORMATION is ${SGX_SDK_CONTAINS_DEBUG_INFORMATION}")
       set(SHARED_DEFINES
@@ -359,9 +296,7 @@ if(NOT DEPENDANCIES_LOADED)
         NOMINMAX
         DEFAULT_LOG_LEVEL=spdlog::level::info
         ${BUILD_TEST_FLAG}
-        ${RPC_BUILD_SGX_FLAG}
-        TEMP_DIR="${TEMP_DIR}"
-        RUNTIME_DIR="${RUNTIME_DIR}")
+        ${RPC_BUILD_SGX_FLAG})
 
       if(${BUILD_TYPE} STREQUAL "release")
         if(${SGX_MODE} STREQUAL "release")
@@ -460,26 +395,39 @@ if(NOT DEPENDANCIES_LOADED)
       ${ENCLAVE_LIBC_INCLUDES} ${SGX_LIBCXX_INCLUDE_DIR}
       ${SGX_LIBSTDCXX_INCLUDE_DIR})
 
-    set(HOST_LIBRARIES ${SHARED_HOST_LIBRARIES} sgx_tcrypto_host
+    set(HOST_LIBRARIES ${SHARED_HOST_LIBRARIES} sgx_tcrypto
       ${SGX_USVC_LIB} sgx_capable ${SGX_URTS_LIB})
+
+  else()
+    if(WIN32) # Windows
+      set(WARNING_LEVEL 3)
+      set(WARNINGS_AS_ERRORS ON)
+
+      if(WARNINGS_AS_ERRORS)
+        set(WARNING_FLAG /W${WARNING_LEVEL} /WX)
+      else(WARNINGS_AS_ERRORS)
+        set(WARNING_FLAG /W${WARNING_LEVEL} /WX-)
+      endif(WARNINGS_AS_ERRORS)
+
+      set(SHARED_DEFINES
+        ${BUILD_TEST_FLAG}
+        ${RPC_USE_LOGGING_FLAG}
+        ${RPC_BUILD_SGX_FLAG})
+
+      set(SHARED_COMPILE_OPTIONS
+        ${WARNING_FLAG}
+        /bigobj
+      )
+
+      set(SHARED_HOST_COMPILE_OPTIONS ${SHARED_COMPILE_OPTIONS})
+
+      set(SHARED_ENCLAVE_COMPILE_OPTIONS ${SHARED_COMPILE_OPTIONS} )
+
+      set(SHARED_ENCLAVE_LINK_OPTIONS ${LINK_OPTIONS})
+      set(SHARED_HOST_LINK_OPTIONS ${LINK_OPTIONS})
+    else()
+    endif()
   endif()
-
-  message("HOST_DEFINES ${HOST_DEFINES}")
-  message("HOST_COMPILE_OPTIONS ${HOST_COMPILE_OPTIONS}")
-  message("HOST_LINK_OPTIONS ${HOST_LINK_OPTIONS}")
-  message("HOST_LINK_EXE_OPTIONS ${HOST_LINK_EXE_OPTIONS}")
-
-  message("ENCLAVE_DEFINES ${ENCLAVE_DEFINES}")
-  message("ENCLAVE_COMPILE_OPTIONS ${ENCLAVE_COMPILE_OPTIONS}")
-  message("ENCLAVE_LINK_OPTIONS ${ENCLAVE_LINK_OPTIONS}")
-
-  # ############################################################################
-  # this gets rid of the 'd' suffix to file names needed to prevent confusion
-  # with the enclave measurement logic, it will be nice to remove this
-  # limitation
-  set(CMAKE_DEBUG_POSTFIX
-    ""
-    CACHE STRING "Adds a postfix for debug-built libraries." FORCE)
 
   # ############################################################################
   # enable testing

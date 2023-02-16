@@ -38,6 +38,7 @@ if(${RPC_BUILD_SGX})
   set(ENCLAVE_SERVICE_PROXY src/enclave_service_proxy.cpp)
 endif()
 
+if(${RPC_BUILD_SGX})
 add_library(common_host STATIC
   ${ENCLAVE_SERVICE_PROXY}
   include/common/enclave_service_proxy.h
@@ -63,11 +64,40 @@ endif()
 
 target_link_libraries(common_host
   PUBLIC
-  ${MARSHAL_TEST_EDL_HOST}
+  marshal_test_edl_host
   example_interface
 
   rpc::marshaller_host
   yas_common
 )
+else()
+add_library(common_host INTERFACE
+  include/common/enclave_service_proxy.h
+  include/common/foo_impl.h
+  include/common/host_service_proxy.h
+  include/common/tests.h
+)
+
+target_compile_definitions(common_host INTERFACE ${HOST_DEFINES})
+target_include_directories(common_host
+  INTERFACE
+  "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+  "$<INSTALL_INTERFACE:include/marshalled_tests>"
+  ${HOST_INCLUDES})
+
+target_compile_options(common_host INTERFACE ${HOST_COMPILE_OPTIONS})
+target_link_options(common_host INTERFACE ${HOST_LINK_OPTIONS})
+
+target_link_libraries(common_host
+INTERFACE
+  example_interface
+
+  rpc::marshaller_host
+  yas_common
+)
+
+endif()
+
+
 
 set_property(TARGET common_host PROPERTY COMPILE_PDB_NAME common_host)
