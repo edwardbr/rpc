@@ -11,7 +11,7 @@ In other words you can easily make an API that is accessible from another machin
 ### A bit of history
 RPC has been around for decades targeting mainly the C programming language and was very popular in the 80's and 90's. The technology reached its zenith with the arrival of (D)COM from Microsoft and CORBA from a consortium of other companies.  Unfortunately both organizations hated each other and with their closed source attitudes people fell out of love with them in favour with XMLRPC, SOAP and REST as the new sexy kids on the block.  
 
-RPC though is a valuable solution for all solutions, however historically it did not offer direct answers for working over insecure networks, partly because of the short sighted intransigence and secrecy of various organizations.  People are coming off from some of these aging fads and are returning to higher performance solutions such as this.
+RPC though is a valuable solution for all solutions, however historically it did not offer direct answers for working over insecure networks, partly because of the short sighted intransigence and secrecy of various organizations.  People are coming off from some of the other aging fads and are returning to higher performance solutions such as this.
 
 ### Yes but what are they?
 RPC calls are function calls that pretend to run code locally, when in fact the calls are serialized up and sent to a different location such as a remote machine, where the parameters are unpacked and the function call is made.  The return values are then sent back in a similar manner back to the caller, with the caller potentially unaware that the call was made on a remote location.
