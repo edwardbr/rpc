@@ -39,7 +39,7 @@ extern "C" {
 #ifdef _IN_ENCLAVE
 sgx_status_t __cdecl log_str(const char* str, size_t sz);
 #else
-void __cdecl log_str(const char* str, size_t sz);
+void log_str(const char* str, size_t sz);
 #endif
 }
 
