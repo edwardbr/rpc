@@ -2,7 +2,13 @@ cmake_minimum_required(VERSION 3.0.0)
 
 project(rpc VERSION 1.0.0)
 
+  # ############################################################################
+  # settings
 option(RPC_STANDALONE "build the rpc on its own and not part of another repo" ON)
+option(RPC_BUILD_SGX "build enclave code" OFF)
+option(RPC_BUILD_TEST "build test code" ON)
+option(RPC_USE_LOGGING "turn on rpc logging" OFF)
+option(FORCE_DEBUG_INFORMATION "force inclusion of debug information" OFF)
 
 if(RPC_STANDALONE)
     find_package(Git QUIET)

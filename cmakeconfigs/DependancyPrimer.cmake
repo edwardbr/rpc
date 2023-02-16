@@ -5,12 +5,6 @@ if(NOT DEPENDANCIES_LOADED)
   # if this is loaded in a parent module then dont do this
   set(DEPENDANCIES_LOADED ON)
 
-  # ############################################################################
-  # settings
-  option(RPC_BUILD_SGX "build enclave code" OFF)
-  option(RPC_BUILD_TEST "build test code" ON)
-  option(RPC_USE_LOGGING "turn on rpc logging" OFF)
-  option(FORCE_DEBUG_INFORMATION "force inclusion of debug information" OFF)
 
   message("BUILD_TYPE ${BUILD_TYPE}")
   message("CMAKE_BUILD_TYPE ${CMAKE_BUILD_TYPE}")
