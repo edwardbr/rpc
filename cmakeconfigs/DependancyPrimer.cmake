@@ -205,13 +205,11 @@ if(NOT DEPENDANCIES_LOADED)
           set(HOST_DEFINES 
             ${SHARED_HOST_DEFINES}
             NDEBUG
-            PREVENT_DEBUG_ENCLAVE  # what is this?
           )
         else()
           set(HOST_DEFINES 
             ${SHARED_HOST_DEFINES}
             NDEBUG
-            PREVENT_DEBUG_ENCLAVE  # what is this?
             EDEBUG # sets SGX_DEBUG_FLAG to 1
           )
         endif()
