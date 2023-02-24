@@ -59,7 +59,7 @@ int main(const int argc, char* argv[])
 {
     try
     {
-
+        std::string module_name;
         string rootIdl;
         string headerPath;
         string proxyPath;
@@ -83,6 +83,7 @@ int main(const int argc, char* argv[])
 			clipp::required("-s", "--stub").doc("the generated stub relative filename") & clipp::value("stub",stubPath),
             clipp::parameter("-t", "--stub_header").doc("the generated stub header relative filename") & clipp::value("stub_header",stubHeaderPath),
 			clipp::option("-m", "--mock").doc("the generated mock relative filename") & clipp::value("mock",mockPath),
+			clipp::option("-M", "--module_name").doc("the name given to the stub_factory") & clipp::value("module_name",module_name),
 			clipp::repeatable(clipp::option("-p", "--path") & clipp::value("path",include_paths)).doc("locations of include files used by the idl"),
 			clipp::option("-n","--namespace").doc("namespace of the generated interface") & clipp::value("namespace",namespaces),
 			clipp::option("-d","--dump_preprocessor_output_and_die").set(dump_preprocessor_output_and_die).doc("dump preprocessor output and die"),
@@ -241,7 +242,7 @@ int main(const int argc, char* argv[])
 
         // do the generation to the ostrstreams
         {
-            enclave_marshaller::synchronous_generator::write_files(true, *objects, header_stream, proxy_stream,
+            enclave_marshaller::synchronous_generator::write_files(module_name, true, *objects, header_stream, proxy_stream,
                                                                    proxy_header_stream, stub_stream, stub_header_stream, 
                                                                    namespaces, headerPath, proxyHeaderPath, stubHeaderPath, imports);
 

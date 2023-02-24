@@ -82,7 +82,7 @@ namespace rpc
             rpc::shared_ptr<i_interface_stub> new_stub;
             rpc::shared_ptr<i_interface_stub> stub = stub_map.begin()->second;
             ret = stub->cast(interface_id, new_stub);
-            if (ret == rpc::error::OK())
+            if (ret == rpc::error::OK() && new_stub)
             {
                 add_interface(new_stub);
             }

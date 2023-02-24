@@ -13,10 +13,10 @@ if(${BUILD_ENCLAVE})
   HEADER_ONLY_LIBS
 
   TRUSTED_LIBS
-    marshaller_enclave
+    rpc_enclave
     marshal_test_edl_enclave    
     common_enclave
-    example_interface
+    example_interface_enclave
 
     yas_common
     ${SGX_ENCLAVE_LIBS}

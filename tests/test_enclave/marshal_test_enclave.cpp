@@ -13,14 +13,6 @@
 
 #include <example/example.h>
 
-#include <example_shared_proxy.cpp>
-#include <example_shared_stub.cpp>
-
-#include <example_import_proxy.cpp>
-#include <example_import_stub.cpp>
-
-#include <example_proxy.cpp>
-#include <example_stub.cpp>
 #include <rpc/remote_pointer.h>
 
 using namespace marshalled_tests;
@@ -136,6 +128,9 @@ int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t host_id, uint64_t 
 {
     //create a rpc::zone service for the enclave
     rpc_server = rpc::make_shared<rpc::child_service>(rpc::zone{child_zone_id}); 
+    marshalled_tests::example_import_register_stubs(rpc_server);
+    marshalled_tests::example_shared_register_stubs(rpc_server);
+    marshalled_tests::example_interface_register_stubs(rpc_server);
     const rpc::i_telemetry_service* p_telemetry_service = &telemetry_service;
 
     rpc::shared_ptr<yyy::i_host> host;

@@ -6,6 +6,10 @@
 #include <rpc/i_telemetry_service.h>
 #include <rpc/basic_service_proxies.h>
 
+#include <example_shared_stub.cpp.h>
+#include <example_import_stub.cpp.h>
+#include <example_stub.cpp.h>
+
 void log(const std::string& data)
 {
     log_str(data.data(), data.size() + 1);
@@ -377,6 +381,10 @@ namespace marshalled_tests
         {
             auto this_service = this_service_.lock();
             auto child_service = rpc::make_shared<rpc::child_service>(rpc::zone{new_zone_id});
+            marshalled_tests::example_import_register_stubs(child_service);
+            marshalled_tests::example_shared_register_stubs(child_service);
+            marshalled_tests::example_interface_register_stubs(child_service);
+
             auto service_proxy_to_child = rpc::local_child_service_proxy::create(child_service, this_service, telemetry_);
 
             // create the example object implementation with a recursive chain of services

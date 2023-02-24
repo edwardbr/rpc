@@ -21,9 +21,9 @@ target_link_libraries(rpc_test
   PUBLIC 
     marshal_test_edl_host
     common_host
-    example_interface
+    example_interface_host
     
-    rpc::marshaller_host 
+    rpc::rpc_host 
     yas_common    
     fmt::fmt-header-only
     GTest::gtest_main

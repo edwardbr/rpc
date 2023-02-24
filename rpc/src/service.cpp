@@ -692,6 +692,42 @@ namespace rpc
         }
     }
 
+    int service::create_interface_stub(rpc::interface_ordinal interface_id, rpc::interface_ordinal original_interface_id, const rpc::shared_ptr<rpc::i_interface_stub>& original, rpc::shared_ptr<rpc::i_interface_stub>& new_stub)
+    {
+        //an identity check, send back the same pointer
+        if(interface_id == original_interface_id)
+        {
+            new_stub = rpc::static_pointer_cast<rpc::i_interface_stub>(original);
+            return rpc::error::OK();
+        }
+
+        auto it = stub_factories.find(interface_id);
+        if(it == stub_factories.end())
+        {
+            return rpc::error::INVALID_CAST();
+        }
+
+        new_stub = it->second(original);
+        if(!new_stub)
+        {
+            return rpc::error::INVALID_CAST();
+        }
+        //note a nullptr return value is a valid value, it indicates that this object does not implement that interface
+        return rpc::error::OK();
+    }
+
+    //note this function is not thread safe!  Use it before using the service class for normal operation
+    int service::add_interface_stub_factory(rpc::interface_ordinal interface_id, std::function<rpc::shared_ptr<rpc::i_interface_stub>(const rpc::shared_ptr<rpc::i_interface_stub>&)> factory)
+    {
+        auto it = stub_factories.find(interface_id);
+        if(it != stub_factories.end())
+        {
+            rpc::error::INVALID_DATA();
+        }
+        stub_factories.emplace(interface_id, std::move(factory));
+        return rpc::error::OK();
+    }
+
     rpc::shared_ptr<casting_interface> service::get_castable_interface(object object_id, interface_ordinal interface_id)
     {
         auto ob = get_object(object_id).lock();
