@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.12)
 
-EnclaveMarshaller(
+RPCGenerate(
     example_shared
     example_shared.idl
     ${CMAKE_CURRENT_SOURCE_DIR}
@@ -16,7 +16,7 @@ EnclaveMarshaller(
         ${CMAKE_SOURCE_DIR}/submodules/idlparser/defines
     )    
 
-EnclaveMarshaller(
+RPCGenerate(
     example_import
     example_import.idl
     ${CMAKE_CURRENT_SOURCE_DIR}
@@ -33,7 +33,7 @@ EnclaveMarshaller(
         ${CMAKE_SOURCE_DIR}/submodules/idlparser/defines
     )
 
-EnclaveMarshaller(
+RPCGenerate(
     example_interface
     example_interface.idl
     ${CMAKE_CURRENT_SOURCE_DIR}

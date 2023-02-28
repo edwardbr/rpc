@@ -27,7 +27,7 @@ target_include_directories(rpc_enclave
     PRIVATE 
         ${ENCLAVE_LIBCXX_INCLUDES})
 target_link_libraries(rpc_enclave 
-    PUBLIC 
+    PRIVATE 
     yas_common)
 target_link_options(rpc_enclave PRIVATE ${ENCLAVE_LINK_OPTIONS})
 
@@ -65,7 +65,6 @@ target_include_directories(rpc_host
 target_link_libraries(rpc_host 
     PRIVATE        
         yas_common
-    PUBLIC 
         ${HOST_LIBRARIES})
 
 target_compile_options(rpc_host PRIVATE ${HOST_COMPILE_OPTIONS})

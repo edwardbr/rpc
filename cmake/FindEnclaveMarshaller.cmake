@@ -1,4 +1,4 @@
-function(EnclaveMarshaller
+function(RPCGenerate
   name
   idl
   base_dir
@@ -11,11 +11,12 @@ function(EnclaveMarshaller
   # multivalue expects string "dependencies"
   # multivalue expects string "include_paths"
   # multivalue expects string "defines"
+  # multivalue expects string "additional_headers"
   # optional_val mock
 )
   set(options)
   set(singleValueArgs mock)
-  set(multiValueArgs dependencies include_paths defines)
+  set(multiValueArgs dependencies include_paths defines additional_headers)
 
   # split out multivalue variables
   cmake_parse_arguments("params" "${options}" "${singleValueArgs}" "${multiValueArgs}" ${ARGN})
@@ -29,7 +30,7 @@ function(EnclaveMarshaller
   set(full_stub_path ${output_path}/src/${stub})
 
   if(${DEBUG_RPC_GEN})
-    message("EnclaveMarshaller name ${name}")
+    message("RPCGenerate name ${name}")
     message("idl ${idl}")
     message("base_dir ${base_dir}")
     message("output_path ${output_path}")
@@ -38,6 +39,7 @@ function(EnclaveMarshaller
     message("stub ${stub}")
     message("namespace ${namespace}")
     message("dependencies ${params_dependencies}")
+    message("additional_headers ${params_additional_headers}")
     message("paths ${params_include_paths}")
     message("defines ${params_defines}")
     message("mock ${params_mock}")
@@ -55,6 +57,7 @@ function(EnclaveMarshaller
   endif()
 
   set(PATHS_PARAMS "")
+  set(ADDITIONAL_HEADERS "")
 
   foreach(path ${params_include_paths})
     set(PATHS_PARAMS ${PATHS_PARAMS} --path "${path}")
@@ -64,14 +67,27 @@ function(EnclaveMarshaller
     set(PATHS_PARAMS ${PATHS_PARAMS} -D "${define}")
   endforeach()
 
+  foreach(additional_headers ${params_additional_headers})
+    set(ADDITIONAL_HEADERS ${ADDITIONAL_HEADERS} --additional_headers "${additional_headers}")
+  endforeach()
+
+  message(ADDITIONAL_HEADERS ${ADDITIONAL_HEADERS})
+
   foreach(dep ${params_dependencies})
+    message("dep ${dep}")
     get_target_property(dep_base_dir ${dep}_generate base_dir)
+    message("dep_base_dir ${dep_base_dir}")
 
     if(dep_base_dir)
       set(PATHS_PARAMS ${PATHS_PARAMS} --path "${dep_base_dir}")
     endif()
-    set(GENERATED_DEPENDANCIES ${GENERATED_DEPENDANCIES} ${dep}_generate)
+    if(BUILD_ENCLAVE)
+      set(GENERATED_DEPENDANCIES ${GENERATED_DEPENDANCIES} ${dep}_generate)
+    else()
+      set(GENERATED_DEPENDANCIES ${GENERATED_DEPENDANCIES} ${dep} ${dep}_generate)
+    endif()
   endforeach()
+  message("PATHS_PARAMS ${PATHS_PARAMS}")
 
   if(NOT ${namespace} STREQUAL "")
     set(PATHS_PARAMS ${PATHS_PARAMS} --namespace "${namespace}")
@@ -92,6 +108,7 @@ function(EnclaveMarshaller
       --proxy ${proxy}
       --stub ${stub}
       ${PATHS_PARAMS}
+      ${ADDITIONAL_HEADERS}
     MAIN_DEPENDENCY ${idl}
     IMPLICIT_DEPENDS ${idl}
     DEPENDS ${GENERATED_DEPENDANCIES}
@@ -122,6 +139,7 @@ function(EnclaveMarshaller
     --proxy ${proxy}
     --stub ${stub}
     ${PATHS_PARAMS}
+    ${ADDITIONAL_HEADERS}
     MAIN_DEPENDENCY ${idl}
     IMPLICIT_DEPENDS ${idl}
     DEPENDS ${GENERATED_DEPENDANCIES}
@@ -172,7 +190,7 @@ function(EnclaveMarshaller
       ${full_proxy_path}
     )
     target_compile_definitions(${name}_host PRIVATE ${HOST_DEFINES})
-    target_include_directories(${name}_host PUBLIC "$<BUILD_INTERFACE:${output_path}>" "$<BUILD_INTERFACE:${output_path}/include>")
+    target_include_directories(${name}_host PUBLIC "$<BUILD_INTERFACE:${output_path}>" "$<BUILD_INTERFACE:${output_path}/include>" PRIVATE ${HOST_INCLUDES})
     target_compile_options(${name}_host PRIVATE ${HOST_COMPILE_OPTIONS})
     target_link_directories(${name}_host PUBLIC ${SGX_LIBRARY_PATH})
     set_property(TARGET ${name}_host PROPERTY COMPILE_PDB_NAME ${name}_host)
@@ -186,7 +204,7 @@ function(EnclaveMarshaller
 
     foreach(dep ${params_dependencies})
       add_dependencies(${name}_host ${dep}_generate)
-      target_link_libraries(${name}_host PUBLIC ${dep}_host)
+      target_link_libraries(${name}_host PRIVATE ${dep}_host)
     endforeach()
 
     # #and an enclave specific target
@@ -212,7 +230,7 @@ function(EnclaveMarshaller
 
     foreach(dep ${params_dependencies})
       add_dependencies(${name}_enclave ${dep}_generate)
-      target_link_libraries(${name}_enclave PUBLIC ${dep}_enclave)
+      target_link_libraries(${name}_enclave PRIVATE ${dep}_enclave)
     endforeach()
   endif()
 endfunction()

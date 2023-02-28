@@ -25,7 +25,7 @@ if(${BUILD_ENCLAVE})
   
   
    target_link_libraries(common_enclave 
-   PUBLIC
+   PRIVATE
      rpc_enclave
      marshal_test_edl_enclave
      example_interface_enclave
@@ -57,7 +57,7 @@ endif()
 
 
  target_link_libraries(common_host 
- PUBLIC
+ PRIVATE
    marshal_test_edl_host
    example_interface_host
 

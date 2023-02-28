@@ -72,6 +72,7 @@ int main(const int argc, char* argv[])
         std::vector<std::string> include_paths;
         std::vector<std::string> defines;
         std::vector<std::string> wrong_elements;
+        std::vector<std::string> additional_headers;
         bool dump_preprocessor_output_and_die = false;
 
         auto cli = (
@@ -88,6 +89,7 @@ int main(const int argc, char* argv[])
 			clipp::option("-n","--namespace").doc("namespace of the generated interface") & clipp::value("namespace",namespaces),
 			clipp::option("-d","--dump_preprocessor_output_and_die").set(dump_preprocessor_output_and_die).doc("dump preprocessor output and die"),
 			clipp::repeatable(clipp::option("-D") & clipp::value("define",defines)).doc("macro define"),
+			clipp::repeatable(clipp::option("-H", "--additional_headers") & clipp::value("additional_headers",additional_headers)).doc("additional header to be added to the idl generated header"),
 			clipp::any_other(wrong_elements)
 		);
 
@@ -244,7 +246,7 @@ int main(const int argc, char* argv[])
         {
             enclave_marshaller::synchronous_generator::write_files(module_name, true, *objects, header_stream, proxy_stream,
                                                                    proxy_header_stream, stub_stream, stub_header_stream, 
-                                                                   namespaces, headerPath, proxyHeaderPath, stubHeaderPath, imports);
+                                                                   namespaces, headerPath, proxyHeaderPath, stubHeaderPath, imports, additional_headers);
 
             header_stream << ends;
             proxy_stream << ends;
