@@ -213,7 +213,11 @@ namespace enclave_marshaller
                 if (cls->get_type() == entity_type::NAMESPACE)
                 {
 
-                    header("namespace {}", cls->get_name());
+                    bool is_inline = cls->get_attribute("inline") == "inline";
+                    if(is_inline)
+                        header("inline namespace {}", cls->get_name());
+                    else
+                        header("namespace {}", cls->get_name());
                     header("{{");
 
                     write_namespace(from_host, *cls, id, header);

@@ -16,7 +16,9 @@ if(${BUILD_ENCLAVE})
     rpc_enclave
     marshal_test_edl_enclave    
     common_enclave
+    example_import_enclave
     example_interface_enclave
+    example_shared_enclave
 
     yas_common
     ${SGX_ENCLAVE_LIBS}
