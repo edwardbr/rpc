@@ -24,5 +24,6 @@ namespace rpc
         void set_OK_val(int val);
         void set_offset_val(int val);
         void set_offset_val_is_negative(bool val);
+        const char* to_string(int);
     };
 }

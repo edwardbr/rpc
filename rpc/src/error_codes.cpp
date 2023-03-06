@@ -29,5 +29,23 @@ namespace rpc
         void set_OK_val(int val){OK_val = val;}
         void set_offset_val(int val){offset_val = val;}
         void set_offset_val_is_negative(bool val){offset_val_is_negative = val;}
+
+        const char* to_string(int err)
+        {
+            if(err == OUT_OF_MEMORY()){return " out of memory";}
+            if(err == NEED_MORE_MEMORY()){return " need more memory";}
+            if(err == SECURITY_ERROR()){return " security error";}
+            if(err == INVALID_DATA()){return " invalid data";}
+            if(err == TRANSPORT_ERROR()){return " transport error";}
+            if(err == INVALID_METHOD_ID()){return " invalid method id";}
+            if(err == INVALID_INTERFACE_ID()){return " invalid interface id";}
+            if(err == INVALID_CAST()){return " invalid cast";}
+            if(err == ZONE_NOT_SUPPORTED()){return " zone not supported";}
+            if(err == ZONE_NOT_INITIALISED()){return " zone not initialised";}
+            if(err == ZONE_NOT_FOUND()){return " zone not found";}
+            if(err == OBJECT_NOT_FOUND()){return " object not found";}
+            if(err == INVALID_VERSION()){return " invalid version";}
+            return " invalid error code";
+        }
     };
 }
