@@ -19,6 +19,7 @@ namespace rpc
         int ZONE_NOT_FOUND();
         int OBJECT_NOT_FOUND();
         int INVALID_VERSION();
+        int EXCEPTION();
         int MAX();//the biggest value
 
         void set_OK_val(int val);

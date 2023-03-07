@@ -21,10 +21,11 @@ namespace rpc
         int ZONE_NOT_INITIALISED(){return offset_val + (offset_val_is_negative ? - 10 : 10);}
         int ZONE_NOT_FOUND(){return offset_val + (offset_val_is_negative ? - 11 : 11);}
         int OBJECT_NOT_FOUND(){return offset_val + (offset_val_is_negative ? - 12 : 12);}
-        int INVALID_VERSION(){return offset_val + (offset_val_is_negative ? - 13 : 13);}//dont forget to update MIN & MAX if new values
+        int INVALID_VERSION(){return offset_val + (offset_val_is_negative ? - 13 : 13);}
+        int EXCEPTION(){return offset_val + (offset_val_is_negative ? - 14 : 14);}//dont forget to update MIN & MAX if new values
 
-        int MIN(){return offset_val + (offset_val_is_negative ? -13 : 1);}
-        int MAX(){return offset_val + (offset_val_is_negative ? -1 : 13);}
+        int MIN(){return offset_val + (offset_val_is_negative ? -14 : 1);}
+        int MAX(){return offset_val + (offset_val_is_negative ? -1 : 14);}
 
         void set_OK_val(int val){OK_val = val;}
         void set_offset_val(int val){offset_val = val;}
@@ -45,6 +46,7 @@ namespace rpc
             if(err == ZONE_NOT_FOUND()){return " zone not found";}
             if(err == OBJECT_NOT_FOUND()){return " object not found";}
             if(err == INVALID_VERSION()){return " invalid version";}
+            if(err == EXCEPTION()){return " exception";}
             return " invalid error code";
         }
     };

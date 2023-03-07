@@ -804,6 +804,9 @@ namespace enclave_marshaller
                     stub("//STUB_PARAM_CAST");
                     stub("if(__rpc_ret == rpc::error::OK())");
                     stub("{{");
+					stub("try");
+					stub("{{");
+
                     stub.print_tabs();
                     stub.raw("__rpc_ret = __rpc_target_->{}(", function.get_name());
 
@@ -826,6 +829,11 @@ namespace enclave_marshaller
                         }
                     }
                     stub.raw(");\n");
+					stub("}}");
+					stub("catch(...)");
+					stub("{{");
+					stub("__rpc_ret = rpc::error::EXCEPTION();");
+					stub("}}");
                     stub("}}");
 
                     {
