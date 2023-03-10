@@ -22,10 +22,12 @@ namespace rpc
         int ZONE_NOT_FOUND(){return offset_val + (offset_val_is_negative ? - 11 : 11);}
         int OBJECT_NOT_FOUND(){return offset_val + (offset_val_is_negative ? - 12 : 12);}
         int INVALID_VERSION(){return offset_val + (offset_val_is_negative ? - 13 : 13);}
-        int EXCEPTION(){return offset_val + (offset_val_is_negative ? - 14 : 14);}//dont forget to update MIN & MAX if new values
+        int EXCEPTION(){return offset_val + (offset_val_is_negative ? - 14 : 14);}
+        int PROXY_DESERIALISATION_ERROR(){return offset_val + (offset_val_is_negative ? - 15 : 15);}
+        int STUB_DESERIALISATION_ERROR(){return offset_val + (offset_val_is_negative ? - 16 : 16);}//dont forget to update MIN & MAX if new values
 
-        int MIN(){return offset_val + (offset_val_is_negative ? -14 : 1);}
-        int MAX(){return offset_val + (offset_val_is_negative ? -1 : 14);}
+        int MIN(){return offset_val + (offset_val_is_negative ? -16 : 1);}
+        int MAX(){return offset_val + (offset_val_is_negative ? -1 : 16);}
 
         void set_OK_val(int val){OK_val = val;}
         void set_offset_val(int val){offset_val = val;}

@@ -20,6 +20,8 @@ namespace rpc
         int OBJECT_NOT_FOUND();
         int INVALID_VERSION();
         int EXCEPTION();
+        int PROXY_DESERIALISATION_ERROR();
+        int STUB_DESERIALISATION_ERROR();
         int MAX();//the biggest value
 
         void set_OK_val(int val);
