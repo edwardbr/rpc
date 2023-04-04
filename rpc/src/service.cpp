@@ -139,7 +139,17 @@ namespace rpc
             {
                 return rpc::error::INVALID_DATA();
             }
-            return stub->call(caller_channel_zone_id, caller_zone_id, interface_id, method_id, in_size_, in_buf_, out_buf_);
+            std::for_each(service_loggers.begin(), service_loggers.end(), [&](const std::shared_ptr<service_logger>& logger){
+                logger->before_send(caller_zone_id, object_id, interface_id, method_id, in_size_, in_buf_ ? in_buf_ : "");
+            });
+
+            auto ret = stub->call(caller_channel_zone_id, caller_zone_id, interface_id, method_id, in_size_, in_buf_, out_buf_);
+
+            std::for_each(service_loggers.begin(), service_loggers.end(), [&](const std::shared_ptr<service_logger>& logger){
+                logger->after_send(caller_zone_id, object_id, interface_id, method_id, ret, out_buf_);
+            });
+
+            return ret;
         }
     }
 

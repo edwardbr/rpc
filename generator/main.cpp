@@ -68,6 +68,7 @@ int main(const int argc, char* argv[])
         string stubHeaderPath;
         string mockPath;
         string output_path;
+        string serialisation_format = "yas::binary";
         std::vector<std::string> namespaces;
         std::vector<std::string> include_paths;
         std::vector<std::string> defines;
@@ -81,6 +82,7 @@ int main(const int argc, char* argv[])
 			clipp::required("-x", "--proxy").doc("the generated proxy relative filename") & clipp::value("proxy",proxyPath),
             clipp::parameter("-y", "--proxy_header").doc("the generated proxy header relative filename") & clipp::value("proxy_header",proxyHeaderPath),
 			clipp::required("-s", "--stub").doc("the generated stub relative filename") & clipp::value("stub",stubPath),
+			clipp::required("-S", "--serialisation_format").doc("the format of serialisation") & clipp::value("serialisation_format", serialisation_format),
             clipp::parameter("-t", "--stub_header").doc("the generated stub header relative filename") & clipp::value("stub_header",stubHeaderPath),
 			clipp::option("-m", "--mock").doc("the generated mock relative filename") & clipp::value("mock",mockPath),
 			clipp::repeatable(clipp::option("-p", "--path") & clipp::value("path",include_paths)).doc("locations of include files used by the idl"),
@@ -243,7 +245,7 @@ int main(const int argc, char* argv[])
         {
             enclave_marshaller::synchronous_generator::write_files(true, *objects, header_stream, proxy_stream,
                                                                    proxy_header_stream, stub_stream, stub_header_stream, 
-                                                                   namespaces, headerPath, proxyHeaderPath, stubHeaderPath, imports);
+                                                                   namespaces, headerPath, proxyHeaderPath, stubHeaderPath, imports, serialisation_format);
 
             header_stream << ends;
             proxy_stream << ends;

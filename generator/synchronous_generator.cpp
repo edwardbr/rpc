@@ -550,8 +550,18 @@ namespace enclave_marshaller
         }
 
         void write_interface(bool from_host, const class_entity& m_ob, writer& header, writer& proxy, writer& stub,
-                             size_t id)
+                             size_t id, const std::string& serialisation_format)
         {
+            std::string oarchive_type = "binary_oarchive";
+            if(serialisation_format.find("yas::json") != std::string::npos)
+            {
+                oarchive_type = "json_oarchive";
+            }
+            else if(serialisation_format.find("yas::text") != std::string::npos)
+            {
+                oarchive_type = "text_oarchive";
+            }
+
             auto interface_name = std::string(m_ob.get_type() == entity_type::LIBRARY ? "i_" : "") + m_ob.get_name();
 
             std::string base_class_declaration;
@@ -736,7 +746,7 @@ namespace enclave_marshaller
                         stub("yas::intrusive_buffer in(in_buf_, in_size_);");
                         stub("try");
                         stub("{{");
-                        stub("yas::load<yas::mem|yas::binary|yas::no_header>(in, YAS_OBJECT_NVP(");
+                        stub("yas::load<yas::mem|{}|yas::no_header>(in, YAS_OBJECT_NVP(", serialisation_format);
                         stub("  \"in\"");
                         stub("  ,(\"__rpc_version\", __rpc_version)");
 					  
@@ -770,11 +780,11 @@ namespace enclave_marshaller
                         }
                         proxy("  );");
                         proxy("yas::count_ostream __rpc_counter;");
-                        proxy("yas::binary_oarchive<yas::count_ostream, yas::mem|yas::binary|yas::no_header> __rpc_oa(__rpc_counter);");
+                        proxy("yas::{}<yas::count_ostream, yas::mem|{}|yas::no_header> __rpc_oa(__rpc_counter);", oarchive_type, serialisation_format);
                         proxy("__rpc_oa(__rpc_yas_mapping);");
                         proxy("__rpc_in_buf.resize(__rpc_counter.total_size);");
                         proxy("yas::mem_ostream __rpc_writer(__rpc_in_buf.data(), __rpc_counter.total_size);");
-                        proxy("yas::save<yas::mem|yas::binary|yas::no_header>(__rpc_writer, __rpc_yas_mapping);");
+                        proxy("yas::save<yas::mem|{}|yas::no_header>(__rpc_writer, __rpc_yas_mapping);", serialisation_format);
                         stub("  ));");
                         stub("}}");
                         stub("catch(...)");
@@ -905,8 +915,8 @@ namespace enclave_marshaller
                         proxy("//PROXY_MARSHALL_OUT");
                         proxy("try");
                         proxy("{{");
-                        proxy("yas::load<yas::mem|yas::binary|yas::no_header>(yas::intrusive_buffer{{__rpc_out_buf.data(), "
-                              "__rpc_out_buf.size()}}, YAS_OBJECT_NVP(");
+                        proxy("yas::load<yas::mem|{}|yas::no_header>(yas::intrusive_buffer{{__rpc_out_buf.data(), "
+                              "__rpc_out_buf.size()}}, YAS_OBJECT_NVP(", serialisation_format);
                         proxy("  \"out\"");
                         proxy("  ,(\"__return_value\", __rpc_ret)");
 
@@ -941,11 +951,11 @@ namespace enclave_marshaller
                     stub("  );");
 
                     stub("yas::count_ostream __rpc_counter;");
-                    stub("yas::binary_oarchive<yas::count_ostream, yas::mem|yas::binary|yas::no_header> __rpc_oa(__rpc_counter);");
+                    stub("yas::{}<yas::count_ostream, yas::mem|{}|yas::no_header> __rpc_oa(__rpc_counter);", oarchive_type, serialisation_format);
                     stub("__rpc_oa(__rpc_yas_mapping);");
                     stub("__rpc_out_buf.resize(__rpc_counter.total_size);");
                     stub("yas::mem_ostream __rpc_writer(__rpc_out_buf.data(), __rpc_counter.total_size);");
-                    stub("yas::save<yas::mem|yas::binary|yas::no_header>(__rpc_writer, __rpc_yas_mapping);");
+                    stub("yas::save<yas::mem|{}|yas::no_header>(__rpc_writer, __rpc_yas_mapping);", serialisation_format);
                     stub("return __rpc_ret;");
 
                     proxy("//PROXY_VALUE_RETURN");
@@ -1350,7 +1360,7 @@ namespace enclave_marshaller
         }
 
         void write_marshalling_logic_nested(bool from_host, const class_entity& cls, std::string prefix, writer& header,
-                                            writer& proxy, writer& stub)
+                                            writer& proxy, writer& stub, const std::string& serialisation_format)
         {
             if (cls.get_type() == entity_type::STRUCT)
                 write_struct(cls, header);
@@ -1360,10 +1370,10 @@ namespace enclave_marshaller
             std::size_t hash = std::hash<std::string> {}(prefix + "::" + cls.get_name());
 
             if (cls.get_type() == entity_type::INTERFACE)
-                write_interface(from_host, cls, header, proxy, stub, hash);
+                write_interface(from_host, cls, header, proxy, stub, hash, serialisation_format);
 
             if (cls.get_type() == entity_type::LIBRARY)
-                write_interface(from_host, cls, header, proxy, stub, hash);
+                write_interface(from_host, cls, header, proxy, stub, hash, serialisation_format);
         }
 
         void write_marshalling_logic(const class_entity& lib, std::string prefix, writer& header,
@@ -1442,7 +1452,7 @@ namespace enclave_marshaller
 
         // entry point
         void write_namespace(bool from_host, const class_entity& lib, std::string prefix, writer& header, writer& proxy,
-                             writer& stub)
+                             writer& stub, const std::string& serialisation_format)
         {
             for (auto cls : lib.get_classes())
             {
@@ -1468,7 +1478,7 @@ namespace enclave_marshaller
                     proxy("{{");
                     stub("{{");
 
-                    write_namespace(from_host, *cls, prefix + cls->get_name() + "::", header, proxy, stub);
+                    write_namespace(from_host, *cls, prefix + cls->get_name() + "::", header, proxy, stub, serialisation_format);
 
                     header("}}");
                     proxy("}}");
@@ -1476,7 +1486,7 @@ namespace enclave_marshaller
                 }
                 else
                 {
-                    write_marshalling_logic_nested(from_host, *cls, prefix, header, proxy, stub);
+                    write_marshalling_logic_nested(from_host, *cls, prefix, header, proxy, stub, serialisation_format);
                 }
             }
             write_marshalling_logic(lib, prefix, header, proxy, stub);
@@ -1577,7 +1587,7 @@ namespace enclave_marshaller
         void write_files(bool from_host, const class_entity& lib, std::ostream& hos, std::ostream& pos, std::ostream& phos,
                          std::ostream& sos, std::ostream& shos, const std::vector<std::string>& namespaces,
                          const std::string& header_filename, const std::string& proxy_header_filename, 
-                         const std::string& stub_header_filename, const std::list<std::string>& imports)
+                         const std::string& stub_header_filename, const std::list<std::string>& imports, const std::string& serialisation_format)
         {
             writer header(hos);
             writer proxy(pos);
@@ -1617,6 +1627,10 @@ namespace enclave_marshaller
             proxy_header("#include <yas/mem_streams.hpp>");
             proxy_header("#include <yas/binary_iarchive.hpp>");
             proxy_header("#include <yas/binary_oarchive.hpp>");
+            proxy_header("#include <yas/json_iarchive.hpp>");
+            proxy_header("#include <yas/json_oarchive.hpp>");
+            proxy_header("#include <yas/text_iarchive.hpp>");
+            proxy_header("#include <yas/text_oarchive.hpp>");
             proxy_header("#include <yas/std_types.hpp>");
             proxy_header("#include <yas/count_streams.hpp>");
             proxy_header("#include <rpc/proxy.h>");
@@ -1632,6 +1646,10 @@ namespace enclave_marshaller
             stub_header("#include <yas/mem_streams.hpp>");
             stub_header("#include <yas/binary_iarchive.hpp>");
             stub_header("#include <yas/binary_oarchive.hpp>");
+            stub_header("#include <yas/json_iarchive.hpp>");
+            stub_header("#include <yas/json_oarchive.hpp>");
+            stub_header("#include <yas/text_iarchive.hpp>");
+            stub_header("#include <yas/text_oarchive.hpp>");
             stub_header("#include <yas/count_streams.hpp>");
             stub_header("#include <yas/std_types.hpp>");
             stub_header("#include <rpc/stub.h>");
@@ -1664,7 +1682,7 @@ namespace enclave_marshaller
             
             write_stub_factory_lookup(lib, prefix, header, proxy, stub);
 
-            write_namespace(from_host, lib, prefix, header, proxy, stub);
+            write_namespace(from_host, lib, prefix, header, proxy, stub, serialisation_format);
 
             for (auto& ns : namespaces)
             {

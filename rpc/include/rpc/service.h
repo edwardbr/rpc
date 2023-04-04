@@ -3,6 +3,7 @@
 #include <string>
 #include <memory>
 #include <map>
+#include <list>
 #include <unordered_map>
 #include <mutex>
 #include <assert.h>
@@ -22,6 +23,14 @@ namespace rpc
     class service_proxy;
 
     const object dummy_object_id = {std::numeric_limits<uint64_t>::max()};
+
+    class service_logger
+    {
+    public:
+        virtual ~service_logger() = default;
+        virtual void before_send(caller_zone caller_zone_id, object object_id, interface_ordinal interface_id, method method_id, size_t in_size_, const char* in_buf_) = 0;
+        virtual void after_send(caller_zone caller_zone_id, object object_id, interface_ordinal interface_id, method method_id, int ret, const std::vector<char>& out_buf_) = 0;
+    };
     
     // responsible for all object lifetimes created within the zone
     class service : 
@@ -51,6 +60,7 @@ namespace rpc
         };
 
         std::map<zone_route, rpc::weak_ptr<service_proxy>> other_zones;
+        std::list<std::shared_ptr<service_logger>> service_loggers;
 
         // hard lock on the root object
         mutable std::mutex insert_control;
@@ -97,6 +107,12 @@ namespace rpc
         template<class T> rpc::shared_ptr<T> get_local_interface(object object_id)
         {
             return rpc::static_pointer_cast<T>(get_castable_interface(object_id, {T::id}));
+        }
+
+        //note this is not thread safe and should only be used on setup
+        void add_service_logger(const std::shared_ptr<service_logger>& logger)
+        {
+            service_loggers.push_back(logger);
         }
 
         friend service_proxy;

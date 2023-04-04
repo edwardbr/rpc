@@ -12,6 +12,7 @@ if(NOT DEPENDANCIES_LOADED)
   option(BUILD_DC_APPS "build dc apps" ON)
   option(BUILD_TEST "build test code" ON)
   option(BUILD_MEASUREMENT "measure enclave code" ON)
+  option(RPC_SERIALISATION_FORMAT "format of rpc serialisation" "yas::binary")
   option(DEBUG_ENCLAVE_MEMLEAK "detect memory leaks in enclaves" OFF)
   option(DEBUG_ENCLAVE_MEMLEAK_PLACEMENT_NEW "detect memory leaks in enclaves" OFF)
   option(SECRETARIUM_UNITY_BUILD "enable unity build" OFF)
@@ -126,12 +127,21 @@ if(NOT DEPENDANCIES_LOADED)
       else()
         set(DEFAULT_LOG_LEVEL "spdlog::level::info")
       endif()
+
+      if(RPC_SERIALISATION_FORMAT STREQUAL "")
+        set(RPC_SERIALISATION_FMT "yas::binary" CACHE STRING "override default rpc serialisation")
+      elseif(NOT DEFINED RPC_SERIALISATION_FORMAT)
+        set(RPC_SERIALISATION_FMT "yas::binary" CACHE STRING "override default rpc serialisation")
+      else()
+        set(RPC_SERIALISATION_FMT ${RPC_SERIALISATION_FORMAT})
+      endif()
     
       set(SHARED_DEFINES
         ENCLAVE_STATUS=sgx_status_t
         ENCLAVE_OK=SGX_SUCCESS
         _LIB
         NOMINMAX
+        RPC_SERIALISATION_FORMAT=${RPC_SERIALISATION_FMT}
         DEFAULT_LOG_LEVEL=${DEFAULT_LOG_LEVEL})
       set(SHARED_HOST_DEFINES
         ${SHARED_DEFINES}
@@ -140,7 +150,7 @@ if(NOT DEPENDANCIES_LOADED)
       set(SHARED_ENCLAVE_DEFINES
         ${SHARED_DEFINES}
         _IN_ENCLAVE)
-
+      
       set(SHARED_COMPILE_OPTIONS
           ${WARNING_FLAG}
           /bigobj

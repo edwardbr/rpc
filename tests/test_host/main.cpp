@@ -1,5 +1,6 @@
 #include <iostream>
 #include <unordered_map>
+#include <string_view>
 
 #include <sgx_urts.h>
 #include <sgx_quote.h>
@@ -30,6 +31,7 @@
 #include "gtest/gtest.h"
 
 #include <spdlog/spdlog.h>
+#include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 
 
@@ -181,6 +183,35 @@ struct in_memory_setup
     }
 };
 
+class test_service_logger : public rpc::service_logger
+{
+    inline static std::shared_ptr<spdlog::logger> logr = spdlog::basic_logger_mt("basic_logger", "./conversation.txt", true);
+
+public:
+
+    test_service_logger() 
+    {
+        logr->info("************************************");
+        logr->info("test {}", ::testing::UnitTest::GetInstance()->current_test_info()->name());
+    }
+    virtual ~test_service_logger()
+    {
+        
+    }
+
+
+    void before_send(rpc::caller_zone caller_zone_id, rpc::object object_id, rpc::interface_ordinal interface_id, rpc::method method_id, size_t in_size_, const char* in_buf_)
+    {
+        logr->info("caller_zone_id {} object_id {} interface_ordinal {} method {} data {}", caller_zone_id.id, object_id.id, interface_id.id, method_id.id, std::string_view(in_buf_, in_size_));
+    }
+
+    void after_send(rpc::caller_zone caller_zone_id, rpc::object object_id, rpc::interface_ordinal interface_id, rpc::method method_id, int ret, const std::vector<char>& out_buf_)
+    {
+        logr->info("caller_zone_id {} object_id {} interface_ordinal {} method {} ret {} data {}", caller_zone_id.id, object_id.id, interface_id.id, method_id.id, ret, std::string_view(out_buf_.data(), out_buf_.size()));
+    }
+};
+
+
 template<bool UseHostInChild, bool RunStandardTests, bool CreateNewZoneThenCreateSubordinatedZone>
 struct inproc_setup
 {
@@ -203,6 +234,7 @@ struct inproc_setup
         tm = rpc::make_shared<host_telemetry_service>();
         telemetry_service = tm.get();
         root_service = rpc::make_shared<rpc::service>(rpc::zone{++zone_gen_});
+        root_service->add_service_logger(std::make_shared<test_service_logger>());
         current_host_service = root_service;
         child_service = rpc::make_shared<rpc::child_service>(rpc::zone{++zone_gen_});
 
@@ -315,6 +347,7 @@ struct enclave_setup
         tm = rpc::make_shared<host_telemetry_service>();
         telemetry_service = tm.get();
         root_service = rpc::make_shared<rpc::service>(rpc::zone{++zone_gen_});
+        root_service->add_service_logger(std::make_shared<test_service_logger>());
         current_host_service = root_service;
         
         i_host_ptr = rpc::shared_ptr<yyy::i_host> (new host());
