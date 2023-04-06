@@ -553,11 +553,11 @@ namespace enclave_marshaller
                              size_t id, const std::string& serialisation_format)
         {
             std::string oarchive_type = "binary_oarchive";
-            if(serialisation_format.find("yas::json") != std::string::npos)
+            if(serialisation_format.find("json") != std::string::npos)
             {
                 oarchive_type = "json_oarchive";
             }
-            else if(serialisation_format.find("yas::text") != std::string::npos)
+            else if(serialisation_format.find("text") != std::string::npos)
             {
                 oarchive_type = "text_oarchive";
             }
@@ -746,7 +746,7 @@ namespace enclave_marshaller
                         stub("yas::intrusive_buffer in(in_buf_, in_size_);");
                         stub("try");
                         stub("{{");
-                        stub("yas::load<yas::mem|{}|yas::no_header>(in, YAS_OBJECT_NVP(", serialisation_format);
+                        stub("yas::load<yas::mem|yas::{}|yas::no_header>(in, YAS_OBJECT_NVP(", serialisation_format);
                         stub("  \"in\"");
                         stub("  ,(\"__rpc_version\", __rpc_version)");
 					  
@@ -780,11 +780,11 @@ namespace enclave_marshaller
                         }
                         proxy("  );");
                         proxy("yas::count_ostream __rpc_counter;");
-                        proxy("yas::{}<yas::count_ostream, yas::mem|{}|yas::no_header> __rpc_oa(__rpc_counter);", oarchive_type, serialisation_format);
+                        proxy("yas::{}<yas::count_ostream, yas::mem|yas::{}|yas::no_header> __rpc_oa(__rpc_counter);", oarchive_type, serialisation_format);
                         proxy("__rpc_oa(__rpc_yas_mapping);");
                         proxy("__rpc_in_buf.resize(__rpc_counter.total_size);");
                         proxy("yas::mem_ostream __rpc_writer(__rpc_in_buf.data(), __rpc_counter.total_size);");
-                        proxy("yas::save<yas::mem|{}|yas::no_header>(__rpc_writer, __rpc_yas_mapping);", serialisation_format);
+                        proxy("yas::save<yas::mem|yas::{}|yas::no_header>(__rpc_writer, __rpc_yas_mapping);", serialisation_format);
                         stub("  ));");
                         stub("}}");
                         stub("catch(...)");
@@ -915,7 +915,7 @@ namespace enclave_marshaller
                         proxy("//PROXY_MARSHALL_OUT");
                         proxy("try");
                         proxy("{{");
-                        proxy("yas::load<yas::mem|{}|yas::no_header>(yas::intrusive_buffer{{__rpc_out_buf.data(), "
+                        proxy("yas::load<yas::mem|yas::{}|yas::no_header>(yas::intrusive_buffer{{__rpc_out_buf.data(), "
                               "__rpc_out_buf.size()}}, YAS_OBJECT_NVP(", serialisation_format);
                         proxy("  \"out\"");
                         proxy("  ,(\"__return_value\", __rpc_ret)");
@@ -951,11 +951,11 @@ namespace enclave_marshaller
                     stub("  );");
 
                     stub("yas::count_ostream __rpc_counter;");
-                    stub("yas::{}<yas::count_ostream, yas::mem|{}|yas::no_header> __rpc_oa(__rpc_counter);", oarchive_type, serialisation_format);
+                    stub("yas::{}<yas::count_ostream, yas::mem|yas::{}|yas::no_header> __rpc_oa(__rpc_counter);", oarchive_type, serialisation_format);
                     stub("__rpc_oa(__rpc_yas_mapping);");
                     stub("__rpc_out_buf.resize(__rpc_counter.total_size);");
                     stub("yas::mem_ostream __rpc_writer(__rpc_out_buf.data(), __rpc_counter.total_size);");
-                    stub("yas::save<yas::mem|{}|yas::no_header>(__rpc_writer, __rpc_yas_mapping);", serialisation_format);
+                    stub("yas::save<yas::mem|yas::{}|yas::no_header>(__rpc_writer, __rpc_yas_mapping);", serialisation_format);
                     stub("return __rpc_ret;");
 
                     proxy("//PROXY_VALUE_RETURN");

@@ -112,7 +112,7 @@ namespace rpc
             }
 
             //recover err_code from the out buffer
-            yas::load<yas::mem|RPC_SERIALISATION_FORMAT|yas::no_header>(yas::intrusive_buffer{out_buf_.data(), out_buf_.size()}, YAS_OBJECT_NVP(
+            yas::load<yas::mem|yas::RPC_SERIALISATION_FORMAT|yas::no_header>(yas::intrusive_buffer{out_buf_.data(), out_buf_.size()}, YAS_OBJECT_NVP(
             "out"
             ,("__return_value", err_code)
             ));      

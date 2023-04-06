@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.0.0)
 
 if(RPC_STANDALONE)
-    option(RPC_SERIALISATION_FORMAT "format of rpc serialisation" "yas::binary")
+    option(RPC_SERIALISATION_FORMAT "format of rpc serialisation" "binary")
 
     set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/output)
     set(CMAKE_PDB_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/output)
