@@ -25,7 +25,6 @@ target_link_libraries(rpc_test
     
     rpc::marshaller_host 
     yas_common   
-    glaze_glaze 
     fmt::fmt-header-only
     GTest::gtest_main
     GTest::gmock_main
