@@ -12,7 +12,9 @@ if(NOT DEPENDANCIES_LOADED)
   option(BUILD_DC_APPS "build dc apps" ON)
   option(BUILD_TEST "build test code" ON)
   option(BUILD_MEASUREMENT "measure enclave code" ON)
-  option(RPC_SERIALISATION_FORMAT "format of rpc serialisation" "binary")
+  option(RPC_SERIALISATION_BINARY "format of rpc serialisation" OFF)
+  option(RPC_SERIALISATION_TEXT "format of rpc serialisation" OFF)
+  option(RPC_SERIALISATION_JSON "format of rpc serialisation" OFF)
   option(DEBUG_ENCLAVE_MEMLEAK "detect memory leaks in enclaves" OFF)
   option(DEBUG_ENCLAVE_MEMLEAK_PLACEMENT_NEW "detect memory leaks in enclaves" OFF)
   option(SECRETARIUM_UNITY_BUILD "enable unity build" OFF)
@@ -128,12 +130,14 @@ if(NOT DEPENDANCIES_LOADED)
         set(DEFAULT_LOG_LEVEL "spdlog::level::info")
       endif()
 
-      if(RPC_SERIALISATION_FORMAT STREQUAL "")
-        set(RPC_SERIALISATION_FMT "binary" CACHE STRING "override default rpc serialisation")
-      elseif(NOT DEFINED RPC_SERIALISATION_FORMAT)
-        set(RPC_SERIALISATION_FMT "binary" CACHE STRING "override default rpc serialisation")
+
+
+      if(RPC_SERIALISATION_TEXT)
+        set(RPC_SERIALISATION_FMT RPC_SERIALISATION_TEXT)
+      elseif(RPC_SERIALISATION_JSON)
+        set(RPC_SERIALISATION_FMT RPC_SERIALISATION_JSON)
       else()
-        set(RPC_SERIALISATION_FMT ${RPC_SERIALISATION_FORMAT})
+        set(RPC_SERIALISATION_FMT RPC_SERIALISATION_BINARY)
       endif()
     
       set(SHARED_DEFINES
@@ -141,7 +145,7 @@ if(NOT DEPENDANCIES_LOADED)
         ENCLAVE_OK=SGX_SUCCESS
         _LIB
         NOMINMAX
-        RPC_SERIALISATION_FORMAT=${RPC_SERIALISATION_FMT}
+        ${RPC_SERIALISATION_FMT}
         DEFAULT_LOG_LEVEL=${DEFAULT_LOG_LEVEL})
       set(SHARED_HOST_DEFINES
         ${SHARED_DEFINES}

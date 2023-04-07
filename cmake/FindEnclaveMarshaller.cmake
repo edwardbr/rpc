@@ -70,8 +70,12 @@ function(EnclaveMarshaller
     set(PATHS_PARAMS ${PATHS_PARAMS} --namespace "${namespace}")
   endif()
 
-  if(NOT ${RPC_SERIALISATION_FORMAT} STREQUAL "")
-    set(PATHS_PARAMS ${PATHS_PARAMS} --serialisation_format "${RPC_SERIALISATION_FORMAT}")
+  if(RPC_SERIALISATION_TEXT)
+    set(PATHS_PARAMS ${PATHS_PARAMS} --serialisation_format text)
+  elseif(RPC_SERIALISATION_JSON)
+    set(PATHS_PARAMS ${PATHS_PARAMS} --serialisation_format json)
+  else()
+    set(PATHS_PARAMS ${PATHS_PARAMS} --serialisation_format binary)
   endif()
 
   if(DEFINED params_mock AND NOT ${params_mock} STREQUAL "")

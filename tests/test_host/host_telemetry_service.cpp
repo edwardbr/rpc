@@ -96,7 +96,7 @@ void host_telemetry_service::on_service_proxy_deletion(const char* name, rpc::zo
         
         found->second.count--;
         spdlog::error("service still being used! name {} zone_id {} destination_zone_id {} caller_zone_id {}", name, zone_id.get_val(), destination_zone_id.get_val(), caller_zone_id.get_val());
-        spdlog::info("on_service_proxy_deletion name {} zone_id {} destination_zone_id {} caller_zone_id {}", name, zone_id.get_val(), destination_zone_id.get_val()), caller_zone_id.get_val();
+        spdlog::info("on_service_proxy_deletion name {} zone_id {} destination_zone_id {} caller_zone_id {}", name, zone_id.get_val(), destination_zone_id.get_val(), caller_zone_id.get_val());
     }        
 }
 void host_telemetry_service::on_service_proxy_try_cast(const char* name, rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::interface_ordinal interface_id) const
