@@ -41,9 +41,9 @@ namespace rpc
         sgx_launch_token_t token = {0};
         int updated = 0;
         #ifdef _WIN32
-            auto status = sgx_create_enclavea(filename_.data(), 1, &token, &updated, &eid_, NULL);
+            auto status = sgx_create_enclavea(filename_.data(), SGX_DEBUG_FLAG, &token, &updated, &eid_, NULL);
         #else
-            auto status = sgx_create_enclave(filename_.data(), 1, &token, &updated, &eid_, NULL);
+            auto status = sgx_create_enclave(filename_.data(), SGX_DEBUG_FLAG, &token, &updated, &eid_, NULL);
         #endif
         if (status)
         {

@@ -37,6 +37,6 @@ if(${BUILD_ENCLAVE})
 
   set_property(TARGET marshal_test_enclave PROPERTY COMPILE_PDB_NAME marshal_test_enclave)
 
-  enclave_sign(marshal_test_enclave KEY marshal_test_enclave_private.pem CONFIG marshal_test_enclave.config.xml)
+  enclave_sign(marshal_test_enclave KEY marshal_test_enclave_private.pem CONFIG marshal_test_enclave.config.${SGX_MODE}.xml)
 
  endif()
