@@ -1599,6 +1599,7 @@ namespace enclave_marshaller
             header("");
             header("#include <memory>");
             header("#include <vector>");
+            header("#include <list>");
             header("#include <map>");
             header("#include <set>");
             header("#include <string>");
