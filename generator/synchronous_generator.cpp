@@ -734,6 +734,8 @@ namespace enclave_marshaller
                         stub("//STUB_MARSHALL_IN");
                         stub("uint8_t __rpc_version = 0;");
                         stub("yas::intrusive_buffer in(in_buf_, in_size_);");
+                        stub("try");
+                        stub("{{");
                         stub("yas::load<yas::mem|yas::binary|yas::no_header>(in, YAS_OBJECT_NVP(");
                         stub("  \"in\"");
                         stub("  ,(\"__rpc_version\", __rpc_version)");
@@ -774,6 +776,12 @@ namespace enclave_marshaller
                         proxy("yas::mem_ostream __rpc_writer(__rpc_in_buf.data(), __rpc_counter.total_size);");
                         proxy("yas::save<yas::mem|yas::binary|yas::no_header>(__rpc_writer, __rpc_yas_mapping);");
                         stub("  ));");
+                        stub("}}");
+                        stub("catch(...)");
+                        stub("{{");
+                        stub("return rpc::error::STUB_DESERIALISATION_ERROR();");
+                        stub("}}");
+                        
                         stub("if(__rpc_version != rpc::get_version())");
                         stub("  return rpc::error::INVALID_VERSION();");
                     }
@@ -804,6 +812,9 @@ namespace enclave_marshaller
                     stub("//STUB_PARAM_CAST");
                     stub("if(__rpc_ret == rpc::error::OK())");
                     stub("{{");
+					stub("try");
+					stub("{{");
+
                     stub.print_tabs();
                     stub.raw("__rpc_ret = __rpc_target_->{}(", function.get_name());
 
@@ -826,6 +837,11 @@ namespace enclave_marshaller
                         }
                     }
                     stub.raw(");\n");
+					stub("}}");
+					stub("catch(...)");
+					stub("{{");
+					stub("__rpc_ret = rpc::error::EXCEPTION();");
+					stub("}}");
                     stub("}}");
 
                     {
@@ -887,6 +903,8 @@ namespace enclave_marshaller
                     {
                         uint64_t count = 1;
                         proxy("//PROXY_MARSHALL_OUT");
+                        proxy("try");
+                        proxy("{{");
                         proxy("yas::load<yas::mem|yas::binary|yas::no_header>(yas::intrusive_buffer{{__rpc_out_buf.data(), "
                               "__rpc_out_buf.size()}}, YAS_OBJECT_NVP(");
                         proxy("  \"out\"");
@@ -914,7 +932,12 @@ namespace enclave_marshaller
                         }
                     }
                     proxy("  ));");
-
+                    proxy("}}");
+                    proxy("catch(...)");
+                    proxy("{{");
+                    proxy("return rpc::error::PROXY_DESERIALISATION_ERROR();");
+                    proxy("}}");
+                        
                     stub("  );");
 
                     stub("yas::count_ostream __rpc_counter;");
@@ -1561,6 +1584,7 @@ namespace enclave_marshaller
 
             header("#include <memory>");
             header("#include <vector>");
+            header("#include <list>");
             header("#include <map>");
             header("#include <set>");
             header("#include <string>");

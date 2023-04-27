@@ -21,13 +21,37 @@ namespace rpc
         [[nodiscard]] int ZONE_NOT_INITIALISED(){return offset_val + (offset_val_is_negative ? - 10 : 10);}
         [[nodiscard]] int ZONE_NOT_FOUND(){return offset_val + (offset_val_is_negative ? - 11 : 11);}
         [[nodiscard]] int OBJECT_NOT_FOUND(){return offset_val + (offset_val_is_negative ? - 12 : 12);}
-        [[nodiscard]] int INVALID_VERSION(){return offset_val + (offset_val_is_negative ? - 13 : 13);}//dont forget to update MIN & MAX if new values
+        [[nodiscard]] int INVALID_VERSION(){return offset_val + (offset_val_is_negative ? - 13 : 13);}
+        [[nodiscard]] int EXCEPTION(){return offset_val + (offset_val_is_negative ? - 14 : 14);}
+        [[nodiscard]] int PROXY_DESERIALISATION_ERROR(){return offset_val + (offset_val_is_negative ? - 15 : 15);}
+        [[nodiscard]] int STUB_DESERIALISATION_ERROR(){return offset_val + (offset_val_is_negative ? - 16 : 16);}//dont forget to update MIN & MAX if new values
 
-        [[nodiscard]] int MIN(){return offset_val + (offset_val_is_negative ? -13 : 1);}
-        [[nodiscard]] int MAX(){return offset_val + (offset_val_is_negative ? -1 : 13);}
+        [[nodiscard]] int MIN(){return offset_val + (offset_val_is_negative ? -16 : 1);}
+        [[nodiscard]] int MAX(){return offset_val + (offset_val_is_negative ? -1 : 16);}
 
         void set_OK_val(int val){OK_val = val;}
         void set_offset_val(int val){offset_val = val;}
         void set_offset_val_is_negative(bool val){offset_val_is_negative = val;}
+
+        const char* to_string(int err)
+        {
+            if(err == OUT_OF_MEMORY()){return " out of memory";}
+            if(err == NEED_MORE_MEMORY()){return " need more memory";}
+            if(err == SECURITY_ERROR()){return " security error";}
+            if(err == INVALID_DATA()){return " invalid data";}
+            if(err == TRANSPORT_ERROR()){return " transport error";}
+            if(err == INVALID_METHOD_ID()){return " invalid method id";}
+            if(err == INVALID_INTERFACE_ID()){return " invalid interface id";}
+            if(err == INVALID_CAST()){return " invalid cast";}
+            if(err == ZONE_NOT_SUPPORTED()){return " zone not supported";}
+            if(err == ZONE_NOT_INITIALISED()){return " zone not initialised";}
+            if(err == ZONE_NOT_FOUND()){return " zone not found";}
+            if(err == OBJECT_NOT_FOUND()){return " object not found";}
+            if(err == INVALID_VERSION()){return " invalid version";}
+            if(err == EXCEPTION()){return " exception";}
+            if(err == PROXY_DESERIALISATION_ERROR()){return " proxy deserialisation error";}
+            if(err == STUB_DESERIALISATION_ERROR()){return " stub deserialisation error";}
+            return " invalid error code";
+        }
     };
 }

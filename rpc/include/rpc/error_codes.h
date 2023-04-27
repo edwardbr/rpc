@@ -19,10 +19,14 @@ namespace rpc
         int ZONE_NOT_FOUND();
         int OBJECT_NOT_FOUND();
         int INVALID_VERSION();
+        int EXCEPTION();
+        int PROXY_DESERIALISATION_ERROR();
+        int STUB_DESERIALISATION_ERROR();
         int MAX();//the biggest value
 
         void set_OK_val(int val);
         void set_offset_val(int val);
         void set_offset_val_is_negative(bool val);
+        const char* to_string(int);
     };
 }
