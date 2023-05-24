@@ -412,15 +412,15 @@ if(SGX_FOUND)
     cmake_parse_arguments("SGX" "${optionArgs}" "${oneValueArgs}"
                           "${multiValueArgs}" ${ARGN})
 
+    if(NOT "${SGX_LDSCRIPT}" STREQUAL "")
+      get_filename_component(LDS_ABSPATH ${SGX_LDSCRIPT} ABSOLUTE)
+      set(LDSCRIPT_FLAG "-Wl,--version-script=${LDS_ABSPATH}")
+    endif()
     if(NOT "${SGX_EDL_IMPL}" STREQUAL "")
       if("${SGX_EDL_SEARCH_PATHS}" STREQUAL "")
         message(
           FATAL_ERROR
             "${target}: SGX enclave edl file search paths are not provided!")
-      endif()
-      if(NOT "${SGX_LDSCRIPT}" STREQUAL "")
-        get_filename_component(LDS_ABSPATH ${SGX_LDSCRIPT} ABSOLUTE)
-        set(LDSCRIPT_FLAG "-Wl,--version-script=${LDS_ABSPATH}")
       endif()
       add_library(${target} SHARED ${SGX_SRCS})
       enclave_edl_library(${target}-edlobj ${SGX_EDL_IMPL} "${SGX_EDL_SEARCH_PATHS}" ${SGX_USE_PREFIX} "${SGX_EDL_INCLUDE_PATH}")
