@@ -3,9 +3,7 @@ function(RPCGenerate
   idl
   base_dir
   output_path
-  header
-  proxy
-  stub
+  sub_directory
   namespace
 
   # multivalue expects string "dependencies"
@@ -23,20 +21,17 @@ function(RPCGenerate
 
   cmake_path(APPEND base_dir ${idl} OUTPUT_VARIABLE idl)
 
-  set(full_header_path ${output_path}/include/${header})
-  set(full_proxy_header_path ${output_path}/src/${proxy}.h)
-  set(full_proxy_path ${output_path}/src/${proxy})
-  set(full_stub_header_path ${output_path}/src/${stub}.h)
-  set(full_stub_path ${output_path}/src/${stub})
+  set(full_header_path ${output_path}/include/${sub_directory}/${name}.h)
+  set(full_proxy_path ${output_path}/src/${sub_directory}/${name}_proxy.cpp)
+  set(full_stub_path ${output_path}/src/${sub_directory}/${name}_stub.cpp)
+  set(full_stub_header_path ${output_path}/include/${sub_directory}/${name}_stub.h)
 
   if(${DEBUG_RPC_GEN})
     message("RPCGenerate name ${name}")
     message("idl ${idl}")
     message("base_dir ${base_dir}")
     message("output_path ${output_path}")
-    message("header ${header}")
-    message("proxy ${proxy}")
-    message("stub ${stub}")
+    message("sub_directory ${sub_directory}")
     message("namespace ${namespace}")
     message("dependencies ${params_dependencies}")
     message("additional_headers ${params_additional_headers}")
@@ -44,10 +39,9 @@ function(RPCGenerate
     message("defines ${params_defines}")
     message("mock ${params_mock}")
     message("full_header_path ${full_header_path}")
-    message("full_proxy_header_path ${full_proxy_header_path}")
     message("full_proxy_path ${full_proxy_path}")
-    message("full_stub_header_path ${full_stub_header_path}")
     message("full_stub_path ${full_stub_path}")
+    message("full_stub_header_path ${full_stub_header_path}")
   endif()
 
   if(EXISTS ENCLAVE_MARSHALLER_EXECUTABLE)
@@ -74,9 +68,7 @@ function(RPCGenerate
   message(ADDITIONAL_HEADERS ${ADDITIONAL_HEADERS})
 
   foreach(dep ${params_dependencies})
-    message("dep ${dep}")
     get_target_property(dep_base_dir ${dep}_generate base_dir)
-    message("dep_base_dir ${dep_base_dir}")
 
     if(dep_base_dir)
       set(PATHS_PARAMS ${PATHS_PARAMS} --path "${dep_base_dir}")
@@ -87,7 +79,6 @@ function(RPCGenerate
       set(GENERATED_DEPENDANCIES ${GENERATED_DEPENDANCIES} ${dep} ${dep}_generate)
     endif()
   endforeach()
-  message("PATHS_PARAMS ${PATHS_PARAMS}")
 
   if(NOT ${namespace} STREQUAL "")
     set(PATHS_PARAMS ${PATHS_PARAMS} --namespace "${namespace}")
@@ -99,14 +90,15 @@ function(RPCGenerate
 
   if(${DEBUG_RPC_GEN})
     message("
-    add_custom_command(OUTPUT ${full_header_path} ${full_proxy_header_path} ${full_proxy_path} ${full_stub_header_path} ${full_stub_path}
+    add_custom_command(OUTPUT ${full_header_path} ${full_proxy_path} ${full_stub_header_path} ${full_stub_path}
     COMMAND ${ENCLAVE_MARSHALLER}
       --idl ${idl}
       --module_name ${name}
       --output_path ${output_path}
-      --header ${header}
-      --proxy ${proxy}
-      --stub ${stub}
+      --header ${full_header_path}
+      --proxy ${full_proxy_path}
+      --stub ${full_stub_path}
+      --stub_header ${full_stub_header_path}
       ${PATHS_PARAMS}
       ${ADDITIONAL_HEADERS}
     MAIN_DEPENDENCY ${idl}
@@ -115,29 +107,29 @@ function(RPCGenerate
     COMMENT \"Running generator ${idl}\"
   )
 
-  message(${name}_generate)
-  add_custom_target(${name}_generate DEPENDS ${full_header_path}  ${full_proxy_path})
+  add_custom_target(${name}_idl_generate DEPENDS ${full_header_path}  ${full_proxy_path})
 
-  set_target_properties(${name}_generate PROPERTIES base_dir ${base_dir})
+  set_target_properties(${name}_idl_generate PROPERTIES base_dir ${base_dir})
 
-  add_library(${name} INTERFACE)
-  add_dependencies(${name} ${name}_generate)
-  target_include_directories(${name} INTERFACE \"${output_path}\")
+  add_library(${name}_idl INTERFACE)
+  add_dependencies(${name}_idl ${name}_idl_generate)
+  target_include_directories(${name}_idl INTERFACE \"${output_path}\")
 
   if(DEFINED params_dependencies)
-    target_link_libraries(${name} INTERFACE ${params_dependencies})
+    target_link_libraries(${name}_idl INTERFACE ${params_dependencies})
   endif()
 ")
   endif()
 
-  add_custom_command(OUTPUT ${full_header_path} ${full_proxy_header_path} ${full_proxy_path} ${full_stub_header_path} ${full_stub_path}
+  add_custom_command(OUTPUT ${full_header_path} ${full_proxy_path} ${full_stub_header_path} ${full_stub_path}
     COMMAND ${ENCLAVE_MARSHALLER}
     --idl ${idl}
-    --module_name ${name}
+    --module_name ${name}_idl
     --output_path ${output_path}
-    --header ${header}
-    --proxy ${proxy}
-    --stub ${stub}
+    --header ${full_header_path}
+    --proxy ${full_proxy_path}
+    --stub ${full_stub_path}
+    --stub_header ${full_stub_header_path}
     ${PATHS_PARAMS}
     ${ADDITIONAL_HEADERS}
     MAIN_DEPENDENCY ${idl}
@@ -146,91 +138,63 @@ function(RPCGenerate
     COMMENT "Running generator ${idl}"
   )
 
-  message(${name}_generate)
-  add_custom_target(${name}_generate DEPENDS ${full_header_path} ${full_proxy_header_path} ${full_proxy_path} ${full_stub_header_path} ${full_stub_path})
+  add_custom_target(${name}_idl_generate DEPENDS ${full_header_path} ${full_proxy_path} ${full_stub_header_path} ${full_stub_path})
 
-  set_target_properties(${name}_generate PROPERTIES base_dir ${base_dir})
-
-  foreach(dep ${params_dependencies})
-    message("add_dependencies(${name}_generate ${dep}_generate)")
-    add_dependencies(${name}_generate ${dep}_generate)
-  endforeach()
-
-  #[[add_library(${name} STATIC
-    ${full_header_path}
-    ${full_stub_header_path}
-    ${full_stub_path}
-    ${full_proxy_header_path}
-    ${full_proxy_path}
-  )
-
-  set_property(TARGET ${name}_host PROPERTY COMPILE_PDB_NAME ${name})
-
-  target_link_libraries(${name} PUBLIC
-    rpc_host
-  )
-  add_dependencies(${name} ${name}_generate)
+  set_target_properties(${name}_idl_generate PROPERTIES base_dir ${base_dir})
 
   foreach(dep ${params_dependencies})
-    add_dependencies(${name} ${dep}_generate)
+    add_dependencies(${name}_idl_generate ${dep}_generate)
   endforeach()
 
-  target_include_directories(${name} PUBLIC "$<BUILD_INTERFACE:${output_path}>" "$<BUILD_INTERFACE:${output_path}/include>")
-
-  if(DEFINED params_dependencies)
-    target_link_libraries(${name} PUBLIC ${params_dependencies})
-  endif()]]
   if(BUILD_ENCLAVE)
     # #specify a host specific target
-    add_library(${name}_host STATIC
+    add_library(${name}_idl_host STATIC
       ${full_header_path}
       ${full_stub_header_path}
       ${full_stub_path}
-      ${full_proxy_header_path}
       ${full_proxy_path}
     )
-    target_compile_definitions(${name}_host PRIVATE ${HOST_DEFINES})
-    target_include_directories(${name}_host PUBLIC "$<BUILD_INTERFACE:${output_path}>" "$<BUILD_INTERFACE:${output_path}/include>" PRIVATE ${HOST_INCLUDES})
-    target_compile_options(${name}_host PRIVATE ${HOST_COMPILE_OPTIONS})
-    target_link_directories(${name}_host PUBLIC ${SGX_LIBRARY_PATH})
-    set_property(TARGET ${name}_host PROPERTY COMPILE_PDB_NAME ${name}_host)
+    target_compile_definitions(${name}_idl_host PRIVATE ${HOST_DEFINES})
+    target_include_directories(${name}_idl_host PUBLIC "$<BUILD_INTERFACE:${output_path}>" "$<BUILD_INTERFACE:${output_path}/include>" PRIVATE ${HOST_INCLUDES})
+    target_compile_options(${name}_idl_host PRIVATE ${HOST_COMPILE_OPTIONS})
+    target_link_directories(${name}_idl_host PUBLIC ${SGX_LIBRARY_PATH})
+    set_property(TARGET ${name}_idl_host PROPERTY COMPILE_PDB_NAME ${name}_idl_host)
 
-    target_link_libraries(${name}_host PUBLIC
+    target_link_libraries(${name}_idl_host PUBLIC
       rpc_host
       yas_common
     )
 
-    add_dependencies(${name}_host ${name}_generate)
+    add_dependencies(${name}_idl_host ${name}_idl_generate)
 
     foreach(dep ${params_dependencies})
-      add_dependencies(${name}_host ${dep}_generate)
-      target_link_libraries(${name}_host PRIVATE ${dep}_host)
+      add_dependencies(${name}_idl_host ${dep}_generate)
+      target_link_libraries(${name}_idl_host PUBLIC ${dep}_host)
     endforeach()
 
     # #and an enclave specific target
-    add_library(${name}_enclave STATIC
+    add_library(${name}_idl_enclave STATIC
       ${full_header_path}
       ${full_stub_header_path}
       ${full_stub_path}
-      ${full_proxy_header_path}
       ${full_proxy_path}
     )
-    target_compile_definitions(${name}_enclave PRIVATE ${ENCLAVE_DEFINES})
-    target_include_directories(${name}_enclave PUBLIC "$<BUILD_INTERFACE:${output_path}>" "$<BUILD_INTERFACE:${output_path}/include>" PRIVATE ${ENCLAVE_LIBCXX_INCLUDES})
-    target_compile_options(${name}_enclave PRIVATE ${ENCLAVE_COMPILE_OPTIONS})
-    target_link_directories(${name}_enclave PRIVATE ${SGX_LIBRARY_PATH})
-    set_property(TARGET ${name}_enclave PROPERTY COMPILE_PDB_NAME ${name}_enclave)
+    target_compile_definitions(${name}_idl_enclave PRIVATE ${ENCLAVE_DEFINES})
+    target_include_directories(${name}_idl_enclave PUBLIC "$<BUILD_INTERFACE:${output_path}>" "$<BUILD_INTERFACE:${output_path}/include>" PRIVATE ${ENCLAVE_LIBCXX_INCLUDES})
+    target_compile_options(${name}_idl_enclave PRIVATE ${ENCLAVE_COMPILE_OPTIONS})
+    target_link_directories(${name}_idl_enclave PRIVATE ${SGX_LIBRARY_PATH})
+    set_property(TARGET ${name}_idl_enclave PROPERTY COMPILE_PDB_NAME ${name}_idl_enclave)
 
-    target_link_libraries(${name}_enclave PUBLIC
+    target_link_libraries(${name}_idl_enclave PUBLIC
       rpc_enclave
       yas_common
     )
 
-    add_dependencies(${name}_enclave ${name}_generate)
+    add_dependencies(${name}_idl_enclave ${name}_idl_generate)
 
     foreach(dep ${params_dependencies})
-      add_dependencies(${name}_enclave ${dep}_generate)
-      target_link_libraries(${name}_enclave PRIVATE ${dep}_enclave)
+      add_dependencies(${name}_idl_enclave ${dep}_generate)
+      target_link_libraries(${name}_idl_enclave PUBLIC ${dep}_enclave)
     endforeach()
   endif()
 endfunction()

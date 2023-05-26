@@ -128,9 +128,9 @@ int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t host_id, uint64_t 
 {
     //create a rpc::zone service for the enclave
     rpc_server = rpc::make_shared<rpc::child_service>(rpc::zone{child_zone_id}); 
-    marshalled_tests::example_import_register_stubs(rpc_server);
-    marshalled_tests::example_shared_register_stubs(rpc_server);
-    marshalled_tests::example_interface_register_stubs(rpc_server);
+    marshalled_tests::example_import_idl_register_stubs(rpc_server);
+    marshalled_tests::example_shared_idl_register_stubs(rpc_server);
+    marshalled_tests::example_idl_register_stubs(rpc_server);
     const rpc::i_telemetry_service* p_telemetry_service = &telemetry_service;
 
     rpc::shared_ptr<yyy::i_host> host;

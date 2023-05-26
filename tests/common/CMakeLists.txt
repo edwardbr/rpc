@@ -28,7 +28,7 @@ if(${BUILD_ENCLAVE})
    PRIVATE
      rpc_enclave
      marshal_test_edl_enclave
-     example_interface_enclave
+     example_idl_enclave
 
      yas_common    
     )
@@ -59,7 +59,7 @@ endif()
  target_link_libraries(common_host 
  PRIVATE
    marshal_test_edl_host
-   example_interface_host
+   example_idl_host
 
    rpc::rpc_host 
    yas_common    

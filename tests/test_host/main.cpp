@@ -194,14 +194,14 @@ struct inproc_setup
         tm = rpc::make_shared<host_telemetry_service>();
         telemetry_service = tm.get();
         root_service = rpc::make_shared<rpc::service>(rpc::zone{++zone_gen_});
-        marshalled_tests::example_import_register_stubs(root_service);
-        marshalled_tests::example_shared_register_stubs(root_service);
-        marshalled_tests::example_interface_register_stubs(root_service);
+        marshalled_tests::example_import_idl_register_stubs(root_service);
+        marshalled_tests::example_shared_idl_register_stubs(root_service);
+        marshalled_tests::example_idl_register_stubs(root_service);
         current_host_service = root_service;
         child_service = rpc::make_shared<rpc::child_service>(rpc::zone{++zone_gen_});
-        marshalled_tests::example_import_register_stubs(child_service);
-        marshalled_tests::example_shared_register_stubs(child_service);
-        marshalled_tests::example_interface_register_stubs(child_service);
+        marshalled_tests::example_import_idl_register_stubs(child_service);
+        marshalled_tests::example_shared_idl_register_stubs(child_service);
+        marshalled_tests::example_idl_register_stubs(child_service);
 
         rpc::interface_descriptor host_encap {};
         rpc::interface_descriptor example_encap {};
@@ -259,9 +259,9 @@ struct inproc_setup
     rpc::shared_ptr<yyy::i_example> create_new_zone()
     {        
         rpc::shared_ptr<rpc::child_service> new_service = rpc::make_shared<rpc::child_service>(rpc::zone{++zone_gen_});
-        marshalled_tests::example_import_register_stubs(child_service);
-        marshalled_tests::example_shared_register_stubs(child_service);
-        marshalled_tests::example_interface_register_stubs(child_service);
+        marshalled_tests::example_import_idl_register_stubs(child_service);
+        marshalled_tests::example_shared_idl_register_stubs(child_service);
+        marshalled_tests::example_idl_register_stubs(child_service);
         
         // create a proxy to the rpc::service hosting the child service
         auto service_proxy_to_host
@@ -315,9 +315,9 @@ struct enclave_setup
         tm = rpc::make_shared<host_telemetry_service>();
         telemetry_service = tm.get();
         root_service = rpc::make_shared<rpc::service>(rpc::zone{++zone_gen_});
-        marshalled_tests::example_import_register_stubs(root_service);
-        marshalled_tests::example_shared_register_stubs(root_service);
-        marshalled_tests::example_interface_register_stubs(root_service);
+        marshalled_tests::example_import_idl_register_stubs(root_service);
+        marshalled_tests::example_shared_idl_register_stubs(root_service);
+        marshalled_tests::example_idl_register_stubs(root_service);
         current_host_service = root_service;
         
         i_host_ptr = rpc::shared_ptr<yyy::i_host> (new host());

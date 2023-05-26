@@ -21,7 +21,7 @@ target_link_libraries(rpc_test
   PUBLIC 
     marshal_test_edl_host
     common_host
-    example_interface_host
+    example_idl_host
     
     rpc::rpc_host 
     yas_common    

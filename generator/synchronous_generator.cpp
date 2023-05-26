@@ -1564,14 +1564,13 @@ namespace enclave_marshaller
         }
 
         // entry point
-        void write_files(std::string module_name, bool from_host, const class_entity& lib, std::ostream& hos, std::ostream& pos, std::ostream& phos,
+        void write_files(std::string module_name, bool from_host, const class_entity& lib, std::ostream& hos, std::ostream& pos, 
                          std::ostream& sos, std::ostream& shos, const std::vector<std::string>& namespaces,
-                         const std::string& header_filename, const std::string& proxy_header_filename, 
+                         const std::string& header_filename, 
                          const std::string& stub_header_filename, const std::list<std::string>& imports, std::vector<std::string> additional_headers)
         {
             writer header(hos);
             writer proxy(pos);
-            writer proxy_header(phos);
             writer stub(sos);
             writer stub_header(shos);
 
@@ -1609,19 +1608,15 @@ namespace enclave_marshaller
 
             header("");
 
-            proxy_header("#pragma once");
-            proxy_header("#include <yas/mem_streams.hpp>");
-            proxy_header("#include <yas/binary_iarchive.hpp>");
-            proxy_header("#include <yas/binary_oarchive.hpp>");
-            proxy_header("#include <yas/std_types.hpp>");
-            proxy_header("#include <yas/count_streams.hpp>");
-            proxy_header("#include <rpc/proxy.h>");
-            proxy_header("#include <rpc/stub.h>");
-            proxy_header("#include <rpc/service.h>");
-            proxy_header("#include \"{}\"", header_filename);
-            proxy_header("");
-
-            proxy("#include \"{}\"", proxy_header_filename);
+            proxy("#include <yas/mem_streams.hpp>");
+            proxy("#include <yas/binary_iarchive.hpp>");
+            proxy("#include <yas/binary_oarchive.hpp>");
+            proxy("#include <yas/std_types.hpp>");
+            proxy("#include <yas/count_streams.hpp>");
+            proxy("#include <rpc/proxy.h>");
+            proxy("#include <rpc/stub.h>");
+            proxy("#include <rpc/service.h>");
+            proxy("#include \"{}\"", header_filename);
             proxy("");
 
             stub_header("#pragma once");
@@ -1646,8 +1641,6 @@ namespace enclave_marshaller
                 header("{{");
                 proxy("namespace {}", ns);
                 proxy("{{");
-                proxy_header("namespace {}", ns);
-                proxy_header("{{");
                 stub("namespace {}", ns);
                 stub("{{");
                 stub_header("namespace {}", ns);
@@ -1656,7 +1649,7 @@ namespace enclave_marshaller
                 prefix += ns + "::";
             }
 
-            write_namespace_predeclaration(lib, header, proxy_header, stub_header);
+            write_namespace_predeclaration(lib, header, proxy, stub_header);
             
             write_stub_factory_lookup(module_name, lib, prefix, stub_header, proxy, stub);
 
@@ -1666,7 +1659,6 @@ namespace enclave_marshaller
             {
                 header("}}");
                 proxy("}}");
-                proxy_header("}}");
                 stub("}}");
                 stub_header("}}");
             }
