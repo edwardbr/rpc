@@ -1537,30 +1537,16 @@ namespace enclave_marshaller
         void write_stub_factory_lookup(const std::string module_name, const class_entity& lib, std::string prefix, writer& stub_header, writer& proxy,
                              writer& stub)
         {
-            if (lib.get_owner() == nullptr)
-            {
-                //stub("#ifndef STUB_FACTORY");
-                //stub("#define STUB_FACTORY");
-            }
-            
+            stub_header("int {}_register_stubs(const rpc::shared_ptr<rpc::service>& srv);", module_name);
+            stub("int {}_register_stubs(const rpc::shared_ptr<rpc::service>& srv)", module_name);
+            stub("{{");
 
-            {
-                stub_header("int {}_register_stubs(const rpc::shared_ptr<rpc::service>& srv);", module_name);
-                stub("int {}_register_stubs(const rpc::shared_ptr<rpc::service>& srv)", module_name);
-                stub("{{");
+            std::set<std::string> done;
 
-                std::set<std::string> done;
+            write_stub_factory_lookup_items(lib, prefix, proxy, stub, done);
 
-                write_stub_factory_lookup_items(lib, prefix, proxy, stub, done);
-
-                stub("return rpc::error::OK();");
-                stub("}}");
-            }
-            
-            if (lib.get_owner() == nullptr)
-            {
-                //stub("#endif");
-            }
+            stub("return rpc::error::OK();");
+            stub("}}");
         }
 
         // entry point
@@ -1620,17 +1606,17 @@ namespace enclave_marshaller
             proxy("");
 
             stub_header("#pragma once");
-            stub_header("#include <yas/mem_streams.hpp>");
-            stub_header("#include <yas/binary_iarchive.hpp>");
-            stub_header("#include <yas/binary_oarchive.hpp>");
-            stub_header("#include <yas/count_streams.hpp>");
-            stub_header("#include <yas/std_types.hpp>");
-            stub_header("#include <rpc/stub.h>");
-            stub_header("#include <rpc/proxy.h>");
             stub_header("#include <rpc/service.h>");
-            stub_header("#include \"{}\"", header_filename);
             stub_header("");
 
+            stub("#include <yas/mem_streams.hpp>");
+            stub("#include <yas/binary_iarchive.hpp>");
+            stub("#include <yas/binary_oarchive.hpp>");
+            stub("#include <yas/count_streams.hpp>");
+            stub("#include <yas/std_types.hpp>");
+            stub("#include <rpc/stub.h>");
+            stub("#include <rpc/proxy.h>");
+            stub("#include \"{}\"", header_filename);
             stub("#include \"{}\"", stub_header_filename);
             stub("");
 
@@ -1649,7 +1635,7 @@ namespace enclave_marshaller
                 prefix += ns + "::";
             }
 
-            write_namespace_predeclaration(lib, header, proxy, stub_header);
+            write_namespace_predeclaration(lib, header, proxy, stub);
             
             write_stub_factory_lookup(module_name, lib, prefix, stub_header, proxy, stub);
 
