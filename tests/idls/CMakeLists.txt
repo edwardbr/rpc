@@ -1,51 +1,45 @@
 cmake_minimum_required(VERSION 3.12)
 
-EnclaveMarshaller(
+RPCGenerate(
     example_shared
-    example_shared.idl
+    example_shared/example_shared.idl
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_BINARY_DIR}/generated
-    example/example_shared.h
-    example_shared_proxy.cpp
-    example_shared_stub.cpp
+    example_shared
     marshalled_tests
-    mock example/example_shared_mock.h
+    mock example_shared/example_shared_mock.h
     dependencies
     include_paths
         ${CMAKE_CURRENT_SOURCE_DIR}/.
         ${CMAKE_SOURCE_DIR}/submodules/idlparser/defines
     )    
 
-EnclaveMarshaller(
+RPCGenerate(
     example_import
-    example_import.idl
+    example_import/example_import.idl
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_BINARY_DIR}/generated
-    example/example_import.h
-    example_import_proxy.cpp
-    example_import_stub.cpp
+    example_import
     marshalled_tests
-    mock example/example_import_mock.h
+    mock example_import/example_import_mock.h
     dependencies
-        example_shared
+        example_shared_idl
     include_paths
         ${CMAKE_CURRENT_SOURCE_DIR}/.
         ${CMAKE_SOURCE_DIR}/submodules/idlparser/defines
     )
 
-EnclaveMarshaller(
-    example_interface
-    example_interface.idl
+RPCGenerate(
+    example
+    example/example.idl
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_BINARY_DIR}/generated
-    example/example.h
-    example_proxy.cpp
-    example_stub.cpp
+    example
     marshalled_tests
     mock example/example_mock.h
     dependencies
-        example_import
-        example_shared
+        example_import_idl
+        example_shared_idl
     include_paths
         ${CMAKE_CURRENT_SOURCE_DIR}/.
         ${CMAKE_SOURCE_DIR}/submodules/idlparser/defines

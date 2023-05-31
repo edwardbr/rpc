@@ -1,6 +1,5 @@
 cmake_minimum_required(VERSION 3.0.0)
 
-include(CTest)
 enable_testing()
 
 add_executable(generator 
@@ -14,7 +13,7 @@ target_include_directories(generator
     PRIVATE 
         ${HOST_INCLUDES})
 target_link_libraries(generator 
-    PUBLIC 
+    PRIVATE 
         ast_parser
         macro_parser 
         utils

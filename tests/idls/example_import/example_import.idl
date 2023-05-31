@@ -1,4 +1,4 @@
-#import "example_shared.idl"
+#import "example_shared/example_shared.idl"
 [inline] namespace v1
 {
     namespace zzz

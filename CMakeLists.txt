@@ -24,7 +24,7 @@ if(RPC_STANDALONE)
 endif()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
-include(FindEnclaveMarshaller)
+include(FindRPCGenerator)
 
 add_subdirectory(generator)
 add_subdirectory(rpc)
@@ -33,5 +33,5 @@ add_subdirectory(tests)
 endif()
 
 
-INSTALL(FILES "${CMAKE_CURRENT_LIST_DIR}/cmake/FindEnclaveMarshaller.cmake"
+INSTALL(FILES "${CMAKE_CURRENT_LIST_DIR}/cmake/FindRPCGenerator.cmake"
         DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/cmake/rpc )

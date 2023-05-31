@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.0.0)
 
 if(RPC_STANDALONE)
+  set(FMT_INSTALL ON)
   add_subdirectory(fmt)
   add_subdirectory(clipp)
   add_subdirectory(googletest)

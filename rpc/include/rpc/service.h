@@ -9,6 +9,7 @@
 #include <assert.h>
 #include <atomic>
 #include <limits>
+#include <functional>
 
 #include <rpc/types.h>
 #include <rpc/marshaller.h>
@@ -44,6 +45,7 @@ namespace rpc
 
         // map object_id's to stubs
         std::unordered_map<object, rpc::weak_ptr<object_stub>> stubs;
+        std::unordered_map<rpc::interface_ordinal, std::function<rpc::shared_ptr<rpc::i_interface_stub>(const rpc::shared_ptr<rpc::i_interface_stub>&)>> stub_factories;
         // map wrapped objects pointers to stubs
         std::map<void*, rpc::weak_ptr<object_stub>> wrapped_object_to_stub;
 
@@ -77,7 +79,6 @@ namespace rpc
         object generate_new_object_id() const { return {++object_id_generator}; }
         virtual rpc::shared_ptr<rpc::service_proxy> get_parent() const {return nullptr;}
 
-        template<class T> std::function<shared_ptr<i_interface_stub>(const shared_ptr<object_stub>& stub)> create_interface_stub(const shared_ptr<T>& iface);
         template<class T> interface_descriptor proxy_bind_in_param(const shared_ptr<T>& iface, shared_ptr<object_stub>& stub);
         template<class T> interface_descriptor stub_bind_out_param(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, const shared_ptr<T>& iface);
 
@@ -109,13 +110,23 @@ namespace rpc
             return rpc::static_pointer_cast<T>(get_castable_interface(object_id, {T::id}));
         }
 
+        template<class T> 
+        std::function<shared_ptr<i_interface_stub>(const shared_ptr<object_stub>& stub)> create_interface_stub(
+            const shared_ptr<T>& iface);
+        int create_interface_stub(
+            rpc::interface_ordinal interface_id
+            , rpc::interface_ordinal original_interface_id
+            , const rpc::shared_ptr<rpc::i_interface_stub>& original
+            , rpc::shared_ptr<rpc::i_interface_stub>& new_stub);
+
+        //note this function is not thread safe!  Use it before using the service class for normal operation
+        int add_interface_stub_factory(rpc::interface_ordinal interface_id, std::function<rpc::shared_ptr<rpc::i_interface_stub>(const rpc::shared_ptr<rpc::i_interface_stub>&)> factory);
+
         //note this is not thread safe and should only be used on setup
         void add_service_logger(const std::shared_ptr<service_logger>& logger)
         {
             service_loggers.push_back(logger);
-        }
-
-        friend service_proxy;
+        }        friend service_proxy;
     };
 
     //Child services need to maintain the lifetime of the root object in its zone 

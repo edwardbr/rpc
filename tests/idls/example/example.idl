@@ -1,5 +1,5 @@
-#import "example_shared.idl"
-#import "example_import.idl"
+#import "example_shared/example_shared.idl"
+#import "example_import/example_import.idl"
 
 namespace yyy
 {

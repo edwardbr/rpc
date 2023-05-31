@@ -25,10 +25,10 @@ if(${BUILD_ENCLAVE})
   
   
    target_link_libraries(common_enclave 
-   PUBLIC
-     marshaller_enclave
+   PRIVATE
+     rpc_enclave
      marshal_test_edl_enclave
-     example_interface
+     example_idl_enclave
 
      yas_common    
     )
@@ -57,11 +57,11 @@ endif()
 
 
  target_link_libraries(common_host 
- PUBLIC
+ PRIVATE
    marshal_test_edl_host
-   example_interface
+   example_idl_host
 
-   rpc::marshaller_host 
+   rpc::rpc_host 
    yas_common    
  )
 
