@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <mutex>
 
+#include <rpc/version.h>
 #include <rpc/types.h>
 #include <rpc/marshaller.h>
 #include <rpc/service.h>
@@ -402,7 +403,8 @@ namespace rpc
             {
                 op = object_proxy::create(encap.object_id, service_proxy);
                 service_proxy->add_ref(
-                    service_proxy->get_destination_channel_zone_id()
+                    rpc::get_version()
+                    , service_proxy->get_destination_channel_zone_id()
                     , encap.destination_zone_id
                     , encap.object_id
                     , {0}
@@ -479,7 +481,7 @@ namespace rpc
         {
             //as this is an out parameter the callee will be doing an add ref if the object proxy is already found we can do a release
             assert(!new_proxy_added);
-            service_proxy->release(encap.destination_zone_id, encap.object_id, caller_zone_id);
+            service_proxy->release(rpc::get_version(), encap.destination_zone_id, encap.object_id, caller_zone_id);
         }
         else
         {
@@ -524,6 +526,7 @@ namespace rpc
         }
 
         service_proxy->add_ref(
+            rpc::get_version(),
             service_proxy->get_destination_channel_zone_id(), 
             service_proxy->get_destination_zone_id(), 
             {dummy_object_id}, 

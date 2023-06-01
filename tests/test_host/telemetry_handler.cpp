@@ -16,7 +16,10 @@ extern "C"
     }
 
     int call_host(
-        uint64_t caller_channel_zone_id
+        uint64_t protocol_version                          //version of the rpc call protocol
+        , uint64_t encoding                                  //format of the serialised data
+        , uint64_t tag                                       //info on the type of the call 
+        , uint64_t caller_channel_zone_id
         , uint64_t caller_zone_id
         , uint64_t destination_zone_id
         , uint64_t object_id
@@ -38,7 +41,7 @@ extern "C"
         }
         if (out_buf.empty())
         {
-            int ret = root_service->send({caller_channel_zone_id}, {caller_zone_id}, {destination_zone_id}, {object_id}, {interface_id}, {method_id}, sz_int,
+            int ret = root_service->send(protocol_version, rpc::encoding(encoding), tag, {caller_channel_zone_id}, {caller_zone_id}, {destination_zone_id}, {object_id}, {interface_id}, {method_id}, sz_int,
                                          data_in, out_buf);
             if (ret >= rpc::error::MIN() && ret <= rpc::error::MAX())
                 return ret;
@@ -50,33 +53,48 @@ extern "C"
         out_buf.clear();
         return rpc::error::OK();
     }
-    int try_cast_host(uint64_t zone_id, uint64_t object_id, uint64_t interface_id)
+    int try_cast_host(
+        uint64_t protocol_version                          //version of the rpc call protocol
+        , uint64_t zone_id
+        , uint64_t object_id
+        , uint64_t interface_id)
     {
         auto root_service = current_host_service.lock();
         if (!root_service)
         {
             return rpc::error::TRANSPORT_ERROR();
         }
-        int ret = root_service->try_cast({zone_id}, {object_id}, {interface_id});
+        int ret = root_service->try_cast(protocol_version, {zone_id}, {object_id}, {interface_id});
         return ret;
     }
-    uint64_t add_ref_host(uint64_t destination_channel_zone_id, uint64_t destination_zone_id, uint64_t object_id, uint64_t caller_channel_zone_id, uint64_t caller_zone_id, char build_out_param_channel)
+    uint64_t add_ref_host(
+        uint64_t protocol_version                          //version of the rpc call protocol
+        , uint64_t destination_channel_zone_id
+        , uint64_t destination_zone_id
+        , uint64_t object_id
+        , uint64_t caller_channel_zone_id
+        , uint64_t caller_zone_id
+        , char build_out_param_channel)
     {
         auto root_service = current_host_service.lock();
         if (!root_service)
         {
             return rpc::error::TRANSPORT_ERROR();
         }
-        return root_service->add_ref({destination_channel_zone_id}, {destination_zone_id}, {object_id}, {caller_channel_zone_id}, {caller_zone_id}, static_cast<rpc::add_ref_options>(build_out_param_channel), false);
+        return root_service->add_ref(protocol_version, {destination_channel_zone_id}, {destination_zone_id}, {object_id}, {caller_channel_zone_id}, {caller_zone_id}, static_cast<rpc::add_ref_options>(build_out_param_channel), false);
     }
-    uint64_t release_host(uint64_t zone_id, uint64_t object_id, uint64_t caller_zone_id)
+    uint64_t release_host(
+        uint64_t protocol_version                          //version of the rpc call protocol
+        , uint64_t zone_id
+        , uint64_t object_id
+        , uint64_t caller_zone_id)
     {
         auto root_service = current_host_service.lock();
         if (!root_service)
         {
             return rpc::error::TRANSPORT_ERROR();
         }
-        return root_service->release({zone_id}, {object_id}, {caller_zone_id});
+        return root_service->release(protocol_version, {zone_id}, {object_id}, {caller_zone_id});
     }
 
     void on_service_creation_host(const char* name, rpc::zone zone_id)

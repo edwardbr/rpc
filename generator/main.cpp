@@ -67,7 +67,6 @@ int main(const int argc, char* argv[])
         string stubHeaderPath;
         string mockPath;
         string output_path;
-        string serialisation_format = "yas::binary";
         std::vector<std::string> namespaces;
         std::vector<std::string> include_paths;
         std::vector<std::string> defines;

@@ -158,6 +158,9 @@ void marshal_test_destroy_enclave()
 }
 
 int call_enclave(
+    uint64_t protocol_version,                          //version of the rpc call protocol
+    uint64_t encoding,                                  //format of the serialised data
+    uint64_t tag,                                       //info on the type of the call passed from the idl generator 
     uint64_t caller_channel_zone_id,
     uint64_t caller_zone_id,
     uint64_t zone_id, 
@@ -199,7 +202,19 @@ int call_enclave(
     }
 
     std::vector<char> tmp;
-    int ret = rpc_server->send({caller_channel_zone_id}, {caller_zone_id}, {zone_id}, {object_id}, {interface_id}, {method_id}, sz_int, data_in, tmp);
+    int ret = rpc_server->send(
+        protocol_version,                          //version of the rpc call protocol
+        rpc::encoding(encoding),                                  //format of the serialised data
+        tag,
+        {caller_channel_zone_id}, 
+        {caller_zone_id}, 
+        {zone_id}, 
+        {object_id}, 
+        {interface_id}, 
+        {method_id}, 
+        sz_int, 
+        data_in, 
+        tmp);
     if(ret >= rpc::error::MIN() && ret <= rpc::error::MAX())
         return ret;
 
@@ -214,18 +229,18 @@ int call_enclave(
     return rpc::error::NEED_MORE_MEMORY();
 }
 
-int try_cast_enclave(uint64_t zone_id, uint64_t object_id, uint64_t interface_id)
+int try_cast_enclave(uint64_t protocol_version, uint64_t zone_id, uint64_t object_id, uint64_t interface_id)
 {
-    int ret = rpc_server->try_cast({zone_id}, {object_id}, {interface_id});
+    int ret = rpc_server->try_cast(protocol_version, {zone_id}, {object_id}, {interface_id});
     return ret;
 }
 
-uint64_t add_ref_enclave(uint64_t destination_channel_zone_id, uint64_t destination_zone_id, uint64_t object_id, uint64_t caller_channel_zone_id, uint64_t caller_zone_id, char build_out_param_channel)
+uint64_t add_ref_enclave(uint64_t protocol_version, uint64_t destination_channel_zone_id, uint64_t destination_zone_id, uint64_t object_id, uint64_t caller_channel_zone_id, uint64_t caller_zone_id, char build_out_param_channel)
 {
-    return rpc_server->add_ref({destination_channel_zone_id}, {destination_zone_id}, {object_id}, {caller_channel_zone_id}, {caller_zone_id}, static_cast<rpc::add_ref_options>(build_out_param_channel), false);
+    return rpc_server->add_ref(protocol_version, {destination_channel_zone_id}, {destination_zone_id}, {object_id}, {caller_channel_zone_id}, {caller_zone_id}, static_cast<rpc::add_ref_options>(build_out_param_channel), false);
 }
 
-uint64_t release_enclave(uint64_t zone_id, uint64_t object_id, uint64_t caller_zone_id)
+uint64_t release_enclave(uint64_t protocol_version, uint64_t zone_id, uint64_t object_id, uint64_t caller_zone_id)
 {
-    return rpc_server->release({zone_id}, {object_id}, {caller_zone_id});
+    return rpc_server->release(protocol_version, {zone_id}, {object_id}, {caller_zone_id});
 }

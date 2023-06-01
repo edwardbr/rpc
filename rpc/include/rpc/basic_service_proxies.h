@@ -52,42 +52,70 @@ namespace rpc
             return ret;
         }
 
-        int send(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, destination_zone destination_zone_id, object object_id, interface_ordinal interface_id, method method_id, size_t in_size_,
-                 const char* in_buf_, std::vector<char>& out_buf_) override
+        int send(
+            uint64_t protocol_version, 
+			encoding encoding, 
+			uint64_t tag, 
+            caller_channel_zone caller_channel_zone_id, 
+            caller_zone caller_zone_id, 
+            destination_zone destination_zone_id, 
+            object object_id, 
+            interface_ordinal interface_id, 
+            method method_id, 
+            size_t in_size_,
+            const char* in_buf_, 
+            std::vector<char>& out_buf_)
+            override
         {
-            return destination_service_.lock()->send(caller_channel_zone_id, caller_zone_id, destination_zone_id, object_id, interface_id, method_id, in_size_, in_buf_, out_buf_);
+            return destination_service_.lock()->send(protocol_version, encoding, tag, caller_channel_zone_id, caller_zone_id, destination_zone_id, object_id, interface_id, method_id, in_size_, in_buf_, out_buf_);
         }
-        int try_cast(destination_zone destination_zone_id, object object_id, interface_ordinal interface_id) override
+        int try_cast(            
+            uint64_t protocol_version, 
+            destination_zone destination_zone_id, 
+            object object_id, 
+            interface_ordinal interface_id) override
         {
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
             {
                 telemetry_service->on_service_proxy_try_cast("local_service_proxy", get_zone_id(), destination_zone_id,
                                                              object_id, interface_id);
             }
-            return destination_service_.lock()->try_cast(destination_zone_id, object_id, interface_id);
+            return destination_service_.lock()->try_cast(protocol_version, destination_zone_id, object_id, interface_id);
         }
-        uint64_t add_ref(destination_channel_zone destination_channel_zone_id, destination_zone destination_zone_id, object object_id, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, add_ref_options build_out_param_channel, bool proxy_add_ref) override
+        uint64_t add_ref(
+            uint64_t protocol_version, 
+            destination_channel_zone destination_channel_zone_id, 
+            destination_zone destination_zone_id, 
+            object object_id, 
+            caller_channel_zone caller_channel_zone_id, 
+            caller_zone caller_zone_id, 
+            add_ref_options build_out_param_channel, 
+            bool proxy_add_ref) override
         {
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
             {
                 telemetry_service->on_service_proxy_add_ref("local_service_proxy", get_zone_id(), destination_zone_id,
                                                             object_id, caller_zone_id);
             }
-            auto ret = destination_service_.lock()->add_ref(destination_channel_zone_id, destination_zone_id, object_id, caller_channel_zone_id, caller_zone_id, build_out_param_channel, proxy_add_ref);            
+            auto ret = destination_service_.lock()->add_ref(protocol_version, destination_channel_zone_id, destination_zone_id, object_id, caller_channel_zone_id, caller_zone_id, build_out_param_channel, proxy_add_ref);            
             if(proxy_add_ref && ret != std::numeric_limits<uint64_t>::max())
             {
                 add_external_ref();
             }
             return ret;
         }
-        uint64_t release(destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id) override
+        uint64_t release(
+            uint64_t protocol_version, 
+            destination_zone destination_zone_id, 
+            object object_id, 
+            caller_zone caller_zone_id) override
         {
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
             {
                 telemetry_service->on_service_proxy_release("local_service_proxy", get_zone_id(), destination_zone_id,
                                                             object_id, caller_zone_id);
             }
-            auto ret = destination_service_.lock()->release(destination_zone_id, object_id, caller_zone_id);
+            auto ret = destination_service_.lock()->release(protocol_version, destination_zone_id, object_id, caller_zone_id);
             if(ret != std::numeric_limits<uint64_t>::max())
             {
                 release_external_ref();
@@ -137,42 +165,72 @@ namespace rpc
             return ret;
         }
 
-        int send(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, destination_zone destination_zone_id, object object_id, interface_ordinal interface_id, method method_id, size_t in_size_,
-                 const char* in_buf_, std::vector<char>& out_buf_) override
+        int send(
+            uint64_t protocol_version, 
+			encoding encoding, 
+			uint64_t tag, 
+            caller_channel_zone caller_channel_zone_id, 
+            caller_zone caller_zone_id, 
+            destination_zone destination_zone_id, 
+            object object_id, 
+            interface_ordinal interface_id, 
+            method method_id, 
+            size_t in_size_,
+            const char* in_buf_, 
+            std::vector<char>& out_buf_
+        ) override
         {
-            return destination_service_->send(caller_channel_zone_id, caller_zone_id, destination_zone_id, object_id, interface_id, method_id, in_size_, in_buf_, out_buf_);
+            return destination_service_->send(protocol_version, encoding, tag, caller_channel_zone_id, caller_zone_id, destination_zone_id, object_id, interface_id, method_id, in_size_, in_buf_, out_buf_);
         }
-        int try_cast(destination_zone destination_zone_id, object object_id, interface_ordinal interface_id) override
+        int try_cast(
+            uint64_t protocol_version, 
+            destination_zone destination_zone_id, 
+            object object_id, 
+            interface_ordinal interface_id
+        ) override
         {
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
             {
                 telemetry_service->on_service_proxy_try_cast("local_child_service_proxy", get_zone_id(),
                                                              destination_zone_id, object_id, interface_id);
             }
-            return destination_service_->try_cast(destination_zone_id, object_id, interface_id);
+            return destination_service_->try_cast(protocol_version, destination_zone_id, object_id, interface_id);
         }
-        uint64_t add_ref(destination_channel_zone destination_channel_zone_id, destination_zone destination_zone_id, object object_id, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, add_ref_options build_out_param_channel, bool proxy_add_ref) override
+        uint64_t add_ref(
+            uint64_t protocol_version, 
+            destination_channel_zone destination_channel_zone_id, 
+            destination_zone destination_zone_id, 
+            object object_id, 
+            caller_channel_zone caller_channel_zone_id, 
+            caller_zone caller_zone_id, 
+            add_ref_options build_out_param_channel, 
+            bool proxy_add_ref
+        ) override
         {
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
             {
                 telemetry_service->on_service_proxy_add_ref("local_child_service_proxy", get_zone_id(),
                                                             destination_zone_id, object_id, caller_zone_id);
             }
-            auto ret = destination_service_->add_ref(destination_channel_zone_id, destination_zone_id, object_id, caller_channel_zone_id, caller_zone_id, build_out_param_channel, proxy_add_ref);            
+            auto ret = destination_service_->add_ref(protocol_version, destination_channel_zone_id, destination_zone_id, object_id, caller_channel_zone_id, caller_zone_id, build_out_param_channel, proxy_add_ref);            
             if(proxy_add_ref && ret != std::numeric_limits<uint64_t>::max())
             {
                 add_external_ref();
             }
             return ret;
         }
-        uint64_t release(destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id) override
+        uint64_t release(
+            uint64_t protocol_version, 
+            destination_zone destination_zone_id, 
+            object object_id, 
+            caller_zone caller_zone_id) override
         {
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
             {
                 telemetry_service->on_service_proxy_release("local_child_service_proxy", get_zone_id(),
                                                             destination_zone_id, object_id, caller_zone_id);
             }
-            auto ret = destination_service_->release(destination_zone_id, object_id, caller_zone_id);
+            auto ret = destination_service_->release(protocol_version, destination_zone_id, object_id, caller_zone_id);
             if(ret != std::numeric_limits<uint64_t>::max())
             {
                 release_external_ref();

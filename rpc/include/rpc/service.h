@@ -82,9 +82,6 @@ namespace rpc
         template<class T> interface_descriptor proxy_bind_in_param(const shared_ptr<T>& iface, shared_ptr<object_stub>& stub);
         template<class T> interface_descriptor stub_bind_out_param(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, const shared_ptr<T>& iface);
 
-        int send(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, destination_zone destination_zone_id, object object_id, interface_ordinal interface_id, method method_id, size_t in_size_,
-                        const char* in_buf_, std::vector<char>& out_buf_) override;
-
         interface_descriptor prepare_out_param(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, rpc::proxy_base* base);
         interface_descriptor get_proxy_stub_descriptor(caller_channel_zone caller_channel_zone_id, 
                                                         caller_zone caller_zone_id, 
@@ -93,13 +90,43 @@ namespace rpc
                                                         bool outcall,
                                                         rpc::shared_ptr<object_stub>& stub);
                                  
-        //int add_object(const rpc::shared_ptr<object_stub>& stub);
         rpc::weak_ptr<object_stub> get_object(object object_id) const;
 
-        int try_cast(destination_zone destination_zone_id, object object_id, interface_ordinal interface_id) override;
-        uint64_t add_ref(destination_channel_zone destination_channel_zone_id, destination_zone destination_zone_id, object object_id, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, add_ref_options build_out_param_channel, bool proxy_add_ref) override;
+        int send(
+            uint64_t protocol_version, 
+			encoding encoding, 
+			uint64_t tag, 
+            caller_channel_zone caller_channel_zone_id, 
+            caller_zone caller_zone_id, 
+            destination_zone destination_zone_id, 
+            object object_id, interface_ordinal 
+            interface_id, 
+            method method_id, 
+            size_t in_size_,
+            const char* in_buf_, 
+            std::vector<char>& out_buf_)
+            override;
+        int try_cast(            
+            uint64_t protocol_version, 
+            destination_zone destination_zone_id, 
+            object object_id, 
+            interface_ordinal interface_id) override;
+        uint64_t add_ref(
+            uint64_t protocol_version, 
+            destination_channel_zone destination_channel_zone_id, 
+            destination_zone destination_zone_id, 
+            object object_id, 
+            caller_channel_zone caller_channel_zone_id, 
+            caller_zone caller_zone_id, 
+            add_ref_options build_out_param_channel, 
+            bool proxy_add_ref) override;
+        uint64_t release(
+            uint64_t protocol_version, 
+            destination_zone destination_zone_id, 
+            object object_id, 
+            caller_zone caller_zone_id) override;
+
         uint64_t release_local_stub(const rpc::shared_ptr<rpc::object_stub>& stub);
-        uint64_t release(destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id) override;
 
         void inner_add_zone_proxy(const rpc::shared_ptr<service_proxy>& service_proxy);
         virtual void add_zone_proxy(const rpc::shared_ptr<service_proxy>& zone);
@@ -126,7 +153,8 @@ namespace rpc
         void add_service_logger(const std::shared_ptr<service_logger>& logger)
         {
             service_loggers.push_back(logger);
-        }        friend service_proxy;
+        }
+        friend service_proxy;
     };
 
     //Child services need to maintain the lifetime of the root object in its zone 

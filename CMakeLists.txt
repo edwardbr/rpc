@@ -1,10 +1,6 @@
 cmake_minimum_required(VERSION 3.0.0)
 
 if(RPC_STANDALONE)
-    option(RPC_SERIALISATION_TEXT "set rpc serialisation to text" OFF)
-    option(RPC_SERIALISATION_JSON "set rpc serialisation to json" OFF)
-    option(RPC_SERIALISATION_BINARY "set rpc serialisation to binary" OFF)
-
     set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/output)
     set(CMAKE_PDB_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/output)
     set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/output)
