@@ -65,7 +65,7 @@ namespace rpc
     {
         return service_proxy_->send(
             get_version(),
-            encoding::yas_binary,
+            encoding::enc_default,
             0,
             caller_channel_zone{}, 
             service_proxy_->get_zone_id().as_caller(), 
