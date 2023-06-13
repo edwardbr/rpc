@@ -56,6 +56,347 @@ namespace enclave_marshaller
             }
         };
 
+
+        uint64_t generate_fingerprint(const class_entity& cls, std::vector<const class_entity*> entity_stack, writer* comment);
+        const class_entity& get_root(const class_entity& cls);
+        std::string get_full_name(const class_entity& cls);
+        const class_entity* find_type(std::string type_name, const class_entity& cls);
+        std::string extract_subsituted_templates(const std::string& source, const class_entity& cls, std::vector<const class_entity*> entity_stack);
+
+        const class_entity& get_root(const class_entity& cls)
+        {
+            auto* tmp = cls.get_owner();
+            while (tmp)
+            {
+                auto tmp1 = tmp->get_owner();                
+                if(!tmp1)
+                    break;
+                tmp = tmp1;
+            }   
+            if(tmp)
+                return *tmp;
+            return cls;
+        }      
+
+        std::string get_full_name(const class_entity& cls)
+        {
+            auto name = cls.get_name();
+            auto* tmp = cls.get_owner();
+            while (tmp)
+            {
+                name = tmp->get_name() + "::" + name;
+                auto tmp1 = tmp->get_owner();                
+                if(!tmp1)
+                    break;
+                tmp = tmp1;
+            }   
+            name = "::" + name;
+            return name;
+        }    
+
+        const class_entity* find_type(std::string type_name, const class_entity& cls)
+        {
+            auto* tmp = &get_root(cls);
+
+            auto type_namespace = split_namespaces(type_name);
+
+            const auto* current_namespace = &cls;
+            if(type_name.size() >= 2 && type_name[0] == ':' && type_name[1] == ':')
+            {
+                current_namespace = &get_root(cls);
+            }
+
+            do
+            {
+                auto candidate_namespace = current_namespace;
+            
+                while(candidate_namespace)
+                {
+                    size_t pos = 0;
+                    for (const auto& ns : type_namespace) 
+                    {
+                        std::shared_ptr<class_entity> subcls = nullptr;
+                        for(auto tmp1 : candidate_namespace->get_classes())
+                        {
+                            if(tmp1->get_name() == ns)
+                            {
+                                subcls = tmp1;
+                                break;
+                            }
+                        }
+                        if(subcls)
+                        {
+                            candidate_namespace = subcls.get();
+                        }
+                        else
+                        {
+                            candidate_namespace = nullptr;
+                            break;
+                        }
+                    }      
+                    if(candidate_namespace)
+                    {
+                        return candidate_namespace;
+                    }
+                }
+                current_namespace = current_namespace->get_owner();
+            } while (current_namespace);
+            
+            return nullptr;
+        };
+
+        std::string extract_subsituted_templates(const std::string& source, const class_entity& cls, std::vector<const class_entity*> entity_stack)
+        {
+            std::stringstream sstr;
+            std::stringstream temp;
+            bool is_in_name = false;
+            for(auto char_data : source)
+            {
+                if(isalpha(char_data) || isdigit(char_data) || char_data == '_' || char_data == ':')
+                {
+                    temp << char_data;
+                }
+                else 
+                {
+                    auto name = temp.str();
+                    std::stringstream tmp;
+                    temp.swap(tmp);//the clear function does not do what you would think that it would do so we swap them
+                    if(!name.empty())
+                    {
+                        auto* type = find_type(name, cls);
+                        if(type && type != &cls)
+                        {
+                            auto id = generate_fingerprint(*type, entity_stack, nullptr);
+                            if(id == 0)
+                                sstr << get_full_name(*type);
+                            else
+                                sstr << id;                            
+                        }
+                        else
+                            sstr << name;
+                    }
+                    sstr << char_data;
+                }
+                char_data++;
+            }
+            auto name = temp.str();
+            if(!name.empty())
+            {
+                auto* type = find_type(name, cls);
+                if(type && type != &cls)
+                {
+                    auto id = generate_fingerprint(*type, entity_stack, nullptr);
+                    if(id == 0)
+                        sstr << get_full_name(*type);
+                    else
+                        sstr << id;
+                }
+                else
+                    sstr << name;
+            }  
+            auto output = sstr.str();          
+            return output;
+        }
+
+        std::string substitute_template_params(const std::string& type, const std::string& alternative)
+        {
+            std::string output;
+            int inBrackets = 0;
+            for(size_t i = 0;i < type.length();i++)
+            {
+                if(type[i] == '<')
+                {
+                    inBrackets++;
+                    if(inBrackets == 1)
+                    {
+                        output += type[i];
+                        //splice in the alternative
+                        output += alternative;
+                        continue;
+                    }
+                }
+                else if(type[i] == '>')
+                {
+                    inBrackets--;
+                }
+                
+                if(!inBrackets)
+                {
+                    output += type[i];
+                }
+            }
+            if(inBrackets != 0)
+            {
+                throw std::runtime_error("template type missing '>'");
+            }
+            return output;
+        }
+
+        uint64_t generate_fingerprint(const class_entity& cls, std::vector<const class_entity*> entity_stack, writer* comment)
+        {
+            for(const auto* tmp : entity_stack)
+            {
+                if(tmp == &cls)
+                {
+                    //we have a problem in that we are recursing back to the orginating interface that needs the id of itself even though it is in the middle of working it out
+                    return 0;
+                }
+            }
+            entity_stack.push_back(&cls);
+
+            std::string seed;
+            for(auto& item : cls.get_attributes())
+            {
+                //if(item == "")
+            }
+            if(cls.get_type() == entity_type::INTERFACE || cls.get_type() == entity_type::LIBRARY)
+            {
+                auto* owner = cls.get_owner();
+                while (owner)
+                {
+                    seed = owner->get_name() + "::" + seed;
+                    owner = owner->get_owner();                
+                } 
+
+                if(cls.get_type() == entity_type::LIBRARY)
+                    seed += "i_";
+
+                seed += cls.get_name();
+
+                seed += "{";
+                for(auto& func : cls.get_functions())
+                {
+                    seed += "[";
+                    for(auto& item : cls.get_attributes())
+                    {
+                        if(item == "noexcept")
+                            seed += item + ",";
+                        else if(item == "const")
+                            seed += item + ",";
+                        else if(item == "tag")
+                            seed += item + ",";
+                    }
+                    seed += "]";
+                    seed += func.get_name();
+                    seed += "(";
+                    for(auto& param : func.get_parameters())
+                    {
+                        seed += "[";
+                        for(auto& item : param.get_attributes())
+                        {
+                            if(item == "in")
+                                seed += item + ",";
+                            else if(item == "out")
+                                seed += item + ",";
+                            else if(item == "inout")
+                                seed += item + ",";
+                            else if(item == "const")
+                                seed += item + ",";
+                        }
+                        seed += "]";
+
+                        auto param_type = param.get_type();
+                        if(param_type == "something_complicated")
+                            param_type=param_type;
+                        std::string reference_modifiers;
+                        strip_reference_modifiers(param_type, reference_modifiers);
+                        auto template_params = get_template_param(param_type);
+                        if(!template_params.empty())
+                        {
+                            auto substituted_template_param = extract_subsituted_templates(template_params, cls, entity_stack);
+                            seed += substitute_template_params(param_type, substituted_template_param);
+                        }
+                        else
+                        {                        
+                            auto* type = find_type(param_type, cls);
+                            if(type && type != &cls)
+                            {
+                                uint64_t type_id = generate_fingerprint(*type, entity_stack, nullptr);
+                                seed += std::to_string(type_id);
+                            }
+                            else
+                            {
+                                seed += param_type;
+                            }
+                        }
+                        
+                        seed += reference_modifiers + " ";
+                        seed += param.get_name() + ",";
+                        
+                    }
+                    seed += ")";                    
+                }
+                seed += "}";
+            }
+            if(!cls.get_is_template() && cls.get_type() == entity_type::STRUCT)
+            {
+                //template classes cannot know what type they are until the template parameters are specified
+                seed += "struct";
+                seed += get_full_name(cls);
+                auto bc = cls.get_base_classes();
+                if (!bc.empty())
+                {
+                    seed += " : ";
+                    int i = 0;
+                    for (auto base_class : bc)
+                    {
+                        if (i)
+                            seed += ", ";
+                        uint64_t type_id = generate_fingerprint(*base_class, {}, nullptr);
+                        seed += std::to_string(type_id) + " ";
+                        i++;
+                    }
+                }
+                seed += "{";
+
+                int i = 0;
+                for (auto& field : cls.get_functions())
+                {
+                    if (field.get_type() != FunctionTypeVariable)
+                        continue;
+
+                    if (i)
+                        seed += ", ";
+                    
+                    auto param_type = field.get_return_type();
+                    std::string reference_modifiers;
+                    strip_reference_modifiers(param_type, reference_modifiers);
+                    auto template_params = get_template_param(param_type);
+                    if(!template_params.empty())
+                    {
+                        auto substituted_template_param = extract_subsituted_templates(template_params, cls, entity_stack);
+                        seed += substitute_template_params(param_type, substituted_template_param);
+                    }
+                    else
+                    {
+                        const class_entity* type_info = find_type(param_type, cls);
+                        if(type_info && type_info != &cls)
+                        {
+                            uint64_t type_id = generate_fingerprint(*type_info, entity_stack, nullptr);
+                            seed += std::to_string(type_id);                        
+                        }
+                        else
+                        {
+                            seed += param_type;    
+                        }
+                    }
+                    seed += reference_modifiers + " ";
+                    seed += field.get_name();
+                    if (field.get_array_string().size())
+                        seed += "[" + field.get_array_string() + "]";
+                    i++;
+                }
+                seed += "}";
+            }
+
+            if(comment)
+                (*comment)("//{}", seed);
+            
+            entity_stack.pop_back();
+            
+            return std::hash<std::string> {}(seed);
+        }
+
         template<>
         std::string renderer::render<renderer::BY_VALUE>(print_type option, bool from_host, const class_entity& lib,
                                                          const std::string& name, bool is_in, bool is_out,
@@ -365,8 +706,8 @@ namespace enclave_marshaller
                 return false;
 
             std::string type_name = type;
-            std::string referenceModifiers;
-            strip_reference_modifiers(type_name, referenceModifiers);
+            std::string reference_modifiers;
+            strip_reference_modifiers(type_name, reference_modifiers);
 
             std::string encapsulated_type = get_encapsulated_shared_ptr_type(type_name);
 
@@ -382,12 +723,12 @@ namespace enclave_marshaller
 
             if (!is_interface)
             {
-                if (referenceModifiers.empty())
+                if (reference_modifiers.empty())
                 {
                     output = renderer().render<renderer::BY_VALUE>(option, from_host, lib, name, in, out, is_const,
                                                                    type_name, count);
                 }
-                else if (referenceModifiers == "&")
+                else if (reference_modifiers == "&")
                 {
                     if (by_value)
                     {
@@ -404,22 +745,22 @@ namespace enclave_marshaller
                                                                         type_name, count);
                     }
                 }
-                else if (referenceModifiers == "&&")
+                else if (reference_modifiers == "&&")
                 {
                     output = renderer().render<renderer::MOVE>(option, from_host, lib, name, in, out, is_const,
                                                                type_name, count);
                 }
-                else if (referenceModifiers == "*")
+                else if (reference_modifiers == "*")
                 {
                     output = renderer().render<renderer::POINTER>(option, from_host, lib, name, in, out, is_const,
                                                                   type_name, count);
                 }
-                else if (referenceModifiers == "*&")
+                else if (reference_modifiers == "*&")
                 {
                     output = renderer().render<renderer::POINTER_REFERENCE>(option, from_host, lib, name, in, out,
                                                                             is_const, type_name, count);
                 }
-                else if (referenceModifiers == "**")
+                else if (reference_modifiers == "**")
                 {
                     output = renderer().render<renderer::POINTER_POINTER>(option, from_host, lib, name, in, out,
                                                                           is_const, type_name, count);
@@ -427,29 +768,29 @@ namespace enclave_marshaller
                 else
                 {
 
-                    std::cerr << fmt::format("passing data by {} as in {} {} is not supported", referenceModifiers,
+                    std::cerr << fmt::format("passing data by {} as in {} {} is not supported", reference_modifiers,
                                              type, name);
-                    throw fmt::format("passing data by {} as in {} {} is not supported", referenceModifiers, type,
+                    throw fmt::format("passing data by {} as in {} {} is not supported", reference_modifiers, type,
                                       name);
                 }
             }
             else
             {
-                if (referenceModifiers.empty() || (referenceModifiers == "&" && (is_const || !out)))
+                if (reference_modifiers.empty() || (reference_modifiers == "&" && (is_const || !out)))
                 {
                     output = renderer().render<renderer::INTERFACE>(option, from_host, lib, name, in, out, is_const,
                                                                     type_name, count);
                 }
-                else if (referenceModifiers == "&")
+                else if (reference_modifiers == "&")
                 {
                     output = renderer().render<renderer::INTERFACE_REFERENCE>(option, from_host, lib, name, in, out,
                                                                               is_const, type_name, count);
                 }
                 else
                 {
-                    std::cerr << fmt::format("passing interface by {} as in {} {} is not supported", referenceModifiers,
+                    std::cerr << fmt::format("passing interface by {} as in {} {} is not supported", reference_modifiers,
                                              type, name);
-                    throw fmt::format("passing interface by {} as in {} {} is not supported", referenceModifiers, type,
+                    throw fmt::format("passing interface by {} as in {} {} is not supported", reference_modifiers, type,
                                       name);
                 }
             }
@@ -475,8 +816,8 @@ namespace enclave_marshaller
             }
 
             std::string type_name = type;
-            std::string referenceModifiers;
-            strip_reference_modifiers(type_name, referenceModifiers);
+            std::string reference_modifiers;
+            strip_reference_modifiers(type_name, reference_modifiers);
 
             std::string encapsulated_type = get_encapsulated_shared_ptr_type(type_name);
 
@@ -490,7 +831,7 @@ namespace enclave_marshaller
                 }
             }
 
-            if (referenceModifiers.empty())
+            if (reference_modifiers.empty())
             {
                 std::cerr << fmt::format("out parameters require data to be sent by pointer or reference {} {} ", type,
                                          name);
@@ -499,25 +840,25 @@ namespace enclave_marshaller
 
             if (!is_interface)
             {
-                if (referenceModifiers == "&")
+                if (reference_modifiers == "&")
                 {
                     output = renderer().render<renderer::BY_VALUE>(option, from_host, lib, name, in, out, is_const,
                                                                     type_name, count);
                 }
-                else if (referenceModifiers == "&&")
+                else if (reference_modifiers == "&&")
                 {
                     throw std::runtime_error("out call rvalue references is not possible");
                 }
-                else if (referenceModifiers == "*")
+                else if (reference_modifiers == "*")
                 {
                     throw std::runtime_error("passing [out] by_pointer data by * will not work use a ** or *&");
                 }
-                else if (referenceModifiers == "*&")
+                else if (reference_modifiers == "*&")
                 {
                     output = renderer().render<renderer::POINTER_REFERENCE>(option, from_host, lib, name, in, out,
                                                                             is_const, type_name, count);
                 }
-                else if (referenceModifiers == "**")
+                else if (reference_modifiers == "**")
                 {
                     output = renderer().render<renderer::POINTER_POINTER>(option, from_host, lib, name, in, out,
                                                                           is_const, type_name, count);
@@ -525,24 +866,24 @@ namespace enclave_marshaller
                 else
                 {
 
-                    std::cerr << fmt::format("passing data by {} as in {} {} is not supported", referenceModifiers,
+                    std::cerr << fmt::format("passing data by {} as in {} {} is not supported", reference_modifiers,
                                              type, name);
-                    throw fmt::format("passing data by {} as in {} {} is not supported", referenceModifiers, type,
+                    throw fmt::format("passing data by {} as in {} {} is not supported", reference_modifiers, type,
                                       name);
                 }
             }
             else
             {
-                if (referenceModifiers == "&")
+                if (reference_modifiers == "&")
                 {
                     output = renderer().render<renderer::INTERFACE_REFERENCE>(option, from_host, lib, name, in, out,
                                                                               is_const, type_name, count);
                 }
                 else
                 {
-                    std::cerr << fmt::format("passing interface by {} as in {} {} is not supported", referenceModifiers,
+                    std::cerr << fmt::format("passing interface by {} as in {} {} is not supported", reference_modifiers,
                                              type, name);
-                    throw fmt::format("passing interface by {} as in {} {} is not supported", referenceModifiers, type,
+                    throw fmt::format("passing interface by {} as in {} {} is not supported", reference_modifiers, type,
                                       name);
                 }
             }
@@ -572,6 +913,7 @@ namespace enclave_marshaller
             header("class {}{} : public rpc::casting_interface", interface_name, base_class_declaration);
             header("{{");
             header("public:");
+            header("static constexpr uint64_t fingerprint = {}ull;", generate_fingerprint(m_ob, {}, &header));
             header("static constexpr uint64_t id = {}ull;", id);
             header("virtual ~{}() = default;", interface_name);
 
@@ -1172,6 +1514,7 @@ namespace enclave_marshaller
             }
             header("struct {}{}", m_ob.get_name(), base_class_declaration);
             header("{{");
+            header("static constexpr uint64_t fingerprint = {}ull;", generate_fingerprint(m_ob, {}, &header));
 
             for (auto& field : m_ob.get_functions())
             {
