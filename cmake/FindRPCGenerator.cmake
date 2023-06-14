@@ -172,6 +172,7 @@ function(RPCGenerate
       target_link_libraries(${name}_idl_host PUBLIC ${dep}_host)
     endforeach()
 
+    ###############################################################################
     # #and an enclave specific target
     add_library(${name}_idl_enclave STATIC
       ${full_header_path}
@@ -196,5 +197,35 @@ function(RPCGenerate
       add_dependencies(${name}_idl_enclave ${dep}_generate)
       target_link_libraries(${name}_idl_enclave PUBLIC ${dep}_enclave)
     endforeach()
+
+    ###############################################################################
+        # #and an enclave specific target
+        add_library(${name}_idl_enclave_v1 STATIC
+        ${full_header_path}
+        ${full_stub_header_path}
+        ${full_stub_path}
+        ${full_proxy_path}
+      )
+      target_compile_definitions(${name}_idl_enclave_v1 
+        PUBLIC
+          NO_RPC_V2
+        PRIVATE 
+          ${ENCLAVE_DEFINES})
+      target_include_directories(${name}_idl_enclave_v1 PUBLIC "$<BUILD_INTERFACE:${output_path}>" "$<BUILD_INTERFACE:${output_path}/include>" PRIVATE ${ENCLAVE_LIBCXX_INCLUDES})
+      target_compile_options(${name}_idl_enclave_v1 PRIVATE ${ENCLAVE_COMPILE_OPTIONS})
+      target_link_directories(${name}_idl_enclave_v1 PRIVATE ${SGX_LIBRARY_PATH})
+      set_property(TARGET ${name}_idl_enclave_v1 PROPERTY COMPILE_PDB_NAME ${name}_idl_enclave_v1)
+  
+      target_link_libraries(${name}_idl_enclave_v1 PUBLIC
+        rpc_enclave_v1
+        yas_common
+      )
+  
+      add_dependencies(${name}_idl_enclave_v1 ${name}_idl_generate)
+  
+      foreach(dep ${params_dependencies})
+        add_dependencies(${name}_idl_enclave_v1 ${dep}_generate)
+        target_link_libraries(${name}_idl_enclave_v1 PUBLIC ${dep}_enclave)
+      endforeach()
   endif()
 endfunction()

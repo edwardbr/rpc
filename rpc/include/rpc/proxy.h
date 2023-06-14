@@ -63,8 +63,14 @@ namespace rpc
         }   
         const rpc::casting_interface* query_interface(rpc::interface_ordinal interface_id) const override 
         { 
-            if(T::id == interface_id.get_val())
+            #ifndef NO_RPC_V2
+            if(T::get_id(rpc::VERSION_2) == interface_id)
                 return static_cast<const T*>(this);  
+            #endif
+            #ifndef NO_RPC_V1
+            if(T::get_id(rpc::VERSION_1) == interface_id)
+                return static_cast<const T*>(this);  
+            #endif
             return nullptr;
         }
         virtual ~proxy_impl() = default;
@@ -83,7 +89,7 @@ namespace rpc
         // note the interface pointer may change if there is already an interface inserted successfully
         void register_interface(interface_ordinal interface_id, rpc::weak_ptr<proxy_base>& value);
 
-        int try_cast(interface_ordinal interface_id);
+        int try_cast(std::function<interface_ordinal (uint8_t)> id_getter);
 
     public:
         static rpc::shared_ptr<object_proxy> create(object object_id,
@@ -98,7 +104,7 @@ namespace rpc
         object get_object_id() const {return {object_id_};}
         destination_zone get_destination_zone_id() const;
 
-        int send(interface_ordinal interface_id, method method_id, size_t in_size_, const char* in_buf_,
+        int send(std::function<interface_ordinal (uint8_t)> id_getter, method method_id, size_t in_size_, const char* in_buf_,
                         std::vector<char>& out_buf_);
 
         size_t get_proxy_count()
@@ -126,19 +132,41 @@ namespace rpc
 
             { // scope for the lock
                 std::lock_guard guard(insert_control_);
-                if(T::id == 0)
+#ifndef NO_RPC_V2
+                if(T::get_id(rpc::VERSION_2) == 0)
                 {
                     return rpc::error::OK();
                 }
-                auto item = proxy_map.find({T::id});
-                if (item != proxy_map.end())
                 {
-                    return create(item);
+                    auto item = proxy_map.find(T::get_id(rpc::VERSION_2));
+                    if (item != proxy_map.end())
+                    {
+                        return create(item);
+                    }
                 }
+#endif
+#ifndef NO_RPC_V1
+                if(T::get_id(rpc::VERSION_1) == 0)
+                {
+                    return rpc::error::OK();
+                }
+                {
+                    auto item = proxy_map.find(T::get_id(rpc::VERSION_1));
+                    if (item != proxy_map.end())
+                    {
+                        return create(item);
+                    }
+                }
+#endif
                 if (!do_remote_check)
                 {
                     create_interface_proxy<T>(iface);
-                    proxy_map[{T::id}] = rpc::reinterpret_pointer_cast<proxy_base>(iface);
+#ifndef NO_RPC_V1
+                    proxy_map[T::get_id(rpc::VERSION_1)] = rpc::reinterpret_pointer_cast<proxy_base>(iface);
+#endif
+#ifndef NO_RPC_V2
+                    proxy_map[T::get_id(rpc::VERSION_2)] = rpc::reinterpret_pointer_cast<proxy_base>(iface);
+#endif                    
                     return rpc::error::OK();
                 }
             }
@@ -147,7 +175,7 @@ namespace rpc
             if (do_remote_check)
             {
                 // see if object_id can implement interface
-                int ret = try_cast({T::id});
+                int ret = try_cast(T::get_id);
                 if (ret != rpc::error::OK())
                 {
                     return ret;
@@ -157,14 +185,32 @@ namespace rpc
                 std::lock_guard guard(insert_control_);
 
                 // check again...
-                auto item = proxy_map.find({T::id});
-                if (item != proxy_map.end())
+#ifndef NO_RPC_V2
                 {
-                    return create(item);
+                    auto item = proxy_map.find(T::get_id(rpc::VERSION_2));
+                    if (item != proxy_map.end())
+                    {
+                        return create(item);
+                    }
                 }
+#endif
+#ifndef NO_RPC_V1
+                {
+                    auto item = proxy_map.find(T::get_id(rpc::VERSION_1));
+                    if (item != proxy_map.end())
+                    {
+                        return create(item);
+                    }
+                }
+#endif
 
                 create_interface_proxy<T>(iface);
-                proxy_map[{T::id}] = rpc::reinterpret_pointer_cast<proxy_base>(iface);
+#ifndef NO_RPC_V1
+                proxy_map[T::get_id(rpc::VERSION_1)] = rpc::reinterpret_pointer_cast<proxy_base>(iface);
+#endif
+#ifndef NO_RPC_V2
+                proxy_map[T::get_id(rpc::VERSION_2)] = rpc::reinterpret_pointer_cast<proxy_base>(iface);
+#endif
                 return rpc::error::OK();
             }
         }
@@ -279,6 +325,31 @@ namespace rpc
                 assert(dependent_services_lock_);
                 dependent_services_lock_ = nullptr;
             }            
+        }
+
+        int call(
+                encoding encoding 
+                , uint64_t tag 
+                , object object_id 
+                , std::function<interface_ordinal (uint8_t)> id_getter 
+                , method method_id 
+                , size_t in_size_
+                , const char* in_buf_ 
+                , std::vector<char>& out_buf_)
+        {
+            return send(
+                get_version(),
+                encoding::enc_default,
+                0,
+                caller_channel_zone{}, 
+                get_zone_id().as_caller(), 
+                get_destination_zone_id(), 
+                object_id, 
+                id_getter(get_version()), 
+                method_id, 
+                in_size_, 
+                in_buf_, 
+                out_buf_);
         }
 
         std::unordered_map<object, rpc::weak_ptr<object_proxy>> get_proxies(){return proxies_;}
@@ -457,9 +528,25 @@ namespace rpc
             auto count = serv->release_local_stub(ob);
             assert(count);
 
-            auto interface_stub = ob->get_interface({T::id});
+#ifndef NO_RPC_V2
+            auto interface_stub = ob->get_interface(T::get_id(rpc::VERSION_2));
             if(!interface_stub)
+            {
+#ifndef NO_RPC_V1
+                interface_stub = ob->get_interface(T::get_id(rpc::VERSION_1));
+#endif                
+                if(!interface_stub)
+                {
+                    return rpc::error::INVALID_INTERFACE_ID();
+                }
+            }
+#elif !defined(NO_RPC_V1)
+            auto interface_stub = ob->get_interface(T::get_id(rpc::VERSION_1));
+            if(!interface_stub)
+            {
                 return rpc::error::INVALID_INTERFACE_ID();
+            }
+#endif
 
             val = rpc::static_pointer_cast<T>(interface_stub->get_castable_interface());
             return rpc::error::OK();

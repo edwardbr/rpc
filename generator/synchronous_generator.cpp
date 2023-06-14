@@ -913,8 +913,22 @@ namespace enclave_marshaller
             header("class {}{} : public rpc::casting_interface", interface_name, base_class_declaration);
             header("{{");
             header("public:");
-            header("static constexpr uint64_t fingerprint = {}ull;", generate_fingerprint(m_ob, {}, &header));
-            header("static constexpr uint64_t id = {}ull;", id);
+            header("static rpc::interface_ordinal get_id(uint8_t rpc_version)");
+            header("{{");
+            header("#ifndef NO_RPC_V2");
+            header("if(rpc_version == rpc::VERSION_2)");
+            header("{{");
+            header("return {{{}ull}};", generate_fingerprint(m_ob, {}, &header));
+            header("}}");
+            header("#endif");
+            header("#ifndef NO_RPC_V1");
+            header("if(rpc_version == rpc::VERSION_1)");
+            header("{{");
+            header("return {{{}ull}};", id);
+            header("}}");
+            header("#endif");
+            header("return {{0}};");
+            header("}}");
             header("virtual ~{}() = default;", interface_name);
 
             proxy("class {0}_proxy : public rpc::proxy_impl<{0}>", interface_name);
@@ -926,11 +940,11 @@ namespace enclave_marshaller
             proxy("auto __rpc_sp = __rpc_op->get_service_proxy();");
             proxy("   if(auto* telemetry_service = "
                   "__rpc_sp->get_telemetry_service();telemetry_service)");
-            proxy("   {{");
-            proxy("   telemetry_service->on_interface_proxy_creation(\"{0}_proxy\", "
+            proxy("{{");
+            proxy("telemetry_service->on_interface_proxy_creation(\"{0}_proxy\", "
                   "__rpc_sp->get_zone_id(), "
                   "__rpc_sp->get_destination_zone_id(), __rpc_op->get_object_id(), "
-                  "{{{0}_proxy::id}});",
+                  "{{{0}_proxy::get_id(rpc::get_version())}});",
                   interface_name);
             proxy("}}");
             proxy("}}");
@@ -947,7 +961,7 @@ namespace enclave_marshaller
             proxy("telemetry_service->on_interface_proxy_deletion(\"{0}_proxy\", "
                   "__rpc_sp->get_zone_id(), "
                   "__rpc_sp->get_destination_zone_id(), __rpc_op->get_object_id(), "
-                  "{{{0}_proxy::id}});",
+                  "{{{0}_proxy::get_id(rpc::get_version())}});",
                   interface_name);
             proxy("}}");
             proxy("}}");
@@ -1028,7 +1042,7 @@ namespace enclave_marshaller
                     proxy("telemetry_service->on_interface_proxy_send(\"{0}_proxy\", "
                           "__rpc_sp->get_zone_id(), "
                           "__rpc_sp->get_destination_zone_id(), "
-                          "__rpc_op->get_object_id(), {{{0}_proxy::id}}, {{{1}}});",
+                          "__rpc_op->get_object_id(), {{{0}_proxy::get_id(rpc::get_version())}}, {{{1}}});",
                           interface_name, function_count);
                     proxy("}}");
 
@@ -1138,7 +1152,7 @@ namespace enclave_marshaller
                     }
 
                     proxy("std::vector<char> __rpc_out_buf(24); //max size using short string optimisation");
-                    proxy("{} __rpc_ret = __rpc_op->send({{{}::id}}, {{{}}}, __rpc_in_buf.size(), __rpc_in_buf.data(), __rpc_out_buf);",
+                    proxy("{} __rpc_ret = __rpc_op->send({}::get_id, {{{}}}, __rpc_in_buf.size(), __rpc_in_buf.data(), __rpc_out_buf);",
                           function.get_return_type(), interface_name, function_count);
                     proxy("if(__rpc_ret >= rpc::error::MIN() && __rpc_ret <= rpc::error::MAX())");
                     proxy("{{");
@@ -1377,17 +1391,32 @@ namespace enclave_marshaller
                 return;
             done.insert(ns);
 
-            stub("srv->add_interface_stub_factory({{{0}::id}}, [](const rpc::shared_ptr<rpc::i_interface_stub>& original) -> rpc::shared_ptr<rpc::i_interface_stub>", ns);
+            stub("srv->add_interface_stub_factory({0}::get_id, std::make_shared<std::function<rpc::shared_ptr<rpc::i_interface_stub>(const rpc::shared_ptr<rpc::i_interface_stub>&)>>([](const rpc::shared_ptr<rpc::i_interface_stub>& original) -> rpc::shared_ptr<rpc::i_interface_stub>", ns);
             stub("{{");
             stub("auto ci = original->get_castable_interface();");
-            stub("auto* tmp = const_cast<{0}*>(static_cast<const {0}*>(ci->query_interface({{{0}::id}})));", ns);
+            stub("const {0}* tmp = nullptr;", ns);
+            stub("#ifndef NO_RPC_V2");
+            stub("{{");
+            stub("auto* tmp = const_cast<{0}*>(static_cast<const {0}*>(ci->query_interface({0}::get_id(rpc::VERSION_2))));", ns);
             stub("if(tmp != nullptr)");
             stub("{{");
             stub("rpc::shared_ptr<{0}> tmp_ptr(ci, tmp);", ns);
             stub("return rpc::static_pointer_cast<rpc::i_interface_stub>({}_stub::create(tmp_ptr, original->get_object_stub()));", ns);
             stub("}}");
+            stub("}}");
+            stub("#endif");            
+            stub("#ifndef NO_RPC_V1");
+            stub("{{");
+            stub("auto* tmp = const_cast<{0}*>(static_cast<const {0}*>(ci->query_interface({{{0}::get_id(rpc::VERSION_1)}})));", ns);
+            stub("if(tmp != nullptr)");
+            stub("{{");
+            stub("rpc::shared_ptr<{0}> tmp_ptr(ci, tmp);", ns);
+            stub("return rpc::static_pointer_cast<rpc::i_interface_stub>({}_stub::create(tmp_ptr, original->get_object_stub()));", ns);
+            stub("}}");
+            stub("}}");
+            stub("#endif");            
             stub("return nullptr;");
-            stub("}});");
+            stub("}}));");
         }
 
         void write_stub_cast_factory(const class_entity& lib, const class_entity& m_ob, writer& stub)
@@ -1397,7 +1426,7 @@ namespace enclave_marshaller
                  interface_name);
             stub("{{");
             stub("auto& service = get_object_stub().lock()->get_zone();");
-            stub("int __rpc_ret = service.create_interface_stub(interface_id, {{{}::id}}, shared_from_this(), new_stub);", interface_name);
+            stub("int __rpc_ret = service.create_interface_stub(interface_id, {}::get_id, shared_from_this(), new_stub);", interface_name);
             stub("return __rpc_ret;");
             stub("}}");
         }
@@ -1433,7 +1462,10 @@ namespace enclave_marshaller
             stub("rpc::shared_ptr<{0}_stub> shared_from_this(){{return rpc::shared_ptr<{0}_stub>(weak_this_);}}",
                  interface_name);
             stub("");
-            stub("rpc::interface_ordinal get_interface_id() const override {{ return {{{}::id}}; }};", interface_name);
+            stub("rpc::interface_ordinal get_interface_id(uint8_t rpc_version) const override");
+            stub("{{");
+            stub("return {{{}::get_id(rpc_version)}};", interface_name);
+            stub("}}");            
             stub("virtual rpc::shared_ptr<rpc::casting_interface> get_castable_interface() const override {{ return rpc::static_pointer_cast<rpc::casting_interface>(__rpc_target_); }}", interface_name);
 
             stub("rpc::weak_ptr<rpc::object_stub> get_object_stub() const override {{ return target_stub_;}}");
@@ -1514,7 +1546,18 @@ namespace enclave_marshaller
             }
             header("struct {}{}", m_ob.get_name(), base_class_declaration);
             header("{{");
-            header("static constexpr uint64_t fingerprint = {}ull;", generate_fingerprint(m_ob, {}, &header));
+
+            header("static uint64_t get_id(uint8_t rpc_version)");
+            header("{{");
+            header("//if(rpc_version == rpc::VERSION_1) not implemented");
+            header("#ifndef NO_RPC_V2");
+            header("if(rpc_version == rpc::VERSION_2)");
+            header("{{");
+            header("return {}ull;", generate_fingerprint(m_ob, {}, &header));
+            header("}}");
+            header("#endif");
+            header("return 0;");
+            header("}}");
 
             for (auto& field : m_ob.get_functions())
             {

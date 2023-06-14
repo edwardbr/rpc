@@ -92,7 +92,7 @@ class host :
     void* get_address() const override { return (void*)this; }
     const rpc::casting_interface* query_interface(rpc::interface_ordinal interface_id) const override
     {
-        if (yyy::i_host::id == interface_id.get_val())
+        if (rpc::match<yyy::i_host>(interface_id))
             return static_cast<const yyy::i_host*>(this);
         return nullptr;
     }

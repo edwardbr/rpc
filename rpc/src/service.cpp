@@ -816,10 +816,23 @@ namespace rpc
         }
     }
 
-    int service::create_interface_stub(rpc::interface_ordinal interface_id, rpc::interface_ordinal original_interface_id, const rpc::shared_ptr<rpc::i_interface_stub>& original, rpc::shared_ptr<rpc::i_interface_stub>& new_stub)
+    int service::create_interface_stub(rpc::interface_ordinal interface_id, std::function<interface_ordinal(uint8_t)> interface_getter, const rpc::shared_ptr<rpc::i_interface_stub>& original, rpc::shared_ptr<rpc::i_interface_stub>& new_stub)
     {
         //an identity check, send back the same pointer
-        if(interface_id == original_interface_id)
+        if(
+#ifndef NO_RPC_V2
+                interface_getter(rpc::VERSION_2) == interface_id
+#endif
+#if !defined(NO_RPC_V) && !defined(NO_RPC_V2)
+                ||
+#endif
+#ifndef NO_RPC_V1
+                interface_getter(rpc::VERSION_1) == interface_id
+#endif            
+#if defined(NO_RPC_V) && defined(NO_RPC_V2)
+                false
+#endif
+        )
         {
             new_stub = rpc::static_pointer_cast<rpc::i_interface_stub>(original);
             return rpc::error::OK();
@@ -831,7 +844,7 @@ namespace rpc
             return rpc::error::INVALID_CAST();
         }
 
-        new_stub = it->second(original);
+        new_stub = (*it->second)(original);
         if(!new_stub)
         {
             return rpc::error::INVALID_CAST();
@@ -841,14 +854,27 @@ namespace rpc
     }
 
     //note this function is not thread safe!  Use it before using the service class for normal operation
-    int service::add_interface_stub_factory(rpc::interface_ordinal interface_id, std::function<rpc::shared_ptr<rpc::i_interface_stub>(const rpc::shared_ptr<rpc::i_interface_stub>&)> factory)
+    int service::add_interface_stub_factory(std::function<interface_ordinal (uint8_t)> id_getter, std::shared_ptr<std::function<rpc::shared_ptr<rpc::i_interface_stub>(const rpc::shared_ptr<rpc::i_interface_stub>&)>> factory)
     {
-        auto it = stub_factories.find(interface_id);
+#ifndef NO_RPC_V1
+        auto interface_id = id_getter(rpc::VERSION_1);
+        auto it = stub_factories.find({interface_id});
         if(it != stub_factories.end())
         {
             rpc::error::INVALID_DATA();
         }
-        stub_factories.emplace(interface_id, std::move(factory));
+        stub_factories[{interface_id}] = factory;
+#endif
+
+#ifndef NO_RPC_V2
+        interface_id = id_getter(rpc::VERSION_2);
+        it = stub_factories.find({interface_id});
+        if(it != stub_factories.end())
+        {
+            rpc::error::INVALID_DATA();
+        }
+        stub_factories[{interface_id}] = factory;
+#endif
         return rpc::error::OK();
     }
 

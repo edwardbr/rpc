@@ -1,5 +1,6 @@
 #include "rpc/stub.h"
 #include "rpc/service.h"
+#include "rpc/version.h"
 
 #ifndef LOG_STR_DEFINED
 # ifdef USE_RPC_LOGGING
@@ -44,7 +45,12 @@ namespace rpc
 
     void object_stub::add_interface(const rpc::shared_ptr<i_interface_stub>& iface)
     {
-        stub_map[iface->get_interface_id()] = iface;
+#ifndef NO_RPC_V1        
+        stub_map[iface->get_interface_id(rpc::VERSION_1)] = iface;
+#endif
+#ifndef NO_RPC_V2
+        stub_map[iface->get_interface_id(rpc::VERSION_2)] = iface;
+#endif
     }
 
     rpc::shared_ptr<i_interface_stub> object_stub::get_interface(interface_ordinal interface_id)

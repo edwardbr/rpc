@@ -12,6 +12,7 @@
 #include <functional>
 
 #include <rpc/types.h>
+#include <rpc/version.h>
 #include <rpc/marshaller.h>
 #include <rpc/remote_pointer.h>
 #include <rpc/casting_interface.h>
@@ -45,7 +46,7 @@ namespace rpc
 
         // map object_id's to stubs
         std::unordered_map<object, rpc::weak_ptr<object_stub>> stubs;
-        std::unordered_map<rpc::interface_ordinal, std::function<rpc::shared_ptr<rpc::i_interface_stub>(const rpc::shared_ptr<rpc::i_interface_stub>&)>> stub_factories;
+        std::unordered_map<rpc::interface_ordinal, std::shared_ptr<std::function<rpc::shared_ptr<rpc::i_interface_stub>(const rpc::shared_ptr<rpc::i_interface_stub>&)>>> stub_factories;
         // map wrapped objects pointers to stubs
         std::map<void*, rpc::weak_ptr<object_stub>> wrapped_object_to_stub;
 
@@ -134,7 +135,13 @@ namespace rpc
         virtual void remove_zone_proxy(destination_zone destination_zone_id, caller_zone caller_zone_id, destination_channel_zone destination_channel_zone_id);
         template<class T> rpc::shared_ptr<T> get_local_interface(object object_id)
         {
-            return rpc::static_pointer_cast<T>(get_castable_interface(object_id, {T::id}));
+            return rpc::static_pointer_cast<T>(get_castable_interface(object_id, 
+#ifndef NO_RPC_V2            
+            T::get_id(rpc::VERSION_2)
+#else
+            T::get_id(rpc::VERSION_1)
+#endif
+            ));
         }
 
         template<class T> 
@@ -142,12 +149,12 @@ namespace rpc
             const shared_ptr<T>& iface);
         int create_interface_stub(
             rpc::interface_ordinal interface_id
-            , rpc::interface_ordinal original_interface_id
+            , std::function<interface_ordinal(uint8_t)> original_interface_id
             , const rpc::shared_ptr<rpc::i_interface_stub>& original
             , rpc::shared_ptr<rpc::i_interface_stub>& new_stub);
 
         //note this function is not thread safe!  Use it before using the service class for normal operation
-        int add_interface_stub_factory(rpc::interface_ordinal interface_id, std::function<rpc::shared_ptr<rpc::i_interface_stub>(const rpc::shared_ptr<rpc::i_interface_stub>&)> factory);
+        int add_interface_stub_factory(std::function<interface_ordinal (uint8_t)> id_getter, std::shared_ptr<std::function<rpc::shared_ptr<rpc::i_interface_stub>(const rpc::shared_ptr<rpc::i_interface_stub>&)>> factory);
 
         //note this is not thread safe and should only be used on setup
         void add_service_logger(const std::shared_ptr<service_logger>& logger)
