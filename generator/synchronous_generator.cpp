@@ -4,6 +4,10 @@
 #include <type_traits>
 #include "coreclasses.h"
 #include "cpp_parser.h"
+extern "C"
+{
+    #include "sha3.h"
+}
 #include <filesystem>
 #include <sstream>
 
@@ -393,8 +397,14 @@ namespace enclave_marshaller
                 (*comment)("//{}", seed);
             
             entity_stack.pop_back();
-            
-            return std::hash<std::string> {}(seed);
+
+            //convert to sha3 hash
+            sha3_context c;
+            sha3_Init256(&c);
+            sha3_Update(&c, seed.data(), seed.length());
+            const auto* hash = sha3_Finalize(&c);
+            //truncate and return generated hash
+            return *(uint64_t*)hash;
         }
 
         template<>
@@ -1755,6 +1765,7 @@ namespace enclave_marshaller
 
             header("");
 
+            //this is deprecated and only to be used with rpc v1, delete when no longer needed
             std::size_t hash = std::hash<std::string> {}(prefix + "::" + cls.get_name());
 
             if (cls.get_type() == entity_type::INTERFACE)

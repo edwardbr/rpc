@@ -5,7 +5,8 @@ enable_testing()
 add_executable(generator 
     synchronous_generator.cpp
     synchronous_mock_generator.cpp
-    main.cpp)
+    main.cpp
+    sha3.c)
 
 target_compile_definitions(generator PRIVATE ${HOST_DEFINES})
 target_compile_options(generator PRIVATE ${HOST_COMPILE_OPTIONS})
