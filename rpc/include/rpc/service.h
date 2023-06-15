@@ -80,11 +80,12 @@ namespace rpc
         object generate_new_object_id() const { return {++object_id_generator}; }
         virtual rpc::shared_ptr<rpc::service_proxy> get_parent() const {return nullptr;}
 
-        template<class T> interface_descriptor proxy_bind_in_param(const shared_ptr<T>& iface, shared_ptr<object_stub>& stub);
-        template<class T> interface_descriptor stub_bind_out_param(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, const shared_ptr<T>& iface);
+        template<class T> interface_descriptor proxy_bind_in_param(uint64_t protocol_version, const shared_ptr<T>& iface, shared_ptr<object_stub>& stub);
+        template<class T> interface_descriptor stub_bind_out_param(uint64_t protocol_version, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, const shared_ptr<T>& iface);
 
-        interface_descriptor prepare_out_param(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, rpc::proxy_base* base);
-        interface_descriptor get_proxy_stub_descriptor(caller_channel_zone caller_channel_zone_id, 
+        interface_descriptor prepare_out_param(uint64_t protocol_version, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, rpc::proxy_base* base);
+        interface_descriptor get_proxy_stub_descriptor(uint64_t protocol_version, 
+                                                        caller_channel_zone caller_channel_zone_id, 
                                                         caller_zone caller_zone_id, 
                                                         rpc::casting_interface* pointer,
                                                         std::function<rpc::shared_ptr<i_interface_stub>(rpc::shared_ptr<object_stub>)> fn,
@@ -133,15 +134,9 @@ namespace rpc
         virtual void add_zone_proxy(const rpc::shared_ptr<service_proxy>& zone);
         virtual rpc::shared_ptr<service_proxy> get_zone_proxy(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, destination_zone destination_zone_id, caller_zone new_caller_zone_id, bool& new_proxy_added);
         virtual void remove_zone_proxy(destination_zone destination_zone_id, caller_zone caller_zone_id, destination_channel_zone destination_channel_zone_id);
-        template<class T> rpc::shared_ptr<T> get_local_interface(object object_id)
+        template<class T> rpc::shared_ptr<T> get_local_interface(uint64_t protocol_version, object object_id)
         {
-            return rpc::static_pointer_cast<T>(get_castable_interface(object_id, 
-#ifndef NO_RPC_V2            
-            T::get_id(rpc::VERSION_2)
-#else
-            T::get_id(rpc::VERSION_1)
-#endif
-            ));
+            return rpc::static_pointer_cast<T>(get_castable_interface(object_id, T::get_id(protocol_version)));
         }
 
         template<class T> 
@@ -199,6 +194,14 @@ namespace rpc
         }
         rpc::shared_ptr<rpc::object_stub> stub;
         auto factory = serv.create_interface_stub(iface);
-        return serv.get_proxy_stub_descriptor(empty_caller_channel_zone, caller_zone_id, iface.get(), factory, false, stub);
+        return serv.get_proxy_stub_descriptor(rpc::get_version(), empty_caller_channel_zone, caller_zone_id, iface.get(), factory, false, stub);
     }
+
+
+    struct retry_buffer
+    {
+        std::vector<char> data;
+        int return_value;
+    };
+
 }

@@ -31,27 +31,27 @@ extern "C"
         , char* data_out
         , size_t* data_out_sz)
     {
-        thread_local std::vector<char> out_buf;
+        thread_local rpc::retry_buffer out_buf;
 
         auto root_service = current_host_service.lock();
         if (!root_service)
         {
-            out_buf.clear();
+            out_buf.data.clear();
             return rpc::error::TRANSPORT_ERROR();
         }
-        if (out_buf.empty())
+        if (out_buf.data.empty())
         {
-            int ret = root_service->send(protocol_version, rpc::encoding(encoding), tag, {caller_channel_zone_id}, {caller_zone_id}, {destination_zone_id}, {object_id}, {interface_id}, {method_id}, sz_int,
-                                         data_in, out_buf);
-            if (ret >= rpc::error::MIN() && ret <= rpc::error::MAX())
-                return ret;
+            out_buf.return_value = root_service->send(protocol_version, rpc::encoding(encoding), tag, {caller_channel_zone_id}, {caller_zone_id}, {destination_zone_id}, {object_id}, {interface_id}, {method_id}, sz_int,
+                                         data_in, out_buf.data);
+            if (out_buf.return_value >= rpc::error::MIN() && out_buf.return_value <= rpc::error::MAX())
+                return out_buf.return_value;
         }
-        *data_out_sz = out_buf.size();
+        *data_out_sz = out_buf.data.size();
         if (*data_out_sz > sz_out)
             return rpc::error::NEED_MORE_MEMORY();
-        memcpy(data_out, out_buf.data(), out_buf.size());
-        out_buf.clear();
-        return rpc::error::OK();
+        memcpy(data_out, out_buf.data.data(), out_buf.data.size());
+        out_buf.data.clear();
+        return out_buf.return_value;
     }
     int try_cast_host(
         uint64_t protocol_version                          //version of the rpc call protocol

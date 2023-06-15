@@ -56,9 +56,11 @@ using ::testing::Sequence;
 using namespace marshalled_tests;
 
 #ifdef _WIN32 // windows
-auto enclave_path = "./marshal_test_enclave.signed.dll";
+std::string enclave_path = "./marshal_test_enclave.signed.dll";
+std::string enclave_path_v1 = "./marshal_test_enclave_v1.signed.dll";
 #else         // Linux
-auto enclave_path = "./libmarshal_test_enclave.signed.so";
+std::string enclave_path = "./libmarshal_test_enclave.signed.so";
+std::string enclave_path_v1 = "./libmarshal_test_enclave_v1.signed.so";
 #endif
 
 rpc::weak_ptr<rpc::service> current_host_service;
@@ -85,6 +87,8 @@ class host :
     public rpc::enable_shared_from_this<host>
 {
 
+    bool use_v1_rpc_dll_ = false;
+
   	//perhaps this should be an unsorted list but map is easier to debug for now
     std::map<std::string, rpc::shared_ptr<yyy::i_example>> cached_apps_; 
     std::mutex cached_apps_mux_;
@@ -98,6 +102,8 @@ class host :
     }
 
 public:
+
+    host(bool use_v1_rpc_dll = false) : use_v1_rpc_dll_(use_v1_rpc_dll){}
     ~host(){}
     error_code create_enclave(rpc::shared_ptr<yyy::i_example>& target) override
     {
@@ -105,7 +111,7 @@ public:
         auto serv = current_host_service.lock();
         auto err_code = rpc::enclave_service_proxy::create(
             {++(*zone_gen)}, 
-            enclave_path, 
+            use_v1_rpc_dll_ ? enclave_path_v1 : enclave_path, 
             serv,
             host,
             target, 
@@ -252,11 +258,11 @@ struct inproc_setup
             host_encap = rpc::create_interface_stub(*root_service, hst);
 
             // simple test to check that we can get a useful local interface based on type and object id
-            auto example_from_cast = root_service->get_local_interface<yyy::i_host>(host_encap.object_id);
+            auto example_from_cast = root_service->get_local_interface<yyy::i_host>(rpc::get_version(), host_encap.object_id);
             EXPECT_EQ(example_from_cast, hst);
         }
 
-        ASSERT(!rpc::demarshall_interface_proxy(service_proxy_to_host, host_encap,  child_service->get_zone_id().as_caller(), i_host_ptr));
+        ASSERT(!rpc::demarshall_interface_proxy(rpc::get_version(), service_proxy_to_host, host_encap,  child_service->get_zone_id().as_caller(), i_host_ptr));
 
         {
             // create the example object implementation
@@ -267,11 +273,11 @@ struct inproc_setup
 
             // simple test to check that we can get a usefule local interface based on type and object id
             auto example_from_cast
-                = child_service->get_local_interface<yyy::i_example>(example_encap.object_id);
+                = child_service->get_local_interface<yyy::i_example>(rpc::get_version(), example_encap.object_id);
             EXPECT_EQ(example_from_cast, remote_example);
         }
 
-        ASSERT(!rpc::demarshall_interface_proxy(service_proxy_to_child, example_encap, root_service->get_zone_id().as_caller(), i_example_ptr));
+        ASSERT(!rpc::demarshall_interface_proxy(rpc::get_version(), service_proxy_to_child, example_encap, root_service->get_zone_id().as_caller(), i_example_ptr));
     }
 
     virtual void TearDown()
@@ -307,11 +313,11 @@ struct inproc_setup
 
         // simple test to check that we can get a usefule local interface based on type and object id
         auto example_from_cast
-            = new_service->get_local_interface<yyy::i_example>(example_encap.object_id);
+            = new_service->get_local_interface<yyy::i_example>(rpc::get_version(), example_encap.object_id);
         EXPECT_EQ(example_from_cast, remote_example);
 
         rpc::shared_ptr<yyy::i_example> example_relay_ptr;
-        ASSERT(!rpc::demarshall_interface_proxy(service_proxy_to_child, example_encap, root_service->get_zone_id().as_caller(), example_relay_ptr));                
+        ASSERT(!rpc::demarshall_interface_proxy(rpc::get_version(), service_proxy_to_child, example_encap, root_service->get_zone_id().as_caller(), example_relay_ptr));                
         
         if(CreateNewZoneThenCreateSubordinatedZone)
         {
@@ -323,7 +329,7 @@ struct inproc_setup
     }
 };
 
-template<bool UseHostInChild, bool RunStandardTests, bool CreateNewZoneThenCreateSubordinatedZone>
+template<bool UseHostInChild, bool RunStandardTests, bool CreateNewZoneThenCreateSubordinatedZone, bool use_v1_rpc_dll>
 struct enclave_setup
 {
     rpc::shared_ptr<host_telemetry_service> tm;
@@ -350,11 +356,11 @@ struct enclave_setup
         marshalled_tests::example_idl_register_stubs(root_service);
         current_host_service = root_service;
         
-        i_host_ptr = rpc::shared_ptr<yyy::i_host> (new host());
+        i_host_ptr = rpc::shared_ptr<yyy::i_host> (new host(use_v1_rpc_dll));
 
         auto err_code = rpc::enclave_service_proxy::create(
             {++zone_gen_}, 
-            enclave_path, 
+            use_v1_rpc_dll ? enclave_path_v1 : enclave_path, 
             root_service, 
             use_host_in_child ? i_host_ptr : nullptr, 
             i_example_ptr,
@@ -378,7 +384,7 @@ struct enclave_setup
         rpc::shared_ptr<yyy::i_example> ptr;
         auto err_code = rpc::enclave_service_proxy::create(
             {++zone_gen_}, 
-            enclave_path, 
+            use_v1_rpc_dll ? enclave_path_v1 : enclave_path, 
             root_service, 
             use_host_in_child ? i_host_ptr : nullptr, 
             ptr,
@@ -423,14 +429,23 @@ using local_implementations = ::testing::Types<
     inproc_setup<true, true, true>, 
 
 
-    enclave_setup<false, false, false>, 
-    enclave_setup<false, false, true>, 
-    enclave_setup<false, true, false>, 
-    enclave_setup<false, true, true>, 
-    enclave_setup<true, false, false>, 
-    enclave_setup<true, false, true>, 
-    enclave_setup<true, true, false>, 
-    enclave_setup<true, true, true>>;
+    enclave_setup<false, false, false, false>, 
+    enclave_setup<false, false, true, false>, 
+    enclave_setup<false, true, false, false>, 
+    enclave_setup<false, true, true, false>, 
+    enclave_setup<true, false, false, false>, 
+    enclave_setup<true, false, true, false>, 
+    enclave_setup<true, true, false, false>, 
+    enclave_setup<true, true, true, false>,
+
+    enclave_setup<false, false, false, true>, 
+    enclave_setup<false, false, true, true>, 
+    enclave_setup<false, true, false, true>, 
+    enclave_setup<false, true, true, true>, 
+    enclave_setup<true, false, false, true>, 
+    enclave_setup<true, false, true, true>, 
+    enclave_setup<true, true, false, true>, 
+    enclave_setup<true, true, true, true>>;
 TYPED_TEST_SUITE(type_test, local_implementations);
 
 TYPED_TEST(type_test, initialisation_test)
@@ -475,10 +490,15 @@ typedef Types<
     inproc_setup<true, true, false>, 
     inproc_setup<true, true, true>, 
 
-    enclave_setup<true, false, false>, 
-    enclave_setup<true, false, true>, 
-    enclave_setup<true, true, false>, 
-    enclave_setup<true, true, true>> remote_implementations;
+    enclave_setup<true, false, false, false>, 
+    enclave_setup<true, false, true, false>, 
+    enclave_setup<true, true, false, false>, 
+    enclave_setup<true, true, true, false>, 
+
+    enclave_setup<true, false, false, true>, 
+    enclave_setup<true, false, true, true>, 
+    enclave_setup<true, true, false, true>, 
+    enclave_setup<true, true, true, true>> remote_implementations;
 TYPED_TEST_SUITE(remote_type_test, remote_implementations);
 
 TYPED_TEST(remote_type_test, remote_standard_tests)
@@ -743,10 +763,15 @@ typedef Types<
     inproc_setup<true, true, false>, 
     inproc_setup<true, true, true>, 
 
-    enclave_setup<true, false, false>, 
-    enclave_setup<true, false, true>, 
-    enclave_setup<true, true, false>, 
-    enclave_setup<true, true, true>> type_test_with_host_implementations;
+    enclave_setup<true, false, false, false>, 
+    enclave_setup<true, false, true, false>, 
+    enclave_setup<true, true, false, false>, 
+    enclave_setup<true, true, true, false>, 
+
+    enclave_setup<true, false, false, true>, 
+    enclave_setup<true, false, true, true>, 
+    enclave_setup<true, true, false, true>, 
+    enclave_setup<true, true, true, true>> type_test_with_host_implementations;
 TYPED_TEST_SUITE(type_test_with_host, type_test_with_host_implementations);
 
 

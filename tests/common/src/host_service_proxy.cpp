@@ -149,7 +149,15 @@ namespace rpc
                 telemetry_service->message(rpc::i_telemetry_service::err, "add_ref_host failed");
             }
             return std::numeric_limits<uint64_t>::max();
-        }        
+        }     
+        if(ret == std::numeric_limits<uint64_t>::max())
+        {
+            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
+            {
+                telemetry_service->on_service_proxy_release("host_service_proxy", get_zone_id(), destination_zone_id,
+                                                            object_id, caller_zone_id);
+            }
+        }   
         if(proxy_add_ref && ret != std::numeric_limits<uint64_t>::max())
         {
             add_external_ref();

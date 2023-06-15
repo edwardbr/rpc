@@ -22,6 +22,7 @@ namespace enclave_marshaller
         enum print_type
         {
             PROXY_PREPARE_IN,
+            PROXY_PREPARE_IN_INTERFACE_ID,
             PROXY_MARSHALL_IN,
             PROXY_OUT_DECLARATION,
             PROXY_MARSHALL_OUT,
@@ -594,10 +595,12 @@ namespace enclave_marshaller
             {
             case PROXY_PREPARE_IN:
                 return fmt::format("rpc::shared_ptr<rpc::object_stub> {}_stub_;", name);
+            case PROXY_PREPARE_IN_INTERFACE_ID:
+                return fmt::format("auto {0}_stub_id_ = proxy_bind_in_param(__rpc_sp->get_remote_rpc_version(), {0}, {0}_stub_);", name);
             case PROXY_MARSHALL_IN:
             {
                 auto ret = fmt::format(
-                    ",(\"_{1}\", proxy_bind_in_param({0}, {0}_stub_))",
+                    ",(\"_{1}\", {0}_stub_id_)",
                     name, count);
                 count++;
                 return ret;
@@ -624,7 +627,7 @@ namespace enclave_marshaller
 				if(__rpc_ret == rpc::error::OK() && {1}_object_.destination_zone_id.is_set() && {1}_object_.object_id.is_set())
                 {{
                     auto& zone_ = target_stub_.lock()->get_zone();
-                    __rpc_ret = rpc::stub_bind_in_param(zone_, caller_channel_zone_id, caller_zone_id, {1}_object_, {1});
+                    __rpc_ret = rpc::stub_bind_in_param(protocol_version, zone_, caller_channel_zone_id, caller_zone_id, {1}_object_, {1});
                 }}
 )__",
                                    object_type, name);
@@ -650,8 +653,16 @@ namespace enclave_marshaller
             {
             case PROXY_PREPARE_IN:
                 return fmt::format("rpc::shared_ptr<rpc::object_stub> {}_stub_;", name);
+            case PROXY_PREPARE_IN_INTERFACE_ID:
+                return fmt::format("auto {0}_stub_id_ = proxy_bind_in_param(__rpc_sp->get_remote_rpc_version(), {0}, {0}_stub_);", name);
             case PROXY_MARSHALL_IN:
-                return fmt::format("  ,(\"{0}\", {0})", name);
+            {
+                auto ret = fmt::format(
+                    ",(\"_{1}\", {0}_stub_id_)",
+                    name, count);
+                count++;
+                return ret;
+            }
             case PROXY_MARSHALL_OUT:
                 return fmt::format("  ,(\"{0}\", {0}_)", name);
 
@@ -671,7 +682,7 @@ namespace enclave_marshaller
                     "rpc::interface_descriptor {0}_;", name);
             case STUB_ADD_REF_OUT:
                 return fmt::format(
-                    "{0}_ = zone_.stub_bind_out_param(caller_channel_zone_id, caller_zone_id, {0});", name);
+                    "{0}_ = zone_.stub_bind_out_param(protocol_version, caller_channel_zone_id, caller_zone_id, {0});", name);
             case STUB_MARSHALL_OUT:
                 return fmt::format("  ,(\"{0}\", {0}_)", name);
             default:
@@ -988,7 +999,7 @@ namespace enclave_marshaller
                   interface_name);
             proxy("");
 
-            stub("int {0}_stub::call(rpc::caller_channel_zone caller_channel_zone_id, rpc::caller_zone caller_zone_id, rpc::method method_id, size_t in_size_, const char* in_buf_, std::vector<char>& "
+            stub("int {0}_stub::call(uint64_t protocol_version, rpc::caller_channel_zone caller_channel_zone_id, rpc::caller_zone caller_zone_id, rpc::method method_id, size_t in_size_, const char* in_buf_, std::vector<char>& "
                  "__rpc_out_buf)", interface_name);
             stub("{{");
 
@@ -1074,28 +1085,128 @@ namespace enclave_marshaller
                         }
                     }
 
-                    proxy("std::vector<char> __rpc_in_buf;");                    
+                    proxy("std::vector<char> __rpc_in_buf;");     
+                    proxy("auto __rpc_ret = rpc::error::OK();");
+                    proxy("std::vector<char> __rpc_out_buf(24); //max size using short string optimisation");
+                    
+                    proxy("//PROXY_PREPARE_IN");
+                    uint64_t count = 1;
+                    for (auto& parameter : function.get_parameters())
+                    {
+                        std::string output;
+                        {
+                            if (!is_in_call(PROXY_PREPARE_IN, from_host, m_ob, parameter.get_name(),
+                                            parameter.get_type(), parameter.get_attributes(), count, output))
+                                continue;
+                            proxy(output);
 
+                            if (!is_in_call(PROXY_PREPARE_IN_INTERFACE_ID, from_host, m_ob, parameter.get_name(),
+                                            parameter.get_type(), parameter.get_attributes(), count, output))
+                                continue;                                    
+
+                            proxy(output);
+                        }
+                        count++;
+                    }
+                    proxy("bool has_sent = false;");
+                    proxy("#ifndef NO_RPC_V2");
+                    proxy("if(__rpc_sp->get_remote_rpc_version() == rpc::VERSION_2)");
+                    proxy("{{");               
+                    stub("#ifndef NO_RPC_V2");
+                    stub("if(protocol_version == rpc::VERSION_2)");
+                    stub("{{");               
                     if (has_inparams)
                     {
-                        proxy("//PROXY_PREPARE_IN");
-                        uint64_t count = 1;
-                        for (auto& parameter : function.get_parameters())
-                        {
-                            std::string output;
-                            {
-                                if (!is_in_call(PROXY_PREPARE_IN, from_host, m_ob, parameter.get_name(),
-                                                parameter.get_type(), parameter.get_attributes(), count, output))
-                                    continue;
-
-                                proxy(output);
-                            }
-                            count++;
-                        }
-                        
+                        stub("//PROXY_PREPARE_IN");                        
                         proxy("auto __rpc_in_yas_mapping = YAS_OBJECT_NVP(");
                         proxy("  \"in\"");
-                        proxy("  ,(\"__rpc_version\", rpc::get_version())");
+
+                        stub("//STUB_MARSHALL_IN");
+                        stub("yas::intrusive_buffer in(in_buf_, in_size_);");
+                        stub("try");
+                        stub("{{");
+                            stub("auto __rpc_in_yas_mapping = YAS_OBJECT_NVP(");
+                            stub("  \"in\"");
+                        
+
+                            count = 1;
+                            for (auto& parameter : function.get_parameters())
+                            {
+                                std::string output;
+                                {
+                                    if (!is_in_call(PROXY_MARSHALL_IN, from_host, m_ob, parameter.get_name(),
+                                                    parameter.get_type(), parameter.get_attributes(), count, output))
+                                        continue;
+
+                                    proxy(output);
+                                }
+                                count++;
+                            }
+
+                            count = 1;
+                            for (auto& parameter : function.get_parameters())
+                            {
+                                std::string output;
+                                {
+                                    if (!is_in_call(STUB_MARSHALL_IN, from_host, m_ob, parameter.get_name(),
+                                                    parameter.get_type(), parameter.get_attributes(), count, output))
+                                        continue;
+
+                                    stub(output);
+                                }
+                                count++;
+                            }
+                            proxy("  );");
+                            proxy("yas::count_ostream __rpc_counter;");
+                            
+                            proxy("{{");
+                            proxy("yas::binary_oarchive<yas::count_ostream, yas::mem|yas::binary|yas::no_header> __rpc_oa(__rpc_counter);");
+                            proxy("__rpc_oa(__rpc_in_yas_mapping);");
+                            proxy("}}");
+                            
+                            proxy("__rpc_in_buf.resize(__rpc_counter.total_size);");
+                            proxy("yas::mem_ostream __rpc_writer(__rpc_in_buf.data(), __rpc_counter.total_size);");
+                            proxy("{{");
+                            proxy("yas::save<yas::mem|yas::binary|yas::no_header>(__rpc_writer, __rpc_in_yas_mapping);");
+                            proxy("}}");
+                            stub("  );");
+                            stub("{{");
+                            stub("yas::load<yas::mem|yas::binary|yas::no_header>(in, __rpc_in_yas_mapping);");
+                            stub("}}");
+                        stub("}}");
+                        stub("catch(...)");
+                        stub("{{");
+                        stub("return rpc::error::STUB_DESERIALISATION_ERROR();");
+                        stub("}}");
+                    }
+                    proxy("__rpc_ret = __rpc_op->send({}::get_id, {{{}}}, __rpc_in_buf.size(), __rpc_in_buf.data(), __rpc_out_buf);",
+                        interface_name, function_count);
+                    proxy("has_sent = true;");
+                    proxy("}}");
+                    proxy("#ifndef NO_RPC_V1");
+                    proxy("if(!has_sent || __rpc_ret == rpc::error::INVALID_VERSION()) // carry over if");
+                    proxy("#endif");
+                    proxy("#endif");
+                    stub("}}");
+                    
+                    stub("#ifndef NO_RPC_V1");
+                    stub("else // carry over if");
+                    stub("#endif");
+                    stub("#endif");
+
+                    proxy("#ifndef NO_RPC_V1");
+                    proxy("//optionally try again with an older version of the protocol");
+                    proxy("if(__rpc_sp->get_remote_rpc_version() == rpc::VERSION_1)");
+                    proxy("{{");               
+                    stub("#ifndef NO_RPC_V1");
+                    stub("//optionally try again with an older version of the protocol");
+                    stub("if(protocol_version == rpc::VERSION_1)");
+                    stub("{{");                                           
+                    if (has_inparams)
+                    {
+                        proxy("auto __rpc_in_yas_mapping = YAS_OBJECT_NVP(");
+                        proxy("  \"in\"");
+                        proxy("  ,(\"__rpc_version\", rpc::VERSION_1) //this is superfluous in later versions of the protocol");
 
                         stub("//STUB_MARSHALL_IN");
                         stub("uint8_t __rpc_version = 0;");
@@ -1104,8 +1215,8 @@ namespace enclave_marshaller
                         stub("{{");
                         stub("auto __rpc_in_yas_mapping = YAS_OBJECT_NVP(");
                         stub("  \"in\"");
-                        stub("  ,(\"__rpc_version\", __rpc_version)");
-					  
+                        stub("  ,(\"__rpc_version\", __rpc_version) //this is superfluous in later versions of the protocol");
+                    
 
                         count = 1;
                         for (auto& parameter : function.get_parameters())
@@ -1157,13 +1268,18 @@ namespace enclave_marshaller
                         stub("return rpc::error::STUB_DESERIALISATION_ERROR();");
                         stub("}}");
                         
-                        stub("if(__rpc_version != rpc::get_version())");
+                        stub("if(__rpc_version != rpc::VERSION_1)");
                         stub("  return rpc::error::INVALID_VERSION();");
                     }
+                    
+                    proxy("__rpc_ret = __rpc_op->send({}::get_id, {{{}}}, __rpc_in_buf.size(), __rpc_in_buf.data(), __rpc_out_buf);",
+                        interface_name, function_count);
+                    proxy("has_sent = true;");
+                    proxy("}}");
+                    proxy("#endif");
+                    stub("}}");
+                    stub("#endif");
 
-                    proxy("std::vector<char> __rpc_out_buf(24); //max size using short string optimisation");
-                    proxy("{} __rpc_ret = __rpc_op->send({}::get_id, {{{}}}, __rpc_in_buf.size(), __rpc_in_buf.data(), __rpc_out_buf);",
-                          function.get_return_type(), interface_name, function_count);
                     proxy("if(__rpc_ret >= rpc::error::MIN() && __rpc_ret <= rpc::error::MAX())");
                     proxy("{{");
                     proxy("return __rpc_ret;");
@@ -1276,58 +1392,134 @@ namespace enclave_marshaller
                         stub("}}");                        
                     }
                     {
-                        uint64_t count = 1;
-                        proxy("//PROXY_MARSHALL_OUT");
-                        proxy("try");
-                        proxy("{{");
-                        proxy("auto __rpc_out_yas_mapping = YAS_OBJECT_NVP(");
-                        proxy("  \"out\"");
-                        proxy("  ,(\"__return_value\", __rpc_ret)");
+                        proxy("#ifndef NO_RPC_V2");
+                        proxy("if(__rpc_sp->get_remote_rpc_version() == rpc::VERSION_2)");
+                        proxy("{{");               
+                            uint64_t count = 1;
+                            proxy("//PROXY_MARSHALL_OUT");
+                            proxy("try");
+                            proxy("{{");
+                            proxy("auto __rpc_out_yas_mapping = YAS_OBJECT_NVP(");
+                            proxy("  \"out\"");
 
-                        stub("//STUB_MARSHALL_OUT");
-                        stub("auto __rpc_out_yas_mapping = YAS_OBJECT_NVP(");
-                        stub("  \"out\"");
-                        stub("  ,(\"__return_value\", __rpc_ret)");
+                        stub("#ifndef NO_RPC_V2");
+                        stub("if(protocol_version == rpc::VERSION_2)");
+                        stub("{{");                               stub("//STUB_MARSHALL_OUT");
+                            stub("auto __rpc_out_yas_mapping = YAS_OBJECT_NVP(");
+                            stub("  \"out\"");
 
-                        for (auto& parameter : function.get_parameters())
-                        {
-                            count++;
-                            std::string output;
-                            if (!is_out_call(PROXY_MARSHALL_OUT, from_host, m_ob, parameter.get_name(),
-                                             parameter.get_type(), parameter.get_attributes(), count, output))
-                                continue;
-                            proxy(output);
+                            for (auto& parameter : function.get_parameters())
+                            {
+                                count++;
+                                std::string output;
+                                if (!is_out_call(PROXY_MARSHALL_OUT, from_host, m_ob, parameter.get_name(),
+                                                parameter.get_type(), parameter.get_attributes(), count, output))
+                                    continue;
+                                proxy(output);
 
-                            if (!is_out_call(STUB_MARSHALL_OUT, from_host, m_ob, parameter.get_name(),
-                                             parameter.get_type(), parameter.get_attributes(), count, output))
-                                continue;
+                                if (!is_out_call(STUB_MARSHALL_OUT, from_host, m_ob, parameter.get_name(),
+                                                parameter.get_type(), parameter.get_attributes(), count, output))
+                                    continue;
 
-                            stub(output);
-                        }
+                                stub(output);
+                            }
+                            proxy("  );");
+                            proxy("{{");
+                            proxy("yas::load<yas::mem|yas::binary|yas::no_header>(yas::intrusive_buffer{{__rpc_out_buf.data(), __rpc_out_buf.size()}}, __rpc_out_yas_mapping);");
+                            proxy("}}");
+                            proxy("}}");
+                            proxy("catch(...)");
+                            proxy("{{");
+                            proxy("return rpc::error::PROXY_DESERIALISATION_ERROR();");
+                            proxy("}}");
+                                
+                            stub("  );");
+
+                            stub("yas::count_ostream __rpc_counter;");
+                            stub("{{");
+                            stub("yas::binary_oarchive<yas::count_ostream, yas::mem|yas::binary|yas::no_header> __rpc_oa(__rpc_counter);");
+                            stub("__rpc_oa(__rpc_out_yas_mapping);");
+                            stub("}}");
+                            stub("__rpc_out_buf.resize(__rpc_counter.total_size);");
+                            stub("yas::mem_ostream __rpc_writer(__rpc_out_buf.data(), __rpc_counter.total_size);");
+                            stub("{{");
+                            stub("yas::save<yas::mem|yas::binary|yas::no_header>(__rpc_writer, __rpc_out_yas_mapping);");
+                            stub("}}");
+                            stub("return __rpc_ret;");
+
+                        proxy("}}");
+                        proxy("#ifndef NO_RPC_V1");
+                        proxy("else");
+                        proxy("#endif");
+                        proxy("#endif");
+                        stub("}}");
+                        stub("#endif");
                     }
-                    proxy("  );");
-                    proxy("{{");
-                    proxy("yas::load<yas::mem|yas::binary|yas::no_header>(yas::intrusive_buffer{{__rpc_out_buf.data(), __rpc_out_buf.size()}}, __rpc_out_yas_mapping);");
-                    proxy("}}");
-                    proxy("}}");
-                    proxy("catch(...)");
-                    proxy("{{");
-                    proxy("return rpc::error::PROXY_DESERIALISATION_ERROR();");
-                    proxy("}}");
-                        
-                    stub("  );");
+                    {
+                        proxy("#ifndef NO_RPC_V1");
+                        proxy("if(__rpc_sp->get_remote_rpc_version() == rpc::VERSION_1)");
+                        proxy("{{");               
 
-                    stub("yas::count_ostream __rpc_counter;");
-                    stub("{{");
-                    stub("yas::binary_oarchive<yas::count_ostream, yas::mem|yas::binary|yas::no_header> __rpc_oa(__rpc_counter);");
-                    stub("__rpc_oa(__rpc_out_yas_mapping);");
-                    stub("}}");
-                    stub("__rpc_out_buf.resize(__rpc_counter.total_size);");
-                    stub("yas::mem_ostream __rpc_writer(__rpc_out_buf.data(), __rpc_counter.total_size);");
-                    stub("{{");
-                    stub("yas::save<yas::mem|yas::binary|yas::no_header>(__rpc_writer, __rpc_out_yas_mapping);");
-                    stub("}}");
-                    stub("return __rpc_ret;");
+                        stub("#ifndef NO_RPC_V1");
+                        stub("if(protocol_version == rpc::VERSION_1)");
+                        stub("{{");                               stub("//STUB_MARSHALL_OUT");
+                            proxy("//PROXY_MARSHALL_OUT");
+                            proxy("try");
+                            proxy("{{");
+                            proxy("auto __rpc_out_yas_mapping = YAS_OBJECT_NVP(");
+                            proxy("  \"out\"");
+                            proxy("  ,(\"__return_value\", __rpc_ret)");
+
+                            stub("//STUB_MARSHALL_OUT");
+                            stub("auto __rpc_out_yas_mapping = YAS_OBJECT_NVP(");
+                            stub("  \"out\"");
+                            stub("  ,(\"__return_value\", __rpc_ret)");
+
+                            uint64_t count = 1;
+                            for (auto& parameter : function.get_parameters())
+                            {
+                                count++;
+                                std::string output;
+                                if (!is_out_call(PROXY_MARSHALL_OUT, from_host, m_ob, parameter.get_name(),
+                                                parameter.get_type(), parameter.get_attributes(), count, output))
+                                    continue;
+                                proxy(output);
+
+                                if (!is_out_call(STUB_MARSHALL_OUT, from_host, m_ob, parameter.get_name(),
+                                                parameter.get_type(), parameter.get_attributes(), count, output))
+                                    continue;
+
+                                stub(output);
+                            }
+                            proxy("  );");
+                            proxy("{{");
+                            proxy("yas::load<yas::mem|yas::binary|yas::no_header>(yas::intrusive_buffer{{__rpc_out_buf.data(), __rpc_out_buf.size()}}, __rpc_out_yas_mapping);");
+                            proxy("}}");
+                            proxy("}}");
+                            proxy("catch(...)");
+                            proxy("{{");
+                            proxy("return rpc::error::PROXY_DESERIALISATION_ERROR();");
+                            proxy("}}");
+                                
+                            stub("  );");
+
+                            stub("yas::count_ostream __rpc_counter;");
+                            stub("{{");
+                            stub("yas::binary_oarchive<yas::count_ostream, yas::mem|yas::binary|yas::no_header> __rpc_oa(__rpc_counter);");
+                            stub("__rpc_oa(__rpc_out_yas_mapping);");
+                            stub("}}");
+                            stub("__rpc_out_buf.resize(__rpc_counter.total_size);");
+                            stub("yas::mem_ostream __rpc_writer(__rpc_out_buf.data(), __rpc_counter.total_size);");
+                            stub("{{");
+                            stub("yas::save<yas::mem|yas::binary|yas::no_header>(__rpc_writer, __rpc_out_yas_mapping);");
+                            stub("}}");
+                            stub("return __rpc_ret;");
+
+                        proxy("}}");
+                        proxy("#endif");
+                        stub("}}");
+                        stub("#endif");
+                    }
 
                     proxy("//PROXY_VALUE_RETURN");
                     {
@@ -1480,7 +1672,7 @@ namespace enclave_marshaller
 
             stub("rpc::weak_ptr<rpc::object_stub> get_object_stub() const override {{ return target_stub_;}}");
             stub("void* get_pointer() const override {{ return __rpc_target_.get();}}");
-            stub("int call(rpc::caller_channel_zone caller_channel_zone_id, rpc::caller_zone caller_zone_id, rpc::method method_id, size_t in_size_, const char* in_buf_, std::vector<char>& "
+            stub("int call(uint64_t protocol_version, rpc::caller_channel_zone caller_channel_zone_id, rpc::caller_zone caller_zone_id, rpc::method method_id, size_t in_size_, const char* in_buf_, std::vector<char>& "
                  "__rpc_out_buf) override;");
             stub("int cast(rpc::interface_ordinal interface_id, rpc::shared_ptr<rpc::i_interface_stub>& new_stub) override;");
             stub("}};");
@@ -1686,11 +1878,11 @@ namespace enclave_marshaller
 
             int id = 1;
             header("template<> rpc::interface_descriptor "
-                   "rpc::service::proxy_bind_in_param(const rpc::shared_ptr<{}{}>& "
+                   "rpc::service::proxy_bind_in_param(uint64_t protocol_version, const rpc::shared_ptr<{}{}>& "
                    "iface, rpc::shared_ptr<rpc::object_stub>& stub);",
                    ns, interface_name);
             header("template<> rpc::interface_descriptor "
-                   "rpc::service::stub_bind_out_param(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, const rpc::shared_ptr<{}{}>& "
+                   "rpc::service::stub_bind_out_param(uint64_t protocol_version, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, const rpc::shared_ptr<{}{}>& "
                    "iface);",
                    ns, interface_name);
         }
@@ -1730,7 +1922,7 @@ namespace enclave_marshaller
             stub("}};");
             stub("}}");
 
-            stub("template<> interface_descriptor service::proxy_bind_in_param(const shared_ptr<{}{}>& iface, shared_ptr<object_stub>& stub)",
+            stub("template<> interface_descriptor service::proxy_bind_in_param(uint64_t protocol_version, const shared_ptr<{}{}>& iface, shared_ptr<object_stub>& stub)",
                  ns, interface_name);
             stub("{{");
             stub("if(!iface)");
@@ -1739,10 +1931,10 @@ namespace enclave_marshaller
             stub("}}");
 
             stub("auto factory = create_interface_stub(iface);");
-            stub("return get_proxy_stub_descriptor({{0}}, {{0}}, iface.get(), factory, false, stub);");
+            stub("return get_proxy_stub_descriptor(protocol_version, {{0}}, {{0}}, iface.get(), factory, false, stub);");
             stub("}}");
             
-            stub("template<> interface_descriptor service::stub_bind_out_param(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, const shared_ptr<{}{}>& iface)",
+            stub("template<> interface_descriptor service::stub_bind_out_param(uint64_t protocol_version, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, const shared_ptr<{}{}>& iface)",
                  ns, interface_name);
             stub("{{");
             stub("if(!iface)");
@@ -1753,7 +1945,7 @@ namespace enclave_marshaller
             stub("shared_ptr<object_stub> stub;");
 
             stub("auto factory = create_interface_stub(iface);");
-            stub("return get_proxy_stub_descriptor(caller_channel_zone_id, caller_zone_id, iface.get(), factory, true, stub);");
+            stub("return get_proxy_stub_descriptor(protocol_version, caller_channel_zone_id, caller_zone_id, iface.get(), factory, true, stub);");
             stub("}}");
         }
 

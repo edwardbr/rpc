@@ -47,7 +47,7 @@ namespace rpc
             int err_code = ret->initialise_enclave(object_id);
             if(err_code)
                 return err_code;
-            auto error = rpc::demarshall_interface_proxy(ret, {object_id, destination_zone_id}, svc->get_zone_id().as_caller(), root_object);
+            auto error = rpc::demarshall_interface_proxy(rpc::get_version(), ret, {object_id, destination_zone_id}, svc->get_zone_id().as_caller(), root_object);
             if(error != rpc::error::OK())
                 return error;
             svc->add_zone_proxy(ret);

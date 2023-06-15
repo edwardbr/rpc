@@ -429,7 +429,7 @@ namespace marshalled_tests
             child_service->set_parent(service_proxy_to_this_zone, true);
 
 
-            return rpc::demarshall_interface_proxy(service_proxy_to_child, example_encap, this_service->get_zone_id().as_caller(), target);
+            return rpc::demarshall_interface_proxy(rpc::get_version(), service_proxy_to_child, example_encap, this_service->get_zone_id().as_caller(), target);
         }
 
         error_code add(int a, int b, int& c) override

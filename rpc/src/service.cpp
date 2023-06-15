@@ -140,7 +140,7 @@ namespace rpc
             if(!other_zone)
             {
                 assert(false);
-                return rpc::error::ZONE_NOT_SUPPORTED();
+                return rpc::error::ZONE_NOT_FOUND();
             }
             return other_zone->send(
                 protocol_version, 
@@ -158,6 +158,19 @@ namespace rpc
         }
         else
         {
+#ifndef NO_RPC_V2
+            if(protocol_version == rpc::VERSION_2)
+            ;
+            else 
+#endif
+#ifndef NO_RPC_V1
+            if(protocol_version == rpc::VERSION_1)
+            ;
+            else
+#endif
+            {
+                return rpc::error::INCOMPATIBLE_SERVICE();
+            }
             rpc::weak_ptr<object_stub> weak_stub = get_object(object_id);
             auto stub = weak_stub.lock();
             if (stub == nullptr)
@@ -168,7 +181,7 @@ namespace rpc
                 logger->before_send(caller_zone_id, object_id, interface_id, method_id, in_size_, in_buf_ ? in_buf_ : "");
             });
 
-            auto ret = stub->call(caller_channel_zone_id, caller_zone_id, interface_id, method_id, in_size_, in_buf_, out_buf_);
+            auto ret = stub->call(protocol_version, caller_channel_zone_id, caller_zone_id, interface_id, method_id, in_size_, in_buf_, out_buf_);
 
             std::for_each(service_loggers.begin(), service_loggers.end(), [&](const std::shared_ptr<service_logger>& logger){
                 logger->after_send(caller_zone_id, object_id, interface_id, method_id, ret, out_buf_);
@@ -178,7 +191,7 @@ namespace rpc
         }
     }
 
-    interface_descriptor service::prepare_out_param(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, rpc::proxy_base* base)
+    interface_descriptor service::prepare_out_param(uint64_t protocol_version, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, rpc::proxy_base* base)
     {
         auto object_proxy = base->get_object_proxy();
         auto object_service_proxy = object_proxy->get_service_proxy();
@@ -201,7 +214,7 @@ namespace rpc
             //note the caller_channel_zone_id is 0 as both the caller and the destination are in from the same direction so any other value is wrong
             //Dont external_add_ref the local service proxy as we are return to source no channel is required
             object_service_proxy->add_ref(
-                rpc::get_version(),
+                protocol_version,
                 {0}, 
                 destination_zone_id, 
                 object_id, 
@@ -227,7 +240,7 @@ namespace rpc
             //the fork is here so we need to add ref the destination normally with caller info
             //note the caller_channel_zone_id is is this zones id as the caller came from a route via this node
             destination_zone->add_ref(
-                rpc::get_version(),
+                protocol_version,
                 destination_channel_zone_id, 
                 destination_zone_id, 
                 object_id, 
@@ -243,7 +256,7 @@ namespace rpc
             assert(caller_zone);
             //note the caller_channel_zone_id is 0 as the caller came from this route 
             caller_zone->add_ref(
-                rpc::get_version(),
+                protocol_version,
                 zone_id_.as_destination_channel(), 
                 destination_zone_id, 
                 object_id, 
@@ -259,7 +272,7 @@ namespace rpc
     //this is a key function that returns an interface descriptor
     //for wrapping an implementation to a local object inside a stub where needed
     //or if the interface is a proxy to add ref it
-    interface_descriptor service::get_proxy_stub_descriptor(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, rpc::casting_interface* iface,
+    interface_descriptor service::get_proxy_stub_descriptor(uint64_t protocol_version, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, rpc::casting_interface* iface,
                                         std::function<rpc::shared_ptr<i_interface_stub>(rpc::shared_ptr<object_stub>)> fn,
                                         bool outcall,
                                         rpc::shared_ptr<object_stub>& stub)
@@ -273,7 +286,7 @@ namespace rpc
             }
             if(proxy_base)
             {
-                return prepare_out_param(caller_channel_zone_id, caller_zone_id, proxy_base);
+                return prepare_out_param(protocol_version, caller_channel_zone_id, caller_zone_id, proxy_base);
             }
         }
 
@@ -314,7 +327,7 @@ namespace rpc
                 assert(caller_zone);
                 //note the caller_channel_zone_id is 0 as the caller came from this route 
                 caller_zone->add_ref(
-                    rpc::get_version(),
+                    protocol_version,
                     {0}, 
                     zone_id_.as_destination(), 
                     stub->get_id(), 
@@ -358,12 +371,25 @@ namespace rpc
             if(!other_zone)
             {
                 assert(false);
-                return rpc::error::ZONE_NOT_SUPPORTED();
+                return rpc::error::ZONE_NOT_FOUND();
             }
             return other_zone->try_cast(protocol_version, destination_zone_id, object_id, interface_id);
         }
         else
         {
+#ifndef NO_RPC_V2
+            if(protocol_version == rpc::VERSION_2)
+            ;
+            else 
+#endif
+#ifndef NO_RPC_V1
+            if(protocol_version == rpc::VERSION_1)
+            ;
+            else
+#endif
+            {
+                return rpc::error::INCOMPATIBLE_SERVICE();
+            }
             rpc::weak_ptr<object_stub> weak_stub = get_object(object_id);
             auto stub = weak_stub.lock();
             if (!stub)
@@ -569,6 +595,20 @@ namespace rpc
         }
         else
         {
+#ifndef NO_RPC_V2
+            if(protocol_version == rpc::VERSION_2)
+            ;
+            else 
+#endif
+#ifndef NO_RPC_V1
+            if(protocol_version == rpc::VERSION_1)
+            ;
+            else
+#endif
+            {
+                return std::numeric_limits<uint64_t>::max();
+            }
+
             //find the caller
             if(zone_id_.as_caller() != caller_zone_id && !!(build_out_param_channel & add_ref_options::build_caller_route))
             {
@@ -659,6 +699,19 @@ namespace rpc
         }
         else
         {
+#ifndef NO_RPC_V2
+            if(protocol_version == rpc::VERSION_2)
+            ;
+            else 
+#endif
+#ifndef NO_RPC_V1
+            if(protocol_version == rpc::VERSION_1)
+            ;
+            else
+#endif
+            {
+                return std::numeric_limits<uint64_t>::max();
+            }
 
             bool reset_stub = false;
             rpc::shared_ptr<rpc::object_stub> stub;
