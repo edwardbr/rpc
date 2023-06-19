@@ -122,7 +122,7 @@ namespace rpc
                 return rpc::error::TRANSPORT_ERROR();
             }
 
-#ifndef NO_RPC_V1
+#ifdef RPC_V1
             if(protocol_version == rpc::VERSION_1)
             {
                 //recover err_code from the out buffer

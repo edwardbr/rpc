@@ -936,13 +936,13 @@ namespace enclave_marshaller
             header("public:");
             header("static rpc::interface_ordinal get_id(uint8_t rpc_version)");
             header("{{");
-            header("#ifndef NO_RPC_V2");
+            header("#ifdef RPC_V2");
             header("if(rpc_version == rpc::VERSION_2)");
             header("{{");
             header("return {{{}ull}};", generate_fingerprint(m_ob, {}, &header));
             header("}}");
             header("#endif");
-            header("#ifndef NO_RPC_V1");
+            header("#ifdef RPC_V1");
             header("if(rpc_version == rpc::VERSION_1)");
             header("{{");
             header("return {{{}ull}};", id);
@@ -1109,10 +1109,10 @@ namespace enclave_marshaller
                         count++;
                     }
                     proxy("bool has_sent = false;");
-                    proxy("#ifndef NO_RPC_V2");
+                    proxy("#ifdef RPC_V2");
                     proxy("if(__rpc_sp->get_remote_rpc_version() == rpc::VERSION_2)");
                     proxy("{{");               
-                    stub("#ifndef NO_RPC_V2");
+                    stub("#ifdef RPC_V2");
                     stub("if(protocol_version == rpc::VERSION_2)");
                     stub("{{");               
                     if (has_inparams)
@@ -1183,22 +1183,22 @@ namespace enclave_marshaller
                         interface_name, function_count);
                     proxy("has_sent = true;");
                     proxy("}}");
-                    proxy("#ifndef NO_RPC_V1");
+                    proxy("#ifdef RPC_V1");
                     proxy("if(!has_sent || __rpc_ret == rpc::error::INVALID_VERSION()) // carry over if");
                     proxy("#endif");
                     proxy("#endif");
                     stub("}}");
                     
-                    stub("#ifndef NO_RPC_V1");
+                    stub("#ifdef RPC_V1");
                     stub("else // carry over if");
                     stub("#endif");
                     stub("#endif");
 
-                    proxy("#ifndef NO_RPC_V1");
+                    proxy("#ifdef RPC_V1");
                     proxy("//optionally try again with an older version of the protocol");
                     proxy("if(__rpc_sp->get_remote_rpc_version() == rpc::VERSION_1)");
                     proxy("{{");               
-                    stub("#ifndef NO_RPC_V1");
+                    stub("#ifdef RPC_V1");
                     stub("//optionally try again with an older version of the protocol");
                     stub("if(protocol_version == rpc::VERSION_1)");
                     stub("{{");                                           
@@ -1392,7 +1392,7 @@ namespace enclave_marshaller
                         stub("}}");                        
                     }
                     {
-                        proxy("#ifndef NO_RPC_V2");
+                        proxy("#ifdef RPC_V2");
                         proxy("if(__rpc_sp->get_remote_rpc_version() == rpc::VERSION_2)");
                         proxy("{{");               
                             uint64_t count = 1;
@@ -1402,7 +1402,7 @@ namespace enclave_marshaller
                             proxy("auto __rpc_out_yas_mapping = YAS_OBJECT_NVP(");
                             proxy("  \"out\"");
 
-                        stub("#ifndef NO_RPC_V2");
+                        stub("#ifdef RPC_V2");
                         stub("if(protocol_version == rpc::VERSION_2)");
                         stub("{{");                               stub("//STUB_MARSHALL_OUT");
                             stub("auto __rpc_out_yas_mapping = YAS_OBJECT_NVP(");
@@ -1448,7 +1448,7 @@ namespace enclave_marshaller
                             stub("return __rpc_ret;");
 
                         proxy("}}");
-                        proxy("#ifndef NO_RPC_V1");
+                        proxy("#ifdef RPC_V1");
                         proxy("else");
                         proxy("#endif");
                         proxy("#endif");
@@ -1456,11 +1456,11 @@ namespace enclave_marshaller
                         stub("#endif");
                     }
                     {
-                        proxy("#ifndef NO_RPC_V1");
+                        proxy("#ifdef RPC_V1");
                         proxy("if(__rpc_sp->get_remote_rpc_version() == rpc::VERSION_1)");
                         proxy("{{");               
 
-                        stub("#ifndef NO_RPC_V1");
+                        stub("#ifdef RPC_V1");
                         stub("if(protocol_version == rpc::VERSION_1)");
                         stub("{{");                               stub("//STUB_MARSHALL_OUT");
                             proxy("//PROXY_MARSHALL_OUT");
@@ -1597,7 +1597,7 @@ namespace enclave_marshaller
             stub("{{");
             stub("auto ci = original->get_castable_interface();");
             stub("const {0}* tmp = nullptr;", ns);
-            stub("#ifndef NO_RPC_V2");
+            stub("#ifdef RPC_V2");
             stub("{{");
             stub("auto* tmp = const_cast<{0}*>(static_cast<const {0}*>(ci->query_interface({0}::get_id(rpc::VERSION_2))));", ns);
             stub("if(tmp != nullptr)");
@@ -1607,7 +1607,7 @@ namespace enclave_marshaller
             stub("}}");
             stub("}}");
             stub("#endif");            
-            stub("#ifndef NO_RPC_V1");
+            stub("#ifdef RPC_V1");
             stub("{{");
             stub("auto* tmp = const_cast<{0}*>(static_cast<const {0}*>(ci->query_interface({{{0}::get_id(rpc::VERSION_1)}})));", ns);
             stub("if(tmp != nullptr)");
@@ -1752,7 +1752,7 @@ namespace enclave_marshaller
             header("static uint64_t get_id(uint8_t rpc_version)");
             header("{{");
             header("//if(rpc_version == rpc::VERSION_1) not implemented");
-            header("#ifndef NO_RPC_V2");
+            header("#ifdef RPC_V2");
             header("if(rpc_version == rpc::VERSION_2)");
             header("{{");
             header("return {}ull;", generate_fingerprint(m_ob, {}, &header));

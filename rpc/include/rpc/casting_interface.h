@@ -23,16 +23,16 @@ namespace rpc
     bool match(rpc::interface_ordinal interface_id)
     {
         return 
-            #ifndef NO_RPC_V2
+            #ifdef RPC_V2
                 T::get_id(rpc::VERSION_2) == interface_id
             #endif
-            #if !defined(NO_RPC_V) && !defined(NO_RPC_V2)
+            #if defined(RPC_V1) && defined(RPC_V2)
                 ||
             #endif
-            #ifndef NO_RPC_V1
+            #ifdef RPC_V1
                 T::get_id(rpc::VERSION_1) == interface_id
             #endif            
-            #if defined(NO_RPC_V) && defined(NO_RPC_V2)
+            #if !defined(RPC_V1) && !defined(RPC_V2)
                 false
             #endif
             ;

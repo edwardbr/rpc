@@ -45,10 +45,10 @@ namespace rpc
 
     void object_stub::add_interface(const rpc::shared_ptr<i_interface_stub>& iface)
     {
-#ifndef NO_RPC_V1        
+#ifdef RPC_V1        
         stub_map[iface->get_interface_id(rpc::VERSION_1)] = iface;
 #endif
-#ifndef NO_RPC_V2
+#ifdef RPC_V2
         stub_map[iface->get_interface_id(rpc::VERSION_2)] = iface;
 #endif
     }

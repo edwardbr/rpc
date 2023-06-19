@@ -35,7 +35,7 @@ namespace marshalled_tests
             : telemetry_(telemetry)
         {
             if (telemetry_)
-#ifndef NO_RPC_V2
+#ifdef RPC_V2
                 telemetry_->on_impl_creation("baz", {xxx::i_baz::get_id(rpc::VERSION_2)});
 #else
                 telemetry_->on_impl_creation("baz", {xxx::i_baz::get_id(rpc::VERSION_1)});
@@ -45,7 +45,7 @@ namespace marshalled_tests
         virtual ~baz()
         {
             if (telemetry_)
-#ifndef NO_RPC_V2
+#ifdef RPC_V2
                 telemetry_->on_impl_deletion("baz", {xxx::i_baz::get_id(rpc::VERSION_2)});
 #else
                 telemetry_->on_impl_deletion("baz", {xxx::i_baz::get_id(rpc::VERSION_1)});
@@ -87,7 +87,7 @@ namespace marshalled_tests
             : telemetry_(telemetry)
         {
             if (telemetry_)
-#ifndef NO_RPC_V2
+#ifdef RPC_V2
                 telemetry_->on_impl_creation("foo", {xxx::i_foo::get_id(rpc::VERSION_2)});
 #else
                 telemetry_->on_impl_creation("foo", {xxx::i_foo::get_id(rpc::VERSION_1)});
@@ -96,7 +96,7 @@ namespace marshalled_tests
         virtual ~foo()
         {
             if (telemetry_)
-#ifndef NO_RPC_V2
+#ifdef RPC_V2
                 telemetry_->on_impl_deletion("foo", {xxx::i_foo::get_id(rpc::VERSION_2)});
 #else
                 telemetry_->on_impl_deletion("foo", {xxx::i_foo::get_id(rpc::VERSION_1)});
@@ -325,7 +325,7 @@ namespace marshalled_tests
             : telemetry_(telemetry)
         {
             if (telemetry_)
-#ifndef NO_RPC_V2
+#ifdef RPC_V2
                 telemetry_->on_impl_creation("multiple_inheritance", {xxx::i_bar::get_id(rpc::VERSION_2)});
 #else
                 telemetry_->on_impl_creation("multiple_inheritance", {xxx::i_bar::get_id(rpc::VERSION_1)});
@@ -334,7 +334,7 @@ namespace marshalled_tests
         virtual ~multiple_inheritance()
         {
             if (telemetry_)
-#ifndef NO_RPC_V2
+#ifdef RPC_V2
                 telemetry_->on_impl_deletion("multiple_inheritance", {xxx::i_bar::get_id(rpc::VERSION_2)});
 #else
                 telemetry_->on_impl_deletion("multiple_inheritance", {xxx::i_bar::get_id(rpc::VERSION_1)});
@@ -375,7 +375,7 @@ namespace marshalled_tests
             , this_service_(this_service)
         {
             if (telemetry_)
-#ifndef NO_RPC_V2
+#ifdef RPC_V2
                 telemetry_->on_impl_creation("example", {yyy::i_example::get_id(rpc::VERSION_2)});
 #else
                 telemetry_->on_impl_creation("example", {yyy::i_example::get_id(rpc::VERSION_1)});
@@ -384,7 +384,7 @@ namespace marshalled_tests
         virtual ~example()
         {
             if (telemetry_)
-#ifndef NO_RPC_V2
+#ifdef RPC_V2
                 telemetry_->on_impl_deletion("example", {yyy::i_example::get_id(rpc::VERSION_2)});
 #else
                 telemetry_->on_impl_deletion("example", {yyy::i_example::get_id(rpc::VERSION_1)});

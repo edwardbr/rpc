@@ -158,12 +158,12 @@ namespace rpc
         }
         else
         {
-#ifndef NO_RPC_V2
+#ifdef RPC_V2
             if(protocol_version == rpc::VERSION_2)
             ;
             else 
 #endif
-#ifndef NO_RPC_V1
+#ifdef RPC_V1
             if(protocol_version == rpc::VERSION_1)
             ;
             else
@@ -377,12 +377,12 @@ namespace rpc
         }
         else
         {
-#ifndef NO_RPC_V2
+#ifdef RPC_V2
             if(protocol_version == rpc::VERSION_2)
             ;
             else 
 #endif
-#ifndef NO_RPC_V1
+#ifdef RPC_V1
             if(protocol_version == rpc::VERSION_1)
             ;
             else
@@ -595,12 +595,12 @@ namespace rpc
         }
         else
         {
-#ifndef NO_RPC_V2
+#ifdef RPC_V2
             if(protocol_version == rpc::VERSION_2)
             ;
             else 
 #endif
-#ifndef NO_RPC_V1
+#ifdef RPC_V1
             if(protocol_version == rpc::VERSION_1)
             ;
             else
@@ -699,12 +699,12 @@ namespace rpc
         }
         else
         {
-#ifndef NO_RPC_V2
+#ifdef RPC_V2
             if(protocol_version == rpc::VERSION_2)
             ;
             else 
 #endif
-#ifndef NO_RPC_V1
+#ifdef RPC_V1
             if(protocol_version == rpc::VERSION_1)
             ;
             else
@@ -873,16 +873,16 @@ namespace rpc
     {
         //an identity check, send back the same pointer
         if(
-#ifndef NO_RPC_V2
+#ifdef RPC_V2
                 interface_getter(rpc::VERSION_2) == interface_id
 #endif
-#if !defined(NO_RPC_V) && !defined(NO_RPC_V2)
+#if defined(RPC_V1) && defined(RPC_V2)
                 ||
 #endif
-#ifndef NO_RPC_V1
+#ifdef RPC_V1
                 interface_getter(rpc::VERSION_1) == interface_id
 #endif            
-#if defined(NO_RPC_V) && defined(NO_RPC_V2)
+#if !defined(RPC_V1) && !defined(RPC_V2)
                 false
 #endif
         )
@@ -909,7 +909,7 @@ namespace rpc
     //note this function is not thread safe!  Use it before using the service class for normal operation
     int service::add_interface_stub_factory(std::function<interface_ordinal (uint8_t)> id_getter, std::shared_ptr<std::function<rpc::shared_ptr<rpc::i_interface_stub>(const rpc::shared_ptr<rpc::i_interface_stub>&)>> factory)
     {
-#ifndef NO_RPC_V1
+#ifdef RPC_V1
         auto interface_id = id_getter(rpc::VERSION_1);
         auto it = stub_factories.find({interface_id});
         if(it != stub_factories.end())
@@ -919,7 +919,7 @@ namespace rpc
         stub_factories[{interface_id}] = factory;
 #endif
 
-#ifndef NO_RPC_V2
+#ifdef RPC_V2
         interface_id = id_getter(rpc::VERSION_2);
         it = stub_factories.find({interface_id});
         if(it != stub_factories.end())
