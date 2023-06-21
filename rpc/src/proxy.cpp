@@ -51,7 +51,7 @@ namespace rpc
         service_proxy_ = nullptr;
     }
 
-    int object_proxy::send(std::function<interface_ordinal (uint8_t)> id_getter, method method_id, size_t in_size_, const char* in_buf_,
+    int object_proxy::send(std::function<interface_ordinal (uint64_t)> id_getter, method method_id, size_t in_size_, const char* in_buf_,
                                   std::vector<char>& out_buf_)
     {
         return service_proxy_->sp_call(
@@ -65,7 +65,7 @@ namespace rpc
             out_buf_);
     }
 
-    int object_proxy::try_cast(std::function<interface_ordinal (uint8_t)> id_getter)
+    int object_proxy::try_cast(std::function<interface_ordinal (uint64_t)> id_getter)
     {
         return service_proxy_->sp_try_cast(service_proxy_->get_destination_zone_id(), object_id_, id_getter);
     }

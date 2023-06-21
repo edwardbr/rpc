@@ -934,7 +934,7 @@ namespace enclave_marshaller
             header("class {}{} : public rpc::casting_interface", interface_name, base_class_declaration);
             header("{{");
             header("public:");
-            header("static rpc::interface_ordinal get_id(uint8_t rpc_version)");
+            header("static rpc::interface_ordinal get_id(uint64_t rpc_version)");
             header("{{");
             header("#ifdef RPC_V2");
             header("if(rpc_version == rpc::VERSION_2)");
@@ -1209,7 +1209,7 @@ namespace enclave_marshaller
                         proxy("  ,(\"__rpc_version\", rpc::VERSION_1) //this is superfluous in later versions of the protocol");
 
                         stub("//STUB_MARSHALL_IN");
-                        stub("uint8_t __rpc_version = 0;");
+                        stub("uint64_t __rpc_version = 0;");
                         stub("yas::intrusive_buffer in(in_buf_, in_size_);");
                         stub("try");
                         stub("{{");
@@ -1389,12 +1389,24 @@ namespace enclave_marshaller
                             }
                             stub(output);
                         }
-                        stub("}}");                        
+                        stub("}}");
                     }
+                    bool has_out_parameter = false;
+                    for (auto& parameter : function.get_parameters())
+                    {
+                        std::string output;
+                        if (is_out_call(PROXY_MARSHALL_OUT, from_host, m_ob, parameter.get_name(),
+                                        parameter.get_type(), parameter.get_attributes(), count, output))
+                        {
+                            has_out_parameter = true;
+                            break;
+                        }
+                    }
+                    if (has_out_parameter)
                     {
                         proxy("#ifdef RPC_V2");
                         proxy("if(__rpc_sp->get_remote_rpc_version() == rpc::VERSION_2)");
-                        proxy("{{");               
+                        proxy("{{");
                             uint64_t count = 1;
                             proxy("//PROXY_MARSHALL_OUT");
                             proxy("try");
@@ -1404,7 +1416,8 @@ namespace enclave_marshaller
 
                         stub("#ifdef RPC_V2");
                         stub("if(protocol_version == rpc::VERSION_2)");
-                        stub("{{");                               stub("//STUB_MARSHALL_OUT");
+                        stub("{{");
+                            stub("//STUB_MARSHALL_OUT");
                             stub("auto __rpc_out_yas_mapping = YAS_OBJECT_NVP(");
                             stub("  \"out\"");
 
@@ -1455,14 +1468,23 @@ namespace enclave_marshaller
                         stub("}}");
                         stub("#endif");
                     }
+                    else
+                    {
+                        stub("#ifdef RPC_V2");
+                        stub("if(protocol_version == rpc::VERSION_2)");
+                        stub("{{");
+                        stub("return __rpc_ret;");
+                        stub("}}");
+                        stub("#endif");
+                    }
                     {
                         proxy("#ifdef RPC_V1");
                         proxy("if(__rpc_sp->get_remote_rpc_version() == rpc::VERSION_1)");
-                        proxy("{{");               
+                        proxy("{{");
 
                         stub("#ifdef RPC_V1");
                         stub("if(protocol_version == rpc::VERSION_1)");
-                        stub("{{");                               stub("//STUB_MARSHALL_OUT");
+                        stub("{{");
                             proxy("//PROXY_MARSHALL_OUT");
                             proxy("try");
                             proxy("{{");
@@ -1664,7 +1686,7 @@ namespace enclave_marshaller
             stub("rpc::shared_ptr<{0}_stub> shared_from_this(){{return rpc::shared_ptr<{0}_stub>(weak_this_);}}",
                  interface_name);
             stub("");
-            stub("rpc::interface_ordinal get_interface_id(uint8_t rpc_version) const override");
+            stub("rpc::interface_ordinal get_interface_id(uint64_t rpc_version) const override");
             stub("{{");
             stub("return {{{}::get_id(rpc_version)}};", interface_name);
             stub("}}");            
@@ -1749,7 +1771,7 @@ namespace enclave_marshaller
             header("struct {}{}", m_ob.get_name(), base_class_declaration);
             header("{{");
 
-            header("static uint64_t get_id(uint8_t rpc_version)");
+            header("static uint64_t get_id(uint64_t rpc_version)");
             header("{{");
             header("//if(rpc_version == rpc::VERSION_1) not implemented");
             header("#ifdef RPC_V2");

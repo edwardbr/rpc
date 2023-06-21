@@ -89,7 +89,7 @@ namespace rpc
         // note the interface pointer may change if there is already an interface inserted successfully
         void register_interface(interface_ordinal interface_id, rpc::weak_ptr<proxy_base>& value);
 
-        int try_cast(std::function<interface_ordinal (uint8_t)> id_getter);
+        int try_cast(std::function<interface_ordinal (uint64_t)> id_getter);
 
     public:
         static rpc::shared_ptr<object_proxy> create(object object_id,
@@ -104,7 +104,7 @@ namespace rpc
         object get_object_id() const {return {object_id_};}
         destination_zone get_destination_zone_id() const;
 
-        int send(std::function<interface_ordinal (uint8_t)> id_getter, method method_id, size_t in_size_, const char* in_buf_,
+        int send(std::function<interface_ordinal (uint64_t)> id_getter, method method_id, size_t in_size_, const char* in_buf_,
                         std::vector<char>& out_buf_);
 
         size_t get_proxy_count()
@@ -253,7 +253,7 @@ namespace rpc
         rpc::shared_ptr<service_proxy> dependent_services_lock_;
         std::atomic<int> dependent_services_count_ = 0;
         const rpc::i_telemetry_service* const telemetry_service_ = nullptr;
-        std::atomic<uint8_t> version_ = rpc::get_version();
+        std::atomic<uint64_t> version_ = rpc::get_version();
 
     protected:
 
@@ -295,7 +295,7 @@ namespace rpc
             assert(service_.lock() != nullptr);
         }
 
-        void set_remote_rpc_version(uint8_t version) {version_ = version;}
+        void set_remote_rpc_version(uint64_t version) {version_ = version;}
 
         mutable rpc::weak_ptr<service_proxy> weak_this_;
 
@@ -318,7 +318,7 @@ namespace rpc
 #endif
         }
 
-        uint8_t get_remote_rpc_version() const {return version_.load();}
+        uint64_t get_remote_rpc_version() const {return version_.load();}
         
         void add_external_ref()
         {
@@ -354,13 +354,13 @@ namespace rpc
         }
 
         [[nodiscard]] int sp_call(
-                encoding encoding 
-                , uint64_t tag 
-                , object object_id 
-                , std::function<interface_ordinal (uint8_t)> id_getter 
-                , method method_id 
+                encoding encoding
+                , uint64_t tag
+                , object object_id
+                , std::function<interface_ordinal (uint64_t)> id_getter
+                , method method_id
                 , size_t in_size_
-                , const char* in_buf_ 
+                , const char* in_buf_
                 , std::vector<char>& out_buf_)
         {
             auto version = version_.load();
@@ -387,7 +387,7 @@ namespace rpc
         [[nodiscard]] int sp_try_cast(            
             destination_zone destination_zone_id 
             , object object_id 
-            , std::function<interface_ordinal (uint8_t)> id_getter)
+            , std::function<interface_ordinal (uint64_t)> id_getter)
         {
             auto original_version = version_.load();
             auto version = original_version;
@@ -603,11 +603,11 @@ namespace rpc
                                 , rpc::add_ref_options::normal
                                 , !new_proxy_added);
                 if(ret == std::numeric_limits<uint64_t>::max()) 
-                    return ret;
+                    return -1;
             }
             auto ret = op->query_interface(iface, false);        
             return ret;
-        }        
+        }
     }
 
     //declared here as object_proxy and service_proxy is not fully defined in the body of proxy_base
@@ -743,7 +743,7 @@ namespace rpc
             rpc::add_ref_options::build_destination_route, 
             false);
         if(ret == std::numeric_limits<uint64_t>::max())
-            return ret;
+            return -1;
 
         rpc::shared_ptr<object_proxy> op = service_proxy->get_object_proxy(encap.object_id);
         if(!op)

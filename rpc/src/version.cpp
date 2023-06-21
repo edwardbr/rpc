@@ -2,8 +2,9 @@
 
 namespace rpc
 {
-    //128 versions should be enough, if we need more we can use the eighth bit to carry to the next bit
-    std::uint8_t get_version() 
+    // 128 versions should be enough, if we need more we can use the eighth bit to carry to the next bit
+    // /!\ actually switched to uint64_t for consistency with other parts of the code that were using that
+    std::uint64_t get_version()
     {
 #ifdef RPC_V2
         return VERSION_2;

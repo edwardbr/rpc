@@ -163,7 +163,7 @@ sha3_Update(void *priv, void const *bufIn, size_t len)
     unsigned old_tail = (8 - ctx->byteIndex) & 7;
 
     size_t words;
-    unsigned tail;
+    size_t tail;
     size_t i;
 
     const uint8_t *buf = bufIn;
