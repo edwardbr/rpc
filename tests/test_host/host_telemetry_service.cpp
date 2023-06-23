@@ -3,6 +3,14 @@
 
 #include "gtest/gtest.h"
 
+extern "C"
+{
+    void rpc_log(const char* str, size_t sz)
+    {
+        spdlog::info(str);
+    }
+}
+
 host_telemetry_service::~host_telemetry_service()
 {
     spdlog::info("orphaned services {}", services.size());

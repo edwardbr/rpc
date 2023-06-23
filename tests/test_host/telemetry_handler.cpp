@@ -10,11 +10,6 @@ extern const rpc::i_telemetry_service* telemetry_service;
 // an ocall for logging the test
 extern "C"
 {
-    void log_str(const char* str, size_t sz)
-    {
-        puts(str);
-    }
-
     int call_host(
         uint64_t protocol_version                          //version of the rpc call protocol
         , uint64_t encoding                                  //format of the serialised data

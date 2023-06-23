@@ -40,7 +40,7 @@ namespace rpc
         public rpc::enable_shared_from_this<service>
     {
     protected:
-        static std::atomic<uint64_t> zone_count;
+        static std::atomic<uint64_t> zone_id_generator;
         zone zone_id_ = {0};
         mutable std::atomic<uint64_t> object_id_generator = 0;
 
@@ -70,14 +70,14 @@ namespace rpc
         rpc::shared_ptr<casting_interface> get_castable_interface(object object_id, interface_ordinal interface_id);
 
     public:
-        explicit service(zone zone_id = generate_new_zone_id()) : zone_id_(zone_id){}
+        explicit service(zone zone_id = generate_new_zone_id());
         virtual ~service();
 
         virtual bool check_is_empty() const;
         zone get_zone_id() const {return zone_id_;}
         void set_zone_id(zone zone_id){zone_id_ = zone_id;}
-        static zone generate_new_zone_id() { return {++zone_count}; }
-        object generate_new_object_id() const { return {++object_id_generator}; }
+        static zone generate_new_zone_id();
+        object generate_new_object_id() const;
         virtual rpc::shared_ptr<rpc::service_proxy> get_parent() const {return nullptr;}
 
         template<class T> interface_descriptor proxy_bind_in_param(uint64_t protocol_version, const shared_ptr<T>& iface, shared_ptr<object_stub>& stub);

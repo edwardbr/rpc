@@ -267,6 +267,12 @@ namespace rpc
             caller_zone_id_(caller_zone_id),
             telemetry_service_(telemetry_service)
         {
+#ifdef USE_RPC_LOGGING
+            auto message = std::string("service_proxy::service_proxy zone ") + std::to_string(zone_id_.get_val())
+            + std::string(" destination zone ") + std::to_string(destination_zone_id_.get_val()) 
+            + std::string(" caller zone ") + std::to_string(caller_zone_id.get_val());
+            LOG_STR(message.c_str(), message.size());
+#endif
             assert(svc != nullptr);
         }
 
@@ -279,8 +285,17 @@ namespace rpc
                 telemetry_service_(other.telemetry_service_),
                 dependent_services_count_(0)
         {
+#ifdef USE_RPC_LOGGING
+            auto message = std::string("service_proxy::service_proxy cloned zone ") + std::to_string(zone_id_.get_val())
+            + std::string(" destination zone ") + std::to_string(destination_zone_id_.get_val()) 
+            + std::string(" destination channel zone ") + std::to_string(destination_channel_zone_.get_val())
+            + std::string(" caller zone ") + std::to_string(caller_zone_id_.get_val());
+            LOG_STR(message.data(),message.size());
+#endif
             assert(service_.lock() != nullptr);
         }
+
+        void set_remote_rpc_version(uint8_t version) {version_ = version;}
 
         mutable rpc::weak_ptr<service_proxy> weak_this_;
 
@@ -293,6 +308,14 @@ namespace rpc
             {
                 svc->remove_zone_proxy(destination_zone_id_, caller_zone_id_, destination_channel_zone_);
             }
+            
+#ifdef USE_RPC_LOGGING
+            auto message = std::string("service_proxy::~service_proxy zone ") + std::to_string(zone_id_.get_val())
+            + std::string(" destination zone ") + std::to_string(destination_zone_id_.get_val()) 
+            + std::string(" destination channel zone ") + std::to_string(destination_channel_zone_.get_val())
+            + std::string(" caller zone ") + std::to_string(caller_zone_id_.get_val());
+            LOG_STR(message.data(),message.size());
+#endif
         }
 
         uint8_t get_remote_rpc_version() const {return version_.load();}

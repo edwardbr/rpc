@@ -96,7 +96,7 @@ enclave {
             uint64_t caller_zone_id                             //the original zone where the call came from
             );
 
-        void log_str([in, size=sz] const char* str, size_t sz);
+        void rpc_log([in, size=sz] const char* str, size_t sz);
 
 
         void on_service_creation_host([in, string] const char* name, uint64_t zone_id);

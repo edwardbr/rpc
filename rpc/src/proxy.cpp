@@ -1,18 +1,5 @@
 #include "rpc/proxy.h"
-
-
-#ifndef LOG_STR_DEFINED
-# ifdef USE_RPC_LOGGING
-#  define LOG_STR(str, sz) log_str(str, sz)
-   extern "C"
-   {
-       void log_str(const char* str, size_t sz);
-   }
-# else
-#  define LOG_STR(str, sz)
-# endif
-#define LOG_STR_DEFINED
-#endif
+#include "rpc/logger.h"
 
 namespace rpc
 {
@@ -26,11 +13,13 @@ namespace rpc
             telemetry_service->on_object_proxy_creation(service_proxy_->get_zone_id(), service_proxy_->get_destination_zone_id(), object_id);
         }
 
+#ifdef USE_RPC_LOGGING
         auto message = std::string("object_proxy::object_proxy destination zone ") + std::to_string(service_proxy_->get_destination_zone_id().get_val()) 
         + std::string(", object_id ") + std::to_string(object_id.get_val())
         + std::string(", zone_id ") + std::to_string(service_proxy->get_zone_id().get_val())
         + std::string(", cloned from ") + std::to_string(service_proxy->get_destination_channel_zone_id().get_val());
         LOG_STR(message.c_str(), message.size());
+#endif
     }
 
     rpc::shared_ptr<object_proxy> object_proxy::create(object object_id, 
@@ -49,11 +38,13 @@ namespace rpc
             telemetry_service->on_object_proxy_deletion(service_proxy_->get_zone_id(), service_proxy_->get_destination_zone_id(), object_id_);
         }
 
+#ifdef USE_RPC_LOGGING
         auto message = std::string("object_proxy::~object_proxy zone ") + std::to_string(service_proxy_->get_destination_zone_id().get_val()) 
         + std::string(", object_id ") + std::to_string(object_id_.get_val())
         + std::string(", zone_id ") + std::to_string(service_proxy_->get_zone_id().get_val())
         + std::string(", cloned from ") + std::to_string(service_proxy_->get_destination_channel_zone_id().get_val());
         LOG_STR(message.c_str(), message.size());
+#endif
 
         service_proxy_->remove_object_proxy(object_id_);
         service_proxy_->sp_release(service_proxy_->get_destination_zone_id(), object_id_, service_proxy_->get_zone_id().as_caller()); 

@@ -1,19 +1,7 @@
 #include "rpc/stub.h"
 #include "rpc/service.h"
 #include "rpc/version.h"
-
-#ifndef LOG_STR_DEFINED
-# ifdef USE_RPC_LOGGING
-#  define LOG_STR(str, sz) log_str(str, sz)
-   extern "C"
-   {
-       void log_str(const char* str, size_t sz);
-   }
-# else
-#  define LOG_STR(str, sz)
-# endif
-#define LOG_STR_DEFINED
-#endif
+#include "rpc/logger.h"
 
 namespace rpc
 {

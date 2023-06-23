@@ -8,29 +8,40 @@
 #include "rpc/stub.h"
 #include "rpc/proxy.h"
 #include "rpc/version.h"
+#include "rpc/logger.h"
 
-#ifndef LOG_STR_DEFINED
-# ifdef USE_RPC_LOGGING
-#  define LOG_STR(str, sz) log_str(str, sz)
-   extern "C"
-   {
-       void log_str(const char* str, size_t sz);
-   }
-# else
-#  define LOG_STR(str, sz)
-# endif
-#define LOG_STR_DEFINED
-#endif
 namespace rpc
 {
     ////////////////////////////////////////////////////////////////////////////
     // service
 
-    std::atomic<uint64_t> service::zone_count = 0;
+    std::atomic<uint64_t> service::zone_id_generator = 0;
+    zone service::generate_new_zone_id() 
+    { 
+        auto count = ++zone_id_generator;
+        return {count}; 
+    }
+
+    object service::generate_new_object_id() const 
+    { 
+        auto count = ++object_id_generator;
+        return {count}; 
+    }
+
+    service::service(zone zone_id) : zone_id_(zone_id)
+    {
+#ifdef USE_RPC_LOGGING
+        auto message = std::string("new service zone ") + std::to_string(zone_id.get_val());
+        LOG_STR(message.data(),message.size());
+#endif
+    }
 
     service::~service() 
     {
-        LOG("~service",100);
+#ifdef USE_RPC_LOGGING
+        auto message = std::string("~service zone ") + std::to_string(zone_id_.get_val());
+        LOG_STR(message.data(),message.size());
+#endif
         object_id_generator = 0;
         // to do: assert that there are no more object_stubs in memory
         bool is_empty = check_is_empty();
@@ -49,13 +60,17 @@ namespace rpc
             auto stub =  item.second.lock();
             if(!stub)
             {
+#ifdef USE_RPC_LOGGING
                 auto message = std::string("stub zone ") + std::to_string(get_zone_id()) + std::string(", object stub ") + std::to_string(item.first) + std::string(" has been released but not deregisted in the service suspected unclean shutdown");
                 LOG_STR(message.c_str(), message.size());
+#endif
             }
             else
             {
+#ifdef USE_RPC_LOGGING
                 auto message = std::string("stub zone ") + std::to_string(get_zone_id()) + std::string(", object stub ") + std::to_string(item.first) + std::string(" has not been released, there is a strong pointer maintaining a positive reference count suspected unclean shutdown");
                 LOG_STR(message.c_str(), message.size());
+#endif
             }
             success = false;
         }
@@ -64,13 +79,17 @@ namespace rpc
             auto stub =  item.second.lock();
             if(!stub)
             {
+#ifdef USE_RPC_LOGGING
                 auto message = std::string("wrapped stub zone ") + std::to_string(get_zone_id()) + std::string(", wrapped_object has been released but not deregisted in the service suspected unclean shutdown");
                 LOG_STR(message.c_str(), message.size());
+#endif
             }
             else
             {
+#ifdef USE_RPC_LOGGING
                 auto message = std::string("wrapped stub zone ") + std::to_string(get_zone_id()) + std::string(", wrapped_object ") + std::to_string(stub->get_id()) + std::string(" has not been deregisted in the service suspected unclean shutdown");
                 LOG_STR(message.c_str(), message.size());
+#endif
             }
             success = false;
         }
@@ -80,29 +99,37 @@ namespace rpc
             auto svcproxy =  item.second.lock();
             if(!svcproxy)
             {
+#ifdef USE_RPC_LOGGING
                 auto message = std::string("service proxy zone ") + std::to_string(get_zone_id()) + std::string(", proxy ") + std::to_string(item.first.dest.id) + std::string(", has been released but not deregisted in the service");
                 LOG_STR(message.c_str(), message.size());
+#endif
             }
             else
             {
+#ifdef USE_RPC_LOGGING
                 auto message = std::string("service proxy zone ") + std::to_string(get_zone_id()) 
                 + std::string(", destination_zone ") + std::to_string(svcproxy->get_destination_zone_id())
                 + std::string(", destination_channel_zone ") + std::to_string(svcproxy->get_destination_channel_zone_id()) 
                 + std::string(" has not been released in the service suspected unclean shutdown");
                 LOG_STR(message.c_str(), message.size());
+#endif
 
                 for(auto proxy : svcproxy->get_proxies())
                 {
                     auto op = proxy.second.lock();
                     if(op)
                     {
+#ifdef USE_RPC_LOGGING
                         auto message = std::string("has object_proxy ") + std::to_string(op->get_object_id());
                         LOG_STR(message.c_str(), message.size());
+#endif
                     }
                     else
                     {
+#ifdef USE_RPC_LOGGING
                         auto message = std::string("has null object_proxy");
                         LOG_STR(message.c_str(), message.size());
+#endif
                     }
                 }
             }

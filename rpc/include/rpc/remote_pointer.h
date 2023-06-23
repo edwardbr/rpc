@@ -26,19 +26,12 @@
 #include <string>
 #include <typeinfo>
 
-#ifdef DUMP_REF_COUNT
-#include <sgx_error.h>
-extern "C" {
-#ifdef _IN_ENCLAVE
-sgx_status_t __cdecl log_str(const char* str, size_t sz);
-#else
-void __cdecl log_str(const char* str, size_t sz);
-#endif
-}
+#include "rpc/logger.h"
 
-#define LOG(str, sz) log_str(str, sz)
+#ifdef DUMP_REF_COUNT
+    #define LOG(str, sz) LOG_STR(str, sz)
 #else
-#define LOG(str, sz)
+    #define LOG(str, sz)
 #endif
 
 namespace rpc

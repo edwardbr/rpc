@@ -12,7 +12,7 @@
 
 void log(const std::string& data)
 {
-    log_str(data.data(), data.size() + 1);
+    rpc_log(data.data(), data.size());
 }
 
 namespace marshalled_tests
