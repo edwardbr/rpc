@@ -1179,8 +1179,13 @@ namespace enclave_marshaller
                         stub("return rpc::error::STUB_DESERIALISATION_ERROR();");
                         stub("}}");
                     }
-                    proxy("__rpc_ret = __rpc_op->send({}::get_id, {{{}}}, __rpc_in_buf.size(), __rpc_in_buf.data(), __rpc_out_buf);",
-                        interface_name, function_count);
+                    
+                    std::string tag = function.get_attribute_value("tag");
+                    if(tag.empty())
+                        tag = "0";
+                    
+                    proxy("__rpc_ret = __rpc_op->send((uint64_t){}, {}::get_id, {{{}}}, __rpc_in_buf.size(), __rpc_in_buf.data(), __rpc_out_buf);",
+                        tag, interface_name, function_count);
                     proxy("has_sent = true;");
                     proxy("}}");
                     proxy("#ifdef RPC_V1");
@@ -1272,8 +1277,8 @@ namespace enclave_marshaller
                         stub("  return rpc::error::INVALID_VERSION();");
                     }
                     
-                    proxy("__rpc_ret = __rpc_op->send({}::get_id, {{{}}}, __rpc_in_buf.size(), __rpc_in_buf.data(), __rpc_out_buf);",
-                        interface_name, function_count);
+                    proxy("__rpc_ret = __rpc_op->send((uint64_t){}, {}::get_id, {{{}}}, __rpc_in_buf.size(), __rpc_in_buf.data(), __rpc_out_buf);",
+                        tag, interface_name, function_count);
                     proxy("has_sent = true;");
                     proxy("}}");
                     proxy("#endif");

@@ -104,7 +104,7 @@ namespace rpc
         object get_object_id() const {return {object_id_};}
         destination_zone get_destination_zone_id() const;
 
-        int send(std::function<interface_ordinal (uint64_t)> id_getter, method method_id, size_t in_size_, const char* in_buf_,
+        int send(uint64_t tag, std::function<interface_ordinal (uint64_t)> id_getter, method method_id, size_t in_size_, const char* in_buf_,
                         std::vector<char>& out_buf_);
 
         size_t get_proxy_count()
@@ -367,7 +367,7 @@ namespace rpc
             auto ret = send(
                 version,
                 encoding::enc_default,
-                0,
+                tag,
                 caller_channel_zone{}, 
                 get_zone_id().as_caller(), 
                 get_destination_zone_id(), 

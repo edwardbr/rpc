@@ -51,12 +51,12 @@ namespace rpc
         service_proxy_ = nullptr;
     }
 
-    int object_proxy::send(std::function<interface_ordinal (uint64_t)> id_getter, method method_id, size_t in_size_, const char* in_buf_,
+    int object_proxy::send(uint64_t tag, std::function<interface_ordinal (uint64_t)> id_getter, method method_id, size_t in_size_, const char* in_buf_,
                                   std::vector<char>& out_buf_)
     {
         return service_proxy_->sp_call(
             encoding::enc_default,
-            0,
+            tag,
             object_id_, 
             id_getter, 
             method_id, 
