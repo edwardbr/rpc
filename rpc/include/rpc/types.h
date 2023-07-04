@@ -1,4 +1,5 @@
 #pragma once
+#include <string>
 #include <stdint.h>
 #include <functional>
 
@@ -137,6 +138,14 @@ namespace rpc
     {
         method() = default;
         method(const type_id<MethodId>& other) : type_id<MethodId>(other){}
+    };
+
+    struct function_info
+    {
+        std::string name;
+        method id;
+        uint64_t tag;
+        bool marshalls_interfaces;
     };
 }
 

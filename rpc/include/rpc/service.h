@@ -149,7 +149,7 @@ namespace rpc
             , rpc::shared_ptr<rpc::i_interface_stub>& new_stub);
 
         //note this function is not thread safe!  Use it before using the service class for normal operation
-        int add_interface_stub_factory(std::function<interface_ordinal (uint8_t)> id_getter, std::shared_ptr<std::function<rpc::shared_ptr<rpc::i_interface_stub>(const rpc::shared_ptr<rpc::i_interface_stub>&)>> factory);
+        void add_interface_stub_factory(std::function<interface_ordinal (uint8_t)> id_getter, std::shared_ptr<std::function<rpc::shared_ptr<rpc::i_interface_stub>(const rpc::shared_ptr<rpc::i_interface_stub>&)>> factory);
 
         //note this is not thread safe and should only be used on setup
         void add_service_logger(const std::shared_ptr<service_logger>& logger)

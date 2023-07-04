@@ -950,7 +950,63 @@ namespace enclave_marshaller
             header("#endif");
             header("return {{0}};");
             header("}}");
+            header("");
+            header("static std::vector<rpc::function_info> get_function_info();");
+            header("");
             header("virtual ~{}() = default;", interface_name);
+
+            
+            //generate the get_function_info function for the interface
+            {
+                proxy("std::vector<rpc::function_info> {0}::get_function_info()", interface_name);
+                proxy("{{");
+                proxy("std::vector<rpc::function_info> functions;");
+                
+                const auto& library =  get_root(m_ob);
+                int function_count = 1;
+                for (auto& function : m_ob.get_functions())
+                {
+                    if (function.get_type() != FunctionTypeMethod)
+                        continue;
+
+                    std::string tag = function.get_attribute_value("tag");
+                    if(tag.empty())
+                        tag = "0";
+
+                    bool marshalls_interfaces = false;
+
+                    for(auto parameter : function.get_parameters())
+                    {
+                        auto& attributes = parameter.get_attributes();
+                        auto in = std::find(attributes.begin(), attributes.end(), "in") != attributes.end();
+                        auto out = std::find(attributes.begin(), attributes.end(), "out") != attributes.end();
+                        auto is_const = std::find(attributes.begin(), attributes.end(), "const") != attributes.end();
+                        auto by_value = std::find(attributes.begin(), attributes.end(), "by_value") != attributes.end();
+
+                        std::string type_name = parameter.get_type();
+                        std::string reference_modifiers;
+                        strip_reference_modifiers(type_name, reference_modifiers);
+
+                        std::string encapsulated_type = get_encapsulated_shared_ptr_type(type_name);
+
+                        bool is_interface = false;
+                        std::shared_ptr<class_entity> obj;
+                        if (library.find_class(encapsulated_type, obj))
+                        {
+                            if (obj->get_type() == entity_type::INTERFACE)
+                            {
+                                marshalls_interfaces = true;
+                                break;
+                            }
+                        }                    
+                    }
+
+                    proxy("functions.emplace_back(rpc::function_info{{\"{}\", {{{}}}, (uint64_t){}, {}}});", function.get_name(), function_count, tag, marshalls_interfaces);
+                    function_count++;
+                }            
+                proxy("return functions;");
+                proxy("}}");            
+            }
 
             proxy("class {0}_proxy : public rpc::proxy_impl<{0}>", interface_name);
             proxy("{{");
@@ -999,8 +1055,9 @@ namespace enclave_marshaller
                   interface_name);
             proxy("");
 
-            stub("int {0}_stub::call(uint64_t protocol_version, rpc::caller_channel_zone caller_channel_zone_id, rpc::caller_zone caller_zone_id, rpc::method method_id, size_t in_size_, const char* in_buf_, std::vector<char>& "
-                 "__rpc_out_buf)", interface_name);
+
+            stub("int {0}_stub::call(uint64_t protocol_version, rpc::encoding enc, rpc::caller_channel_zone caller_channel_zone_id, rpc::caller_zone caller_zone_id, rpc::method method_id, size_t in_size_, const char* in_buf_, std::vector<char>& "
+                "__rpc_out_buf)", interface_name);
             stub("{{");
 
             bool has_methods = false;
@@ -1171,7 +1228,25 @@ namespace enclave_marshaller
                             proxy("}}");
                             stub("  );");
                             stub("{{");
-                            stub("yas::load<yas::mem|yas::binary|yas::no_header>(in, __rpc_in_yas_mapping);");
+
+							stub("switch(enc)");
+							stub("{{");
+								stub("case rpc::encoding::yas_compressed_binary:");
+									stub("yas::load<yas::mem|yas::binary|yas::compacted|yas::no_header>(in, __rpc_in_yas_mapping);");
+									stub("break;");
+								stub("case rpc::encoding::yas_text:");
+									stub("yas::load<yas::mem|yas::text|yas::no_header>(in, __rpc_in_yas_mapping);");
+									stub("break;");
+								stub("case rpc::encoding::yas_json:");
+									stub("yas::load<yas::mem|yas::json|yas::no_header>(in, __rpc_in_yas_mapping);");
+									stub("break;");
+								stub("case rpc::encoding::enc_default:");
+								stub("case rpc::encoding::yas_binary:");
+									stub("yas::load<yas::mem|yas::binary|yas::no_header>(in, __rpc_in_yas_mapping);");
+									stub("break;");
+								stub("default:");
+									stub("return rpc::error::STUB_DESERIALISATION_ERROR();");
+							stub("}}");                            
                             stub("}}");
                         stub("}}");
                         stub("catch(...)");
@@ -1454,14 +1529,56 @@ namespace enclave_marshaller
                             stub("  );");
 
                             stub("yas::count_ostream __rpc_counter;");
-                            stub("{{");
-                            stub("yas::binary_oarchive<yas::count_ostream, yas::mem|yas::binary|yas::no_header> __rpc_oa(__rpc_counter);");
-                            stub("__rpc_oa(__rpc_out_yas_mapping);");
-                            stub("}}");
+
+							stub("switch(enc)");
+							stub("{{");
+								stub("case rpc::encoding::yas_compressed_binary:");
+        							stub("{{");
+									stub("yas::binary_oarchive<yas::count_ostream, yas::mem|yas::binary|yas::compacted|yas::no_header> __rpc_oa(__rpc_counter);");
+                                    stub("__rpc_oa(__rpc_out_yas_mapping);");
+									stub("break;");
+        							stub("}}");
+								stub("case rpc::encoding::yas_text:");
+        							stub("{{");
+									stub("yas::binary_oarchive<yas::count_ostream, yas::mem|yas::text|yas::no_header> __rpc_oa(__rpc_counter);");
+                                    stub("__rpc_oa(__rpc_out_yas_mapping);");
+									stub("break;");
+        							stub("}}");
+								stub("case rpc::encoding::yas_json:");
+        							stub("{{");
+									stub("yas::binary_oarchive<yas::count_ostream, yas::mem|yas::json|yas::no_header> __rpc_oa(__rpc_counter);");
+                                    stub("__rpc_oa(__rpc_out_yas_mapping);");
+									stub("break;");
+        							stub("}}");
+								stub("case rpc::encoding::enc_default:");
+								stub("case rpc::encoding::yas_binary:");
+        							stub("{{");
+									stub("yas::binary_oarchive<yas::count_ostream, yas::mem|yas::binary|yas::no_header> __rpc_oa(__rpc_counter);");
+                                    stub("__rpc_oa(__rpc_out_yas_mapping);");
+									stub("break;");
+        							stub("}}");
+								stub("default:");
+									stub("return rpc::error::STUB_DESERIALISATION_ERROR();");
+							stub("}}");                            
                             stub("__rpc_out_buf.resize(__rpc_counter.total_size);");
                             stub("yas::mem_ostream __rpc_writer(__rpc_out_buf.data(), __rpc_counter.total_size);");
-                            stub("{{");
-                            stub("yas::save<yas::mem|yas::binary|yas::no_header>(__rpc_writer, __rpc_out_yas_mapping);");
+							stub("switch(enc)");
+							stub("{{");
+								stub("case rpc::encoding::yas_compressed_binary:");
+									stub("yas::save<yas::mem|yas::binary|yas::compacted|yas::no_header>(__rpc_writer, __rpc_out_yas_mapping);");
+									stub("break;");
+								stub("case rpc::encoding::yas_text:");
+									stub("yas::save<yas::mem|yas::text|yas::no_header>(__rpc_writer, __rpc_out_yas_mapping);");
+									stub("break;");
+								stub("case rpc::encoding::yas_json:");
+									stub("yas::save<yas::mem|yas::json|yas::no_header>(__rpc_writer, __rpc_out_yas_mapping);");
+									stub("break;");
+								stub("case rpc::encoding::enc_default:");
+								stub("case rpc::encoding::yas_binary:");
+									stub("yas::save<yas::mem|yas::binary|yas::no_header>(__rpc_writer, __rpc_out_yas_mapping);");
+									stub("break;");
+								stub("default:");
+									stub("return rpc::error::STUB_DESERIALISATION_ERROR();");
                             stub("}}");
                             stub("return __rpc_ret;");
 
@@ -1699,7 +1816,7 @@ namespace enclave_marshaller
 
             stub("rpc::weak_ptr<rpc::object_stub> get_object_stub() const override {{ return target_stub_;}}");
             stub("void* get_pointer() const override {{ return __rpc_target_.get();}}");
-            stub("int call(uint64_t protocol_version, rpc::caller_channel_zone caller_channel_zone_id, rpc::caller_zone caller_zone_id, rpc::method method_id, size_t in_size_, const char* in_buf_, std::vector<char>& "
+            stub("int call(uint64_t protocol_version, rpc::encoding enc, rpc::caller_channel_zone caller_channel_zone_id, rpc::caller_zone caller_zone_id, rpc::method method_id, size_t in_size_, const char* in_buf_, std::vector<char>& "
                  "__rpc_out_buf) override;");
             stub("int cast(rpc::interface_ordinal interface_id, rpc::shared_ptr<rpc::i_interface_stub>& new_stub) override;");
             stub("}};");
@@ -2168,15 +2285,14 @@ namespace enclave_marshaller
         void write_stub_factory_lookup(const std::string module_name, const class_entity& lib, std::string prefix, writer& stub_header, writer& proxy,
                              writer& stub)
         {
-            stub_header("int {}_register_stubs(const rpc::shared_ptr<rpc::service>& srv);", module_name);
-            stub("int {}_register_stubs(const rpc::shared_ptr<rpc::service>& srv)", module_name);
+            stub_header("void {}_register_stubs(const rpc::shared_ptr<rpc::service>& srv);", module_name);
+            stub("void {}_register_stubs(const rpc::shared_ptr<rpc::service>& srv)", module_name);
                 stub("{{");
 
                 std::set<std::string> done;
 
             write_stub_factory_lookup_items(lib, prefix, proxy, stub, done);
 
-            stub("return rpc::error::OK();");
                 stub("}}");
             }
             

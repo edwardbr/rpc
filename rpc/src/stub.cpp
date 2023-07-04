@@ -51,6 +51,7 @@ namespace rpc
 
     int object_stub::call(
         uint64_t protocol_version
+        , rpc::encoding enc
         , caller_channel_zone caller_channel_zone_id
         , caller_zone caller_zone_id
         , interface_ordinal interface_id
@@ -69,7 +70,7 @@ namespace rpc
         }
         if(stub)
         {
-            return stub->call(protocol_version, caller_channel_zone_id, caller_zone_id, method_id, in_size_, in_buf_, out_buf_);
+            return stub->call(protocol_version, enc, caller_channel_zone_id, caller_zone_id, method_id, in_size_, in_buf_, out_buf_);
         }        
         return rpc::error::INVALID_INTERFACE_ID();
     }

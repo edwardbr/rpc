@@ -25,10 +25,11 @@ namespace rpc
         [[nodiscard]] int EXCEPTION(){return offset_val + (offset_val_is_negative ? - 14 : 14);}
         [[nodiscard]] int PROXY_DESERIALISATION_ERROR(){return offset_val + (offset_val_is_negative ? - 15 : 15);}
         [[nodiscard]] int STUB_DESERIALISATION_ERROR(){return offset_val + (offset_val_is_negative ? - 16 : 16);}
-        [[nodiscard]] int INCOMPATIBLE_SERVICE(){return offset_val + (offset_val_is_negative ? - 17 : 17);}//dont forget to update MIN & MAX if new values
+        [[nodiscard]] int INCOMPATIBLE_SERVICE(){return offset_val + (offset_val_is_negative ? - 17 : 17);}
+        [[nodiscard]] int INCOMPATIBLE_SERIALISATION(){return offset_val + (offset_val_is_negative ? - 18 : 18);}//dont forget to update MIN & MAX if new values
 
-        [[nodiscard]] int MIN(){return offset_val + (offset_val_is_negative ? -17 : 1);}
-        [[nodiscard]] int MAX(){return offset_val + (offset_val_is_negative ? -1 : 17);}
+        [[nodiscard]] int MIN(){return offset_val + (offset_val_is_negative ? -18 : 1);}
+        [[nodiscard]] int MAX(){return offset_val + (offset_val_is_negative ? -1 : 18);}
 
         void set_OK_val(int val){OK_val = val;}
         void set_offset_val(int val){offset_val = val;}
@@ -53,6 +54,7 @@ namespace rpc
             if(err == PROXY_DESERIALISATION_ERROR()){return " proxy deserialisation error";}
             if(err == STUB_DESERIALISATION_ERROR()){return " stub deserialisation error";}
             if(err == INCOMPATIBLE_SERVICE()){return " service proxy is incompatible with the client";}
+            if(err == INCOMPATIBLE_SERIALISATION()){return " service proxy does not support this serialisation format try JSON";}
             return " invalid error code";
         }
     };

@@ -208,7 +208,7 @@ namespace rpc
                 logger->before_send(caller_zone_id, object_id, interface_id, method_id, in_size_, in_buf_ ? in_buf_ : "");
             });
 
-            auto ret = stub->call(protocol_version, caller_channel_zone_id, caller_zone_id, interface_id, method_id, in_size_, in_buf_, out_buf_);
+            auto ret = stub->call(protocol_version, encoding, caller_channel_zone_id, caller_zone_id, interface_id, method_id, in_size_, in_buf_, out_buf_);
 
             std::for_each(service_loggers.begin(), service_loggers.end(), [&](const std::shared_ptr<service_logger>& logger){
                 logger->after_send(caller_zone_id, object_id, interface_id, method_id, ret, out_buf_);
@@ -934,7 +934,7 @@ namespace rpc
     }
 
     //note this function is not thread safe!  Use it before using the service class for normal operation
-    int service::add_interface_stub_factory(std::function<interface_ordinal (uint8_t)> id_getter, std::shared_ptr<std::function<rpc::shared_ptr<rpc::i_interface_stub>(const rpc::shared_ptr<rpc::i_interface_stub>&)>> factory)
+    void service::add_interface_stub_factory(std::function<interface_ordinal (uint8_t)> id_getter, std::shared_ptr<std::function<rpc::shared_ptr<rpc::i_interface_stub>(const rpc::shared_ptr<rpc::i_interface_stub>&)>> factory)
     {
 #ifdef RPC_V1
         auto interface_id = id_getter(rpc::VERSION_1);
@@ -955,7 +955,6 @@ namespace rpc
         }
         stub_factories[{interface_id}] = factory;
 #endif
-        return rpc::error::OK();
     }
 
     rpc::shared_ptr<casting_interface> service::get_castable_interface(object object_id, interface_ordinal interface_id)

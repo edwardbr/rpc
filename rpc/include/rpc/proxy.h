@@ -254,6 +254,7 @@ namespace rpc
         std::atomic<int> dependent_services_count_ = 0;
         const rpc::i_telemetry_service* const telemetry_service_ = nullptr;
         std::atomic<uint64_t> version_ = rpc::get_version();
+        encoding enc_ = encoding::enc_default;
 
     protected:
 
@@ -283,7 +284,8 @@ namespace rpc
                 service_(other.service_),
                 caller_zone_id_(other.caller_zone_id_),
                 telemetry_service_(other.telemetry_service_),
-                dependent_services_count_(0)
+                dependent_services_count_(0),
+                enc_(other.enc_)
         {
 #ifdef USE_RPC_LOGGING
             auto message = std::string("service_proxy::service_proxy cloned zone ") + std::to_string(zone_id_.get_val())
@@ -320,6 +322,14 @@ namespace rpc
 
         uint64_t get_remote_rpc_version() const {return version_.load();}
         
+        uint64_t set_encoding(encoding enc)
+        {
+            if(version_ == rpc::VERSION_1)
+                return error::INCOMPATIBLE_SERVICE();
+            enc_ = enc;
+            return error::OK();
+        }       
+        
         void add_external_ref()
         {
             std::lock_guard g(insert_control_);
@@ -354,7 +364,7 @@ namespace rpc
         }
 
         [[nodiscard]] int sp_call(
-                encoding encoding
+                encoding enc
                 , uint64_t tag
                 , object object_id
                 , std::function<interface_ordinal (uint64_t)> id_getter
@@ -363,10 +373,16 @@ namespace rpc
                 , const char* in_buf_
                 , std::vector<char>& out_buf_)
         {
+            //force a lowest common denominator
+            if(enc != encoding::yas_json && enc_ != encoding::enc_default && enc != enc_)
+            {
+                return error::INCOMPATIBLE_SERIALISATION();
+            }
+
             auto version = version_.load();
             auto ret = send(
                 version,
-                encoding::enc_default,
+                enc_,
                 tag,
                 caller_channel_zone{}, 
                 get_zone_id().as_caller(), 
