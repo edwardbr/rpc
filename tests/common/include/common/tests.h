@@ -185,6 +185,8 @@ namespace marshalled_tests
                 rpc::shared_ptr<xxx::i_baz> b(new baz(telemetry_service));
                 err_code = foo->call_baz_interface(b);
             }
+
+            ASSERT(foo->exception_test() == rpc::error::EXCEPTION());
         }
         {
             rpc::shared_ptr<xxx::i_baz> i_baz_ptr;

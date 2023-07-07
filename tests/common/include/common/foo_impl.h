@@ -304,6 +304,13 @@ namespace marshalled_tests
             val = cached_;
             return rpc::error::OK();
         }
+
+        error_code exception_test() override
+        {
+            telemetry_->message(rpc::i_telemetry_service::info, "exception_test");
+            throw std::runtime_error("oops");
+            return rpc::error::OK();
+        }
     };
 
     class multiple_inheritance : public xxx::i_bar, public xxx::i_baz

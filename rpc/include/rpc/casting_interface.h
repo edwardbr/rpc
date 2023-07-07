@@ -2,6 +2,7 @@
 
 #include <rpc/types.h>
 #include <rpc/version.h>
+#include <rpc/casting_interface.h>
 
 namespace rpc
 {

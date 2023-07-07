@@ -63,6 +63,8 @@ interface i_foo
     
     error_code set_interface([in]const rpc::shared_ptr<i_baz>& val);//can be null
     error_code get_interface([out]rpc::shared_ptr<i_baz>& val);//can be null
+
+    error_code exception_test();
 };
 
 interface i_bar
