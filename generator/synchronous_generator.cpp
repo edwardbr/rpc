@@ -1661,6 +1661,13 @@ namespace enclave_marshaller
                         stub("#ifdef RPC_V2");
                         stub("if(protocol_version == rpc::VERSION_2)");
                         stub("{{");
+
+						stub("if(enc == rpc::encoding::yas_json)");
+						stub("{{");
+                            stub("__rpc_out_buf.resize(2);");
+							stub("__rpc_out_buf[0] = '{{';");
+							stub("__rpc_out_buf[1] = '}}';");
+                        stub("}}");
                         stub("return __rpc_ret;");
                         stub("}}");
                         stub("#endif");
