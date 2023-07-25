@@ -911,6 +911,16 @@ namespace enclave_marshaller
             return true;
         }
 
+        /*std::string ReplaceAll(std::string str, const std::string& from, const std::string& to) 
+        {
+            size_t start_pos = 0;
+            while((start_pos = str.find(from, start_pos)) != std::string::npos) {
+                str.replace(start_pos, from.length(), to);
+                start_pos += to.length(); // Handles case where 'to' is a substring of 'from'
+            }
+            return str;
+        }*/
+
         void write_interface(bool from_host, const class_entity& m_ob, writer& header, writer& proxy, writer& stub,
                              size_t id)
         {
@@ -966,6 +976,16 @@ namespace enclave_marshaller
                 int function_count = 1;
                 for (auto& function : m_ob.get_functions())
                 {
+                    if (function.get_type() == FunctionTypeCppQuote)
+                    {
+                        // auto text = function.get_name();
+
+                        // text = ReplaceAll(text, "{", "{{");
+                        // text = ReplaceAll(text, "}", "}}");      
+
+//                        header.raw(text);
+                        continue;
+                    }
                     if (function.get_type() != FunctionTypeMethod)
                         continue;
 

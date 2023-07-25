@@ -83,7 +83,7 @@ int main(const int argc, char* argv[])
             clipp::required("-t", "--stub_header").doc("the generated stub header relative filename") & clipp::value("stub_header",stubHeaderPath),
 			clipp::option("-m", "--mock").doc("the generated mock relative filename") & clipp::value("mock",mockPath),
 			clipp::option("-M", "--module_name").doc("the name given to the stub_factory") & clipp::value("module_name",module_name),
-			clipp::repeatable(clipp::option("-p", "--path") & clipp::value("path",include_paths)).doc("locations of include files used by the idl"),
+			clipp::repeatable(clipp::option("-P", "--path") & clipp::value("path",include_paths)).doc("locations of include files used by the idl"),
 			clipp::option("-n","--namespace").doc("namespace of the generated interface") & clipp::value("namespace",namespaces),
 			clipp::option("-d","--dump_preprocessor_output_and_die").set(dump_preprocessor_output_and_die).doc("dump preprocessor output and die"),
 			clipp::repeatable(clipp::option("-D") & clipp::value("define",defines)).doc("macro define"),
