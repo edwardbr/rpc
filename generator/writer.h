@@ -41,13 +41,12 @@ public:
     {
         fmt::print(strm_, format_str, args...);
     }
-    /*void write_buffer(const std::string& str)
+    void write_buffer(const std::string& str)
     {
-        strm_.flush();
         auto buffer = fmt::basic_memory_buffer<char>();
         buffer.append(str);
         fmt::detail::write_buffer<char>(strm_, buffer);
-    }*/
+    }
     void print_tabs()
     {
         for(int i = 0;i < count_;i++)
