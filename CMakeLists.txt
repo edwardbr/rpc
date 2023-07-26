@@ -29,5 +29,5 @@ add_subdirectory(tests)
 endif()
 
 
-INSTALL(FILES "${CMAKE_CURRENT_LIST_DIR}/cmake/FindRPCGenerator.cmake"
-        DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/cmake/rpc )
+install(FILES "${CMAKE_CURRENT_LIST_DIR}/cmake/FindRPCGenerator.cmake"
+        DESTINATION ${CMAKE_INSTALL_PREFIX}/cmake/rpc )

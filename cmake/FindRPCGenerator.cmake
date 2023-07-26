@@ -70,15 +70,19 @@ function(RPCGenerate
   message(ADDITIONAL_HEADERS ${ADDITIONAL_HEADERS})
 
   foreach(dep ${params_dependencies})
-    get_target_property(dep_base_dir ${dep}_generate base_dir)
+    if(TARGET ${dep}_generate)
+      get_target_property(dep_base_dir ${dep}_generate base_dir)
 
-    if(dep_base_dir)
-      set(PATHS_PARAMS ${PATHS_PARAMS} --path "${dep_base_dir}")
-    endif()
-    if(BUILD_ENCLAVE)
-      set(GENERATED_DEPENDANCIES ${GENERATED_DEPENDANCIES} ${dep}_generate)
+      if(dep_base_dir)
+        set(PATHS_PARAMS ${PATHS_PARAMS} --path "${dep_base_dir}")
+      endif()
+      if(BUILD_ENCLAVE)
+        set(GENERATED_DEPENDANCIES ${GENERATED_DEPENDANCIES} ${dep}_generate)
+      else()
+        set(GENERATED_DEPENDANCIES ${GENERATED_DEPENDANCIES} ${dep} ${dep}_generate)
+      endif()
     else()
-      set(GENERATED_DEPENDANCIES ${GENERATED_DEPENDANCIES} ${dep} ${dep}_generate)
+      message("target ${dep}_generate does not exist so skipped")
     endif()
   endforeach()
 
@@ -114,7 +118,11 @@ function(RPCGenerate
   set_target_properties(${name}_idl_generate PROPERTIES base_dir ${base_dir})
 
   foreach(dep ${params_dependencies})
-    add_dependencies(${name}_idl_generate ${dep}_generate)
+    if(TARGET ${dep}_generate)
+      add_dependencies(${name}_idl_generate ${dep}_generate)
+    else()
+      message(\"target ${dep}_generate does not exist so skipped\")
+    endif()
   endforeach()
 
   foreach(dep ${params_link_libraries})
@@ -149,7 +157,11 @@ function(RPCGenerate
   set_target_properties(${name}_idl_generate PROPERTIES base_dir ${base_dir})
 
   foreach(dep ${params_dependencies})
-    add_dependencies(${name}_idl_generate ${dep}_generate)
+    if(TARGET ${dep}_generate)
+      add_dependencies(${name}_idl_generate ${dep}_generate)
+    else()
+      message("target ${dep}_generate does not exist so skipped")
+    endif()
   endforeach()
 
   foreach(dep ${params_link_libraries})
@@ -175,27 +187,31 @@ function(RPCGenerate
       target_compile_options(${name}_idl_host PRIVATE ${HOST_COMPILE_OPTIONS})
       target_link_directories(${name}_idl_host PUBLIC ${SGX_LIBRARY_PATH})
       set_property(TARGET ${name}_idl_host PROPERTY COMPILE_PDB_NAME ${name}_idl_host)
-  
+
       target_link_libraries(${name}_idl_host PUBLIC
         rpc_host
         yas_common
       )
-  
+
       add_dependencies(${name}_idl_host ${name}_idl_generate)
-  
+
       foreach(dep ${params_dependencies})
-        add_dependencies(${name}_idl_host ${dep}_generate)
+        if(TARGET ${dep}_generate)
+          add_dependencies(${name}_idl_host ${dep}_generate)
+        else()
+          message(\"target ${dep}_generate does not exist so skipped\")
+        endif()
         target_link_libraries(${name}_idl_host PUBLIC ${dep}_host)
       endforeach()
-  
+
       foreach(dep ${params_link_libraries})
-        # if (TARGET ${dep}_host)
+        if(TARGET ${dep}_host)
           add_dependencies(${name}_idl_host ${dep}_host)
-        # else()
-        #   message(\"target ${dep}_host does not exist so skipped\")
-        # endif()
+        else()
+          message(\"target ${dep}_host does not exist so skipped\")
+        endif()
       endforeach()
-  
+
       ###############################################################################
       # #and an enclave specific target
       add_library(${name}_idl_enclave STATIC
@@ -209,65 +225,72 @@ function(RPCGenerate
       target_compile_options(${name}_idl_enclave PRIVATE ${ENCLAVE_COMPILE_OPTIONS})
       target_link_directories(${name}_idl_enclave PRIVATE ${SGX_LIBRARY_PATH})
       set_property(TARGET ${name}_idl_enclave PROPERTY COMPILE_PDB_NAME ${name}_idl_enclave)
-  
+
       target_link_libraries(${name}_idl_enclave PUBLIC
         rpc_enclave
         yas_common
       )
-  
+
       add_dependencies(${name}_idl_enclave ${name}_idl_generate)
-  
+
       foreach(dep ${params_dependencies})
-        add_dependencies(${name}_idl_enclave ${dep}_generate)
+        if(TARGET ${dep}_generate)
+          add_dependencies(${name}_idl_enclave ${dep}_generate)
+        else()
+          message(\"target ${dep}_generate does not exist so skipped\")
+        endif()
         target_link_libraries(${name}_idl_enclave PUBLIC ${dep}_enclave)
       endforeach()
-  
+
       foreach(dep ${params_link_libraries})
-        # if (TARGET ${dep}_enclave)
+        if(TARGET ${dep}_enclave)
           add_dependencies(${name}_idl_enclave ${dep}_enclave)
-        # else()
-        #   message(\"target ${dep}_enclave does not exist so skipped\")
-        # endif()
+        else()
+          message(\"target ${dep}_enclave does not exist so skipped\")
+        endif()
       endforeach()
-  
+
       ###############################################################################
-          # #and an enclave specific target
-          add_library(${name}_idl_enclave_v1 STATIC
-          ${full_header_path}
-          ${full_stub_header_path}
-          ${full_stub_path}
-          ${full_proxy_path}
-        )
-        target_compile_definitions(${name}_idl_enclave_v1 
-          PUBLIC
-            NO_RPC_V2
-          PRIVATE 
-            ${ENCLAVE_DEFINES})
-        target_include_directories(${name}_idl_enclave_v1 PUBLIC \"$<BUILD_INTERFACE:${output_path}>\" \"$<BUILD_INTERFACE:${output_path}/include>\" PRIVATE ${ENCLAVE_LIBCXX_INCLUDES})
-        target_compile_options(${name}_idl_enclave_v1 PRIVATE ${ENCLAVE_COMPILE_OPTIONS})
-        target_link_directories(${name}_idl_enclave_v1 PRIVATE ${SGX_LIBRARY_PATH})
-        set_property(TARGET ${name}_idl_enclave_v1 PROPERTY COMPILE_PDB_NAME ${name}_idl_enclave_v1)
-    
-        target_link_libraries(${name}_idl_enclave_v1 PUBLIC
-          rpc_enclave_v1
-          yas_common
-        )
-    
-        add_dependencies(${name}_idl_enclave_v1 ${name}_idl_generate)
-    
-        foreach(dep ${params_dependencies})
+      # #and an enclave specific target
+      add_library(${name}_idl_enclave_v1 STATIC
+        ${full_header_path}
+        ${full_stub_header_path}
+        ${full_stub_path}
+        ${full_proxy_path}
+      )
+      target_compile_definitions(${name}_idl_enclave_v1
+        PUBLIC
+          NO_RPC_V2
+        PRIVATE
+          ${ENCLAVE_DEFINES})
+      target_include_directories(${name}_idl_enclave_v1 PUBLIC \"$<BUILD_INTERFACE:${output_path}>\" \"$<BUILD_INTERFACE:${output_path}/include>\" PRIVATE ${ENCLAVE_LIBCXX_INCLUDES})
+      target_compile_options(${name}_idl_enclave_v1 PRIVATE ${ENCLAVE_COMPILE_OPTIONS})
+      target_link_directories(${name}_idl_enclave_v1 PRIVATE ${SGX_LIBRARY_PATH})
+      set_property(TARGET ${name}_idl_enclave_v1 PROPERTY COMPILE_PDB_NAME ${name}_idl_enclave_v1)
+
+      target_link_libraries(${name}_idl_enclave_v1 PUBLIC
+        rpc_enclave_v1
+        yas_common
+      )
+
+      add_dependencies(${name}_idl_enclave_v1 ${name}_idl_generate)
+
+      foreach(dep ${params_dependencies})
+        if(TARGET ${dep}_generate)
           add_dependencies(${name}_idl_enclave_v1 ${dep}_generate)
-          target_link_libraries(${name}_idl_enclave_v1 PUBLIC ${dep}_enclave)
-        endforeach()
-  
-        foreach(dep ${params_link_libraries})
-        # if (TARGET ${dep}_idl_enclave_v1)
-          add_dependencies(${name}_idl_enclave ${dep}_enclave)
-        # else()
-        #   message(\"target ${dep}_enclave does not exist so skipped\")
-        # endif()
+        else()
+          message(\"target ${dep}_generate does not exist so skipped\")
+        endif()
+        target_link_libraries(${name}_idl_enclave_v1 PUBLIC ${dep}_enclave)
       endforeach()
-            ")
+
+      foreach(dep ${params_link_libraries})
+        if(TARGET ${dep}_enclave)
+          add_dependencies(${name}_idl_enclave ${dep}_enclave)
+        else()
+          message(\"target ${dep}_enclave does not exist so skipped\")
+        endif()
+      endforeach()")
     endif()
     # #specify a host specific target
     add_library(${name}_idl_host STATIC
@@ -290,12 +313,16 @@ function(RPCGenerate
     add_dependencies(${name}_idl_host ${name}_idl_generate)
 
     foreach(dep ${params_dependencies})
-      add_dependencies(${name}_idl_host ${dep}_generate)
+      if(TARGET ${dep}_generate)
+        add_dependencies(${name}_idl_host ${dep}_generate)
+      else()
+        message("target ${dep}_generate does not exist so skipped")
+      endif()
       target_link_libraries(${name}_idl_host PUBLIC ${dep}_host)
     endforeach()
 
     foreach(dep ${params_link_libraries})
-      if (TARGET ${dep}_host)
+      if(TARGET ${dep}_host)
         target_link_libraries(${name}_idl_host PRIVATE ${dep}_host)
       else()
         message("target ${dep}_host does not exist so skipped")
@@ -324,12 +351,16 @@ function(RPCGenerate
     add_dependencies(${name}_idl_enclave ${name}_idl_generate)
 
     foreach(dep ${params_dependencies})
-      add_dependencies(${name}_idl_enclave ${dep}_generate)
+      if(TARGET ${dep}_generate)
+        add_dependencies(${name}_idl_enclave ${dep}_generate)
+      else()
+        message("target ${dep}_generate does not exist so skipped")
+      endif()
       target_link_libraries(${name}_idl_enclave PUBLIC ${dep}_enclave)
     endforeach()
 
     foreach(dep ${params_link_libraries})
-      if (TARGET ${dep}_enclave)
+      if(TARGET ${dep}_enclave)
         target_link_libraries(${name}_idl_enclave PRIVATE ${dep}_enclave)
       else()
         message("target ${dep}_enclave does not exist so skipped")
@@ -337,17 +368,17 @@ function(RPCGenerate
     endforeach()
 
     ###############################################################################
-      # #and an enclave specific target
-      add_library(${name}_idl_enclave_v1 STATIC
+    # #and an enclave specific target
+    add_library(${name}_idl_enclave_v1 STATIC
       ${full_header_path}
       ${full_stub_header_path}
       ${full_stub_path}
       ${full_proxy_path}
     )
-    target_compile_definitions(${name}_idl_enclave_v1 
+    target_compile_definitions(${name}_idl_enclave_v1
       PUBLIC
         NO_RPC_V2
-      PRIVATE 
+      PRIVATE
         ${ENCLAVE_DEFINES})
     target_include_directories(${name}_idl_enclave_v1 PUBLIC "$<BUILD_INTERFACE:${output_path}>" "$<BUILD_INTERFACE:${output_path}/include>" PRIVATE ${ENCLAVE_LIBCXX_INCLUDES})
     target_compile_options(${name}_idl_enclave_v1 PRIVATE ${ENCLAVE_COMPILE_OPTIONS})
@@ -362,12 +393,16 @@ function(RPCGenerate
     add_dependencies(${name}_idl_enclave_v1 ${name}_idl_generate)
 
     foreach(dep ${params_dependencies})
-      add_dependencies(${name}_idl_enclave_v1 ${dep}_generate)
+      if(TARGET ${dep}_generate)
+        add_dependencies(${name}_idl_enclave_v1 ${dep}_generate)
+      else()
+        message("target ${dep}_generate does not exist so skipped")
+      endif()
       target_link_libraries(${name}_idl_enclave_v1 PUBLIC ${dep}_enclave)
     endforeach()
 
     foreach(dep ${params_link_libraries})
-      if (TARGET ${dep}_enclave)
+      if(TARGET ${dep}_enclave)
         target_link_libraries(${name}_idl_enclave_v1 PRIVATE ${dep}_enclave)
       else()
         message("target ${dep}_enclave does not exist so skipped")
