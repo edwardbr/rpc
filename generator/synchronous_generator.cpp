@@ -252,7 +252,7 @@ namespace enclave_marshaller
             std::string seed;
             for(auto& item : cls.get_attributes())
             {
-                //if(item == "")
+                seed += item;
             }
             if(cls.get_type() == entity_type::INTERFACE || cls.get_type() == entity_type::LIBRARY)
             {
@@ -274,14 +274,15 @@ namespace enclave_marshaller
                     if (func.get_type() == FunctionTypeCppQuote)
                         continue;
                     seed += "[";
-                    for(auto& item : cls.get_attributes())
+                    for(auto& item : func.get_attributes())
                     {
-                        if(item == "noexcept")
+                        seed += item;
+                        /*if(item == "noexcept")
                             seed += item + ",";
                         else if(item == "const")
                             seed += item + ",";
                         else if(item == "tag")
-                            seed += item + ",";
+                            seed += item + ",";*/
                     }
                     seed += "]";
                     seed += func.get_name();
@@ -291,14 +292,15 @@ namespace enclave_marshaller
                         seed += "[";
                         for(auto& item : param.get_attributes())
                         {
-                            if(item == "in")
+                            seed += item;
+                            /*if(item == "in")
                                 seed += item + ",";
                             else if(item == "out")
                                 seed += item + ",";
                             else if(item == "inout")
                                 seed += item + ",";
                             else if(item == "const")
-                                seed += item + ",";
+                                seed += item + ",";*/
                         }
                         seed += "]";
 
@@ -1114,8 +1116,22 @@ namespace enclave_marshaller
                         header.raw("{}{} {}", modifier, parameter.get_type(), parameter.get_name());
                         proxy.raw("{}{} {}", modifier, parameter.get_type(), parameter.get_name());
                     }
-                    header.raw(") = 0;\n");
-                    proxy.raw(") override\n");
+                    bool function_is_const = false;
+                    for (auto& item : function.get_attributes())
+                    {
+                        if (item == "const")
+                            function_is_const = true;
+                    }        
+                    if(function_is_const)            
+                    {
+                        header.raw(") const = 0;\n");
+                        proxy.raw(") const override\n");
+                    }
+                    else
+                    {
+                        header.raw(") = 0;\n");
+                        proxy.raw(") override\n");
+                    }
                     proxy("{{");
 
                     bool has_inparams = false;
@@ -2305,7 +2321,15 @@ namespace enclave_marshaller
                     header("{{");
                     proxy("{{");
                     stub("{{");
-
+                    for (auto& function : cls->get_functions())
+                    {
+                        if (function.get_type() == FunctionTypeCppQuote)
+                        {
+                            auto text = function.get_name();
+                            header.write_buffer(text);
+                            continue;
+                        }
+                    }
                     write_namespace(from_host, *cls, prefix + cls->get_name() + "::", header, proxy, stub);
 
                     header("}}");
