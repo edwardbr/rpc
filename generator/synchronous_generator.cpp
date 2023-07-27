@@ -277,7 +277,7 @@ namespace enclave_marshaller
                         sha3_Init256(&c);
                         sha3_Update(&c, func.get_name().data(), func.get_name().length());
                         const auto* hash = sha3_Finalize(&c);
-                        seed += "cpp_quote";
+                        seed += "#cpp_quote";
                         seed += std::to_string(*(uint64_t*)hash);
                         continue;
                     }
