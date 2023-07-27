@@ -272,7 +272,25 @@ namespace enclave_marshaller
                 for(auto& func : cls.get_functions())
                 {
                     if (func.get_type() == FunctionTypeCppQuote)
+                    {
+                        sha3_context c;
+                        sha3_Init256(&c);
+                        sha3_Update(&c, func.get_name().data(), func.get_name().length());
+                        const auto* hash = sha3_Finalize(&c);
+                        seed += "cpp_quote";
+                        seed += std::to_string(*(uint64_t*)hash);
                         continue;
+                    }
+                    if (func.get_type() == FunctionTypePublic)
+                    {
+                        seed += "public:";
+                        continue;
+                    }
+                    if (func.get_type() == FunctionTypePrivate)
+                    {
+                        seed += "private:";
+                        continue;
+                    }
                     seed += "[";
                     for(auto& item : func.get_attributes())
                     {
@@ -935,6 +953,7 @@ namespace enclave_marshaller
                     i++;
                 }
             }
+            header("class {}_stub;", interface_name);
             header("class {}{} : public rpc::casting_interface", interface_name, base_class_declaration);
             header("{{");
             header("public:");
@@ -974,6 +993,16 @@ namespace enclave_marshaller
                     {
                         auto text = function.get_name();
                         header.write_buffer(text);
+                        continue;
+                    }
+                    if (function.get_type() == FunctionTypePublic)
+                    {
+                        header("public:");
+                        continue;
+                    }
+                    if (function.get_type() == FunctionTypePrivate)
+                    {
+                        header("private:");
                         continue;
                     }
                     if (function.get_type() != FunctionTypeMethod)
@@ -1822,6 +1851,7 @@ namespace enclave_marshaller
                 stub("}};");
             }
 
+            header("friend {}_stub;", interface_name);
             header("}};");
             header("");
             proxy("}};");
