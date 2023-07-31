@@ -42,7 +42,7 @@ void get_imports(const std::shared_ptr<class_entity>& object, std::list<std::str
     }
 }
 
-bool is_dfferent(const std::stringstream& stream, const std::string& data)
+bool is_different(const std::stringstream& stream, const std::string& data)
 {
     auto stream_str = stream.str();
     if (stream_str.empty())
@@ -252,22 +252,22 @@ int main(const int argc, char* argv[])
         }
 
         // compare and write if different
-        if (is_dfferent(header_stream, interfaces_h_data))
+        if (is_different(header_stream, interfaces_h_data))
         {
             ofstream file(header_path);
             file << header_stream.str();
         }
-        if (is_dfferent(proxy_stream, interfaces_proxy_data))
+        if (is_different(proxy_stream, interfaces_proxy_data))
         {
             ofstream file(proxy_path);
             file << proxy_stream.str();
         }
-        if (is_dfferent(stub_stream, interfaces_stub_data))
+        if (is_different(stub_stream, interfaces_stub_data))
         {
             ofstream file(stub_path);
             file << stub_stream.str();
         }
-        if (is_dfferent(stub_header_stream, interfaces_stub_header_data))
+        if (is_different(stub_header_stream, interfaces_stub_header_data))
         {
             ofstream file(stub_header_path);
             file << stub_header_stream.str();

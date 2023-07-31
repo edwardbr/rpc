@@ -43,9 +43,7 @@ public:
     }
     void write_buffer(const std::string& str)
     {
-        auto buffer = fmt::basic_memory_buffer<char>();
-        buffer.append(str);
-        fmt::detail::write_buffer<char>(strm_, buffer);
+        strm_ << str;
     }
     void print_tabs()
     {

@@ -989,22 +989,6 @@ namespace enclave_marshaller
                 int function_count = 1;
                 for (auto& function : m_ob.get_functions())
                 {
-                    if (function.get_type() == FunctionTypeCppQuote)
-                    {
-                        auto text = function.get_name();
-                        header.write_buffer(text);
-                        continue;
-                    }
-                    if (function.get_type() == FunctionTypePublic)
-                    {
-                        header("public:");
-                        continue;
-                    }
-                    if (function.get_type() == FunctionTypePrivate)
-                    {
-                        header("private:");
-                        continue;
-                    }
                     if (function.get_type() != FunctionTypeMethod)
                         continue;
 
@@ -1115,6 +1099,22 @@ namespace enclave_marshaller
                 int function_count = 1;
                 for (auto& function : m_ob.get_functions())
                 {
+                    if (function.get_type() == FunctionTypeCppQuote)
+                    {
+                        auto text = function.get_name();
+                        header.write_buffer(text);
+                        continue;
+                    }
+                    if (function.get_type() == FunctionTypePublic)
+                    {
+                        header("public:");
+                        continue;
+                    }
+                    if (function.get_type() == FunctionTypePrivate)
+                    {
+                        header("private:");
+                        continue;
+                    }
                     if (function.get_type() != FunctionTypeMethod)
                         continue;
 
@@ -2537,6 +2537,16 @@ namespace enclave_marshaller
             
             write_stub_factory_lookup(module_name, lib, prefix, stub_header, proxy, stub);
 
+
+            for (auto& function : lib.get_functions())
+            {
+                if (function.get_type() == FunctionTypeCppQuote)
+                {
+                    auto text = function.get_name();
+                    header.write_buffer(text);
+                    continue;
+                }
+            }
             write_namespace(from_host, lib, prefix, header, proxy, stub);
 
             for (auto& ns : namespaces)
