@@ -1876,27 +1876,27 @@ namespace enclave_marshaller
                 return;
             done.insert(ns);
 
-            stub("srv->add_interface_stub_factory({0}::get_id, std::make_shared<std::function<rpc::shared_ptr<rpc::i_interface_stub>(const rpc::shared_ptr<rpc::i_interface_stub>&)>>([](const rpc::shared_ptr<rpc::i_interface_stub>& original) -> rpc::shared_ptr<rpc::i_interface_stub>", ns);
+            stub("srv->add_interface_stub_factory(::{0}::get_id, std::make_shared<std::function<rpc::shared_ptr<rpc::i_interface_stub>(const rpc::shared_ptr<rpc::i_interface_stub>&)>>([](const rpc::shared_ptr<rpc::i_interface_stub>& original) -> rpc::shared_ptr<rpc::i_interface_stub>", ns);
             stub("{{");
             stub("auto ci = original->get_castable_interface();");
-            stub("const {0}* tmp = nullptr;", ns);
+            stub("const ::{0}* tmp = nullptr;", ns);
             stub("#ifdef RPC_V2");
             stub("{{");
-            stub("auto* tmp = const_cast<{0}*>(static_cast<const {0}*>(ci->query_interface({0}::get_id(rpc::VERSION_2))));", ns);
+            stub("auto* tmp = const_cast<::{0}*>(static_cast<const ::{0}*>(ci->query_interface(::{0}::get_id(rpc::VERSION_2))));", ns);
             stub("if(tmp != nullptr)");
             stub("{{");
-            stub("rpc::shared_ptr<{0}> tmp_ptr(ci, tmp);", ns);
-            stub("return rpc::static_pointer_cast<rpc::i_interface_stub>({}_stub::create(tmp_ptr, original->get_object_stub()));", ns);
+            stub("rpc::shared_ptr<::{0}> tmp_ptr(ci, tmp);", ns);
+            stub("return rpc::static_pointer_cast<rpc::i_interface_stub>(::{}_stub::create(tmp_ptr, original->get_object_stub()));", ns);
             stub("}}");
             stub("}}");
             stub("#endif");            
             stub("#ifdef RPC_V1");
             stub("{{");
-            stub("auto* tmp = const_cast<{0}*>(static_cast<const {0}*>(ci->query_interface({{{0}::get_id(rpc::VERSION_1)}})));", ns);
+            stub("auto* tmp = const_cast<::{0}*>(static_cast<const ::{0}*>(ci->query_interface({{::{0}::get_id(rpc::VERSION_1)}})));", ns);
             stub("if(tmp != nullptr)");
             stub("{{");
-            stub("rpc::shared_ptr<{0}> tmp_ptr(ci, tmp);", ns);
-            stub("return rpc::static_pointer_cast<rpc::i_interface_stub>({}_stub::create(tmp_ptr, original->get_object_stub()));", ns);
+            stub("rpc::shared_ptr<::{0}> tmp_ptr(ci, tmp);", ns);
+            stub("return rpc::static_pointer_cast<rpc::i_interface_stub>(::{}_stub::create(tmp_ptr, original->get_object_stub()));", ns);
             stub("}}");
             stub("}}");
             stub("#endif");            
@@ -2161,11 +2161,11 @@ namespace enclave_marshaller
 
             int id = 1;
             header("template<> rpc::interface_descriptor "
-                   "rpc::service::proxy_bind_in_param(uint64_t protocol_version, const rpc::shared_ptr<{}{}>& "
+                   "rpc::service::proxy_bind_in_param(uint64_t protocol_version, const rpc::shared_ptr<::{}{}>& "
                    "iface, rpc::shared_ptr<rpc::object_stub>& stub);",
                    ns, interface_name);
             header("template<> rpc::interface_descriptor "
-                   "rpc::service::stub_bind_out_param(uint64_t protocol_version, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, const rpc::shared_ptr<{}{}>& "
+                   "rpc::service::stub_bind_out_param(uint64_t protocol_version, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, const rpc::shared_ptr<::{}{}>& "
                    "iface);",
                    ns, interface_name);
         }
@@ -2186,26 +2186,26 @@ namespace enclave_marshaller
                 build_scoped_name(owner, ns);
             }
 
-            proxy("template<> void object_proxy::create_interface_proxy(shared_ptr<{}{}>& "
+            proxy("template<> void object_proxy::create_interface_proxy(shared_ptr<::{}{}>& "
                   "inface)",
                   ns, interface_name);
             proxy("{{");
-            proxy("inface = {1}{0}_proxy::create(shared_from_this());", interface_name, ns);
+            proxy("inface = ::{1}{0}_proxy::create(shared_from_this());", interface_name, ns);
             proxy("}}");
             proxy("");
 
             
-            stub("template<> std::function<shared_ptr<i_interface_stub>(const shared_ptr<object_stub>& stub)> service::create_interface_stub(const shared_ptr<{}{}>& iface)",
+            stub("template<> std::function<shared_ptr<i_interface_stub>(const shared_ptr<object_stub>& stub)> service::create_interface_stub(const shared_ptr<::{}{}>& iface)",
                  ns, interface_name);
             stub("{{");
             stub("return [&](const shared_ptr<object_stub>& stub) -> "
                  "shared_ptr<i_interface_stub>{{");
-            stub("return static_pointer_cast<i_interface_stub>({}{}_stub::create(iface, stub));", ns,
+            stub("return static_pointer_cast<i_interface_stub>(::{}{}_stub::create(iface, stub));", ns,
                  interface_name);
             stub("}};");
             stub("}}");
 
-            stub("template<> interface_descriptor service::proxy_bind_in_param(uint64_t protocol_version, const shared_ptr<{}{}>& iface, shared_ptr<object_stub>& stub)",
+            stub("template<> interface_descriptor service::proxy_bind_in_param(uint64_t protocol_version, const shared_ptr<::{}{}>& iface, shared_ptr<object_stub>& stub)",
                  ns, interface_name);
             stub("{{");
             stub("if(!iface)");
@@ -2217,7 +2217,7 @@ namespace enclave_marshaller
             stub("return get_proxy_stub_descriptor(protocol_version, {{0}}, {{0}}, iface.get(), factory, false, stub);");
             stub("}}");
             
-            stub("template<> interface_descriptor service::stub_bind_out_param(uint64_t protocol_version, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, const shared_ptr<{}{}>& iface)",
+            stub("template<> interface_descriptor service::stub_bind_out_param(uint64_t protocol_version, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, const shared_ptr<::{}{}>& iface)",
                  ns, interface_name);
             stub("{{");
             stub("if(!iface)");
