@@ -6,7 +6,7 @@ RPCGenerate(
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_BINARY_DIR}/generated
     example_shared
-    marshalled_tests
+    ""
     mock example_shared/example_shared_mock.h
     dependencies
     include_paths
@@ -20,7 +20,7 @@ RPCGenerate(
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_BINARY_DIR}/generated
     example_import
-    marshalled_tests
+    ""
     mock example_import/example_import_mock.h
     dependencies
         example_shared_idl
@@ -35,7 +35,7 @@ RPCGenerate(
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_BINARY_DIR}/generated
     example
-    marshalled_tests
+    ""
     mock example/example_mock.h
     dependencies
         example_import_idl

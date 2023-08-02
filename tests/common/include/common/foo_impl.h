@@ -420,9 +420,9 @@ namespace marshalled_tests
         {
             auto this_service = this_service_.lock();
             auto child_service = rpc::make_shared<rpc::child_service>(rpc::zone{new_zone_id});
-            marshalled_tests::example_import_idl_register_stubs(child_service);
-            marshalled_tests::example_shared_idl_register_stubs(child_service);
-            marshalled_tests::example_idl_register_stubs(child_service);
+            example_import_idl_register_stubs(child_service);
+            example_shared_idl_register_stubs(child_service);
+            example_idl_register_stubs(child_service);
 
             auto service_proxy_to_child = rpc::local_child_service_proxy::create(child_service, this_service, telemetry_);
 
@@ -453,7 +453,7 @@ namespace marshalled_tests
         {
             if (!host)
                 return rpc::error::INVALID_DATA();
-            rpc::shared_ptr<marshalled_tests::yyy::i_example> target;
+            rpc::shared_ptr<yyy::i_example> target;
             auto err = host->create_enclave(target);
             if(err != rpc::error::OK())
                 return err;
