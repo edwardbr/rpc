@@ -22,10 +22,14 @@ function(RPCGenerate
 
   cmake_path(APPEND base_dir ${idl} OUTPUT_VARIABLE idl)
 
-  set(full_header_path ${output_path}/include/${sub_directory}/${name}.h)
-  set(full_proxy_path ${output_path}/src/${sub_directory}/${name}_proxy.cpp)
-  set(full_stub_path ${output_path}/src/${sub_directory}/${name}_stub.cpp)
-  set(full_stub_header_path ${output_path}/include/${sub_directory}/${name}_stub.h)
+  set(header_path ${sub_directory}/${name}.h)
+  set(proxy_path ${sub_directory}/${name}_proxy.cpp)
+  set(stub_path ${sub_directory}/${name}_stub.cpp)
+  set(stub_header_path ${sub_directory}/${name}_stub.h)
+  set(full_header_path ${output_path}/include/${header_path})
+  set(full_proxy_path ${output_path}/src/${proxy_path})
+  set(full_stub_path ${output_path}/src/${stub_path})
+  set(full_stub_header_path ${output_path}/include/${stub_header_path})
 
   if(${DEBUG_RPC_GEN})
     message("RPCGenerate name ${name}")
@@ -40,6 +44,10 @@ function(RPCGenerate
     message("paths ${params_include_paths}")
     message("defines ${params_defines}")
     message("mock ${params_mock}")
+    message("header_path ${header_path}")
+    message("proxy_path ${proxy_path}")
+    message("stub_path ${stub_path}")
+    message("stub_header_path ${stub_header_path}")
     message("full_header_path ${full_header_path}")
     message("full_proxy_path ${full_proxy_path}")
     message("full_stub_path ${full_stub_path}")
@@ -101,10 +109,10 @@ function(RPCGenerate
     --idl ${idl}
     --module_name ${name}_idl
     --output_path ${output_path}
-    --header ${full_header_path}
-    --proxy ${full_proxy_path}
-    --stub ${full_stub_path}
-    --stub_header ${full_stub_header_path}
+    --header ${header_path}
+    --proxy ${proxy_path}
+    --stub ${stub_path}
+    --stub_header ${stub_header_path}
     ${PATHS_PARAMS}
     ${ADDITIONAL_HEADERS}
     MAIN_DEPENDENCY ${idl}
@@ -140,10 +148,10 @@ function(RPCGenerate
     --idl ${idl}
     --module_name ${name}_idl
     --output_path ${output_path}
-    --header ${full_header_path}
-    --proxy ${full_proxy_path}
-    --stub ${full_stub_path}
-    --stub_header ${full_stub_header_path}
+    --header ${header_path}
+    --proxy ${proxy_path}
+    --stub ${stub_path}
+    --stub_header ${stub_header_path}
     ${PATHS_PARAMS}
     ${ADDITIONAL_HEADERS}
     MAIN_DEPENDENCY ${idl}
@@ -338,7 +346,7 @@ function(RPCGenerate
       ${full_proxy_path}
     )
     target_compile_definitions(${name}_idl_enclave PRIVATE ${ENCLAVE_DEFINES})
-    target_include_directories(${name}_idl_enclave PUBLIC "$<BUILD_INTERFACE:${output_path}>" "$<BUILD_INTERFACE:${output_path}/include>" PRIVATE ${ENCLAVE_LIBCXX_INCLUDES})
+    target_include_directories(${name}_idl_enclave PUBLIC "$<BUILD_INTERFACE:${output_path}>" "$<BUILD_INTERFACE:${output_path}/include>" PRIVATE "${output_path}/include" ${ENCLAVE_LIBCXX_INCLUDES})
     target_compile_options(${name}_idl_enclave PRIVATE ${ENCLAVE_COMPILE_OPTIONS})
     target_link_directories(${name}_idl_enclave PRIVATE ${SGX_LIBRARY_PATH})
     set_property(TARGET ${name}_idl_enclave PROPERTY COMPILE_PDB_NAME ${name}_idl_enclave)
