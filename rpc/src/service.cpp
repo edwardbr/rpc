@@ -825,6 +825,9 @@ namespace rpc
 
         item = other_zones.lower_bound({destination_zone_id, {0}});
 
+        if(item->first.dest != destination_zone_id)
+            item = other_zones.end();
+
         //if not we can make one from the proxy of the calling channel zone
         //this zone knows nothing about the destination zone however the caller channel zone will know how to connect to it
         if (item == other_zones.end() && caller_channel_zone_id.is_set())
