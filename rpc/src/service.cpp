@@ -825,7 +825,7 @@ namespace rpc
 
         item = other_zones.lower_bound({destination_zone_id, {0}});
 
-        if(item->first.dest != destination_zone_id)
+        if(item != other_zones.end() && item->first.dest != destination_zone_id)
             item = other_zones.end();
 
         //if not we can make one from the proxy of the calling channel zone
