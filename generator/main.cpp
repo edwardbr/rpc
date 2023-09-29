@@ -159,6 +159,11 @@ int main(const int argc, char* argv[])
 
         std::stringstream output_stream;
         auto r = parser->load(output_stream, rootIdl, parsed_paths, loaded_includes);
+        if(!r)
+        {
+            std::cerr << "unable to load " << rootIdl << '\n';
+            return -1;
+        }  
         pre_parsed_data = output_stream.str();
         if (dump_preprocessor_output_and_die)
         {
