@@ -264,8 +264,8 @@ namespace rpc
                         const rpc::i_telemetry_service* telemetry_service) : 
             zone_id_(svc->get_zone_id()),
             destination_zone_id_(destination_zone_id),
-            service_(svc),
             caller_zone_id_(caller_zone_id),
+            service_(svc),
             telemetry_service_(telemetry_service)
         {
 #ifdef USE_RPC_LOGGING
@@ -281,10 +281,10 @@ namespace rpc
                 zone_id_(other.zone_id_),
                 destination_zone_id_(other.destination_zone_id_),
                 destination_channel_zone_(other.destination_channel_zone_),
-                service_(other.service_),
                 caller_zone_id_(other.caller_zone_id_),
-                telemetry_service_(other.telemetry_service_),
+                service_(other.service_),
                 dependent_services_count_(0),
+                telemetry_service_(other.telemetry_service_),
                 enc_(other.enc_)
         {
 #ifdef USE_RPC_LOGGING

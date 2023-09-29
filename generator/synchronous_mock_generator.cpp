@@ -65,7 +65,6 @@ namespace enclave_marshaller
 
             if (has_methods)
             {
-                int function_count = 1;
                 for (auto& function : m_ob.get_functions())
                 {
                     if (function.get_type() != FunctionTypeMethod)
@@ -319,6 +318,7 @@ namespace enclave_marshaller
 
             for (auto& ns : namespaces)
             {
+                (void)ns;
                 header("}}");
             }
             //header("}}");

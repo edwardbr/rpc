@@ -101,8 +101,6 @@ namespace enclave_marshaller
 
         const class_entity* find_type(std::string type_name, const class_entity& cls)
         {
-            auto* tmp = &get_root(cls);
-
             auto type_namespace = split_namespaces(type_name);
 
             const auto* current_namespace = &cls;
@@ -117,7 +115,6 @@ namespace enclave_marshaller
             
                 while(candidate_namespace)
                 {
-                    size_t pos = 0;
                     for (const auto& ns : type_namespace) 
                     {
                         std::shared_ptr<class_entity> subcls = nullptr;
@@ -154,7 +151,6 @@ namespace enclave_marshaller
         {
             std::stringstream sstr;
             std::stringstream temp;
-            bool is_in_name = false;
             for(auto char_data : source)
             {
                 if(isalpha(char_data) || isdigit(char_data) || char_data == '_' || char_data == ':')
@@ -323,8 +319,6 @@ namespace enclave_marshaller
                         seed += "]";
 
                         auto param_type = param.get_type();
-                        if(param_type == "something_complicated")
-                            param_type=param_type;
                         std::string reference_modifiers;
                         strip_reference_modifiers(param_type, reference_modifiers);
                         auto template_params = get_template_param(param_type);
@@ -846,7 +840,6 @@ namespace enclave_marshaller
         {
             auto in = std::find(attributes.begin(), attributes.end(), "in") != attributes.end();
             auto out = std::find(attributes.begin(), attributes.end(), "out") != attributes.end();
-            auto by_value = std::find(attributes.begin(), attributes.end(), "by_value") != attributes.end();
             auto is_const = std::find(attributes.begin(), attributes.end(), "const") != attributes.end();
 
             if (!out)
@@ -1000,19 +993,12 @@ namespace enclave_marshaller
 
                     for(auto parameter : function.get_parameters())
                     {
-                        auto& attributes = parameter.get_attributes();
-                        auto in = std::find(attributes.begin(), attributes.end(), "in") != attributes.end();
-                        auto out = std::find(attributes.begin(), attributes.end(), "out") != attributes.end();
-                        auto is_const = std::find(attributes.begin(), attributes.end(), "const") != attributes.end();
-                        auto by_value = std::find(attributes.begin(), attributes.end(), "by_value") != attributes.end();
-
                         std::string type_name = parameter.get_type();
                         std::string reference_modifiers;
                         strip_reference_modifiers(type_name, reference_modifiers);
 
                         std::string encapsulated_type = get_encapsulated_shared_ptr_type(type_name);
 
-                        bool is_interface = false;
                         std::shared_ptr<class_entity> obj;
                         if (library.find_class(encapsulated_type, obj))
                         {
@@ -1179,11 +1165,12 @@ namespace enclave_marshaller
 
                     {
                         stub("//STUB_DEMARSHALL_DECLARATION");
+                        stub("#pragma GCC diagnostic push");
+                        stub("#pragma GCC diagnostic ignored \"-Wunused-variable\"");
                         stub("int __rpc_ret = rpc::error::OK();");
                         uint64_t count = 1;
                         for (auto& parameter : function.get_parameters())
                         {
-                            bool is_interface = false;
                             std::string output;
                             if (is_in_call(STUB_DEMARSHALL_DECLARATION, from_host, m_ob, parameter.get_name(),
                                            parameter.get_type(), parameter.get_attributes(), count, output))
@@ -1193,6 +1180,7 @@ namespace enclave_marshaller
                                             parameter.get_type(), parameter.get_attributes(), count, output);
                             stub("{};", output);
                         }
+                        stub("#pragma GCC diagnostic pop");
                     }
 
                     proxy("std::vector<char> __rpc_in_buf;");     
@@ -1879,7 +1867,6 @@ namespace enclave_marshaller
             stub("srv->add_interface_stub_factory(::{0}::get_id, std::make_shared<std::function<rpc::shared_ptr<rpc::i_interface_stub>(const rpc::shared_ptr<rpc::i_interface_stub>&)>>([](const rpc::shared_ptr<rpc::i_interface_stub>& original) -> rpc::shared_ptr<rpc::i_interface_stub>", ns);
             stub("{{");
             stub("auto ci = original->get_castable_interface();");
-            stub("const ::{0}* tmp = nullptr;", ns);
             stub("#ifdef RPC_V2");
             stub("{{");
             stub("auto* tmp = const_cast<::{0}*>(static_cast<const ::{0}*>(ci->query_interface(::{0}::get_id(rpc::VERSION_2))));", ns);
@@ -1936,6 +1923,7 @@ namespace enclave_marshaller
             stub("mutable rpc::weak_ptr<{}_stub> weak_this_;", interface_name);
             stub("");
             stub("public:");
+            stub("virtual ~{0}_stub() = default;", interface_name);
             stub("static rpc::shared_ptr<{0}_stub> create(const rpc::shared_ptr<{0}>& __rpc_target, "
                  "rpc::weak_ptr<rpc::object_stub> __rpc_target_stub)",
                  interface_name);
@@ -2159,7 +2147,6 @@ namespace enclave_marshaller
                 build_scoped_name(owner, ns);
             }
 
-            int id = 1;
             header("template<> rpc::interface_descriptor "
                    "rpc::service::proxy_bind_in_param(uint64_t protocol_version, const rpc::shared_ptr<::{}{}>& "
                    "iface, rpc::shared_ptr<rpc::object_stub>& stub);",
@@ -2254,7 +2241,6 @@ namespace enclave_marshaller
                                      writer& proxy, writer& stub)
         {
             {
-                int id = 1;
                 for (auto& cls : lib.get_classes())
                 {
                     if (!cls->get_import_lib().empty())
@@ -2551,6 +2537,7 @@ namespace enclave_marshaller
 
             for (auto& ns : namespaces)
             {
+                (void)ns;
                 header("}}");
                 proxy("}}");
                 stub("}}");
