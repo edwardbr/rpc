@@ -71,7 +71,16 @@ namespace enclave_marshaller
                         continue;
 
                     header.print_tabs();
-                    header.raw("MOCK_METHOD{}({}, {}(", function.get_parameters().size(), function.get_name(), function.get_return_type());
+                    bool is_const_func = false;
+                    for (auto& item : function.get_attributes())
+                    {
+                        if (item == "const")
+                            is_const_func = true;
+                    } 
+                    if(is_const_func)                   
+                        header.raw("MOCK_CONST_METHOD{}({}, {}(", function.get_parameters().size(), function.get_name(), function.get_return_type());
+                    else
+                        header.raw("MOCK_METHOD{}({}, {}(", function.get_parameters().size(), function.get_name(), function.get_return_type());
                     bool has_parameter = false;
                     for (auto& parameter : function.get_parameters())
                     {
