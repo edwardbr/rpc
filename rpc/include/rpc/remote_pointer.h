@@ -34,6 +34,12 @@
     #define LOG(str, sz)
 #endif
 
+#ifdef __linux__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wc++20-extensions"
+#endif // __linux__
+
+
 namespace rpc
 {
     struct __shared_ptr_dummy_rebind_allocator_type;
@@ -562,15 +568,9 @@ namespace rpc
     {
     };
     
-    #ifdef __linux__
-    #pragma clang diadnostic push
-    #pragma clang diadnostic ignored "-Wc++20-extensions"
-    #endif // __linux__
-
     template<class _Ptr> struct __is_deletable<_Ptr, decltype(delete declval<_Ptr>())> : std::true_type
     {
     };
-
     template<class _Ptr, class = void> struct __is_array_deletable : std::false_type
     {
     };
@@ -580,10 +580,6 @@ namespace rpc
     template<class _Ptr> struct __is_array_deletable<_Ptr, decltype(delete[] declval<_Ptr>())> : std::true_type
     {
     };
-
-    #ifdef __linux__
-    #pragma clang diadnostic pop
-    #endif // __linux__
 
     template<class _Dp, class _Pt, class = decltype(declval<_Dp>()(declval<_Pt>()))>
     static std::true_type __well_formed_deleter_test(int);
@@ -2072,3 +2068,7 @@ element_type*>::value>> shared_ptr(unique_ptr<_Yp, _Dp>&& __r) : __ptr_(__r.get(
         return ret;
     }
 }
+
+#ifdef __linux__
+#pragma clang diagnostic pop
+#endif // __linux__
