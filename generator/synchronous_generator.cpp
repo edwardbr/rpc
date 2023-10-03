@@ -1165,8 +1165,10 @@ namespace enclave_marshaller
 
                     {
                         stub("//STUB_DEMARSHALL_DECLARATION");
+                        stub("#if defined(__clang__) || defined(__GNUC__) || defined(__GNUG__)");
                         stub("#pragma GCC diagnostic push");
                         stub("#pragma GCC diagnostic ignored \"-Wunused-variable\"");
+                        stub("#endif");
                         stub("int __rpc_ret = rpc::error::OK();");
                         uint64_t count = 1;
                         for (auto& parameter : function.get_parameters())
@@ -1180,7 +1182,9 @@ namespace enclave_marshaller
                                             parameter.get_type(), parameter.get_attributes(), count, output);
                             stub("{};", output);
                         }
+                        stub("#if defined(__clang__) || defined(__GNUC__) || defined(__GNUG__)");
                         stub("#pragma GCC diagnostic pop");
+                        stub("#endif");
                     }
 
                     proxy("std::vector<char> __rpc_in_buf;");     
