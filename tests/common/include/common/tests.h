@@ -15,7 +15,6 @@ namespace marshalled_tests
 
     void standard_tests(xxx::i_foo& foo, bool enclave, const rpc::i_telemetry_service* telemetry_service)
     {
-        int ret = 0;
         {
             ASSERT(!foo.do_something_in_val(33));
         }
