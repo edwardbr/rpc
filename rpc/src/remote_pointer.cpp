@@ -1,3 +1,4 @@
+//this is the legacy rpc implementation kept for win32 for now
 
 #include <rpc/remote_pointer.h>
 
