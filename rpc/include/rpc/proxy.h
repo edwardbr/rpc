@@ -449,7 +449,7 @@ namespace rpc
                     , caller_zone_id 
                     , build_out_param_channel 
                     , proxy_add_ref);
-                if(ret != std::numeric_limits<uint64_t>::max())
+                if(ret != ::std::numeric_limits<uint64_t>::max())
                 {
                     if(original_version != version)
                     {
@@ -476,7 +476,7 @@ namespace rpc
                     , destination_zone_id 
                     , object_id 
                     , caller_zone_id);
-                if(ret != std::numeric_limits<uint64_t>::max())
+                if(ret != ::std::numeric_limits<uint64_t>::max())
                 {
                     if(original_version != version)
                     {
@@ -618,7 +618,7 @@ namespace rpc
                                 , zone_id.as_caller()// this zone will now be the caller to this object
                                 , rpc::add_ref_options::normal
                                 , !new_proxy_added);
-                if(ret == std::numeric_limits<uint64_t>::max()) 
+                if(ret == ::std::numeric_limits<uint64_t>::max()) 
                     return -1;
             }
             auto ret = op->query_interface(iface, false);        
@@ -758,7 +758,7 @@ namespace rpc
             serv->get_zone_id().as_caller(), 
             rpc::add_ref_options::build_destination_route, 
             false);
-        if(ret == std::numeric_limits<uint64_t>::max())
+        if(ret == ::std::numeric_limits<uint64_t>::max())
             return -1;
 
         rpc::shared_ptr<object_proxy> op = service_proxy->get_object_proxy(encap.object_id);
