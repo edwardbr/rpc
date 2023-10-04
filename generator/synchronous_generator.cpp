@@ -1210,8 +1210,8 @@ namespace enclave_marshaller
                         }
                         count++;
                     }
-                    proxy("bool has_sent = false;");
                     proxy("#ifdef RPC_V2");
+                    proxy("bool has_sent = false;");
                     proxy("if(__rpc_sp->get_remote_rpc_version() == rpc::VERSION_2)");
                     proxy("{{");               
                     stub("#ifdef RPC_V2");
@@ -1429,7 +1429,6 @@ namespace enclave_marshaller
                     
                     proxy("__rpc_ret = __rpc_op->send((uint64_t){}, {}::get_id, {{{}}}, __rpc_in_buf.size(), __rpc_in_buf.data(), __rpc_out_buf);",
                         tag, interface_name, function_count);
-                    proxy("has_sent = true;");
                     proxy("}}");
                     proxy("#endif");
                     stub("}}");
