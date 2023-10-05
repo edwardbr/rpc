@@ -480,7 +480,6 @@ namespace rpc
             else if(build_channel)
             {
                 //we are here as this zone needs to send the destination addref and caller addref to different zones
-                bool release_dest_zone = false;
                 rpc::shared_ptr<rpc::service_proxy> dest_zone;
                 {
                     std::lock_guard g(insert_control);
@@ -545,7 +544,11 @@ namespace rpc
                                     caller_zone_id, 
                                     build_out_param_channel, 
                                     false);
-                                release_dest_zone = true;
+                                dest_zone->release_external_ref();//perhaps this could be optimised
+                                if(ret == std::numeric_limits<uint64_t>::max())
+                                {
+                                    return ret;
+                                }
                                 break;
                             }
                         }
@@ -574,8 +577,6 @@ namespace rpc
                                 add_ref_options::build_caller_route, false);
                     }while(false);
                 }
-                if(release_dest_zone)
-                    dest_zone->release_external_ref();//perhaps this could be optimised
 
                 return 1;
             }
