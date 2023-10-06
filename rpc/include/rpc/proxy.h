@@ -665,6 +665,10 @@ namespace rpc
 
             auto count = serv->release_local_stub(ob);
             assert(count);
+            if(!count || count == std::numeric_limits<uint64_t>::max())
+            {
+                return rpc::error::REFERENCE_COUNT_ERROR();
+            }
 
 #ifdef RPC_V2
             auto interface_stub = ob->get_interface(T::get_id(rpc::VERSION_2));

@@ -45,6 +45,7 @@ namespace rpc
         object_id_generator = 0;
         // to do: assert that there are no more object_stubs in memory
         bool is_empty = check_is_empty();
+        (void)is_empty;
         assert(is_empty);
 
         stubs.clear();
