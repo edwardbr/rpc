@@ -1,5 +1,11 @@
 cmake_minimum_required(VERSION 3.0.0)
 
+if(WIN32)
+set(REMOTE_PTR_CPP src/remote_pointer.cpp)
+else()
+set(REMOTE_PTR_CPP )
+endif()
+
 add_library(rpc_enclave 
     include/rpc/marshaller.h
     include/rpc/basic_service_proxies.h
@@ -9,7 +15,7 @@ add_library(rpc_enclave
     include/rpc/service.h
     include/rpc/stub.h
     src/proxy.cpp
-    src/remote_pointer.cpp
+    ${REMOTE_PTR_CPP}
     src/service.cpp
     src/stub.cpp
     src/error_codes.cpp
@@ -46,7 +52,7 @@ add_library(rpc_enclave_v1
     include/rpc/service.h
     include/rpc/stub.h
     src/proxy.cpp
-    src/remote_pointer.cpp
+    ${REMOTE_PTR_CPP}
     src/service.cpp
     src/stub.cpp
     src/error_codes.cpp
@@ -84,7 +90,7 @@ add_library(rpc_host
     include/rpc/service.h
     include/rpc/stub.h
     src/proxy.cpp
-    src/remote_pointer.cpp
+    ${REMOTE_PTR_CPP}
     src/service.cpp
     src/stub.cpp
     src/error_codes.cpp

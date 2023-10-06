@@ -24,6 +24,7 @@ namespace rpc
         int STUB_DESERIALISATION_ERROR();   //a stub is unable to deserialise data from a caller
         int INCOMPATIBLE_SERVICE();         //a service proxy is incompatible with the client
         int INCOMPATIBLE_SERIALISATION();   //service proxy does not support this serialisation format try JSON
+        int REFERENCE_COUNT_ERROR();        //reference count error
         int MAX();//the biggest value
 
         void set_OK_val(int val);
