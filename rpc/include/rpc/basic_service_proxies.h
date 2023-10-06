@@ -98,7 +98,7 @@ namespace rpc
                                                             object_id, caller_zone_id);
             }
             auto ret = destination_service_.lock()->add_ref(protocol_version, destination_channel_zone_id, destination_zone_id, object_id, caller_channel_zone_id, caller_zone_id, build_out_param_channel, proxy_add_ref);            
-            if(proxy_add_ref && ret != ::std::numeric_limits<uint64_t>::max())
+            if(proxy_add_ref && ret != std::numeric_limits<uint64_t>::max())
             {
                 add_external_ref();
             }
@@ -116,7 +116,7 @@ namespace rpc
                                                             object_id, caller_zone_id);
             }
             auto ret = destination_service_.lock()->release(protocol_version, destination_zone_id, object_id, caller_zone_id);
-            if(ret != ::std::numeric_limits<uint64_t>::max())
+            if(ret != std::numeric_limits<uint64_t>::max())
             {
                 release_external_ref();
             }  
@@ -213,7 +213,7 @@ namespace rpc
                                                             destination_zone_id, object_id, caller_zone_id);
             }
             auto ret = destination_service_->add_ref(protocol_version, destination_channel_zone_id, destination_zone_id, object_id, caller_channel_zone_id, caller_zone_id, build_out_param_channel, proxy_add_ref);            
-            if(proxy_add_ref && ret != ::std::numeric_limits<uint64_t>::max())
+            if(proxy_add_ref && ret != std::numeric_limits<uint64_t>::max())
             {
                 add_external_ref();
             }
@@ -231,7 +231,7 @@ namespace rpc
                                                             destination_zone_id, object_id, caller_zone_id);
             }
             auto ret = destination_service_->release(protocol_version, destination_zone_id, object_id, caller_zone_id);
-            if(ret != ::std::numeric_limits<uint64_t>::max())
+            if(ret != std::numeric_limits<uint64_t>::max())
             {
                 release_external_ref();
             }  

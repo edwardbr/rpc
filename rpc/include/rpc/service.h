@@ -24,7 +24,7 @@ namespace rpc
     class service;
     class service_proxy;
 
-    const object dummy_object_id = {::std::numeric_limits<uint64_t>::max()};
+    const object dummy_object_id = {std::numeric_limits<uint64_t>::max()};
 
     class service_logger
     {
