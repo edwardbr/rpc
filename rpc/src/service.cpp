@@ -262,7 +262,7 @@ namespace rpc
             }
             else
             {
-                destination_zone = object_service_proxy->clone_for_zone(destination_zone_id, caller_zone_id, caller_channel_zone_id);
+                destination_zone = object_service_proxy->clone_for_zone(destination_zone_id, caller_zone_id);
             }
 
             //the fork is here so we need to add ref the destination normally with caller info
@@ -498,7 +498,7 @@ namespace rpc
                         if(found != other_zones.end() && found->first.dest.get_val() == dest_channel)
                         {
                             auto tmp = found->second.lock();
-                            dest_zone = tmp->clone_for_zone(destination_zone_id, caller_zone_id, {});
+                            dest_zone = tmp->clone_for_zone(destination_zone_id, caller_zone_id);
                         }
                         else
                         {
@@ -599,7 +599,7 @@ namespace rpc
                         if(found != other_zones.end() && found->first.dest == destination_zone_id)
                         {
                             auto tmp = found->second.lock();
-                            other_zone = tmp->clone_for_zone(destination_zone_id, caller_zone_id, {});
+                            other_zone = tmp->clone_for_zone(destination_zone_id, caller_zone_id);
                         }
                     }
 
@@ -608,7 +608,7 @@ namespace rpc
                     {
                         auto parent = get_parent();
                         assert(parent);
-                        other_zone = parent->clone_for_zone(destination_zone_id, caller_zone_id, {});
+                        other_zone = parent->clone_for_zone(destination_zone_id, caller_zone_id);
                     }
                 }
                 return other_zone->add_ref(
@@ -864,7 +864,7 @@ namespace rpc
             return nullptr;
         }
 
-        auto proxy = calling_proxy->clone_for_zone(destination_zone_id, new_caller_zone_id, caller_channel_zone_id);
+        auto proxy = calling_proxy->clone_for_zone(destination_zone_id, new_caller_zone_id);
         new_proxy_added = true;
         return proxy;
     }
@@ -1026,7 +1026,7 @@ namespace rpc
         if(parent_service_)
         {
             std::lock_guard g(insert_control);
-            proxy = parent_service_->clone_for_zone(destination_zone_id, caller_zone_id, caller_channel_zone_id);
+            proxy = parent_service_->clone_for_zone(destination_zone_id, caller_zone_id);
             new_proxy_added = true;
             return proxy;
         }

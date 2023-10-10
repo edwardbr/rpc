@@ -492,7 +492,7 @@ namespace rpc
         std::unordered_map<object, rpc::weak_ptr<object_proxy>> get_proxies(){return proxies_;}
 
         virtual rpc::shared_ptr<service_proxy> deep_copy_for_clone() = 0;
-        rpc::shared_ptr<service_proxy> clone_for_zone(destination_zone destination_zone_id, caller_zone caller_zone_id, caller_channel_zone caller_channel_zone_id)
+        rpc::shared_ptr<service_proxy> clone_for_zone(destination_zone destination_zone_id, caller_zone caller_zone_id)
         {
             assert(!(caller_zone_id_ == caller_zone_id && destination_zone_id_ == destination_zone_id));
             auto ret = deep_copy_for_clone();
