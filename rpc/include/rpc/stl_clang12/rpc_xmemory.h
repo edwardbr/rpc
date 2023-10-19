@@ -21,11 +21,15 @@
 #include <tuple>
 #endif // _HAS_CXX20
 
+#if defined(__clang__) || defined(__GNUC__) || defined(__GNUG__)
+    #pragma GCC diagnostic ignored "-Wdeprecated-dynamic-exception-spec"
+#else
 #pragma pack(push, _CRT_PACKING)
 #pragma warning(push, _STL_WARNING_LEVEL)
 #pragma warning(disable : _STL_DISABLED_WARNINGS)
 _STL_DISABLE_CLANG_WARNINGS
 #pragma push_macro("new")
+#endif
 #undef new
 
 _RPC_BEGIN
@@ -1936,13 +1940,19 @@ struct _In_place_key_extract_map<_Key, ::std::pair<_First, _Second>> {
     }
 };
 
+#if defined(__clang__) || defined(__GNUC__) || defined(__GNUG__)
+#else
 #pragma warning(push)
 #pragma warning(disable : 4624) // '%s': destructor was implicitly defined as deleted
+#endif
 template <class _Ty>
 struct _Wrap {
     _Ty _Value; // workaround for VSO-586813 "T^ is not allowed in a union"
 };
+#if defined(__clang__) || defined(__GNUC__) || defined(__GNUG__)
+#else
 #pragma warning(pop)
+#endif
 
 template <class _Alloc>
 struct _Alloc_temporary2 {
@@ -2186,9 +2196,12 @@ constexpr _Ty* uninitialized_construct_using_allocator(_Ty* _Ptr, const _Alloc& 
 #endif // _HAS_CXX20
 _RPC_END
 
+#if defined(__clang__) || defined(__GNUC__) || defined(__GNUG__)
+#else
 #pragma pop_macro("new")
 _STL_RESTORE_CLANG_WARNINGS
 #pragma warning(pop)
 #pragma pack(pop)
+#endif
 #endif // _STL_COMPILER_PREPROCESSOR
 #endif // _XMEMORY_

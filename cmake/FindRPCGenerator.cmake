@@ -191,7 +191,7 @@ function(RPCGenerate
         ${full_proxy_path}
       )
       target_compile_definitions(${name}_idl_host PRIVATE ${HOST_DEFINES})
-      target_include_directories(${name}_idl_host PUBLIC \"$<BUILD_INTERFACE:${output_path}>\" \"$<BUILD_INTERFACE:${output_path}/include>\" PRIVATE ${HOST_INCLUDES})
+      target_include_directories(${name}_idl_host PUBLIC \"$<BUILD_INTERFACE:${output_path}>\" \"$<BUILD_INTERFACE:${output_path}/include>\" PRIVATE ${HOST_INCLUDES} ${params_include_paths})
       target_compile_options(${name}_idl_host PRIVATE ${HOST_COMPILE_OPTIONS})
       target_link_directories(${name}_idl_host PUBLIC ${SGX_LIBRARY_PATH})
       set_property(TARGET ${name}_idl_host PROPERTY COMPILE_PDB_NAME ${name}_idl_host)
@@ -229,7 +229,7 @@ function(RPCGenerate
         ${full_proxy_path}
       )
       target_compile_definitions(${name}_idl_enclave PRIVATE ${ENCLAVE_DEFINES})
-      target_include_directories(${name}_idl_enclave PUBLIC \"$<BUILD_INTERFACE:${output_path}>\" \"$<BUILD_INTERFACE:${output_path}/include>\" PRIVATE ${ENCLAVE_LIBCXX_INCLUDES})
+      target_include_directories(${name}_idl_enclave PUBLIC \"$<BUILD_INTERFACE:${output_path}>\" \"$<BUILD_INTERFACE:${output_path}/include>\" PRIVATE ${ENCLAVE_LIBCXX_INCLUDES} ${params_include_paths})
       target_compile_options(${name}_idl_enclave PRIVATE ${ENCLAVE_COMPILE_OPTIONS})
       target_link_directories(${name}_idl_enclave PRIVATE ${SGX_LIBRARY_PATH})
       set_property(TARGET ${name}_idl_enclave PROPERTY COMPILE_PDB_NAME ${name}_idl_enclave)
@@ -271,7 +271,7 @@ function(RPCGenerate
           NO_RPC_V2
         PRIVATE
           ${ENCLAVE_DEFINES})
-      target_include_directories(${name}_idl_enclave_v1 PUBLIC \"$<BUILD_INTERFACE:${output_path}>\" \"$<BUILD_INTERFACE:${output_path}/include>\" PRIVATE ${ENCLAVE_LIBCXX_INCLUDES})
+      target_include_directories(${name}_idl_enclave_v1 PUBLIC \"$<BUILD_INTERFACE:${output_path}>\" \"$<BUILD_INTERFACE:${output_path}/include>\" PRIVATE ${ENCLAVE_LIBCXX_INCLUDES} ${params_include_paths})
       target_compile_options(${name}_idl_enclave_v1 PRIVATE ${ENCLAVE_COMPILE_OPTIONS})
       target_link_directories(${name}_idl_enclave_v1 PRIVATE ${SGX_LIBRARY_PATH})
       set_property(TARGET ${name}_idl_enclave_v1 PROPERTY COMPILE_PDB_NAME ${name}_idl_enclave_v1)
@@ -308,7 +308,7 @@ function(RPCGenerate
       ${full_proxy_path}
     )
     target_compile_definitions(${name}_idl_host PRIVATE ${HOST_DEFINES})
-    target_include_directories(${name}_idl_host PUBLIC "$<BUILD_INTERFACE:${output_path}>" "$<BUILD_INTERFACE:${output_path}/include>" PRIVATE ${HOST_INCLUDES})
+    target_include_directories(${name}_idl_host PUBLIC "$<BUILD_INTERFACE:${output_path}>" "$<BUILD_INTERFACE:${output_path}/include>" PRIVATE ${HOST_INCLUDES} ${params_include_paths})
     target_compile_options(${name}_idl_host PRIVATE ${HOST_COMPILE_OPTIONS})
     target_link_directories(${name}_idl_host PUBLIC ${SGX_LIBRARY_PATH})
     set_property(TARGET ${name}_idl_host PROPERTY COMPILE_PDB_NAME ${name}_idl_host)
@@ -346,7 +346,7 @@ function(RPCGenerate
       ${full_proxy_path}
     )
     target_compile_definitions(${name}_idl_enclave PRIVATE ${ENCLAVE_DEFINES})
-    target_include_directories(${name}_idl_enclave PUBLIC "$<BUILD_INTERFACE:${output_path}>" "$<BUILD_INTERFACE:${output_path}/include>" PRIVATE "${output_path}/include" ${ENCLAVE_LIBCXX_INCLUDES})
+    target_include_directories(${name}_idl_enclave PUBLIC "$<BUILD_INTERFACE:${output_path}>" "$<BUILD_INTERFACE:${output_path}/include>" PRIVATE "${output_path}/include" ${ENCLAVE_LIBCXX_INCLUDES} ${params_include_paths})
     target_compile_options(${name}_idl_enclave PRIVATE ${ENCLAVE_COMPILE_OPTIONS})
     target_link_directories(${name}_idl_enclave PRIVATE ${SGX_LIBRARY_PATH})
     set_property(TARGET ${name}_idl_enclave PROPERTY COMPILE_PDB_NAME ${name}_idl_enclave)
@@ -388,7 +388,7 @@ function(RPCGenerate
         NO_RPC_V2
       PRIVATE
         ${ENCLAVE_DEFINES})
-    target_include_directories(${name}_idl_enclave_v1 PUBLIC "$<BUILD_INTERFACE:${output_path}>" "$<BUILD_INTERFACE:${output_path}/include>" PRIVATE ${ENCLAVE_LIBCXX_INCLUDES})
+    target_include_directories(${name}_idl_enclave_v1 PUBLIC "$<BUILD_INTERFACE:${output_path}>" "$<BUILD_INTERFACE:${output_path}/include>" PRIVATE ${ENCLAVE_LIBCXX_INCLUDES} ${params_include_paths})
     target_compile_options(${name}_idl_enclave_v1 PRIVATE ${ENCLAVE_COMPILE_OPTIONS})
     target_link_directories(${name}_idl_enclave_v1 PRIVATE ${SGX_LIBRARY_PATH})
     set_property(TARGET ${name}_idl_enclave_v1 PROPERTY COMPILE_PDB_NAME ${name}_idl_enclave_v1)

@@ -27,11 +27,19 @@
 //#include <crtdefs.h>
 #include <assert.h>
 
+#if defined(__clang__) || defined(__GNUC__) || defined(__GNUG__)
+#define THIS_CALL
+#define _ALLOW_MSC_VER_MISMATCH
+#define _ALLOW_ITERATOR_DEBUG_LEVEL_MISMATCH
+#define _ALLOW_RUNTIME_LIBRARY_MISMATCH
+#else
 #pragma pack(push, _CRT_PACKING)
 #pragma warning(push, _STL_WARNING_LEVEL)
 #pragma warning(disable : _STL_DISABLED_WARNINGS)
 _STL_DISABLE_CLANG_WARNINGS
 #pragma push_macro("new")
+#define THIS_CALL __thiscall
+#endif
 #undef new
 
 #if defined(MRTDLL) && defined(_CRTBLD)
@@ -376,9 +384,9 @@ public:
     }
 
 #else // _M_CEE_PURE
-    __thiscall _Lockit() noexcept;
-    explicit __thiscall _Lockit(int) noexcept; // set the lock
-    __thiscall ~_Lockit() noexcept; // clear the lock
+    THIS_CALL _Lockit() noexcept;
+    explicit THIS_CALL _Lockit(int) noexcept; // set the lock
+    THIS_CALL ~_Lockit() noexcept; // clear the lock
 #endif // _M_CEE_PURE
 
     static void __cdecl _Lockit_ctor(int) noexcept;
@@ -482,8 +490,8 @@ public:
     }
 
 #else // _M_CEE_PURE
-    __thiscall _Init_locks() noexcept;
-    __thiscall ~_Init_locks() noexcept;
+    THIS_CALL _Init_locks() noexcept;
+    THIS_CALL ~_Init_locks() noexcept;
 #endif // _M_CEE_PURE
 
 private:
@@ -533,9 +541,12 @@ _RPC_END
 #define _RELIABILITY_CONTRACT
 #endif // _RELIABILITY_CONTRACT
 
+#if defined(__clang__) || defined(__GNUC__) || defined(__GNUG__)
+#else
 #pragma pop_macro("new")
 _STL_RESTORE_CLANG_WARNINGS
 #pragma warning(pop)
 #pragma pack(pop)
+#endif
 #endif // _STL_COMPILER_PREPROCESSOR
 #endif // _YVALS

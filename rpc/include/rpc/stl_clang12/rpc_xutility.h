@@ -29,11 +29,15 @@ struct _Select<false> {
     using _Apply = _Ty2;
 };
 
+#if defined(__clang__) || defined(__GNUC__) || defined(__GNUG__)
+#pragma GCC diagnostic ignored "-Wc++20-extensions"
+#else
 #pragma pack(push, _CRT_PACKING)
 #pragma warning(push, _STL_WARNING_LEVEL)
 #pragma warning(disable : _STL_DISABLED_WARNINGS)
 _STL_DISABLE_CLANG_WARNINGS
 #pragma push_macro("new")
+#endif
 #undef new
 
 
@@ -4598,13 +4602,19 @@ _INLINE_VAR constexpr bool _Is_pointer_address_comparable =
 // * They must be the same size. (`int == long` is eligible; `int == long long` isn't.)
 // * The usual arithmetic conversions must preserve bit patterns. (This is true for `int == unsigned int`,
 //   but false for `short == unsigned short`.)
+#if defined(__clang__) || defined(__GNUC__) || defined(__GNUG__)
+#else
 #pragma warning(push)
 #pragma warning(disable : 4806) // no value of type 'bool' promoted to type 'char' can equal the given constant
+#endif
 template <class _Elem1, class _Elem2,
     bool = sizeof(_Elem1) == sizeof(_Elem2) && ::std::is_integral_v<_Elem1>&& ::std::is_integral_v<_Elem2>>
 _INLINE_VAR constexpr bool _Can_memcmp_elements =
     ::std::is_same_v<_Elem1, bool> || ::std::is_same_v<_Elem2, bool> || static_cast<_Elem1>(-1) == static_cast<_Elem2>(-1);
+#if defined(__clang__) || defined(__GNUC__) || defined(__GNUG__)
+#else
 #pragma warning(pop)
+#endif
 
 #ifdef __cpp_lib_byte
 // Allow memcmping std::::std::byte.
@@ -5527,7 +5537,10 @@ _CONSTEXPR20 void reverse(const _BidIt _First, const _BidIt _Last) { // reverse 
         _Is_trivially_swappable<_Elem>, ::std::negation<::std::is_volatile<_Elem>>>;
     constexpr size_t _Nx                = sizeof(_Elem);
 
+#if defined(__clang__) || defined(__GNUC__) || defined(__GNUG__)
+#else
 #pragma warning(suppress : 6326) // Potential comparison of a constant with another constant
+#endif
     if constexpr (_Allow_vectorization && _Nx <= 8 && (_Nx & (_Nx - 1)) == 0) {
 #if _HAS_CXX20
         if (!_RPC is_constant_evaluated())
@@ -6135,9 +6148,12 @@ struct monostate {};
 #endif // _HAS_CXX17
 
 _RPC_END
+#if defined(__clang__) || defined(__GNUC__) || defined(__GNUG__)
+#else
 #pragma pop_macro("new")
 _STL_RESTORE_CLANG_WARNINGS
 #pragma warning(pop)
 #pragma pack(pop)
+#endif
 #endif // _STL_COMPILER_PREPROCESSOR
 #endif // _XUTILITY_

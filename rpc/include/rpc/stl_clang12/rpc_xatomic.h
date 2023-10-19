@@ -12,11 +12,14 @@
 //#include <intrin0.h>
 #include <type_traits>
 
+#if defined(__clang__) || defined(__GNUC__) || defined(__GNUG__)
+#else
 #pragma pack(push, _CRT_PACKING)
 #pragma warning(push, _STL_WARNING_LEVEL)
 #pragma warning(disable : _STL_DISABLED_WARNINGS)
 _STL_DISABLE_CLANG_WARNINGS
 #pragma push_macro("new")
+#endif
 #undef new
 
 #define _CONCATX(x, y) x##y
@@ -109,9 +112,12 @@ _NODISCARD const volatile _Integral* _Atomic_address_as(const _Ty& _Source) noex
 
 _RPC_END
 
+#if defined(__clang__) || defined(__GNUC__) || defined(__GNUG__)
+#else
 #pragma pop_macro("new")
 _STL_RESTORE_CLANG_WARNINGS
 #pragma warning(pop)
 #pragma pack(pop)
+#endif
 #endif // _STL_COMPILER_PREPROCESSOR
 #endif // _XATOMIC_H
