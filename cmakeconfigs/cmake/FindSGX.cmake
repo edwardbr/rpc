@@ -551,6 +551,7 @@ if(SGX_FOUND)
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 
     endif()
+    post_build_strip_symbols("${target}" BINARY "$<TARGET_FILE_DIR:${target}>/${OUTPUT_NAME}")
 
     set(CLEAN_FILES
         "$<TARGET_FILE_DIR:${target}>/${OUTPUT_NAME};$<TARGET_FILE_DIR:${target}>/${target}_hash.hex"
