@@ -347,6 +347,12 @@ function(RPCGenerate
     )
     target_compile_definitions(${name}_idl_enclave PRIVATE ${ENCLAVE_DEFINES})
     target_include_directories(${name}_idl_enclave PUBLIC "$<BUILD_INTERFACE:${output_path}>" "$<BUILD_INTERFACE:${output_path}/include>" PRIVATE "${output_path}/include" ${ENCLAVE_LIBCXX_INCLUDES} ${params_include_paths})
+
+    set(stripped_idl)
+    cmake_path(GET idl STEM stripped_idl)
+    install(DIRECTORY "$<BUILD_INTERFACE:${output_path}>" DESTINATION include/secretarium/idls)
+    install(FILES     "$<BUILD_INTERFACE:${idl}>"         DESTINATION include/secretarium/idls/${stripped_idl})
+
     target_compile_options(${name}_idl_enclave PRIVATE ${ENCLAVE_COMPILE_OPTIONS})
     target_link_directories(${name}_idl_enclave PRIVATE ${SGX_LIBRARY_PATH})
     set_property(TARGET ${name}_idl_enclave PROPERTY COMPILE_PDB_NAME ${name}_idl_enclave)
