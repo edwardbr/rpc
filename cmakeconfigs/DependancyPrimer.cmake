@@ -20,6 +20,8 @@ if(NOT DEPENDANCIES_LOADED)
 
   option(INCLUDE_DC_APPS_DLLS "include dc apps as dlls" ON)
   option(INCLUDE_DC_APPS_EMBEDDED "include dc apps in main enclave" ON)
+  option(ENABLE_CLANG_TIDY "Enable clang-tidy in build" ON)
+  option(ENABLE_CLANG_TIDY_FIX "Turn on auto fix in clang tidy" OFF)
 
   if(NOT DEFINED DC_APPS)
     set(DC_APPS "ALL_DCAPPS")
@@ -333,6 +335,17 @@ if(NOT DEPENDANCIES_LOADED)
       set(ENCLAVE_SSL_INCLUDES "C:/Dev/Libs/VS2015/x64/openssl-1.1.1/include")
     
     else()
+      find_program(CLANG_TIDY_EXE
+        NAMES "clang-tidy" REQUIRED
+        )
+
+      # setup clang-tidy command from executable + options
+      if(ENABLE_CLANG_TIDY_FIX)
+        set(CLANG_TIDY_COMMAND "${CLANG_TIDY_EXE}" -fix-errors -fix)
+      else()
+        set(CLANG_TIDY_COMMAND "${CLANG_TIDY_EXE}")
+      endif()
+      
       set(HOST_DEFINES ENCLAVE_STATUS=sgx_status_t ENCLAVE_OK=SGX_SUCCESS DISALLOW_BAD_JUMPS)
       set(ENCLAVE_DEFINES _IN_ENCLAVE CLEAN_LIBC ENCLAVE_STATUS=sgx_status_t
                           ENCLAVE_OK=SGX_SUCCESS DISALLOW_BAD_JUMPS)
