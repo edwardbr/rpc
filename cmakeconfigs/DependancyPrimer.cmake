@@ -1,5 +1,5 @@
 # Copyright 2021 Secretarium Ltd <contact@secretarium.org>
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.24)
 
 if(NOT DEPENDANCIES_LOADED)
   #if this is loaded in a parent module then dont do this

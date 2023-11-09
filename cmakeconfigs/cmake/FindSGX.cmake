@@ -2,7 +2,7 @@
 
 # FindPackage cmake file for Intel SGX SDK
 
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.24)
 include(CMakeParseArguments)
 
 set(SGX_FOUND "NO")

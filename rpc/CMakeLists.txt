@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.24)
 
 if(WIN32)
 set(REMOTE_PTR_CPP src/remote_pointer.cpp)
