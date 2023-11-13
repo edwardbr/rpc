@@ -1974,7 +1974,10 @@ namespace enclave_marshaller
 
         void write_enum_forward_declaration(const class_entity& m_ob, writer& header)
         {
-            header("enum class {}", m_ob.get_name());
+            if(m_ob.get_base_classes().empty())
+                header("enum class {}", m_ob.get_name());
+            else
+                header("enum class {} : {}", m_ob.get_name(), m_ob.get_base_classes().front()->get_name());
             header("{{");
             auto enum_vals = m_ob.get_functions();
             for (auto& enum_val : enum_vals)
