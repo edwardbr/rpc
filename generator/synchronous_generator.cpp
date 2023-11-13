@@ -1979,7 +1979,10 @@ namespace enclave_marshaller
             auto enum_vals = m_ob.get_functions();
             for (auto& enum_val : enum_vals)
             {
-                header("{},", enum_val.get_name());
+                if(enum_val.get_return_type().empty())
+                    header("{},", enum_val.get_name());
+                else
+                    header("{} = {},", enum_val.get_name(), enum_val.get_return_type());                
             }
             header("}};");
         }
