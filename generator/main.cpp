@@ -174,7 +174,7 @@ int main(const int argc, char* argv[])
         // load the idl file
         auto objects = std::make_shared<class_entity>(nullptr);
         const auto* ppdata = pre_parsed_data.data();
-        objects->parse_structure(ppdata, true);
+        objects->parse_structure(ppdata, true, false);
 
         std::list<std::string> imports;
         {

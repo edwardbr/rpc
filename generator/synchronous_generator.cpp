@@ -269,6 +269,8 @@ namespace enclave_marshaller
                 {
                     if (func.get_type() == FunctionTypeCppQuote)
                     {
+                        if(func.get_is_in_import())
+                            continue;
                         sha3_context c;
                         sha3_Init256(&c);
                         sha3_Update(&c, func.get_name().data(), func.get_name().length());
@@ -1087,6 +1089,8 @@ namespace enclave_marshaller
                 {
                     if (function.get_type() == FunctionTypeCppQuote)
                     {
+                        if(function.get_is_in_import())
+                            continue;
                         auto text = function.get_name();
                         header.write_buffer(text);
                         continue;
@@ -2350,6 +2354,8 @@ namespace enclave_marshaller
                     {
                         if (function.get_type() == FunctionTypeCppQuote)
                         {
+                            if(function.get_is_in_import())
+                                continue;
                             auto text = function.get_name();
                             header.write_buffer(text);
                             continue;
@@ -2537,6 +2543,8 @@ namespace enclave_marshaller
             {
                 if (function.get_type() == FunctionTypeCppQuote)
                 {
+                    if(function.get_is_in_import())
+                        continue;
                     auto text = function.get_name();
                     header.write_buffer(text);
                     continue;
