@@ -26,10 +26,10 @@ namespace javascript_json
     }
 }
 
-void get_imports(const std::shared_ptr<class_entity>& object, std::list<std::string>& imports,
+void get_imports(const class_entity& object, std::list<std::string>& imports,
                  std::set<std::string>& imports_cache)
 {
-    for (auto& cls : object->get_classes())
+    for (auto& cls : object.get_classes())
     {
         if (!cls->get_import_lib().empty())
         {
@@ -185,7 +185,7 @@ int main(const int argc, char* argv[])
                 return -1;
             }
 
-            get_imports(objects, imports, imports_cache);
+            get_imports(*objects, imports, imports_cache);
         }
 
         string interfaces_h_data;

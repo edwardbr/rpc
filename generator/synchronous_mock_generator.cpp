@@ -18,7 +18,7 @@ namespace enclave_marshaller
 
         void write_interface(bool from_host, const class_entity& m_ob, writer& header, int id)
         {
-            auto interface_name = std::string(m_ob.get_type() == entity_type::LIBRARY ? "i_" : "") + m_ob.get_name();
+            auto interface_name = std::string(m_ob.get_entity_type() == entity_type::LIBRARY ? "i_" : "") + m_ob.get_name();
 
             std::string base_class_declaration;
             auto bc = m_ob.get_base_classes();
@@ -58,7 +58,7 @@ namespace enclave_marshaller
             bool has_methods = false;
             for (auto& function : m_ob.get_functions())
             {
-                if (function.get_type() != FunctionTypeMethod)
+                if (function->get_entity_type() != entity_type::FUNCTION_METHOD)
                     continue;
                 has_methods = true;
             }
@@ -67,22 +67,22 @@ namespace enclave_marshaller
             {
                 for (auto& function : m_ob.get_functions())
                 {
-                    if (function.get_type() != FunctionTypeMethod)
+                    if (function->get_entity_type() != entity_type::FUNCTION_METHOD)
                         continue;
 
                     header.print_tabs();
                     bool is_const_func = false;
-                    for (auto& item : function.get_attributes())
+                    for (auto& item : function->get_attributes())
                     {
                         if (item == "const")
                             is_const_func = true;
                     } 
                     if(is_const_func)                   
-                        header.raw("MOCK_CONST_METHOD{}({}, {}(", function.get_parameters().size(), function.get_name(), function.get_return_type());
+                        header.raw("MOCK_CONST_METHOD{}({}, {}(", function->get_parameters().size(), function->get_name(), function->get_return_type());
                     else
-                        header.raw("MOCK_METHOD{}({}, {}(", function.get_parameters().size(), function.get_name(), function.get_return_type());
+                        header.raw("MOCK_METHOD{}({}, {}(", function->get_parameters().size(), function->get_name(), function->get_return_type());
                     bool has_parameter = false;
-                    for (auto& parameter : function.get_parameters())
+                    for (auto& parameter : function->get_parameters())
                     {
                         if (has_parameter)
                         {
@@ -148,7 +148,7 @@ namespace enclave_marshaller
             header("{{");
             for (auto& function : m_ob.get_functions())
             {
-                header("Matcher<{}> {}_matcher_;", function.get_return_type(), function.get_name());
+                header("Matcher<{}> {}_matcher_;", function->get_return_type(), function->get_name());
             }
             header("public:");
             header("{0}_matcher(", interface_name);
@@ -160,7 +160,7 @@ namespace enclave_marshaller
                     header.raw(",\n");
                 is_first = false;
                 header.print_tabs();
-                header.raw("const Matcher<{}> {}_matcher", function.get_return_type(), function.get_name());
+                header.raw("const Matcher<{}> {}_matcher", function->get_return_type(), function->get_name());
             }
             if(!m_ob.get_functions().empty())
                 header.raw("\n");
@@ -169,9 +169,9 @@ namespace enclave_marshaller
             for (auto& function : m_ob.get_functions())
             {
                 if(is_first)
-                    header(": {0}_matcher_({0}_matcher)", function.get_name());
+                    header(": {0}_matcher_({0}_matcher)", function->get_name());
                 else
-                    header(", {0}_matcher_({0}_matcher)", function.get_name());
+                    header(", {0}_matcher_({0}_matcher)", function->get_name());
                 is_first = false;
             }                
             header.set_count(header.get_count() - 1);
@@ -181,7 +181,7 @@ namespace enclave_marshaller
             header("{{");
             for (auto& function : m_ob.get_functions())
             {
-                header("if (!{0}_matcher_.MatchAndExplain(request.{0}, listener))", function.get_name());
+                header("if (!{0}_matcher_.MatchAndExplain(request.{0}, listener))", function->get_name());
                 header("\treturn false;");
             }
 		    header("return true;");
@@ -191,8 +191,8 @@ namespace enclave_marshaller
             header("(*os) << \"is working \";");
             for (auto& function : m_ob.get_functions())
             {
-                header("(*os) << \"{} \";", function.get_name());
-		        header("{}_matcher_.DescribeTo(os);", function.get_name());
+                header("(*os) << \"{} \";", function->get_name());
+		        header("{}_matcher_.DescribeTo(os);", function->get_name());
             }
         	header("}};");              
             header("virtual void DescribeNegationTo(::std::ostream* os) const");
@@ -200,8 +200,8 @@ namespace enclave_marshaller
             header("(*os) << \"is not working \";");
             for (auto& function : m_ob.get_functions())
             {
-                header("(*os) << \"{} \";", function.get_name());
-                header("{}_matcher_.DescribeTo(os);", function.get_name());           
+                header("(*os) << \"{} \";", function->get_name());
+                header("{}_matcher_.DescribeTo(os);", function->get_name());           
             }
             header("}};");              
             header("}};");
@@ -210,13 +210,13 @@ namespace enclave_marshaller
 
         void write_marshalling_logic_nested(bool from_host, const class_entity& cls, int id, writer& header)
         {
-            if (cls.get_type() == entity_type::INTERFACE)
+            if (cls.get_entity_type() == entity_type::INTERFACE)
                 write_interface(from_host, cls, header, id);
 
-            if (cls.get_type() == entity_type::LIBRARY)
+            if (cls.get_entity_type() == entity_type::LIBRARY)
                 write_interface(from_host, cls, header, id);
 
-            if (cls.get_type() == entity_type::STRUCT)
+            if (cls.get_entity_type() == entity_type::STRUCT)
                 write_struct(from_host, cls, header, id);
         }
 
@@ -227,7 +227,7 @@ namespace enclave_marshaller
             {
                 if(!cls->get_import_lib().empty())
                     continue;
-                if (cls->get_type() == entity_type::NAMESPACE)
+                if (cls->get_entity_type() == entity_type::NAMESPACE)
                 {
 
                     bool is_inline = cls->get_attribute("inline") == "inline";

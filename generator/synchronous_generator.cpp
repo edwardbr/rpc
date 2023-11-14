@@ -250,7 +250,7 @@ namespace enclave_marshaller
             {
                 seed += item;
             }
-            if(cls.get_type() == entity_type::INTERFACE || cls.get_type() == entity_type::LIBRARY)
+            if(cls.get_entity_type() == entity_type::INTERFACE || cls.get_entity_type() == entity_type::LIBRARY)
             {
                 auto* owner = cls.get_owner();
                 while (owner)
@@ -259,7 +259,7 @@ namespace enclave_marshaller
                     owner = owner->get_owner();                
                 } 
 
-                if(cls.get_type() == entity_type::LIBRARY)
+                if(cls.get_entity_type() == entity_type::LIBRARY)
                     seed += "i_";
 
                 seed += cls.get_name();
@@ -267,30 +267,30 @@ namespace enclave_marshaller
                 seed += "{";
                 for(auto& func : cls.get_functions())
                 {
-                    if (func.get_type() == FunctionTypeCppQuote)
+                    if (func->get_entity_type() == entity_type::FUNCTION_CPPQUOTE)
                     {
-                        if(func.get_is_in_import())
+                        if(func->get_is_in_import())
                             continue;
                         sha3_context c;
                         sha3_Init256(&c);
-                        sha3_Update(&c, func.get_name().data(), func.get_name().length());
+                        sha3_Update(&c, func->get_name().data(), func->get_name().length());
                         const auto* hash = sha3_Finalize(&c);
                         seed += "#cpp_quote";
                         seed += std::to_string(*(uint64_t*)hash);
                         continue;
                     }
-                    if (func.get_type() == FunctionTypePublic)
+                    if (func->get_entity_type() == entity_type::FUNCTION_PUBLIC)
                     {
                         seed += "public:";
                         continue;
                     }
-                    if (func.get_type() == FunctionTypePrivate)
+                    if (func->get_entity_type() == entity_type::FUNCTION_PRIVATE)
                     {
                         seed += "private:";
                         continue;
                     }
                     seed += "[";
-                    for(auto& item : func.get_attributes())
+                    for(auto& item : func->get_attributes())
                     {
                         seed += item;
                         /*if(item == "noexcept")
@@ -301,9 +301,9 @@ namespace enclave_marshaller
                             seed += item + ",";*/
                     }
                     seed += "]";
-                    seed += func.get_name();
+                    seed += func->get_name();
                     seed += "(";
-                    for(auto& param : func.get_parameters())
+                    for(auto& param : func->get_parameters())
                     {
                         seed += "[";
                         for(auto& item : param.get_attributes())
@@ -351,7 +351,7 @@ namespace enclave_marshaller
                 }
                 seed += "}";
             }
-            if(!cls.get_is_template() && cls.get_type() == entity_type::STRUCT)
+            if(!cls.get_is_template() && cls.get_entity_type() == entity_type::STRUCT)
             {
                 //template classes cannot know what type they are until the template parameters are specified
                 seed += "struct";
@@ -375,13 +375,13 @@ namespace enclave_marshaller
                 int i = 0;
                 for (auto& field : cls.get_functions())
                 {
-                    if (field.get_type() != FunctionTypeVariable)
+                    if (field->get_entity_type() != entity_type::FUNCTION_VARIABLE)
                         continue;
 
                     if (i)
                         seed += ", ";
                     
-                    auto param_type = field.get_return_type();
+                    auto param_type = field->get_return_type();
                     std::string reference_modifiers;
                     strip_reference_modifiers(param_type, reference_modifiers);
                     auto template_params = get_template_param(param_type);
@@ -404,9 +404,9 @@ namespace enclave_marshaller
                         }
                     }
                     seed += reference_modifiers + " ";
-                    seed += field.get_name();
-                    if (field.get_array_string().size())
-                        seed += "[" + field.get_array_string() + "]";
+                    seed += field->get_name();
+                    if (field->get_array_string().size())
+                        seed += "[" + field->get_array_string() + "]";
                     i++;
                 }
                 seed += "}";
@@ -754,7 +754,7 @@ namespace enclave_marshaller
             std::shared_ptr<class_entity> obj;
             if (lib.find_class(encapsulated_type, obj))
             {
-                if (obj->get_type() == entity_type::INTERFACE)
+                if (obj->get_entity_type() == entity_type::INTERFACE)
                 {
                     is_interface = true;
                 }
@@ -863,7 +863,7 @@ namespace enclave_marshaller
             std::shared_ptr<class_entity> obj;
             if (lib.find_class(encapsulated_type, obj))
             {
-                if (obj->get_type() == entity_type::INTERFACE)
+                if (obj->get_entity_type() == entity_type::INTERFACE)
                 {
                     is_interface = true;
                 }
@@ -927,11 +927,25 @@ namespace enclave_marshaller
             }
             return true;
         }
+        
+        void write_constexpr(writer& header, const function_entity& function)
+        {
+            header.print_tabs();
+            header.raw("static constexpr {} {}", function.get_return_type(), function.get_name());
+            if (!function.get_default_value().empty())
+            {
+                header.raw(" = {};\n", function.get_default_value());
+            }
+            else
+            {
+                header.raw("{{}};\n");
+            }                    
+        }           
 
         void write_interface(bool from_host, const class_entity& m_ob, writer& header, writer& proxy, writer& stub,
                              size_t id)
         {
-            auto interface_name = std::string(m_ob.get_type() == entity_type::LIBRARY ? "i_" : "") + m_ob.get_name();
+            auto interface_name = std::string(m_ob.get_entity_type() == entity_type::LIBRARY ? "i_" : "") + m_ob.get_name();
 
             std::string base_class_declaration;
             auto bc = m_ob.get_base_classes();
@@ -984,16 +998,16 @@ namespace enclave_marshaller
                 int function_count = 1;
                 for (auto& function : m_ob.get_functions())
                 {
-                    if (function.get_type() != FunctionTypeMethod)
+                    if (function->get_entity_type() != entity_type::FUNCTION_METHOD)
                         continue;
 
-                    std::string tag = function.get_attribute_value("tag");
+                    std::string tag = function->get_attribute_value("tag");
                     if(tag.empty())
                         tag = "0";
 
                     bool marshalls_interfaces = false;
 
-                    for(auto parameter : function.get_parameters())
+                    for(auto parameter : function->get_parameters())
                     {
                         std::string type_name = parameter.get_type();
                         std::string reference_modifiers;
@@ -1004,7 +1018,7 @@ namespace enclave_marshaller
                         std::shared_ptr<class_entity> obj;
                         if (library.find_class(encapsulated_type, obj))
                         {
-                            if (obj->get_type() == entity_type::INTERFACE)
+                            if (obj->get_entity_type() == entity_type::INTERFACE)
                             {
                                 marshalls_interfaces = true;
                                 break;
@@ -1012,7 +1026,7 @@ namespace enclave_marshaller
                         }                    
                     }
 
-                    proxy("functions.emplace_back(rpc::function_info{{\"{}\", {{{}}}, (uint64_t){}, {}}});", function.get_name(), function_count, tag, marshalls_interfaces);
+                    proxy("functions.emplace_back(rpc::function_info{{\"{}\", {{{}}}, (uint64_t){}, {}}});", function->get_name(), function_count, tag, marshalls_interfaces);
                     function_count++;
                 }            
                 proxy("return functions;");
@@ -1074,7 +1088,7 @@ namespace enclave_marshaller
             bool has_methods = false;
             for (auto& function : m_ob.get_functions())
             {
-                if (function.get_type() != FunctionTypeMethod)
+                if (function->get_entity_type() != entity_type::FUNCTION_METHOD)
                     continue;
                 has_methods = true;
             }
@@ -1087,25 +1101,30 @@ namespace enclave_marshaller
                 int function_count = 1;
                 for (auto& function : m_ob.get_functions())
                 {
-                    if (function.get_type() == FunctionTypeCppQuote)
+                    if (function->get_entity_type() == entity_type::FUNCTION_CPPQUOTE)
                     {
-                        if(function.get_is_in_import())
+                        if(function->get_is_in_import())
                             continue;
-                        auto text = function.get_name();
+                        auto text = function->get_name();
                         header.write_buffer(text);
                         continue;
                     }
-                    if (function.get_type() == FunctionTypePublic)
+                    if (function->get_entity_type() == entity_type::FUNCTION_PUBLIC)
                     {
                         header("public:");
                         continue;
                     }
-                    if (function.get_type() == FunctionTypePrivate)
+                    if (function->get_entity_type() == entity_type::FUNCTION_PRIVATE)
                     {
                         header("private:");
                         continue;
                     }
-                    if (function.get_type() != FunctionTypeMethod)
+                    if (function->get_entity_type() == entity_type::FUNCTION_CONSTEXPR)
+                    {
+                        write_constexpr(header, *function);
+                        continue;                 
+                    }                    
+                    if (function->get_entity_type() != entity_type::FUNCTION_METHOD)
                         continue;
 
                     stub("case {}:", function_count);
@@ -1113,12 +1132,12 @@ namespace enclave_marshaller
 
                     header.print_tabs();
                     proxy.print_tabs();
-                    header.raw("virtual {} {}(", function.get_return_type(), function.get_name());
-                    // proxy.raw("virtual {} {}_proxy::{} (", function.get_return_type(), interface_name,
-                    //           function.get_name());
-                    proxy.raw("virtual {} {}(", function.get_return_type(), function.get_name());
+                    header.raw("virtual {} {}(", function->get_return_type(), function->get_name());
+                    // proxy.raw("virtual {} {}_proxy::{} (", function->get_return_type(), interface_name,
+                    //           function->get_name());
+                    proxy.raw("virtual {} {}(", function->get_return_type(), function->get_name());
                     bool has_parameter = false;
-                    for (auto& parameter : function.get_parameters())
+                    for (auto& parameter : function->get_parameters())
                     {
                         if (has_parameter)
                         {
@@ -1136,7 +1155,7 @@ namespace enclave_marshaller
                         proxy.raw("{}{} {}", modifier, parameter.get_type(), parameter.get_name());
                     }
                     bool function_is_const = false;
-                    for (auto& item : function.get_attributes())
+                    for (auto& item : function->get_attributes())
                     {
                         if (item == "const")
                             function_is_const = true;
@@ -1175,7 +1194,7 @@ namespace enclave_marshaller
                         stub("#endif");
                         stub("int __rpc_ret = rpc::error::OK();");
                         uint64_t count = 1;
-                        for (auto& parameter : function.get_parameters())
+                        for (auto& parameter : function->get_parameters())
                         {
                             std::string output;
                             if (is_in_call(STUB_DEMARSHALL_DECLARATION, from_host, m_ob, parameter.get_name(),
@@ -1197,7 +1216,7 @@ namespace enclave_marshaller
                     
                     proxy("//PROXY_PREPARE_IN");
                     uint64_t count = 1;
-                    for (auto& parameter : function.get_parameters())
+                    for (auto& parameter : function->get_parameters())
                     {
                         std::string output;
                         {
@@ -1236,7 +1255,7 @@ namespace enclave_marshaller
                         
 
                             count = 1;
-                            for (auto& parameter : function.get_parameters())
+                            for (auto& parameter : function->get_parameters())
                             {
                                 std::string output;
                                 {
@@ -1250,7 +1269,7 @@ namespace enclave_marshaller
                             }
 
                             count = 1;
-                            for (auto& parameter : function.get_parameters())
+                            for (auto& parameter : function->get_parameters())
                             {
                                 std::string output;
                                 {
@@ -1296,7 +1315,7 @@ namespace enclave_marshaller
 								stub("default:");
                                     stub("#ifdef USE_RPC_LOGGING");
                                     stub("{{");
-                                    stub("auto error_message = std::string(\"An invalid rpc encoding has been specified when trying to call {} in an implementation of {} \");", function.get_name(), interface_name);
+                                    stub("auto error_message = std::string(\"An invalid rpc encoding has been specified when trying to call {} in an implementation of {} \");", function->get_name(), interface_name);
                                     stub("LOG_STR(error_message.data(), error_message.length());");
                                     stub("}}");
                                     stub("#endif");
@@ -1307,7 +1326,7 @@ namespace enclave_marshaller
                         stub("#ifdef USE_RPC_LOGGING");
                         stub("catch(std::exception ex)");
                         stub("{{");
-                        stub("auto error_message = std::string(\"A stub deserialisation error has occurred in an {} implementation in function {} \") + ex.what();", interface_name, function.get_name());
+                        stub("auto error_message = std::string(\"A stub deserialisation error has occurred in an {} implementation in function {} \") + ex.what();", interface_name, function->get_name());
                         stub("LOG_STR(error_message.data(), error_message.length());");
                         stub("return rpc::error::STUB_DESERIALISATION_ERROR();");
                         stub("}}");
@@ -1315,14 +1334,14 @@ namespace enclave_marshaller
                         stub("catch(...)");
                         stub("{{");
                         stub("#ifdef USE_RPC_LOGGING");
-                        stub("auto error_message = std::string(\"exception has occurred in an {} implementation in function {}\");", interface_name, function.get_name());
+                        stub("auto error_message = std::string(\"exception has occurred in an {} implementation in function {}\");", interface_name, function->get_name());
                         stub("LOG_STR(error_message.data(), error_message.length());");
                         stub("#endif");
                         stub("return rpc::error::STUB_DESERIALISATION_ERROR();");
                         stub("}}");
                     }
                     
-                    std::string tag = function.get_attribute_value("tag");
+                    std::string tag = function->get_attribute_value("tag");
                     if(tag.empty())
                         tag = "0";
                     
@@ -1366,7 +1385,7 @@ namespace enclave_marshaller
                     
 
                         count = 1;
-                        for (auto& parameter : function.get_parameters())
+                        for (auto& parameter : function->get_parameters())
                         {
                             std::string output;
                             {
@@ -1380,7 +1399,7 @@ namespace enclave_marshaller
                         }
 
                         count = 1;
-                        for (auto& parameter : function.get_parameters())
+                        for (auto& parameter : function->get_parameters())
                         {
                             std::string output;
                             {
@@ -1413,7 +1432,7 @@ namespace enclave_marshaller
                         stub("#ifdef USE_RPC_LOGGING");
                         stub("catch(std::exception ex)");
                         stub("{{");
-                        stub("auto error_message = std::string(\"A stub deserialisation error has occurred in an {} implementation in function {} \") + ex.what();", interface_name, function.get_name());
+                        stub("auto error_message = std::string(\"A stub deserialisation error has occurred in an {} implementation in function {} \") + ex.what();", interface_name, function->get_name());
                         stub("LOG_STR(error_message.data(), error_message.length());");
                         stub("return rpc::error::STUB_DESERIALISATION_ERROR();");
                         stub("}}");
@@ -1421,7 +1440,7 @@ namespace enclave_marshaller
                         stub("catch(...)");
                         stub("{{");
                         stub("#ifdef USE_RPC_LOGGING");
-                        stub("auto error_message = std::string(\"exception has occurred in an {} implementation in function {}\");", interface_name, function.get_name());
+                        stub("auto error_message = std::string(\"exception has occurred in an {} implementation in function {}\");", interface_name, function->get_name());
                         stub("LOG_STR(error_message.data(), error_message.length());");
                         stub("#endif");
                         stub("return rpc::error::STUB_DESERIALISATION_ERROR();");
@@ -1447,7 +1466,7 @@ namespace enclave_marshaller
 
                     {
                         uint64_t count = 1;
-                        for (auto& parameter : function.get_parameters())
+                        for (auto& parameter : function->get_parameters())
                         {
                             std::string output;
                             if (!is_in_call(STUB_PARAM_WRAP, from_host, m_ob, parameter.get_name(),
@@ -1465,12 +1484,12 @@ namespace enclave_marshaller
 					stub("{{");
 
                     stub.print_tabs();
-                    stub.raw("__rpc_ret = __rpc_target_->{}(", function.get_name());
+                    stub.raw("__rpc_ret = __rpc_target_->{}(", function->get_name());
 
                     {
                         bool has_param = false;
                         uint64_t count = 1;
-                        for (auto& parameter : function.get_parameters())
+                        for (auto& parameter : function->get_parameters())
                         {
                             std::string output;
                             if (!is_in_call(STUB_PARAM_CAST, from_host, m_ob, parameter.get_name(),
@@ -1490,7 +1509,7 @@ namespace enclave_marshaller
 					stub("#ifdef USE_RPC_LOGGING");
 					stub("catch(std::exception ex)");
 					stub("{{");
-					stub("auto error_message = std::string(\"exception has occurred in an {} implementation in function {} \") + ex.what();", interface_name, function.get_name());
+					stub("auto error_message = std::string(\"exception has occurred in an {} implementation in function {} \") + ex.what();", interface_name, function->get_name());
 					stub("LOG_STR(error_message.data(), error_message.length());");
 					stub("__rpc_ret = rpc::error::EXCEPTION();");
 					stub("}}");
@@ -1498,7 +1517,7 @@ namespace enclave_marshaller
                     stub("catch(...)");
 					stub("{{");
 					stub("#ifdef USE_RPC_LOGGING");
-					stub("auto error_message = std::string(\"exception has occurred in an {} implementation in function {}\");", interface_name, function.get_name());
+					stub("auto error_message = std::string(\"exception has occurred in an {} implementation in function {}\");", interface_name, function->get_name());
 					stub("LOG_STR(error_message.data(), error_message.length());");
 					stub("#endif");
 					stub("__rpc_ret = rpc::error::EXCEPTION();");
@@ -1508,7 +1527,7 @@ namespace enclave_marshaller
                     {
                         uint64_t count = 1;
                         proxy("//PROXY_OUT_DECLARATION");
-                        for (auto& parameter : function.get_parameters())
+                        for (auto& parameter : function->get_parameters())
                         {
                             count++;
                             std::string output;
@@ -1525,7 +1544,7 @@ namespace enclave_marshaller
                     {
                         stub("//STUB_ADD_REF_OUT_PREDECLARE");
                         uint64_t count = 1;
-                        for (auto& parameter : function.get_parameters())
+                        for (auto& parameter : function->get_parameters())
                         {
                             count++;
                             std::string output;
@@ -1543,7 +1562,7 @@ namespace enclave_marshaller
         
                         count = 1;
                         bool has_preamble = false;
-                        for (auto& parameter : function.get_parameters())
+                        for (auto& parameter : function->get_parameters())
                         {
                             count++;
                             std::string output;
@@ -1562,7 +1581,7 @@ namespace enclave_marshaller
                         stub("}}");
                     }
                     bool has_out_parameter = false;
-                    for (auto& parameter : function.get_parameters())
+                    for (auto& parameter : function->get_parameters())
                     {
                         std::string output;
                         if (is_out_call(PROXY_MARSHALL_OUT, from_host, m_ob, parameter.get_name(),
@@ -1591,7 +1610,7 @@ namespace enclave_marshaller
                             stub("auto __rpc_out_yas_mapping = YAS_OBJECT_NVP(");
                             stub("  \"out\"");
 
-                            for (auto& parameter : function.get_parameters())
+                            for (auto& parameter : function->get_parameters())
                             {
                                 count++;
                                 std::string output;
@@ -1614,7 +1633,7 @@ namespace enclave_marshaller
                             proxy("#ifdef USE_RPC_LOGGING");
                             proxy("catch(std::exception ex)");
                             proxy("{{");
-                            proxy("auto error_message = std::string(\"A proxy deserialisation error has occurred while calling {} in aimplementation of {} \") + ex.what();", function.get_name(), interface_name);
+                            proxy("auto error_message = std::string(\"A proxy deserialisation error has occurred while calling {} in aimplementation of {} \") + ex.what();", function->get_name(), interface_name);
                             proxy("LOG_STR(error_message.data(), error_message.length());");
                             proxy("return rpc::error::PROXY_DESERIALISATION_ERROR();");
                             proxy("}}");
@@ -1622,7 +1641,7 @@ namespace enclave_marshaller
                             proxy("catch(...)");
                             proxy("{{");
                             proxy("#ifdef USE_RPC_LOGGING");
-                            proxy("auto error_message = std::string(\"A proxy deserialisation error has occurred while calling {} in aimplementation of {} \");", function.get_name(), interface_name);
+                            proxy("auto error_message = std::string(\"A proxy deserialisation error has occurred while calling {} in aimplementation of {} \");", function->get_name(), interface_name);
                             proxy("LOG_STR(error_message.data(), error_message.length());");
                             proxy("#endif");
                             proxy("return rpc::error::PROXY_DESERIALISATION_ERROR();");
@@ -1662,7 +1681,7 @@ namespace enclave_marshaller
 								stub("default:");
                                     stub("#ifdef USE_RPC_LOGGING");
                                     stub("{{");
-                                    stub("auto error_message = std::string(\"An invalid rpc encoding has been specified when trying to call {} in an implementation of {} \");", function.get_name(), interface_name);
+                                    stub("auto error_message = std::string(\"An invalid rpc encoding has been specified when trying to call {} in an implementation of {} \");", function->get_name(), interface_name);
                                     stub("LOG_STR(error_message.data(), error_message.length());");
                                     stub("}}");
                                     stub("#endif");
@@ -1688,7 +1707,7 @@ namespace enclave_marshaller
 								stub("default:");
                                     stub("#ifdef USE_RPC_LOGGING");
                                     stub("{{");
-                                    stub("auto error_message = std::string(\"An invalid rpc encoding has been specified when trying to call {} in an implementation of {} \");", function.get_name(), interface_name);
+                                    stub("auto error_message = std::string(\"An invalid rpc encoding has been specified when trying to call {} in an implementation of {} \");", function->get_name(), interface_name);
                                     stub("LOG_STR(error_message.data(), error_message.length());");
                                     stub("}}");
                                     stub("#endif");
@@ -1741,7 +1760,7 @@ namespace enclave_marshaller
                             stub("  ,(\"__return_value\", __rpc_ret)");
 
                             uint64_t count = 1;
-                            for (auto& parameter : function.get_parameters())
+                            for (auto& parameter : function->get_parameters())
                             {
                                 count++;
                                 std::string output;
@@ -1764,7 +1783,7 @@ namespace enclave_marshaller
                             proxy("#ifdef USE_RPC_LOGGING");
                             proxy("catch(std::exception ex)");
                             proxy("{{");
-                            proxy("auto error_message = std::string(\"A proxy deserialisation error has occurred while calling {} in aimplementation of {} \") + ex.what();", function.get_name(), interface_name);
+                            proxy("auto error_message = std::string(\"A proxy deserialisation error has occurred while calling {} in aimplementation of {} \") + ex.what();", function->get_name(), interface_name);
                             proxy("LOG_STR(error_message.data(), error_message.length());");
                             proxy("return rpc::error::PROXY_DESERIALISATION_ERROR();");
                             proxy("}}");
@@ -1772,7 +1791,7 @@ namespace enclave_marshaller
                             proxy("catch(...)");
                             proxy("{{");
                             proxy("#ifdef USE_RPC_LOGGING");
-                            proxy("auto error_message = std::string(\"A proxy deserialisation error has occurred while calling {} in aimplementation of {} \");", function.get_name(), interface_name);
+                            proxy("auto error_message = std::string(\"A proxy deserialisation error has occurred while calling {} in aimplementation of {} \");", function->get_name(), interface_name);
                             proxy("LOG_STR(error_message.data(), error_message.length());");
                             proxy("#endif");
                             proxy("return rpc::error::PROXY_DESERIALISATION_ERROR();");
@@ -1801,7 +1820,7 @@ namespace enclave_marshaller
                     proxy("//PROXY_VALUE_RETURN");
                     {
                         uint64_t count = 1;
-                        for (auto& parameter : function.get_parameters())
+                        for (auto& parameter : function->get_parameters())
                         {
                             count++;
                             std::string output;
@@ -1818,7 +1837,7 @@ namespace enclave_marshaller
                     proxy("//PROXY_CLEAN_IN");
                     {
                         uint64_t count = 1;
-                        for (auto& parameter : function.get_parameters())
+                        for (auto& parameter : function->get_parameters())
                         {
                             std::string output;
                             {
@@ -1859,7 +1878,7 @@ namespace enclave_marshaller
 
         void write_stub_factory(const class_entity& lib, const class_entity& m_ob, writer& stub, std::set<std::string>& done)
         {
-            auto interface_name = std::string(m_ob.get_type() == entity_type::LIBRARY ? "i_" : "") + m_ob.get_name();
+            auto interface_name = std::string(m_ob.get_entity_type() == entity_type::LIBRARY ? "i_" : "") + m_ob.get_name();
             auto owner = m_ob.get_owner();
             std::string ns = interface_name;
             while(!owner->get_name().empty())
@@ -1900,7 +1919,7 @@ namespace enclave_marshaller
 
         void write_stub_cast_factory(const class_entity& lib, const class_entity& m_ob, writer& stub)
         {
-            auto interface_name = std::string(m_ob.get_type() == entity_type::LIBRARY ? "i_" : "") + m_ob.get_name();
+            auto interface_name = std::string(m_ob.get_entity_type() == entity_type::LIBRARY ? "i_" : "") + m_ob.get_name();
             stub("int {}_stub::cast(rpc::interface_ordinal interface_id, rpc::shared_ptr<rpc::i_interface_stub>& new_stub)",
                  interface_name);
             stub("{{");
@@ -1915,7 +1934,7 @@ namespace enclave_marshaller
             header("class {};", m_ob.get_name());
             proxy("class {}_proxy;", m_ob.get_name());
 
-            auto interface_name = std::string(m_ob.get_type() == entity_type::LIBRARY ? "i_" : "") + m_ob.get_name();
+            auto interface_name = std::string(m_ob.get_entity_type() == entity_type::LIBRARY ? "i_" : "") + m_ob.get_name();
 
             stub("class {0}_stub : public rpc::i_interface_stub", interface_name);
             stub("{{");
@@ -1986,10 +2005,10 @@ namespace enclave_marshaller
             auto enum_vals = m_ob.get_functions();
             for (auto& enum_val : enum_vals)
             {
-                if(enum_val.get_return_type().empty())
-                    header("{},", enum_val.get_name());
+                if(enum_val->get_return_type().empty())
+                    header("{},", enum_val->get_name());
                 else
-                    header("{} = {},", enum_val.get_name(), enum_val.get_return_type());                
+                    header("{} = {},", enum_val->get_name(), enum_val->get_return_type());                
             }
             header("}};");
         }
@@ -2047,20 +2066,24 @@ namespace enclave_marshaller
 
             for (auto& field : m_ob.get_functions())
             {
-                if (field.get_type() != FunctionTypeVariable)
-                    continue;
-
-                header.print_tabs();
-                header.raw("{} {}", field.get_return_type(), field.get_name());
-                if (field.get_array_string().size())
-                    header.raw("[{}]", field.get_array_string());
-                if (!field.get_default_value().empty())
+                if (field->get_entity_type() == entity_type::FUNCTION_VARIABLE)
                 {
-                    header.raw(" = {}::{};\n", field.get_return_type(), field.get_default_value());
+                    header.print_tabs();
+                    header.raw("{} {}", field->get_return_type(), field->get_name());
+                    if (field->get_array_string().size())
+                        header.raw("[{}]", field->get_array_string());
+                    if (!field->get_default_value().empty())
+                    {
+                        header.raw(" = {}::{};\n", field->get_return_type(), field->get_default_value());
+                    }
+                    else
+                    {
+                        header.raw("{{}};\n");
+                    }
                 }
-                else
+                else if (field->get_entity_type() == entity_type::FUNCTION_CONSTEXPR)
                 {
-                    header.raw("{{}};\n");
+                    write_constexpr(header, *field);                 
                 }
             }
 
@@ -2073,7 +2096,7 @@ namespace enclave_marshaller
 
             for (auto& field : m_ob.get_functions())
             {
-                header("  ,(\"{0}\", {0})", field.get_name());
+                header("  ,(\"{0}\", {0})", field->get_name());
             }
             header(");");
 
@@ -2119,7 +2142,7 @@ namespace enclave_marshaller
             {
                 header.raw("\n");
                 header.print_tabs();
-                header.raw("{1}lhs.{0} != rhs.{0}", field.get_name(), first_pass ? "" : "|| ");
+                header.raw("{1}lhs.{0} != rhs.{0}", field->get_name(), first_pass ? "" : "|| ");
                 first_pass = false;
             }
             header.raw(";\n");
@@ -2146,7 +2169,7 @@ namespace enclave_marshaller
                                                    writer& header, writer& proxy, writer& stub,
                                                    const std::vector<std::string>& namespaces)
         {
-            auto interface_name = std::string(obj.get_type() == entity_type::LIBRARY ? "i_" : "") + obj.get_name();
+            auto interface_name = std::string(obj.get_entity_type() == entity_type::LIBRARY ? "i_" : "") + obj.get_name();
             std::string ns;
 
             for (auto& name : namespaces)
@@ -2173,7 +2196,7 @@ namespace enclave_marshaller
         void write_library_proxy_factory(writer& proxy, writer& stub, const class_entity& obj,
                                          const std::vector<std::string>& namespaces)
         {
-            auto interface_name = std::string(obj.get_type() == entity_type::LIBRARY ? "i_" : "") + obj.get_name();
+            auto interface_name = std::string(obj.get_entity_type() == entity_type::LIBRARY ? "i_" : "") + obj.get_name();
             std::string ns;
 
             for (auto& name : namespaces)
@@ -2235,7 +2258,7 @@ namespace enclave_marshaller
         void write_marshalling_logic_nested(bool from_host, const class_entity& cls, std::string prefix, writer& header,
                                             writer& proxy, writer& stub)
         {
-            if (cls.get_type() == entity_type::STRUCT)
+            if (cls.get_entity_type() == entity_type::STRUCT)
                 write_struct(cls, header);
 
             header("");
@@ -2243,10 +2266,10 @@ namespace enclave_marshaller
             //this is deprecated and only to be used with rpc v1, delete when no longer needed
             std::size_t hash = std::hash<std::string> {}(prefix + "::" + cls.get_name());
 
-            if (cls.get_type() == entity_type::INTERFACE)
+            if (cls.get_entity_type() == entity_type::INTERFACE)
                 write_interface(from_host, cls, header, proxy, stub, hash);
 
-            if (cls.get_type() == entity_type::LIBRARY)
+            if (cls.get_entity_type() == entity_type::LIBRARY)
                 write_interface(from_host, cls, header, proxy, stub, hash);
         }
 
@@ -2258,7 +2281,7 @@ namespace enclave_marshaller
                 {
                     if (!cls->get_import_lib().empty())
                         continue;
-                    if (cls->get_type() == entity_type::INTERFACE)
+                    if (cls->get_entity_type() == entity_type::INTERFACE)
                         write_stub_cast_factory(lib, *cls, stub);
                 }
 
@@ -2266,7 +2289,7 @@ namespace enclave_marshaller
                 {
                     if (!cls->get_import_lib().empty())
                         continue;
-                    if (cls->get_type() == entity_type::LIBRARY)
+                    if (cls->get_entity_type() == entity_type::LIBRARY)
                         write_stub_cast_factory(lib, *cls, stub);
                 }
             }
@@ -2280,21 +2303,21 @@ namespace enclave_marshaller
             {
                 if (!cls->get_import_lib().empty())
                     continue;
-                if (cls->get_type() == entity_type::INTERFACE || cls->get_type() == entity_type::LIBRARY)
+                if (cls->get_entity_type() == entity_type::INTERFACE || cls->get_entity_type() == entity_type::LIBRARY)
                     write_interface_forward_declaration(*cls, header, proxy, stub);
-                if (cls->get_type() == entity_type::STRUCT)
-                    write_struct_forward_declaration(*cls, header);
-                if (cls->get_type() == entity_type::ENUM)
-                    write_enum_forward_declaration(*cls, header);
-                if (cls->get_type() == entity_type::TYPEDEF)
-                    write_typedef_forward_declaration(*cls, header);
+                // if (cls->get_entity_type() == entity_type::STRUCT)
+                //     write_struct_forward_declaration(*cls, header);
+                // if (cls->get_entity_type() == entity_type::ENUM)
+                //     write_enum_forward_declaration(*cls, header);
+                // if (cls->get_entity_type() == entity_type::TYPEDEF)
+                //     write_typedef_forward_declaration(*cls, header);
             }
 
             for (auto cls : lib.get_classes())
             {
                 if (!cls->get_import_lib().empty())
                     continue;
-                if (cls->get_type() == entity_type::NAMESPACE)
+                if (cls->get_entity_type() == entity_type::NAMESPACE)
                 {
                     bool is_inline = cls->get_attribute("inline") == "inline";
                     if(is_inline)
@@ -2331,7 +2354,16 @@ namespace enclave_marshaller
             {
                 if (!cls->get_import_lib().empty())
                     continue;
-                if (cls->get_type() == entity_type::NAMESPACE)
+                // if (cls->get_entity_type() == entity_type::INTERFACE || cls->get_entity_type() == entity_type::LIBRARY)
+                //     write_interface_forward_declaration(*cls, header, proxy, stub);
+                if (cls->get_entity_type() == entity_type::STRUCT)
+                    write_struct_forward_declaration(*cls, header);
+                if (cls->get_entity_type() == entity_type::ENUM)
+                    write_enum_forward_declaration(*cls, header);
+                if (cls->get_entity_type() == entity_type::TYPEDEF)
+                    write_typedef_forward_declaration(*cls, header);
+
+                if (cls->get_entity_type() == entity_type::NAMESPACE)
                 {
                     bool is_inline = cls->get_attribute("inline") == "inline";
 
@@ -2352,14 +2384,20 @@ namespace enclave_marshaller
                     stub("{{");
                     for (auto& function : cls->get_functions())
                     {
-                        if (function.get_type() == FunctionTypeCppQuote)
+                        if (function->get_entity_type() == entity_type::FUNCTION_CPPQUOTE)
                         {
-                            if(function.get_is_in_import())
+                            if(function->get_is_in_import())
                                 continue;
-                            auto text = function.get_name();
+                            auto text = function->get_name();
                             header.write_buffer(text);
                             continue;
-                        }
+                        }                       
+
+                        if (function->get_entity_type() == entity_type::FUNCTION_CONSTEXPR)
+                        {
+                            write_constexpr(header, *function);                 
+                            continue;                 
+                        }                              
                     }
                     write_namespace(from_host, *cls, prefix + cls->get_name() + "::", header, proxy, stub);
 
@@ -2382,32 +2420,32 @@ namespace enclave_marshaller
             {
                 if (!cls->get_import_lib().empty())
                     continue;
-                if (cls->get_type() == entity_type::NAMESPACE)
+                if (cls->get_entity_type() == entity_type::NAMESPACE)
                 {
 
                     write_epilog(from_host, *cls, header, proxy, stub, namespaces);
                 }
                 else
                 {
-                    if (cls->get_type() == entity_type::LIBRARY || cls->get_type() == entity_type::INTERFACE)
+                    if (cls->get_entity_type() == entity_type::LIBRARY || cls->get_entity_type() == entity_type::INTERFACE)
                         write_encapsulate_outbound_interfaces(lib, *cls, header, proxy, stub, namespaces);
 
-                    if (cls->get_type() == entity_type::LIBRARY || cls->get_type() == entity_type::INTERFACE)
+                    if (cls->get_entity_type() == entity_type::LIBRARY || cls->get_entity_type() == entity_type::INTERFACE)
                         write_library_proxy_factory(proxy, stub, *cls, namespaces);
                 }
             }
         }
 
-        void write_stub_factory_lookup_items(const class_entity& lib, std::string prefix, writer& proxy,
+        void write_stub_factory_lookup_items(const class_entity& lib, std::string prefix,
                                 writer& stub, std::set<std::string>& done)
         {
             for (auto cls : lib.get_classes())
             {
                 if (!cls->get_import_lib().empty())
                     continue;
-                if (cls->get_type() == entity_type::NAMESPACE)
+                if (cls->get_entity_type() == entity_type::NAMESPACE)
                 {
-                    write_stub_factory_lookup_items(*cls, prefix + cls->get_name() + "::", proxy, stub, done);
+                    write_stub_factory_lookup_items(*cls, prefix + cls->get_name() + "::", stub, done);
                 }
                 else
                 {
@@ -2415,7 +2453,7 @@ namespace enclave_marshaller
                     {
                         if (!cls->get_import_lib().empty())
                             continue;
-                        if (cls->get_type() == entity_type::INTERFACE)
+                        if (cls->get_entity_type() == entity_type::INTERFACE)
                             write_stub_factory(lib, *cls, stub, done);
                     }
 
@@ -2423,7 +2461,7 @@ namespace enclave_marshaller
                     {
                         if (!cls->get_import_lib().empty())
                             continue;
-                        if (cls->get_type() == entity_type::LIBRARY)
+                        if (cls->get_entity_type() == entity_type::LIBRARY)
                             write_stub_factory(lib, *cls, stub, done);
                     }
                 }
@@ -2439,7 +2477,7 @@ namespace enclave_marshaller
 
                 std::set<std::string> done;
 
-            write_stub_factory_lookup_items(lib, prefix, proxy, stub, done);
+            write_stub_factory_lookup_items(lib, prefix, stub, done);
 
                 stub("}}");
             }
@@ -2536,16 +2574,15 @@ namespace enclave_marshaller
 
             write_namespace_predeclaration(lib, header, proxy, stub);
             
-            write_stub_factory_lookup(module_name, lib, prefix, stub_header, proxy, stub);
 
 
             for (auto& function : lib.get_functions())
             {
-                if (function.get_type() == FunctionTypeCppQuote)
+                if (function->get_entity_type() == entity_type::FUNCTION_CPPQUOTE)
                 {
-                    if(function.get_is_in_import())
+                    if(function->get_is_in_import())
                         continue;
-                    auto text = function.get_name();
+                    auto text = function->get_name();
                     header.write_buffer(text);
                     continue;
                 }
@@ -2568,6 +2605,8 @@ namespace enclave_marshaller
             write_epilog(from_host, lib, header, proxy, stub, namespaces);
             proxy("}}");
             stub("}}");
+            
+            write_stub_factory_lookup(module_name, lib, prefix, stub_header, proxy, stub);
         }
     }
 }
