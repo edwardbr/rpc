@@ -24,4 +24,7 @@ target_link_libraries(generator
 target_link_options(generator PRIVATE ${HOST_LINK_EXE_OPTIONS})
 
 set_property(TARGET generator PROPERTY COMPILE_PDB_NAME generator)
+if(ENABLE_CLANG_TIDY)
+  set_target_properties(generator PROPERTIES CXX_CLANG_TIDY "${CLANG_TIDY_COMMAND}")
+endif()
 post_build_strip_symbols(generator)

@@ -39,6 +39,8 @@ target_link_options(rpc_test PRIVATE ${HOST_LINK_EXE_OPTIONS})
 target_link_directories(rpc_test PUBLIC ${SGX_LIBRARY_PATH})
 set_property(TARGET rpc_test PROPERTY COMPILE_PDB_NAME rpc_test) 
 
+if(ENABLE_CLANG_TIDY)
+  set_target_properties(rpc_test PROPERTIES CXX_CLANG_TIDY "${CLANG_TIDY_COMMAND}")
+endif()
 
 gtest_discover_tests(rpc_test)
-

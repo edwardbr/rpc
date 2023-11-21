@@ -38,7 +38,9 @@ if(${BUILD_ENCLAVE})
   target_link_options(marshal_test_enclave PRIVATE ${ENCLAVE_LINK_OPTIONS})
 
   set_property(TARGET marshal_test_enclave PROPERTY COMPILE_PDB_NAME marshal_test_enclave)
-
+  if(ENABLE_CLANG_TIDY)
+    set_target_properties(marshal_test_enclave PROPERTIES CXX_CLANG_TIDY "${CLANG_TIDY_COMMAND}")
+  endif()
   enclave_sign(marshal_test_enclave KEY marshal_test_enclave_private.pem CONFIG marshal_test_enclave.config.${SGX_MODE}.xml)
 ###############################################################################
   add_enclave_library(marshal_test_enclave_v1
@@ -78,7 +80,9 @@ if(${BUILD_ENCLAVE})
   target_link_options(marshal_test_enclave_v1 PRIVATE ${ENCLAVE_LINK_OPTIONS})
 
   set_property(TARGET marshal_test_enclave_v1 PROPERTY COMPILE_PDB_NAME marshal_test_enclave_v1)
-
+  if(ENABLE_CLANG_TIDY)
+    set_target_properties(marshal_test_enclave_v1 PROPERTIES CXX_CLANG_TIDY "${CLANG_TIDY_COMMAND}")
+  endif()
   enclave_sign(marshal_test_enclave_v1 KEY marshal_test_enclave_private.pem CONFIG marshal_test_enclave.config.${SGX_MODE}.xml)
 
  endif()
