@@ -75,8 +75,6 @@ function(RPCGenerate
     set(ADDITIONAL_HEADERS ${ADDITIONAL_HEADERS} --additional_headers "${additional_headers}")
   endforeach()
 
-  message(ADDITIONAL_HEADERS ${ADDITIONAL_HEADERS})
-
   foreach(dep ${params_dependencies})
     if(TARGET ${dep}_generate)
       get_target_property(dep_base_dir ${dep}_generate base_dir)
