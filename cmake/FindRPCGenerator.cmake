@@ -1,26 +1,37 @@
-function(RPCGenerate
+function(
+  RPCGenerate
   name
   idl
   base_dir
   output_path
   sub_directory
   namespace
-
-  # multivalue expects string "dependencies"
-  # multivalue expects string "link_libraries"
-  # multivalue expects string "include_paths"
-  # multivalue expects string "defines"
-  # multivalue expects string "additional_headers"
-  # optional_val mock
+  # multivalue expects string "dependencies" multivalue expects string "link_libraries" multivalue expects string
+  # "include_paths" multivalue expects string "defines" multivalue expects string "additional_headers" optional_val mock
 )
   set(options)
   set(singleValueArgs mock)
-  set(multiValueArgs dependencies link_libraries include_paths defines additional_headers)
+  set(multiValueArgs
+      dependencies
+      link_libraries
+      include_paths
+      defines
+      additional_headers)
 
   # split out multivalue variables
-  cmake_parse_arguments("params" "${options}" "${singleValueArgs}" "${multiValueArgs}" ${ARGN})
+  cmake_parse_arguments(
+    "params"
+    "${options}"
+    "${singleValueArgs}"
+    "${multiValueArgs}"
+    ${ARGN})
 
-  cmake_path(APPEND base_dir ${idl} OUTPUT_VARIABLE idl)
+  cmake_path(
+    APPEND
+    base_dir
+    ${idl}
+    OUTPUT_VARIABLE
+    idl)
 
   set(header_path ${sub_directory}/${name}.h)
   set(proxy_path ${sub_directory}/${name}_proxy.cpp)
@@ -101,7 +112,8 @@ function(RPCGenerate
   endif()
 
   if(${DEBUG_RPC_GEN})
-    message("
+    message(
+      "
     add_custom_command(OUTPUT ${full_header_path} ${full_proxy_path} ${full_stub_header_path} ${full_stub_path}
     COMMAND ${ENCLAVE_MARSHALLER}
     --idl ${idl}
@@ -141,24 +153,18 @@ function(RPCGenerate
 ")
   endif()
 
-  add_custom_command(OUTPUT ${full_header_path} ${full_proxy_path} ${full_stub_header_path} ${full_stub_path}
-    COMMAND ${ENCLAVE_MARSHALLER}
-    --idl ${idl}
-    --module_name ${name}_idl
-    --output_path ${output_path}
-    --header ${header_path}
-    --proxy ${proxy_path}
-    --stub ${stub_path}
-    --stub_header ${stub_header_path}
-    ${PATHS_PARAMS}
-    ${ADDITIONAL_HEADERS}
+  add_custom_command(
+    OUTPUT ${full_header_path} ${full_proxy_path} ${full_stub_header_path} ${full_stub_path}
+    COMMAND
+      ${ENCLAVE_MARSHALLER} --idl ${idl} --module_name ${name}_idl --output_path ${output_path} --header ${header_path}
+      --proxy ${proxy_path} --stub ${stub_path} --stub_header ${stub_header_path} ${PATHS_PARAMS} ${ADDITIONAL_HEADERS}
     MAIN_DEPENDENCY ${idl}
     IMPLICIT_DEPENDS ${idl}
     DEPENDS ${GENERATED_DEPENDANCIES}
-    COMMENT "Running generator ${idl}"
-  )
+    COMMENT "Running generator ${idl}")
 
-  add_custom_target(${name}_idl_generate DEPENDS ${full_header_path} ${full_proxy_path} ${full_stub_header_path} ${full_stub_path})
+  add_custom_target(${name}_idl_generate DEPENDS ${full_header_path} ${full_proxy_path} ${full_stub_header_path}
+                                                 ${full_stub_path})
 
   set_target_properties(${name}_idl_generate PROPERTIES base_dir ${base_dir})
 
@@ -171,7 +177,7 @@ function(RPCGenerate
   endforeach()
 
   foreach(dep ${params_link_libraries})
-    if (TARGET ${dep})
+    if(TARGET ${dep})
       add_dependencies(${name}_idl_generate ${dep})
     else()
       message("target ${dep} does not exist so skipped")
@@ -305,22 +311,18 @@ function(RPCGenerate
     endforeach()")
     endif()
     # #specify a host specific target
-    add_library(${name}_idl_host STATIC
-      ${full_header_path}
-      ${full_stub_header_path}
-      ${full_stub_path}
-      ${full_proxy_path}
-    )
+    add_library(${name}_idl_host STATIC ${full_header_path} ${full_stub_header_path} ${full_stub_path}
+                                        ${full_proxy_path})
     target_compile_definitions(${name}_idl_host PRIVATE ${HOST_DEFINES})
-    target_include_directories(${name}_idl_host PUBLIC "$<BUILD_INTERFACE:${output_path}>" "$<BUILD_INTERFACE:${output_path}/include>" PRIVATE ${HOST_INCLUDES} ${params_include_paths})
+    target_include_directories(
+      ${name}_idl_host
+      PUBLIC "$<BUILD_INTERFACE:${output_path}>" "$<BUILD_INTERFACE:${output_path}/include>"
+      PRIVATE ${HOST_INCLUDES} ${params_include_paths})
     target_compile_options(${name}_idl_host PRIVATE ${HOST_COMPILE_OPTIONS})
     target_link_directories(${name}_idl_host PUBLIC ${SGX_LIBRARY_PATH})
     set_property(TARGET ${name}_idl_host PROPERTY COMPILE_PDB_NAME ${name}_idl_host)
 
-    target_link_libraries(${name}_idl_host PUBLIC
-      rpc_host
-      yas_common
-    )
+    target_link_libraries(${name}_idl_host PUBLIC rpc_host yas_common)
 
     add_dependencies(${name}_idl_host ${name}_idl_generate)
 
@@ -341,30 +343,26 @@ function(RPCGenerate
       endif()
     endforeach()
 
-    ###############################################################################
+    # ##################################################################################################################
     # #and an enclave specific target
-    add_library(${name}_idl_enclave STATIC
-      ${full_header_path}
-      ${full_stub_header_path}
-      ${full_stub_path}
-      ${full_proxy_path}
-    )
+    add_library(${name}_idl_enclave STATIC ${full_header_path} ${full_stub_header_path} ${full_stub_path}
+                                           ${full_proxy_path})
     target_compile_definitions(${name}_idl_enclave PRIVATE ${ENCLAVE_DEFINES})
-    target_include_directories(${name}_idl_enclave PUBLIC "$<BUILD_INTERFACE:${output_path}>" "$<BUILD_INTERFACE:${output_path}/include>" PRIVATE "${output_path}/include" ${ENCLAVE_LIBCXX_INCLUDES} ${params_include_paths})
+    target_include_directories(
+      ${name}_idl_enclave
+      PUBLIC "$<BUILD_INTERFACE:${output_path}>" "$<BUILD_INTERFACE:${output_path}/include>"
+      PRIVATE "${output_path}/include" ${ENCLAVE_LIBCXX_INCLUDES} ${params_include_paths})
 
     set(stripped_idl)
     cmake_path(GET idl STEM stripped_idl)
     install(DIRECTORY "$<BUILD_INTERFACE:${output_path}>" DESTINATION include/secretarium/idls)
-    install(FILES     "$<BUILD_INTERFACE:${idl}>"         DESTINATION include/secretarium/idls/${stripped_idl})
+    install(FILES "$<BUILD_INTERFACE:${idl}>" DESTINATION include/secretarium/idls/${stripped_idl})
 
     target_compile_options(${name}_idl_enclave PRIVATE ${ENCLAVE_COMPILE_OPTIONS})
     target_link_directories(${name}_idl_enclave PRIVATE ${SGX_LIBRARY_PATH})
     set_property(TARGET ${name}_idl_enclave PROPERTY COMPILE_PDB_NAME ${name}_idl_enclave)
 
-    target_link_libraries(${name}_idl_enclave PUBLIC
-      rpc_enclave
-      yas_common
-    )
+    target_link_libraries(${name}_idl_enclave PUBLIC rpc_enclave yas_common)
 
     add_dependencies(${name}_idl_enclave ${name}_idl_generate)
 
@@ -385,28 +383,23 @@ function(RPCGenerate
       endif()
     endforeach()
 
-    ###############################################################################
+    # ##################################################################################################################
     # #and an enclave specific target
-    add_library(${name}_idl_enclave_v1 STATIC
-      ${full_header_path}
-      ${full_stub_header_path}
-      ${full_stub_path}
-      ${full_proxy_path}
-    )
-    target_compile_definitions(${name}_idl_enclave_v1
-      PUBLIC
-        NO_RPC_V2
-      PRIVATE
-        ${ENCLAVE_DEFINES})
-    target_include_directories(${name}_idl_enclave_v1 PUBLIC "$<BUILD_INTERFACE:${output_path}>" "$<BUILD_INTERFACE:${output_path}/include>" PRIVATE ${ENCLAVE_LIBCXX_INCLUDES} ${params_include_paths})
+    add_library(${name}_idl_enclave_v1 STATIC ${full_header_path} ${full_stub_header_path} ${full_stub_path}
+                                              ${full_proxy_path})
+    target_compile_definitions(
+      ${name}_idl_enclave_v1
+      PUBLIC NO_RPC_V2
+      PRIVATE ${ENCLAVE_DEFINES})
+    target_include_directories(
+      ${name}_idl_enclave_v1
+      PUBLIC "$<BUILD_INTERFACE:${output_path}>" "$<BUILD_INTERFACE:${output_path}/include>"
+      PRIVATE ${ENCLAVE_LIBCXX_INCLUDES} ${params_include_paths})
     target_compile_options(${name}_idl_enclave_v1 PRIVATE ${ENCLAVE_COMPILE_OPTIONS})
     target_link_directories(${name}_idl_enclave_v1 PRIVATE ${SGX_LIBRARY_PATH})
     set_property(TARGET ${name}_idl_enclave_v1 PROPERTY COMPILE_PDB_NAME ${name}_idl_enclave_v1)
 
-    target_link_libraries(${name}_idl_enclave_v1 PUBLIC
-      rpc_enclave_v1
-      yas_common
-    )
+    target_link_libraries(${name}_idl_enclave_v1 PUBLIC rpc_enclave_v1 yas_common)
 
     add_dependencies(${name}_idl_enclave_v1 ${name}_idl_generate)
 

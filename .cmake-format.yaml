@@ -1,0 +1,121 @@
+_help_format: Options affecting formatting.
+format:
+  line_width: 120
+  max_pargs_hwrap: 4
+_help_parse: Options affecting listfile parsing
+parse:
+  _help_additional_commands:
+  - Specify structure for custom cmake functions
+  additional_commands:
+    rpcgenerate:
+      pargs:
+        nargs: 6+
+        flags:
+        - IS_CONTRACT
+      spelling: RPCGenerate
+      kwargs:
+        MOCK: 1
+        DEPENDENCIES: +
+        LINK_LIBRARIES: +
+        INCLUDE_PATHS: +
+        DEFINES: +
+        ADDITIONAL_HEADERS: +
+    add_trusted_header:
+      pargs:
+        nargs: 1+
+        flags:
+        - USE_PREFIX
+      kwargs:
+        EDL: 1
+        LDSCRIPT: 1
+        SRCS: +
+        HEADER_ONLY_LIBS: +
+        EDL_SEARCH_PATHS: +
+    add_untrusted_header:
+      pargs:
+        nargs: 1+
+        flags:
+        - USE_PREFIX
+      kwargs:
+        EDL: 1
+        LDSCRIPT: 1
+        SRCS: +
+        HEADER_ONLY_LIBS: +
+        EDL_SEARCH_PATHS: +
+    add_trusted_library:
+      pargs:
+        nargs: 1+
+        flags:
+        - USE_PREFIX
+      kwargs:
+        EDL: 1
+        LDSCRIPT: 1
+        SRCS: +
+        HEADER_ONLY_LIBS: +
+        EDL_SEARCH_PATHS: +
+    enclave_edl_library:
+      pargs:
+        nargs: 6
+    host_edl_library:
+      pargs:
+        nargs: 6+
+        flags: []
+      kwargs:
+        EXTRA_LIBS: +
+    add_enclave_library:
+      pargs:
+        nargs: 1+
+        flags:
+        - USE_PREFIX
+        - REMOVE_INIT_SECTION
+      kwargs:
+        EDL_IMPL: 1
+        LDSCRIPT: 1
+        SRCS: +
+        TRUSTED_LIBS: +
+        HEADER_ONLY_LIBS: +
+        EDL: +
+        EDL_SEARCH_PATHS: +
+        EDL_INCLUDE_PATH: +
+    enclave_sign:
+      pargs:
+        nargs: 1+
+        flags: []
+      kwargs:
+        KEY: 1
+        CONFIG: 1
+        OUTPUT: 1
+    add_untrusted_library:
+      pargs:
+        nargs: 2+
+        flags:
+        - USE_PREFIX
+      kwargs:
+        EDL: 1
+        LDSCRIPT: 1
+        SRCS: +
+        HEADER_ONLY_LIBS: +
+        EDL_SEARCH_PATHS: +
+        EDL_IMPL: +
+        EDL_INCLUDE_PATHS: +
+    add_untrusted_executable_simple:
+      pargs:
+        nargs: 1+
+        flags:
+        - USE_PREFIX
+      kwargs:
+        SRCS: +
+        HEADER_ONLY_LIBS: +
+        EDL_SEARCH_PATHS: +
+        EDL: +
+        EDL_IMPL: +
+        EDL_INCLUDE_PATHS: +
+    add_untrusted_executable:
+      pargs:
+        nargs: 1+
+        flags:
+        - USE_PREFIX
+      kwargs:
+        SRCS: +
+        EDL: +
+        EDL_SEARCH_PATHS: +
