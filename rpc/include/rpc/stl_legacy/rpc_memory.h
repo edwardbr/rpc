@@ -1931,10 +1931,6 @@ element_type*>::value>> shared_ptr(unique_ptr<_Yp, _Dp>&& __r) : __ptr_(__r.get(
         }
     };
 
-    //    template<class _CharT, class _Traits, class _Yp>
-    //    inline basic_ostream<_CharT, _Traits>& operator<<(basic_ostream<_CharT, _Traits>& __os, shared_ptr<_Yp>
-    //    const& __p);
-
     class __sp_mut
     {
         void* __lx;

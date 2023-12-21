@@ -328,14 +328,6 @@ namespace enclave_marshaller
                         for(auto& item : param.get_attributes())
                         {
                             seed += item;
-                            /*if(item == "in")
-                                seed += item + ",";
-                            else if(item == "out")
-                                seed += item + ",";
-                            else if(item == "inout")
-                                seed += item + ",";
-                            else if(item == "const")
-                                seed += item + ",";*/
                         }
                         seed += "]";
 
@@ -2096,28 +2088,6 @@ namespace enclave_marshaller
             stub("}};");
             stub("");
         }
-
-        // void write_struct_forward_declaration(const class_entity& m_ob, writer& header)
-        // {
-        //     if(!elem->is_in_import())
-        //     {
-        //         if(m_ob.get_is_template())
-        //         {
-        //             header.print_tabs();
-        //             header.raw("template<");
-        //             bool first_pass = true;
-        //             for(const auto& param : m_ob.get_template_params())
-        //             {
-        //                 if(!first_pass)
-        //                     header.raw(", ");
-        //                 first_pass = false;
-        //                 header.raw("{} {}", param.type, param.name);
-        //             }
-        //             header.raw(">\n");
-        //         }
-        //         header("struct {};", m_ob.get_name());
-        //     }
-        // }
 
         void write_enum_forward_declaration(const entity& ent, writer& header)
         {
