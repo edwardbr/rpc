@@ -256,7 +256,7 @@ int main(const int argc, char* argv[])
                 mock_stream << ends;
             }
             
-            auto checksums_path = std::filesystem::path(output_path)/"CHECK_SUMS";
+            auto checksums_path = std::filesystem::path(output_path)/"check_sums";
             std::filesystem::create_directory(checksums_path);
             component_checksum::write_namespace(*objects, checksums_path);
         }
