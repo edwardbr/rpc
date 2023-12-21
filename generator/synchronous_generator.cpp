@@ -271,6 +271,32 @@ namespace enclave_marshaller
                 seed += "{";
                 for(auto& func : cls.get_functions())
                 {
+                    {
+                        //this is to tell the fingerprinter that an element does not want to be added to the fingerprint
+                        bool no_fingerprint = false;
+                        for(auto& item : func->get_attributes())
+                        {
+                            if(item == "no_fingerprint")
+                            {
+                                no_fingerprint = true;
+                                continue;
+                            }
+                        }
+                        if(no_fingerprint)
+                            continue;
+                    }
+                    
+                    seed += "[";
+                    for(auto& item : func->get_attributes())
+                    {
+                        //this keyword should not contaminate the interface fingerprint, so that we can deprecate a method and warn developers that this method is for the chop
+                        //unfortunately for legacy reasons "deprecated" does contaminate the fingerprint we need to flush through all prior interface versions before we can rehabilitate this as "deprecated"
+                        if(item == "_deprecated")
+                            continue;
+                        seed += item;
+                    }
+                    seed += "]";
+                    
                     if(func->get_entity_type() == entity_type::CPPQUOTE)
                     {
                         if(func->is_in_import())
@@ -293,18 +319,7 @@ namespace enclave_marshaller
                         seed += "private:";
                         continue;
                     }
-                    seed += "[";
-                    for(auto& item : func->get_attributes())
-                    {
-                        seed += item;
-                        /*if(item == "noexcept")
-                            seed += item + ",";
-                        else if(item == "const")
-                            seed += item + ",";
-                        else if(item == "tag")
-                            seed += item + ",";*/
-                    }
-                    seed += "]";
+
                     seed += func->get_name();
                     seed += "(";
                     for(auto& param : func->get_parameters())
@@ -938,7 +953,7 @@ namespace enclave_marshaller
         {
             if(constexpression.is_in_import())
                 return;
-            auto function = static_cast<const function_entity&>(constexpression);
+            auto& function = static_cast<const function_entity&>(constexpression);
             header.print_tabs();
             header.raw("static constexpr {} {}", function.get_return_type(), function.get_name());
             if(!function.get_default_value().empty())
@@ -961,6 +976,11 @@ namespace enclave_marshaller
 
                 header.print_tabs();
                 proxy.print_tabs();
+                for(auto& item : function->get_attributes())
+                {
+                    if(item == "deprecated" || item == "_deprecated")
+                        header.raw("[[deprecated]] ");
+                }
                 header.raw("virtual {} {}(", function->get_return_type(), function->get_name());
                 // proxy.raw("virtual {} {}_proxy::{} (", function->get_return_type(), interface_name,
                 //           function->get_name());
@@ -1726,6 +1746,15 @@ namespace enclave_marshaller
                 stub("}}");
                 stub("break;");
             }
+            else if(function->get_entity_type() == entity_type::FUNCTION_PRIVATE)
+            {
+                header("private:");
+            }
+            else if(function->get_entity_type() == entity_type::FUNCTION_PUBLIC)
+            {
+                header("public:");
+            }
+
         }
         void write_interface(bool from_host, const class_entity& m_ob, writer& header, writer& proxy, writer& stub,
                              size_t id)
@@ -2094,7 +2123,7 @@ namespace enclave_marshaller
         {
             if(!ent.is_in_import())
             {
-                auto enum_entity = static_cast<const class_entity&>(ent);
+                auto& enum_entity = static_cast<const class_entity&>(ent);
                 if(enum_entity.get_base_classes().empty())
                     header("enum class {}", enum_entity.get_name());
                 else
@@ -2116,7 +2145,7 @@ namespace enclave_marshaller
         {
             if(!ent.is_in_import())
             {
-                auto cls = static_cast<const class_entity&>(ent);
+                auto& cls = static_cast<const class_entity&>(ent);
                 header("using {} = {};", cls.get_name(), cls.get_alias_name());
             }
         }
@@ -2173,7 +2202,7 @@ namespace enclave_marshaller
             {
                 if(field->get_entity_type() == entity_type::FUNCTION_VARIABLE)
                 {
-                    auto function_variable = static_cast<const function_entity*>(field.get());
+                    auto* function_variable = static_cast<const function_entity*>(field.get());
                     header.print_tabs();
                     header.raw("{} {}", function_variable->get_return_type(), function_variable->get_name());
                     if(function_variable->get_array_string().size())
@@ -2476,7 +2505,7 @@ namespace enclave_marshaller
                     header("{{");
                     proxy("{{");
                     stub("{{");
-                    auto ent = static_cast<const class_entity&>(*elem);
+                    auto& ent = static_cast<const class_entity&>(*elem);
                     write_namespace(from_host, ent, prefix + elem->get_name() + "::", header, proxy, stub);
                     header("}}");
                     proxy("}}");
@@ -2484,14 +2513,14 @@ namespace enclave_marshaller
                 }
                 else if(elem->get_entity_type() == entity_type::STRUCT)
                 {
-                    auto ent = static_cast<const class_entity&>(*elem);
+                    auto& ent = static_cast<const class_entity&>(*elem);
                     write_struct(ent, header);
                 }
 
                 else if(elem->get_entity_type() == entity_type::INTERFACE
                          || elem->get_entity_type() == entity_type::LIBRARY)
                 {
-                    auto ent = static_cast<const class_entity&>(*elem);
+                    auto& ent = static_cast<const class_entity&>(*elem);
                     write_interface(from_host, ent, header, proxy, stub, hash);
                 }
                 else if(elem->get_entity_type() == entity_type::CONSTEXPR)
