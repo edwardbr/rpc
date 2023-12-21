@@ -27,8 +27,12 @@ namespace component_checksum
         auto* tmp = entity->get_owner();
         if(tmp)
             ns = get_namespace(tmp);
-        
+
+#ifdef WIN32        
+        ns += entity->get_name() + ".";
+#else
         ns += entity->get_name() + "::";
+#endif        
         return ns;
     }
     
