@@ -13,6 +13,7 @@
 
 #include "synchronous_generator.h"
 #include "synchronous_mock_generator.h"
+#include "component_checksum.h"
 
 using namespace std;
 
@@ -254,6 +255,10 @@ int main(const int argc, char* argv[])
                                                                             headerPath, imports);
                 mock_stream << ends;
             }
+            
+            auto checksums_path = std::filesystem::path(output_path)/"CHECK_SUMS";
+            std::filesystem::create_directory(checksums_path);
+            component_checksum::write_namespace(*objects, checksums_path);
         }
 
         // compare and write if different

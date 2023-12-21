@@ -2,7 +2,13 @@ cmake_minimum_required(VERSION 3.24)
 
 enable_testing()
 
-add_executable(generator synchronous_generator.cpp synchronous_mock_generator.cpp main.cpp sha3.c)
+add_executable(generator 
+                synchronous_generator.cpp 
+                synchronous_mock_generator.cpp 
+                main.cpp 
+                sha3.c
+                component_checksum.cpp
+                fingerprint_generator.cpp)
 
 target_compile_definitions(generator PRIVATE ${HOST_DEFINES})
 target_compile_options(generator PRIVATE ${HOST_COMPILE_OPTIONS})
