@@ -20,7 +20,7 @@ namespace component_checksum
 {
     std::string get_namespace(const class_entity* entity)
     {
-        if(!entity)
+        if(!entity || entity->get_name().empty())
             return "";
             
         std::string ns;
