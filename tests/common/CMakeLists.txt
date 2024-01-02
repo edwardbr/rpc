@@ -54,7 +54,7 @@ target_include_directories(
 target_compile_options(common_host PRIVATE ${HOST_COMPILE_OPTIONS})
 target_link_options(common_host PRIVATE ${HOST_LINK_OPTIONS})
 
-target_link_libraries(common_host PRIVATE marshal_test_edl_host example_idl_host rpc::rpc_host yas_common)
+target_link_libraries(common_host PRIVATE ${HOST_LIBRARIES} marshal_test_edl_host example_idl_host rpc::rpc_host yas_common)
 
 set_property(TARGET common_host PROPERTY COMPILE_PDB_NAME common_host)
 

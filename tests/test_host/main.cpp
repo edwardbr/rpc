@@ -59,8 +59,8 @@ using namespace marshalled_tests;
 std::string enclave_path = "./marshal_test_enclave.signed.dll";
 std::string enclave_path_v1 = "./marshal_test_enclave_v1.signed.dll";
 #else         // Linux
-std::string enclave_path = "./libmarshal_test_enclave.signed.so";
-std::string enclave_path_v1 = "./libmarshal_test_enclave_v1.signed.so";
+std::string enclave_path = "./marshal_test_enclave.signed.so";
+std::string enclave_path_v1 = "./marshal_test_enclave_v1.signed.so";
 #endif
 
 rpc::weak_ptr<rpc::service> current_host_service;

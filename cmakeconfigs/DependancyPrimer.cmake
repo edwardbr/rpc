@@ -370,6 +370,21 @@ if(NOT DEPENDANCIES_LOADED)
         -L/opt/intel/sgxsdk/lib64
         -lsgx_tcrypto
         linux_dependancies_host)
+      if(${SGX_HW}) # not simulation
+        set(HOST_LIBRARIES
+          ${SHARED_HOST_LIBRARIES}
+          sgx_tcrypto
+          sgx_uae_service
+          sgx_capable
+          sgx_urts)
+      else()
+        set(HOST_LIBRARIES
+          ${SHARED_HOST_LIBRARIES}
+          sgx_tcrypto
+          sgx_uae_service_sim
+          sgx_capable
+          sgx_urts_sim)
+      endif()        
       set(OS_DEPENDANCIES_ENCLAVE linux_dependancies_enclave)
       set(ENCLAVE_SSL_INCLUDES "/opt/intel/sgxssl/include")
     endif()
