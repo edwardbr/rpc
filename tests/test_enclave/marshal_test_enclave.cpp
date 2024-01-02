@@ -1,3 +1,7 @@
+/*
+ *   Copyright (c) 2024 Edward Boggis-Rolfe
+ *   All rights reserved.
+ */
 #include "stdio.h"
 #include <string>
 #include <cstring>

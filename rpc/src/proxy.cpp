@@ -1,3 +1,7 @@
+/*
+ *   Copyright (c) 2024 Edward Boggis-Rolfe
+ *   All rights reserved.
+ */
 #include "rpc/proxy.h"
 #include "rpc/logger.h"
 

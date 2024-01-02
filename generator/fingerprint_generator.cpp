@@ -1,3 +1,7 @@
+/*
+ *   Copyright (c) 2024 Edward Boggis-Rolfe
+ *   All rights reserved.
+ */
 #include "fingerprint_generator.h"
 #include "cpp_parser.h"
 #include <filesystem>

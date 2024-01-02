@@ -1,3 +1,7 @@
+/*
+ *   Copyright (c) 2024 Edward Boggis-Rolfe
+ *   All rights reserved.
+ */
 #include <iostream>
 #include <unordered_map>
 #include <rpc/basic_service_proxies.h>

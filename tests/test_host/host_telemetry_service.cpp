@@ -1,3 +1,7 @@
+/*
+ *   Copyright (c) 2024 Edward Boggis-Rolfe
+ *   All rights reserved.
+ */
 #include <host_telemetry_service.h>
 #include <spdlog/spdlog.h>
 

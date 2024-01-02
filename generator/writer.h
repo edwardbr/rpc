@@ -1,3 +1,7 @@
+/*
+ *   Copyright (c) 2024 Edward Boggis-Rolfe
+ *   All rights reserved.
+ */
 #pragma once
 #include <fmt/format.h>
 #include <fmt/ostream.h>
@@ -56,4 +60,3 @@ public:
     int get_count(){return count_;}
     void set_count(int count){count_ = count;}
 };
-

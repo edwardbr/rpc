@@ -1,3 +1,7 @@
+/*
+ *   Copyright (c) 2024 Edward Boggis-Rolfe
+ *   All rights reserved.
+ */
 #include "common/host_service_proxy.h"
 #include "rpc/i_telemetry_service.h"
 

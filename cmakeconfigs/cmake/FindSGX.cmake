@@ -1,4 +1,7 @@
-# Copyright 2021 Edward Boggis-Rolfe <edward@bogis-rolfe.com>
+#[[
+   Copyright (c) 2024 Edward Boggis-Rolfe
+   All rights reserved.
+]]
 
 # FindPackage cmake file for Intel SGX SDK
 

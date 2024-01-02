@@ -1,3 +1,7 @@
+/*
+ *   Copyright (c) 2024 Edward Boggis-Rolfe
+ *   All rights reserved.
+ */
 #include "rpc/stub.h"
 #include "rpc/service.h"
 #include "rpc/version.h"

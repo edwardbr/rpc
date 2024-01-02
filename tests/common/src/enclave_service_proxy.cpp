@@ -1,3 +1,7 @@
+/*
+ *   Copyright (c) 2024 Edward Boggis-Rolfe
+ *   All rights reserved.
+ */
 #include "common/enclave_service_proxy.h"
 
 #ifndef _IN_ENCLAVE

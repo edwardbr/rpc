@@ -1,4 +1,8 @@
-# Copyright 2021 Edward Boggis-Rolfe <edward@bogis-rolfe.com>
+#[[
+   Copyright (c) 2024 Edward Boggis-Rolfe
+   All rights reserved.
+]]
+
 cmake_minimum_required(VERSION 3.24)
 
 if(NOT DEPENDANCIES_LOADED)

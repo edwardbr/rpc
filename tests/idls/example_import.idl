@@ -1,3 +1,8 @@
+/*
+ *   Copyright (c) 2024 Edward Boggis-Rolfe
+ *   All rights reserved.
+ */
+ 
 #import "example_shared.idl"
 [inline] namespace v1
 {

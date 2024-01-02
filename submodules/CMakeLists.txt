@@ -1,3 +1,8 @@
+#[[
+   Copyright (c) 2024 Edward Boggis-Rolfe
+   All rights reserved.
+]]
+
 cmake_minimum_required(VERSION 3.0.0)
 
 if(RPC_STANDALONE)

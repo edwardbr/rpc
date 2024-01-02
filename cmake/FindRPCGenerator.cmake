@@ -1,3 +1,8 @@
+#[[
+   Copyright (c) 2024 Edward Boggis-Rolfe
+   All rights reserved.
+]]
+
 function(
   RPCGenerate
   name
