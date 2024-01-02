@@ -88,3 +88,5 @@ Currently tested on Compilers:
  * Visual Studio 2017
 
 Though strongly suggest upgrading to the latest version of these compilers
+
+SHA2 Credit to: https://github.com/brainhub/SHA3IUF 

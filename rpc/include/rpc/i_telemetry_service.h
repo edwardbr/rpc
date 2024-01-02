@@ -3,8 +3,8 @@
 #include <rpc/types.h>
 
 //copied from spdlog
-#define I_TELEMETRY_LEVEL_TRACE 0
-#define I_TELEMETRY_LEVEL_DEBUG 1
+#define I_TELEMETRY_LEVEL_DEBUG 0
+#define I_TELEMETRY_LEVEL_TRACE 1
 #define I_TELEMETRY_LEVEL_INFO 2
 #define I_TELEMETRY_LEVEL_WARN 3
 #define I_TELEMETRY_LEVEL_ERROR 4
@@ -18,8 +18,8 @@ namespace rpc
     public:
         enum level_enum
         {
-            trace = I_TELEMETRY_LEVEL_TRACE,
             debug = I_TELEMETRY_LEVEL_DEBUG,
+            trace = I_TELEMETRY_LEVEL_TRACE,
             info = I_TELEMETRY_LEVEL_INFO,
             warn = I_TELEMETRY_LEVEL_WARN,
             err = I_TELEMETRY_LEVEL_ERROR,

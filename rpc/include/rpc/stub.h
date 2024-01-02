@@ -47,8 +47,16 @@ namespace rpc
 
         service& get_zone() const { return zone_; }
 
-        int call(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, interface_ordinal interface_id, method method_id, size_t in_size_, const char* in_buf_,
-                        std::vector<char>& out_buf_);
+        int call(
+            uint64_t protocol_version
+            , rpc::encoding enc
+            , caller_channel_zone caller_channel_zone_id
+            , caller_zone caller_zone_id
+            , interface_ordinal interface_id
+            , method method_id
+            , size_t in_size_
+            , const char* in_buf_
+            , std::vector<char>& out_buf_);
         int try_cast(interface_ordinal interface_id);
 
         void add_interface(const shared_ptr<i_interface_stub>& iface);
@@ -62,8 +70,8 @@ namespace rpc
     class i_interface_stub
     {
     public:
-        virtual interface_ordinal get_interface_id() const = 0;
-        virtual int call(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, method method_id, size_t in_size_, const char* in_buf_, std::vector<char>& out_buf_)
+        virtual interface_ordinal get_interface_id(uint64_t rpc_version) const = 0;
+        virtual int call(uint64_t protocol_version, rpc::encoding enc, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, method method_id, size_t in_size_, const char* in_buf_, std::vector<char>& out_buf_)
             = 0;
         virtual int cast(interface_ordinal interface_id, shared_ptr<i_interface_stub>& new_stub) = 0;
         virtual weak_ptr<object_stub> get_object_stub() const = 0;

@@ -1,15 +1,13 @@
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.24)
 
-if(${RPC_BUILD_SGX})
 host_edl_library(
   marshal_test_edl_host
   enclave_marshal_test.edl
   ""
   OFF
   ""
-  ""
-)
-set_property(TARGET marshal_test_edl_host PROPERTY COMPILE_PDB_NAME marshal_test_edl_host)    
+  "")
+set_property(TARGET marshal_test_edl_host PROPERTY COMPILE_PDB_NAME marshal_test_edl_host)
 
 enclave_edl_library(
   marshal_test_edl_enclave
@@ -17,7 +15,5 @@ enclave_edl_library(
   ""
   OFF
   ""
-  ""
-)
-set_property(TARGET marshal_test_edl_enclave PROPERTY COMPILE_PDB_NAME marshal_test_edl_enclave)   
-endif()
+  "")
+set_property(TARGET marshal_test_edl_enclave PROPERTY COMPILE_PDB_NAME marshal_test_edl_enclave)

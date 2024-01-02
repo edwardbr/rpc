@@ -27,3 +27,4 @@ SpaceBeforeAssignmentOperators: true
 SpacesInSquareBrackets: false
 Cpp11BracedListStyle: true
 NamespaceIndentation: All
+SpaceBeforeParens: Never 

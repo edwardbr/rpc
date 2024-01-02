@@ -41,9 +41,9 @@ namespace rpc
         sgx_launch_token_t token = {0};
         int updated = 0;
         #ifdef _WIN32
-            auto status = sgx_create_enclavea(filename_.data(), 1, &token, &updated, &eid_, NULL);
+            auto status = sgx_create_enclavea(filename_.data(), SGX_DEBUG_FLAG, &token, &updated, &eid_, NULL);
         #else
-            auto status = sgx_create_enclave(filename_.data(), 1, &token, &updated, &eid_, NULL);
+            auto status = sgx_create_enclave(filename_.data(), SGX_DEBUG_FLAG, &token, &updated, &eid_, NULL);
         #endif
         if (status)
         {
@@ -74,8 +74,19 @@ namespace rpc
         return rpc::error::OK();
     }
 
-    int enclave_service_proxy::send(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, destination_zone destination_zone_id, object object_id, interface_ordinal interface_id, method method_id,
-                                           size_t in_size_, const char* in_buf_, std::vector<char>& out_buf_)
+    int enclave_service_proxy::send(
+        uint64_t protocol_version, 
+        encoding encoding, 
+        uint64_t tag,
+        caller_channel_zone caller_channel_zone_id, 
+        caller_zone caller_zone_id, 
+        destination_zone destination_zone_id, 
+        object object_id, 
+        interface_ordinal interface_id, 
+        method method_id,
+        size_t in_size_, 
+        const char* in_buf_, 
+        std::vector<char>& out_buf_)
     {
         if(destination_zone_id != get_destination_zone_id())
             return rpc::error::ZONE_NOT_SUPPORTED();   
@@ -83,7 +94,7 @@ namespace rpc
         int err_code = 0;
         size_t data_out_sz = 0;
         void* tls = nullptr;
-        sgx_status_t status = ::call_enclave(eid_, &err_code, caller_channel_zone_id.get_val(), caller_zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), interface_id.get_val(), method_id.get_val(), in_size_, in_buf_,
+        sgx_status_t status = ::call_enclave(eid_, &err_code, protocol_version, (uint64_t)encoding, tag, caller_channel_zone_id.get_val(), caller_zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), interface_id.get_val(), method_id.get_val(), in_size_, in_buf_,
                                              out_buf_.size(), out_buf_.data(), &data_out_sz, &tls);
 
         if (status)
@@ -100,7 +111,7 @@ namespace rpc
             // data too small reallocate memory and try again
             out_buf_.resize(data_out_sz);
             
-            status = ::call_enclave(eid_, &err_code, caller_channel_zone_id.get_val(), caller_zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), interface_id.get_val(), method_id.get_val(), in_size_, in_buf_,
+            status = ::call_enclave(eid_, &err_code, protocol_version, (uint64_t)encoding, tag, caller_channel_zone_id.get_val(), caller_zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), interface_id.get_val(), method_id.get_val(), in_size_, in_buf_,
                                     out_buf_.size(), out_buf_.data(), &data_out_sz, &tls);
             if (status)
             {
@@ -111,17 +122,28 @@ namespace rpc
                 return rpc::error::TRANSPORT_ERROR();
             }
 
-            //recover err_code from the out buffer
-            yas::load<yas::mem|yas::binary|yas::no_header>(yas::intrusive_buffer{out_buf_.data(), out_buf_.size()}, YAS_OBJECT_NVP(
-            "out"
-            ,("__return_value", err_code)
-            ));      
+#ifdef RPC_V1
+            if(protocol_version == rpc::VERSION_1)
+            {
+                //recover err_code from the out buffer
+                yas::load<
+#ifdef RPC_SERIALISATION_TEXT
+                    yas::mem|yas::text|yas::no_header
+#else
+                    yas::mem|yas::binary|yas::no_header
+#endif
+                >(yas::intrusive_buffer{out_buf_.data(), out_buf_.size()}, YAS_OBJECT_NVP(
+                "out"
+                ,("__return_value", err_code)
+                ));      
+            }
+#endif            
         }
 
         return err_code;
     }
 
-    int enclave_service_proxy::try_cast(destination_zone destination_zone_id, object object_id, interface_ordinal interface_id)
+    int enclave_service_proxy::try_cast(uint64_t protocol_version, destination_zone destination_zone_id, object object_id, interface_ordinal interface_id)
     {
         if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
         {
@@ -129,12 +151,12 @@ namespace rpc
                                                             object_id, interface_id);
         }
         int err_code = 0;
-        sgx_status_t status = ::try_cast_enclave(eid_, &err_code, destination_zone_id.get_val(), object_id.get_val(), interface_id.get_val());
+        sgx_status_t status = ::try_cast_enclave(eid_, &err_code, protocol_version, destination_zone_id.get_val(), object_id.get_val(), interface_id.get_val());
         if(status == SGX_ERROR_ECALL_NOT_ALLOWED)
         {
             auto task = std::thread([&]()
             {
-                status = ::try_cast_enclave(eid_, &err_code, destination_zone_id.get_val(), object_id.get_val(), interface_id.get_val());
+                status = ::try_cast_enclave(eid_, &err_code, protocol_version, destination_zone_id.get_val(), object_id.get_val(), interface_id.get_val());
             });
             task.join();
         }
@@ -150,7 +172,7 @@ namespace rpc
         return err_code;
     }
 
-    uint64_t enclave_service_proxy::add_ref(destination_channel_zone destination_channel_zone_id, destination_zone destination_zone_id, object object_id, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, add_ref_options build_out_param_channel, bool proxy_add_ref)
+    uint64_t enclave_service_proxy::add_ref(uint64_t protocol_version, destination_channel_zone destination_channel_zone_id, destination_zone destination_zone_id, object object_id, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, add_ref_options build_out_param_channel, bool proxy_add_ref)
     {
         if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
         {
@@ -158,12 +180,13 @@ namespace rpc
                                                         object_id, caller_zone_id);
         }
         uint64_t ret = 0;
-        sgx_status_t status = ::add_ref_enclave(eid_, &ret, destination_channel_zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), caller_channel_zone_id.get_val(), caller_zone_id.get_val(), (uint8_t)build_out_param_channel);
+        constexpr auto add_ref_failed_val = std::numeric_limits<uint64_t>::max();
+        sgx_status_t status = ::add_ref_enclave(eid_, &ret, protocol_version, destination_channel_zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), caller_channel_zone_id.get_val(), caller_zone_id.get_val(), (uint8_t)build_out_param_channel);
         if(status == SGX_ERROR_ECALL_NOT_ALLOWED)
         {
             auto task = std::thread([&]()
             {
-                status = ::add_ref_enclave(eid_, &ret, destination_channel_zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), caller_channel_zone_id.get_val(), caller_zone_id.get_val(), (uint8_t)build_out_param_channel);
+                status = ::add_ref_enclave(eid_, &ret, protocol_version, destination_channel_zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), caller_channel_zone_id.get_val(), caller_zone_id.get_val(), (uint8_t)build_out_param_channel);
             });
             task.join();
         }
@@ -174,16 +197,24 @@ namespace rpc
                 telemetry_service->message(rpc::i_telemetry_service::err, "add_ref_enclave failed");
             }
             assert(false);
-            return std::numeric_limits<uint64_t>::max();
+            return add_ref_failed_val;
         }        
-        if(proxy_add_ref && ret != std::numeric_limits<uint64_t>::max())
+        if(ret == add_ref_failed_val)
+        {
+            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
+            {
+                telemetry_service->on_service_proxy_release("enclave_service_proxy", get_zone_id(), destination_zone_id,
+                                                            object_id, caller_zone_id);
+            }
+        }
+        if(proxy_add_ref && ret != add_ref_failed_val)
         {
             add_external_ref();
         }
         return ret;
     }
 
-    uint64_t enclave_service_proxy::release(destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id)
+    uint64_t enclave_service_proxy::release(uint64_t protocol_version, destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id)
     {
         if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
         {
@@ -191,12 +222,12 @@ namespace rpc
                                                         object_id, caller_zone_id);
         }
         uint64_t ret = 0;
-        sgx_status_t status = ::release_enclave(eid_, &ret, destination_zone_id.get_val(), object_id.get_val(), caller_zone_id.get_val());
+        sgx_status_t status = ::release_enclave(eid_, &ret, protocol_version, destination_zone_id.get_val(), object_id.get_val(), caller_zone_id.get_val());
         if(status == SGX_ERROR_ECALL_NOT_ALLOWED)
         {
             auto task = std::thread([&]()
             {
-                status = ::release_enclave(eid_, &ret, destination_zone_id.get_val(), object_id.get_val(), caller_zone_id.get_val());
+                status = ::release_enclave(eid_, &ret, protocol_version, destination_zone_id.get_val(), object_id.get_val(), caller_zone_id.get_val());
             });
             task.join();
         }

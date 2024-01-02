@@ -1,18 +1,7 @@
 #include "rpc/stub.h"
 #include "rpc/service.h"
-
-#ifndef LOG_STR_DEFINED
-# ifdef RPC_USE_LOGGING
-#  define LOG_STR(str, sz) log_str(str, sz)
-   extern "C"
-   {
-       void log_str(const char* str, size_t sz);
-   }
-# else
-#  define LOG_STR(str, sz)
-# endif
-#define LOG_STR_DEFINED
-#endif
+#include "rpc/version.h"
+#include "rpc/logger.h"
 
 namespace rpc
 {
@@ -44,7 +33,12 @@ namespace rpc
 
     void object_stub::add_interface(const rpc::shared_ptr<i_interface_stub>& iface)
     {
-        stub_map[iface->get_interface_id()] = iface;
+#ifdef RPC_V1        
+        stub_map[iface->get_interface_id(rpc::VERSION_1)] = iface;
+#endif
+#ifdef RPC_V2
+        stub_map[iface->get_interface_id(rpc::VERSION_2)] = iface;
+#endif
     }
 
     rpc::shared_ptr<i_interface_stub> object_stub::get_interface(interface_ordinal interface_id)
@@ -55,8 +49,16 @@ namespace rpc
         return res->second;
     }
 
-    int object_stub::call(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, interface_ordinal interface_id, method method_id, size_t in_size_, const char* in_buf_,
-                                 std::vector<char>& out_buf_)
+    int object_stub::call(
+        uint64_t protocol_version
+        , rpc::encoding enc
+        , caller_channel_zone caller_channel_zone_id
+        , caller_zone caller_zone_id
+        , interface_ordinal interface_id
+        , method method_id
+        , size_t in_size_
+        , const char* in_buf_
+        , std::vector<char>& out_buf_)
     {
         rpc::shared_ptr<i_interface_stub> stub;
         {
@@ -68,9 +70,9 @@ namespace rpc
         }
         if(stub)
         {
-            return stub->call(caller_channel_zone_id, caller_zone_id, method_id, in_size_, in_buf_, out_buf_);
+            return stub->call(protocol_version, enc, caller_channel_zone_id, caller_zone_id, method_id, in_size_, in_buf_, out_buf_);
         }        
-        return rpc::error::INVALID_DATA();
+        return rpc::error::INVALID_INTERFACE_ID();
     }
 
     int object_stub::try_cast(interface_ordinal interface_id)
@@ -82,7 +84,7 @@ namespace rpc
             rpc::shared_ptr<i_interface_stub> new_stub;
             rpc::shared_ptr<i_interface_stub> stub = stub_map.begin()->second;
             ret = stub->cast(interface_id, new_stub);
-            if (ret == rpc::error::OK())
+            if (ret == rpc::error::OK() && new_stub)
             {
                 add_interface(new_stub);
             }

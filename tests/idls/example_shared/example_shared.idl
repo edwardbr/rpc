@@ -1,0 +1,80 @@
+typedef int error_code;
+
+namespace xxx
+{
+struct something_complicated
+{
+    int int_val;
+    std::string string_val;
+};
+
+struct something_more_complicated
+{
+    std::vector<something_complicated> vector_val;
+    std::map<std::string, something_complicated> map_val;    
+};
+
+template<typename T>
+struct typed_payload
+{
+    std::array<uint8_t, sizeof(T)> payload;
+};
+
+interface i_foo
+{
+    error_code do_something_in_val(                                                        int                             val); //marshal by value - implictly const
+    error_code do_something_in_ref(                                [in]            const   int                         &   val); //marshal by reference - implictly const, cannot be enclave memory addresses will be refused
+    error_code do_something_in_by_val_ref(                         [in, by_value]  const   int                         &   val); //marshal by value - implictly const
+    error_code do_something_in_move_ref(                           [in]                    int                         &&  val); //marshal by value
+    error_code do_something_in_ptr(                                [in]            const   int                         *   val); //marshal by pointer - implictly const
+    error_code do_something_out_val(                               [out, by_value]         int                         &   val); //marshal by value
+    error_code do_something_out_ptr_ref(                           [out]                   int                         *&  val); //marshal by ref pointer can be null, cannot be enclave memory addresses if to be readable
+    error_code do_something_out_ptr_ptr(                           [out]                   int                         **  val); //marshal by pointer pointer can be null, cannot be enclave memory addresses if to be readable
+    error_code do_something_in_out_ref(                            [in, out, by_value]     int                         &   val); //marshal by value
+
+    error_code give_something_complicated_val(                     [in]                    something_complicated           val); 
+    error_code give_something_complicated_ref(                     [in]            const   something_complicated       &   val); 
+    error_code give_something_complicated_ref_val(                 [in, by_value]  const   something_complicated       &   val); 
+    error_code give_something_complicated_move_ref(                [in]                    something_complicated       &&  val); 
+    error_code give_something_complicated_ptr(                     [in]            const   something_complicated       *   val); 
+    error_code recieve_something_complicated_ref(                  [out, by_value]         something_complicated       &   val); 
+    error_code recieve_something_complicated_ptr(                  [out]                   something_complicated       *&  val); 
+    error_code recieve_something_complicated_in_out_ref(           [in, out, by_value]     something_complicated       &   val); 
+
+    error_code give_something_more_complicated_val(                [in]                    something_more_complicated      val);
+    error_code give_something_more_complicated_ref(                [in]            const   something_more_complicated  &   val);
+    error_code give_something_more_complicated_move_ref(           [in]                    something_more_complicated  &&  val);
+    error_code give_something_more_complicated_ref_val(            [in, by_value]  const   something_more_complicated  &   val);
+    error_code give_something_more_complicated_ptr(                [in]            const   something_more_complicated  *   val);
+    error_code recieve_something_more_complicated_ref(             [out, by_value]         something_more_complicated  &   val);
+    error_code recieve_something_more_complicated_ptr(             [out]                   something_more_complicated  *&  val);
+    error_code recieve_something_more_complicated_in_out_ref(      [in, out, by_value]     something_more_complicated  &   val);
+
+    error_code do_multi_val(int val1, int val2);
+    error_code do_multi_complicated_val(const something_more_complicated val1, const something_more_complicated val2);
+
+
+
+    error_code recieve_interface([out]rpc::shared_ptr<i_foo>& val);//can be null
+    error_code give_interface([in]rpc::shared_ptr<i_baz> val);//can be null
+    error_code call_baz_interface([in]const rpc::shared_ptr<i_baz>& val);//can be null
+    error_code create_baz_interface([out]rpc::shared_ptr<i_baz>& val);//can be null
+    error_code get_null_interface([out]rpc::shared_ptr<i_baz>& val);//can be null
+    
+    error_code set_interface([in]const rpc::shared_ptr<i_baz>& val);//can be null
+    error_code get_interface([out]rpc::shared_ptr<i_baz>& val);//can be null
+
+    error_code exception_test();
+};
+
+interface i_bar
+{
+    error_code do_something_else(int val);
+};    
+
+interface i_baz
+{
+    error_code callback(int val);
+    error_code blob_test([in] const std::vector<uint8_t>& inval, [out] std::vector<uint8_t>& out_val);
+};
+}

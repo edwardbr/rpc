@@ -13,14 +13,6 @@
 
 #include <example/example.h>
 
-#include <example_shared_proxy.cpp>
-#include <example_shared_stub.cpp>
-
-#include <example_import_proxy.cpp>
-#include <example_import_stub.cpp>
-
-#include <example_proxy.cpp>
-#include <example_stub.cpp>
 #include <rpc/remote_pointer.h>
 
 using namespace marshalled_tests;
@@ -136,6 +128,9 @@ int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t host_id, uint64_t 
 {
     //create a rpc::zone service for the enclave
     rpc_server = rpc::make_shared<rpc::child_service>(rpc::zone{child_zone_id}); 
+    example_import_idl_register_stubs(rpc_server);
+    example_shared_idl_register_stubs(rpc_server);
+    example_idl_register_stubs(rpc_server);
     const rpc::i_telemetry_service* p_telemetry_service = &telemetry_service;
 
     rpc::shared_ptr<yyy::i_host> host;
@@ -143,7 +138,7 @@ int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t host_id, uint64_t 
     if(host_id)
     {
         auto host_proxy = rpc::host_service_proxy::create({host_zone_id}, {host_id}, rpc_server, p_telemetry_service);
-        auto err_code = rpc::demarshall_interface_proxy<yyy::i_host>(host_proxy, {{host_id}, {host_zone_id}}, {child_zone_id}, host);
+        auto err_code = rpc::demarshall_interface_proxy<yyy::i_host>(rpc::get_version(), host_proxy, {{host_id}, {host_zone_id}}, {child_zone_id}, host);
         if(err_code != rpc::error::OK())
             return err_code;
     }
@@ -163,6 +158,9 @@ void marshal_test_destroy_enclave()
 }
 
 int call_enclave(
+    uint64_t protocol_version,                          //version of the rpc call protocol
+    uint64_t encoding,                                  //format of the serialised data
+    uint64_t tag,                                       //info on the type of the call passed from the idl generator 
     uint64_t caller_channel_zone_id,
     uint64_t caller_zone_id,
     uint64_t zone_id, 
@@ -176,14 +174,18 @@ int call_enclave(
     size_t* data_out_sz, 
     void** enclave_retry_buffer)
 {
+    if(protocol_version > rpc::get_version())
+    {
+        return rpc::error::INVALID_VERSION();
+    }
     //a retry cache using enclave_retry_buffer as thread local storage, leaky if the client does not retry with more memory
     if(!enclave_retry_buffer)
     {        
         return rpc::error::INVALID_DATA();
     }
 
-    auto*& retry_buf = *reinterpret_cast<std::vector<char>**>(enclave_retry_buffer);
-    if(retry_buf && !sgx_is_within_enclave(retry_buf, sizeof(std::vector<char>*)))
+    auto*& retry_buf = *reinterpret_cast<rpc::retry_buffer**>(enclave_retry_buffer);
+    if(retry_buf && !sgx_is_within_enclave(retry_buf, sizeof(rpc::retry_buffer*)))
     {
         return rpc::error::SECURITY_ERROR();
     }
@@ -191,20 +193,34 @@ int call_enclave(
 
     if(retry_buf)
     {
-        *data_out_sz = retry_buf->size();
+        *data_out_sz = retry_buf->data.size();
         if(*data_out_sz > sz_out)
         {
             return rpc::error::NEED_MORE_MEMORY();
         }
     
-        memcpy(data_out, retry_buf->data(), retry_buf->size());
+        memcpy(data_out, retry_buf->data.data(), retry_buf->data.size());
+        auto ret = retry_buf->return_value;
         delete retry_buf;
         retry_buf = nullptr;
-        return rpc::error::OK();
+        return ret;
     }
 
     std::vector<char> tmp;
-    int ret = rpc_server->send({caller_channel_zone_id}, {caller_zone_id}, {zone_id}, {object_id}, {interface_id}, {method_id}, sz_int, data_in, tmp);
+
+    int ret = rpc_server->send(
+        protocol_version,                          //version of the rpc call protocol
+        rpc::encoding(encoding),                                  //format of the serialised data
+        tag,
+        {caller_channel_zone_id}, 
+        {caller_zone_id}, 
+        {zone_id}, 
+        {object_id}, 
+        {interface_id}, 
+        {method_id}, 
+        sz_int, 
+        data_in, 
+        tmp);
     if(ret >= rpc::error::MIN() && ret <= rpc::error::MAX())
         return ret;
 
@@ -215,22 +231,34 @@ int call_enclave(
         return ret;
     }
 
-    retry_buf = new std::vector<char>(std::move(tmp));
+    retry_buf = new rpc::retry_buffer{std::move(tmp), ret};
     return rpc::error::NEED_MORE_MEMORY();
 }
 
-int try_cast_enclave(uint64_t zone_id, uint64_t object_id, uint64_t interface_id)
+int try_cast_enclave(uint64_t protocol_version, uint64_t zone_id, uint64_t object_id, uint64_t interface_id)
 {
-    int ret = rpc_server->try_cast({zone_id}, {object_id}, {interface_id});
+    if(protocol_version > rpc::get_version())
+    {
+        return rpc::error::INVALID_VERSION();
+    }
+    int ret = rpc_server->try_cast(protocol_version, {zone_id}, {object_id}, {interface_id});
     return ret;
 }
 
-uint64_t add_ref_enclave(uint64_t destination_channel_zone_id, uint64_t destination_zone_id, uint64_t object_id, uint64_t caller_channel_zone_id, uint64_t caller_zone_id, char build_out_param_channel)
+uint64_t add_ref_enclave(uint64_t protocol_version, uint64_t destination_channel_zone_id, uint64_t destination_zone_id, uint64_t object_id, uint64_t caller_channel_zone_id, uint64_t caller_zone_id, char build_out_param_channel)
 {
-    return rpc_server->add_ref({destination_channel_zone_id}, {destination_zone_id}, {object_id}, {caller_channel_zone_id}, {caller_zone_id}, static_cast<rpc::add_ref_options>(build_out_param_channel), false);
+    if(protocol_version > rpc::get_version())
+    {
+        return std::numeric_limits<uint64_t>::max();
+    }
+    return rpc_server->add_ref(protocol_version, {destination_channel_zone_id}, {destination_zone_id}, {object_id}, {caller_channel_zone_id}, {caller_zone_id}, static_cast<rpc::add_ref_options>(build_out_param_channel), false);
 }
 
-uint64_t release_enclave(uint64_t zone_id, uint64_t object_id, uint64_t caller_zone_id)
+uint64_t release_enclave(uint64_t protocol_version, uint64_t zone_id, uint64_t object_id, uint64_t caller_zone_id)
 {
-    return rpc_server->release({zone_id}, {object_id}, {caller_zone_id});
+    if(protocol_version > rpc::get_version())
+    {
+        return std::numeric_limits<uint64_t>::max();
+    }
+    return rpc_server->release(protocol_version, {zone_id}, {object_id}, {caller_zone_id});
 }

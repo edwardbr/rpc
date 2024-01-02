@@ -1,83 +1,119 @@
-cmake_minimum_required(VERSION 3.0.0)
+cmake_minimum_required(VERSION 3.24)
 
-add_library(marshaller_enclave 
-    include/rpc/marshaller.h
-    include/rpc/basic_service_proxies.h
-    include/rpc/marshaller.h
-    include/rpc/proxy.h
-    include/rpc/remote_pointer.h
-    include/rpc/service.h
-    include/rpc/stub.h
-    src/proxy.cpp
-    src/remote_pointer.cpp
-    src/service.cpp
-    src/stub.cpp
-    src/error_codes.cpp
-    src/version.cpp
-    )
+if(WIN32)
+  set(REMOTE_PTR_CPP src/remote_pointer.cpp)
+else()
+  set(REMOTE_PTR_CPP)
+endif()
 
-target_compile_definitions(marshaller_enclave 
-    PRIVATE 
-        ${ENCLAVE_DEFINES})
-target_compile_options(marshaller_enclave PRIVATE ${ENCLAVE_COMPILE_OPTIONS})
-target_include_directories(marshaller_enclave 
-    PUBLIC 
-        "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-        "$<INSTALL_INTERFACE:include/rpc>"
-    PRIVATE 
-        ${ENCLAVE_LIBCXX_INCLUDES})
-target_link_libraries(marshaller_enclave 
-    PUBLIC 
-    yas_common)
-target_link_options(marshaller_enclave PRIVATE ${ENCLAVE_LINK_OPTIONS})
+add_library(
+  rpc_enclave
+  include/rpc/marshaller.h
+  include/rpc/basic_service_proxies.h
+  include/rpc/marshaller.h
+  include/rpc/proxy.h
+  include/rpc/remote_pointer.h
+  include/rpc/service.h
+  include/rpc/stub.h
+  src/proxy.cpp
+  ${REMOTE_PTR_CPP}
+  src/service.cpp
+  src/stub.cpp
+  src/error_codes.cpp
+  src/version.cpp)
 
-set_property(TARGET marshaller_enclave PROPERTY COMPILE_PDB_NAME marshaller_enclave)
+target_compile_definitions(rpc_enclave PRIVATE ${ENCLAVE_DEFINES})
+target_compile_options(rpc_enclave PRIVATE ${ENCLAVE_COMPILE_OPTIONS})
+target_include_directories(
+  rpc_enclave
+  PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>" "$<INSTALL_INTERFACE:include/rpc>"
+  PRIVATE ${ENCLAVE_LIBCXX_INCLUDES})
+target_link_libraries(rpc_enclave PRIVATE yas_common)
+target_link_options(rpc_enclave PRIVATE ${ENCLAVE_LINK_OPTIONS})
 
-add_library(rpc::marshaller_enclave ALIAS marshaller_enclave)
+set_property(TARGET rpc_enclave PROPERTY COMPILE_PDB_NAME rpc_enclave)
+if(ENABLE_CLANG_TIDY)
+  set_target_properties(rpc_enclave PROPERTIES CXX_CLANG_TIDY "${CLANG_TIDY_COMMAND}")
+endif()
+add_library(rpc::rpc_enclave ALIAS rpc_enclave)
 
-################################################################################
-add_library(marshaller_host
-    include/rpc/marshaller.h
-    include/rpc/basic_service_proxies.h
-    include/rpc/marshaller.h
-    include/rpc/proxy.h
-    include/rpc/remote_pointer.h
-    include/rpc/service.h
-    include/rpc/stub.h
-    src/proxy.cpp
-    src/remote_pointer.cpp
-    src/service.cpp
-    src/stub.cpp
-    src/error_codes.cpp
-    src/version.cpp
-    )
+# ######################################################################################################################
 
+add_library(
+  rpc_enclave_v1
+  include/rpc/marshaller.h
+  include/rpc/basic_service_proxies.h
+  include/rpc/marshaller.h
+  include/rpc/proxy.h
+  include/rpc/remote_pointer.h
+  include/rpc/service.h
+  include/rpc/stub.h
+  src/proxy.cpp
+  ${REMOTE_PTR_CPP}
+  src/service.cpp
+  src/stub.cpp
+  src/error_codes.cpp
+  src/version.cpp)
 
-target_compile_definitions(marshaller_host PRIVATE ${HOST_DEFINES})
+target_compile_definitions(
+  rpc_enclave_v1
+  PUBLIC NO_RPC_V2
+  PRIVATE ${ENCLAVE_DEFINES})
+target_compile_options(rpc_enclave_v1 PRIVATE ${ENCLAVE_COMPILE_OPTIONS})
+target_include_directories(
+  rpc_enclave_v1
+  PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>" "$<INSTALL_INTERFACE:include/rpc>"
+  PRIVATE ${ENCLAVE_LIBCXX_INCLUDES})
+target_link_libraries(rpc_enclave_v1 PRIVATE yas_common)
+target_link_options(rpc_enclave_v1 PRIVATE ${ENCLAVE_LINK_OPTIONS})
 
-target_include_directories(marshaller_host 
-    PUBLIC 
-    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-    "$<INSTALL_INTERFACE:include/rpc>"
-    PRIVATE 
-    ${HOST_INCLUDES})
+set_property(TARGET rpc_enclave_v1 PROPERTY COMPILE_PDB_NAME rpc_enclave_v1)
+if(ENABLE_CLANG_TIDY)
+  set_target_properties(rpc_enclave_v1 PROPERTIES CXX_CLANG_TIDY "${CLANG_TIDY_COMMAND}")
+endif()
+add_library(rpc::rpc_enclave_v1 ALIAS rpc_enclave_v1)
 
-target_link_libraries(marshaller_host 
-    PRIVATE        
-        yas_common
-    PUBLIC 
-        ${HOST_LIBRARIES})
+# ######################################################################################################################
+add_library(
+  rpc_host
+  include/rpc/marshaller.h
+  include/rpc/basic_service_proxies.h
+  include/rpc/marshaller.h
+  include/rpc/proxy.h
+  include/rpc/remote_pointer.h
+  include/rpc/service.h
+  include/rpc/stub.h
+  src/proxy.cpp
+  ${REMOTE_PTR_CPP}
+  src/service.cpp
+  src/stub.cpp
+  src/error_codes.cpp
+  src/version.cpp)
 
-target_compile_options(marshaller_host PRIVATE ${HOST_COMPILE_OPTIONS})
-target_link_options(marshaller_host PRIVATE ${HOST_LINK_EXE_OPTIONS})
-target_link_directories(marshaller_host PUBLIC ${SGX_LIBRARY_PATH})
-set_property(TARGET marshaller_host PROPERTY COMPILE_PDB_NAME marshaller_host)     
+target_compile_definitions(rpc_host PRIVATE ${HOST_DEFINES})
 
+target_include_directories(
+  rpc_host
+  PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>" "$<INSTALL_INTERFACE:include/rpc>"
+  PRIVATE ${HOST_INCLUDES})
 
-add_library(rpc::marshaller_host ALIAS marshaller_host)
+target_link_libraries(rpc_host PRIVATE yas_common ${HOST_LIBRARIES})
 
-install(DIRECTORY include/ DESTINATION include/rpc 
-FILES_MATCHING 
-  PATTERN "*.h*" 
-  #PATTERN "private" EXCLUDE
+target_compile_options(rpc_host PRIVATE ${HOST_COMPILE_OPTIONS})
+target_link_options(rpc_host PRIVATE ${HOST_LINK_EXE_OPTIONS})
+target_link_directories(rpc_host PUBLIC ${SGX_LIBRARY_PATH})
+set_property(TARGET rpc_host PROPERTY COMPILE_PDB_NAME rpc_host)
+
+if(ENABLE_CLANG_TIDY)
+  set_target_properties(rpc_host PROPERTIES CXX_CLANG_TIDY "${CLANG_TIDY_COMMAND}")
+endif()
+
+add_library(rpc::rpc_host ALIAS rpc_host)
+
+install(
+  DIRECTORY include/
+  DESTINATION include/rpc
+  FILES_MATCHING
+  PATTERN "*.h*"
+  # PATTERN "private" EXCLUDE
 )

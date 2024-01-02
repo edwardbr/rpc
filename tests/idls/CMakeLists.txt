@@ -1,52 +1,34 @@
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.24)
 
-EnclaveMarshaller(
-    example_shared
-    example_shared.idl
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_BINARY_DIR}/generated
-    example/example_shared.h
-    example_shared_proxy.cpp
-    example_shared_stub.cpp
-    marshalled_tests
-    mock example/example_shared_mock.h
-    dependencies
-    include_paths
-        ${CMAKE_CURRENT_SOURCE_DIR}/.
-        ${CMAKE_SOURCE_DIR}/submodules/idlparser/defines
-    )    
+RPCGenerate(
+  example_shared
+  example_shared/example_shared.idl
+  ${CMAKE_CURRENT_SOURCE_DIR}
+  ${CMAKE_BINARY_DIR}/generated
+  example_shared
+  ""
+  mock example_shared/example_shared_mock.h
+  dependencies
+  include_paths ${CMAKE_CURRENT_SOURCE_DIR}/.)
 
-EnclaveMarshaller(
-    example_import
-    example_import.idl
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_BINARY_DIR}/generated
-    example/example_import.h
-    example_import_proxy.cpp
-    example_import_stub.cpp
-    marshalled_tests
-    mock example/example_import_mock.h
-    dependencies
-        example_shared
-    include_paths
-        ${CMAKE_CURRENT_SOURCE_DIR}/.
-        ${CMAKE_SOURCE_DIR}/submodules/idlparser/defines
-    )
+RPCGenerate(
+  example_import
+  example_import/example_import.idl
+  ${CMAKE_CURRENT_SOURCE_DIR}
+  ${CMAKE_BINARY_DIR}/generated
+  example_import
+  ""
+  mock example_import/example_import_mock.h
+  dependencies example_shared_idl
+  include_paths ${CMAKE_CURRENT_SOURCE_DIR}/.)
 
-EnclaveMarshaller(
-    example_interface
-    example_interface.idl
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_BINARY_DIR}/generated
-    example/example.h
-    example_proxy.cpp
-    example_stub.cpp
-    marshalled_tests
-    mock example/example_mock.h
-    dependencies
-        example_import
-        example_shared
-    include_paths
-        ${CMAKE_CURRENT_SOURCE_DIR}/.
-        ${CMAKE_SOURCE_DIR}/submodules/idlparser/defines
-    )
+RPCGenerate(
+  example
+  example/example.idl
+  ${CMAKE_CURRENT_SOURCE_DIR}
+  ${CMAKE_BINARY_DIR}/generated
+  example
+  ""
+  mock example/example_mock.h
+  dependencies example_import_idl example_shared_idl
+  include_paths ${CMAKE_CURRENT_SOURCE_DIR}/.)

@@ -7,74 +7,78 @@ buildType:
       buildType: Debug
       settings:
         BUILD_TYPE: debug
+        SGX_MODE: debug
+        SGX_HW: ON
+    DebugWithSigning:
+      short: DebugWithSigning
+      long: Emit DebugWithSigning information
+      buildType: Debug
+      settings:
+        BUILD_TYPE: debug
+        SGX_MODE: debug
+        SGX_HW: ON
+        SGX_KEY: "c:/keys"
+    Simulation:
+      short: Simulation
+      long: Emit debug simulation information
+      buildType: Debug
+      settings:
+        BUILD_TYPE: debug
+        SGX_MODE: debug
+        SGX_HW: OFF
+    Prerelease:
+      short: Prerelease
+      long: Prerelease generated code
+      buildType: Release
+      settings:
+        BUILD_TYPE: release
+        SGX_MODE: prerelease
+        SGX_HW: ON
+    SimulationOptimized:
+      short: SimulationPrerelease
+      long: Release generated code with SGX Simulation libraries
+      buildType: Release
+      settings:
+        BUILD_TYPE: release
+        SGX_MODE: debug
+        SGX_HW: OFF
+    PrereleaseNinja:
+      short: PrereleaseNinja
+      long: Prerelease with Ninja generator
+      buildType: Release
+      settings:
+        BUILD_TYPE: release
+        SGX_MODE: prerelease
+        SGX_HW: ON
     Release:
       short: Release
       long: Optimize generated code
       buildType: Release
       settings:
         BUILD_TYPE: release
-    # not implemented yet
-    # asan:
-    #   short: Asan
-    #   long: Instrument with Address Sanitizer
-    #   buildType: Debug
-    #   settings:
-    #     BUILD_TYPE: debug
-    #     SANITIZER: address
-    # tsan:
-    #   short: Tsan
-    #   long: Instrument with Thread Sanitizer
-    #   buildType: Debug
-    #   settings:
-    #     BUILD_TYPE: debug
-    #     SANITIZER: thread
-    # usan:
-    #   short: Usan
-    #   long: Instrument with Undefined behavior Sanitizer
-    #   buildType: Debug
-    #   settings:
-    #     BUILD_TYPE: debug
-    #     SANITIZER: undefined
-
-sgx:
-  default: Debug
-  choices:
-    Debug:
-      short: SGX-Debug
-      long: SGX Debug libraries
-      settings:
-        SGX_MODE: debug
-        SGX_HW: ON
-    Simulation:
-      short: SGX-Simulation
-      long: SGX Simulation libraries
-      settings:
-        SGX_MODE: debug
-        SGX_HW: OFF
-    Prerelease:
-      short: SGX-Prerelease
-      long: SGX Prerelease libraries
-      settings:
-        SGX_MODE: prerelease
-        SGX_HW: ON
-    Release:
-      short: SGX-Release
-      long: SGX Release libraries
-      settings:
         SGX_MODE: release
         SGX_HW: ON
-
-
-test:
-  default: On
-  choices:
-    On:
-      short: Enable-Test-Code
-      long: Enable byzantine test code
+    asan:
+      short: Asan
+      long: Instrument with Address Sanitizer
+      buildType: Debug
       settings:
-        RPC_BUILD_TEST: ON
-    Off:
-      short: Disable-Test-Code
-      long: Disable byzantine test code
+        BUILD_TYPE: debug
+        SGX_MODE: debug
+        SGX_HW: OFF
+    tsan:
+      short: Tsan
+      long: Instrument with Thread Sanitizer
+      buildType: Debug
       settings:
-        RPC_BUILD_TEST: OFF
+        BUILD_TYPE: debug
+        SGX_MODE: debug
+        SGX_HW: OFF
+    usan:
+      short: Usan
+      long: Instrument with Undefined behaviour Sanitizer
+      buildType: Debug
+      settings:
+        BUILD_TYPE: debug
+        SGX_MODE: debug
+        SGX_HW: OFF

@@ -26,10 +26,10 @@ public:
             }
         });
         assert(!(tmp%2));//should always be in pairs
-        if(tmp >= 0)
+        if(format_str[0] != '#' && tmp >= 0)
             print_tabs();
         count_ += tmp/2;
-        if(tmp < 0)
+        if(format_str[0] != '#' && tmp < 0)
             print_tabs();
         fmt::print(strm_, format_str, args...);
         fmt::print(strm_, "\n");
@@ -40,6 +40,10 @@ public:
     void raw(const S& format_str, Args&&... args)
     {
         fmt::print(strm_, format_str, args...);
+    }
+    void write_buffer(const std::string& str)
+    {
+        strm_ << str;
     }
     void print_tabs()
     {

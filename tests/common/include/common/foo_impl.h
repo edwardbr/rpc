@@ -6,17 +6,13 @@
 #include <rpc/i_telemetry_service.h>
 #include <rpc/basic_service_proxies.h>
 
-extern "C" {
-#ifdef _IN_ENCLAVE
-sgx_status_t __cdecl log_str(const char* str, size_t sz);
-#else
-void log_str(const char* str, size_t sz);
-#endif
-}
+#include <example_shared/example_shared_stub.h>
+#include <example_import/example_import_stub.h>
+#include <example/example_stub.h>
 
 void log(const std::string& data)
 {
-    log_str(data.data(), data.size() + 1);
+    rpc_log(data.data(), data.size());
 }
 
 namespace marshalled_tests
@@ -27,9 +23,9 @@ namespace marshalled_tests
         void* get_address() const override { return (void*)this; }
         const rpc::casting_interface* query_interface(rpc::interface_ordinal interface_id) const override
         {
-            if (xxx::i_baz::id == interface_id.get_val())
+            if (rpc::match<xxx::i_baz>(interface_id))
                 return static_cast<const xxx::i_baz*>(this);
-            if (xxx::i_bar::id == interface_id.get_val())
+            if (rpc::match<xxx::i_bar>(interface_id))
                 return static_cast<const xxx::i_bar*>(this);
             return nullptr;
         }
@@ -39,13 +35,21 @@ namespace marshalled_tests
             : telemetry_(telemetry)
         {
             if (telemetry_)
-                telemetry_->on_impl_creation("baz", {xxx::i_baz::id});
+#ifdef RPC_V2
+                telemetry_->on_impl_creation("baz", {xxx::i_baz::get_id(rpc::VERSION_2)});
+#else
+                telemetry_->on_impl_creation("baz", {xxx::i_baz::get_id(rpc::VERSION_1)});
+#endif
         }
 
         virtual ~baz()
         {
             if (telemetry_)
-                telemetry_->on_impl_deletion("baz", {xxx::i_baz::id});
+#ifdef RPC_V2
+                telemetry_->on_impl_deletion("baz", {xxx::i_baz::get_id(rpc::VERSION_2)});
+#else
+                telemetry_->on_impl_deletion("baz", {xxx::i_baz::get_id(rpc::VERSION_1)});
+#endif
         }
         int callback(int val) override
         {
@@ -71,7 +75,7 @@ namespace marshalled_tests
         void* get_address() const override { return (void*)this; }
         const rpc::casting_interface* query_interface(rpc::interface_ordinal interface_id) const override
         {
-            if (xxx::i_foo::id == interface_id.get_val())
+            if (rpc::match<xxx::i_foo>(interface_id))
                 return static_cast<const xxx::i_foo*>(this);
             return nullptr;
         }
@@ -83,12 +87,20 @@ namespace marshalled_tests
             : telemetry_(telemetry)
         {
             if (telemetry_)
-                telemetry_->on_impl_creation("foo", {xxx::i_foo::id});
+#ifdef RPC_V2
+                telemetry_->on_impl_creation("foo", {xxx::i_foo::get_id(rpc::VERSION_2)});
+#else
+                telemetry_->on_impl_creation("foo", {xxx::i_foo::get_id(rpc::VERSION_1)});
+#endif
         }
         virtual ~foo()
         {
             if (telemetry_)
-                telemetry_->on_impl_deletion("foo", {xxx::i_foo::id});
+#ifdef RPC_V2
+                telemetry_->on_impl_deletion("foo", {xxx::i_foo::get_id(rpc::VERSION_2)});
+#else
+                telemetry_->on_impl_deletion("foo", {xxx::i_foo::get_id(rpc::VERSION_1)});
+#endif
         }
         error_code do_something_in_val(int val) override
         {
@@ -292,6 +304,13 @@ namespace marshalled_tests
             val = cached_;
             return rpc::error::OK();
         }
+
+        error_code exception_test() override
+        {
+            telemetry_->message(rpc::i_telemetry_service::info, "exception_test");
+            throw std::runtime_error("oops");
+            return rpc::error::OK();
+        }
     };
 
     class multiple_inheritance : public xxx::i_bar, public xxx::i_baz
@@ -301,9 +320,9 @@ namespace marshalled_tests
         void* get_address() const override { return (void*)this; }
         const rpc::casting_interface* query_interface(rpc::interface_ordinal interface_id) const override
         {
-            if (xxx::i_bar::id == interface_id.get_val())
+            if (rpc::match<xxx::i_bar>(interface_id))
                 return static_cast<const xxx::i_bar*>(this);
-            if (xxx::i_baz::id == interface_id.get_val())
+            if (rpc::match<xxx::i_baz>(interface_id))
                 return static_cast<const xxx::i_baz*>(this);
             return nullptr;
         }
@@ -313,12 +332,20 @@ namespace marshalled_tests
             : telemetry_(telemetry)
         {
             if (telemetry_)
-                telemetry_->on_impl_creation("multiple_inheritance", {xxx::i_bar::id});
+#ifdef RPC_V2
+                telemetry_->on_impl_creation("multiple_inheritance", {xxx::i_bar::get_id(rpc::VERSION_2)});
+#else
+                telemetry_->on_impl_creation("multiple_inheritance", {xxx::i_bar::get_id(rpc::VERSION_1)});
+#endif
         }
         virtual ~multiple_inheritance()
         {
             if (telemetry_)
-                telemetry_->on_impl_deletion("multiple_inheritance", {xxx::i_bar::id});
+#ifdef RPC_V2
+                telemetry_->on_impl_deletion("multiple_inheritance", {xxx::i_bar::get_id(rpc::VERSION_2)});
+#else
+                telemetry_->on_impl_deletion("multiple_inheritance", {xxx::i_bar::get_id(rpc::VERSION_1)});
+#endif
         }
 
         error_code do_something_else(int val) override { return rpc::error::OK(); }
@@ -343,7 +370,7 @@ namespace marshalled_tests
         void* get_address() const override { return (void*)this; }
         const rpc::casting_interface* query_interface(rpc::interface_ordinal interface_id) const override
         {
-            if (yyy::i_example::id == interface_id.get_val())
+            if (rpc::match<yyy::i_example>(interface_id))
                 return static_cast<const yyy::i_example*>(this);
             return nullptr;
         }
@@ -355,12 +382,20 @@ namespace marshalled_tests
             , this_service_(this_service)
         {
             if (telemetry_)
-                telemetry_->on_impl_creation("example", {yyy::i_example::id});
+#ifdef RPC_V2
+                telemetry_->on_impl_creation("example", {yyy::i_example::get_id(rpc::VERSION_2)});
+#else
+                telemetry_->on_impl_creation("example", {yyy::i_example::get_id(rpc::VERSION_1)});
+#endif
         }
         virtual ~example()
         {
             if (telemetry_)
-                telemetry_->on_impl_deletion("example", {yyy::i_example::id});
+#ifdef RPC_V2
+                telemetry_->on_impl_deletion("example", {yyy::i_example::get_id(rpc::VERSION_2)});
+#else
+                telemetry_->on_impl_deletion("example", {yyy::i_example::get_id(rpc::VERSION_1)});
+#endif
         }
 
         error_code create_multiple_inheritance(rpc::shared_ptr<xxx::i_baz>& target) override
@@ -385,6 +420,10 @@ namespace marshalled_tests
         {
             auto this_service = this_service_.lock();
             auto child_service = rpc::make_shared<rpc::child_service>(rpc::zone{new_zone_id});
+            example_import_idl_register_stubs(child_service);
+            example_shared_idl_register_stubs(child_service);
+            example_idl_register_stubs(child_service);
+
             auto service_proxy_to_child = rpc::local_child_service_proxy::create(child_service, this_service, telemetry_);
 
             // create the example object implementation with a recursive chain of services
@@ -397,7 +436,7 @@ namespace marshalled_tests
             child_service->set_parent(service_proxy_to_this_zone, true);
 
 
-            return rpc::demarshall_interface_proxy(service_proxy_to_child, example_encap, this_service->get_zone_id().as_caller(), target);
+            return rpc::demarshall_interface_proxy(rpc::get_version(), service_proxy_to_child, example_encap, this_service->get_zone_id().as_caller(), target);
         }
 
         error_code add(int a, int b, int& c) override
@@ -414,7 +453,7 @@ namespace marshalled_tests
         {
             if (!host)
                 return rpc::error::INVALID_DATA();
-            rpc::shared_ptr<marshalled_tests::yyy::i_example> target;
+            rpc::shared_ptr<yyy::i_example> target;
             auto err = host->create_enclave(target);
             if(err != rpc::error::OK())
                 return err;

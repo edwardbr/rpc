@@ -15,7 +15,6 @@ namespace marshalled_tests
 
     void standard_tests(xxx::i_foo& foo, bool enclave, const rpc::i_telemetry_service* telemetry_service)
     {
-        int ret = 0;
         {
             ASSERT(!foo.do_something_in_val(33));
         }
@@ -185,6 +184,8 @@ namespace marshalled_tests
                 rpc::shared_ptr<xxx::i_baz> b(new baz(telemetry_service));
                 err_code = foo->call_baz_interface(b);
             }
+
+            ASSERT(foo->exception_test() == rpc::error::EXCEPTION());
         }
         {
             rpc::shared_ptr<xxx::i_baz> i_baz_ptr;
