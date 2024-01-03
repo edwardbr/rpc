@@ -35,6 +35,7 @@
 
 
 #include <rpc/stl_clang12/rpc_xmemory.h>
+#include <rpc/casting_interface.h>
 
 
 
@@ -950,116 +951,6 @@ private:
 #endif // _HAS_DEPRECATED_RAW_STORAGE_ITERATOR
 
 
-#if _HAS_AUTO_PTR_ETC
-template <class _Ty>
-class auto_ptr;
-
-template <class _Ty>
-struct auto_ptr_ref { // proxy reference for auto_ptr copying
-    explicit auto_ptr_ref(_Ty* _Right) : _Ref(_Right) {}
-
-    _Ty* _Ref; // generic pointer to auto_ptr ptr
-};
-
-template <class _Ty>
-class auto_ptr { // wrap an object pointer to ensure destruction
-public:
-    using element_type = _Ty;
-
-    explicit auto_ptr(_Ty* _Ptr = nullptr) noexcept : _Myptr(_Ptr) {}
-
-    auto_ptr(auto_ptr& _Right) noexcept : _Myptr(_Right.release()) {}
-
-    auto_ptr(auto_ptr_ref<_Ty> _Right) noexcept {
-        _Ty* _Ptr   = _Right._Ref;
-        _Right._Ref = nullptr; // release old
-        _Myptr      = _Ptr; // reset this
-    }
-
-    template <class _Other>
-    operator auto_ptr<_Other>() noexcept { // convert to compatible auto_ptr
-        return auto_ptr<_Other>(*this);
-    }
-
-    template <class _Other>
-    operator auto_ptr_ref<_Other>() noexcept { // convert to compatible auto_ptr_ref
-        _Other* _Cvtptr = _Myptr; // test implicit conversion
-        auto_ptr_ref<_Other> _Ans(_Cvtptr);
-        _Myptr = nullptr; // pass ownership to auto_ptr_ref
-        return _Ans;
-    }
-
-    template <class _Other>
-    auto_ptr& operator=(auto_ptr<_Other>& _Right) noexcept {
-        reset(_Right.release());
-        return *this;
-    }
-
-    template <class _Other>
-    auto_ptr(auto_ptr<_Other>& _Right) noexcept : _Myptr(_Right.release()) {}
-
-    auto_ptr& operator=(auto_ptr& _Right) noexcept {
-        reset(_Right.release());
-        return *this;
-    }
-
-    auto_ptr& operator=(auto_ptr_ref<_Ty> _Right) noexcept {
-        _Ty* _Ptr   = _Right._Ref;
-        _Right._Ref = 0; // release old
-        reset(_Ptr); // set new
-        return *this;
-    }
-
-    ~auto_ptr() noexcept {
-        delete _Myptr;
-    }
-
-    _NODISCARD _Ty& operator*() const noexcept {
-#if _ITERATOR_DEBUG_LEVEL == 2
-        _STL_VERIFY(_Myptr, "auto_ptr not dereferenceable");
-#endif // _ITERATOR_DEBUG_LEVEL == 2
-
-        return *get();
-    }
-
-    _NODISCARD _Ty* operator->() const noexcept {
-#if _ITERATOR_DEBUG_LEVEL == 2
-        _STL_VERIFY(_Myptr, "auto_ptr not dereferenceable");
-#endif // _ITERATOR_DEBUG_LEVEL == 2
-
-        return get();
-    }
-
-    _NODISCARD _Ty* get() const noexcept {
-        return _Myptr;
-    }
-
-    _Ty* release() noexcept {
-        _Ty* _Tmp = _Myptr;
-        _Myptr    = nullptr;
-        return _Tmp;
-    }
-
-    void reset(_Ty* _Ptr = nullptr) noexcept { // destroy designated object and store new pointer
-        if (_Ptr != _Myptr) {
-            delete _Myptr;
-        }
-
-        _Myptr = _Ptr;
-    }
-
-private:
-    _Ty* _Myptr; // the wrapped object pointer
-};
-
-template <>
-class auto_ptr<void> {
-public:
-    using element_type = void;
-};
-#endif // _HAS_AUTO_PTR_ETC
-
-
 class bad_weak_ptr : public ::std::exception { // exception type for invalid use of expired weak_ptr object
 public:
     bad_weak_ptr() noexcept {}
@@ -1312,18 +1203,18 @@ protected:
     }
 
     template <class _Ty2>
-    void _Copy_construct_from(const shared_ptr<_Ty2>& _Other) noexcept {
+    void _Copy_construct_from(const shared_ptr<_Ty2>& _Other, bool optimistic) noexcept {
         // implement shared_ptr's (converting) copy ctor
-        _Other._Incref();
+        _Other._Incref(optimistic);
 
         _Ptr = _Other._Ptr;
         _Rep = _Other._Rep;
     }
 
     template <class _Ty2>
-    void _Alias_construct_from(const shared_ptr<_Ty2>& _Other, element_type* _Px) noexcept {
+    void _Alias_construct_from(const shared_ptr<_Ty2>& _Other, element_type* _Px, bool optimistic) noexcept {
         // implement shared_ptr's aliasing ctor
-        _Other._Incref();
+        _Other._Incref(optimistic);
 
         _Ptr = _Px;
         _Rep = _Other._Rep;
@@ -1343,25 +1234,54 @@ protected:
     friend class weak_ptr; // specifically, weak_ptr::lock()
 
     template <class _Ty2>
-    bool _Construct_from_weak(const weak_ptr<_Ty2>& _Other) noexcept {
+    bool _Construct_from_weak(const weak_ptr<_Ty2>& _Other, bool optimistic) noexcept {
         // implement shared_ptr's ctor from weak_ptr, and weak_ptr::lock()
         if (_Other._Rep && _Other._Rep->_Incref_nz()) {
             _Ptr = _Other._Ptr;
             _Rep = _Other._Rep;
+            if(optimistic)
+            {
+                if constexpr(std::is_base_of_v<rpc::casting_interface, _Ty>)
+                {
+                    //if you get gip from the compiler about multiple definitions then override get_default_interface in the most derived implementation class 
+                    //specifying any base interface implementation to de-confuse the compiler
+                    _Ptr->get_default_interface()->__add_shared_ptr();
+                }
+            }
             return true;
         }
 
         return false;
     }
 
-    void _Incref() const noexcept {
-        if (_Rep) {
+    void _Incref(bool optimistic) const noexcept {
+        if (_Rep) 
+        {
             _Rep->_Incref();
+            if(optimistic)
+            {
+                if constexpr(std::is_base_of_v<rpc::casting_interface, _Ty>)
+                {
+                    //if you get gip from the compiler about multiple definitions then override get_default_interface in the most derived implementation class 
+                    //specifying any base interface implementation to de-confuse the compiler
+                    _Ptr->get_default_interface()->__add_shared_ptr();
+                }
+            }
         }
     }
 
-    void _Decref() noexcept { // decrement reference count
-        if (_Rep) {
+    void _Decref(bool optimistic) noexcept { // decrement reference count
+        if (_Rep) 
+        {
+            if(optimistic)
+            {
+                if constexpr(std::is_base_of_v<rpc::casting_interface, _Ty>)
+                {
+                    //if you get gip from the compiler about multiple definitions then override get_default_interface in the most derived implementation class 
+                    //specifying any base interface implementation to de-confuse the compiler
+                    _Ptr->get_default_interface()->__remove_shared_ptr();
+                }
+            }
             _Rep->_Decref();
         }
     }
@@ -1521,6 +1441,9 @@ struct _Temporary_owner_del {
 };
 
 template <class _Ty>
+class optimistic_ptr;
+
+template <class _Ty>
 class shared_ptr : public _Ptr_base<_Ty> { // class for reference counted resource management
 private:
     using _Mybase = _Ptr_base<_Ty>;
@@ -1581,7 +1504,7 @@ public:
     template <class _Ty2>
     shared_ptr(const shared_ptr<_Ty2>& _Right, element_type* _Px) noexcept {
         // construct shared_ptr object that aliases _Right
-        this->_Alias_construct_from(_Right, _Px);
+        this->_Alias_construct_from(_Right, _Px, false);
     }
 
     template <class _Ty2>
@@ -1591,13 +1514,13 @@ public:
     }
 
     shared_ptr(const shared_ptr& _Other) noexcept { // construct shared_ptr object that owns same resource as _Other
-        this->_Copy_construct_from(_Other);
+        this->_Copy_construct_from(_Other, false);
     }
 
     template <class _Ty2, enable_if_t<_SP_pointer_compatible<_Ty2, _Ty>::value, int> = 0>
     shared_ptr(const shared_ptr<_Ty2>& _Other) noexcept {
         // construct shared_ptr object that owns same resource as _Other
-        this->_Copy_construct_from(_Other);
+        this->_Copy_construct_from(_Other, false);
     }
 
     shared_ptr(shared_ptr&& _Right) noexcept { // construct shared_ptr object that takes resource from _Right
@@ -1609,21 +1532,31 @@ public:
         this->_Move_construct_from(_STD move(_Right));
     }
 
+    shared_ptr(const optimistic_ptr<_Ty>& _Other) noexcept { // construct shared_ptr object that owns same resource as _Other
+        this->_Copy_construct_from(_Other, false);
+    }
+
+    template <class _Ty2, enable_if_t<_SP_pointer_compatible<_Ty2, _Ty>::value, int> = 0>
+    shared_ptr(const optimistic_ptr<_Ty2>& _Other) noexcept {
+        // construct shared_ptr object that owns same resource as _Other
+        this->_Copy_construct_from(_Other, false);
+    }
+
+    shared_ptr(optimistic_ptr<_Ty>&& _Right) noexcept { // construct shared_ptr object that takes resource from _Right
+        this->_Move_construct_from(_STD move(_Right));
+    }
+
+    template <class _Ty2, enable_if_t<_SP_pointer_compatible<_Ty2, _Ty>::value, int> = 0>
+    shared_ptr(optimistic_ptr<_Ty2>&& _Right) noexcept { // construct shared_ptr object that takes resource from _Right
+        this->_Move_construct_from(_STD move(_Right));
+    }
+
     template <class _Ty2, enable_if_t<_SP_pointer_compatible<_Ty2, _Ty>::value, int> = 0>
     explicit shared_ptr(const weak_ptr<_Ty2>& _Other) { // construct shared_ptr object that owns resource *_Other
-        if (!this->_Construct_from_weak(_Other)) {
+        if (!this->_Construct_from_weak(_Other, false)) {
             _Throw_bad_weak_ptr();
         }
     }
-
-#if _HAS_AUTO_PTR_ETC
-    template <class _Ty2, enable_if_t<::std::is_convertible_v<_Ty2*, _Ty*>, int> = 0>
-    shared_ptr(auto_ptr<_Ty2>&& _Other) { // construct shared_ptr object that owns *_Other.get()
-        _Ty2* _Px = _Other.get();
-        _Set_ptr_rep_and_enable_shared(_Px, new _Ref_count<_Ty2>(_Px));
-        _Other.release();
-    }
-#endif // _HAS_AUTO_PTR_ETC
 
     template <class _Ux, class _Dx,
         enable_if_t<::std::conjunction_v<_SP_pointer_compatible<_Ux, _Ty>,
@@ -1646,7 +1579,7 @@ public:
     }
 
     ~shared_ptr() noexcept { // release resource
-        this->_Decref();
+        this->_Decref(false);
     }
 
     shared_ptr& operator=(const shared_ptr& _Right) noexcept {
@@ -1670,14 +1603,6 @@ public:
         shared_ptr(_STD move(_Right)).swap(*this);
         return *this;
     }
-
-#if _HAS_AUTO_PTR_ETC
-    template <class _Ty2>
-    shared_ptr& operator=(auto_ptr<_Ty2>&& _Right) {
-        shared_ptr(_STD move(_Right)).swap(*this);
-        return *this;
-    }
-#endif // _HAS_AUTO_PTR_ETC
 
     template <class _Ux, class _Dx>
     shared_ptr& operator=(unique_ptr<_Ux, _Dx>&& _Right) { // move from unique_ptr
@@ -2084,6 +2009,438 @@ _NODISCARD _Dx* get_deleter(const shared_ptr<_Ty>& _Sx) noexcept {
 template <class _Dx, class _Ty>
 _Dx* get_deleter(const shared_ptr<_Ty>&) noexcept = delete; // requires static RTTI
 #endif // _HAS_STATIC_RTTI
+
+////////////////////////////////////////////////////////
+// optimistic pointer
+
+template <class _Ty>
+class optimistic_ptr : public _Ptr_base<_Ty> { // class for reference counted resource management
+private:
+    using _Mybase = _Ptr_base<_Ty>;    
+
+public:
+    using typename _Mybase::element_type;
+
+#if _HAS_CXX17
+    using weak_type = weak_ptr<_Ty>;
+#endif // _HAS_CXX17
+
+    constexpr optimistic_ptr() noexcept 
+    {
+        static_assert(std::is_base_of_v<casting_interface, _Ty>, "only use optimistic_ptr on interfaces");
+    }
+
+    constexpr optimistic_ptr(::std::nullptr_t) noexcept 
+    {
+        static_assert(std::is_base_of_v<casting_interface, _Ty>, "only use optimistic_ptr on interfaces");
+    } // construct empty optimistic_ptr
+
+    optimistic_ptr(const optimistic_ptr& _Other) noexcept 
+    { // construct optimistic_ptr object that owns same resource as _Other
+        this->_Copy_construct_from(_Other, true);
+    }
+
+    template <class _Ty2, enable_if_t<_SP_pointer_compatible<_Ty2, _Ty>::value, int> = 0>
+    optimistic_ptr(const optimistic_ptr<_Ty2>& _Other) noexcept {
+        // construct optimistic_ptr object that owns same resource as _Other
+        this->_Copy_construct_from(_Other, true);
+    }
+
+    optimistic_ptr(optimistic_ptr&& _Right) noexcept { // construct optimistic_ptr object that takes resource from _Right
+        this->_Move_construct_from(_STD move(_Right));
+    }
+
+    template <class _Ty2, enable_if_t<_SP_pointer_compatible<_Ty2, _Ty>::value, int> = 0>
+    optimistic_ptr(optimistic_ptr<_Ty2>&& _Right) noexcept { // construct optimistic_ptr object that takes resource from _Right
+        this->_Move_construct_from(_STD move(_Right));
+    }
+
+    optimistic_ptr(const shared_ptr<_Ty>& _Other) noexcept { // construct shared_ptr object that owns same resource as _Other
+        static_assert(std::is_base_of_v<casting_interface, _Ty>, "only use optimistic_ptr on interfaces");
+        this->_Copy_construct_from(_Other, true);
+    }
+
+    template <class _Ty2, enable_if_t<_SP_pointer_compatible<_Ty2, _Ty>::value, int> = 0>
+    optimistic_ptr(const shared_ptr<_Ty2>& _Other) noexcept 
+    {
+        // construct shared_ptr object that owns same resource as _Other
+        static_assert(std::is_base_of_v<casting_interface, _Ty>, "only use optimistic_ptr on interfaces");
+        this->_Copy_construct_from(_Other, true);
+    }
+
+    optimistic_ptr(shared_ptr<_Ty>&& _Right) noexcept 
+    { // construct shared_ptr object that takes resource from _Right
+        static_assert(std::is_base_of_v<casting_interface, _Ty>, "only use optimistic_ptr on interfaces");
+        this->_Move_construct_from(_STD move(_Right));
+    }
+
+    template <class _Ty2, enable_if_t<_SP_pointer_compatible<_Ty2, _Ty>::value, int> = 0>
+    optimistic_ptr(shared_ptr<_Ty2>&& _Right) noexcept 
+    { // construct shared_ptr object that takes resource from _Right
+        static_assert(std::is_base_of_v<casting_interface, _Ty>, "only use optimistic_ptr on interfaces");
+        this->_Move_construct_from(_STD move(_Right));
+    }
+
+    template <class _Ty2, enable_if_t<_SP_pointer_compatible<_Ty2, _Ty>::value, int> = 0>
+    explicit optimistic_ptr(const weak_ptr<_Ty2>& _Other) 
+    { // construct optimistic_ptr object that owns resource *_Other
+        static_assert(std::is_base_of_v<casting_interface, _Ty>, "only use optimistic_ptr on interfaces");
+        if (!this->_Construct_from_weak(_Other, true)) {
+            _Throw_bad_weak_ptr();
+        }
+    }
+
+    ~optimistic_ptr() noexcept { // release resource
+        this->_Decref(true);
+    }
+
+    optimistic_ptr& operator=(const optimistic_ptr& _Right) noexcept {
+        optimistic_ptr(_Right).swap(*this);
+        return *this;
+    }
+
+    template <class _Ty2>
+    optimistic_ptr& operator=(const optimistic_ptr<_Ty2>& _Right) noexcept {
+        optimistic_ptr(_Right).swap(*this);
+        return *this;
+    }
+
+    optimistic_ptr& operator=(optimistic_ptr&& _Right) noexcept { // take resource from _Right
+        optimistic_ptr(_STD move(_Right)).swap(*this);
+        return *this;
+    }
+
+    template <class _Ty2>
+    optimistic_ptr& operator=(optimistic_ptr<_Ty2>&& _Right) noexcept { // take resource from _Right
+        optimistic_ptr(_STD move(_Right)).swap(*this);
+        return *this;
+    }
+
+    void swap(optimistic_ptr& _Other) noexcept {
+        this->_Swap(_Other);
+    }
+
+    void reset() noexcept { // release resource and convert to empty optimistic_ptr object
+        optimistic_ptr().swap(*this);
+    }
+
+    template <class _Ux>
+    void reset(_Ux* _Px) { // release, take ownership of _Px
+        optimistic_ptr(_Px).swap(*this);
+    }
+
+    template <class _Ux, class _Dx>
+    void reset(_Ux* _Px, _Dx _Dt) { // release, take ownership of _Px, with deleter _Dt
+        optimistic_ptr(_Px, _Dt).swap(*this);
+    }
+
+    template <class _Ux, class _Dx, class _Alloc>
+    void reset(_Ux* _Px, _Dx _Dt, _Alloc _Ax) { // release, take ownership of _Px, with deleter _Dt, allocator _Ax
+        optimistic_ptr(_Px, _Dt, _Ax).swap(*this);
+    }
+
+    using _Mybase::get;
+
+    template <class _Ty2 = _Ty, enable_if_t<!disjunction_v<::std::is_array<_Ty2>, ::std::is_void<_Ty2>>, int> = 0>
+    _NODISCARD _Ty2& operator*() const noexcept {
+        return *get();
+    }
+
+    template <class _Ty2 = _Ty, enable_if_t<!::std::is_array_v<_Ty2>, int> = 0>
+    _NODISCARD _Ty2* operator->() const noexcept {
+        return get();
+    }
+
+    template <class _Ty2 = _Ty, class _Elem = element_type, enable_if_t<::std::is_array_v<_Ty2>, int> = 0>
+    _NODISCARD _Elem& operator[](ptrdiff_t _Idx) const noexcept /* strengthened */ {
+        return get()[_Idx];
+    }
+
+#if _HAS_DEPRECATED_SHARED_PTR_UNIQUE
+    _CXX17_DEPRECATE_SHARED_PTR_UNIQUE _NODISCARD bool unique() const noexcept {
+        // return true if no other optimistic_ptr object owns this resource
+        return this->use_count() == 1;
+    }
+#endif // _HAS_DEPRECATED_SHARED_PTR_UNIQUE
+
+    explicit operator bool() const noexcept {
+        return get() != nullptr;
+    }
+};
+
+#if _HAS_CXX17
+template <class _Ty>
+optimistic_ptr(weak_ptr<_Ty>) -> optimistic_ptr<_Ty>;
+
+template <class _Ty, class _Dx>
+optimistic_ptr(unique_ptr<_Ty, _Dx>) -> optimistic_ptr<_Ty>;
+#endif // _HAS_CXX17
+
+template <class _Ty1, class _Ty2>
+_NODISCARD bool operator==(const optimistic_ptr<_Ty1>& _Left, const optimistic_ptr<_Ty2>& _Right) noexcept {
+    return _Left.get() == _Right.get();
+}
+
+#if _HAS_CXX20
+template <class _Ty1, class _Ty2>
+_NODISCARD strong_ordering operator<=>(const optimistic_ptr<_Ty1>& _Left, const optimistic_ptr<_Ty2>& _Right) noexcept {
+    return _Left.get() <=> _Right.get();
+}
+#else // ^^^ _HAS_CXX20 / !_HAS_CXX20 vvv
+template <class _Ty1, class _Ty2>
+_NODISCARD bool operator!=(const optimistic_ptr<_Ty1>& _Left, const optimistic_ptr<_Ty2>& _Right) noexcept {
+    return _Left.get() != _Right.get();
+}
+
+template <class _Ty1, class _Ty2>
+_NODISCARD bool operator<(const optimistic_ptr<_Ty1>& _Left, const optimistic_ptr<_Ty2>& _Right) noexcept {
+    return _Left.get() < _Right.get();
+}
+
+template <class _Ty1, class _Ty2>
+_NODISCARD bool operator>=(const optimistic_ptr<_Ty1>& _Left, const optimistic_ptr<_Ty2>& _Right) noexcept {
+    return _Left.get() >= _Right.get();
+}
+
+template <class _Ty1, class _Ty2>
+_NODISCARD bool operator>(const optimistic_ptr<_Ty1>& _Left, const optimistic_ptr<_Ty2>& _Right) noexcept {
+    return _Left.get() > _Right.get();
+}
+
+template <class _Ty1, class _Ty2>
+_NODISCARD bool operator<=(const optimistic_ptr<_Ty1>& _Left, const optimistic_ptr<_Ty2>& _Right) noexcept {
+    return _Left.get() <= _Right.get();
+}
+#endif // ^^^ !_HAS_CXX20 ^^^
+
+template <class _Ty>
+_NODISCARD bool operator==(const optimistic_ptr<_Ty>& _Left, ::std::nullptr_t) noexcept {
+    return _Left.get() == nullptr;
+}
+
+#if _HAS_CXX20
+template <class _Ty>
+_NODISCARD strong_ordering operator<=>(const optimistic_ptr<_Ty>& _Left, ::std::nullptr_t) noexcept {
+    return _Left.get() <=> static_cast<typename optimistic_ptr<_Ty>::element_type*>(nullptr);
+}
+#else // ^^^ _HAS_CXX20 / !_HAS_CXX20 vvv
+template <class _Ty>
+_NODISCARD bool operator==(::std::nullptr_t, const optimistic_ptr<_Ty>& _Right) noexcept {
+    return nullptr == _Right.get();
+}
+
+template <class _Ty>
+_NODISCARD bool operator!=(const optimistic_ptr<_Ty>& _Left, ::std::nullptr_t) noexcept {
+    return _Left.get() != nullptr;
+}
+
+template <class _Ty>
+_NODISCARD bool operator!=(::std::nullptr_t, const optimistic_ptr<_Ty>& _Right) noexcept {
+    return nullptr != _Right.get();
+}
+
+template <class _Ty>
+_NODISCARD bool operator<(const optimistic_ptr<_Ty>& _Left, ::std::nullptr_t) noexcept {
+    return _Left.get() < static_cast<typename optimistic_ptr<_Ty>::element_type*>(nullptr);
+}
+
+template <class _Ty>
+_NODISCARD bool operator<(::std::nullptr_t, const optimistic_ptr<_Ty>& _Right) noexcept {
+    return static_cast<typename optimistic_ptr<_Ty>::element_type*>(nullptr) < _Right.get();
+}
+
+template <class _Ty>
+_NODISCARD bool operator>=(const optimistic_ptr<_Ty>& _Left, ::std::nullptr_t) noexcept {
+    return _Left.get() >= static_cast<typename optimistic_ptr<_Ty>::element_type*>(nullptr);
+}
+
+template <class _Ty>
+_NODISCARD bool operator>=(::std::nullptr_t, const optimistic_ptr<_Ty>& _Right) noexcept {
+    return static_cast<typename optimistic_ptr<_Ty>::element_type*>(nullptr) >= _Right.get();
+}
+
+template <class _Ty>
+_NODISCARD bool operator>(const optimistic_ptr<_Ty>& _Left, ::std::nullptr_t) noexcept {
+    return _Left.get() > static_cast<typename optimistic_ptr<_Ty>::element_type*>(nullptr);
+}
+
+template <class _Ty>
+_NODISCARD bool operator>(::std::nullptr_t, const optimistic_ptr<_Ty>& _Right) noexcept {
+    return static_cast<typename optimistic_ptr<_Ty>::element_type*>(nullptr) > _Right.get();
+}
+
+template <class _Ty>
+_NODISCARD bool operator<=(const optimistic_ptr<_Ty>& _Left, ::std::nullptr_t) noexcept {
+    return _Left.get() <= static_cast<typename optimistic_ptr<_Ty>::element_type*>(nullptr);
+}
+
+template <class _Ty>
+_NODISCARD bool operator<=(::std::nullptr_t, const optimistic_ptr<_Ty>& _Right) noexcept {
+    return static_cast<typename optimistic_ptr<_Ty>::element_type*>(nullptr) <= _Right.get();
+}
+#endif // ^^^ !_HAS_CXX20 ^^^
+
+// template <class _Elem, class _Traits, class _Ty>
+// basic_ostream<_Elem, _Traits>& operator<<(basic_ostream<_Elem, _Traits>& _Out, const optimistic_ptr<_Ty>& _Px) {
+//     // write contained pointer to stream
+//     return _Out << _Px.get();
+// }
+
+template <class _Ty>
+void swap(optimistic_ptr<_Ty>& _Left, optimistic_ptr<_Ty>& _Right) noexcept {
+    _Left.swap(_Right);
+}
+
+template <class _Ty1, class _Ty2>
+_NODISCARD optimistic_ptr<_Ty1> static_pointer_cast(const optimistic_ptr<_Ty2>& _Other) noexcept {
+    //only work with local polymorphic types
+    // static_cast for optimistic_ptr that properly respects the reference count control block
+    const auto _Ptr = static_cast<typename optimistic_ptr<_Ty1>::element_type*>(_Other.get());
+    return optimistic_ptr<_Ty1>(_Other, _Ptr);
+}
+
+template <class _Ty1, class _Ty2>
+_NODISCARD optimistic_ptr<_Ty1> static_pointer_cast(optimistic_ptr<_Ty2>&& _Other) noexcept {
+    //only work with local polymorphic types
+    // static_cast for optimistic_ptr that properly respects the reference count control block
+    const auto _Ptr = static_cast<typename optimistic_ptr<_Ty1>::element_type*>(_Other.get());
+    return optimistic_ptr<_Ty1>(_STD move(_Other), _Ptr);
+}
+
+template <class _Ty1, class _Ty2>
+_NODISCARD optimistic_ptr<_Ty1> const_pointer_cast(const optimistic_ptr<_Ty2>& _Other) noexcept {
+    // const_cast for optimistic_ptr that properly respects the reference count control block
+    const auto _Ptr = const_cast<typename optimistic_ptr<_Ty1>::element_type*>(_Other.get());
+    return optimistic_ptr<_Ty1>(_Other, _Ptr);
+}
+
+template <class _Ty1, class _Ty2>
+_NODISCARD optimistic_ptr<_Ty1> const_pointer_cast(optimistic_ptr<_Ty2>&& _Other) noexcept {
+    // const_cast for optimistic_ptr that properly respects the reference count control block
+    const auto _Ptr = const_cast<typename optimistic_ptr<_Ty1>::element_type*>(_Other.get());
+    return optimistic_ptr<_Ty1>(_STD move(_Other), _Ptr);
+}
+
+template <class _Ty1, class _Ty2>
+_NODISCARD optimistic_ptr<_Ty1> reinterpret_pointer_cast(const optimistic_ptr<_Ty2>& _Other) noexcept {
+    //only work with local polymorphic types
+    // reinterpret_cast for optimistic_ptr that properly respects the reference count control block
+    const auto _Ptr = reinterpret_cast<typename optimistic_ptr<_Ty1>::element_type*>(_Other.get());
+    return optimistic_ptr<_Ty1>(_Other, _Ptr);
+}
+
+template <class _Ty1, class _Ty2>
+_NODISCARD optimistic_ptr<_Ty1> reinterpret_pointer_cast(optimistic_ptr<_Ty2>&& _Other) noexcept {
+    //only work with local polymorphic types
+    // reinterpret_cast for optimistic_ptr that properly respects the reference count control block
+    const auto _Ptr = reinterpret_cast<typename optimistic_ptr<_Ty1>::element_type*>(_Other.get());
+    return optimistic_ptr<_Ty1>(_STD move(_Other), _Ptr);
+}
+
+// #ifdef _CPPRTTI
+template <class _Ty1, class _Ty2>
+_NODISCARD optimistic_ptr<_Ty1> dynamic_pointer_cast(const optimistic_ptr<_Ty2>& _Other) noexcept {
+#ifdef _CPPRTTI
+    // dynamic_cast for optimistic_ptr that properly respects the reference count control block
+    const auto _Ptr = dynamic_cast<typename optimistic_ptr<_Ty1>::element_type*>(_Other.get());
+
+    if (_Ptr) {
+        return optimistic_ptr<_Ty1>(_Other, _Ptr);
+    }
+#endif
+
+    _Ty1* ptr = nullptr;
+#ifdef RPC_V2
+    ptr = const_cast<_Ty1*>(static_cast<const _Ty1*>(_Other->query_interface(_Ty1::get_id(rpc::VERSION_2))));
+    if (ptr)
+        return optimistic_ptr<_Ty1>(_Other, ptr);
+#endif
+#ifdef RPC_V1
+    ptr = const_cast<_Ty1*>(static_cast<const _Ty1*>(_Other->query_interface(_Ty1::get_id(rpc::VERSION_1))));
+    if (ptr)
+        return optimistic_ptr<_Ty1>(_Other, ptr);
+#endif
+    auto proxy_ = _Other->get_interface_proxy();
+    if (!proxy_)
+    {
+        return optimistic_ptr<_Ty1>();
+    }
+    auto ob = proxy_->get_object_proxy();
+    optimistic_ptr<_Ty1> ret;
+    //note this magic function will return a shared pointer to a new interface proxy
+    //its refernce count will not be the same as the "from" pointers value, symanticlly it 
+    //behaves the same as with normal dynamic_pointer_cast in that you can use this function to
+    //cast back to the original.  Hoever static_pointer_cast in this case will not work, for
+    //remote interfaces.
+    ob->template query_interface<_Ty1>(ret);
+    return ret;
+
+}
+
+template <class _Ty1, class _Ty2>
+_NODISCARD optimistic_ptr<_Ty1> dynamic_pointer_cast(optimistic_ptr<_Ty2>&& _Other) noexcept {
+#ifdef _CPPRTTI
+    // dynamic_cast for optimistic_ptr that properly respects the reference count control block
+    const auto _Ptr = dynamic_cast<typename optimistic_ptr<_Ty1>::element_type*>(_Other.get());
+
+    if (_Ptr) {
+        return optimistic_ptr<_Ty1>(_STD move(_Other), _Ptr);
+    }
+#endif
+
+    _Ty1* ptr = nullptr;
+#ifdef RPC_V2
+    ptr = const_cast<_Ty1*>(static_cast<const _Ty1*>(_Other->query_interface(_Ty1::get_id(rpc::VERSION_2))));
+    if (ptr)
+        return optimistic_ptr<_Ty1>(_Other, ptr);
+#endif
+#ifdef RPC_V1
+    ptr = const_cast<_Ty1*>(static_cast<const _Ty1*>(_Other->query_interface(_Ty1::get_id(rpc::VERSION_1))));
+    if (ptr)
+        return optimistic_ptr<_Ty1>(_Other, ptr);
+#endif
+    auto proxy_ = _Other->get_interface_proxy();
+    if (!proxy_)
+    {
+        return optimistic_ptr<_Ty1>();
+    }
+    auto ob = proxy_->get_object_proxy();
+    optimistic_ptr<_Ty1> ret;
+    //note this magic function will return a shared pointer to a new interface proxy
+    //its refernce count will not be the same as the "from" pointers value, symanticlly it 
+    //behaves the same as with normal dynamic_pointer_cast in that you can use this function to
+    //cast back to the original.  Hoever static_pointer_cast in this case will not work, for
+    //remote interfaces.
+    ob->template query_interface<_Ty1>(ret);
+    return ret;
+}
+// #else // _CPPRTTI
+// template <class _Ty1, class _Ty2>
+// optimistic_ptr<_Ty1> dynamic_pointer_cast(const optimistic_ptr<_Ty2>&) noexcept = delete; // requires /GR option
+// template <class _Ty1, class _Ty2>
+// optimistic_ptr<_Ty1> dynamic_pointer_cast(optimistic_ptr<_Ty2>&&) noexcept = delete; // requires /GR option
+// #endif // _CPPRTTI
+
+#if _HAS_STATIC_RTTI
+template <class _Dx, class _Ty>
+_NODISCARD _Dx* get_deleter(const optimistic_ptr<_Ty>& _Sx) noexcept {
+    // return pointer to optimistic_ptr's deleter object if its type is _Dx
+    if (_Sx._Rep) {
+        return static_cast<_Dx*>(_Sx._Rep->_Get_deleter(typeid(_Dx)));
+    }
+
+    return nullptr;
+}
+#else // _HAS_STATIC_RTTI
+template <class _Dx, class _Ty>
+_Dx* get_deleter(const optimistic_ptr<_Ty>&) noexcept = delete; // requires static RTTI
+#endif // _HAS_STATIC_RTTI
+
+
+///////////////////////////////////////////////////////
+
+
+
 
 #if _HAS_CXX20
 struct _For_overwrite_tag {
@@ -3148,7 +3505,7 @@ public:
 
     _NODISCARD shared_ptr<_Ty> lock() const noexcept { // convert to shared_ptr
         shared_ptr<_Ty> _Ret;
-        (void) _Ret._Construct_from_weak(*this);
+        (void) _Ret._Construct_from_weak(*this, false);
         return _Ret;
     }
 };
@@ -3289,12 +3646,6 @@ public:
             int> = 0>
     unique_ptr(unique_ptr<_Ty2, _Dx2>&& _Right) noexcept
         : _Mypair(_One_then_variadic_args_t{}, _STD forward<_Dx2>(_Right.get_deleter()), _Right.release()) {}
-
-#if _HAS_AUTO_PTR_ETC
-    template <class _Ty2,
-        enable_if_t<::std::conjunction_v<::std::is_convertible<_Ty2*, _Ty*>, is_same<_Dx, default_delete<_Ty>>>, int> = 0>
-    unique_ptr(auto_ptr<_Ty2>&& _Right) noexcept : _Mypair(_Zero_then_variadic_args_t{}, _Right.release()) {}
-#endif // _HAS_AUTO_PTR_ETC
 
     template <class _Ty2, class _Dx2,
         enable_if_t<::std::conjunction_v<::std::negation<::std::is_array<_Ty2>>, ::std::is_assignable<_Dx&, _Dx2>,
@@ -3716,7 +4067,43 @@ struct owner_less<shared_ptr<_Ty>> {
     _NODISCARD bool operator()(const weak_ptr<_Ty>& _Left, const shared_ptr<_Ty>& _Right) const noexcept {
         return _Left.owner_before(_Right);
     }
+
+    _NODISCARD bool operator()(const optimistic_ptr<_Ty>& _Left, const shared_ptr<_Ty>& _Right) const noexcept {
+        return _Left.owner_before(_Right);
+    }
+
+    _NODISCARD bool operator()(const shared_ptr<_Ty>& _Left, const optimistic_ptr<_Ty>& _Right) const noexcept {
+        return _Left.owner_before(_Right);
+    }
 };
+
+template <class _Ty>
+struct owner_less<optimistic_ptr<_Ty>> {
+    _CXX17_DEPRECATE_ADAPTOR_TYPEDEFS typedef optimistic_ptr<_Ty> _FIRST_ARGUMENT_TYPE_NAME;
+    _CXX17_DEPRECATE_ADAPTOR_TYPEDEFS typedef optimistic_ptr<_Ty> _SECOND_ARGUMENT_TYPE_NAME;
+    _CXX17_DEPRECATE_ADAPTOR_TYPEDEFS typedef bool _RESULT_TYPE_NAME;
+
+    _NODISCARD bool operator()(const optimistic_ptr<_Ty>& _Left, const optimistic_ptr<_Ty>& _Right) const noexcept {
+        return _Left.owner_before(_Right);
+    }
+
+    _NODISCARD bool operator()(const optimistic_ptr<_Ty>& _Left, const shared_ptr<_Ty>& _Right) const noexcept {
+        return _Left.owner_before(_Right);
+    }
+
+    _NODISCARD bool operator()(const shared_ptr<_Ty>& _Left, const optimistic_ptr<_Ty>& _Right) const noexcept {
+        return _Left.owner_before(_Right);
+    }
+
+    _NODISCARD bool operator()(const optimistic_ptr<_Ty>& _Left, const weak_ptr<_Ty>& _Right) const noexcept {
+        return _Left.owner_before(_Right);
+    }
+
+    _NODISCARD bool operator()(const weak_ptr<_Ty>& _Left, const optimistic_ptr<_Ty>& _Right) const noexcept {
+        return _Left.owner_before(_Right);
+    }
+};
+
 
 template <class _Ty>
 struct owner_less<weak_ptr<_Ty>> {
@@ -3733,6 +4120,14 @@ struct owner_less<weak_ptr<_Ty>> {
     }
 
     _NODISCARD bool operator()(const shared_ptr<_Ty>& _Left, const weak_ptr<_Ty>& _Right) const noexcept {
+        return _Left.owner_before(_Right);
+    }
+
+    _NODISCARD bool operator()(const optimistic_ptr<_Ty>& _Left, const weak_ptr<_Ty>& _Right) const noexcept {
+        return _Left.owner_before(_Right);
+    }
+
+    _NODISCARD bool operator()(const weak_ptr<_Ty>& _Left, const optimistic_ptr<_Ty>& _Right) const noexcept {
         return _Left.owner_before(_Right);
     }
 };
@@ -3759,6 +4154,25 @@ struct owner_less<void> {
         return _Left.owner_before(_Right);
     }
 
+    template <class _Ty, class _Uty>
+    _NODISCARD bool operator()(const optimistic_ptr<_Ty>& _Left, const shared_ptr<_Uty>& _Right) const noexcept {
+        return _Left.owner_before(_Right);
+    }
+    template <class _Ty, class _Uty>
+    _NODISCARD bool operator()(const shared_ptr<_Ty>& _Left, const optimistic_ptr<_Uty>& _Right) const noexcept {
+        return _Left.owner_before(_Right);
+    }
+
+    template <class _Ty, class _Uty>
+    _NODISCARD bool operator()(const optimistic_ptr<_Ty>& _Left, const weak_ptr<_Uty>& _Right) const noexcept {
+        return _Left.owner_before(_Right);
+    }
+
+    template <class _Ty, class _Uty>
+    _NODISCARD bool operator()(const weak_ptr<_Ty>& _Left, const optimistic_ptr<_Uty>& _Right) const noexcept {
+        return _Left.owner_before(_Right);
+    }
+
     using is_transparent = int;
 };
 
@@ -3778,6 +4192,13 @@ template <class _Ty>
 struct ::std::hash<rpc::shared_ptr<_Ty>> {
     _NODISCARD size_t operator()(const rpc::shared_ptr<_Ty>& _Keyval) const noexcept {
         return ::std::hash<typename rpc::shared_ptr<_Ty>::element_type*>()(_Keyval.get());
+    }
+};
+
+template <class _Ty>
+struct ::std::hash<rpc::optimistic_ptr<_Ty>> {
+    _NODISCARD size_t operator()(const rpc::optimistic_ptr<_Ty>& _Keyval) const noexcept {
+        return ::std::hash<typename rpc::optimistic_ptr<_Ty>::element_type*>()(_Keyval.get());
     }
 };
 

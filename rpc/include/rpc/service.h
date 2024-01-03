@@ -67,7 +67,7 @@ namespace rpc
             }
         };
 
-        std::map<zone_route, rpc::weak_ptr<service_proxy>> other_zones;
+        std::map<zone_route, std::weak_ptr<service_proxy>> other_zones;
         std::list<std::shared_ptr<service_logger>> service_loggers;
 
         // hard lock on the root object
@@ -83,12 +83,12 @@ namespace rpc
         void set_zone_id(zone zone_id){zone_id_ = zone_id;}
         static zone generate_new_zone_id();
         object generate_new_object_id() const;
-        virtual rpc::shared_ptr<rpc::service_proxy> get_parent() const {return nullptr;}
+        virtual std::shared_ptr<rpc::service_proxy> get_parent() const {return nullptr;}
 
-        template<class T> interface_descriptor proxy_bind_in_param(uint64_t protocol_version, const shared_ptr<T>& iface, shared_ptr<object_stub>& stub);
-        template<class T> interface_descriptor stub_bind_out_param(uint64_t protocol_version, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, const shared_ptr<T>& iface);
+        template<class T> interface_descriptor __proxy_bind_in_param(uint64_t protocol_version, const shared_ptr<T>& iface, shared_ptr<object_stub>& stub);
+        template<class T> interface_descriptor __stub_bind_out_param(uint64_t protocol_version, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, const shared_ptr<T>& iface);
 
-        interface_descriptor prepare_out_param(uint64_t protocol_version, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, const rpc::shared_ptr<rpc::object_proxy>& base);
+        interface_descriptor prepare_out_param(uint64_t protocol_version, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, const std::shared_ptr<rpc::object_proxy>& base);
         interface_descriptor get_proxy_stub_descriptor(uint64_t protocol_version, 
                                                         caller_channel_zone caller_channel_zone_id, 
                                                         caller_zone caller_zone_id, 
@@ -135,9 +135,9 @@ namespace rpc
 
         uint64_t release_local_stub(const rpc::shared_ptr<rpc::object_stub>& stub);
 
-        void inner_add_zone_proxy(const rpc::shared_ptr<service_proxy>& service_proxy);
-        virtual void add_zone_proxy(const rpc::shared_ptr<service_proxy>& zone);
-        virtual rpc::shared_ptr<service_proxy> get_zone_proxy(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, destination_zone destination_zone_id, caller_zone new_caller_zone_id, bool& new_proxy_added);
+        void inner_add_zone_proxy(const std::shared_ptr<service_proxy>& service_proxy);
+        virtual void add_zone_proxy(const std::shared_ptr<service_proxy>& zone);
+        virtual std::shared_ptr<service_proxy> get_zone_proxy(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, destination_zone destination_zone_id, caller_zone new_caller_zone_id, bool& new_proxy_added);
         virtual void remove_zone_proxy(destination_zone destination_zone_id, caller_zone caller_zone_id, destination_channel_zone destination_channel_zone_id);
         template<class T> rpc::shared_ptr<T> get_local_interface(uint64_t protocol_version, object object_id)
         {
@@ -170,7 +170,7 @@ namespace rpc
         //the enclave needs to hold a hard lock to a root object that represents a runtime
         //the enclave service lifetime is managed by the transport functions 
         rpc::shared_ptr<i_interface_stub> root_stub_;
-        rpc::shared_ptr<rpc::service_proxy> parent_service_;
+        std::shared_ptr<rpc::service_proxy> parent_service_;
         bool child_does_not_use_parents_interface_ = false;
     public:
         explicit child_service(zone zone_id = generate_new_zone_id()) : 
@@ -179,11 +179,11 @@ namespace rpc
 
         virtual ~child_service();
 
-        void set_parent(const rpc::shared_ptr<rpc::service_proxy>& parent_service, bool child_does_not_use_parents_interface);
-        rpc::shared_ptr<rpc::service_proxy> get_parent() const override {return parent_service_;}
+        void set_parent(const std::shared_ptr<rpc::service_proxy>& parent_service, bool child_does_not_use_parents_interface);
+        std::shared_ptr<rpc::service_proxy> get_parent() const override {return parent_service_;}
         bool check_is_empty() const override;
         object get_root_object_id() const;
-        rpc::shared_ptr<service_proxy> get_zone_proxy(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, destination_zone destination_zone_id, caller_zone new_caller_zone_id, bool& new_proxy_added) override;
+        std::shared_ptr<service_proxy> get_zone_proxy(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, destination_zone destination_zone_id, caller_zone new_caller_zone_id, bool& new_proxy_added) override;
     };
 
 

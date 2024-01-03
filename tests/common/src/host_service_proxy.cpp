@@ -22,10 +22,10 @@ namespace rpc
         }
     }
 
-    rpc::shared_ptr<service_proxy> host_service_proxy::create(destination_zone host_zone_id, object host_id, const rpc::shared_ptr<rpc::child_service>& svc, const rpc::i_telemetry_service* telemetry_service)
+    std::shared_ptr<service_proxy> host_service_proxy::create(destination_zone host_zone_id, object host_id, const rpc::shared_ptr<rpc::child_service>& svc, const rpc::i_telemetry_service* telemetry_service)
     {
-        auto ret = rpc::shared_ptr<host_service_proxy>(new host_service_proxy(host_zone_id, svc, telemetry_service));
-        auto pthis = rpc::static_pointer_cast<service_proxy>(ret);
+        auto ret = std::shared_ptr<host_service_proxy>(new host_service_proxy(host_zone_id, svc, telemetry_service));
+        auto pthis = std::static_pointer_cast<service_proxy>(ret);
         ret->weak_this_ = pthis;
         svc->add_zone_proxy(ret);
         ret->add_external_ref();
@@ -190,11 +190,7 @@ namespace rpc
                 telemetry_service->message(rpc::i_telemetry_service::err, "release_host failed");
             }
             return std::numeric_limits<uint64_t>::max();
-        }
-        if(ret != std::numeric_limits<uint64_t>::max())
-        {
-            release_external_ref();
-        }   
+        } 
         return ret;
     }
 }

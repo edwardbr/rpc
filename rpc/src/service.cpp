@@ -160,7 +160,7 @@ namespace rpc
     {
         if(destination_zone_id != get_zone_id().as_destination())
         {
-            rpc::shared_ptr<service_proxy> other_zone;
+            std::shared_ptr<service_proxy> other_zone;
             {
                 std::lock_guard g(insert_control);
                 auto found = other_zones.find({destination_zone_id, caller_zone_id});
@@ -223,7 +223,7 @@ namespace rpc
         }
     }
 
-    interface_descriptor service::prepare_out_param(uint64_t protocol_version, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, const rpc::shared_ptr<object_proxy>& object_proxy)
+    interface_descriptor service::prepare_out_param(uint64_t protocol_version, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, const std::shared_ptr<object_proxy>& object_proxy)
     {
         auto object_service_proxy = object_proxy->get_service_proxy();
         auto destination_zone_id = object_service_proxy->get_destination_zone_id();
@@ -256,7 +256,7 @@ namespace rpc
         }
         else
         {
-            rpc::shared_ptr<service_proxy> destination_zone = object_service_proxy;
+            std::shared_ptr<service_proxy> destination_zone = object_service_proxy;
             auto found = other_zones.find({destination_zone_id, caller_zone_id});//we dont need to get caller id for this
             if(found != other_zones.end())
             {
@@ -349,7 +349,7 @@ namespace rpc
                 uint64_t object_channel = caller_channel_zone_id.is_set() ? caller_channel_zone_id.id : caller_zone_id.id;
                 assert(object_channel);
                 //and the caller with destination info
-                rpc::shared_ptr<service_proxy> caller_zone;
+                std::shared_ptr<service_proxy> caller_zone;
                 auto found = other_zones.find({{object_channel}, zone_id_.as_caller()});//we dont need to get caller id for this
                 if(found != other_zones.end())
                     caller_zone = found->second.lock();
@@ -390,7 +390,7 @@ namespace rpc
     {
         if(destination_zone_id != get_zone_id().as_destination())
         {
-            rpc::shared_ptr<service_proxy> other_zone;
+            std::shared_ptr<service_proxy> other_zone;
             {
                 std::lock_guard g(insert_control);
                 auto found = other_zones.lower_bound({destination_zone_id, {0}});
@@ -449,7 +449,7 @@ namespace rpc
             if(dest_channel == caller_channel && build_channel)
             {
                 //we are here as we are passing the buck to the zone that knows to either splits or terminates this zone has no refcount issues to deal with
-                rpc::shared_ptr<rpc::service_proxy> dest_zone;
+                std::shared_ptr<rpc::service_proxy> dest_zone;
                 do
                 {
                     auto found = other_zones.find({destination_zone_id, caller_zone_id});
@@ -484,10 +484,10 @@ namespace rpc
             else if(build_channel)
             {
                 //we are here as this zone needs to send the destination addref and caller addref to different zones
-                rpc::shared_ptr<rpc::service_proxy> dest_zone;
+                std::shared_ptr<rpc::service_proxy> dest_zone;
                 {
                     std::lock_guard g(insert_control);
-                    rpc::shared_ptr<rpc::service_proxy> caller_zone;
+                    std::shared_ptr<rpc::service_proxy> caller_zone;
 
                     auto found = other_zones.find({destination_zone_id, caller_zone_id});
                     if(found != other_zones.end())
@@ -586,7 +586,7 @@ namespace rpc
             }
             else
             {
-                rpc::shared_ptr<service_proxy> other_zone;
+                std::shared_ptr<service_proxy> other_zone;
                 {//brackets here as we are using a lock guard
                     std::lock_guard g(insert_control);
                     auto found = other_zones.find({destination_zone_id, caller_zone_id});
@@ -644,7 +644,7 @@ namespace rpc
             //find the caller
             if(zone_id_.as_caller() != caller_zone_id && !!(build_out_param_channel & add_ref_options::build_caller_route))
             {
-                rpc::shared_ptr<service_proxy> caller_zone;
+                std::shared_ptr<service_proxy> caller_zone;
                 {
                     std::lock_guard g(insert_control);
                     //we swap the parameter types as this is from perspective of the caller and not the proxy that called this function
@@ -713,7 +713,7 @@ namespace rpc
     {
         if(destination_zone_id != get_zone_id().as_destination())
         {
-            rpc::shared_ptr<service_proxy> other_zone;
+            std::shared_ptr<service_proxy> other_zone;
             {
                 std::lock_guard g(insert_control);
                 auto found = other_zones.find({destination_zone_id, caller_zone_id});
@@ -727,7 +727,12 @@ namespace rpc
                 assert(false);
                 return std::numeric_limits<uint64_t>::max();
             }
-            return other_zone->release(protocol_version, destination_zone_id, object_id, caller_zone_id);
+            auto ret = other_zone->release(protocol_version, destination_zone_id, object_id, caller_zone_id);
+            if(ret != std::numeric_limits<uint64_t>::max())
+            {
+                other_zone->release_external_ref();
+            }
+            return ret;
         }
         else
         {
@@ -797,7 +802,7 @@ namespace rpc
     }
     
 
-    void service::inner_add_zone_proxy(const rpc::shared_ptr<service_proxy>& service_proxy)
+    void service::inner_add_zone_proxy(const std::shared_ptr<service_proxy>& service_proxy)
     {
         auto destination_zone_id = service_proxy->get_destination_zone_id();
         auto caller_zone_id = service_proxy->get_caller_zone_id();
@@ -806,14 +811,14 @@ namespace rpc
         other_zones[{destination_zone_id, caller_zone_id}] = service_proxy;
     }
 
-    void service::add_zone_proxy(const rpc::shared_ptr<service_proxy>& service_proxy)
+    void service::add_zone_proxy(const std::shared_ptr<service_proxy>& service_proxy)
     {
         assert(service_proxy->get_destination_zone_id() != zone_id_.as_destination());
         std::lock_guard g(insert_control);
         inner_add_zone_proxy(service_proxy);
     }
 
-    rpc::shared_ptr<service_proxy> service::get_zone_proxy(
+    std::shared_ptr<service_proxy> service::get_zone_proxy(
         caller_channel_zone caller_channel_zone_id, 
         caller_zone caller_zone_id, 
         destination_zone destination_zone_id, 
@@ -874,7 +879,7 @@ namespace rpc
 
     void service::remove_zone_proxy(destination_zone destination_zone_id, caller_zone caller_zone_id, destination_channel_zone destination_channel_zone_id)
     {
-        rpc::shared_ptr<service_proxy> channel_sp;
+        std::shared_ptr<service_proxy> channel_sp;
         {
             std::lock_guard g(insert_control);
             auto item = other_zones.find({destination_zone_id, caller_zone_id});
@@ -976,7 +981,7 @@ namespace rpc
         return interface_stub->get_castable_interface();
     }
 
-    void child_service::set_parent(const rpc::shared_ptr<rpc::service_proxy>& parent_service, bool child_does_not_use_parents_interface)
+    void child_service::set_parent(const std::shared_ptr<rpc::service_proxy>& parent_service, bool child_does_not_use_parents_interface)
     {
         if(parent_service_ && child_does_not_use_parents_interface_)
             parent_service_->release_external_ref();
@@ -1020,7 +1025,7 @@ namespace rpc
         return stub->get_id();
     }
 
-    rpc::shared_ptr<service_proxy> child_service::get_zone_proxy(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, destination_zone destination_zone_id, caller_zone new_caller_zone_id, bool& new_proxy_added)
+    std::shared_ptr<service_proxy> child_service::get_zone_proxy(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, destination_zone destination_zone_id, caller_zone new_caller_zone_id, bool& new_proxy_added)
     {
         auto proxy = service::get_zone_proxy(caller_channel_zone_id, caller_zone_id, destination_zone_id, new_caller_zone_id, new_proxy_added);
         if(proxy)

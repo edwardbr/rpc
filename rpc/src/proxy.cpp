@@ -7,8 +7,29 @@
 
 namespace rpc
 {
+    void casting_interface::__add_shared_ptr() const
+    {
+        const auto* ip = get_interface_proxy();
+        if(ip)
+        {
+            auto op = ip->get_object_proxy();
+            op->add_shared_ptr();
+        }
+    }
+    
+    void casting_interface::__remove_shared_ptr() const
+    {
+        const auto* ip = get_interface_proxy();
+        if(ip)
+        {
+            auto op = ip->get_object_proxy();
+            op->remove_shared_ptr();
+        }
+    }
+
+    
     object_proxy::object_proxy( object object_id, 
-                                rpc::shared_ptr<service_proxy> service_proxy)
+                                std::shared_ptr<service_proxy> service_proxy)
         : object_id_(object_id)
         , service_proxy_(service_proxy)
     {
@@ -26,10 +47,10 @@ namespace rpc
 #endif
     }
 
-    rpc::shared_ptr<object_proxy> object_proxy::create(object object_id, 
-                                            const rpc::shared_ptr<service_proxy>& service_proxy)
+    std::shared_ptr<object_proxy> object_proxy::create(object object_id, 
+                                            const std::shared_ptr<service_proxy>& service_proxy)
     {
-        rpc::shared_ptr<object_proxy> ret(new object_proxy(object_id, service_proxy));
+        std::shared_ptr<object_proxy> ret(new object_proxy(object_id, service_proxy));
         ret->weak_this_ = ret;
         service_proxy->add_object_proxy(ret);
         return ret;

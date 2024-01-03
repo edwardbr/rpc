@@ -242,11 +242,7 @@ namespace rpc
                 telemetry_service->message(rpc::i_telemetry_service::err, "release_enclave failed");
             }
             return std::numeric_limits<uint64_t>::max();
-        }
-        if(ret != std::numeric_limits<uint64_t>::max())
-        {
-            release_external_ref();
-        }  
+        } 
         return ret;
     }
 #endif

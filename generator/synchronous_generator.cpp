@@ -255,7 +255,7 @@ namespace enclave_marshaller
                 return fmt::format("rpc::shared_ptr<rpc::object_stub> {}_stub_;", name);
             case PROXY_PREPARE_IN_INTERFACE_ID:
                 return fmt::format(
-                    "auto {0}_stub_id_ = proxy_bind_in_param(__rpc_sp->get_remote_rpc_version(), {0}, {0}_stub_);",
+                    "auto {0}_stub_id_ = __proxy_bind_in_param(__rpc_sp->get_remote_rpc_version(), {0}, {0}_stub_);",
                     name);
             case PROXY_MARSHALL_IN:
             {
@@ -313,7 +313,7 @@ namespace enclave_marshaller
                 return fmt::format("rpc::shared_ptr<rpc::object_stub> {}_stub_;", name);
             case PROXY_PREPARE_IN_INTERFACE_ID:
                 return fmt::format(
-                    "auto {0}_stub_id_ = proxy_bind_in_param(__rpc_sp->get_remote_rpc_version(), {0}, {0}_stub_);",
+                    "auto {0}_stub_id_ = __proxy_bind_in_param(__rpc_sp->get_remote_rpc_version(), {0}, {0}_stub_);",
                     name);
             case PROXY_MARSHALL_IN:
             {
@@ -340,7 +340,7 @@ namespace enclave_marshaller
                 return fmt::format("rpc::interface_descriptor {0}_;", name);
             case STUB_ADD_REF_OUT:
                 return fmt::format(
-                    "{0}_ = zone_.stub_bind_out_param(protocol_version, caller_channel_zone_id, caller_zone_id, {0});",
+                    "{0}_ = zone_.__stub_bind_out_param(protocol_version, caller_channel_zone_id, caller_zone_id, {0});",
                     name);
             case STUB_MARSHALL_OUT:
                 return fmt::format("  ,(\"{0}\", {0}_)", name);
@@ -1472,7 +1472,7 @@ namespace enclave_marshaller
 
             proxy("class {0}_proxy : public rpc::interface_proxy_t<{0}>", interface_name);
             proxy("{{");
-            proxy("{}_proxy(rpc::shared_ptr<rpc::object_proxy> object_proxy) : ", interface_name);
+            proxy("{}_proxy(std::shared_ptr<rpc::object_proxy> object_proxy) : ", interface_name);
             proxy("  rpc::interface_proxy_t<{}>(object_proxy)", interface_name);
             proxy("{{");
             proxy("auto __rpc_op = get_object_proxy();");
@@ -1504,7 +1504,7 @@ namespace enclave_marshaller
                   interface_name);
             proxy("}}");
             proxy("}}");
-            proxy("[[nodiscard]] static rpc::shared_ptr<{}> create(const rpc::shared_ptr<rpc::object_proxy>& "
+            proxy("[[nodiscard]] static rpc::shared_ptr<{}> create(const std::shared_ptr<rpc::object_proxy>& "
                   "object_proxy)",
                   interface_name);
             proxy("{{");
@@ -1926,11 +1926,11 @@ namespace enclave_marshaller
             }
 
             header("template<> rpc::interface_descriptor "
-                   "rpc::service::proxy_bind_in_param(uint64_t protocol_version, const rpc::shared_ptr<::{}{}>& "
+                   "rpc::service::__proxy_bind_in_param(uint64_t protocol_version, const rpc::shared_ptr<::{}{}>& "
                    "iface, rpc::shared_ptr<rpc::object_stub>& stub);",
                    ns, interface_name);
             header("template<> rpc::interface_descriptor "
-                   "rpc::service::stub_bind_out_param(uint64_t protocol_version, caller_channel_zone "
+                   "rpc::service::__stub_bind_out_param(uint64_t protocol_version, caller_channel_zone "
                    "caller_channel_zone_id, caller_zone caller_zone_id, const rpc::shared_ptr<::{}{}>& "
                    "iface);",
                    ns, interface_name);
@@ -1971,7 +1971,7 @@ namespace enclave_marshaller
             stub("}};");
             stub("}}");
 
-            stub("template<> interface_descriptor service::proxy_bind_in_param(uint64_t protocol_version, const "
+            stub("template<> interface_descriptor service::__proxy_bind_in_param(uint64_t protocol_version, const "
                  "shared_ptr<::{}{}>& iface, shared_ptr<object_stub>& stub)",
                  ns, interface_name);
             stub("{{");
@@ -1985,7 +1985,7 @@ namespace enclave_marshaller
                 "return get_proxy_stub_descriptor(protocol_version, {{0}}, {{0}}, iface.get(), factory, false, stub);");
             stub("}}");
 
-            stub("template<> interface_descriptor service::stub_bind_out_param(uint64_t protocol_version, "
+            stub("template<> interface_descriptor service::__stub_bind_out_param(uint64_t protocol_version, "
                  "caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, const shared_ptr<::{}{}>& "
                  "iface)",
                  ns, interface_name);

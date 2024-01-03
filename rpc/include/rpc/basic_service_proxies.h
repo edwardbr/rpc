@@ -28,7 +28,7 @@ namespace rpc
             }
         }
 
-        rpc::shared_ptr<service_proxy> deep_copy_for_clone() override {return rpc::make_shared<local_service_proxy>(*this);}
+        std::shared_ptr<service_proxy> deep_copy_for_clone() override {return std::make_shared<local_service_proxy>(*this);}
 
     public:
         local_service_proxy(const local_service_proxy& other) = default;
@@ -42,13 +42,13 @@ namespace rpc
         }
 
         //if there is no use of a local_service_proxy in the zone requires_parent_release must be set to true so that the zones service can clean things ups
-        static rpc::shared_ptr<local_service_proxy> create(const rpc::shared_ptr<service>& destination_svc,
+        static std::shared_ptr<local_service_proxy> create(const rpc::shared_ptr<service>& destination_svc,
                                                            const rpc::shared_ptr<child_service>& svc,
                                                            const rpc::i_telemetry_service* telemetry_service,
                                                            bool child_does_not_use_parents_interface)
         {
-            auto ret = rpc::shared_ptr<local_service_proxy>(new local_service_proxy(destination_svc, svc, telemetry_service));
-            auto pthis = rpc::static_pointer_cast<service_proxy>(ret);
+            auto ret = std::shared_ptr<local_service_proxy>(new local_service_proxy(destination_svc, svc, telemetry_service));
+            auto pthis = std::static_pointer_cast<service_proxy>(ret);
             ret->weak_this_ = pthis;
             svc->add_zone_proxy(ret);
             ret->add_external_ref();
@@ -119,11 +119,7 @@ namespace rpc
                 telemetry_service->on_service_proxy_release("local_service_proxy", get_zone_id(), destination_zone_id,
                                                             object_id, caller_zone_id);
             }
-            auto ret = destination_service_.lock()->release(protocol_version, destination_zone_id, object_id, caller_zone_id);
-            if(ret != std::numeric_limits<uint64_t>::max())
-            {
-                release_external_ref();
-            }  
+            auto ret = destination_service_.lock()->release(protocol_version, destination_zone_id, object_id, caller_zone_id);  
             return ret;
         }
     };
@@ -145,7 +141,7 @@ namespace rpc
             }
         }
 
-        rpc::shared_ptr<service_proxy> deep_copy_for_clone() override {return rpc::make_shared<local_child_service_proxy>(*this);}
+        std::shared_ptr<service_proxy> deep_copy_for_clone() override {return std::make_shared<local_child_service_proxy>(*this);}
 
     public:
         local_child_service_proxy(const local_child_service_proxy& other) = default;
@@ -156,13 +152,13 @@ namespace rpc
                 telemetry_service->on_service_proxy_deletion("local_child_service_proxy", get_zone_id(), get_destination_zone_id(), get_caller_zone_id());
             }
         }
-        static rpc::shared_ptr<local_child_service_proxy> create(const rpc::shared_ptr<service>& destination_svc,
+        static std::shared_ptr<local_child_service_proxy> create(const rpc::shared_ptr<service>& destination_svc,
                                                                  const rpc::shared_ptr<service>& svc,
                                                                  const rpc::i_telemetry_service* telemetry_service)
         {
-            auto ret = rpc::shared_ptr<local_child_service_proxy>(
+            auto ret = std::shared_ptr<local_child_service_proxy>(
                 new local_child_service_proxy(destination_svc, svc, telemetry_service));
-            auto pthis = rpc::static_pointer_cast<service_proxy>(ret);
+            auto pthis = std::static_pointer_cast<service_proxy>(ret);
             ret->weak_this_ = pthis;
             svc->add_zone_proxy(ret);
             ret->add_external_ref();
@@ -235,10 +231,6 @@ namespace rpc
                                                             destination_zone_id, object_id, caller_zone_id);
             }
             auto ret = destination_service_->release(protocol_version, destination_zone_id, object_id, caller_zone_id);
-            if(ret != std::numeric_limits<uint64_t>::max())
-            {
-                release_external_ref();
-            }  
             return ret;            
         }
     };

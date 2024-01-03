@@ -35,6 +35,9 @@ namespace marshalled_tests
         }
 
     public:
+        //to discombobulate the compiler re multiple implementations of casting_interface
+        virtual const casting_interface* get_default_interface() const override {return static_cast<const xxx::i_baz*>(this);}
+
         baz(const rpc::i_telemetry_service* telemetry)
             : telemetry_(telemetry)
         {
