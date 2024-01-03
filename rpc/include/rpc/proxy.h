@@ -23,19 +23,19 @@ namespace rpc
     class child_service;
     class service_proxy;
     class object_proxy;
-    template<class T> class proxy_impl;
+    template<class T> class interface_proxy_t;
 
     // non virtual class to allow for type erasure
-    class proxy_base
+    class interface_proxy
     {
         rpc::shared_ptr<object_proxy> object_proxy_;
 
     protected:
-        proxy_base(rpc::shared_ptr<object_proxy> object_proxy)
+        interface_proxy(rpc::shared_ptr<object_proxy> object_proxy)
             : object_proxy_(object_proxy)
         {
         }
-        virtual ~proxy_base()
+        virtual ~interface_proxy()
         {}
 
         template<class T> rpc::interface_descriptor proxy_bind_in_param(uint64_t protocol_version, const rpc::shared_ptr<T>& iface, rpc::shared_ptr<rpc::object_stub>& stub);
@@ -48,11 +48,11 @@ namespace rpc
         rpc::shared_ptr<object_proxy> get_object_proxy() const { return object_proxy_; }
     };
 
-    template<class T> class proxy_impl : public proxy_base, public T
+    template<class T> class interface_proxy_t : public interface_proxy, public T
     {
     public:
-        proxy_impl(rpc::shared_ptr<object_proxy> object_proxy)
-            : proxy_base(object_proxy)
+        interface_proxy_t(rpc::shared_ptr<object_proxy> object_proxy)
+            : interface_proxy(object_proxy)
         {
         }
         
@@ -61,9 +61,9 @@ namespace rpc
             assert(false);
             return (T*)get_object_proxy().get();
         }   
-        rpc::proxy_base* query_proxy_base() const override 
+        const rpc::interface_proxy* get_interface_proxy() const override 
         { 
-            return static_cast<proxy_base*>(const_cast<proxy_impl*>(this)); 
+            return this; 
         }   
         const rpc::casting_interface* query_interface(rpc::interface_ordinal interface_id) const override 
         { 
@@ -77,21 +77,21 @@ namespace rpc
             #endif
             return nullptr;
         }
-        virtual ~proxy_impl() = default;
+        virtual ~interface_proxy_t() = default;
     };
 
     class object_proxy
     {
         object object_id_;
         rpc::shared_ptr<service_proxy> service_proxy_;
-        std::unordered_map<interface_ordinal, rpc::weak_ptr<proxy_base>> proxy_map;
+        std::unordered_map<interface_ordinal, rpc::weak_ptr<interface_proxy>> proxy_map;
         std::mutex insert_control_;
         mutable rpc::weak_ptr<object_proxy> weak_this_;
 
         object_proxy(object object_id, rpc::shared_ptr<service_proxy> service_proxy);
 
         // note the interface pointer may change if there is already an interface inserted successfully
-        void register_interface(interface_ordinal interface_id, rpc::weak_ptr<proxy_base>& value);
+        void register_interface(interface_ordinal interface_id, rpc::weak_ptr<interface_proxy>& value);
 
         int try_cast(std::function<interface_ordinal (uint64_t)> id_getter);
 
@@ -121,13 +121,13 @@ namespace rpc
 
         template<class T> int query_interface(rpc::shared_ptr<T>& iface, bool do_remote_check = true)
         {
-            auto create = [&](std::unordered_map<interface_ordinal, rpc::weak_ptr<proxy_base>>::iterator item) -> int {
-                rpc::shared_ptr<proxy_base> proxy = item->second.lock();
+            auto create = [&](std::unordered_map<interface_ordinal, rpc::weak_ptr<interface_proxy>>::iterator item) -> int {
+                rpc::shared_ptr<interface_proxy> proxy = item->second.lock();
                 if (!proxy)
                 {
                     // weak pointer needs refreshing
                     create_interface_proxy<T>(iface);
-                    item->second = rpc::reinterpret_pointer_cast<proxy_base>(iface);
+                    item->second = rpc::reinterpret_pointer_cast<interface_proxy>(iface);
                     return rpc::error::OK();
                 }
                 iface = rpc::reinterpret_pointer_cast<T>(proxy);
@@ -166,10 +166,10 @@ namespace rpc
                 {
                     create_interface_proxy<T>(iface);
 #ifdef RPC_V1
-                    proxy_map[T::get_id(rpc::VERSION_1)] = rpc::reinterpret_pointer_cast<proxy_base>(iface);
+                    proxy_map[T::get_id(rpc::VERSION_1)] = rpc::reinterpret_pointer_cast<interface_proxy>(iface);
 #endif
 #ifdef RPC_V2
-                    proxy_map[T::get_id(rpc::VERSION_2)] = rpc::reinterpret_pointer_cast<proxy_base>(iface);
+                    proxy_map[T::get_id(rpc::VERSION_2)] = rpc::reinterpret_pointer_cast<interface_proxy>(iface);
 #endif                    
                     return rpc::error::OK();
                 }
@@ -210,10 +210,10 @@ namespace rpc
 
                 create_interface_proxy<T>(iface);
 #ifdef RPC_V1
-                proxy_map[T::get_id(rpc::VERSION_1)] = rpc::reinterpret_pointer_cast<proxy_base>(iface);
+                proxy_map[T::get_id(rpc::VERSION_1)] = rpc::reinterpret_pointer_cast<interface_proxy>(iface);
 #endif
 #ifdef RPC_V2
-                proxy_map[T::get_id(rpc::VERSION_2)] = rpc::reinterpret_pointer_cast<proxy_base>(iface);
+                proxy_map[T::get_id(rpc::VERSION_2)] = rpc::reinterpret_pointer_cast<interface_proxy>(iface);
 #endif
                 return rpc::error::OK();
             }
@@ -563,9 +563,9 @@ namespace rpc
         friend child_service;
     };
 
-    //declared here as object_proxy and service_proxy is not fully defined in the body of proxy_base
+    //declared here as object_proxy and service_proxy is not fully defined in the body of interface_proxy
     template<class T>
-    interface_descriptor proxy_base::proxy_bind_in_param(uint64_t protocol_version, const rpc::shared_ptr<T>& iface, rpc::shared_ptr<rpc::object_stub>& stub)
+    interface_descriptor interface_proxy::proxy_bind_in_param(uint64_t protocol_version, const rpc::shared_ptr<T>& iface, rpc::shared_ptr<rpc::object_stub>& stub)
     {
         if(!iface)
             return interface_descriptor();
@@ -573,7 +573,7 @@ namespace rpc
         auto operating_service = object_proxy_->get_service_proxy()->get_operating_zone_service();
 
         //this is to check that an interface is belonging to another zone and not the operating zone
-        auto proxy = iface->query_proxy_base();
+        auto proxy = iface->get_interface_proxy();
         if(proxy && proxy->get_object_proxy()->get_destination_zone_id() != operating_service->get_zone_id().as_destination())
         {
             return {proxy->get_object_proxy()->get_object_id(), proxy->get_object_proxy()->get_destination_zone_id()};
@@ -630,9 +630,9 @@ namespace rpc
         }
     }
 
-    //declared here as object_proxy and service_proxy is not fully defined in the body of proxy_base
+    //declared here as object_proxy and service_proxy is not fully defined in the body of interface_proxy
     template<class T>
-    interface_descriptor proxy_base::stub_bind_out_param(uint64_t protocol_version, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, const rpc::shared_ptr<T>& iface)
+    interface_descriptor interface_proxy::stub_bind_out_param(uint64_t protocol_version, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, const rpc::shared_ptr<T>& iface)
     {
         if(!iface)
             return {{0},{0}};
@@ -640,7 +640,7 @@ namespace rpc
         auto operating_service = object_proxy_->get_service_proxy()->get_operating_zone_service();
 
         //this is to check that an interface is belonging to another zone and not the operating zone
-        auto proxy = iface->query_proxy_base();
+        auto proxy = iface->get_interface_proxy();
         if(proxy && proxy->get_object_proxy()->get_zone_id() != operating_service->get_zone_id())
         {
             return {proxy->get_object_proxy()->get_object_id(), proxy->get_object_proxy()->get_zone_id()};

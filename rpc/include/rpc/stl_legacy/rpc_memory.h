@@ -2052,7 +2052,7 @@ element_type*>::value>> shared_ptr(unique_ptr<_Yp, _Dp>&& __r) : __ptr_(__r.get(
         if (ptr)
             return shared_ptr<T1>(from, ptr);
 #endif
-        auto proxy_ = from->query_proxy_base();
+        auto proxy_ = from->get_interface_proxy();
         if (!proxy_)
         {
             return shared_ptr<T1>();

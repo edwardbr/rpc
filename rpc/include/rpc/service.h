@@ -27,6 +27,7 @@ namespace rpc
     class object_stub;
     class service;
     class service_proxy;
+    class object_proxy;
 
     const object dummy_object_id = {std::numeric_limits<uint64_t>::max()};
 
@@ -87,7 +88,7 @@ namespace rpc
         template<class T> interface_descriptor proxy_bind_in_param(uint64_t protocol_version, const shared_ptr<T>& iface, shared_ptr<object_stub>& stub);
         template<class T> interface_descriptor stub_bind_out_param(uint64_t protocol_version, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, const shared_ptr<T>& iface);
 
-        interface_descriptor prepare_out_param(uint64_t protocol_version, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, rpc::proxy_base* base);
+        interface_descriptor prepare_out_param(uint64_t protocol_version, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, const rpc::shared_ptr<rpc::object_proxy>& base);
         interface_descriptor get_proxy_stub_descriptor(uint64_t protocol_version, 
                                                         caller_channel_zone caller_channel_zone_id, 
                                                         caller_zone caller_zone_id, 

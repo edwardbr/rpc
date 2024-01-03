@@ -1470,10 +1470,10 @@ namespace enclave_marshaller
                 proxy("}}");
             }
 
-            proxy("class {0}_proxy : public rpc::proxy_impl<{0}>", interface_name);
+            proxy("class {0}_proxy : public rpc::interface_proxy_t<{0}>", interface_name);
             proxy("{{");
             proxy("{}_proxy(rpc::shared_ptr<rpc::object_proxy> object_proxy) : ", interface_name);
-            proxy("  rpc::proxy_impl<{}>(object_proxy)", interface_name);
+            proxy("  rpc::interface_proxy_t<{}>(object_proxy)", interface_name);
             proxy("{{");
             proxy("auto __rpc_op = get_object_proxy();");
             proxy("auto __rpc_sp = __rpc_op->get_service_proxy();");

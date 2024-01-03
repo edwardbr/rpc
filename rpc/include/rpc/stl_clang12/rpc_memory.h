@@ -2009,7 +2009,7 @@ _NODISCARD shared_ptr<_Ty1> dynamic_pointer_cast(const shared_ptr<_Ty2>& _Other)
     if (ptr)
         return shared_ptr<_Ty1>(_Other, ptr);
 #endif
-    auto proxy_ = _Other->query_proxy_base();
+    auto proxy_ = _Other->get_interface_proxy();
     if (!proxy_)
     {
         return shared_ptr<_Ty1>();
@@ -2048,7 +2048,7 @@ _NODISCARD shared_ptr<_Ty1> dynamic_pointer_cast(shared_ptr<_Ty2>&& _Other) noex
     if (ptr)
         return shared_ptr<_Ty1>(_Other, ptr);
 #endif
-    auto proxy_ = _Other->query_proxy_base();
+    auto proxy_ = _Other->get_interface_proxy();
     if (!proxy_)
     {
         return shared_ptr<_Ty1>();

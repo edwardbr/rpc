@@ -223,9 +223,8 @@ namespace rpc
         }
     }
 
-    interface_descriptor service::prepare_out_param(uint64_t protocol_version, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, rpc::proxy_base* base)
+    interface_descriptor service::prepare_out_param(uint64_t protocol_version, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, const rpc::shared_ptr<object_proxy>& object_proxy)
     {
-        auto object_proxy = base->get_object_proxy();
         auto object_service_proxy = object_proxy->get_service_proxy();
         auto destination_zone_id = object_service_proxy->get_destination_zone_id();
         auto destination_channel_zone_id = object_service_proxy->get_destination_channel_zone_id();
@@ -311,14 +310,14 @@ namespace rpc
     {
         if(outcall)
         {
-            proxy_base* proxy_base = nullptr;
+            const interface_proxy* proxy = nullptr;
             if(caller_channel_zone_id.is_set() || caller_zone_id.is_set())
             {
-                proxy_base = iface->query_proxy_base();
+                proxy = iface->get_interface_proxy();
             }
-            if(proxy_base)
+            if(proxy)
             {
-                return prepare_out_param(protocol_version, caller_channel_zone_id, caller_zone_id, proxy_base);
+                return prepare_out_param(protocol_version, caller_channel_zone_id, caller_zone_id, proxy->get_object_proxy());
             }
         }
 
