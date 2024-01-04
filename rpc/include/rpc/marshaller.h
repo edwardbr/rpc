@@ -66,6 +66,7 @@ namespace rpc
     class i_marshaller
     {
     public:
+        virtual ~i_marshaller() = default;
         virtual int send(
             uint64_t protocol_version 
 			, encoding encoding 
