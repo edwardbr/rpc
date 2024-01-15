@@ -21,6 +21,13 @@ namespace rpc
         int initialise_enclave(object& object_id);
        
         rpc::shared_ptr<service_proxy> deep_copy_for_clone() override {return rpc::make_shared<enclave_service_proxy>(*this);}
+        void clone_completed() override
+        {
+            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
+            {
+                telemetry_service->on_service_proxy_creation("enclave_service_proxy", get_zone_id(), get_destination_zone_id(), get_caller_zone_id());
+            }
+        }
         
         std::shared_ptr<enclave_owner> enclave_owner_;
         uint64_t eid_ = 0;        
@@ -42,7 +49,6 @@ namespace rpc
             auto pthis = rpc::static_pointer_cast<service_proxy>(ret);
 
             ret->weak_this_ = pthis;
-
             object object_id = {0};
             int err_code = ret->initialise_enclave(object_id);
             if(err_code)

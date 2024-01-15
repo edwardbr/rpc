@@ -8,11 +8,6 @@ namespace rpc
         : object_id_(object_id)
         , service_proxy_(service_proxy)
     {
-        if(auto* telemetry_service = service_proxy_->get_telemetry_service();telemetry_service)
-        {
-            telemetry_service->on_object_proxy_creation(service_proxy_->get_zone_id(), service_proxy_->get_destination_zone_id(), object_id);
-        }
-
 #ifdef USE_RPC_LOGGING
         auto message = std::string("object_proxy::object_proxy zone_id ") + std::to_string(service_proxy->get_zone_id().get_val())
         + std::string(", object_id ") + std::to_string(object_id.get_val())
@@ -23,9 +18,13 @@ namespace rpc
     }
 
     rpc::shared_ptr<object_proxy> object_proxy::create(object object_id, 
-                                            const rpc::shared_ptr<service_proxy>& service_proxy)
+                                            const rpc::shared_ptr<service_proxy>& service_proxy, bool add_ref_done)
     {
         rpc::shared_ptr<object_proxy> ret(new object_proxy(object_id, service_proxy));
+        if(auto* telemetry_service = service_proxy->get_telemetry_service();telemetry_service)
+        {
+            telemetry_service->on_object_proxy_creation(service_proxy->get_zone_id(), service_proxy->get_destination_zone_id(), object_id, add_ref_done);
+        }        
         ret->weak_this_ = ret;
         service_proxy->add_object_proxy(ret);
         return ret;

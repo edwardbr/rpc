@@ -25,6 +25,18 @@ namespace rpc
         }
 
         rpc::shared_ptr<service_proxy> deep_copy_for_clone() override {return rpc::make_shared<local_service_proxy>(*this);}
+        void clone_completed() override
+        {
+            if(get_zone_id() == 2 && get_destination_zone_id() == 1 && get_caller_zone_id() == 4)
+            {
+                //this is for a custom breakpoint
+                get_zone_id();
+            }
+            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
+            {
+                telemetry_service->on_service_proxy_creation("local_service_proxy", get_zone_id(), get_destination_zone_id(), get_caller_zone_id());
+            }
+        }
 
     public:
         local_service_proxy(const local_service_proxy& other) = default;
@@ -74,11 +86,6 @@ namespace rpc
             , object object_id 
             , interface_ordinal interface_id) override
         {
-            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
-            {
-                telemetry_service->on_service_proxy_try_cast("local_service_proxy", get_zone_id(), destination_zone_id,
-                                                             object_id, interface_id);
-            }
             return destination_service_.lock()->try_cast(protocol_version, destination_zone_id, object_id, interface_id);
         }
         uint64_t add_ref(
@@ -91,11 +98,6 @@ namespace rpc
             , add_ref_options build_out_param_channel 
             , bool proxy_add_ref) override
         {
-            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
-            {
-                telemetry_service->on_service_proxy_add_ref("local_service_proxy", get_zone_id(), destination_zone_id,
-                                                            object_id, caller_zone_id);
-            }
             auto dest = destination_service_.lock();
             auto ret = dest->add_ref(protocol_version, destination_channel_zone_id, destination_zone_id, object_id, caller_channel_zone_id, caller_zone_id, build_out_param_channel, proxy_add_ref);            
             if(proxy_add_ref && ret != std::numeric_limits<uint64_t>::max())
@@ -113,11 +115,6 @@ namespace rpc
             , object object_id 
             , caller_zone caller_zone_id) override
         {
-            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
-            {
-                telemetry_service->on_service_proxy_release("local_service_proxy", get_zone_id(), destination_zone_id,
-                                                            object_id, caller_zone_id);
-            }
             auto ret = destination_service_.lock()->release(protocol_version, destination_zone_id, object_id, caller_zone_id);
             if(ret != std::numeric_limits<uint64_t>::max())
             {
@@ -145,6 +142,13 @@ namespace rpc
         }
 
         rpc::shared_ptr<service_proxy> deep_copy_for_clone() override {return rpc::make_shared<local_child_service_proxy>(*this);}
+        void clone_completed() override
+        {
+            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
+            {
+                telemetry_service->on_service_proxy_creation("local_child_service_proxy", get_zone_id(), get_destination_zone_id(), get_caller_zone_id());
+            }
+        }
 
     public:
         local_child_service_proxy(const local_child_service_proxy& other) = default;
@@ -192,11 +196,6 @@ namespace rpc
             , interface_ordinal interface_id
         ) override
         {
-            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
-            {
-                telemetry_service->on_service_proxy_try_cast("local_child_service_proxy", get_zone_id(),
-                                                             destination_zone_id, object_id, interface_id);
-            }
             return destination_service_->try_cast(protocol_version, destination_zone_id, object_id, interface_id);
         }
         uint64_t add_ref(
@@ -210,11 +209,6 @@ namespace rpc
             , bool proxy_add_ref
         ) override
         {
-            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
-            {
-                telemetry_service->on_service_proxy_add_ref("local_child_service_proxy", get_zone_id(),
-                                                            destination_zone_id, object_id, caller_zone_id);
-            }
             auto ret = destination_service_->add_ref(protocol_version, destination_channel_zone_id, destination_zone_id, object_id, caller_channel_zone_id, caller_zone_id, build_out_param_channel, proxy_add_ref);            
             if(proxy_add_ref && ret != std::numeric_limits<uint64_t>::max())
             {
@@ -228,11 +222,6 @@ namespace rpc
             , object object_id 
             , caller_zone caller_zone_id) override
         {
-            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
-            {
-                telemetry_service->on_service_proxy_release("local_child_service_proxy", get_zone_id(),
-                                                            destination_zone_id, object_id, caller_zone_id);
-            }
             auto ret = destination_service_->release(protocol_version, destination_zone_id, object_id, caller_zone_id);
             if(ret != std::numeric_limits<uint64_t>::max())
             {

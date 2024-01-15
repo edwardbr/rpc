@@ -77,20 +77,20 @@ namespace marshalled_tests
         {
             xxx::something_complicated val;
             ASSERT(!foo.recieve_something_complicated_ref(val));
-            std::cout << "got " << val.string_val << "\n";
+            log(std::string("got ") + val.string_val);
         }
         if (!enclave)
         {
             xxx::something_complicated* val = nullptr;
             ASSERT(!foo.recieve_something_complicated_ptr(val));
-            std::cout << "got " << val->int_val << "\n";
+            log(std::string("got ") + std::to_string(val->int_val));
             delete val;
         }
         {
             xxx::something_complicated val;
             val.int_val = 32;
             ASSERT(!foo.recieve_something_complicated_in_out_ref(val));
-            std::cout << "got " << val.int_val << "\n";
+            log(std::string("got ") + std::to_string(val.int_val));
         }
         {
             xxx::something_more_complicated val;
@@ -123,20 +123,20 @@ namespace marshalled_tests
         {
             xxx::something_more_complicated val;
             ASSERT(!foo.recieve_something_more_complicated_ref(val));
-            std::cout << "got " << val.map_val.begin()->first << "\n";
+            log(std::string("got ") + val.map_val.begin()->first);
         }
         if (!enclave)
         {
             xxx::something_more_complicated* val = nullptr;
             ASSERT(!foo.recieve_something_more_complicated_ptr(val));
-            std::cout << "got " << val->map_val.begin()->first << "\n";
+            log(std::string("got ") + val->map_val.begin()->first);
             delete val;
         }
         {
             xxx::something_more_complicated val;
             val.map_val["22"] = xxx::something_complicated {33, "22"};
             ASSERT(!foo.recieve_something_more_complicated_in_out_ref(val));
-            std::cout << "got " << val.map_val.begin()->first << "\n";
+            log(std::string("got ") + val.map_val.begin()->first);
         }
         {
             int val1 = 1;
@@ -152,7 +152,11 @@ namespace marshalled_tests
         }
     }
 
-    void remote_tests(bool use_host_in_child, rpc::shared_ptr<yyy::i_example> example_ptr, const rpc::i_telemetry_service* telemetry_service)
+    void remote_tests(
+        bool use_host_in_child
+        , rpc::shared_ptr<yyy::i_example> example_ptr
+        , const rpc::i_telemetry_service* telemetry_service
+        , rpc::zone zone_id)
     {
         int val = 0;
         example_ptr->add(1, 2, val);
@@ -172,7 +176,7 @@ namespace marshalled_tests
             int err_code = foo->recieve_interface(other_foo);
             if (err_code != rpc::error::OK())
             {
-                std::cout << "create_foo failed\n";
+                log(std::string("create_foo failed"));
             }
             else
             {
@@ -181,7 +185,7 @@ namespace marshalled_tests
 
             if(use_host_in_child)
             {
-                rpc::shared_ptr<xxx::i_baz> b(new baz(telemetry_service));
+                rpc::shared_ptr<xxx::i_baz> b(new baz(telemetry_service, zone_id));
                 err_code = foo->call_baz_interface(b);
             }
 

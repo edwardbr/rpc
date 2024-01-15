@@ -106,11 +106,7 @@ namespace rpc
         interface_ordinal interface_id
     )
     {
-        if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
-        {
-            telemetry_service->on_service_proxy_try_cast("host_service_proxy", get_zone_id(),
-                                                            destination_zone_id, object_id, interface_id);
-        }
+        assert(destination_zone_id == get_destination_zone_id());
         int err_code = 0;
         sgx_status_t status = ::try_cast_host(&err_code, protocol_version, destination_zone_id.get_val(), object_id.get_val(), interface_id.get_val());
         if (status)
@@ -135,11 +131,6 @@ namespace rpc
         bool proxy_add_ref
     )
     {
-        if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
-        {
-            telemetry_service->on_service_proxy_add_ref("host_service_proxy", get_zone_id(),
-                                                        destination_zone_id, object_id, caller_zone_id);
-        }
         uint64_t ret = 0;
         sgx_status_t status = ::add_ref_host(&ret, protocol_version, destination_channel_zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), caller_channel_zone_id.get_val(), caller_zone_id.get_val(), (std::uint8_t)build_out_param_channel);
         if (status)
@@ -149,15 +140,7 @@ namespace rpc
                 telemetry_service->message(rpc::i_telemetry_service::err, "add_ref_host failed");
             }
             return std::numeric_limits<uint64_t>::max();
-        }     
-        if(ret == std::numeric_limits<uint64_t>::max())
-        {
-            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
-            {
-                telemetry_service->on_service_proxy_release("host_service_proxy", get_zone_id(), destination_zone_id,
-                                                            object_id, caller_zone_id);
-            }
-        }   
+        }  
         if(proxy_add_ref && ret != std::numeric_limits<uint64_t>::max())
         {
             add_external_ref();
@@ -175,11 +158,6 @@ namespace rpc
         caller_zone caller_zone_id
     )
     {
-        if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
-        {
-            telemetry_service->on_service_proxy_release("host_service_proxy", get_zone_id(),
-                                                        destination_zone_id, object_id, caller_zone_id);
-        }
         uint64_t ret = 0;
         sgx_status_t status = ::release_host(&ret, protocol_version, destination_zone_id.get_val(), object_id.get_val(), caller_zone_id.get_val());
         if (status)

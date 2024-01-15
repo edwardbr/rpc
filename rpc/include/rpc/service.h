@@ -16,6 +16,7 @@
 #include <rpc/marshaller.h>
 #include <rpc/remote_pointer.h>
 #include <rpc/casting_interface.h>
+#include <rpc/i_telemetry_service.h>
 
 namespace rpc
 {
@@ -67,10 +68,11 @@ namespace rpc
 
         // hard lock on the root object
         mutable std::mutex insert_control;
+        const i_telemetry_service* telemetry_service_ = nullptr;
         rpc::shared_ptr<casting_interface> get_castable_interface(object object_id, interface_ordinal interface_id);
 
     public:
-        explicit service(zone zone_id = generate_new_zone_id());
+        explicit service(zone zone_id, const i_telemetry_service* telemetry_service);
         virtual ~service();
 
         virtual bool check_is_empty() const;
@@ -171,8 +173,8 @@ namespace rpc
         destination_zone parent_zone_id_;
         bool child_does_not_use_parents_interface_ = true;
     public:
-        explicit child_service(zone zone_id, destination_zone parent_zone_id) : 
-            service(zone_id),
+        explicit child_service(zone zone_id, destination_zone parent_zone_id, const i_telemetry_service* telemetry_service) : 
+            service(zone_id, telemetry_service),
             parent_zone_id_(parent_zone_id)
         {}
 

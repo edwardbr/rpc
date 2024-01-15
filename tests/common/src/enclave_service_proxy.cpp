@@ -145,11 +145,6 @@ namespace rpc
 
     int enclave_service_proxy::try_cast(uint64_t protocol_version, destination_zone destination_zone_id, object object_id, interface_ordinal interface_id)
     {
-        if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
-        {
-            telemetry_service->on_service_proxy_try_cast("enclave_service_proxy", get_zone_id(), destination_zone_id,
-                                                            object_id, interface_id);
-        }
         int err_code = 0;
         sgx_status_t status = ::try_cast_enclave(eid_, &err_code, protocol_version, destination_zone_id.get_val(), object_id.get_val(), interface_id.get_val());
         if(status == SGX_ERROR_ECALL_NOT_ALLOWED)
@@ -174,11 +169,6 @@ namespace rpc
 
     uint64_t enclave_service_proxy::add_ref(uint64_t protocol_version, destination_channel_zone destination_channel_zone_id, destination_zone destination_zone_id, object object_id, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, add_ref_options build_out_param_channel, bool proxy_add_ref)
     {
-        if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
-        {
-            telemetry_service->on_service_proxy_add_ref("enclave_service_proxy", get_zone_id(), destination_zone_id,
-                                                        object_id, caller_zone_id);
-        }
         uint64_t ret = 0;
         constexpr auto add_ref_failed_val = std::numeric_limits<uint64_t>::max();
         sgx_status_t status = ::add_ref_enclave(eid_, &ret, protocol_version, destination_channel_zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), caller_channel_zone_id.get_val(), caller_zone_id.get_val(), (uint8_t)build_out_param_channel);
@@ -198,15 +188,7 @@ namespace rpc
             }
             assert(false);
             return add_ref_failed_val;
-        }        
-        if(ret == add_ref_failed_val)
-        {
-            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
-            {
-                telemetry_service->on_service_proxy_release("enclave_service_proxy", get_zone_id(), destination_zone_id,
-                                                            object_id, caller_zone_id);
-            }
-        }
+        }    
         if(proxy_add_ref && ret != add_ref_failed_val)
         {
             add_external_ref();
@@ -216,11 +198,6 @@ namespace rpc
 
     uint64_t enclave_service_proxy::release(uint64_t protocol_version, destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id)
     {
-        if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
-        {
-            telemetry_service->on_service_proxy_release("enclave_service_proxy", get_zone_id(), destination_zone_id,
-                                                        object_id, caller_zone_id);
-        }
         uint64_t ret = 0;
         sgx_status_t status = ::release_enclave(eid_, &ret, protocol_version, destination_zone_id.get_val(), object_id.get_val(), caller_zone_id.get_val());
         if(status == SGX_ERROR_ECALL_NOT_ALLOWED)

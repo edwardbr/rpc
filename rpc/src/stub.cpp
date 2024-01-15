@@ -5,10 +5,13 @@
 
 namespace rpc
 {
-    object_stub::object_stub(object id, service& zone)
+    object_stub::object_stub(object id, service& zone, void* target, const i_telemetry_service* telemetry_service)
         : id_(id)
         , zone_(zone)
+        , telemetry_service_(telemetry_service)
     {
+        if(telemetry_service_)
+            telemetry_service_->on_stub_creation(zone_.get_zone_id(), id_, (uint64_t)target);
 #ifdef USE_RPC_LOGGING
         auto message = std::string("object_stub::object_stub zone_id ") + std::to_string(zone_.get_zone_id()) 
         + std::string(", object_id ") + std::to_string(id_);
@@ -17,6 +20,8 @@ namespace rpc
     }
     object_stub::~object_stub()
     {
+        if(telemetry_service_)
+            telemetry_service_->on_stub_deletion(zone_.get_zone_id(), id_);
 #ifdef USE_RPC_LOGGING
         auto message = std::string("object_stub::~object_stub zone_id ") + std::to_string(zone_.get_zone_id()) 
         + std::string(", object_id ") + std::to_string(id_);
@@ -95,6 +100,8 @@ namespace rpc
     uint64_t object_stub::add_ref()
     {
         uint64_t ret = ++reference_count;
+        if(telemetry_service_)
+            telemetry_service_->on_stub_add_ref(zone_.get_zone_id(), id_, {}, ret, {});
         assert(ret != std::numeric_limits<uint64_t>::max());
         assert(ret != 0);
         return ret;
@@ -103,6 +110,8 @@ namespace rpc
     uint64_t object_stub::release()
     {
         uint64_t count = --reference_count;
+        if(telemetry_service_)
+            telemetry_service_->on_stub_release(zone_.get_zone_id(), id_, {}, count, {});
         assert(count != std::numeric_limits<uint64_t>::max());
         return count;
     }

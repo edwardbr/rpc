@@ -28,8 +28,10 @@ namespace rpc
         return {count}; 
     }
 
-    service::service(zone zone_id) : zone_id_(zone_id)
+    service::service(zone zone_id, const i_telemetry_service* telemetry_service) : zone_id_(zone_id), telemetry_service_(telemetry_service)
     {
+        if(telemetry_service_)
+            telemetry_service_->on_service_creation("", zone_id);
 #ifdef USE_RPC_LOGGING
         auto message = std::string("new service zone_id ") + std::to_string(zone_id.get_val());
         LOG_STR(message.data(),message.size());
@@ -38,6 +40,8 @@ namespace rpc
 
     service::~service() 
     {
+        if(telemetry_service_)
+            telemetry_service_->on_service_deletion("", zone_id_);        
 #ifdef USE_RPC_LOGGING
         auto message = std::string("~service zone_id ") + std::to_string(zone_id_.get_val());
         LOG_STR(message.data(),message.size());
@@ -235,6 +239,7 @@ namespace rpc
     {
         auto object_proxy = base->get_object_proxy();
         auto object_service_proxy = object_proxy->get_service_proxy();
+        assert(object_service_proxy->get_zone_id() == zone_id_);
         auto destination_zone_id = object_service_proxy->get_destination_zone_id();
         auto destination_channel_zone_id = object_service_proxy->get_destination_channel_zone_id();
         auto object_id = object_proxy->get_object_id();
@@ -344,7 +349,7 @@ namespace rpc
             {
                 //else create a stub
                 auto id = generate_new_object_id();
-                stub = rpc::shared_ptr<object_stub>(new object_stub(id, *this));
+                stub = rpc::shared_ptr<object_stub>(new object_stub(id, *this, pointer, telemetry_service_));
                 rpc::shared_ptr<i_interface_stub> interface_stub = fn(stub);
                 stub->add_interface(interface_stub);
                 wrapped_object_to_stub[pointer] = stub;
@@ -413,6 +418,10 @@ namespace rpc
                 assert(false);
                 return rpc::error::ZONE_NOT_FOUND();
             }
+            if (telemetry_service_)
+            {
+                telemetry_service_->on_service_try_cast("service", get_zone_id(), destination_zone_id, {0}, object_id, interface_id);
+            }
             return other_zone->try_cast(protocol_version, destination_zone_id, object_id, interface_id);
         }
         else
@@ -449,6 +458,9 @@ namespace rpc
         bool proxy_add_ref
     )
 {
+        if(telemetry_service_)
+            telemetry_service_->on_service_add_ref("service", zone_id_, destination_channel_zone_id, destination_zone_id, object_id, caller_channel_zone_id, caller_zone_id);    
+        
         auto dest_channel = destination_channel_zone_id.is_set() ? destination_channel_zone_id.get_val() : destination_zone_id.get_val();
         auto caller_channel = caller_channel_zone_id.is_set() ? caller_channel_zone_id.id : caller_zone_id.id;
 
@@ -720,6 +732,9 @@ namespace rpc
         caller_zone caller_zone_id
     )
     {
+        if(telemetry_service_)
+            telemetry_service_->on_service_release("service", zone_id_, destination_zone_id, object_id, caller_zone_id);    
+
         if(destination_zone_id != get_zone_id().as_destination())
         {
             rpc::shared_ptr<service_proxy> other_zone;
@@ -997,7 +1012,7 @@ namespace rpc
 
     void child_service::set_parent(const rpc::shared_ptr<rpc::service_proxy>& parent_service_proxy)
     {
-        if(child_does_not_use_parents_interface_ && parent_service_proxy_)
+        if(child_does_not_use_parents_interface_ && parent_service_proxy_ && parent_service_proxy_ != parent_service_proxy)
         {
             parent_service_proxy_->release_external_ref();
         }

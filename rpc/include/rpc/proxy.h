@@ -93,7 +93,7 @@ namespace rpc
 
     public:
         static rpc::shared_ptr<object_proxy> create(object object_id,
-                                                    const rpc::shared_ptr<service_proxy>& service_proxy);
+                                                    const rpc::shared_ptr<service_proxy>& service_proxy, bool add_ref_done);
 
         virtual ~object_proxy();
 
@@ -230,8 +230,8 @@ namespace rpc
         destination_channel_zone destination_channel_zone_ = {0};
         caller_zone caller_zone_id_ = {0};
         rpc::weak_ptr<service> service_;
-        rpc::shared_ptr<service_proxy> dependent_services_lock_;
-        std::atomic<int> dependent_services_count_ = 0;
+        rpc::shared_ptr<service_proxy> lifetime_lock_;
+        std::atomic<int> lifetime_lock_count_ = 0;
         const rpc::i_telemetry_service* const telemetry_service_ = nullptr;
         std::atomic<uint64_t> version_ = rpc::get_version();
         encoding enc_ = encoding::enc_default;
@@ -263,7 +263,7 @@ namespace rpc
                 destination_channel_zone_(other.destination_channel_zone_),
                 caller_zone_id_(other.caller_zone_id_),
                 service_(other.service_),
-                dependent_services_count_(0),
+                lifetime_lock_count_(0),
                 telemetry_service_(other.telemetry_service_),
                 enc_(other.enc_)
         {
@@ -313,10 +313,10 @@ namespace rpc
         void add_external_ref()
         {
             std::lock_guard g(insert_control_);
-            auto count = ++dependent_services_count_;
+            auto count = ++lifetime_lock_count_;
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
             {
-                telemetry_service->on_service_proxy_add_external_ref("service_proxy", zone_id_, destination_zone_id_, count, caller_zone_id_);
+                telemetry_service->on_service_proxy_add_external_ref("service_proxy", zone_id_, destination_channel_zone_, destination_zone_id_, caller_zone_id_, count);
             } 
 #ifdef USE_RPC_LOGGING
         auto message = std::string("service_proxy add_external_ref zone_id ") + std::to_string(zone_id_.get_val())
@@ -329,19 +329,19 @@ namespace rpc
             assert(count >= 1);
             if(count == 1)
             {
-                assert(!dependent_services_lock_);
-                dependent_services_lock_ = weak_this_.lock();
-                assert(dependent_services_lock_);
+                assert(!lifetime_lock_);
+                lifetime_lock_ = weak_this_.lock();
+                assert(lifetime_lock_);
             }            
         }
 
         void release_external_ref()
         {
             std::lock_guard g(insert_control_);
-            auto count = --dependent_services_count_;
+            auto count = --lifetime_lock_count_;
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
             {
-                telemetry_service->on_service_proxy_release_external_ref("service_proxy", zone_id_, destination_zone_id_, count, caller_zone_id_);
+                telemetry_service->on_service_proxy_release_external_ref("service_proxy", zone_id_, destination_channel_zone_, destination_zone_id_, caller_zone_id_, count);
             }            
 #ifdef USE_RPC_LOGGING
         auto message = std::string("service_proxy release_external_ref zone_id ") + std::to_string(zone_id_.get_val())
@@ -354,8 +354,8 @@ namespace rpc
             assert(count >= 0);
             if(count == 0)
             {
-                assert(dependent_services_lock_);
-                dependent_services_lock_ = nullptr;
+                assert(lifetime_lock_);
+                lifetime_lock_ = nullptr;
             }            
         }
 
@@ -405,11 +405,17 @@ namespace rpc
             auto version = original_version;
             while(version)
             {
+                auto if_id = id_getter(version);
+                if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
+                {
+                    telemetry_service->on_service_proxy_try_cast("service_proxy", get_zone_id(),
+                                                                    destination_zone_id, get_caller_zone_id(), object_id, if_id);
+                }
                 auto ret = try_cast(
                     version
                     , destination_zone_id
                     , object_id
-                    , id_getter(version));
+                    , if_id);
                 if(ret != rpc::error::INVALID_VERSION())
                 {
                     if(original_version != version)
@@ -432,6 +438,11 @@ namespace rpc
             , add_ref_options build_out_param_channel 
             , bool proxy_add_ref)
         {
+            if (telemetry_service_)
+            {
+                telemetry_service_->on_service_proxy_add_ref("service_proxy", get_zone_id(),
+                                                                destination_zone_id, get_caller_zone_id(), object_id);
+            }
             auto original_version = version_.load();
             auto version = original_version;
             while(version)
@@ -463,6 +474,13 @@ namespace rpc
             , object object_id 
             , caller_zone caller_zone_id) 
         {
+
+            if (telemetry_service_ && object_id != dummy_object_id)
+            {
+                telemetry_service_->on_service_proxy_release("service_proxy", get_zone_id(),
+                                                                destination_zone_id, get_caller_zone_id(), object_id);
+            }
+            
             auto original_version = version_.load();
             auto version = original_version;
             while(version)
@@ -488,6 +506,7 @@ namespace rpc
         std::unordered_map<object, rpc::weak_ptr<object_proxy>> get_proxies(){return proxies_;}
 
         virtual rpc::shared_ptr<service_proxy> deep_copy_for_clone() = 0;
+        virtual void clone_completed() = 0;
         rpc::shared_ptr<service_proxy> clone_for_zone(destination_zone destination_zone_id, caller_zone caller_zone_id)
         {
             assert(!(caller_zone_id_ == caller_zone_id && destination_zone_id_ == destination_zone_id));
@@ -501,10 +520,7 @@ namespace rpc
             }
 
             ret->weak_this_ = ret;
-            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
-            {
-                telemetry_service->on_service_proxy_creation("service_proxy", zone_id_, ret->get_destination_zone_id(), caller_zone_id);
-            }
+            ret->clone_completed();
             get_operating_zone_service()->inner_add_zone_proxy(ret);
             ret->add_external_ref();
             return ret;
@@ -605,7 +621,7 @@ namespace rpc
             rpc::shared_ptr<object_proxy> op = service_proxy->get_object_proxy(encap.object_id);
             if(!op)
             {
-                op = object_proxy::create(encap.object_id, service_proxy);
+                op = object_proxy::create(encap.object_id, service_proxy, true);
                 auto ret = service_proxy->sp_add_ref(
                                 service_proxy->get_destination_channel_zone_id()
                                 , encap.destination_zone_id
@@ -712,7 +728,7 @@ namespace rpc
         else
         {
             //else we create an object_proxy and add ref to the service proxy as it has a new object to monitor
-            op = object_proxy::create(encap.object_id, service_proxy);
+            op = object_proxy::create(encap.object_id, service_proxy, true);
             
             //this tells child_services that the parent channel no longer needs to be explicitly released
             serv->notify_parent_add_ref(sp->get_destination_zone_id());
@@ -766,7 +782,7 @@ namespace rpc
         rpc::shared_ptr<object_proxy> op = service_proxy->get_object_proxy(encap.object_id);
         if(!op)
         {
-            op = object_proxy::create(encap.object_id, service_proxy);
+            op = object_proxy::create(encap.object_id, service_proxy, true);
         }
         return op->query_interface(val, false);
     }

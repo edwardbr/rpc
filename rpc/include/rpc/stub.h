@@ -11,6 +11,7 @@
 #include <rpc/marshaller.h>
 #include <rpc/remote_pointer.h>
 #include <rpc/casting_interface.h>
+#include <rpc/i_telemetry_service.h>
 
 namespace rpc
 {
@@ -28,9 +29,10 @@ namespace rpc
         shared_ptr<object_stub> p_this;
         std::atomic<uint64_t> reference_count = 0;
         service& zone_;
+        const i_telemetry_service* telemetry_service_ = nullptr;
 
     public:
-        object_stub(object id, service& zone);
+        object_stub(object id, service& zone, void* target, const i_telemetry_service* telemetry_service);
         ~object_stub();
         object get_id() const
         {
