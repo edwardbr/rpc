@@ -17,6 +17,7 @@ add_library(
   include/rpc/stub.h
   src/proxy.cpp
   ${REMOTE_PTR_CPP}
+  src/casting_interface.cpp
   src/service.cpp
   src/stub.cpp
   src/error_codes.cpp
@@ -50,6 +51,7 @@ add_library(
   include/rpc/stub.h
   src/proxy.cpp
   ${REMOTE_PTR_CPP}
+  src/casting_interface.cpp
   src/service.cpp
   src/stub.cpp
   src/error_codes.cpp
@@ -85,6 +87,7 @@ add_library(
   include/rpc/stub.h
   src/proxy.cpp
   ${REMOTE_PTR_CPP}
+  src/casting_interface.cpp
   src/service.cpp
   src/stub.cpp
   src/error_codes.cpp

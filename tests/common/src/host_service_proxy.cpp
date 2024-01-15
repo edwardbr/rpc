@@ -25,7 +25,7 @@ namespace rpc
         ret->weak_this_ = pthis;
         svc->add_zone_proxy(ret);
         ret->add_external_ref();
-        svc->set_parent(pthis, host_id.id ? false : true);
+        svc->set_parent(pthis);
         return pthis;
     }
 
@@ -162,6 +162,9 @@ namespace rpc
         {
             add_external_ref();
         }
+
+        auto svc = rpc::static_pointer_cast<child_service>(get_operating_zone_service());
+        svc->notify_parent_add_ref(destination_zone_id);
         return ret;
     }
 

@@ -40,15 +40,14 @@ namespace rpc
         //if there is no use of a local_service_proxy in the zone requires_parent_release must be set to true so that the zones service can clean things ups
         static rpc::shared_ptr<local_service_proxy> create(const rpc::shared_ptr<service>& destination_svc,
                                                            const rpc::shared_ptr<child_service>& svc,
-                                                           const rpc::i_telemetry_service* telemetry_service,
-                                                           bool child_does_not_use_parents_interface)
+                                                           const rpc::i_telemetry_service* telemetry_service)
         {
             auto ret = rpc::shared_ptr<local_service_proxy>(new local_service_proxy(destination_svc, svc, telemetry_service));
             auto pthis = rpc::static_pointer_cast<service_proxy>(ret);
             ret->weak_this_ = pthis;
             svc->add_zone_proxy(ret);
             ret->add_external_ref();
-            svc->set_parent(pthis, child_does_not_use_parents_interface);
+            svc->set_parent(pthis);
             return ret;
         }
 
@@ -97,11 +96,15 @@ namespace rpc
                 telemetry_service->on_service_proxy_add_ref("local_service_proxy", get_zone_id(), destination_zone_id,
                                                             object_id, caller_zone_id);
             }
-            auto ret = destination_service_.lock()->add_ref(protocol_version, destination_channel_zone_id, destination_zone_id, object_id, caller_channel_zone_id, caller_zone_id, build_out_param_channel, proxy_add_ref);            
+            auto dest = destination_service_.lock();
+            auto ret = dest->add_ref(protocol_version, destination_channel_zone_id, destination_zone_id, object_id, caller_channel_zone_id, caller_zone_id, build_out_param_channel, proxy_add_ref);            
             if(proxy_add_ref && ret != std::numeric_limits<uint64_t>::max())
             {
                 add_external_ref();
             }
+            
+            auto svc = rpc::static_pointer_cast<child_service>(get_operating_zone_service());
+            svc->notify_parent_add_ref(destination_zone_id);
             return ret;
         }
         uint64_t release(

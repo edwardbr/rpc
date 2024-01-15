@@ -127,7 +127,7 @@ rpc::shared_ptr<rpc::child_service> rpc_server;
 int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t host_id, uint64_t child_zone_id, uint64_t* example_object_id)
 {
     //create a rpc::zone service for the enclave
-    rpc_server = rpc::make_shared<rpc::child_service>(rpc::zone{child_zone_id}); 
+    rpc_server = rpc::make_shared<rpc::child_service>(rpc::zone{child_zone_id}, rpc::destination_zone{host_zone_id}); 
     example_import_idl_register_stubs(rpc_server);
     example_shared_idl_register_stubs(rpc_server);
     example_idl_register_stubs(rpc_server);

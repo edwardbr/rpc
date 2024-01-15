@@ -10,7 +10,7 @@ namespace rpc
         , zone_(zone)
     {
 #ifdef USE_RPC_LOGGING
-        auto message = std::string("object_stub::object_stub zone ") + std::to_string(zone_.get_zone_id()) 
+        auto message = std::string("object_stub::object_stub zone_id ") + std::to_string(zone_.get_zone_id()) 
         + std::string(", object_id ") + std::to_string(id_);
         LOG_STR(message.c_str(), message.size());
 #endif
@@ -18,7 +18,7 @@ namespace rpc
     object_stub::~object_stub()
     {
 #ifdef USE_RPC_LOGGING
-        auto message = std::string("object_stub::~object_stub zone ") + std::to_string(zone_.get_zone_id()) 
+        auto message = std::string("object_stub::~object_stub zone_id ") + std::to_string(zone_.get_zone_id()) 
         + std::string(", object_id ") + std::to_string(id_);
         LOG_STR(message.c_str(), message.size());
 #endif

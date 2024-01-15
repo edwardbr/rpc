@@ -251,7 +251,8 @@ namespace enclave_marshaller
                 return fmt::format("rpc::shared_ptr<rpc::object_stub> {}_stub_;", name);
             case PROXY_PREPARE_IN_INTERFACE_ID:
                 return fmt::format(
-                    "auto {0}_stub_id_ = proxy_bind_in_param(__rpc_sp->get_remote_rpc_version(), {0}, {0}_stub_);",
+                    "assert(rpc::are_in_same_zone(this, {0}.get()));\n"
+                    "\t\t\tauto {0}_stub_id_ = proxy_bind_in_param(__rpc_sp->get_remote_rpc_version(), {0}, {0}_stub_);",
                     name);
             case PROXY_MARSHALL_IN:
             {
@@ -309,7 +310,8 @@ namespace enclave_marshaller
                 return fmt::format("rpc::shared_ptr<rpc::object_stub> {}_stub_;", name);
             case PROXY_PREPARE_IN_INTERFACE_ID:
                 return fmt::format(
-                    "auto {0}_stub_id_ = proxy_bind_in_param(__rpc_sp->get_remote_rpc_version(), {0}, {0}_stub_);",
+                    "assert(rpc::are_in_same_zone(this, {0}.get()));\n"
+                    "\t\t\tauto {0}_stub_id_ = proxy_bind_in_param(__rpc_sp->get_remote_rpc_version(), {0}, {0}_stub_);",
                     name);
             case PROXY_MARSHALL_IN:
             {

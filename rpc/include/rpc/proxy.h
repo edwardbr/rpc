@@ -216,26 +216,6 @@ namespace rpc
         }
     };
 
-
-	//this bundle of joy implements a non locking pointer where if the remote object is not there
-    //it will return an error without crashing
-	/*template<class T> class optimistic_proxy_impl : public T
-	{
-		object object_id_;
-		zone destination_zone_id_;
-		rpc::weak_ptr<service_proxy> service_proxy_;
-	public:
-		optimistic_proxy_impl(rpc::shared_ptr<object_proxy> object_proxy)
-			: object_id_(object_proxy->get_object_id())
-			, destination_zone_id_(object_proxy->get_zone_id())
-			, service_proxy_(object_proxy->get_service_proxy())
-		{}
-		virtual ~optimistic_proxy_impl() = default;
-		object get_object_id() const { return object_id_; }
-		destination_zone get_zone_id() const { return destination_zone_id_; }
-		rpc::weak_ptr<service_proxy> get_service_proxy() const { return service_proxy_; }
-	};*/
-
     // the class that encapsulates an environment or zone
     // only host code can use this class directly other enclaves *may* have access to the i_service_proxy derived interface
 
@@ -269,9 +249,9 @@ namespace rpc
             telemetry_service_(telemetry_service)
         {
 #ifdef USE_RPC_LOGGING
-            auto message = std::string("service_proxy::service_proxy zone ") + std::to_string(zone_id_.get_val())
-            + std::string(" destination zone ") + std::to_string(destination_zone_id_.get_val()) 
-            + std::string(" caller zone ") + std::to_string(caller_zone_id.get_val());
+            auto message = std::string("service_proxy::service_proxy zone_id ") + std::to_string(zone_id_.get_val())
+            + std::string(" destination_zone_id ") + std::to_string(destination_zone_id_.get_val()) 
+            + std::string(" caller_zone_id ") + std::to_string(caller_zone_id.get_val());
             LOG_STR(message.c_str(), message.size());
 #endif
             assert(svc != nullptr);
@@ -288,10 +268,10 @@ namespace rpc
                 enc_(other.enc_)
         {
 #ifdef USE_RPC_LOGGING
-            auto message = std::string("service_proxy::service_proxy cloned zone ") + std::to_string(zone_id_.get_val())
-            + std::string(" destination zone ") + std::to_string(destination_zone_id_.get_val()) 
-            + std::string(" destination channel zone ") + std::to_string(destination_channel_zone_.get_val())
-            + std::string(" caller zone ") + std::to_string(caller_zone_id_.get_val());
+            auto message = std::string("service_proxy::service_proxy cloned zone_id ") + std::to_string(zone_id_.get_val())
+            + std::string(" destination_zone_id ") + std::to_string(destination_zone_id_.get_val()) 
+            + std::string(" destination_channel_zone_id ") + std::to_string(destination_channel_zone_.get_val())
+            + std::string(" caller_zone_id ") + std::to_string(caller_zone_id_.get_val());
             LOG_STR(message.data(),message.size());
 #endif
             assert(service_.lock() != nullptr);
@@ -312,10 +292,10 @@ namespace rpc
             }
             
 #ifdef USE_RPC_LOGGING
-            auto message = std::string("service_proxy::~service_proxy zone ") + std::to_string(zone_id_.get_val())
-            + std::string(" destination zone ") + std::to_string(destination_zone_id_.get_val()) 
-            + std::string(" destination channel zone ") + std::to_string(destination_channel_zone_.get_val())
-            + std::string(" caller zone ") + std::to_string(caller_zone_id_.get_val());
+            auto message = std::string("service_proxy::~service_proxy zone_id ") + std::to_string(zone_id_.get_val())
+            + std::string(" destination_zone_id ") + std::to_string(destination_zone_id_.get_val()) 
+            + std::string(" destination_channel_zone_id ") + std::to_string(destination_channel_zone_.get_val())
+            + std::string(" caller_zone_id ") + std::to_string(caller_zone_id_.get_val());
             LOG_STR(message.data(),message.size());
 #endif
         }
@@ -337,7 +317,15 @@ namespace rpc
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
             {
                 telemetry_service->on_service_proxy_add_external_ref("service_proxy", zone_id_, destination_zone_id_, count, caller_zone_id_);
-            }            
+            } 
+#ifdef USE_RPC_LOGGING
+        auto message = std::string("service_proxy add_external_ref zone_id ") + std::to_string(zone_id_.get_val())
+            + std::string(" destination_zone_id ") + std::to_string(destination_zone_id_.get_val())
+            + std::string(" destination_channel_zone_id ") + std::to_string(destination_channel_zone_.get_val())
+            + std::string(" caller_zone_id ") + std::to_string(caller_zone_id_.get_val())
+            + std::string(" count ") + std::to_string(count);
+        LOG_STR(message.data(),message.size());
+#endif                       
             assert(count >= 1);
             if(count == 1)
             {
@@ -355,6 +343,14 @@ namespace rpc
             {
                 telemetry_service->on_service_proxy_release_external_ref("service_proxy", zone_id_, destination_zone_id_, count, caller_zone_id_);
             }            
+#ifdef USE_RPC_LOGGING
+        auto message = std::string("service_proxy release_external_ref zone_id ") + std::to_string(zone_id_.get_val())
+            + std::string(" destination_zone_id ") + std::to_string(destination_zone_id_.get_val())
+            + std::string(" destination_channel_zone_id ") + std::to_string(destination_channel_zone_.get_val())
+            + std::string(" caller_zone_id ") + std::to_string(caller_zone_id_.get_val())
+            + std::string(" count ") + std::to_string(count);
+        LOG_STR(message.data(),message.size());
+#endif 
             assert(count >= 0);
             if(count == 0)
             {
@@ -697,6 +693,7 @@ namespace rpc
         //get the right  service proxy
         bool new_proxy_added = false;
         auto service_proxy = sp;
+        
         if(sp->get_destination_zone_id() != encap.destination_zone_id)
         {
             //if the zone is different lookup or clone the right proxy
@@ -716,8 +713,9 @@ namespace rpc
         {
             //else we create an object_proxy and add ref to the service proxy as it has a new object to monitor
             op = object_proxy::create(encap.object_id, service_proxy);
-            /*if(!new_proxy_added && sp->get_destination_zone_id() == encap.destination_zone_id)
-                service_proxy->add_external_ref();*/
+            
+            //this tells child_services that the parent channel no longer needs to be explicitly released
+            serv->notify_parent_add_ref(sp->get_destination_zone_id());
         }
         return op->query_interface(val, false);
     }
