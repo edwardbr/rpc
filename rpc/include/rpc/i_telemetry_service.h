@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include <rpc/types.h>
+#include <rpc/marshaller.h>
 
 //copied from spdlog
 #define I_TELEMETRY_LEVEL_DEBUG 0
@@ -32,7 +33,7 @@ namespace rpc
         virtual void on_service_creation(const char* name, zone zone_id) const = 0;
         virtual void on_service_deletion(const char* name, zone zone_id) const = 0;
         virtual void on_service_try_cast(const char* name, zone zone_id, destination_zone destination_zone_id, caller_zone caller_zone_id, object object_id, interface_ordinal interface_id) const = 0;
-        virtual void on_service_add_ref(const char* name, zone zone_id, destination_channel_zone destination_channel_zone_id, destination_zone destination_zone_id, object object_id, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id) const = 0;
+        virtual void on_service_add_ref(const char* name, zone zone_id, destination_channel_zone destination_channel_zone_id, destination_zone destination_zone_id, object object_id, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, rpc::add_ref_options options) const = 0;
         virtual void on_service_release(const char* name, zone zone_id, destination_channel_zone destination_channel_zone_id, destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id) const = 0;  
 
         virtual void on_service_proxy_creation(const char* name, zone zone_id, destination_zone destination_zone_id, caller_zone caller_zone_id) const = 0;

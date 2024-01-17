@@ -107,10 +107,10 @@ extern "C"
         if (telemetry_service)
             telemetry_service->on_service_try_cast(name, {zone_id}, {destination_zone_id}, {caller_zone_id}, {object_id}, {interface_id});
     }
-    void on_service_add_ref_host(const char* name, uint64_t zone_id, uint64_t destination_channel_zone_id, uint64_t destination_zone_id, uint64_t object_id, uint64_t caller_channel_zone_id, uint64_t caller_zone_id)
+    void on_service_add_ref_host(const char* name, uint64_t zone_id, uint64_t destination_channel_zone_id, uint64_t destination_zone_id, uint64_t object_id, uint64_t caller_channel_zone_id, uint64_t caller_zone_id, uint64_t options)
     {
         if (telemetry_service)
-            telemetry_service->on_service_add_ref(name, {zone_id}, {destination_channel_zone_id}, {destination_zone_id}, {object_id}, {caller_channel_zone_id}, {caller_zone_id});
+            telemetry_service->on_service_add_ref(name, {zone_id}, {destination_channel_zone_id}, {destination_zone_id}, {object_id}, {caller_channel_zone_id}, {caller_zone_id}, (rpc::add_ref_options) options);
     }
     void on_service_release_host(const char* name, uint64_t zone_id, uint64_t destination_channel_zone_id, uint64_t destination_zone_id, uint64_t object_id, uint64_t caller_zone_id)
     {

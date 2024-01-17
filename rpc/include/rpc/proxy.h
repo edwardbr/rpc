@@ -236,6 +236,8 @@ namespace rpc
         std::atomic<uint64_t> version_ = rpc::get_version();
         encoding enc_ = encoding::enc_default;
         bool has_add_reffed_ = false;
+        //if a service proxy is pointing to the zones parent zone then it needs to stay alive even if there are no active references going through it
+        bool is_parent_channel_ = false;
 
     protected:
 
@@ -279,6 +281,17 @@ namespace rpc
         }
 
         void set_remote_rpc_version(uint64_t version) {version_ = version;}
+        bool is_parent_channel() const {return is_parent_channel_;}
+        void set_parent_channel(bool val) 
+        {
+            is_parent_channel_ = val;
+
+            if(lifetime_lock_count_ == 0 && is_parent_channel_ == false)
+            {
+                assert(lifetime_lock_);
+                lifetime_lock_ = nullptr;
+            }                 
+        }
 
         mutable rpc::weak_ptr<service_proxy> weak_this_;
 
@@ -364,7 +377,7 @@ namespace rpc
         LOG_STR(message.data(),message.size());
 #endif 
             assert(count >= 0);
-            if(count == 0)
+            if(count == 0 && is_parent_channel_ == false)
             {
                 assert(lifetime_lock_);
                 lifetime_lock_ = nullptr;
@@ -451,11 +464,6 @@ namespace rpc
             , add_ref_options build_out_param_channel 
             , bool proxy_add_ref)
         {
-            if (telemetry_service_)
-            {
-                telemetry_service_->on_service_proxy_add_ref("service_proxy", get_zone_id(),
-                                                                destination_zone_id, destination_channel_zone_id, get_caller_zone_id(), object_id);
-            }
             auto original_version = version_.load();
             auto version = original_version;
             while(version)
@@ -526,6 +534,7 @@ namespace rpc
         {
             assert(!(caller_zone_id_ == caller_zone_id && destination_zone_id_ == destination_zone_id));
             auto ret = deep_copy_for_clone();
+            ret->is_parent_channel_ = false;
             ret->caller_zone_id_ = caller_zone_id;
             if(destination_zone_id_ != destination_zone_id)
             {

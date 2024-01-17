@@ -258,6 +258,16 @@ namespace rpc
             //caller and destination are in the same channel let them fork where necessary
             //note the caller_channel_zone_id is 0 as both the caller and the destination are in from the same direction so any other value is wrong
             //Dont external_add_ref the local service proxy as we are return to source no channel is required
+            if(telemetry_service_)
+                telemetry_service_->on_service_add_ref(
+                    "", 
+                    get_zone_id(), 
+                    {0}, 
+                    destination_zone_id, 
+                    object_id, 
+                    {0}, 
+                    caller_zone_id, 
+                    rpc::add_ref_options::build_caller_route | rpc::add_ref_options::build_destination_route);   
             object_service_proxy->add_ref(
                 protocol_version,
                 {0}, 
@@ -282,6 +292,17 @@ namespace rpc
                 destination_zone = object_service_proxy->clone_for_zone(destination_zone_id, caller_zone_id);
             }
 
+            if(telemetry_service_)
+                telemetry_service_->on_service_add_ref(
+                    "", 
+                    get_zone_id(), 
+                    destination_channel_zone_id, 
+                    destination_zone_id, 
+                    object_id, 
+                    get_zone_id().as_caller_channel(), 
+                    caller_zone_id, 
+                    rpc::add_ref_options::build_destination_route);                
+
             //the fork is here so we need to add ref the destination normally with caller info
             //note the caller_channel_zone_id is is this zones id as the caller came from a route via this node
             destination_zone->add_ref(
@@ -299,6 +320,18 @@ namespace rpc
             assert(found != other_zones.end());
             auto caller_zone = found->second.lock();
             assert(caller_zone);
+            
+            if(telemetry_service_)
+                telemetry_service_->on_service_add_ref(
+                    "", 
+                    get_zone_id(), 
+                    zone_id_.as_destination_channel(), 
+                    destination_zone_id, 
+                    object_id, 
+                    {0}, 
+                    caller_zone_id, 
+                    rpc::add_ref_options::build_caller_route);                
+            
             //note the caller_channel_zone_id is 0 as the caller came from this route 
             caller_zone->add_ref(
                 protocol_version,
@@ -370,6 +403,17 @@ namespace rpc
                 else
                     caller_zone = get_parent();
                 assert(caller_zone);
+                    
+                if(telemetry_service_)
+                    telemetry_service_->on_service_add_ref(
+                        "", 
+                        get_zone_id(), 
+                        {0}, 
+                        zone_id_.as_destination(), 
+                        stub->get_id(), 
+                        {0}, 
+                        caller_zone_id, 
+                        rpc::add_ref_options::build_caller_route);                    
                 //note the caller_channel_zone_id is 0 as the caller came from this route 
                 caller_zone->add_ref(
                     protocol_version,
@@ -459,7 +503,7 @@ namespace rpc
     )
 {
         if(telemetry_service_)
-            telemetry_service_->on_service_add_ref("service", zone_id_, destination_channel_zone_id, destination_zone_id, object_id, caller_channel_zone_id, caller_zone_id);    
+            telemetry_service_->on_service_add_ref("service", zone_id_, destination_channel_zone_id, destination_zone_id, object_id, caller_channel_zone_id, caller_zone_id, build_out_param_channel);    
         
         auto dest_channel = destination_channel_zone_id.is_set() ? destination_channel_zone_id.get_val() : destination_zone_id.get_val();
         auto caller_channel = caller_channel_zone_id.is_set() ? caller_channel_zone_id.id : caller_zone_id.id;
@@ -492,6 +536,17 @@ namespace rpc
                     assert(false);
 
                 } while(false);
+                
+                if(telemetry_service_)
+                    telemetry_service_->on_service_add_ref(
+                        "", 
+                        get_zone_id(), 
+                        {0}, 
+                        destination_zone_id, 
+                        object_id, 
+                        {0}, 
+                        caller_zone_id, 
+                        build_out_param_channel);                 
                 return dest_zone->add_ref(
                     protocol_version, 
                     {0}, 
@@ -559,6 +614,17 @@ namespace rpc
                             auto cc = caller_zone->get_destination_channel_zone_id().is_set() ? caller_zone->get_destination_channel_zone_id().get_val() : caller_zone->get_destination_zone_id().get_val();
                             if(dc == cc)
                             {
+                                if(telemetry_service_)
+                                    telemetry_service_->on_service_add_ref(
+                                        "", 
+                                        get_zone_id(), 
+                                        {0}, 
+                                        destination_zone_id, 
+                                        object_id, 
+                                        {0}, 
+                                        caller_zone_id, 
+                                        build_out_param_channel);
+
                                 auto ret = dest_zone->add_ref(
                                     protocol_version, 
                                     {0}, 
@@ -579,6 +645,17 @@ namespace rpc
 
                         //then call the add ref to the destination
                         if(!!(build_out_param_channel & add_ref_options::build_destination_route))
+                        {
+                            if(telemetry_service_)
+                                telemetry_service_->on_service_add_ref(
+                                    "", 
+                                    get_zone_id(),
+                                    {0},  
+                                    destination_zone_id, 
+                                    object_id, 
+                                    get_zone_id().as_caller_channel(), 
+                                    caller_zone_id, 
+                                    add_ref_options::build_destination_route);
                             dest_zone->add_ref(
                                 protocol_version, 
                                 {0}, 
@@ -588,9 +665,20 @@ namespace rpc
                                 caller_zone_id, 
                                 add_ref_options::build_destination_route, 
                                 false);
-
+                        }
                         //back fill the ref count to the caller
                         if(!!(build_out_param_channel & add_ref_options::build_caller_route))
+                        {
+                            if(telemetry_service_)
+                                telemetry_service_->on_service_add_ref(
+                                    "", 
+                                    caller_zone->get_zone_id(), 
+                                    zone_id_.as_destination_channel(), 
+                                    destination_zone_id, 
+                                    object_id, 
+                                    caller_channel_zone_id, 
+                                    caller_zone_id, 
+                                    add_ref_options::build_caller_route);                                
                             caller_zone->add_ref(
                                 protocol_version, 
                                 zone_id_.as_destination_channel(), 
@@ -599,6 +687,7 @@ namespace rpc
                                 caller_channel_zone_id, 
                                 caller_zone_id, 
                                 add_ref_options::build_caller_route, false);
+                        }
                     }while(false);
                 }
 
@@ -634,6 +723,16 @@ namespace rpc
                         other_zone = parent->clone_for_zone(destination_zone_id, caller_zone_id);
                     }
                 }
+                if(telemetry_service_)
+                    telemetry_service_->on_service_add_ref(
+                        "", 
+                        get_zone_id(), 
+                        {0}, 
+                        destination_zone_id, 
+                        object_id, 
+                        caller_channel_zone_id, 
+                        caller_zone_id, 
+                        build_out_param_channel);   
                 return other_zone->add_ref(
                     protocol_version, 
                     {0}, 
@@ -679,6 +778,16 @@ namespace rpc
                     }
                     assert(caller_zone);
                 }
+                if(telemetry_service_)
+                    telemetry_service_->on_service_add_ref(
+                        "", 
+                        get_zone_id(), 
+                        {0},
+                        destination_zone_id, 
+                        object_id, 
+                        {}, 
+                        caller_zone_id, 
+                        add_ref_options::build_caller_route);  
                 caller_zone->add_ref(protocol_version, {0},destination_zone_id, object_id, {}, caller_zone_id, add_ref_options::build_caller_route, false);
             }
             if(object_id == dummy_object_id)
@@ -1024,6 +1133,7 @@ namespace rpc
             assert(parent_service_proxy_->get_caller_zone_id() == get_zone_id().as_caller());
             assert(parent_service_proxy_->get_destination_channel_zone_id().get_val() == 0);
             remove_zone_proxy(parent_service_proxy_->get_destination_zone_id(), get_zone_id().as_caller(), {0});
+            parent_service_proxy_->set_parent_channel(false);
             parent_service_proxy_ = nullptr;
         }    
     }

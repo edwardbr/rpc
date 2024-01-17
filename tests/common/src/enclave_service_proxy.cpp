@@ -169,6 +169,11 @@ namespace rpc
 
     uint64_t enclave_service_proxy::add_ref(uint64_t protocol_version, destination_channel_zone destination_channel_zone_id, destination_zone destination_zone_id, object object_id, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, add_ref_options build_out_param_channel, bool proxy_add_ref)
     {
+        if (get_telemetry_service())
+        {
+            get_telemetry_service()->on_service_proxy_add_ref("enclave_service_proxy", get_zone_id(),
+                                                            destination_zone_id, destination_channel_zone_id, get_caller_zone_id(), object_id);
+        }
         uint64_t ret = 0;
         constexpr auto add_ref_failed_val = std::numeric_limits<uint64_t>::max();
         sgx_status_t status = ::add_ref_enclave(eid_, &ret, protocol_version, destination_channel_zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), caller_channel_zone_id.get_val(), caller_zone_id.get_val(), (uint8_t)build_out_param_channel);

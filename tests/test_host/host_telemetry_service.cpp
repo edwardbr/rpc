@@ -158,21 +158,39 @@ void host_telemetry_service::on_service_try_cast(const char* name, rpc::zone zon
         fmt::println(output, "{} -> {} : try_cast {}", service_alias(zone_id), service_proxy_alias({zone_id}, destination_zone_id, caller_zone_id), interface_id.get_val());
 }
 
-void host_telemetry_service::on_service_add_ref(const char* name, rpc::zone zone_id, rpc::destination_channel_zone destination_channel_zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::caller_channel_zone caller_channel_zone_id, rpc::caller_zone caller_zone_id) const
+void host_telemetry_service::on_service_add_ref(const char* name, rpc::zone zone_id, rpc::destination_channel_zone destination_channel_zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::caller_channel_zone caller_channel_zone_id, rpc::caller_zone caller_zone_id, rpc::add_ref_options options) const
 {
     auto dest = destination_channel_zone_id.get_val() ? rpc::zone(destination_channel_zone_id.id) : destination_zone_id.as_zone();
 
-    if(zone_id != dest)
+    if(rpc::add_ref_options::normal == options)
     {
-        fmt::println(output, "{} -> {} : add_ref", service_alias(zone_id), service_alias(dest));
+        if(zone_id != dest)
+        {
+            fmt::println(output, "{} -> {} : add_ref", service_alias(zone_id), service_alias(dest));
+        }
+        else if(object_id != rpc::dummy_object_id)
+        {
+        //     fmt::println(output, "{} -> {} : dummy add_ref", service_alias({caller_zone_id.get_val()}), object_stub_alias(zone_id, object_id));
+        // }
+        // else
+        // {
+            fmt::println(output, "{} -> {} : add_ref", service_alias(zone_id), object_stub_alias(zone_id, object_id));
+        }
     }
-    else if(object_id != rpc::dummy_object_id)
+    else if(!!(options & rpc::add_ref_options::build_caller_route) && !!(options & rpc::add_ref_options::build_destination_route))
     {
-    //     fmt::println(output, "{} -> {} : dummy add_ref", service_alias({caller_zone_id.get_val()}), object_stub_alias(zone_id, object_id));
-    // }
-    // else
-    // {
-        fmt::println(output, "{} -> {} : add_ref", service_alias(zone_id), object_stub_alias(destination_zone_id.as_zone(), object_id));
+        fmt::println(output, "{} -->x {} : add_ref delegate linking", service_alias({caller_zone_id.get_val()}), service_alias(zone_id));
+    }
+    else
+    {
+        if(!!(options & rpc::add_ref_options::build_destination_route))
+        {
+            fmt::println(output, "{} -[#green]>o {} : add_ref build destination", service_alias(zone_id), service_alias(destination_zone_id.as_zone()));
+        }
+        if(!!(options & rpc::add_ref_options::build_caller_route))
+        {
+            fmt::println(output, "{} o-[#magenta]> {} : add_ref build caller", service_alias({caller_zone_id.get_val()}), service_alias(zone_id));
+        }
     }
 }
 
@@ -190,7 +208,7 @@ void host_telemetry_service::on_service_release(const char* name, rpc::zone zone
     // }
     // else
     // {
-        fmt::println(output, "{} -> {} : release", service_alias(zone_id), object_stub_alias(destination_zone_id.as_zone(), object_id));
+        fmt::println(output, "{} -> {} : release", service_alias(zone_id), object_stub_alias(zone_id, object_id));
     }
 }  
 

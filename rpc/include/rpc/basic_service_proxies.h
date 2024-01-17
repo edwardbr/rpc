@@ -60,6 +60,7 @@ namespace rpc
             svc->add_zone_proxy(ret);
             ret->add_external_ref();
             svc->set_parent(pthis);
+            ret->set_parent_channel(true);
             return ret;
         }
 
@@ -98,6 +99,12 @@ namespace rpc
             , add_ref_options build_out_param_channel 
             , bool proxy_add_ref) override
         {
+            if (get_telemetry_service())
+            {
+                get_telemetry_service()->on_service_proxy_add_ref("local_service_proxy", get_zone_id(),
+                                                                destination_zone_id, destination_channel_zone_id, get_caller_zone_id(), object_id);
+            }
+            assert(((std::uint8_t)build_out_param_channel & (std::uint8_t)rpc::add_ref_options::build_caller_route) || destination_channel_zone_id == 0 || destination_channel_zone_id == get_destination_channel_zone_id());
             auto dest = destination_service_.lock();
             auto ret = dest->add_ref(protocol_version, destination_channel_zone_id, destination_zone_id, object_id, caller_channel_zone_id, caller_zone_id, build_out_param_channel, proxy_add_ref);            
             if(proxy_add_ref && ret != std::numeric_limits<uint64_t>::max())
@@ -105,7 +112,7 @@ namespace rpc
                 add_external_ref();
             }
             
-            auto svc = rpc::static_pointer_cast<child_service>(get_operating_zone_service());
+            //auto svc = rpc::static_pointer_cast<child_service>(get_operating_zone_service());
             return ret;
         }
         uint64_t release(
@@ -208,6 +215,11 @@ namespace rpc
             , bool proxy_add_ref
         ) override
         {
+            if (get_telemetry_service())
+            {
+                get_telemetry_service()->on_service_proxy_add_ref("local_child_service_proxy", get_zone_id(),
+                                                                destination_zone_id, destination_channel_zone_id, get_caller_zone_id(), object_id);
+            }
             auto ret = destination_service_->add_ref(protocol_version, destination_channel_zone_id, destination_zone_id, object_id, caller_channel_zone_id, caller_zone_id, build_out_param_channel, proxy_add_ref);            
             if(proxy_add_ref && ret != std::numeric_limits<uint64_t>::max())
             {

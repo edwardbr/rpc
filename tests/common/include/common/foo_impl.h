@@ -416,7 +416,6 @@ namespace marshalled_tests
 
             //link the child to the parent
             auto parent_service_proxy = rpc::local_service_proxy::create(this_service, child_service_ptr, telemetry_);
-            child_service_ptr->set_parent(parent_service_proxy);
 
             //now make an object and present it to the parent
             auto service_proxy_to_child = rpc::local_child_service_proxy::create(child_service_ptr, this_service, telemetry_);

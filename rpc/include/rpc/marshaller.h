@@ -25,8 +25,8 @@ namespace rpc
     enum class add_ref_options : std::uint8_t
     {
         normal = 1,
-        build_destination_route = 2,
-        build_caller_route = 4
+        build_destination_route = 2,    //when unidirectionally addreffing the destination
+        build_caller_route = 4          //when unidirectionally addreffing the caller which prepares refcounts etc in the reverse direction
     };
 
     inline add_ref_options operator|(add_ref_options lhs,add_ref_options rhs)
