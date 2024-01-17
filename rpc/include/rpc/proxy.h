@@ -76,13 +76,13 @@ namespace rpc
         virtual ~proxy_impl() = default;
     };
 
-    class object_proxy
+    struct make_shared_object_proxy_enabler;
+    class object_proxy : public rpc::enable_shared_from_this<object_proxy>
     {
         object object_id_;
         rpc::shared_ptr<service_proxy> service_proxy_;
         std::unordered_map<interface_ordinal, rpc::weak_ptr<proxy_base>> proxy_map;
         std::mutex insert_control_;
-        mutable rpc::weak_ptr<object_proxy> weak_this_;
 
         object_proxy(object object_id, rpc::shared_ptr<service_proxy> service_proxy);
 
@@ -90,15 +90,14 @@ namespace rpc
         void register_interface(interface_ordinal interface_id, rpc::weak_ptr<proxy_base>& value);
 
         int try_cast(std::function<interface_ordinal (uint64_t)> id_getter);
+        
+        friend make_shared_object_proxy_enabler;     
 
     public:
         static rpc::shared_ptr<object_proxy> create(object object_id,
                                                     const rpc::shared_ptr<service_proxy>& service_proxy, bool add_ref_done);
 
         virtual ~object_proxy();
-
-        rpc::shared_ptr<object_proxy const> shared_from_this() const { return rpc::shared_ptr<object_proxy const>(weak_this_); }
-        rpc::shared_ptr<object_proxy> shared_from_this() { return rpc::shared_ptr<object_proxy>(weak_this_); }
 
         rpc::shared_ptr<service_proxy> get_service_proxy() const { return service_proxy_; }
         object get_object_id() const {return {object_id_};}
@@ -220,7 +219,8 @@ namespace rpc
     // only host code can use this class directly other enclaves *may* have access to the i_service_proxy derived interface
 
     class service_proxy : 
-        public i_marshaller
+        public i_marshaller,
+        public rpc::enable_shared_from_this<service_proxy>
     {
         std::unordered_map<object, rpc::weak_ptr<object_proxy>> proxies_;
         std::mutex insert_control_;
@@ -293,8 +293,6 @@ namespace rpc
             }                 
         }
 
-        mutable rpc::weak_ptr<service_proxy> weak_this_;
-
     public:
         virtual ~service_proxy()
         {
@@ -355,7 +353,7 @@ namespace rpc
             if(count == 1)
             {
                 assert(!lifetime_lock_);
-                lifetime_lock_ = weak_this_.lock();
+                lifetime_lock_ = shared_from_this();
                 assert(lifetime_lock_);
             }            
         }
@@ -543,15 +541,11 @@ namespace rpc
                     ret->destination_channel_zone_ = destination_zone_id_.as_destination_channel();
             }
 
-            ret->weak_this_ = ret;
             ret->clone_completed();
             get_operating_zone_service()->inner_add_zone_proxy(ret);
             ret->add_external_ref();
             return ret;
         }
-
-        rpc::shared_ptr<service_proxy> shared_from_this() { return rpc::shared_ptr<service_proxy>(weak_this_); }
-        rpc::shared_ptr<service_proxy const> shared_from_this() const { return rpc::shared_ptr<service_proxy const>(weak_this_); }
 
         //the zone where this proxy is created
         zone get_zone_id() const {return zone_id_;}

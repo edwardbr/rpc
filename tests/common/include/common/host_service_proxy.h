@@ -4,6 +4,7 @@
 
 namespace rpc
 {
+    struct make_shared_host_service_proxy_enabler;
     //This is for enclaves to call the host 
     class host_service_proxy : public service_proxy
     {
@@ -17,6 +18,8 @@ namespace rpc
                 telemetry_service->on_service_proxy_creation("host_service_proxy", get_zone_id(), get_destination_zone_id(), get_caller_zone_id());
             }
         }
+        
+        friend make_shared_host_service_proxy_enabler;
 
     public:
         host_service_proxy(const host_service_proxy& other) = default;

@@ -20,14 +20,22 @@ namespace rpc
 
     rpc::shared_ptr<service_proxy> host_service_proxy::create(destination_zone host_zone_id, object host_id, const rpc::shared_ptr<rpc::child_service>& svc, const rpc::i_telemetry_service* telemetry_service)
     {
-        auto ret = rpc::shared_ptr<host_service_proxy>(new host_service_proxy(host_zone_id, svc, telemetry_service));
-        auto pthis = rpc::static_pointer_cast<service_proxy>(ret);
-        ret->weak_this_ = pthis;
+        //a way to have private constructors in host_service_proxy but still available via enable shared from this
+        struct make_shared_host_service_proxy_enabler : public host_service_proxy 
+        {
+            make_shared_host_service_proxy_enabler(
+                destination_zone host_zone_id, 
+                const rpc::shared_ptr<service>& svc, 
+                const rpc::i_telemetry_service* telemetry_service) 
+                : host_service_proxy(host_zone_id, svc, telemetry_service){}
+        };   
+
+        auto ret = rpc::make_shared<make_shared_host_service_proxy_enabler>(host_zone_id, svc, telemetry_service);
         svc->add_zone_proxy(ret);
         ret->add_external_ref();
-        svc->set_parent(pthis);
+        svc->set_parent(ret);
         ret->set_parent_channel(true);
-        return pthis;
+        return rpc::static_pointer_cast<service_proxy>(ret);
     }
 
     host_service_proxy::~host_service_proxy()

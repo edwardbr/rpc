@@ -7,10 +7,13 @@
 
 namespace rpc
 {
+    struct make_shared_local_service_proxy_enabler;
     //this is an equivelent to an enclave looking at its host
     class local_service_proxy : public service_proxy
     {
         rpc::weak_ptr<service> destination_service_;
+        
+        friend make_shared_local_service_proxy_enabler;
 
         local_service_proxy(const rpc::shared_ptr<service>& destination_svc,
                             const rpc::shared_ptr<child_service>& svc,
@@ -50,20 +53,29 @@ namespace rpc
         }
 
         //if there is no use of a local_service_proxy in the zone requires_parent_release must be set to true so that the zones service can clean things ups
-        static rpc::shared_ptr<local_service_proxy> create(const rpc::shared_ptr<service>& destination_svc,
-                                                           const rpc::shared_ptr<child_service>& svc,
-                                                           const rpc::i_telemetry_service* telemetry_service)
-        {
-            auto ret = rpc::shared_ptr<local_service_proxy>(new local_service_proxy(destination_svc, svc, telemetry_service));
-            auto pthis = rpc::static_pointer_cast<service_proxy>(ret);
-            ret->weak_this_ = pthis;
+        
+        static rpc::shared_ptr<local_service_proxy> local_service_proxy::create(const rpc::shared_ptr<service>& destination_svc,
+                                                            const rpc::shared_ptr<child_service>& svc,
+                                                            const rpc::i_telemetry_service* telemetry_service)
+        {        
+            struct make_shared_local_service_proxy_enabler : public local_service_proxy
+            {
+                virtual ~make_shared_local_service_proxy_enabler() = default;
+                make_shared_local_service_proxy_enabler(const rpc::shared_ptr<service>& destination_svc,
+                                    const rpc::shared_ptr<child_service>& svc,
+                                    const rpc::i_telemetry_service* telemetry_service) : 
+                    local_service_proxy(destination_svc, svc, telemetry_service)
+                {}
+            };
+        
+            auto ret = rpc::make_shared<make_shared_local_service_proxy_enabler>(destination_svc, svc, telemetry_service);
             svc->add_zone_proxy(ret);
             ret->add_external_ref();
-            svc->set_parent(pthis);
+            svc->set_parent(ret);
             ret->set_parent_channel(true);
             return ret;
         }
-
+    
         int send(
             uint64_t protocol_version 
 			, encoding encoding 
@@ -130,10 +142,13 @@ namespace rpc
         }
     };
 
+    struct make_shared_local_child_service_proxy_enabler;
     //this is an equivelent to an host looking at its enclave
     class local_child_service_proxy : public service_proxy
     {
         rpc::shared_ptr<service> destination_service_;
+        
+        friend make_shared_local_child_service_proxy_enabler;
 
         local_child_service_proxy(const rpc::shared_ptr<service>& destination_svc,
                                   const rpc::shared_ptr<service>& svc,
@@ -165,14 +180,22 @@ namespace rpc
                 telemetry_service->on_service_proxy_deletion("local_child_service_proxy", get_zone_id(), get_destination_zone_id(), get_caller_zone_id());
             }
         }
-        static rpc::shared_ptr<local_child_service_proxy> create(const rpc::shared_ptr<service>& destination_svc,
-                                                                 const rpc::shared_ptr<service>& svc,
-                                                                 const rpc::i_telemetry_service* telemetry_service)
+
+        static rpc::shared_ptr<local_child_service_proxy> local_child_service_proxy::create(const rpc::shared_ptr<service>& destination_svc,
+                                                                    const rpc::shared_ptr<service>& svc,
+                                                                    const rpc::i_telemetry_service* telemetry_service)
         {
-            auto ret = rpc::shared_ptr<local_child_service_proxy>(
-                new local_child_service_proxy(destination_svc, svc, telemetry_service));
-            auto pthis = rpc::static_pointer_cast<service_proxy>(ret);
-            ret->weak_this_ = pthis;
+            struct make_shared_local_child_service_proxy_enabler : public local_child_service_proxy
+            {
+                virtual ~make_shared_local_child_service_proxy_enabler() = default;
+                make_shared_local_child_service_proxy_enabler(const rpc::shared_ptr<service>& destination_svc,
+                    const rpc::shared_ptr<service>& svc,
+                    const rpc::i_telemetry_service* telemetry_service) : 
+                    local_child_service_proxy(destination_svc, svc, telemetry_service)
+                {}
+            };
+            
+            auto ret = rpc::make_shared<make_shared_local_child_service_proxy_enabler>(destination_svc, svc, telemetry_service);
             svc->add_zone_proxy(ret);
             ret->add_external_ref();
             return ret;

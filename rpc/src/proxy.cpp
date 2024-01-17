@@ -18,17 +18,22 @@ namespace rpc
     }
 
     rpc::shared_ptr<object_proxy> object_proxy::create(object object_id, 
-                                            const rpc::shared_ptr<service_proxy>& service_proxy, bool add_ref_done)
+                                            const rpc::shared_ptr<service_proxy>& sp, bool add_ref_done)
     {
-        if(add_ref_done)
-            service_proxy->set_has_add_reffed();
-        rpc::shared_ptr<object_proxy> ret(new object_proxy(object_id, service_proxy));
-        if(auto* telemetry_service = service_proxy->get_telemetry_service();telemetry_service)
+        //a way to have private constructors in object_proxy but still available via enable shared from this
+        struct make_shared_object_proxy_enabler : public object_proxy 
         {
-            telemetry_service->on_object_proxy_creation(service_proxy->get_zone_id(), service_proxy->get_destination_zone_id(), object_id, add_ref_done);
+            make_shared_object_proxy_enabler(object object_id, rpc::shared_ptr<service_proxy> sp) : object_proxy(object_id, sp){}
+        };   
+
+        if(add_ref_done)
+            sp->set_has_add_reffed();
+        auto ret = rpc::make_shared<make_shared_object_proxy_enabler>(object_id, sp);
+        if(auto* telemetry_service = sp->get_telemetry_service();telemetry_service)
+        {
+            telemetry_service->on_object_proxy_creation(sp->get_zone_id(), sp->get_destination_zone_id(), object_id, add_ref_done);
         }        
-        ret->weak_this_ = ret;
-        service_proxy->add_object_proxy(ret);
+        sp->add_object_proxy(ret);
         return ret;
     }
 
