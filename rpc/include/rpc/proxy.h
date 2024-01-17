@@ -235,6 +235,7 @@ namespace rpc
         const rpc::i_telemetry_service* const telemetry_service_ = nullptr;
         std::atomic<uint64_t> version_ = rpc::get_version();
         encoding enc_ = encoding::enc_default;
+        bool has_add_reffed_ = false;
 
     protected:
 
@@ -301,6 +302,17 @@ namespace rpc
         }
 
         uint64_t get_remote_rpc_version() const {return version_.load();}
+        void set_has_add_reffed(){has_add_reffed_ = true;}
+        
+        //if returns zero the service needs to remove the proxy
+        bool on_service_shutdown()
+        {
+            if(!has_add_reffed_)
+            {
+                return release_external_ref() == 0;
+            }
+            return false;
+        }
         
         uint64_t set_encoding(encoding enc)
         {
@@ -335,7 +347,7 @@ namespace rpc
             }            
         }
 
-        void release_external_ref()
+        int release_external_ref()
         {
             std::lock_guard g(insert_control_);
             auto count = --lifetime_lock_count_;
@@ -356,7 +368,8 @@ namespace rpc
             {
                 assert(lifetime_lock_);
                 lifetime_lock_ = nullptr;
-            }            
+            }   
+            return count;         
         }
 
         [[nodiscard]] int sp_call(
@@ -441,7 +454,7 @@ namespace rpc
             if (telemetry_service_)
             {
                 telemetry_service_->on_service_proxy_add_ref("service_proxy", get_zone_id(),
-                                                                destination_zone_id, get_caller_zone_id(), object_id);
+                                                                destination_zone_id, destination_channel_zone_id, get_caller_zone_id(), object_id);
             }
             auto original_version = version_.load();
             auto version = original_version;
@@ -462,6 +475,7 @@ namespace rpc
                     {
                         version_.compare_exchange_strong( original_version, version);
                     }
+                    has_add_reffed_ = true;
                     return ret;
                 }
                 version--;
@@ -475,10 +489,11 @@ namespace rpc
             , caller_zone caller_zone_id) 
         {
 
+            assert(destination_zone_id == destination_zone_id_);
             if (telemetry_service_ && object_id != dummy_object_id)
             {
                 telemetry_service_->on_service_proxy_release("service_proxy", get_zone_id(),
-                                                                destination_zone_id, get_caller_zone_id(), object_id);
+                                                                destination_zone_id, destination_channel_zone_,  get_caller_zone_id(), object_id);
             }
             
             auto original_version = version_.load();
@@ -729,9 +744,6 @@ namespace rpc
         {
             //else we create an object_proxy and add ref to the service proxy as it has a new object to monitor
             op = object_proxy::create(encap.object_id, service_proxy, true);
-            
-            //this tells child_services that the parent channel no longer needs to be explicitly released
-            serv->notify_parent_add_ref(sp->get_destination_zone_id());
         }
         return op->query_interface(val, false);
     }

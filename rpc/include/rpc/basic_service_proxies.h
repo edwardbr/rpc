@@ -106,7 +106,6 @@ namespace rpc
             }
             
             auto svc = rpc::static_pointer_cast<child_service>(get_operating_zone_service());
-            svc->notify_parent_add_ref(destination_zone_id);
             return ret;
         }
         uint64_t release(

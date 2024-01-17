@@ -526,9 +526,8 @@ namespace rpc
                         }
                         else
                         {
-                            dest_zone = get_parent();
-                            assert(dest_zone);
-                            dest_zone->add_external_ref();
+                            //get the parent to route it
+                            dest_zone = get_parent()->clone_for_zone(destination_zone_id, caller_zone_id);
                         }
                     }
 
@@ -637,7 +636,7 @@ namespace rpc
                 }
                 return other_zone->add_ref(
                     protocol_version, 
-                    destination_channel_zone_id, 
+                    {0}, 
                     destination_zone_id, 
                     object_id, 
                     caller_channel_zone_id, 
@@ -732,8 +731,6 @@ namespace rpc
         caller_zone caller_zone_id
     )
     {
-        if(telemetry_service_)
-            telemetry_service_->on_service_release("service", zone_id_, destination_zone_id, object_id, caller_zone_id);    
 
         if(destination_zone_id != get_zone_id().as_destination())
         {
@@ -751,10 +748,15 @@ namespace rpc
                 assert(false);
                 return std::numeric_limits<uint64_t>::max();
             }
+            if(telemetry_service_)
+                telemetry_service_->on_service_release("service", zone_id_, other_zone->get_destination_channel_zone_id(), destination_zone_id, object_id, caller_zone_id);    
             return other_zone->release(protocol_version, destination_zone_id, object_id, caller_zone_id);
         }
         else
         {
+            if(telemetry_service_)
+                telemetry_service_->on_service_release("service", zone_id_, {0}, destination_zone_id, object_id, caller_zone_id);    
+
 #ifdef RPC_V2
             if(protocol_version == rpc::VERSION_2)
             ;
@@ -987,13 +989,6 @@ namespace rpc
 
     child_service::~child_service()
     {
-        if(child_does_not_use_parents_interface_)
-        {
-            if(parent_service_proxy_)
-                 parent_service_proxy_->release_external_ref();
-            child_does_not_use_parents_interface_ = false;
-        }
-
         // clean up the zone root pointer
         if (root_stub_)
         {
@@ -1002,9 +997,32 @@ namespace rpc
                 release(rpc::get_version(), zone_id_.as_destination(), stub->get_id(), zone_id_.as_caller());
             root_stub_.reset();
         }    
+        
+        std::vector<rpc::shared_ptr<rpc::service_proxy>> zones_to_be_explicitly_removed;
+        for(auto sp : other_zones)
+        {
+            auto proxy = sp.second.lock();
+            if(proxy->on_service_shutdown() == true && proxy != parent_service_proxy_)
+                zones_to_be_explicitly_removed.push_back(proxy);
+        }
+        
+        for(auto sp : zones_to_be_explicitly_removed)
+        {
+            remove_zone_proxy(sp->get_destination_zone_id(), sp->get_caller_zone_id(), sp->get_destination_channel_zone_id());
+        }
+        zones_to_be_explicitly_removed.clear();
+        
+        // if(child_does_not_use_parents_interface_)
+        // {
+        //     if(parent_service_proxy_)
+        //          parent_service_proxy_->release_external_ref();
+        //     child_does_not_use_parents_interface_ = false;
+        // }
 
         if(parent_service_proxy_)
         {
+            assert(parent_service_proxy_->get_caller_zone_id() == get_zone_id().as_caller());
+            assert(parent_service_proxy_->get_destination_channel_zone_id().get_val() == 0);
             remove_zone_proxy(parent_service_proxy_->get_destination_zone_id(), get_zone_id().as_caller(), {0});
             parent_service_proxy_ = nullptr;
         }    
@@ -1012,25 +1030,28 @@ namespace rpc
 
     void child_service::set_parent(const rpc::shared_ptr<rpc::service_proxy>& parent_service_proxy)
     {
-        if(child_does_not_use_parents_interface_ && parent_service_proxy_ && parent_service_proxy_ != parent_service_proxy)
+        if(
+            // child_does_not_use_parents_interface_ && 
+            parent_service_proxy_ && parent_service_proxy_ != parent_service_proxy)
         {
+            assert(false);
             parent_service_proxy_->release_external_ref();
         }
         if(parent_service_proxy)
         {
             assert(parent_zone_id_ == parent_service_proxy->get_destination_zone_id());
         }
-        child_does_not_use_parents_interface_ = true;
+        // child_does_not_use_parents_interface_ = true;
         parent_service_proxy_ = parent_service_proxy;
     }
     
-    void child_service::notify_parent_add_ref(destination_zone dest)
+    /*void child_service::notify_parent_add_ref(destination_zone dest)
     {
         if(dest == parent_zone_id_)
         {
             child_does_not_use_parents_interface_ = false;
         }
-    }
+    }*/
 
     bool child_service::check_is_empty() const
     {

@@ -158,8 +158,6 @@ namespace rpc
         {
             service_loggers.push_back(logger);
         }
-        
-        virtual void notify_parent_add_ref(destination_zone){}
         friend service_proxy;
     };
 
@@ -171,7 +169,6 @@ namespace rpc
         rpc::shared_ptr<i_interface_stub> root_stub_;
         rpc::shared_ptr<rpc::service_proxy> parent_service_proxy_;
         destination_zone parent_zone_id_;
-        bool child_does_not_use_parents_interface_ = true;
     public:
         explicit child_service(zone zone_id, destination_zone parent_zone_id, const i_telemetry_service* telemetry_service) : 
             service(zone_id, telemetry_service),
@@ -187,7 +184,6 @@ namespace rpc
         destination_zone get_parent_zone_id() const {return parent_zone_id_;}
         //void add_zone_proxy(const rpc::shared_ptr<service_proxy>& service_proxy) override;
         rpc::shared_ptr<service_proxy> get_zone_proxy(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, destination_zone destination_zone_id, caller_zone new_caller_zone_id, bool& new_proxy_added) override;
-        void notify_parent_add_ref(destination_zone dest) override;
     };
 
 

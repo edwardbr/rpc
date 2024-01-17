@@ -41,9 +41,9 @@ public:
         on_service_add_ref_host(name, zone_id.get_val(), destination_channel_zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), caller_channel_zone_id.get_val(), caller_zone_id.get_val());
     }
 
-    void on_service_release(const char* name, rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::caller_zone caller_zone_id) const
+    void on_service_release(const char* name, rpc::zone zone_id, rpc::destination_channel_zone destination_channel_zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::caller_zone caller_zone_id) const
     {
-        on_service_release_host(name, zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), caller_zone_id.get_val());
+        on_service_release_host(name, zone_id.get_val(), destination_channel_zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), caller_zone_id.get_val());
     }      
     virtual void on_service_proxy_creation(const char* name, rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::caller_zone caller_zone_id) const
     {
@@ -57,13 +57,13 @@ public:
     {
         on_service_proxy_try_cast_host(name, zone_id.get_val(), destination_zone_id.get_val(), caller_zone_id.get_val(), object_id.get_val(), interface_id.get_val());
     }
-    virtual void on_service_proxy_add_ref(const char* name, rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::caller_zone caller_zone_id, rpc::object object_id) const
+    virtual void on_service_proxy_add_ref(const char* name, rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::destination_channel_zone destination_channel_zone_id, rpc::caller_zone caller_zone_id, rpc::object object_id) const
     {
-        on_service_proxy_add_ref_host(name, zone_id.get_val(), destination_zone_id.get_val(), caller_zone_id.get_val(), object_id.get_val());
+        on_service_proxy_add_ref_host(name, zone_id.get_val(), destination_zone_id.get_val(), destination_channel_zone_id.get_val(), caller_zone_id.get_val(), object_id.get_val());
     }
-    virtual void on_service_proxy_release(const char* name, rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::caller_zone caller_zone_id, rpc::object object_id) const
+    virtual void on_service_proxy_release(const char* name, rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::destination_channel_zone destination_channel_zone_id, rpc::caller_zone caller_zone_id, rpc::object object_id) const
     {
-        on_service_proxy_release_host(name, zone_id.get_val(), destination_zone_id.get_val(), caller_zone_id.get_val(), object_id.get_val());
+        on_service_proxy_release_host(name, zone_id.get_val(), destination_zone_id.get_val(), destination_channel_zone_id.get_val(), caller_zone_id.get_val(), object_id.get_val());
     }
 
     virtual void on_impl_creation(const char* name, uint64_t address, rpc::zone zone_id) const

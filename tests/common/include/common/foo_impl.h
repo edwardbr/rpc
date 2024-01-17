@@ -406,7 +406,7 @@ namespace marshalled_tests
             return rpc::error::OK();            
         }
         
-        error_code inner_create_example_in_subordnate_zone(rpc::shared_ptr<yyy::i_example>& target, uint64_t new_zone_id, example*& example_ptr)
+        error_code inner_create_example_in_subordnate_zone(rpc::shared_ptr<yyy::i_example>& target, uint64_t new_zone_id, const rpc::shared_ptr<yyy::i_host>& host_ptr)
         {
             auto this_service = this_service_.lock();
             auto child_service_ptr = rpc::make_shared<rpc::child_service>(rpc::zone{new_zone_id}, this_service->get_zone_id().as_destination(), telemetry_);
@@ -422,35 +422,39 @@ namespace marshalled_tests
             auto service_proxy_to_child = rpc::local_child_service_proxy::create(child_service_ptr, this_service, telemetry_);
 
             // create the example object implementation with a recursive chain of services
-            example_ptr = new example(telemetry_, child_service_ptr, nullptr);
-            rpc::shared_ptr<yyy::i_example> remote_example(example_ptr);
+            rpc::shared_ptr<yyy::i_example> remote_example(new example(telemetry_, child_service_ptr, nullptr));
 
             rpc::interface_descriptor example_encap = rpc::create_interface_stub(*child_service_ptr, remote_example);
 
+            telemetry_->message(rpc::i_telemetry_service::info, "rpc::demarshall_interface_proxy");
             auto ret = rpc::demarshall_interface_proxy(rpc::get_version(), service_proxy_to_child, example_encap, this_service->get_zone_id().as_caller(), target);
             if(ret != rpc::error::OK())
                 return ret;
 
                 
             //This voodoo marshalls the host pointer from an this_service perspective to an app service one
-            auto host_descr = this_service->prepare_out_param(rpc::get_version(), {0}, child_service_ptr->get_zone_id().as_caller(), host_->query_proxy_base());
+            telemetry_->message(rpc::i_telemetry_service::info, "prepare_out_param");
+//            auto host_descr = rpc::create_interface_stub(*this_service, host_);
+            auto host_descr = this_service->prepare_out_param(rpc::get_version(), {0}, child_service_ptr->get_zone_id().as_caller(), host_ptr->query_proxy_base());
             
             rpc::shared_ptr<yyy::i_host> marshalled_host;
+            // ret = rpc::demarshall_interface_proxy(rpc::get_version(), parent_service_proxy, host_descr,  child_service_ptr->get_zone_id().as_caller(), marshalled_host);
+            // if(ret != rpc::error::OK())
+            //     return ret;
             rpc::proxy_bind_out_param(parent_service_proxy, host_descr, child_service_ptr->get_zone_id().as_caller(), marshalled_host);
-            example_ptr->set_host(marshalled_host);
+            remote_example->set_host(marshalled_host);
+            //remote_example->set_host(host_);
             return ret;            
         }
 
-        error_code create_example_in_subordnate_zone(rpc::shared_ptr<yyy::i_example>& target, uint64_t new_zone_id) override
+        error_code create_example_in_subordnate_zone(rpc::shared_ptr<yyy::i_example>& target, const rpc::shared_ptr<yyy::i_host>& host_ptr, uint64_t new_zone_id) override
         {
-            example* example_ptr = nullptr;
-            return inner_create_example_in_subordnate_zone(target, new_zone_id, example_ptr);
+            return inner_create_example_in_subordnate_zone(target, new_zone_id, host_ptr);
         }
-        error_code create_example_in_subordnate_zone_and_set_in_host(uint64_t new_zone_id, const std::string& name) override
+        error_code create_example_in_subordnate_zone_and_set_in_host(uint64_t new_zone_id, const std::string& name, const rpc::shared_ptr<yyy::i_host>& host_ptr) override
         {
-            example* example_ptr = nullptr;
             rpc::shared_ptr<yyy::i_example> target;
-            auto ret = inner_create_example_in_subordnate_zone(target, new_zone_id, example_ptr);
+            auto ret = inner_create_example_in_subordnate_zone(target, new_zone_id, host_ptr);
             if(ret != rpc::error::OK())
                 return ret;
             rpc::shared_ptr<yyy::i_host> host;

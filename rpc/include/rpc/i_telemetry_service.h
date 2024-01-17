@@ -33,13 +33,13 @@ namespace rpc
         virtual void on_service_deletion(const char* name, zone zone_id) const = 0;
         virtual void on_service_try_cast(const char* name, zone zone_id, destination_zone destination_zone_id, caller_zone caller_zone_id, object object_id, interface_ordinal interface_id) const = 0;
         virtual void on_service_add_ref(const char* name, zone zone_id, destination_channel_zone destination_channel_zone_id, destination_zone destination_zone_id, object object_id, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id) const = 0;
-        virtual void on_service_release(const char* name, zone zone_id, destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id) const = 0;  
+        virtual void on_service_release(const char* name, zone zone_id, destination_channel_zone destination_channel_zone_id, destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id) const = 0;  
 
         virtual void on_service_proxy_creation(const char* name, zone zone_id, destination_zone destination_zone_id, caller_zone caller_zone_id) const = 0;
         virtual void on_service_proxy_deletion(const char* name, zone zone_id, destination_zone destination_zone_id, caller_zone caller_zone_id) const = 0;
         virtual void on_service_proxy_try_cast(const char* name, zone zone_id, destination_zone destination_zone_id, caller_zone caller_zone_id, object object_id, interface_ordinal interface_id) const = 0;
-        virtual void on_service_proxy_add_ref(const char* name, zone zone_id, destination_zone destination_zone_id, caller_zone caller_zone_id, object object_id) const = 0;
-        virtual void on_service_proxy_release(const char* name, zone zone_id, destination_zone destination_zone_id, caller_zone caller_zone_id, object object_id) const = 0;  
+        virtual void on_service_proxy_add_ref(const char* name, zone zone_id, destination_zone destination_zone_id, destination_channel_zone destination_channel_zone_id, caller_zone caller_zone_id, object object_id) const = 0;
+        virtual void on_service_proxy_release(const char* name, zone zone_id, destination_zone destination_zone_id, destination_channel_zone destination_channel_zone_id, caller_zone caller_zone_id, object object_id) const = 0;  
         virtual void on_service_proxy_add_external_ref(const char* name, zone zone_id, destination_channel_zone destination_channel_zone_id, destination_zone destination_zone_id, caller_zone caller_zone_id, int ref_count) const = 0;
         virtual void on_service_proxy_release_external_ref(const char* name, zone zone_id, destination_channel_zone destination_channel_zone_id, destination_zone destination_zone_id, caller_zone caller_zone_id, int ref_count) const = 0;  
 

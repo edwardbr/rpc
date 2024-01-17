@@ -20,6 +20,8 @@ namespace rpc
     rpc::shared_ptr<object_proxy> object_proxy::create(object object_id, 
                                             const rpc::shared_ptr<service_proxy>& service_proxy, bool add_ref_done)
     {
+        if(add_ref_done)
+            service_proxy->set_has_add_reffed();
         rpc::shared_ptr<object_proxy> ret(new object_proxy(object_id, service_proxy));
         if(auto* telemetry_service = service_proxy->get_telemetry_service();telemetry_service)
         {

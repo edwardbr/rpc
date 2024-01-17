@@ -19,7 +19,7 @@ host_telemetry_service::host_telemetry_service(const std::string& test_suite_nam
     test_suite_name_(test_suite_name),
     name_(name)
 {
-    output = fopen("C:/Dev/Secretarium/core1/build/test.wsd", "w+");
+    output = fopen("C:/Dev/Secretarium/core1/build/test.pu", "w+");
     fmt::println(output, "@startuml");
     fmt::println(output, "title {}.{}", test_suite_name_, name_);
 }
@@ -36,8 +36,8 @@ host_telemetry_service::~host_telemetry_service()
 
     std::for_each(services.begin(), services.end(), [this](std::pair<rpc::zone, name_count> const& it)
     {fmt::println(output, "error service zone_id {} service {} count {}", it.first.id, it.second.name, it.second.count);});
-    std::for_each(impls.begin(), impls.end(), [this](std::pair<impl, uint64_t> const& it)
-    {fmt::println(output, "error implementation {} interface_id {} count {}", it.first.name, it.first.interface_id.id, it.second);});
+    std::for_each(impls.begin(), impls.end(), [this](std::pair<uint64_t, impl> const& it)
+    {fmt::println(output, "error implementation {} zone_id {} count {}", it.second.name, it.second.zone_id.id, it.second.count);});
     std::for_each(stubs.begin(), stubs.end(), [this](std::pair<zone_object, uint64_t> const& it)
     {fmt::println(output, "error stub zone_id {} object_id {} count {}", it.first.zone_id.id, it.first.object_id.id, it.second);});
     std::for_each(service_proxies.begin(), service_proxies.end(), [this](std::pair<orig_zone, name_count> const& it)
@@ -59,9 +59,10 @@ host_telemetry_service::~host_telemetry_service()
     }
     fmt::println(output, "end note");
     fmt::println(output, "@enduml");
-    EXPECT_TRUE(is_heathy);
     fclose(output);
+    EXPECT_TRUE(is_heathy);
     output = nullptr;
+    historical_impls.clear();
 }
 
 std::string service_alias(rpc::zone zone_id)
@@ -159,9 +160,11 @@ void host_telemetry_service::on_service_try_cast(const char* name, rpc::zone zon
 
 void host_telemetry_service::on_service_add_ref(const char* name, rpc::zone zone_id, rpc::destination_channel_zone destination_channel_zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::caller_channel_zone caller_channel_zone_id, rpc::caller_zone caller_zone_id) const
 {
-    if(zone_id.as_destination() != destination_zone_id)
+    auto dest = destination_channel_zone_id.get_val() ? rpc::zone(destination_channel_zone_id.id) : destination_zone_id.as_zone();
+
+    if(zone_id != dest)
     {
-        fmt::println(output, "{} -> {} : add_ref", service_alias(zone_id), service_alias(destination_zone_id.as_zone()));
+        fmt::println(output, "{} -> {} : add_ref", service_alias(zone_id), service_alias(dest));
     }
     else if(object_id != rpc::dummy_object_id)
     {
@@ -173,11 +176,13 @@ void host_telemetry_service::on_service_add_ref(const char* name, rpc::zone zone
     }
 }
 
-void host_telemetry_service::on_service_release(const char* name, rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::caller_zone caller_zone_id) const
+void host_telemetry_service::on_service_release(const char* name, rpc::zone zone_id, rpc::destination_channel_zone destination_channel_zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::caller_zone caller_zone_id) const
 {
-    if(zone_id.as_destination() != destination_zone_id)
+    auto dest = destination_channel_zone_id.get_val() ? rpc::zone(destination_channel_zone_id.id) : destination_zone_id.as_zone();
+
+    if(zone_id != dest)
     {
-        fmt::println(output, "{} -> {} : release", service_alias(zone_id), service_alias(destination_zone_id.as_zone()));
+        fmt::println(output, "{} -> {} : release", service_alias(zone_id), service_alias(dest));
     }
     else if(object_id != rpc::dummy_object_id)
     {
@@ -243,7 +248,7 @@ void host_telemetry_service::on_service_proxy_try_cast(const char* name, rpc::zo
     fflush(output);
 }
 
-void host_telemetry_service::on_service_proxy_add_ref(const char* name, rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::caller_zone caller_zone_id, rpc::object object_id) const
+void host_telemetry_service::on_service_proxy_add_ref(const char* name, rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::destination_channel_zone destination_channel_zone_id, rpc::caller_zone caller_zone_id, rpc::object object_id) const
 {
     // std::lock_guard g(mux);
     // auto found = service_proxies.find(orig_zone{zone_id, destination_zone_id, caller_zone_id});
@@ -256,19 +261,20 @@ void host_telemetry_service::on_service_proxy_add_ref(const char* name, rpc::zon
     // {
     //     fmt::println(output, "object add_ref name {} zone_id {} destination_zone_id {} caller_zone_id {} object_id {}", name, zone_id.get_val(), destination_zone_id.get_val(), caller_zone_id.get_val(), object_id.get_val());
     // }
+    auto dest = destination_channel_zone_id.get_val() ? rpc::zone(destination_channel_zone_id.id) : destination_zone_id.as_zone();
 
     if(object_id == rpc::dummy_object_id)
     {
-        fmt::println(output, "{} -> {} : dummy add_ref", service_proxy_alias(zone_id, destination_zone_id, caller_zone_id), service_alias(destination_zone_id.as_zone()));
+        fmt::println(output, "{} -> {} : dummy add_ref", service_proxy_alias(zone_id, destination_zone_id, caller_zone_id), service_alias(dest));
     }
     else
     {
-        fmt::println(output, "{} -> {} : add_ref", service_proxy_alias(zone_id, destination_zone_id, caller_zone_id), service_alias(destination_zone_id.as_zone()));    
+        fmt::println(output, "{} -> {} : add_ref", service_proxy_alias(zone_id, destination_zone_id, caller_zone_id), service_alias(dest));    
     }
     fflush(output);
 }
 
-void host_telemetry_service::on_service_proxy_release(const char* name, rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::caller_zone caller_zone_id, rpc::object object_id) const
+void host_telemetry_service::on_service_proxy_release(const char* name, rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::destination_channel_zone destination_channel_zone_id, rpc::caller_zone caller_zone_id, rpc::object object_id) const
 {
     // std::lock_guard g(mux);
     // auto found = service_proxies.find(orig_zone{zone_id, destination_zone_id, caller_zone_id});
@@ -280,13 +286,15 @@ void host_telemetry_service::on_service_proxy_release(const char* name, rpc::zon
     // {
     //     fmt::println(output, "object release name {} zone_id {} destination_zone_id {} caller_zone_id {} object_id {}", name, zone_id.get_val(), destination_zone_id.get_val(), caller_zone_id.get_val(), object_id.get_val());
     // }
+    auto dest = destination_channel_zone_id.get_val() ? rpc::zone(destination_channel_zone_id.id) : destination_zone_id.as_zone();
+
     if(object_id == rpc::dummy_object_id)
     {
-        fmt::println(output, "{} -> {} : dummy release", service_proxy_alias(zone_id, destination_zone_id, caller_zone_id), service_alias(destination_zone_id.as_zone()));
+        fmt::println(output, "{} -> {} : dummy release", service_proxy_alias(zone_id, destination_zone_id, caller_zone_id), service_alias(dest));
     }
     else
     {
-        fmt::println(output, "{} -> {} : release", service_proxy_alias(zone_id, destination_zone_id, caller_zone_id), service_alias(destination_zone_id.as_zone()));    
+        fmt::println(output, "{} -> {} : release", service_proxy_alias(zone_id, destination_zone_id, caller_zone_id), service_alias(dest));    
     }
     fflush(output);
 }
@@ -345,15 +353,24 @@ void host_telemetry_service::on_service_proxy_release_external_ref(const char* n
 
 void host_telemetry_service::on_impl_creation(const char* name, uint64_t address, rpc::zone zone_id) const
 {
+    //assert(zone_id.get_val());
     std::lock_guard g(mux);
-    auto found = impls.find(impl{name, address});
+    if(historical_impls.find(address) != historical_impls.end())
+    {
+        assert(!"historical address reused");
+    }
+    auto found = impls.find(address);
     if(found == impls.end())
     {
-        impls.emplace(impl{name, address}, 1);
+        impls.emplace(address, impl{zone_id, name, 1});
+        historical_impls[address] = zone_id;
     }
     else
     {
-        found->second++;
+        if(found->second.zone_id != zone_id)
+            assert(!"object being registered in two zones");
+        else
+            assert(!"new object registered twice");
     }
     
     fmt::println(output, "participant \"{}\" as {} order {}", name, object_alias(address), object_order(zone_id, address)); 
@@ -364,19 +381,16 @@ void host_telemetry_service::on_impl_creation(const char* name, uint64_t address
 void host_telemetry_service::on_impl_deletion(const char* name, uint64_t address, rpc::zone zone_id) const
 {
     std::lock_guard g(mux);
-    auto found = impls.find(impl{name, address});
+    auto found = impls.find(address);
     if(found == impls.end())
     {
-        spdlog::error("impl not found name {} interface_id {}", name, address);
+        spdlog::error("impl not found name {} interface_id {}", address, name);
     }
     else
     {
-        found->second--;
-        if(!found->second)
-        {
-            impls.erase(found);
-        }
+        impls.erase(found);
     }
+    historical_impls.erase(address);
     fmt::println(output, "deactivate {}", object_alias(address));
     fmt::println(output, "hnote over {} : deleted", object_alias(address));
     fflush(output);
@@ -385,6 +399,19 @@ void host_telemetry_service::on_impl_deletion(const char* name, uint64_t address
 void host_telemetry_service::on_stub_creation(rpc::zone zone_id, rpc::object object_id, uint64_t address) const
 {
     std::lock_guard g(mux);
+    auto hi = historical_impls.find(address);
+    if(hi != historical_impls.end() && hi->second != zone_id)
+    {
+        if(hi->second == 0)
+            hi->second = zone_id;
+        else
+            assert(!"object already assigned to a different zone");
+    }
+    else
+    {
+        historical_impls[address] = zone_id;
+    }
+    
     stubs.emplace(zone_object{zone_id, object_id}, 0);
     fmt::println(output, "participant \"object stub\\nzone {}\\nobject {}\" as {} order {} #lime"
         , zone_id.get_val()
