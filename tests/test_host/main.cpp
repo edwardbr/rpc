@@ -851,28 +851,28 @@ TYPED_TEST(remote_type_test, check_identity)
     auto base_baz = rpc::shared_ptr<xxx::i_baz>(new baz(telemetry_service, proxy->get_object_proxy()->get_service_proxy()->get_zone_id()));
     auto input = base_baz;
 
-    /*ASSERT_EQ(lib.get_example()->send_interface_back(input, output), rpc::error::OK());
+    ASSERT_EQ(lib.get_example()->send_interface_back(input, output), rpc::error::OK());
     ASSERT_EQ(input, output);
     
     ASSERT_EQ(new_zone->send_interface_back(input, output), rpc::error::OK());
     ASSERT_EQ(input, output);    
 
     ASSERT_EQ(new_new_zone->send_interface_back(input, output), rpc::error::OK());
-    ASSERT_EQ(input, output); */
+    ASSERT_EQ(input, output); 
 
     input = new_baz;
 
-    /*ASSERT_EQ(lib.get_example()->send_interface_back(input, output), rpc::error::OK());
+    ASSERT_EQ(lib.get_example()->send_interface_back(input, output), rpc::error::OK());
     ASSERT_EQ(input, output);
     
     ASSERT_EQ(new_zone->send_interface_back(input, output), rpc::error::OK());
-    ASSERT_EQ(input, output);  */
+    ASSERT_EQ(input, output);  
 
     ASSERT_EQ(new_new_zone->send_interface_back(input, output), rpc::error::OK());
     ASSERT_EQ(input, output);    
 
 
-    /*input = new_new_baz;
+    input = new_new_baz;
 
     ASSERT_EQ(lib.get_example()->send_interface_back(input, output), rpc::error::OK());
     ASSERT_EQ(input, output);
@@ -913,7 +913,7 @@ TYPED_TEST(remote_type_test, check_identity)
     //       h1                     #
 
     ASSERT_EQ(new_new_zone->send_interface_back(input, output), rpc::error::OK());
-    ASSERT_EQ(input, output);*/
+    ASSERT_EQ(input, output);
 
 }
 

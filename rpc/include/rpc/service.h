@@ -75,12 +75,15 @@ namespace rpc
         explicit service(zone zone_id, const i_telemetry_service* telemetry_service);
         virtual ~service();
 
+        static zone generate_new_zone_id();
+        object generate_new_object_id() const;
+
         virtual bool check_is_empty() const;
         zone get_zone_id() const {return zone_id_;}
         void set_zone_id(zone zone_id){zone_id_ = zone_id;}
-        static zone generate_new_zone_id();
-        object generate_new_object_id() const;
+        virtual destination_zone get_parent_zone_id() const {return {0};}
         virtual rpc::shared_ptr<rpc::service_proxy> get_parent() const {return nullptr;}
+        virtual void set_parent(const rpc::shared_ptr<rpc::service_proxy>& parent_service_proxy){assert(false);};
 
         template<class T> interface_descriptor proxy_bind_in_param(uint64_t protocol_version, const shared_ptr<T>& iface, shared_ptr<object_stub>& stub);
         template<class T> interface_descriptor stub_bind_out_param(uint64_t protocol_version, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, const shared_ptr<T>& iface);
@@ -166,7 +169,6 @@ namespace rpc
     {
         //the enclave needs to hold a hard lock to a root object that represents a runtime
         //the enclave service lifetime is managed by the transport functions 
-        rpc::shared_ptr<i_interface_stub> root_stub_;
         rpc::shared_ptr<rpc::service_proxy> parent_service_proxy_;
         destination_zone parent_zone_id_;
     public:
@@ -177,12 +179,9 @@ namespace rpc
 
         virtual ~child_service();
 
-        void set_parent(const rpc::shared_ptr<rpc::service_proxy>& parent_service_proxy);
         rpc::shared_ptr<rpc::service_proxy> get_parent() const override {return parent_service_proxy_;}
-        bool check_is_empty() const override;
-        object get_root_object_id() const;
-        destination_zone get_parent_zone_id() const {return parent_zone_id_;}
-        //void add_zone_proxy(const rpc::shared_ptr<service_proxy>& service_proxy) override;
+        void set_parent(const rpc::shared_ptr<rpc::service_proxy>& parent_service_proxy) override;
+        destination_zone get_parent_zone_id() const override {return parent_zone_id_;}
         rpc::shared_ptr<service_proxy> get_zone_proxy(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, destination_zone destination_zone_id, caller_zone new_caller_zone_id, bool& new_proxy_added) override;
     };
 

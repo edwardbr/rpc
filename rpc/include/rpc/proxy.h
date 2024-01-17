@@ -318,7 +318,7 @@ namespace rpc
         //if returns zero the service needs to remove the proxy
         bool on_service_shutdown()
         {
-            if(!has_add_reffed_)
+            if(!has_add_reffed_ && !is_parent_channel_)
             {
                 return release_external_ref() == 0;
             }
@@ -783,6 +783,8 @@ namespace rpc
                 new_proxy_added);
         }
 
+        bool proxy_to_parent = serv->get_parent_zone_id() == service_proxy->get_destination_zone_id();
+
         auto ret = service_proxy->sp_add_ref(
             service_proxy->get_destination_channel_zone_id(), 
             service_proxy->get_destination_zone_id(), 
@@ -790,7 +792,7 @@ namespace rpc
             {0}, 
             serv->get_zone_id().as_caller(), 
             rpc::add_ref_options::build_destination_route, 
-            false);
+            proxy_to_parent);
         if(ret == std::numeric_limits<uint64_t>::max())
             return -1;
 

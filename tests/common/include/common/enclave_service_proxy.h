@@ -40,8 +40,41 @@ namespace rpc
         enclave_service_proxy(const enclave_service_proxy& other) = default;
 
         template<class Owner, class Child>
-        static inline int create(destination_zone destination_zone_id, std::string filename, rpc::shared_ptr<service>& svc, const rpc::shared_ptr<Owner>& owner, rpc::shared_ptr<Child>& root_object, const rpc::i_telemetry_service* telemetry_service);
+        static int create(destination_zone destination_zone_id, std::string filename, rpc::shared_ptr<service>& svc, const rpc::shared_ptr<Owner>& owner, rpc::shared_ptr<Child>& root_object, const rpc::i_telemetry_service* telemetry_service)
+        {
+        
+            struct make_shared_enclave_service_proxy_enabler : public enclave_service_proxy
+            {
+                virtual ~make_shared_enclave_service_proxy_enabler() = default;
+                make_shared_enclave_service_proxy_enabler(
+                    destination_zone destination_zone_id
+                    , std::string filename
+                    , rpc::shared_ptr<service>& svc
+                    , object owner_id
+                    , const rpc::i_telemetry_service* telemetry_service
+                    ) 
+                    : enclave_service_proxy(destination_zone_id, filename, svc, owner_id, telemetry_service){}
+            };
+            assert(svc);
 
+            object owner_id = {0};
+            if(owner)
+                owner_id = {rpc::create_interface_stub(*svc, owner).object_id};
+
+            auto ret = rpc::make_shared<make_shared_enclave_service_proxy_enabler>(destination_zone_id, filename, svc, owner_id, telemetry_service);
+            auto pthis = rpc::static_pointer_cast<service_proxy>(ret);
+
+            object object_id = {0};
+            int err_code = ret->initialise_enclave(object_id);
+            if(err_code)
+                return err_code;
+            auto error = rpc::demarshall_interface_proxy(rpc::get_version(), ret, {object_id, destination_zone_id}, svc->get_zone_id().as_caller(), root_object);
+            if(error != rpc::error::OK())
+                return error;
+            svc->add_zone_proxy(ret);
+            ret->add_external_ref();
+            return rpc::error::OK();
+        }   
         virtual ~enclave_service_proxy();
 
         int send(
@@ -78,42 +111,4 @@ namespace rpc
             object object_id, 
             caller_zone caller_zone_id) override;
     };
-    
-    struct make_shared_enclave_service_proxy_enabler : public enclave_service_proxy
-    {
-        virtual ~make_shared_enclave_service_proxy_enabler() = default;
-        make_shared_enclave_service_proxy_enabler(
-            destination_zone destination_zone_id
-            , std::string filename
-            , rpc::shared_ptr<service>& svc
-            , object owner_id
-            , const rpc::i_telemetry_service* telemetry_service
-            ) 
-            : enclave_service_proxy(destination_zone_id, filename, svc, owner_id, telemetry_service){}
-    };
-    
-    template<class Owner, class Child>
-    inline int enclave_service_proxy::create(destination_zone destination_zone_id, std::string filename, rpc::shared_ptr<service>& svc, const rpc::shared_ptr<Owner>& owner, rpc::shared_ptr<Child>& root_object, const rpc::i_telemetry_service* telemetry_service)
-    {
-        assert(svc);
-
-        object owner_id = {0};
-        if(owner)
-            owner_id = {rpc::create_interface_stub(*svc, owner).object_id};
-
-        auto ret = rpc::make_shared<make_shared_enclave_service_proxy_enabler>(destination_zone_id, filename, svc, owner_id, telemetry_service);
-        auto pthis = rpc::static_pointer_cast<service_proxy>(ret);
-
-        object object_id = {0};
-        int err_code = ret->initialise_enclave(object_id);
-        if(err_code)
-            return err_code;
-        auto error = rpc::demarshall_interface_proxy(rpc::get_version(), ret, {object_id, destination_zone_id}, svc->get_zone_id().as_caller(), root_object);
-        if(error != rpc::error::OK())
-            return error;
-        svc->add_zone_proxy(ret);
-        ret->add_external_ref();
-        return rpc::error::OK();
-    }    
-    
 }

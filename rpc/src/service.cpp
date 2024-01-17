@@ -1098,15 +1098,6 @@ namespace rpc
 
     child_service::~child_service()
     {
-        // clean up the zone root pointer
-        if (root_stub_)
-        {
-            auto stub = root_stub_->get_object_stub().lock();
-            if(stub)
-                release(rpc::get_version(), zone_id_.as_destination(), stub->get_id(), zone_id_.as_caller());
-            root_stub_.reset();
-        }    
-        
         std::vector<rpc::shared_ptr<rpc::service_proxy>> zones_to_be_explicitly_removed;
         for(auto sp : other_zones)
         {
@@ -1120,13 +1111,6 @@ namespace rpc
             remove_zone_proxy(sp->get_destination_zone_id(), sp->get_caller_zone_id(), sp->get_destination_channel_zone_id());
         }
         zones_to_be_explicitly_removed.clear();
-        
-        // if(child_does_not_use_parents_interface_)
-        // {
-        //     if(parent_service_proxy_)
-        //          parent_service_proxy_->release_external_ref();
-        //     child_does_not_use_parents_interface_ = false;
-        // }
 
         if(parent_service_proxy_)
         {
@@ -1134,15 +1118,14 @@ namespace rpc
             assert(parent_service_proxy_->get_destination_channel_zone_id().get_val() == 0);
             remove_zone_proxy(parent_service_proxy_->get_destination_zone_id(), get_zone_id().as_caller(), {0});
             parent_service_proxy_->set_parent_channel(false);
+            parent_service_proxy_->release_external_ref();
             parent_service_proxy_ = nullptr;
         }    
     }
 
     void child_service::set_parent(const rpc::shared_ptr<rpc::service_proxy>& parent_service_proxy)
     {
-        if(
-            // child_does_not_use_parents_interface_ && 
-            parent_service_proxy_ && parent_service_proxy_ != parent_service_proxy)
+        if(parent_service_proxy_ && parent_service_proxy_ != parent_service_proxy)
         {
             assert(false);
             parent_service_proxy_->release_external_ref();
@@ -1151,34 +1134,7 @@ namespace rpc
         {
             assert(parent_zone_id_ == parent_service_proxy->get_destination_zone_id());
         }
-        // child_does_not_use_parents_interface_ = true;
         parent_service_proxy_ = parent_service_proxy;
-    }
-    
-    /*void child_service::notify_parent_add_ref(destination_zone dest)
-    {
-        if(dest == parent_zone_id_)
-        {
-            child_does_not_use_parents_interface_ = false;
-        }
-    }*/
-
-    bool child_service::check_is_empty() const
-    {
-        if (root_stub_)
-            return false; // already initialised
-        return service::check_is_empty();
-    }
-
-    object child_service::get_root_object_id() const
-    {
-        if (!root_stub_)
-            return {0};
-        auto stub = root_stub_->get_object_stub().lock();
-        if (!stub)
-            return {0};
-
-        return stub->get_id();
     }
 
     rpc::shared_ptr<service_proxy> child_service::get_zone_proxy(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, destination_zone destination_zone_id, caller_zone new_caller_zone_id, bool& new_proxy_added)
