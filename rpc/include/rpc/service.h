@@ -182,7 +182,6 @@ namespace rpc
         rpc::shared_ptr<rpc::service_proxy> get_parent() const override {return parent_service_proxy_;}
         void set_parent(const rpc::shared_ptr<rpc::service_proxy>& parent_service_proxy) override;
         destination_zone get_parent_zone_id() const override {return parent_zone_id_;}
-        rpc::shared_ptr<service_proxy> get_zone_proxy(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, destination_zone destination_zone_id, caller_zone new_caller_zone_id, bool& new_proxy_added) override;
     };
 
 
@@ -194,6 +193,7 @@ namespace rpc
 
         if(!iface)
         {
+            assert(false);
             return {{0},{0}};
         }
         rpc::shared_ptr<rpc::object_stub> stub;

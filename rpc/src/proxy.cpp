@@ -26,8 +26,6 @@ namespace rpc
             make_shared_object_proxy_enabler(object object_id, rpc::shared_ptr<service_proxy> sp) : object_proxy(object_id, sp){}
         };   
 
-        if(add_ref_done)
-            sp->set_has_add_reffed();
         auto ret = rpc::make_shared<make_shared_object_proxy_enabler>(object_id, sp);
         if(auto* telemetry_service = sp->get_telemetry_service();telemetry_service)
         {

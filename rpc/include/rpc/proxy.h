@@ -120,10 +120,13 @@ namespace rpc
                 rpc::shared_ptr<proxy_base> proxy = item->second.lock();
                 if (!proxy)
                 {
-                    // weak pointer needs refreshing
-                    create_interface_proxy<T>(iface);
-                    item->second = rpc::reinterpret_pointer_cast<proxy_base>(iface);
-                    return rpc::error::OK();
+                    //if we get here then we need to invent a test for this
+                    assert(false);
+                    return rpc::error::INVALID_INTERFACE_ID();
+                    // // weak pointer needs refreshing
+                    // create_interface_proxy<T>(iface);
+                    // item->second = rpc::reinterpret_pointer_cast<proxy_base>(iface);
+                    // return rpc::error::OK();
                 }
                 iface = rpc::reinterpret_pointer_cast<T>(proxy);
                 return rpc::error::OK();
@@ -235,7 +238,6 @@ namespace rpc
         const rpc::i_telemetry_service* const telemetry_service_ = nullptr;
         std::atomic<uint64_t> version_ = rpc::get_version();
         encoding enc_ = encoding::enc_default;
-        bool has_add_reffed_ = false;
         //if a service proxy is pointing to the zones parent zone then it needs to stay alive even if there are no active references going through it
         bool is_parent_channel_ = false;
 
@@ -313,18 +315,7 @@ namespace rpc
         }
 
         uint64_t get_remote_rpc_version() const {return version_.load();}
-        void set_has_add_reffed(){has_add_reffed_ = true;}
-        
-        //if returns zero the service needs to remove the proxy
-        bool on_service_shutdown()
-        {
-            if(!has_add_reffed_ && !is_parent_channel_)
-            {
-                return release_external_ref() == 0;
-            }
-            return false;
-        }
-        
+
         uint64_t set_encoding(encoding enc)
         {
             if(version_ == rpc::VERSION_1)
@@ -481,7 +472,6 @@ namespace rpc
                     {
                         version_.compare_exchange_strong( original_version, version);
                     }
-                    has_add_reffed_ = true;
                     return ret;
                 }
                 version--;
@@ -764,23 +754,30 @@ namespace rpc
         //if it is local to this service then just get the relevant stub
         if(serv->get_zone_id().as_destination() == encap.destination_zone_id)
         {
-            val = serv->get_local_interface<T>(protocol_version, encap.object_id);
-            if(!val)
-                return rpc::error::OBJECT_NOT_FOUND();
-            return rpc::error::OK();
+            //if we get here then we need to invent a test for this
+            assert(false);
+            return rpc::error::INVALID_DATA();            
+            // val = serv->get_local_interface<T>(protocol_version, encap.object_id);
+            // if(!val)
+            //     return rpc::error::OBJECT_NOT_FOUND();
+            // return rpc::error::OK();
         }
 
         //get the right  service proxy
         bool new_proxy_added = false;
         if(service_proxy->get_destination_zone_id() != encap.destination_zone_id)
         {
-            //if the zone is different lookup or clone the right proxy
-            service_proxy = serv->get_zone_proxy(
-                {0}, 
-                caller_zone_id, 
-                encap.destination_zone_id, 
-                caller_zone_id,
-                new_proxy_added);
+            //if we get here then we need to invent a test for this
+            assert(false);
+            return rpc::error::INVALID_DATA();            
+
+            // //if the zone is different lookup or clone the right proxy
+            // service_proxy = serv->get_zone_proxy(
+            //     {0}, 
+            //     caller_zone_id, 
+            //     encap.destination_zone_id, 
+            //     caller_zone_id,
+            //     new_proxy_added);
         }
 
         bool proxy_to_parent = serv->get_parent_zone_id() == service_proxy->get_destination_zone_id();

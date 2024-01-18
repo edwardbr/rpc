@@ -246,6 +246,8 @@ namespace rpc
             auto ret = destination_service_->add_ref(protocol_version, destination_channel_zone_id, destination_zone_id, object_id, caller_channel_zone_id, caller_zone_id, build_out_param_channel, proxy_add_ref);            
             if(proxy_add_ref && ret != std::numeric_limits<uint64_t>::max())
             {
+                //untested
+                assert(false);
                 add_external_ref();
             }
             return ret;

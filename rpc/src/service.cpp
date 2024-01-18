@@ -399,9 +399,15 @@ namespace rpc
                 rpc::shared_ptr<service_proxy> caller_zone;
                 auto found = other_zones.find({{object_channel}, zone_id_.as_caller()});//we dont need to get caller id for this
                 if(found != other_zones.end())
+                {
                     caller_zone = found->second.lock();
+                }
                 else
-                    caller_zone = get_parent();
+                {
+                    //unexpected code path
+                    assert(false);
+                    //caller_zone = get_parent();
+                }
                 assert(caller_zone);
                     
                 if(telemetry_service_)
@@ -435,6 +441,8 @@ namespace rpc
         auto item = stubs.find(object_id);
         if (item == stubs.end())
         {
+            //we need a test if we get here
+            assert(false);
             return rpc::weak_ptr<object_stub>();
         }
 
@@ -520,8 +528,10 @@ namespace rpc
                     auto found = other_zones.find({destination_zone_id, caller_zone_id});
                     if(found != other_zones.end())
                     {
-                        dest_zone = found->second.lock();
-                        dest_zone->add_external_ref();//update the local ref count the object refcount is done further down the stack
+                        //untested section
+                        assert(false);
+                        // dest_zone = found->second.lock();
+                        // dest_zone->add_external_ref();//update the local ref count the object refcount is done further down the stack
                         break;
                     }
 
@@ -599,7 +609,9 @@ namespace rpc
                         }
                         else
                         {
-                            caller_zone = get_parent();
+                            //untested path
+                            assert(false);
+                            //caller_zone = get_parent();
                         }
 
                         assert(caller_zone);
@@ -774,7 +786,9 @@ namespace rpc
                     }                
                     else
                     {
-                        caller_zone = get_parent();                        
+                        //untested
+                        assert(false);
+                        //caller_zone = get_parent();                        
                     }
                     assert(caller_zone);
                 }
@@ -1099,12 +1113,6 @@ namespace rpc
     child_service::~child_service()
     {
         std::vector<rpc::shared_ptr<rpc::service_proxy>> zones_to_be_explicitly_removed;
-        for(auto sp : other_zones)
-        {
-            auto proxy = sp.second.lock();
-            if(proxy->on_service_shutdown() == true && proxy != parent_service_proxy_)
-                zones_to_be_explicitly_removed.push_back(proxy);
-        }
         
         for(auto sp : zones_to_be_explicitly_removed)
         {
@@ -1135,21 +1143,5 @@ namespace rpc
             assert(parent_zone_id_ == parent_service_proxy->get_destination_zone_id());
         }
         parent_service_proxy_ = parent_service_proxy;
-    }
-
-    rpc::shared_ptr<service_proxy> child_service::get_zone_proxy(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, destination_zone destination_zone_id, caller_zone new_caller_zone_id, bool& new_proxy_added)
-    {
-        auto proxy = service::get_zone_proxy(caller_channel_zone_id, caller_zone_id, destination_zone_id, new_caller_zone_id, new_proxy_added);
-        if(proxy)
-            return proxy;
-
-        if(parent_service_proxy_)
-        {
-            std::lock_guard g(insert_control);
-            proxy = parent_service_proxy_->clone_for_zone(destination_zone_id, caller_zone_id);
-            new_proxy_added = true;
-            return proxy;
-        }
-        return nullptr;
     }
 }
