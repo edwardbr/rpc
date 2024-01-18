@@ -377,12 +377,12 @@ namespace marshalled_tests
                 telemetry_->on_impl_deletion("example", (uint64_t)this, zone_id_);
         }
         
-        error_code get_host(rpc::shared_ptr<yyy::i_host>& host)
+        error_code get_host(rpc::shared_ptr<yyy::i_host>& host) override
         {
             host = host_;
             return rpc::error::OK();
         }
-        error_code set_host(const rpc::shared_ptr<yyy::i_host>& host) 
+        error_code set_host(const rpc::shared_ptr<yyy::i_host>& host) override
         {
             host_ = host;
             return rpc::error::OK();

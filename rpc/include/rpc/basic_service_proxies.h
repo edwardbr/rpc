@@ -54,7 +54,7 @@ namespace rpc
 
         //if there is no use of a local_service_proxy in the zone requires_parent_release must be set to true so that the zones service can clean things ups
         
-        static rpc::shared_ptr<local_service_proxy> local_service_proxy::create(const rpc::shared_ptr<service>& destination_svc,
+        static rpc::shared_ptr<local_service_proxy> create(const rpc::shared_ptr<service>& destination_svc,
                                                             const rpc::shared_ptr<child_service>& svc,
                                                             const rpc::i_telemetry_service* telemetry_service)
         {        
@@ -181,7 +181,7 @@ namespace rpc
             }
         }
 
-        static rpc::shared_ptr<local_child_service_proxy> local_child_service_proxy::create(const rpc::shared_ptr<service>& destination_svc,
+        static rpc::shared_ptr<local_child_service_proxy> create(const rpc::shared_ptr<service>& destination_svc,
                                                                     const rpc::shared_ptr<service>& svc,
                                                                     const rpc::i_telemetry_service* telemetry_service)
         {

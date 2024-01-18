@@ -176,7 +176,6 @@ class in_memory_setup
 public:
 
     rpc::shared_ptr<rpc::service> get_root_service() const {return nullptr;}
-    rpc::shared_ptr<rpc::child_service> get_child_service() const {return nullptr;}
     bool get_has_enclave() const {return has_enclave_;}
     rpc::shared_ptr<yyy::i_example> get_example() const {return i_example_ptr_;}
     rpc::shared_ptr<yyy::i_host> get_host() const {return i_host_ptr_;}
@@ -254,7 +253,6 @@ class inproc_setup
 public:
 
     rpc::shared_ptr<rpc::service> get_root_service() const {return root_service_;}
-    rpc::shared_ptr<rpc::child_service> get_child_service() const {return child_service_;}
     bool get_has_enclave() const {return has_enclave_;}
     rpc::shared_ptr<yyy::i_example> get_example() const {return i_example_ptr_;}
     rpc::shared_ptr<yyy::i_host> get_host() const {return i_host_ptr_;}
@@ -443,7 +441,6 @@ class enclave_setup
 public:
 
     rpc::shared_ptr<rpc::service> get_root_service() const {return root_service_;}
-    rpc::shared_ptr<rpc::child_service> get_child_service() const {return child_service_;}
     bool get_has_enclave() const {return has_enclave_;}
     rpc::shared_ptr<yyy::i_host> get_local_host_ptr(){return local_host_ptr_.lock();}
     rpc::shared_ptr<yyy::i_example> get_example() const {return i_example_ptr_;}

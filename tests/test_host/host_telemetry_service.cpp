@@ -1,3 +1,4 @@
+#include <filesystem>
 #include <host_telemetry_service.h>
 #include <spdlog/spdlog.h>
 #include <fmt/os.h>
@@ -19,7 +20,26 @@ host_telemetry_service::host_telemetry_service(const std::string& test_suite_nam
     test_suite_name_(test_suite_name),
     name_(name)
 {
-    output = fopen("C:/Dev/Secretarium/core1/build/test.pu", "w+");
+#ifdef WIN32
+    std::string output_path_name("C:/Dev/Secretarium/core1/build/");
+#else
+    std::string output_path_name("../../rpc_test_diagram/");
+#endif
+    
+    std::filesystem::create_directory(output_path_name);
+
+    auto fixed_name = test_suite_name;
+    for(auto& ch : fixed_name)
+    {
+        if(ch == '/')
+            ch = '#';
+    }
+
+    std::string file_name = output_path_name + fixed_name + ".pu";
+    const char* fn = file_name.c_str();
+        
+    output = ::fopen(fn, "w+");
+
     fmt::println(output, "@startuml");
     fmt::println(output, "title {}.{}", test_suite_name_, name_);
 }

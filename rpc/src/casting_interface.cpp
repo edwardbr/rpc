@@ -1,5 +1,3 @@
-#pragma once
-
 #include <rpc/casting_interface.h>
 #include <rpc/proxy.h>
 
