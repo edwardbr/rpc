@@ -1,6 +1,7 @@
 #include <iostream>
 #include <unordered_map>
 #include <string_view>
+#include <thread>
 
 #include <sgx_urts.h>
 #include <sgx_quote.h>
@@ -254,6 +255,7 @@ public:
 
     rpc::shared_ptr<rpc::service> get_root_service() const {return root_service_;}
     bool get_has_enclave() const {return has_enclave_;}
+    bool is_enclave_setup() const {return false;}
     rpc::shared_ptr<yyy::i_example> get_example() const {return i_example_ptr_;}
     rpc::shared_ptr<yyy::i_host> get_host() const {return i_host_ptr_;}
     rpc::shared_ptr<yyy::i_host> get_local_host_ptr(){return local_host_ptr_.lock();}
@@ -300,7 +302,7 @@ public:
             EXPECT_EQ(example_from_cast, hst);
         }
 
-        ASSERT(!rpc::demarshall_interface_proxy(rpc::get_version(), service_proxy_to_host, host_encap,  child_service_->get_zone_id().as_caller(), i_host_ptr_));
+        ASSERT(rpc::demarshall_interface_proxy(rpc::get_version(), service_proxy_to_host, host_encap,  child_service_->get_zone_id().as_caller(), i_host_ptr_));
 
         {
             // create the example object implementation
@@ -315,7 +317,7 @@ public:
             EXPECT_EQ(example_from_cast, remote_example);
         }
 
-        ASSERT(!rpc::demarshall_interface_proxy(rpc::get_version(), service_proxy_to_child, example_encap, root_service_->get_zone_id().as_caller(), i_example_ptr_));
+        ASSERT(rpc::demarshall_interface_proxy(rpc::get_version(), service_proxy_to_child, example_encap, root_service_->get_zone_id().as_caller(), i_example_ptr_));
     }
 
     virtual void TearDown()
@@ -366,7 +368,7 @@ public:
 #endif 
 
         rpc::shared_ptr<yyy::i_example> example_relay_ptr;
-        ASSERT(!rpc::demarshall_interface_proxy(rpc::get_version(), service_proxy_to_child, example_encap, root_service_->get_zone_id().as_caller(), example_relay_ptr));  
+        ASSERT(rpc::demarshall_interface_proxy(rpc::get_version(), service_proxy_to_child, example_encap, root_service_->get_zone_id().as_caller(), example_relay_ptr));  
         if(use_host_in_child_)
         {
 #ifdef USE_RPC_LOGGING
@@ -390,7 +392,7 @@ public:
             LOG_STR(message.data(),message.size());
 #endif 
             rpc::shared_ptr<yyy::i_host> marshalled_host;
-            ASSERT(!rpc::demarshall_interface_proxy(rpc::get_version(), service_proxy_to_host, host_descr,  new_service->get_zone_id().as_caller(), marshalled_host));
+            ASSERT(rpc::demarshall_interface_proxy(rpc::get_version(), service_proxy_to_host, host_descr,  new_service->get_zone_id().as_caller(), marshalled_host));
             // rpc::proxy_bind_out_param(service_proxy_to_host, host_descr, new_service->get_zone_id().as_caller(), marshalled_host);
                         
 #ifdef USE_RPC_LOGGING
@@ -411,7 +413,7 @@ public:
             LOG_STR(message.data(),message.size());
 #endif         
             rpc::shared_ptr<yyy::i_example> new_ptr;
-            ASSERT(!example_relay_ptr->create_example_in_subordnate_zone(new_ptr, use_host_in_child_ ? local_host_ptr_.lock() : nullptr, ++zone_gen_));
+            ASSERT(example_relay_ptr->create_example_in_subordnate_zone(new_ptr, use_host_in_child_ ? local_host_ptr_.lock() : nullptr, ++zone_gen_));
             example_relay_ptr->set_host(nullptr);
             example_relay_ptr = new_ptr;
         }
@@ -442,6 +444,7 @@ public:
 
     rpc::shared_ptr<rpc::service> get_root_service() const {return root_service_;}
     bool get_has_enclave() const {return has_enclave_;}
+    bool is_enclave_setup() const {return true;}
     rpc::shared_ptr<yyy::i_host> get_local_host_ptr(){return local_host_ptr_.lock();}
     rpc::shared_ptr<yyy::i_example> get_example() const {return i_example_ptr_;}
     rpc::shared_ptr<yyy::i_host> get_host() const {return i_host_ptr_;}
@@ -472,7 +475,7 @@ public:
             i_example_ptr_,
             telemetry_service);
 
-        ASSERT(!err_code);
+        ASSERT(err_code);
     }
 
     virtual void TearDown()
@@ -495,12 +498,12 @@ public:
             use_host_in_child_ ? i_host_ptr_ : nullptr, 
             ptr,
             telemetry_service);
-        ASSERT(!err_code);
+        ASSERT(err_code);
         if(CreateNewZoneThenCreateSubordinatedZone)
         {
             rpc::shared_ptr<yyy::i_example> new_ptr;
             err_code = ptr->create_example_in_subordnate_zone(new_ptr, use_host_in_child_ ? i_host_ptr_ : nullptr, ++zone_gen_);
-            ASSERT(!err_code);
+            ASSERT(err_code);
             ptr = new_ptr;
         }
         return ptr;
@@ -573,8 +576,6 @@ TYPED_TEST(type_test, standard_tests)
     standard_tests(f, this->get_lib().get_has_enclave(), telemetry_service);
 }
 
-
-
 TYPED_TEST(type_test, dyanmic_cast_tests)
 {
     auto root_service = this->get_lib().get_root_service();
@@ -630,6 +631,44 @@ TYPED_TEST(remote_type_test, remote_standard_tests)
     standard_tests(*i_foo_ptr, true, telemetry_service);
 }
 
+
+
+TYPED_TEST(remote_type_test, multithreaded_standard_tests)
+{
+    rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
+    ASSERT_EQ(this->get_lib().get_example()->create_foo(i_foo_ptr), 0);
+    
+    std::vector<std::thread> threads(this->get_lib().is_enclave_setup() ? 3 : 100);
+    for(auto& thread_target : threads)
+    {
+        thread_target = std::thread([&](){
+            standard_tests(*i_foo_ptr, true, telemetry_service);   
+        });
+    }
+    for(auto& thread_target : threads)
+    {
+        thread_target.join();
+    }
+}
+
+
+TYPED_TEST(remote_type_test, multithreaded_standard_tests_with_and_foos)
+{
+    std::vector<std::thread> threads(this->get_lib().is_enclave_setup() ? 3 : 100);
+    for(auto& thread_target : threads)
+    {
+        thread_target = std::thread([&](){
+            rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
+            ASSERT_EQ(this->get_lib().get_example()->create_foo(i_foo_ptr), 0);
+            standard_tests(*i_foo_ptr, true, telemetry_service);   
+        });
+    }
+    for(auto& thread_target : threads)
+    {
+        thread_target.join();
+    }
+}
+
 TYPED_TEST(remote_type_test, remote_tests)
 {    
     auto root_service = this->get_lib().get_root_service();
@@ -641,11 +680,58 @@ TYPED_TEST(remote_type_test, remote_tests)
     remote_tests(this->get_lib().get_use_host_in_child(), this->get_lib().get_example(), telemetry_service, zone_id);
 }
 
+TYPED_TEST(remote_type_test, multithreaded_remote_tests)
+{
+    if(this->get_lib().is_enclave_setup())
+        return; // enclaves barf on memory exhastion;
+    auto root_service = this->get_lib().get_root_service();
+    rpc::zone zone_id;
+    if(root_service)
+        zone_id = root_service->get_zone_id();
+    else
+        zone_id = {0};
+    std::vector<std::thread> threads(this->get_lib().is_enclave_setup() ? 3 : 100);
+    for(auto& thread_target : threads)
+    {
+        thread_target = std::thread([&](){
+            remote_tests(this->get_lib().get_use_host_in_child(), this->get_lib().get_example(), telemetry_service, zone_id);
+        });
+    }
+    for(auto& thread_target : threads)
+    {
+        thread_target.join();
+    }
+}
+
 TYPED_TEST(remote_type_test, create_new_zone)
 {
-    rpc::shared_ptr<xxx::i_foo> i_foo_relay_ptr;
-    auto example_relay_ptr = this->get_lib().create_new_zone();
-    example_relay_ptr->set_host(nullptr);
+    std::vector<std::thread> threads(this->get_lib().is_enclave_setup() ? 3 : 100);
+    for(auto& thread_target : threads)
+    {
+        thread_target = std::thread([&](){
+        auto example_relay_ptr = this->get_lib().create_new_zone();
+        example_relay_ptr->set_host(nullptr);        });
+    }
+    for(auto& thread_target : threads)
+    {
+        thread_target.join();
+    }
+}
+
+TYPED_TEST(remote_type_test, multithreaded_create_new_zone)
+{
+    std::vector<std::thread> threads(this->get_lib().is_enclave_setup() ? 3 : 100);
+    for(auto& thread_target : threads)
+    {
+        thread_target = std::thread([&](){
+            auto example_relay_ptr = this->get_lib().create_new_zone();
+            example_relay_ptr->set_host(nullptr);        
+        });
+    }
+    for(auto& thread_target : threads)
+    {
+        thread_target.join();
+    }
 }
 
 TYPED_TEST(remote_type_test, create_new_zone_releasing_host_then_running_on_other_enclave)
@@ -659,6 +745,24 @@ TYPED_TEST(remote_type_test, create_new_zone_releasing_host_then_running_on_othe
     //ASSERT_EQ(this->get_lib().get_example()->create_foo(i_foo_ptr), 0);
     example_relay_ptr = nullptr;
     //standard_tests(*i_foo_ptr, true, telemetry_service);    
+}
+
+TYPED_TEST(remote_type_test, multithreaded_create_new_zone_releasing_host_then_running_on_other_enclave)
+{
+    std::vector<std::thread> threads(this->get_lib().is_enclave_setup() ? 3 : 100);
+    for(auto& thread_target : threads)
+    {
+        thread_target = std::thread([&](){
+            rpc::shared_ptr<xxx::i_foo> i_foo_relay_ptr;
+            auto example_relay_ptr = this->get_lib().create_new_zone();
+            example_relay_ptr->create_foo(i_foo_relay_ptr);
+            standard_tests(*i_foo_relay_ptr, true, telemetry_service);
+        });
+    }
+    for(auto& thread_target : threads)
+    {
+        thread_target.join();
+    }
 }
 
 TYPED_TEST(remote_type_test, dyanmic_cast_tests)
@@ -692,6 +796,34 @@ TYPED_TEST(remote_type_test, bounce_baz_between_two_interfaces)
     rpc::shared_ptr<xxx::i_baz> baz;
     i_foo_ptr->create_baz_interface(baz);
     i_foo_relay_ptr->call_baz_interface(baz);
+}
+
+
+TYPED_TEST(remote_type_test, multithreaded_bounce_baz_between_two_interfaces)
+{
+    if(this->get_lib().is_enclave_setup())
+        return; // enclaves barf on memory exhastion
+    
+    std::vector<std::thread> threads(this->get_lib().is_enclave_setup() ? 3 : 100);
+    for(auto& thread_target : threads)
+    {
+        thread_target = std::thread([&](){
+            rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
+            ASSERT_EQ(this->get_lib().get_example()->create_foo(i_foo_ptr), 0);
+
+            rpc::shared_ptr<xxx::i_foo> i_foo_relay_ptr;
+            auto example_relay_ptr = this->get_lib().create_new_zone();
+            example_relay_ptr->create_foo(i_foo_relay_ptr);
+
+            rpc::shared_ptr<xxx::i_baz> baz;
+            i_foo_ptr->create_baz_interface(baz);
+            i_foo_relay_ptr->call_baz_interface(baz);
+        });
+    }
+    for(auto& thread_target : threads)
+    {
+        thread_target.join();
+    }
 }
 
 // check for null
@@ -806,6 +938,30 @@ TYPED_TEST(remote_type_test, check_sub_subordinate)
 
     rpc::shared_ptr<yyy::i_example> new_new_zone;
     ASSERT_EQ(new_zone->create_example_in_subordnate_zone(new_new_zone, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK()); //third level
+}
+
+
+
+TYPED_TEST(remote_type_test, multithreaded_check_sub_subordinate)
+{
+    auto& lib = this->get_lib();
+    if(!lib.get_use_host_in_child())
+        return;
+    std::vector<std::thread> threads(this->get_lib().is_enclave_setup() ? 3 : 100);
+    for(auto& thread_target : threads)
+    {
+        thread_target = std::thread([&](){
+            rpc::shared_ptr<yyy::i_example> new_zone;
+            ASSERT_EQ(lib.get_example()->create_example_in_subordnate_zone(new_zone, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK()); //second level
+
+            rpc::shared_ptr<yyy::i_example> new_new_zone;
+            ASSERT_EQ(new_zone->create_example_in_subordnate_zone(new_new_zone, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK()); //third level
+        });
+    }
+    for(auto& thread_target : threads)
+    {
+        thread_target.join();
+    }
 }
 
 TYPED_TEST(remote_type_test, check_identity)
@@ -979,7 +1135,8 @@ TYPED_TEST(type_test_with_host, call_host_look_up_app_unload_app)
     ASSERT_NE(target, nullptr);
 
     ASSERT_EQ(this->get_lib().get_example()->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
-    telemetry_service->message(rpc::i_telemetry_service::info, "call_host_unload_app");
+    if(telemetry_service)
+        telemetry_service->message(rpc::i_telemetry_service::info, "call_host_unload_app");
     ASSERT_EQ(this->get_lib().get_example()->call_host_unload_app("target"), rpc::error::OK());
     target = nullptr;
 }
@@ -994,12 +1151,15 @@ TYPED_TEST(type_test_with_host, call_host_look_up_app_not_return)
     ASSERT_NE(target, nullptr);
 
     ASSERT_EQ(this->get_lib().get_example()->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
-    telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return");
+    if(telemetry_service)
+        telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return");
     ASSERT_EQ(this->get_lib().get_example()->call_host_look_up_app_not_return("target", run_standard_tests), rpc::error::OK());
-    telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return complete");
+    if(telemetry_service)
+        telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return complete");
     ASSERT_EQ(this->get_lib().get_example()->call_host_unload_app("target"), rpc::error::OK());
     target = nullptr;
-    telemetry_service->message(rpc::i_telemetry_service::info, "app released");
+    if(telemetry_service)
+        telemetry_service->message(rpc::i_telemetry_service::info, "app released");
 }
 
 TYPED_TEST(type_test_with_host, create_store_fetch_delete)
@@ -1012,14 +1172,17 @@ TYPED_TEST(type_test_with_host, create_store_fetch_delete)
     ASSERT_NE(target, nullptr);
 
     ASSERT_EQ(this->get_lib().get_example()->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
-    telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app");
+    if(telemetry_service)
+        telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app");
     ASSERT_EQ(this->get_lib().get_example()->call_host_look_up_app("target", target2, run_standard_tests), rpc::error::OK());
-    telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app complete");
+    if(telemetry_service)   
+        telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app complete");
     ASSERT_EQ(this->get_lib().get_example()->call_host_unload_app("target"), rpc::error::OK());
     ASSERT_EQ(target, target2);
     target = nullptr;
     target2 = nullptr;
-    telemetry_service->message(rpc::i_telemetry_service::info, "app released");
+    if(telemetry_service)
+        telemetry_service->message(rpc::i_telemetry_service::info, "app released");
 }
 
 TYPED_TEST(type_test_with_host, create_store_not_return_delete)
@@ -1031,11 +1194,14 @@ TYPED_TEST(type_test_with_host, create_store_not_return_delete)
     ASSERT_NE(target, nullptr);
 
     ASSERT_EQ(this->get_lib().get_example()->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
-    telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return");
+    if(telemetry_service)
+        telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return");
     ASSERT_EQ(this->get_lib().get_example()->call_host_look_up_app_not_return_and_delete("target", run_standard_tests), rpc::error::OK());
-    telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return complete");
+    if(telemetry_service)
+        telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return complete");
     target = nullptr;
-    telemetry_service->message(rpc::i_telemetry_service::info, "app released");
+    if(telemetry_service)
+        telemetry_service->message(rpc::i_telemetry_service::info, "app released");
 }
 
 TYPED_TEST(type_test_with_host, create_store_delete)
@@ -1048,13 +1214,16 @@ TYPED_TEST(type_test_with_host, create_store_delete)
     ASSERT_NE(target, nullptr);
 
     ASSERT_EQ(this->get_lib().get_example()->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
-    telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_and_delete");
+    if(telemetry_service)
+        telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_and_delete");
     ASSERT_EQ(this->get_lib().get_example()->call_host_look_up_app_and_delete("target", target2, run_standard_tests), rpc::error::OK());
-    telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_and_delete complete");
+    if(telemetry_service)
+        telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_and_delete complete");
     ASSERT_EQ(target, target2);
     target = nullptr;
     target2 = nullptr;
-    telemetry_service->message(rpc::i_telemetry_service::info, "app released");
+    if(telemetry_service)
+        telemetry_service->message(rpc::i_telemetry_service::info, "app released");
 }
 
 TYPED_TEST(type_test_with_host, create_subordinate_zone)

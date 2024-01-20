@@ -266,7 +266,15 @@ uint64_t add_ref_enclave(uint64_t protocol_version, uint64_t destination_channel
     {
         return std::numeric_limits<uint64_t>::max();
     }
-    return rpc_server->add_ref(protocol_version, {destination_channel_zone_id}, {destination_zone_id}, {object_id}, {caller_channel_zone_id}, {caller_zone_id}, static_cast<rpc::add_ref_options>(build_out_param_channel), false);
+    return rpc_server->add_ref(
+        protocol_version, 
+        {destination_channel_zone_id}, 
+        {destination_zone_id}, 
+        {object_id}, 
+        {caller_channel_zone_id}, 
+        {caller_zone_id}, 
+        static_cast<rpc::add_ref_options>(build_out_param_channel), 
+        false);
 }
 
 uint64_t release_enclave(uint64_t protocol_version, uint64_t zone_id, uint64_t object_id, uint64_t caller_zone_id)

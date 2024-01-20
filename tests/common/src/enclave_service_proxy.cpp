@@ -194,10 +194,6 @@ namespace rpc
             assert(false);
             return add_ref_failed_val;
         }    
-        if(proxy_add_ref && ret != add_ref_failed_val)
-        {
-            add_external_ref();
-        }
         return ret;
     }
 
@@ -221,10 +217,6 @@ namespace rpc
             }
             return std::numeric_limits<uint64_t>::max();
         }
-        if(ret != std::numeric_limits<uint64_t>::max())
-        {
-            release_external_ref();
-        }  
         return ret;
     }
 #endif

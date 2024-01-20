@@ -72,7 +72,6 @@ namespace rpc
             if(error != rpc::error::OK())
                 return error;
             svc->add_zone_proxy(ret);
-            ret->add_external_ref();
             return rpc::error::OK();
         }   
         virtual ~enclave_service_proxy();

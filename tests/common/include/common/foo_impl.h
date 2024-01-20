@@ -295,7 +295,8 @@ namespace marshalled_tests
 
         error_code exception_test() override
         {
-            telemetry_->message(rpc::i_telemetry_service::info, "exception_test");
+            if(telemetry_)
+                telemetry_->message(rpc::i_telemetry_service::info, "exception_test");
             throw std::runtime_error("oops");
             return rpc::error::OK();
         }
@@ -425,14 +426,16 @@ namespace marshalled_tests
 
             rpc::interface_descriptor example_encap = rpc::create_interface_stub(*child_service_ptr, remote_example);
 
-            telemetry_->message(rpc::i_telemetry_service::info, "rpc::demarshall_interface_proxy");
+            if(telemetry_)
+                telemetry_->message(rpc::i_telemetry_service::info, "rpc::demarshall_interface_proxy");
             auto ret = rpc::demarshall_interface_proxy(rpc::get_version(), service_proxy_to_child, example_encap, this_service->get_zone_id().as_caller(), target);
             if(ret != rpc::error::OK())
                 return ret;
 
                 
             //This voodoo marshalls the host pointer from an this_service perspective to an app service one
-            telemetry_->message(rpc::i_telemetry_service::info, "prepare_out_param");
+            if(telemetry_)
+                telemetry_->message(rpc::i_telemetry_service::info, "prepare_out_param");
 //            auto host_descr = rpc::create_interface_stub(*this_service, host_);
             auto host_descr = this_service->prepare_out_param(rpc::get_version(), {0}, child_service_ptr->get_zone_id().as_caller(), host_ptr->query_proxy_base());
             
@@ -704,7 +707,8 @@ namespace marshalled_tests
 
         error_code send_interface_back(const rpc::shared_ptr<xxx::i_baz>& input, rpc::shared_ptr<xxx::i_baz>& output) override
         {
-            telemetry_->message(rpc::i_telemetry_service::info, "send_interface_back");
+            if(telemetry_)
+                telemetry_->message(rpc::i_telemetry_service::info, "send_interface_back");
             output = input;
             return rpc::error::OK();
         }

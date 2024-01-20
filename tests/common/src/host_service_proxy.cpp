@@ -32,7 +32,6 @@ namespace rpc
 
         auto ret = rpc::make_shared<make_shared_host_service_proxy_enabler>(host_zone_id, svc, telemetry_service);
         svc->add_zone_proxy(ret);
-        ret->add_external_ref();
         svc->set_parent(ret);
         ret->set_parent_channel(true);
         return rpc::static_pointer_cast<service_proxy>(ret);
@@ -155,10 +154,6 @@ namespace rpc
             }
             return std::numeric_limits<uint64_t>::max();
         }  
-        if(proxy_add_ref && ret != std::numeric_limits<uint64_t>::max())
-        {
-            add_external_ref();
-        }
 
         auto svc = rpc::static_pointer_cast<child_service>(get_operating_zone_service());
         return ret;
@@ -181,10 +176,6 @@ namespace rpc
             }
             return std::numeric_limits<uint64_t>::max();
         }
-        if(ret != std::numeric_limits<uint64_t>::max())
-        {
-            release_external_ref();
-        }   
         return ret;
     }
 }

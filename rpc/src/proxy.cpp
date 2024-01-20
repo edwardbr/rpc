@@ -50,8 +50,7 @@ namespace rpc
         LOG_STR(message.c_str(), message.size());
 #endif
 
-        service_proxy_->remove_object_proxy(object_id_);
-        service_proxy_->sp_release(service_proxy_->get_destination_zone_id(), object_id_, service_proxy_->get_zone_id().as_caller()); 
+        service_proxy_->on_object_proxy_released(object_id_);
         service_proxy_ = nullptr;
     }
 

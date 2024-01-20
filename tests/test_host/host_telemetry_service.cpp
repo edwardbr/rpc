@@ -1,4 +1,5 @@
 #include <filesystem>
+#include <algorithm>
 #include <host_telemetry_service.h>
 #include <spdlog/spdlog.h>
 #include <fmt/os.h>
@@ -21,7 +22,7 @@ host_telemetry_service::host_telemetry_service(const std::string& test_suite_nam
     name_(name)
 {
 #ifdef WIN32
-    std::string output_path_name("C:/Dev/Secretarium/core1/build/");
+    std::string output_path_name("C:/Dev/Secretarium/core1/build/rpc_test_diagram/");
 #else
     std::string output_path_name("../../rpc_test_diagram/");
 #endif
@@ -35,7 +36,7 @@ host_telemetry_service::host_telemetry_service(const std::string& test_suite_nam
             ch = '#';
     }
 
-    std::string file_name = output_path_name + fixed_name + ".pu";
+    std::string file_name = output_path_name + fixed_name + "." + name_ + ".pu";
     const char* fn = file_name.c_str();
         
     output = ::fopen(fn, "w+");
@@ -92,7 +93,7 @@ std::string service_alias(rpc::zone zone_id)
 
 uint64_t service_order(rpc::zone zone_id)
 {
-    return zone_id.get_val() * 1000000;
+    return std::min((uint32_t)(zone_id.get_val() * 100000), (uint32_t)999999);
 }
 
 std::string object_stub_alias(rpc::zone zone_id, rpc::object object_id)
@@ -503,8 +504,7 @@ void host_telemetry_service::on_stub_add_ref(rpc::zone zone, rpc::object object_
     }
     else
     {            
-        found->second++;
-        assert(count == found->second);        
+        found->second++;     
         fmt::println(output, "hnote over {} : begin add_ref count {} ", object_stub_alias(zone, object_id), count);
     }
     fflush(output);
@@ -520,7 +520,6 @@ void host_telemetry_service::on_stub_release(rpc::zone zone, rpc::object object_
     }
     {
         found->second--;
-        assert(count == found->second);
         if(found->second == 0)
         {
             fmt::println(output, "hnote over {} : release count {}", object_stub_alias(zone, object_id), count);

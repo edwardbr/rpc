@@ -290,6 +290,7 @@ namespace rpc
             else
             {
                 destination_zone = object_service_proxy->clone_for_zone(destination_zone_id, caller_zone_id);
+                inner_add_zone_proxy(destination_zone);
             }
 
             if(telemetry_service_)
@@ -367,10 +368,13 @@ namespace rpc
                 return prepare_out_param(protocol_version, caller_channel_zone_id, caller_zone_id, proxy_base);
             }
         }
+        
+        //needed by the out call
+        rpc::shared_ptr<service_proxy> caller_zone;
 
-        std::lock_guard g(insert_control);
         auto* pointer = iface->get_address();
         {
+            std::lock_guard g(insert_control);
             //find the stub by its address
             auto item = wrapped_object_to_stub.find(pointer);
             if (item != wrapped_object_to_stub.end())
@@ -382,7 +386,7 @@ namespace rpc
             {
                 //else create a stub
                 auto id = generate_new_object_id();
-                stub = rpc::shared_ptr<object_stub>(new object_stub(id, *this, pointer, telemetry_service_));
+                stub = rpc::make_shared<object_stub>(id, *this, pointer, telemetry_service_);
                 rpc::shared_ptr<i_interface_stub> interface_stub = fn(stub);
                 stub->add_interface(interface_stub);
                 wrapped_object_to_stub[pointer] = stub;
@@ -396,7 +400,6 @@ namespace rpc
                 uint64_t object_channel = caller_channel_zone_id.is_set() ? caller_channel_zone_id.id : caller_zone_id.id;
                 assert(object_channel);
                 //and the caller with destination info
-                rpc::shared_ptr<service_proxy> caller_zone;
                 auto found = other_zones.find({{object_channel}, zone_id_.as_caller()});//we dont need to get caller id for this
                 if(found != other_zones.end())
                 {
@@ -409,29 +412,31 @@ namespace rpc
                     //caller_zone = get_parent();
                 }
                 assert(caller_zone);
-                    
-                if(telemetry_service_)
-                    telemetry_service_->on_service_add_ref(
-                        "", 
-                        get_zone_id(), 
-                        {0}, 
-                        zone_id_.as_destination(), 
-                        stub->get_id(), 
-                        {0}, 
-                        caller_zone_id, 
-                        rpc::add_ref_options::build_caller_route);                    
-                //note the caller_channel_zone_id is 0 as the caller came from this route 
-                caller_zone->add_ref(
-                    protocol_version,
+            }
+        }
+        if(outcall)
+        {
+            if(telemetry_service_)
+                telemetry_service_->on_service_add_ref(
+                    "", 
+                    get_zone_id(), 
                     {0}, 
                     zone_id_.as_destination(), 
                     stub->get_id(), 
                     {0}, 
                     caller_zone_id, 
-                    rpc::add_ref_options::build_caller_route, 
-                    false);        
-            }
-        }
+                    rpc::add_ref_options::build_caller_route);                    
+                //note the caller_channel_zone_id is 0 as the caller came from this route 
+            caller_zone->add_ref(
+                protocol_version,
+                {0}, 
+                zone_id_.as_destination(), 
+                stub->get_id(), 
+                {0}, 
+                caller_zone_id, 
+                rpc::add_ref_options::build_caller_route, 
+                false);        
+        }        
         return {stub->get_id(), get_zone_id().as_destination()};
     }
 
@@ -594,6 +599,7 @@ namespace rpc
                             //get the parent to route it
                             dest_zone = get_parent()->clone_for_zone(destination_zone_id, caller_zone_id);
                         }
+                        inner_add_zone_proxy(dest_zone);
                     }
 
                     if(caller_zone_id == zone_id_.as_caller())
@@ -698,7 +704,8 @@ namespace rpc
                                 object_id, 
                                 caller_channel_zone_id, 
                                 caller_zone_id, 
-                                add_ref_options::build_caller_route, false);
+                                add_ref_options::build_caller_route, 
+                                false);
                         }
                     }while(false);
                 }
@@ -724,6 +731,7 @@ namespace rpc
                         {
                             auto tmp = found->second.lock();
                             other_zone = tmp->clone_for_zone(destination_zone_id, caller_zone_id);
+                            inner_add_zone_proxy(other_zone);
                         }
                     }
 
@@ -733,6 +741,7 @@ namespace rpc
                         auto parent = get_parent();
                         assert(parent);
                         other_zone = parent->clone_for_zone(destination_zone_id, caller_zone_id);
+                        inner_add_zone_proxy(other_zone);
                     }
                 }
                 if(telemetry_service_)
@@ -802,7 +811,15 @@ namespace rpc
                         {}, 
                         caller_zone_id, 
                         add_ref_options::build_caller_route);  
-                caller_zone->add_ref(protocol_version, {0},destination_zone_id, object_id, {}, caller_zone_id, add_ref_options::build_caller_route, false);
+                caller_zone->add_ref(
+                    protocol_version, 
+                    {0},
+                    destination_zone_id, 
+                    object_id, 
+                    {}, 
+                    caller_zone_id, 
+                    add_ref_options::build_caller_route, 
+                    false);
             }
             if(object_id == dummy_object_id)
             {
@@ -873,7 +890,12 @@ namespace rpc
             }
             if(telemetry_service_)
                 telemetry_service_->on_service_release("service", zone_id_, other_zone->get_destination_channel_zone_id(), destination_zone_id, object_id, caller_zone_id);    
-            return other_zone->release(protocol_version, destination_zone_id, object_id, caller_zone_id);
+            auto ret = other_zone->release(protocol_version, destination_zone_id, object_id, caller_zone_id);
+            if(ret != std::numeric_limits<uint64_t>::max())
+            {
+                other_zone->release_external_ref();
+            }
+            return ret;
         }
         else
         {
@@ -899,15 +921,18 @@ namespace rpc
             uint64_t count = 0;
             //these scope brackets are needed as otherwise there will be a recursive lock on a mutex in rare cases when the stub is reset
             {
-                std::lock_guard l(insert_control);
-                auto item = stubs.find(object_id);
-                if (item == stubs.end())
                 {
-                    assert(false);
-                    return std::numeric_limits<uint64_t>::max();
-                }
+                    //a scoped lock
+                    std::lock_guard l(insert_control);
+                    auto item = stubs.find(object_id);
+                    if (item == stubs.end())
+                    {
+                        assert(false);
+                        return std::numeric_limits<uint64_t>::max();
+                    }
 
-                stub = item->second.lock();
+                    stub = item->second.lock();
+                }
 
                 if (!stub)
                 {
@@ -918,19 +943,23 @@ namespace rpc
                 if(!count)
                 {
                     {
-                        stubs.erase(item);
-                    }
-                    {
-                        auto* pointer = stub->get_castable_interface()->get_address();
-                        auto it = wrapped_object_to_stub.find(pointer);
-                        if(it != wrapped_object_to_stub.end())
+                        //a scoped lock
+                        std::lock_guard l(insert_control);
                         {
-                            wrapped_object_to_stub.erase(it);
+                            stubs.erase(object_id);
                         }
-                        else
                         {
-                            assert(false);
-                            return std::numeric_limits<uint64_t>::max();
+                            auto* pointer = stub->get_castable_interface()->get_address();
+                            auto it = wrapped_object_to_stub.find(pointer);
+                            if(it != wrapped_object_to_stub.end())
+                            {
+                                wrapped_object_to_stub.erase(it);
+                            }
+                            else
+                            {
+                                assert(false);
+                                return std::numeric_limits<uint64_t>::max();
+                            }
                         }
                     }
                     stub->reset();        
@@ -948,6 +977,7 @@ namespace rpc
 
     void service::inner_add_zone_proxy(const rpc::shared_ptr<service_proxy>& service_proxy)
     {
+        service_proxy->add_external_ref();
         auto destination_zone_id = service_proxy->get_destination_zone_id();
         auto caller_zone_id = service_proxy->get_caller_zone_id();
         assert(destination_zone_id != zone_id_.as_destination());
@@ -1017,6 +1047,7 @@ namespace rpc
         }
 
         auto proxy = calling_proxy->clone_for_zone(destination_zone_id, new_caller_zone_id);
+        inner_add_zone_proxy(proxy);
         new_proxy_added = true;
         return proxy;
     }

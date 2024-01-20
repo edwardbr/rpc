@@ -352,6 +352,11 @@ namespace rpc
         int release_external_ref()
         {
             std::lock_guard g(insert_control_);
+            return inner_release_external_ref();
+        }
+
+        int inner_release_external_ref()
+        {
             auto count = --lifetime_lock_count_;
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
             {
@@ -472,13 +477,17 @@ namespace rpc
                     {
                         version_.compare_exchange_strong( original_version, version);
                     }
+                    if(proxy_add_ref)
+                    {
+                        add_external_ref();
+                    }
                     return ret;
                 }
                 version--;
             }
             return rpc::error::INCOMPATIBLE_SERVICE();        
         }
-
+        
         uint64_t sp_release(
               destination_zone destination_zone_id 
             , object object_id 
@@ -503,6 +512,8 @@ namespace rpc
                     , caller_zone_id);
                 if(ret != std::numeric_limits<uint64_t>::max())
                 {
+                    release_external_ref();
+                   
                     if(original_version != version)
                     {
                         version_.compare_exchange_strong( original_version, version);
@@ -512,6 +523,60 @@ namespace rpc
                 version--;
             }
             return rpc::error::INCOMPATIBLE_SERVICE();   
+        }
+        
+        void on_object_proxy_released(object object_id)
+        {
+            auto caller_zone_id = get_zone_id().as_caller();
+            assert(caller_zone_id == get_caller_zone_id());
+
+#ifdef USE_RPC_LOGGING
+            {
+                auto message = std::string("on_object_proxy_released zone_id ") + std::to_string(get_zone_id().get_val())
+                + std::string(", object_id ") + std::to_string(object_id.get_val())
+                + std::string(", destination_zone_id ") + std::to_string(destination_zone_id_.get_val()) 
+                + std::string(", called from ") + std::to_string(caller_zone_id.get_val());
+                LOG_STR(message.c_str(), message.size());
+            }
+#endif
+
+            std::lock_guard l(insert_control_);
+            auto item = proxies_.find(object_id);
+            assert(item  != proxies_.end());
+            proxies_.erase(item);  
+
+            if (telemetry_service_ && object_id != dummy_object_id)
+            {
+                telemetry_service_->on_service_proxy_release("service_proxy", get_zone_id(),
+                                                                destination_zone_id_, destination_channel_zone_,  caller_zone_id, object_id);
+            }
+            
+            auto original_version = version_.load();
+            auto version = original_version;
+            while(version)
+            {
+                auto ret = release(
+                    version
+                    , destination_zone_id_ 
+                    , object_id 
+                    , caller_zone_id);
+                if(ret != std::numeric_limits<uint64_t>::max())
+                {
+                    inner_release_external_ref();
+                    if(original_version != version)
+                    {
+                        version_.compare_exchange_strong( original_version, version);
+                    }
+                    return;
+                }
+                version--;
+            }
+            {
+                std::string message("unable to release on service");
+                LOG_STR(message.c_str(), message.size());
+                assert(false);
+            }
+            return;   
         }            
 
         std::unordered_map<object, rpc::weak_ptr<object_proxy>> get_proxies(){return proxies_;}
@@ -532,8 +597,6 @@ namespace rpc
             }
 
             ret->clone_completed();
-            get_operating_zone_service()->inner_add_zone_proxy(ret);
-            ret->add_external_ref();
             return ret;
         }
 
@@ -566,15 +629,7 @@ namespace rpc
                 return nullptr;
             return item->second.lock();            
         }
-
-        void remove_object_proxy(object object_id)
-        {
-            std::lock_guard l(insert_control_);
-            auto item = proxies_.find(object_id);
-            assert(item  != proxies_.end());
-            proxies_.erase(item);       
-        }
-
+        
         friend service;
         friend child_service;
     };
