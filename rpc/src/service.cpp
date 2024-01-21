@@ -281,16 +281,25 @@ namespace rpc
         else
         {
             rpc::shared_ptr<service_proxy> destination_zone = object_service_proxy;
-            auto found = other_zones.find({destination_zone_id, caller_zone_id});//we dont need to get caller id for this
-            if(found != other_zones.end())
+            rpc::shared_ptr<service_proxy> caller_zone;
             {
-                destination_zone = found->second.lock();
+                std::lock_guard g(insert_control);
+                auto found = other_zones.find({destination_zone_id, caller_zone_id});//we dont need to get caller id for this
+                if(found != other_zones.end())
+                {
+                    destination_zone = found->second.lock();
+                }
+                else
+                {
+                    destination_zone = object_service_proxy->clone_for_zone(destination_zone_id, caller_zone_id);
+                    other_zones[{destination_zone_id, caller_zone_id}] = destination_zone;
+                }
                 destination_zone->add_external_ref();
-            }
-            else
-            {
-                destination_zone = object_service_proxy->clone_for_zone(destination_zone_id, caller_zone_id);
-                inner_add_zone_proxy(destination_zone);
+                //and the caller with destination info
+                found = other_zones.find({{object_channel}, zone_id_.as_caller()});//we dont need to get caller id for this
+                assert(found != other_zones.end());
+                caller_zone = found->second.lock();
+                assert(caller_zone);
             }
 
             if(telemetry_service_)
@@ -316,11 +325,6 @@ namespace rpc
                 rpc::add_ref_options::build_destination_route, 
                 false);
             
-            //and the caller with destination info
-            found = other_zones.find({{object_channel}, zone_id_.as_caller()});//we dont need to get caller id for this
-            assert(found != other_zones.end());
-            auto caller_zone = found->second.lock();
-            assert(caller_zone);
             
             if(telemetry_service_)
                 telemetry_service_->on_service_add_ref(

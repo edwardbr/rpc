@@ -22,6 +22,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+#include <clipp.h>
+
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
@@ -63,6 +65,7 @@ std::string enclave_path_v1 = "./marshal_test_enclave_v1.signed.dll";
 std::string enclave_path = "./libmarshal_test_enclave.signed.so";
 std::string enclave_path_v1 = "./libmarshal_test_enclave_v1.signed.so";
 #endif
+bool enable_telemetry_server = true;
 
 rpc::weak_ptr<rpc::service> current_host_service;
 
@@ -75,6 +78,12 @@ namespace {
 
 	extern "C" int main(int argc, char* argv[])
 	{
+        auto cli = (
+			clipp::option("-t", "--enable_telemetry_server").doc("enable the telemetry_server") & clipp::value("enable_telemetry_server", enable_telemetry_server)
+        );
+
+        clipp::parsing_result res = clipp::parse(argc, argv, cli);
+        
         auto logger = spdlog::stdout_color_mt("console");
         logger->set_pattern("[%^%l%$] %v");        
         spdlog::set_default_logger(logger);
@@ -188,7 +197,8 @@ public:
     {   
         zone_gen = &zone_gen_;
         auto test_info = ::testing::UnitTest::GetInstance()->current_test_info();
-        tm = rpc::make_shared<host_telemetry_service>(test_info->test_suite_name(), test_info->name());
+        if(enable_telemetry_server)
+            tm = rpc::make_shared<host_telemetry_service>(test_info->test_suite_name(), test_info->name());
         telemetry_service = tm.get();
         i_host_ptr_ = rpc::shared_ptr<yyy::i_host> (new host(tm.get(), {zone_gen_}));
         local_host_ptr_ = i_host_ptr_;
@@ -266,7 +276,8 @@ public:
     {
         zone_gen = &zone_gen_;
         auto test_info = ::testing::UnitTest::GetInstance()->current_test_info();
-        tm = rpc::make_shared<host_telemetry_service>(test_info->test_suite_name(), test_info->name());
+        if(enable_telemetry_server)
+            tm = rpc::make_shared<host_telemetry_service>(test_info->test_suite_name(), test_info->name());
 
         telemetry_service = tm.get();
         root_service_ = rpc::make_shared<rpc::service>(rpc::zone{++zone_gen_}, tm.get());
@@ -455,7 +466,8 @@ public:
     {
         zone_gen = &zone_gen_;
         auto test_info = ::testing::UnitTest::GetInstance()->current_test_info();
-        tm = rpc::make_shared<host_telemetry_service>(test_info->test_suite_name(), test_info->name());
+        if(enable_telemetry_server)
+            tm = rpc::make_shared<host_telemetry_service>(test_info->test_suite_name(), test_info->name());
         telemetry_service = tm.get();
         root_service_ = rpc::make_shared<rpc::service>(rpc::zone{++zone_gen_}, tm.get());
         root_service_->add_service_logger(std::make_shared<test_service_logger>());

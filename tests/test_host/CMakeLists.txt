@@ -18,6 +18,7 @@ target_link_libraries(
          example_idl_host
          rpc::rpc_host
          yas_common
+         clipp::clipp
          fmt::fmt-header-only
          GTest::gtest_main
          GTest::gmock_main
