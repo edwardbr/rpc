@@ -46,6 +46,7 @@ namespace rpc
         mutable std::atomic<uint64_t> object_id_generator = 0;
 
         // map object_id's to stubs
+        mutable std::mutex stub_control;
         std::unordered_map<object, rpc::weak_ptr<object_stub>> stubs;
         std::unordered_map<rpc::interface_ordinal, std::shared_ptr<std::function<rpc::shared_ptr<rpc::i_interface_stub>(const rpc::shared_ptr<rpc::i_interface_stub>&)>>> stub_factories;
         // map wrapped objects pointers to stubs
@@ -63,11 +64,11 @@ namespace rpc
             }
         };
 
+        mutable std::mutex zone_control;
         std::map<zone_route, rpc::weak_ptr<service_proxy>> other_zones;
         std::list<std::shared_ptr<service_logger>> service_loggers;
 
         // hard lock on the root object
-        mutable std::mutex insert_control;
         const i_telemetry_service* telemetry_service_ = nullptr;
         rpc::shared_ptr<casting_interface> get_castable_interface(object object_id, interface_ordinal interface_id);
 
