@@ -258,7 +258,7 @@ namespace marshalled_tests
             std::vector<uint8_t> out_val;
 
             val->blob_test(in_val, out_val);
-            assert(in_val == out_val);
+            RPC_ASSERT(in_val == out_val);
 
             // this should trigger NEED_MORE_MEMORY signal requiring more out param data to be provided to the called
             // the out param data is temporarily cached and given over when enough memory has been provided, without
@@ -266,7 +266,7 @@ namespace marshalled_tests
             in_val.resize(100000);
             std::fill(in_val.begin(), in_val.end(), 42);
             val->blob_test(in_val, out_val);
-            assert(in_val == out_val);
+            RPC_ASSERT(in_val == out_val);
             return rpc::error::OK();
         }
 

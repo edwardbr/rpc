@@ -114,7 +114,7 @@ namespace rpc
         interface_ordinal interface_id
     )
     {
-        assert(destination_zone_id == get_destination_zone_id());
+        RPC_ASSERT(destination_zone_id == get_destination_zone_id());
         int err_code = 0;
         sgx_status_t status = ::try_cast_host(&err_code, protocol_version, destination_zone_id.get_val(), object_id.get_val(), interface_id.get_val());
         if (status)

@@ -155,8 +155,8 @@ void host_telemetry_service::on_service_deletion(const char* name, rpc::zone zon
     }
     else 
     {
-        found->second.count--;
-        if(found->second.count == 0)
+        auto count = --found->second.count;
+        if(count == 0)
         {
             services.erase(found);
             fmt::println(output, "deactivate {}", service_alias(zone_id));
@@ -348,9 +348,11 @@ void host_telemetry_service::on_service_proxy_add_external_ref(const char* name,
     }
     else
     {
-        found->second.count++;
-        assert(ref_count == found->second.count);
-        //fmt::println(output, "service_proxy add_external_ref name {} zone_id {} destination_zone_id {} caller_zone_id {} ref_count {}", name, zone_id.get_val(), destination_zone_id.get_val(), ref_count, caller_zone_id.get_val(), ref_count);
+        auto count = ++found->second.count;
+        if(ref_count != count)
+        {
+            message(level_enum::warn, fmt::format("add_external_ref count does not match zone_id {} destination_zone_id {} caller_zone_id {} {} - {}", zone_id.id, destination_zone_id.id, caller_zone_id.id, ref_count, count).c_str());            
+        }
     }
 
     if(destination_channel_zone_id == 0 || destination_channel_zone_id == destination_zone_id.as_destination_channel())
@@ -374,9 +376,11 @@ void host_telemetry_service::on_service_proxy_release_external_ref(const char* n
     }
     else
     {
-        found->second.count--;
-        assert(ref_count == found->second.count);
-        //fmt::println(output, "service_proxy release_external_ref name {} zone_id {} destination_zone_id {} caller_zone_id {} ref_count {}", name, zone_id.get_val(), destination_zone_id.get_val(), ref_count, caller_zone_id.get_val(), ref_count);
+        auto count  = --found->second.count;
+        if(ref_count != count)
+        {
+            message(level_enum::warn, fmt::format("release_external_ref count does not match zone_id {} destination_zone_id {} caller_zone_id {} {} - {}", zone_id.id, destination_zone_id.id, caller_zone_id.id, ref_count, count).c_str());
+        }
     }
     if(destination_channel_zone_id == 0 || destination_channel_zone_id == destination_zone_id.as_destination_channel())
     {
@@ -392,11 +396,10 @@ void host_telemetry_service::on_service_proxy_release_external_ref(const char* n
 
 void host_telemetry_service::on_impl_creation(const char* name, uint64_t address, rpc::zone zone_id) const
 {
-    //assert(zone_id.get_val());
     std::lock_guard g(mux);
     if(historical_impls.find(address) != historical_impls.end())
     {
-        assert(!"historical address reused");
+        RPC_ASSERT(!"historical address reused");
     }
     auto found = impls.find(address);
     if(found == impls.end())
@@ -407,9 +410,9 @@ void host_telemetry_service::on_impl_creation(const char* name, uint64_t address
     else
     {
         if(found->second.zone_id != zone_id)
-            assert(!"object being registered in two zones");
+            RPC_ASSERT(!"object being registered in two zones");
         else
-            assert(!"new object registered twice");
+            RPC_ASSERT(!"new object registered twice");
     }
     
     fmt::println(output, "participant \"{}\" as {} order {}", name, object_alias(address), object_order(zone_id, address)); 
@@ -444,7 +447,7 @@ void host_telemetry_service::on_stub_creation(rpc::zone zone_id, rpc::object obj
         if(hi->second == 0)
             hi->second = zone_id;
         else
-            assert(!"object already assigned to a different zone");
+            RPC_ASSERT(!"object already assigned to a different zone");
     }
     else
     {
@@ -519,8 +522,8 @@ void host_telemetry_service::on_stub_release(rpc::zone zone, rpc::object object_
         spdlog::error("stub not found zone_id {} caller_zone_id {} object_id {}", zone.get_val(), caller_zone_id.get_val(), object_id.get_val());
     }
     {
-        found->second--;
-        if(found->second == 0)
+        auto new_count = --found->second;
+        if(new_count == 0)
         {
             fmt::println(output, "hnote over {} : release count {}", object_stub_alias(zone, object_id), count);
         }
@@ -565,8 +568,8 @@ void host_telemetry_service::on_object_proxy_deletion(rpc::zone zone_id, rpc::de
     }
     else
     {
-        found->second--;
-        if(found->second == 0)
+        auto count = --found->second;
+        if(count == 0)
         {
             object_proxies.erase(found);
             fmt::println(output, "deactivate {}", object_proxy_alias(zone_id, destination_zone_id, object_id));
@@ -599,8 +602,8 @@ void host_telemetry_service::on_interface_proxy_deletion(const char* name, rpc::
     }
     else
     {
-        found->second.count--;
-        if(found->second.count == 0)
+        auto count = --found->second.count;
+        if(count == 0)
         {
             interface_proxies.erase(found);
             fmt::println(output, "hnote over {} : deleted \\n {} ", object_proxy_alias(zone_id, destination_zone_id, object_id), name);
@@ -622,6 +625,25 @@ void host_telemetry_service::on_interface_proxy_send(const char* name, rpc::zone
 
 void host_telemetry_service::message(level_enum level, const char* message) const
 {
-    fmt::println(output, "note left : {}", message);
+    std::string colour;
+    switch(level)
+    {
+    case debug:
+        colour = "green";
+    case trace:
+        colour = "blue";
+    case info:
+        colour = "black";
+    case warn:
+        colour = "amber";
+    case err:
+        colour = "red";
+    case off:
+        return;
+    case critical:
+    default:
+        colour = "red";
+    }
+    fmt::println(output, "note left #{}: {}", colour, message);
     fflush(output);
 }

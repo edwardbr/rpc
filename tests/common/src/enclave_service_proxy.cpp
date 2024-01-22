@@ -161,7 +161,7 @@ namespace rpc
             {
                 telemetry_service->message(rpc::i_telemetry_service::err, "try_cast_enclave failed");
             }
-            assert(false);
+            RPC_ASSERT(false);
             return rpc::error::TRANSPORT_ERROR();
         }
         return err_code;
@@ -191,7 +191,7 @@ namespace rpc
             {
                 telemetry_service->message(rpc::i_telemetry_service::err, "add_ref_enclave failed");
             }
-            assert(false);
+            RPC_ASSERT(false);
             return add_ref_failed_val;
         }    
         return ret;

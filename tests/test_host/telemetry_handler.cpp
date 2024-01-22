@@ -1,8 +1,12 @@
 #include <iostream>
 #include <unordered_map>
+#include <chrono>
+
 #include <rpc/basic_service_proxies.h>
 
 #include <host_telemetry_service.h>
+
+using namespace std::chrono_literals;
 
 extern rpc::weak_ptr<rpc::service> current_host_service;
 extern const rpc::i_telemetry_service* telemetry_service;
@@ -241,5 +245,14 @@ extern "C"
     {
         if (telemetry_service)
             telemetry_service->message((rpc::i_telemetry_service::level_enum)level, name);
+    }
+    void hang()
+    {
+        std::cerr << "hanging for debugger\n";
+        bool loop = true;
+        while(loop)
+        {
+            std::this_thread::sleep_for(1s);
+        }
     }
 }

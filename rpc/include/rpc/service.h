@@ -6,11 +6,11 @@
 #include <list>
 #include <unordered_map>
 #include <mutex>
-#include <assert.h>
 #include <atomic>
 #include <limits>
 #include <functional>
 
+#include <rpc/assert.h>
 #include <rpc/types.h>
 #include <rpc/version.h>
 #include <rpc/marshaller.h>
@@ -84,7 +84,7 @@ namespace rpc
         void set_zone_id(zone zone_id){zone_id_ = zone_id;}
         virtual destination_zone get_parent_zone_id() const {return {0};}
         virtual rpc::shared_ptr<rpc::service_proxy> get_parent() const {return nullptr;}
-        virtual void set_parent(const rpc::shared_ptr<rpc::service_proxy>& parent_service_proxy){assert(false);};
+        virtual void set_parent(const rpc::shared_ptr<rpc::service_proxy>& parent_service_proxy){RPC_ASSERT(false);};
 
         template<class T> interface_descriptor proxy_bind_in_param(uint64_t protocol_version, const shared_ptr<T>& iface, shared_ptr<object_stub>& stub);
         template<class T> interface_descriptor stub_bind_out_param(uint64_t protocol_version, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, const shared_ptr<T>& iface);
@@ -194,7 +194,7 @@ namespace rpc
 
         if(!iface)
         {
-            assert(false);
+            RPC_ASSERT(false);
             return {{0},{0}};
         }
         rpc::shared_ptr<rpc::object_stub> stub;

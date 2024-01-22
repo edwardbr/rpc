@@ -4,7 +4,7 @@
 #include <memory>
 #include <unordered_map>
 #include <mutex>
-#include <assert.h>
+#include <rpc/assert.h>
 #include <atomic>
 
 #include <rpc/types.h>
@@ -25,11 +25,15 @@ namespace rpc
     {
         object id_ = {0};
         // stubs have stong pointers
+        mutable std::mutex map_control;
         std::unordered_map<interface_ordinal, shared_ptr<i_interface_stub>> stub_map;
         shared_ptr<object_stub> p_this;
         std::atomic<uint64_t> reference_count = 0;
         service& zone_;
         const i_telemetry_service* telemetry_service_ = nullptr;
+
+        void add_interface(const shared_ptr<i_interface_stub>& iface);
+        friend service; // so that it can call add_interface
 
     public:
         object_stub(object id, service& zone, void* target, const i_telemetry_service* telemetry_service);
@@ -61,7 +65,6 @@ namespace rpc
             , std::vector<char>& out_buf_);
         int try_cast(interface_ordinal interface_id);
 
-        void add_interface(const shared_ptr<i_interface_stub>& iface);
         shared_ptr<i_interface_stub> get_interface(interface_ordinal interface_id);
 
         uint64_t add_ref();

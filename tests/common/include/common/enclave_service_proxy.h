@@ -55,7 +55,7 @@ namespace rpc
                     ) 
                     : enclave_service_proxy(destination_zone_id, filename, svc, owner_id, telemetry_service){}
             };
-            assert(svc);
+            RPC_ASSERT(svc);
 
             object owner_id = {0};
             if(owner)

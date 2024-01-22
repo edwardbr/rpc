@@ -130,5 +130,6 @@ enclave {
         void on_proxy_send_host([in, string] const char* name, uint64_t zone_id, uint64_t destination_zone_id, uint64_t object_id, uint64_t interface_id, uint64_t method_id);
 
         void message_host(uint64_t level, [in, string] const char* name);  
+        void hang();
     };
 };

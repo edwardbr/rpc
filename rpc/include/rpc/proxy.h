@@ -54,7 +54,7 @@ namespace rpc
         
         virtual void* get_address() const override
         {
-            assert(false);
+            RPC_ASSERT(false);
             return (T*)get_object_proxy().get();
         }   
         rpc::proxy_base* query_proxy_base() const override 
@@ -121,7 +121,7 @@ namespace rpc
                 if (!proxy)
                 {
                     //if we get here then we need to invent a test for this
-                    assert(false);
+                    RPC_ASSERT(false);
                     return rpc::error::INVALID_INTERFACE_ID();
                     // // weak pointer needs refreshing
                     // create_interface_proxy<T>(iface);
@@ -259,7 +259,7 @@ namespace rpc
             + std::string(" caller_zone_id ") + std::to_string(caller_zone_id.get_val());
             LOG_STR(message.c_str(), message.size());
 #endif
-            assert(svc != nullptr);
+            RPC_ASSERT(svc != nullptr);
         }
 
         service_proxy(const service_proxy& other) : 
@@ -279,9 +279,10 @@ namespace rpc
             + std::string(" caller_zone_id ") + std::to_string(caller_zone_id_.get_val());
             LOG_STR(message.data(),message.size());
 #endif
-            assert(service_.lock() != nullptr);
+            RPC_ASSERT(service_.lock() != nullptr);
         }
 
+        //not thread safe
         void set_remote_rpc_version(uint64_t version) {version_ = version;}
         bool is_parent_channel() const {return is_parent_channel_;}
         void set_parent_channel(bool val) 
@@ -290,7 +291,7 @@ namespace rpc
 
             if(lifetime_lock_count_ == 0 && is_parent_channel_ == false)
             {
-                assert(lifetime_lock_);
+                RPC_ASSERT(lifetime_lock_);
                 lifetime_lock_ = nullptr;
             }                 
         }
@@ -298,7 +299,7 @@ namespace rpc
     public:
         virtual ~service_proxy()
         {
-            assert(proxies_.empty());
+            RPC_ASSERT(proxies_.empty());
             auto svc = service_.lock();
             if(svc)
             {
@@ -340,12 +341,12 @@ namespace rpc
             + std::string(" count ") + std::to_string(count);
         LOG_STR(message.data(),message.size());
 #endif                       
-            assert(count >= 1);
+            RPC_ASSERT(count >= 1);
             if(count == 1)
             {
-                assert(!lifetime_lock_);
+                RPC_ASSERT(!lifetime_lock_);
                 lifetime_lock_ = shared_from_this();
-                assert(lifetime_lock_);
+                RPC_ASSERT(lifetime_lock_);
             }            
         }
 
@@ -370,10 +371,10 @@ namespace rpc
             + std::string(" count ") + std::to_string(count);
         LOG_STR(message.data(),message.size());
 #endif 
-            assert(count >= 0);
+            RPC_ASSERT(count >= 0);
             if(count == 0 && is_parent_channel_ == false)
             {
-                assert(lifetime_lock_);
+                RPC_ASSERT(lifetime_lock_);
                 lifetime_lock_ = nullptr;
             }   
             return count;         
@@ -494,7 +495,7 @@ namespace rpc
             , caller_zone caller_zone_id) 
         {
 
-            assert(destination_zone_id == destination_zone_id_);
+            RPC_ASSERT(destination_zone_id == destination_zone_id_);
             if (telemetry_service_ && object_id != dummy_object_id)
             {
                 telemetry_service_->on_service_proxy_release("service_proxy", get_zone_id(),
@@ -528,7 +529,7 @@ namespace rpc
         void on_object_proxy_released(object object_id)
         {
             auto caller_zone_id = get_zone_id().as_caller();
-            assert(caller_zone_id == get_caller_zone_id());
+            RPC_ASSERT(caller_zone_id == get_caller_zone_id());
 
 #ifdef USE_RPC_LOGGING
             {
@@ -540,10 +541,12 @@ namespace rpc
             }
 #endif
 
-            std::lock_guard l(insert_control_);
-            auto item = proxies_.find(object_id);
-            assert(item  != proxies_.end());
-            proxies_.erase(item);  
+            {
+                std::lock_guard l(insert_control_);
+                auto item = proxies_.find(object_id);
+                RPC_ASSERT(item  != proxies_.end());
+                proxies_.erase(item);  
+            }
 
             if (telemetry_service_ && object_id != dummy_object_id)
             {
@@ -574,7 +577,7 @@ namespace rpc
             {
                 std::string message("unable to release on service");
                 LOG_STR(message.c_str(), message.size());
-                assert(false);
+                RPC_ASSERT(false);
             }
             return;   
         }            
@@ -585,7 +588,7 @@ namespace rpc
         virtual void clone_completed() = 0;
         rpc::shared_ptr<service_proxy> clone_for_zone(destination_zone destination_zone_id, caller_zone caller_zone_id)
         {
-            assert(!(caller_zone_id_ == caller_zone_id && destination_zone_id_ == destination_zone_id));
+            RPC_ASSERT(!(caller_zone_id_ == caller_zone_id && destination_zone_id_ == destination_zone_id));
             auto ret = deep_copy_for_clone();
             ret->is_parent_channel_ = false;
             ret->caller_zone_id_ = caller_zone_id;
@@ -617,7 +620,7 @@ namespace rpc
         void add_object_proxy(rpc::shared_ptr<object_proxy> op)
         {
             std::lock_guard l(insert_control_);
-            assert(proxies_.find(op->get_object_id()) == proxies_.end());
+            RPC_ASSERT(proxies_.find(op->get_object_id()) == proxies_.end());
             proxies_[op->get_object_id()] = op;
         }
 
@@ -739,7 +742,7 @@ namespace rpc
                 return rpc::error::OBJECT_NOT_FOUND();
 
             auto count = serv->release_local_stub(ob);
-            assert(count);
+            RPC_ASSERT(count);
             if(!count || count == std::numeric_limits<uint64_t>::max())
             {
                 return rpc::error::REFERENCE_COUNT_ERROR();
@@ -785,7 +788,7 @@ namespace rpc
         if(op)
         {
             //as this is an out parameter the callee will be doing an add ref if the object proxy is already found we can do a release
-            assert(!new_proxy_added);
+            RPC_ASSERT(!new_proxy_added);
             service_proxy->sp_release(encap.destination_zone_id, encap.object_id, caller_zone_id);
         }
         else
@@ -810,7 +813,7 @@ namespace rpc
         if(serv->get_zone_id().as_destination() == encap.destination_zone_id)
         {
             //if we get here then we need to invent a test for this
-            assert(false);
+            RPC_ASSERT(false);
             return rpc::error::INVALID_DATA();            
             // val = serv->get_local_interface<T>(protocol_version, encap.object_id);
             // if(!val)
@@ -823,7 +826,7 @@ namespace rpc
         if(service_proxy->get_destination_zone_id() != encap.destination_zone_id)
         {
             //if we get here then we need to invent a test for this
-            assert(false);
+            RPC_ASSERT(false);
             return rpc::error::INVALID_DATA();            
 
             // //if the zone is different lookup or clone the right proxy

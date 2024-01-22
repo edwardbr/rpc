@@ -31,11 +31,14 @@ namespace rpc
 
     rpc::shared_ptr<rpc::casting_interface> object_stub::get_castable_interface() const
     {
-        assert(!stub_map.empty());
+        std::lock_guard g(map_control);
+        RPC_ASSERT(!stub_map.empty());
         auto& iface = stub_map.begin()->second;
         return iface->get_castable_interface();
     }
 
+    //this method is not thread safe as it is only used when the object is constructed by service
+    //or by an internal call by this class
     void object_stub::add_interface(const rpc::shared_ptr<i_interface_stub>& iface)
     {
 #ifdef RPC_V1        
@@ -48,6 +51,7 @@ namespace rpc
 
     rpc::shared_ptr<i_interface_stub> object_stub::get_interface(interface_ordinal interface_id)
     {
+        std::lock_guard g(map_control);
         auto res = stub_map.find(interface_id);
         if(res == stub_map.end())
             return nullptr;
@@ -67,6 +71,7 @@ namespace rpc
     {
         rpc::shared_ptr<i_interface_stub> stub;
         {
+            std::lock_guard g(map_control);
             auto item = stub_map.find(interface_id);
             if (item != stub_map.end())
             {
@@ -82,6 +87,7 @@ namespace rpc
 
     int object_stub::try_cast(interface_ordinal interface_id)
     {
+        std::lock_guard g(map_control);
         int ret = rpc::error::OK();
         auto item = stub_map.find(interface_id);
         if (item == stub_map.end())
@@ -102,8 +108,8 @@ namespace rpc
         uint64_t ret = ++reference_count;
         if(telemetry_service_)
             telemetry_service_->on_stub_add_ref(zone_.get_zone_id(), id_, {}, ret, {});
-        assert(ret != std::numeric_limits<uint64_t>::max());
-        assert(ret != 0);
+        RPC_ASSERT(ret != std::numeric_limits<uint64_t>::max());
+        RPC_ASSERT(ret != 0);
         return ret;
     }
 
@@ -112,7 +118,7 @@ namespace rpc
         uint64_t count = --reference_count;
         if(telemetry_service_)
             telemetry_service_->on_stub_release(zone_.get_zone_id(), id_, {}, count, {});
-        assert(count != std::numeric_limits<uint64_t>::max());
+        RPC_ASSERT(count != std::numeric_limits<uint64_t>::max());
         return count;
     }
 
