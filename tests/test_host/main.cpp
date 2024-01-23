@@ -186,6 +186,7 @@ class in_memory_setup
 
     std::atomic<uint64_t> zone_gen_ = 0;
 public:
+    virtual ~in_memory_setup() = default;
 
     rpc::shared_ptr<rpc::service> get_root_service() const {return nullptr;}
     bool get_has_enclave() const {return has_enclave_;}
@@ -264,6 +265,7 @@ class inproc_setup
     std::atomic<uint64_t> zone_gen_ = 0;
     
 public:
+    virtual ~inproc_setup() = default;
 
     rpc::shared_ptr<rpc::service> get_root_service() const {return root_service_;}
     bool get_has_enclave() const {return has_enclave_;}
@@ -384,6 +386,7 @@ class enclave_setup
 
     std::atomic<uint64_t> zone_gen_ = 0;
 public:
+    virtual ~enclave_setup() = default;
 
     rpc::shared_ptr<rpc::service> get_root_service() const {return root_service_;}
     bool get_has_enclave() const {return has_enclave_;}
