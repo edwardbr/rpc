@@ -134,14 +134,11 @@ public:
     {
         rpc::shared_ptr<yyy::i_host> host = shared_from_this();
         auto serv = current_host_service.lock();
-        auto err_code = serv->connect_to_zone<rpc::enclave_service_proxy, yyy::i_host, yyy::i_example, rpc::destination_zone, std::string, const rpc::shared_ptr<rpc::service>&, const rpc::i_telemetry_service*>(
-            telemetry_service_, 
-            host, 
-            target, 
-            {++(*zone_gen)}, 
-            use_v1_rpc_dll_ ? enclave_path_v1 : enclave_path, 
-            serv,
-            telemetry_service);
+        auto err_code = serv->connect_to_zone<rpc::enclave_service_proxy>( 
+            {++(*zone_gen)}
+            , host
+            , target
+            , use_v1_rpc_dll_ ? enclave_path_v1 : enclave_path);
 
         return err_code;
     };
@@ -288,29 +285,29 @@ public:
         root_service_ = rpc::make_shared<rpc::service>(rpc::zone{++zone_gen_}, tm.get());
         root_service_->add_service_logger(std::make_shared<test_service_logger>());
         current_host_service = root_service_;
-        child_service_ = rpc::make_shared<rpc::child_service>(rpc::zone{++zone_gen_}, root_service_->get_zone_id().as_destination(), tm.get());
-        example_import_idl_register_stubs(child_service_);
-        example_shared_idl_register_stubs(child_service_);
-        example_idl_register_stubs(child_service_);
 
-        rpc::interface_descriptor host_encap {};
-        rpc::interface_descriptor example_encap {};
-        
         rpc::shared_ptr<yyy::i_host> hst(new host(tm.get(), root_service_->get_zone_id()));
         local_host_ptr_ = hst;//assign to weak ptr
-        rpc::shared_ptr<yyy::i_example> remote_example(new example(telemetry_service, child_service_, nullptr));
         
-        auto err_code = root_service_->connect_to_zone<rpc::local_child_service_proxy<yyy::i_example, yyy::i_host>, yyy::i_host, yyy::i_example>(
-            telemetry_service, 
-            hst, 
-            i_example_ptr_, 
-            // local_child_service_proxy params
-            child_service_, 
-            root_service_,
-            remote_example,
-            &i_host_ptr_);
-        if(use_host_in_child_)
-            remote_example->set_host(i_host_ptr_);
+        auto err_code = root_service_->connect_to_zone<rpc::local_child_service_proxy<yyy::i_example, yyy::i_host>>(
+            {++zone_gen_}
+            , hst
+            , i_example_ptr_
+            , [&](
+                rpc::shared_ptr<yyy::i_host>& host
+                , rpc::shared_ptr<yyy::i_example>& new_example
+                , const rpc::shared_ptr<rpc::child_service>& child_service_ptr) -> int
+            {
+                i_host_ptr_ = host;
+                child_service_ = child_service_ptr;
+                example_import_idl_register_stubs(child_service_ptr);
+                example_shared_idl_register_stubs(child_service_ptr);
+                example_idl_register_stubs(child_service_ptr);
+                new_example = rpc::shared_ptr<yyy::i_example>(new example(child_service_ptr->get_telemetry_service(), child_service_ptr, nullptr));  
+                if(use_host_in_child_) 
+                    new_example->set_host(host);
+                return rpc::error::OK();
+            });
         ASSERT_ERROR_CODE(err_code);
     }
 
@@ -327,36 +324,29 @@ public:
 
     rpc::shared_ptr<yyy::i_example> create_new_zone()
     {        
-        auto new_service = rpc::make_shared<rpc::child_service>(rpc::zone{++zone_gen_}, root_service_->get_zone_id().as_destination(), tm.get());
-
-#ifdef USE_RPC_LOGGING
-        auto message = std::string("******** create_new_zone") + std::to_string(zone_gen_.load());
-        LOG_STR(message.data(),message.size());
-#endif                       
-
-        example_import_idl_register_stubs(new_service);
-        example_shared_idl_register_stubs(new_service);
-        example_idl_register_stubs(new_service);
-        
-        rpc::shared_ptr<yyy::i_example> remote_example(new example(telemetry_service, new_service, nullptr));
-        
         rpc::shared_ptr<yyy::i_host> hst;
         if(use_host_in_child_)
             hst = local_host_ptr_.lock();
             
-        rpc::shared_ptr<yyy::i_host> marshalled_host;
         rpc::shared_ptr<yyy::i_example> example_relay_ptr;
-        
-        auto err_code = root_service_->connect_to_zone<rpc::local_child_service_proxy<yyy::i_example, yyy::i_host>, yyy::i_host, yyy::i_example>(
-            telemetry_service, 
-            hst, 
-            example_relay_ptr, 
-            // local_child_service_proxy params
-            new_service, 
-            root_service_,
-            remote_example,
-            &marshalled_host);
-        remote_example->set_host(marshalled_host);     
+
+        auto err_code = root_service_->connect_to_zone<rpc::local_child_service_proxy<yyy::i_example, yyy::i_host>>(
+            {++zone_gen_}
+            , hst
+            , example_relay_ptr
+            , [&](
+                rpc::shared_ptr<yyy::i_host>& host
+                , rpc::shared_ptr<yyy::i_example>& new_example
+                , const rpc::shared_ptr<rpc::child_service>& child_service_ptr) -> int
+            {
+                example_import_idl_register_stubs(child_service_ptr);
+                example_shared_idl_register_stubs(child_service_ptr);
+                example_idl_register_stubs(child_service_ptr);
+                new_example = rpc::shared_ptr<yyy::i_example>(new example(child_service_ptr->get_telemetry_service(), child_service_ptr, nullptr));  
+                if(use_host_in_child_) 
+                    new_example->set_host(host);
+                return rpc::error::OK();
+            });
         
         if(CreateNewZoneThenCreateSubordinatedZone)
         {
@@ -422,14 +412,11 @@ public:
         local_host_ptr_ = i_host_ptr_;        
 
 
-        auto err_code = root_service_->connect_to_zone<rpc::enclave_service_proxy, yyy::i_host, yyy::i_example, rpc::destination_zone, std::string, const rpc::shared_ptr<rpc::service>&, const rpc::i_telemetry_service*>(
-            telemetry_service, 
+        auto err_code = root_service_->connect_to_zone<rpc::enclave_service_proxy>(
+            {++(*zone_gen)}, 
             use_host_in_child_ ? i_host_ptr_ : nullptr, 
             i_example_ptr_, 
-            {++(*zone_gen)}, 
-            use_v1_rpc_dll ? enclave_path_v1 : enclave_path, 
-            root_service_,
-            telemetry_service);
+            use_v1_rpc_dll ? enclave_path_v1 : enclave_path);
 
         ASSERT_ERROR_CODE(err_code);
     }
@@ -448,14 +435,11 @@ public:
     {
         rpc::shared_ptr<yyy::i_example> ptr;
         
-        auto err_code = root_service_->connect_to_zone<rpc::enclave_service_proxy, yyy::i_host, yyy::i_example, rpc::destination_zone, std::string, const rpc::shared_ptr<rpc::service>&, const rpc::i_telemetry_service*>(
-            telemetry_service, 
+        auto err_code = root_service_->connect_to_zone<rpc::enclave_service_proxy>(
+            {++zone_gen_}, 
             use_host_in_child_ ? i_host_ptr_ : nullptr, 
             ptr, 
-            {++zone_gen_}, 
-            use_v1_rpc_dll ? enclave_path_v1 : enclave_path, 
-            root_service_,
-            telemetry_service);
+            use_v1_rpc_dll ? enclave_path_v1 : enclave_path);
             
         ASSERT_ERROR_CODE(err_code);
         if(CreateNewZoneThenCreateSubordinatedZone)

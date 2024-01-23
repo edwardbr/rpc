@@ -20,8 +20,7 @@ namespace rpc
         enclave_service_proxy(
             destination_zone destination_zone_id
             , std::string filename
-            , const rpc::shared_ptr<service>& svc
-            , const rpc::i_telemetry_service* telemetry_service);
+            , const rpc::shared_ptr<service>& svc);
             
         enclave_service_proxy(const enclave_service_proxy& other) = default;
        
@@ -30,9 +29,8 @@ namespace rpc
         
         static rpc::shared_ptr<enclave_service_proxy> create(
             destination_zone destination_zone_id
-            , std::string filename
             , const rpc::shared_ptr<service>& svc
-            , const rpc::i_telemetry_service* telemetry_service);
+            , std::string filename);
         
         int connect(rpc::interface_descriptor input_descr, rpc::interface_descriptor& output_descr) override;
 

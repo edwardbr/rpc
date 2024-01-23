@@ -154,14 +154,14 @@ namespace rpc
         
         template<class proxy_class, class in_param_type, class out_param_type, typename... Args>
         int connect_to_zone(
-            const rpc::i_telemetry_service* telemetry_service, 
+            rpc::destination_zone new_zone_id,
             const rpc::shared_ptr<in_param_type>& input_interface, 
             rpc::shared_ptr<out_param_type>& output_interface,
             Args... args)
         {
             RPC_ASSERT(input_interface == nullptr || !input_interface->query_proxy_base() || input_interface->query_proxy_base()->get_object_proxy()->get_service_proxy()->get_zone_id() == zone_id_);
 
-            auto new_service_proxy = proxy_class::create(args...);
+            auto new_service_proxy = proxy_class::create(new_zone_id, shared_from_this(), args...);
 
             rpc::interface_descriptor input_descr{{0},{0}};
             if(input_interface)

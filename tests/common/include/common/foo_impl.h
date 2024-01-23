@@ -410,28 +410,26 @@ namespace marshalled_tests
         error_code inner_create_example_in_subordnate_zone(rpc::shared_ptr<yyy::i_example>& target, uint64_t new_zone_id, const rpc::shared_ptr<yyy::i_host>& host_ptr)
         {
             auto this_service = this_service_.lock();
-            auto child_service_ptr = rpc::make_shared<rpc::child_service>(rpc::zone{new_zone_id}, this_service->get_zone_id().as_destination(), telemetry_);
-            example_import_idl_register_stubs(child_service_ptr);
-            example_shared_idl_register_stubs(child_service_ptr);
-            example_idl_register_stubs(child_service_ptr);
             
-            rpc::shared_ptr<yyy::i_example> remote_example(new example(telemetry_, child_service_ptr, nullptr));                
-            rpc::shared_ptr<yyy::i_host> marshalled_host;            
-            auto err_code = this_service->connect_to_zone<rpc::local_child_service_proxy<yyy::i_example, yyy::i_host>, yyy::i_host, yyy::i_example>(
-                telemetry_, 
-                host_ptr, 
-                target, 
-                // local_child_service_proxy params
-                child_service_ptr, 
-                this_service,
-                remote_example,
-                &marshalled_host);
+            auto err_code = this_service->connect_to_zone<rpc::local_child_service_proxy<yyy::i_example, yyy::i_host>>(
+                {new_zone_id}
+                , host_ptr
+                , target
+                , [&](
+                    rpc::shared_ptr<yyy::i_host>& host
+                    , rpc::shared_ptr<yyy::i_example>& new_example
+                    , const rpc::shared_ptr<rpc::child_service>& child_service_ptr) -> int
+                {
+                    example_import_idl_register_stubs(child_service_ptr);
+                    example_shared_idl_register_stubs(child_service_ptr);
+                    example_idl_register_stubs(child_service_ptr);
+                    new_example = rpc::shared_ptr<yyy::i_example>(new example(telemetry_, child_service_ptr, nullptr));   
+                    new_example->set_host(host);
+                    return rpc::error::OK();
+                });
             if(err_code != rpc::error::OK())
-                return err_code;
-            err_code = remote_example->set_host(marshalled_host);                
+                return err_code;              
             return err_code;
-
-            remote_example->set_host(host_);
         }
 
         error_code create_example_in_subordnate_zone(rpc::shared_ptr<yyy::i_example>& target, const rpc::shared_ptr<yyy::i_host>& host_ptr, uint64_t new_zone_id) override

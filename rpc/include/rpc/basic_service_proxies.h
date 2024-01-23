@@ -148,20 +148,17 @@ namespace rpc
     {
         rpc::shared_ptr<child_service> destination_service_;
         
-        //these you would not need in a production environment, only needed for the test harness to use
-        rpc::weak_ptr<CHILD_PTR_TYPE> target_ptr_;
-        rpc::shared_ptr<PARENT_PTR_TYPE>* parent_ptr_;
+        typedef std::function<int(rpc::shared_ptr<PARENT_PTR_TYPE>&, rpc::shared_ptr<CHILD_PTR_TYPE>&, rpc::shared_ptr<child_service>&)> connect_fn;
+        connect_fn fn_;
         
         friend rpc::service;
 
         local_child_service_proxy(const rpc::shared_ptr<child_service>& destination_svc,
                                   const rpc::shared_ptr<service>& svc,
-                                  const rpc::shared_ptr<CHILD_PTR_TYPE>& target_ptr,
-                                  rpc::shared_ptr<PARENT_PTR_TYPE>* parent_ptr)
+                                  connect_fn fn)
             : service_proxy(destination_svc->get_zone_id().as_destination(), svc, svc->get_zone_id().as_caller(), svc->get_telemetry_service())
             , destination_service_(destination_svc)
-            , target_ptr_(target_ptr)
-            , parent_ptr_(parent_ptr)
+            , fn_(fn)
         {
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
             {
@@ -188,18 +185,19 @@ namespace rpc
             }
         }
 
-        static rpc::shared_ptr<local_child_service_proxy> create(const rpc::shared_ptr<child_service>& destination_svc,
-                                                                    const rpc::shared_ptr<service>& svc,
-                                                                    const rpc::shared_ptr<CHILD_PTR_TYPE>& target_ptr,
-                                                                    rpc::shared_ptr<PARENT_PTR_TYPE>* parent_ptr)
+        static rpc::shared_ptr<local_child_service_proxy> create(
+            destination_zone destination_zone_id, 
+            const rpc::shared_ptr<service>& svc,
+            connect_fn fn)
         {
-            
+            auto destination_svc = rpc::make_shared<rpc::child_service>(destination_zone_id.as_zone(), svc->get_zone_id().as_destination(), svc->get_telemetry_service());
+
             //link the child to the parent
             auto parent_service_proxy = rpc::local_service_proxy::create(svc, destination_svc, svc->get_telemetry_service());            
             if(!parent_service_proxy)
                 return nullptr;
             
-            auto ret = rpc::shared_ptr<local_child_service_proxy>(new local_child_service_proxy(destination_svc, svc, target_ptr, parent_ptr));
+            auto ret = rpc::shared_ptr<local_child_service_proxy>(new local_child_service_proxy(destination_svc, svc, fn));
             svc->add_zone_proxy(ret);
             return ret;
         }
@@ -207,9 +205,10 @@ namespace rpc
         int connect(rpc::interface_descriptor input_descr, rpc::interface_descriptor& output_descr) override
         {   
             auto err_code = rpc::error::OK();
+            rpc::shared_ptr<PARENT_PTR_TYPE> parent_ptr;
             if(input_descr != interface_descriptor())
             {
-                err_code = rpc::demarshall_interface_proxy(rpc::get_version(), destination_service_->get_parent(), input_descr,  get_zone_id().as_caller(), *parent_ptr_);
+                err_code = rpc::demarshall_interface_proxy(rpc::get_version(), destination_service_->get_parent(), input_descr,  get_zone_id().as_caller(), parent_ptr);
                 if(err_code != rpc::error::OK())
                 {
                     ASSERT_ERROR_CODE(err_code);   
@@ -217,7 +216,12 @@ namespace rpc
                 }
             }
 
-            output_descr = rpc::create_interface_stub(*destination_service_, target_ptr_.lock());
+            rpc::shared_ptr<CHILD_PTR_TYPE> target_ptr;
+            auto ret = fn_(parent_ptr, target_ptr, destination_service_);
+            if(ret != rpc::error::OK())
+                return ret;
+
+            output_descr = rpc::create_interface_stub(*destination_service_, target_ptr);
             return rpc::error::OK();
         }
 

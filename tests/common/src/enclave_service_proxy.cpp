@@ -14,9 +14,8 @@ namespace rpc
     enclave_service_proxy::enclave_service_proxy(
         destination_zone destination_zone_id
         , std::string filename
-        , const rpc::shared_ptr<service>& svc
-        , const rpc::i_telemetry_service* telemetry_service)
-        : service_proxy(destination_zone_id, svc, svc->get_zone_id().as_caller(), telemetry_service)
+        , const rpc::shared_ptr<service>& svc)
+        : service_proxy(destination_zone_id, svc, svc->get_zone_id().as_caller(), svc->get_telemetry_service())
         , filename_(filename)
     {
         if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
@@ -50,12 +49,11 @@ namespace rpc
     
     rpc::shared_ptr<enclave_service_proxy> enclave_service_proxy::create(
         destination_zone destination_zone_id
-        , std::string filename
         , const rpc::shared_ptr<service>& svc
-        , const rpc::i_telemetry_service* telemetry_service)
+        , std::string filename)
     {
         RPC_ASSERT(svc);
-        auto ret = rpc::shared_ptr<enclave_service_proxy>(new enclave_service_proxy(destination_zone_id, filename, svc, telemetry_service));
+        auto ret = rpc::shared_ptr<enclave_service_proxy>(new enclave_service_proxy(destination_zone_id, filename, svc));
         svc->add_zone_proxy(ret);
         return ret;
     }
