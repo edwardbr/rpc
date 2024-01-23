@@ -12,6 +12,7 @@
 #include <rpc/remote_pointer.h>
 #include <rpc/casting_interface.h>
 #include <rpc/i_telemetry_service.h>
+#include <rpc/service.h>
 
 namespace rpc
 {
@@ -74,6 +75,19 @@ namespace rpc
 
     class i_interface_stub
     {
+    protected:
+        //here to be able to call private function
+        template<class T>
+        interface_descriptor stub_bind_out_param(
+            rpc::service& zone
+            , uint64_t protocol_version, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, const shared_ptr<T>& iface)
+        {
+            return zone.stub_bind_out_param(protocol_version
+            , caller_channel_zone_id
+            , caller_zone_id
+            , iface);
+        }            
+            
     public:
         virtual interface_ordinal get_interface_id(uint64_t rpc_version) const = 0;
         virtual int call(uint64_t protocol_version, rpc::encoding enc, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, method method_id, size_t in_size_, const char* in_buf_, std::vector<char>& out_buf_)

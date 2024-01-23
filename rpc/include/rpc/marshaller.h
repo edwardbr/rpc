@@ -194,4 +194,14 @@ namespace rpc
 			);
 		}
     };
+    
+    inline bool operator == (const interface_descriptor& first, const interface_descriptor& second)
+    {
+        return first.destination_zone_id == second.destination_zone_id && first.object_id == second.object_id;
+    }
+    inline bool operator != (const interface_descriptor& first, const interface_descriptor& second)
+    {
+        return !(first == second);
+    }
+
 }

@@ -338,7 +338,7 @@ namespace enclave_marshaller
                 return fmt::format("rpc::interface_descriptor {0}_;", name);
             case STUB_ADD_REF_OUT:
                 return fmt::format(
-                    "{0}_ = zone_.stub_bind_out_param(protocol_version, caller_channel_zone_id, caller_zone_id, {0});",
+                    "{0}_ = stub_bind_out_param(zone_, protocol_version, caller_channel_zone_id, caller_zone_id, {0});",
                     name);
             case STUB_MARSHALL_OUT:
                 return fmt::format("  ,(\"{0}\", {0}_)", name);

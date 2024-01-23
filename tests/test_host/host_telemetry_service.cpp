@@ -21,11 +21,7 @@ host_telemetry_service::host_telemetry_service(const std::string& test_suite_nam
     test_suite_name_(test_suite_name),
     name_(name)
 {
-#ifdef WIN32
-    std::string output_path_name("C:/Dev/Secretarium/core1/build/rpc_test_diagram/");
-#else
     std::string output_path_name("../../rpc_test_diagram/");
-#endif
     
     std::filesystem::create_directory(output_path_name);
 

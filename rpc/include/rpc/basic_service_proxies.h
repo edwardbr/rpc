@@ -4,6 +4,7 @@
 #include <rpc/proxy.h>
 #include <rpc/error_codes.h>
 #include <rpc/i_telemetry_service.h>
+#include <rpc/service.h>
 
 namespace rpc
 {
@@ -74,7 +75,7 @@ namespace rpc
             ret->set_parent_channel(true);
             return ret;
         }
-    
+        
         int send(
             uint64_t protocol_version 
 			, encoding encoding 
@@ -141,19 +142,26 @@ namespace rpc
         }
     };
 
-    struct make_shared_local_child_service_proxy_enabler;
     //this is an equivelent to an host looking at its enclave
+    template<class CHILD_PTR_TYPE, class PARENT_PTR_TYPE>
     class local_child_service_proxy : public service_proxy
     {
-        rpc::shared_ptr<service> destination_service_;
+        rpc::shared_ptr<child_service> destination_service_;
         
-        friend make_shared_local_child_service_proxy_enabler;
+        //these you would not need in a production environment, only needed for the test harness to use
+        rpc::weak_ptr<CHILD_PTR_TYPE> target_ptr_;
+        rpc::shared_ptr<PARENT_PTR_TYPE>* parent_ptr_;
+        
+        friend rpc::service;
 
-        local_child_service_proxy(const rpc::shared_ptr<service>& destination_svc,
+        local_child_service_proxy(const rpc::shared_ptr<child_service>& destination_svc,
                                   const rpc::shared_ptr<service>& svc,
-                                  const rpc::i_telemetry_service* telemetry_service)
-            : service_proxy(destination_svc->get_zone_id().as_destination(), svc, svc->get_zone_id().as_caller(), telemetry_service),
-            destination_service_(destination_svc)
+                                  const rpc::shared_ptr<CHILD_PTR_TYPE>& target_ptr,
+                                  rpc::shared_ptr<PARENT_PTR_TYPE>* parent_ptr)
+            : service_proxy(destination_svc->get_zone_id().as_destination(), svc, svc->get_zone_id().as_caller(), svc->get_telemetry_service())
+            , destination_service_(destination_svc)
+            , target_ptr_(target_ptr)
+            , parent_ptr_(parent_ptr)
         {
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
             {
@@ -161,7 +169,7 @@ namespace rpc
             }
         }
 
-        rpc::shared_ptr<service_proxy> deep_copy_for_clone() override {return rpc::make_shared<local_child_service_proxy>(*this);}
+        rpc::shared_ptr<service_proxy> deep_copy_for_clone() override {return rpc::shared_ptr<service_proxy>(new local_child_service_proxy(*this));}
         void clone_completed() override
         {
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
@@ -180,23 +188,37 @@ namespace rpc
             }
         }
 
-        static rpc::shared_ptr<local_child_service_proxy> create(const rpc::shared_ptr<service>& destination_svc,
+        static rpc::shared_ptr<local_child_service_proxy> create(const rpc::shared_ptr<child_service>& destination_svc,
                                                                     const rpc::shared_ptr<service>& svc,
-                                                                    const rpc::i_telemetry_service* telemetry_service)
+                                                                    const rpc::shared_ptr<CHILD_PTR_TYPE>& target_ptr,
+                                                                    rpc::shared_ptr<PARENT_PTR_TYPE>* parent_ptr)
         {
-            struct make_shared_local_child_service_proxy_enabler : public local_child_service_proxy
-            {
-                virtual ~make_shared_local_child_service_proxy_enabler() = default;
-                make_shared_local_child_service_proxy_enabler(const rpc::shared_ptr<service>& destination_svc,
-                    const rpc::shared_ptr<service>& svc,
-                    const rpc::i_telemetry_service* telemetry_service) : 
-                    local_child_service_proxy(destination_svc, svc, telemetry_service)
-                {}
-            };
             
-            auto ret = rpc::make_shared<make_shared_local_child_service_proxy_enabler>(destination_svc, svc, telemetry_service);
+            //link the child to the parent
+            auto parent_service_proxy = rpc::local_service_proxy::create(svc, destination_svc, svc->get_telemetry_service());            
+            if(!parent_service_proxy)
+                return nullptr;
+            
+            auto ret = rpc::shared_ptr<local_child_service_proxy>(new local_child_service_proxy(destination_svc, svc, target_ptr, parent_ptr));
             svc->add_zone_proxy(ret);
             return ret;
+        }
+        
+        int connect(rpc::interface_descriptor input_descr, rpc::interface_descriptor& output_descr) override
+        {   
+            auto err_code = rpc::error::OK();
+            if(input_descr != interface_descriptor())
+            {
+                err_code = rpc::demarshall_interface_proxy(rpc::get_version(), destination_service_->get_parent(), input_descr,  get_zone_id().as_caller(), *parent_ptr_);
+                if(err_code != rpc::error::OK())
+                {
+                    ASSERT_ERROR_CODE(err_code);   
+                    return err_code;
+                }
+            }
+
+            output_descr = rpc::create_interface_stub(*destination_service_, target_ptr_.lock());
+            return rpc::error::OK();
         }
 
         int send(

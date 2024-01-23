@@ -2,17 +2,7 @@
 
 #include <example/example.h>
 #include <rpc/error_codes.h>
-
-void assert_error_code(int x)
-{
-    if(x != rpc::error::OK())
-    {
-        std::cerr << "bad error_code " << x << "\n";
-        hang();
-    }
-}
-
-#define ASSERT_ERROR_CODE(x) assert_error_code(x)
+#include <rpc/assert.h>
 
 namespace marshalled_tests
 {

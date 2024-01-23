@@ -1,20 +1,26 @@
-#include <assert.h>
+#pragma once
 
-#ifdef _IN_ENCLAVE
-#include <sgx_error.h>
-#endif
+#include <assert.h>
+#include <rpc/error_codes.h>
 
 #ifdef RPC_HANG_ON_FAILED_ASSERT
+#ifdef _IN_ENCLAVE
+#include <sgx_error.h>
 extern "C"
 {
-#ifdef _IN_ENCLAVE
     sgx_status_t hang();
-#else
-    void hang();
-#endif
 }
+#else
+extern "C"
+{
+    void hang();
+}
+#endif
+
 
 #define RPC_ASSERT(x) if(!(x))(hang())
 #else
 #define RPC_ASSERT(x) assert(x)
 #endif
+
+#define ASSERT_ERROR_CODE(x) RPC_ASSERT(x == rpc::error::OK())

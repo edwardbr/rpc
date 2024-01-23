@@ -555,7 +555,8 @@ namespace rpc
                         break;
                     }
 
-                    destination = get_parent();                        
+                    RPC_ASSERT(get_parent() != nullptr);                   
+                    destination = get_parent();     
                     RPC_ASSERT(false);
 
                 } while(false);
@@ -606,6 +607,7 @@ namespace rpc
                             else
                             {
                                 //get the parent to route it
+                                RPC_ASSERT(get_parent() != nullptr);
                                 destination = get_parent()->clone_for_zone(destination_zone_id, caller_zone_id);
                             }
                             inner_add_zone_proxy(destination);

@@ -11,10 +11,13 @@
 namespace rpc
 {
 #ifndef _IN_ENCLAVE
-    enclave_service_proxy::enclave_service_proxy(destination_zone destination_zone_id, std::string filename, const rpc::shared_ptr<service>& svc, object host_id, const rpc::i_telemetry_service* telemetry_service)
+    enclave_service_proxy::enclave_service_proxy(
+        destination_zone destination_zone_id
+        , std::string filename
+        , const rpc::shared_ptr<service>& svc
+        , const rpc::i_telemetry_service* telemetry_service)
         : service_proxy(destination_zone_id, svc, svc->get_zone_id().as_caller(), telemetry_service)
         , filename_(filename)
-        , host_id_(host_id)
     {
         if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
         {
@@ -35,9 +38,31 @@ namespace rpc
         marshal_test_destroy_enclave(eid_);
         sgx_destroy_enclave(eid_);
     }
-
-    int enclave_service_proxy::initialise_enclave(object& object_id)
+    
+    rpc::shared_ptr<service_proxy> enclave_service_proxy::deep_copy_for_clone() {return rpc::shared_ptr<service_proxy>(new enclave_service_proxy(*this));}
+    void enclave_service_proxy::clone_completed()
     {
+        if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
+        {
+            telemetry_service->on_service_proxy_creation("enclave_service_proxy", get_zone_id(), get_destination_zone_id(), get_caller_zone_id());
+        }
+    }
+    
+    rpc::shared_ptr<enclave_service_proxy> enclave_service_proxy::create(
+        destination_zone destination_zone_id
+        , std::string filename
+        , const rpc::shared_ptr<service>& svc
+        , const rpc::i_telemetry_service* telemetry_service)
+    {
+        RPC_ASSERT(svc);
+        auto ret = rpc::shared_ptr<enclave_service_proxy>(new enclave_service_proxy(destination_zone_id, filename, svc, telemetry_service));
+        svc->add_zone_proxy(ret);
+        return ret;
+    }
+            
+    int enclave_service_proxy::connect(rpc::interface_descriptor input_descr, rpc::interface_descriptor& output_descr)
+    {   
+        rpc::object output_object_id = {0};
         sgx_launch_token_t token = {0};
         int updated = 0;
         #ifdef _WIN32
@@ -54,7 +79,7 @@ namespace rpc
             return rpc::error::TRANSPORT_ERROR();
         }
         int err_code = error::OK();
-        status = marshal_test_init_enclave(eid_, &err_code, get_zone_id().get_val(), host_id_.get_val(), get_destination_zone_id().get_val(), &(object_id.get_ref()));
+        status = marshal_test_init_enclave(eid_, &err_code, get_zone_id().get_val(), input_descr.object_id.get_val(), get_destination_zone_id().get_val(), &(output_object_id.get_ref()));
         if (status)
         {
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
@@ -71,8 +96,11 @@ namespace rpc
         enclave_owner_ = std::make_shared<enclave_owner>(eid_);
         if (err_code)
             return err_code;
-        return rpc::error::OK();
-    }
+            
+        output_descr = {output_object_id, get_destination_zone_id()};
+        return err_code;
+    }   
+
 
     int enclave_service_proxy::send(
         uint64_t protocol_version, 

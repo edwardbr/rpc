@@ -325,6 +325,11 @@ namespace rpc
             return error::OK();
         }       
         
+        virtual int connect(rpc::interface_descriptor input_descr, rpc::interface_descriptor& output_descr)
+        {            
+            return rpc::error::ZONE_NOT_SUPPORTED();
+        }
+        
         void add_external_ref()
         {
             std::lock_guard g(insert_control_);
@@ -662,7 +667,7 @@ namespace rpc
     int stub_bind_in_param(uint64_t protocol_version, rpc::service& serv, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, const rpc::interface_descriptor& encap, rpc::shared_ptr<T>& iface)
     {
         //if we have a null object id then return a null ptr
-        if(encap.object_id == 0 || encap.destination_zone_id == 0)
+        if(encap == rpc::interface_descriptor())
         {
             return rpc::error::OK();
         }
@@ -805,6 +810,11 @@ namespace rpc
         //if we have a null object id then return a null ptr
         if(encap.object_id == 0 || encap.destination_zone_id == 0)
             return rpc::error::OK();
+
+        if(encap.destination_zone_id != sp->get_destination_zone_id())
+        {
+            return rpc::proxy_bind_out_param(sp, encap, caller_zone_id, val);
+        }
 
         auto service_proxy = sp;
         auto serv = service_proxy->get_operating_zone_service();

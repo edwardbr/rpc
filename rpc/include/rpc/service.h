@@ -10,6 +10,7 @@
 #include <limits>
 #include <functional>
 
+#include <rpc/error_codes.h>
 #include <rpc/assert.h>
 #include <rpc/types.h>
 #include <rpc/version.h>
@@ -23,6 +24,7 @@ namespace rpc
     class i_interface_stub;
     class object_stub;
     class service;
+    class child_service;
     class service_proxy;
 
     const object dummy_object_id = {std::numeric_limits<uint64_t>::max()};
@@ -71,6 +73,14 @@ namespace rpc
         // hard lock on the root object
         const i_telemetry_service* telemetry_service_ = nullptr;
         rpc::shared_ptr<casting_interface> get_castable_interface(object object_id, interface_ordinal interface_id);
+                                                        
+        template<class T> interface_descriptor proxy_bind_in_param(uint64_t protocol_version, const shared_ptr<T>& iface, shared_ptr<object_stub>& stub);
+        template<class T> interface_descriptor stub_bind_out_param(uint64_t protocol_version, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, const shared_ptr<T>& iface);
+
+        void inner_add_zone_proxy(const rpc::shared_ptr<service_proxy>& service_proxy);
+
+        friend proxy_base;                  
+        friend i_interface_stub;                          
 
     public:
         explicit service(zone zone_id, const i_telemetry_service* telemetry_service);
@@ -85,9 +95,7 @@ namespace rpc
         virtual destination_zone get_parent_zone_id() const {return {0};}
         virtual rpc::shared_ptr<rpc::service_proxy> get_parent() const {return nullptr;}
         virtual void set_parent(const rpc::shared_ptr<rpc::service_proxy>& parent_service_proxy){RPC_ASSERT(false);};
-
-        template<class T> interface_descriptor proxy_bind_in_param(uint64_t protocol_version, const shared_ptr<T>& iface, shared_ptr<object_stub>& stub);
-        template<class T> interface_descriptor stub_bind_out_param(uint64_t protocol_version, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, const shared_ptr<T>& iface);
+        const i_telemetry_service* get_telemetry_service() const {return telemetry_service_;}
 
         interface_descriptor prepare_out_param(uint64_t protocol_version, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, rpc::proxy_base* base);
         interface_descriptor get_proxy_stub_descriptor(uint64_t protocol_version, 
@@ -136,13 +144,56 @@ namespace rpc
 
         uint64_t release_local_stub(const rpc::shared_ptr<rpc::object_stub>& stub);
 
-        void inner_add_zone_proxy(const rpc::shared_ptr<service_proxy>& service_proxy);
         virtual void add_zone_proxy(const rpc::shared_ptr<service_proxy>& zone);
         virtual rpc::shared_ptr<service_proxy> get_zone_proxy(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, destination_zone destination_zone_id, caller_zone new_caller_zone_id, bool& new_proxy_added);
         virtual void remove_zone_proxy(destination_zone destination_zone_id, caller_zone caller_zone_id, destination_channel_zone destination_channel_zone_id);
         template<class T> rpc::shared_ptr<T> get_local_interface(uint64_t protocol_version, object object_id)
         {
             return rpc::static_pointer_cast<T>(get_castable_interface(object_id, T::get_id(protocol_version)));
+        }
+        
+        template<class proxy_class, class in_param_type, class out_param_type, typename... Args>
+        int connect_to_zone(
+            const rpc::i_telemetry_service* telemetry_service, 
+            const rpc::shared_ptr<in_param_type>& input_interface, 
+            rpc::shared_ptr<out_param_type>& output_interface,
+            Args... args)
+        {
+            RPC_ASSERT(input_interface == nullptr || !input_interface->query_proxy_base() || input_interface->query_proxy_base()->get_object_proxy()->get_service_proxy()->get_zone_id() == zone_id_);
+
+            auto new_service_proxy = proxy_class::create(args...);
+
+            rpc::interface_descriptor input_descr{{0},{0}};
+            if(input_interface)
+            {
+                if(input_interface->query_proxy_base())
+                {
+                    input_descr = prepare_out_param(rpc::get_version(), {0}, new_service_proxy->get_destination_zone_id().as_caller(), input_interface->query_proxy_base());   
+                }
+                else
+                {
+                    caller_channel_zone empty_caller_channel_zone = {};
+                    caller_zone caller_zone_id = zone_id_.as_caller();
+
+                    rpc::shared_ptr<rpc::object_stub> stub;
+                    auto factory = create_interface_stub(input_interface);
+                    input_descr = get_proxy_stub_descriptor(rpc::get_version(), empty_caller_channel_zone, caller_zone_id, input_interface.get(), factory, false, stub);        
+                }
+            }
+
+            rpc::interface_descriptor output_descr{{0},{0}};
+            auto err_code = new_service_proxy->connect(input_descr, output_descr);
+            if(err_code != rpc::error::OK())
+            {
+                //clean up
+                return err_code;
+            }
+            
+            if(output_descr.object_id != 0 && output_descr.destination_zone_id != 0)
+            {
+                err_code = rpc::demarshall_interface_proxy(rpc::get_version(), new_service_proxy, output_descr, zone_id_.as_caller(), output_interface);
+            }
+            return err_code;
         }
 
         template<class T> 

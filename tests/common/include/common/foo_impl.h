@@ -414,39 +414,24 @@ namespace marshalled_tests
             example_import_idl_register_stubs(child_service_ptr);
             example_shared_idl_register_stubs(child_service_ptr);
             example_idl_register_stubs(child_service_ptr);
-
-            //link the child to the parent
-            auto parent_service_proxy = rpc::local_service_proxy::create(this_service, child_service_ptr, telemetry_);
-
-            //now make an object and present it to the parent
-            auto service_proxy_to_child = rpc::local_child_service_proxy::create(child_service_ptr, this_service, telemetry_);
-
-            // create the example object implementation with a recursive chain of services
-            rpc::shared_ptr<yyy::i_example> remote_example(new example(telemetry_, child_service_ptr, nullptr));
-
-            rpc::interface_descriptor example_encap = rpc::create_interface_stub(*child_service_ptr, remote_example);
-
-            if(telemetry_)
-                telemetry_->message(rpc::i_telemetry_service::info, "rpc::demarshall_interface_proxy");
-            auto ret = rpc::demarshall_interface_proxy(rpc::get_version(), service_proxy_to_child, example_encap, this_service->get_zone_id().as_caller(), target);
-            if(ret != rpc::error::OK())
-                return ret;
-
-                
-            //This voodoo marshalls the host pointer from an this_service perspective to an app service one
-            if(telemetry_)
-                telemetry_->message(rpc::i_telemetry_service::info, "prepare_out_param");
-//            auto host_descr = rpc::create_interface_stub(*this_service, host_);
-            auto host_descr = this_service->prepare_out_param(rpc::get_version(), {0}, child_service_ptr->get_zone_id().as_caller(), host_ptr->query_proxy_base());
             
-            rpc::shared_ptr<yyy::i_host> marshalled_host;
-            // ret = rpc::demarshall_interface_proxy(rpc::get_version(), parent_service_proxy, host_descr,  child_service_ptr->get_zone_id().as_caller(), marshalled_host);
-            // if(ret != rpc::error::OK())
-            //     return ret;
-            rpc::proxy_bind_out_param(parent_service_proxy, host_descr, child_service_ptr->get_zone_id().as_caller(), marshalled_host);
-            remote_example->set_host(marshalled_host);
-            //remote_example->set_host(host_);
-            return ret;            
+            rpc::shared_ptr<yyy::i_example> remote_example(new example(telemetry_, child_service_ptr, nullptr));                
+            rpc::shared_ptr<yyy::i_host> marshalled_host;            
+            auto err_code = this_service->connect_to_zone<rpc::local_child_service_proxy<yyy::i_example, yyy::i_host>, yyy::i_host, yyy::i_example>(
+                telemetry_, 
+                host_ptr, 
+                target, 
+                // local_child_service_proxy params
+                child_service_ptr, 
+                this_service,
+                remote_example,
+                &marshalled_host);
+            if(err_code != rpc::error::OK())
+                return err_code;
+            err_code = remote_example->set_host(marshalled_host);                
+            return err_code;
+
+            remote_example->set_host(host_);
         }
 
         error_code create_example_in_subordnate_zone(rpc::shared_ptr<yyy::i_example>& target, const rpc::shared_ptr<yyy::i_host>& host_ptr, uint64_t new_zone_id) override
