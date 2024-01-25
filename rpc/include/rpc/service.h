@@ -29,6 +29,9 @@ namespace rpc
 
     const object dummy_object_id = {std::numeric_limits<uint64_t>::max()};
 
+    template<class T> 
+    int demarshall_interface_proxy(uint64_t protocol_version, const rpc::shared_ptr<rpc::service_proxy>& sp, const rpc::interface_descriptor& encap, caller_zone caller_zone_id, rpc::shared_ptr<T>& val);    
+
     class service_logger
     {
     public:
@@ -94,7 +97,7 @@ namespace rpc
         void set_zone_id(zone zone_id){zone_id_ = zone_id;}
         virtual destination_zone get_parent_zone_id() const {return {0};}
         virtual rpc::shared_ptr<rpc::service_proxy> get_parent() const {return nullptr;}
-        virtual void set_parent(const rpc::shared_ptr<rpc::service_proxy>& parent_service_proxy){RPC_ASSERT(false);};
+        virtual void set_parent(const rpc::shared_ptr<rpc::service_proxy>&){RPC_ASSERT(false);};
         const i_telemetry_service* get_telemetry_service() const {return telemetry_service_;}
         
         //passed by value implementing an implicit lock on the life time of ptr

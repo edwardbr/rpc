@@ -76,6 +76,7 @@ namespace rpc
     class i_interface_stub
     {
     protected:
+        virtual ~i_interface_stub() = default;
         //here to be able to call private function
         template<class T>
         interface_descriptor stub_bind_out_param(

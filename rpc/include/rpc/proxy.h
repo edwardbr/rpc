@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <mutex>
 
+#include <rpc/logger.h>
 #include <rpc/version.h>
 #include <rpc/types.h>
 #include <rpc/marshaller.h>
@@ -327,6 +328,8 @@ namespace rpc
         
         virtual int connect(rpc::interface_descriptor input_descr, rpc::interface_descriptor& output_descr)
         {            
+            std::ignore = input_descr;
+            std::ignore = output_descr;
             return rpc::error::ZONE_NOT_SUPPORTED();
         }
         
@@ -807,6 +810,9 @@ namespace rpc
     template<class T> 
     int demarshall_interface_proxy(uint64_t protocol_version, const rpc::shared_ptr<rpc::service_proxy>& sp, const rpc::interface_descriptor& encap, caller_zone caller_zone_id, rpc::shared_ptr<T>& val)
     {
+        if(protocol_version > rpc::get_version())
+            return rpc::error::INCOMPATIBLE_SERVICE();
+            
         //if we have a null object id then return a null ptr
         if(encap.object_id == 0 || encap.destination_zone_id == 0)
             return rpc::error::OK();
@@ -832,7 +838,7 @@ namespace rpc
         }
 
         //get the right  service proxy
-        bool new_proxy_added = false;
+        //bool new_proxy_added = false;
         if(service_proxy->get_destination_zone_id() != encap.destination_zone_id)
         {
             //if we get here then we need to invent a test for this

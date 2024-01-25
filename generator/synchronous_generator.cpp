@@ -58,7 +58,7 @@ namespace enclave_marshaller
                                bool is_in, bool is_out, bool is_const, const std::string& object_type,
                                uint64_t& count) const
             {
-                RPC_ASSERT(false);
+                assert(false);
             }
         };
 
