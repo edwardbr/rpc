@@ -296,7 +296,7 @@ public:
             , hst
             , i_example_ptr_
             , [&](
-                rpc::shared_ptr<yyy::i_host>& host
+                const rpc::shared_ptr<yyy::i_host>& host
                 , rpc::shared_ptr<yyy::i_example>& new_example
                 , const rpc::shared_ptr<rpc::child_service>& child_service_ptr) -> int
             {
@@ -337,7 +337,7 @@ public:
             , hst
             , example_relay_ptr
             , [&](
-                rpc::shared_ptr<yyy::i_host>& host
+                const rpc::shared_ptr<yyy::i_host>& host
                 , rpc::shared_ptr<yyy::i_example>& new_example
                 , const rpc::shared_ptr<rpc::child_service>& child_service_ptr) -> int
             {

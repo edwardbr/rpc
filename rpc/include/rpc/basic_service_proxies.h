@@ -148,7 +148,7 @@ namespace rpc
     {
         rpc::shared_ptr<child_service> destination_service_;
         
-        typedef std::function<int(rpc::shared_ptr<PARENT_PTR_TYPE>&, rpc::shared_ptr<CHILD_PTR_TYPE>&, rpc::shared_ptr<child_service>&)> connect_fn;
+        typedef std::function<int(const rpc::shared_ptr<PARENT_PTR_TYPE>&, rpc::shared_ptr<CHILD_PTR_TYPE>&, const rpc::shared_ptr<child_service>&)> connect_fn;
         connect_fn fn_;
         
         friend rpc::service;

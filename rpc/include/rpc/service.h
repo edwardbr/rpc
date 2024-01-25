@@ -96,6 +96,9 @@ namespace rpc
         virtual rpc::shared_ptr<rpc::service_proxy> get_parent() const {return nullptr;}
         virtual void set_parent(const rpc::shared_ptr<rpc::service_proxy>& parent_service_proxy){RPC_ASSERT(false);};
         const i_telemetry_service* get_telemetry_service() const {return telemetry_service_;}
+        
+        //passed by value implementing an implicit lock on the life time of ptr
+        object get_object_id(shared_ptr<casting_interface> ptr) const;
 
         interface_descriptor prepare_out_param(uint64_t protocol_version, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, rpc::proxy_base* base);
         interface_descriptor get_proxy_stub_descriptor(uint64_t protocol_version, 

@@ -57,6 +57,29 @@ namespace rpc
         wrapped_object_to_stub.clear();
         other_zones.clear();
     }
+    
+    object service::get_object_id(shared_ptr<casting_interface> ptr) const 
+    {
+        if(ptr == nullptr)
+            return {};
+        auto* addr = ptr->get_address();
+        if(addr)
+        {
+            std::lock_guard g(stub_control);
+            auto item = wrapped_object_to_stub.find(addr);
+            if(item != wrapped_object_to_stub.end())
+            {
+                auto obj = item->second.lock();
+                if(obj)
+                    return obj->get_id();
+            }
+        }
+        else
+        {
+            return ptr->query_proxy_base()->get_object_proxy()->get_object_id();
+        }
+        return {};
+    }
 
     bool service::check_is_empty() const
     {
