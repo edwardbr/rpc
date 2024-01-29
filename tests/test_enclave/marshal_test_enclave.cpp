@@ -222,7 +222,7 @@ int call_enclave(
     }
 
     std::vector<char> tmp;
-
+    tmp.resize(sz_out);
     int ret = rpc_server->send(
         protocol_version,                          //version of the rpc call protocol
         rpc::encoding(encoding),                                  //format of the serialised data

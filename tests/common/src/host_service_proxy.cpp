@@ -92,17 +92,20 @@ namespace rpc
                 return rpc::error::TRANSPORT_ERROR();
             }
 
-            //recover err_code from the out buffer
-            yas::load<
+            if(protocol_version == rpc::VERSION_1)
+            {
+                //recover err_code from the out buffer
+                yas::load<
 #ifdef RPC_SERIALISATION_TEXT
-                yas::mem|yas::text|yas::no_header
+                    yas::mem|yas::text|yas::no_header
 #else
-                yas::mem|yas::binary|yas::no_header
+                    yas::mem|yas::binary|yas::no_header
 #endif
-            >(yas::intrusive_buffer{out_buf_.data(), out_buf_.size()}, YAS_OBJECT_NVP(
-            "out"
-            ,("__return_value", err_code)
-            )); 
+                >(yas::intrusive_buffer{out_buf_.data(), out_buf_.size()}, YAS_OBJECT_NVP(
+                "out"
+                ,("__return_value", err_code)
+                )); 
+            }
         }
         return err_code;
     }

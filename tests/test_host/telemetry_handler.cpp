@@ -41,6 +41,7 @@ extern "C"
         }
         if (out_buf.data.empty())
         {
+            out_buf.data.resize(sz_out);
             out_buf.return_value = root_service->send(protocol_version, rpc::encoding(encoding), tag, {caller_channel_zone_id}, {caller_zone_id}, {destination_zone_id}, {object_id}, {interface_id}, {method_id}, sz_int,
                                          data_in, out_buf.data);
             if (out_buf.return_value >= rpc::error::MIN() && out_buf.return_value <= rpc::error::MAX())

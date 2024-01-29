@@ -353,7 +353,7 @@ public:
         if(CreateNewZoneThenCreateSubordinatedZone)
         {
 #ifdef USE_RPC_LOGGING
-            message = std::string("******** create_example_in_subordnate_zone");
+            auto message = std::string("******** create_example_in_subordnate_zone");
             LOG_STR(message.data(),message.size());
 #endif         
             rpc::shared_ptr<yyy::i_example> new_ptr;
@@ -363,7 +363,7 @@ public:
             example_relay_ptr = new_ptr;
         }
 #ifdef USE_RPC_LOGGING
-        message = std::string("******** returning");
+        auto message = std::string("******** returning");
         LOG_STR(message.data(),message.size());
 #endif         
         return example_relay_ptr;
