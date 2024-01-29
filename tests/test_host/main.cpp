@@ -537,13 +537,30 @@ TYPED_TEST(type_test, dyanmic_cast_tests)
     ASSERT_EQ(f->call_baz_interface(nullptr), 0); // feed in a nullptr
     ASSERT_EQ(f->call_baz_interface(baz), 0);     // feed back to the implementation
 
-    auto x = rpc::dynamic_pointer_cast<xxx::i_baz>(baz);
-    ASSERT_NE(x, nullptr);
-    auto y = rpc::dynamic_pointer_cast<xxx::i_bar>(baz);
-    ASSERT_NE(y, nullptr);
-    y->do_something_else(1);
-    auto z = rpc::dynamic_pointer_cast<xxx::i_foo>(baz);
-    ASSERT_NE(y, nullptr);
+    {
+        //test for identity
+        auto x = rpc::dynamic_pointer_cast<xxx::i_baz>(baz);
+        ASSERT_NE(x, nullptr);
+        ASSERT_EQ(x, baz);
+        auto y = rpc::dynamic_pointer_cast<xxx::i_bar>(baz);
+        ASSERT_NE(y, nullptr);
+        y->do_something_else(1);
+        ASSERT_NE(y, nullptr);
+        auto z = rpc::dynamic_pointer_cast<xxx::i_foo>(baz);
+        ASSERT_EQ(z, nullptr);
+    }
+    //retest
+    {
+        auto x = rpc::dynamic_pointer_cast<xxx::i_baz>(baz);
+        ASSERT_NE(x, nullptr);
+        ASSERT_EQ(x, baz);
+        auto y = rpc::dynamic_pointer_cast<xxx::i_bar>(baz);
+        ASSERT_NE(y, nullptr);
+        y->do_something_else(1);
+        ASSERT_NE(y, nullptr);
+        auto z = rpc::dynamic_pointer_cast<xxx::i_foo>(baz);
+        ASSERT_EQ(z, nullptr);
+    }
 }
 
 

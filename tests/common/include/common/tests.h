@@ -189,12 +189,18 @@ namespace marshalled_tests
         {
             rpc::shared_ptr<xxx::i_baz> i_baz_ptr;
             example_ptr->create_multiple_inheritance(i_baz_ptr);
-            auto i_bar_ptr1 = rpc::dynamic_pointer_cast<xxx::i_bar>(i_baz_ptr);
-            RPC_ASSERT(i_bar_ptr1 != nullptr);
-            auto i_baz_ptr2 = rpc::dynamic_pointer_cast<xxx::i_baz>(i_bar_ptr1);
-            RPC_ASSERT(i_baz_ptr2 != nullptr);
-            auto i_bar_ptr2 = rpc::dynamic_pointer_cast<xxx::i_bar>(i_baz_ptr2);
-            RPC_ASSERT(i_bar_ptr2 != nullptr);
+            //repeat twice
+            for(int i = 0; i < 2;i++)
+            {
+                auto i_bar_ptr1 = rpc::dynamic_pointer_cast<xxx::i_bar>(i_baz_ptr);
+                RPC_ASSERT(i_bar_ptr1 != nullptr);
+                auto i_baz_ptr2 = rpc::dynamic_pointer_cast<xxx::i_baz>(i_bar_ptr1);
+                RPC_ASSERT(i_baz_ptr2 == i_baz_ptr);
+                auto i_bar_ptr2 = rpc::dynamic_pointer_cast<xxx::i_bar>(i_baz_ptr2);
+                RPC_ASSERT(i_bar_ptr2 == i_bar_ptr1);
+                auto i_foo = rpc::dynamic_pointer_cast<xxx::i_foo>(i_baz_ptr2);
+                RPC_ASSERT(i_foo == nullptr);
+            }
         }
     }
 }

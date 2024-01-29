@@ -121,13 +121,10 @@ namespace rpc
                 rpc::shared_ptr<proxy_base> proxy = item->second.lock();
                 if (!proxy)
                 {
-                    //if we get here then we need to invent a test for this
-                    RPC_ASSERT(false);
-                    return rpc::error::INVALID_INTERFACE_ID();
-                    // // weak pointer needs refreshing
-                    // create_interface_proxy<T>(iface);
-                    // item->second = rpc::reinterpret_pointer_cast<proxy_base>(iface);
-                    // return rpc::error::OK();
+                    // weak pointer needs refreshing
+                    create_interface_proxy<T>(iface);
+                    item->second = rpc::reinterpret_pointer_cast<proxy_base>(iface);
+                    return rpc::error::OK();
                 }
                 iface = rpc::reinterpret_pointer_cast<T>(proxy);
                 return rpc::error::OK();
