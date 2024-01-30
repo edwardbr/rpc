@@ -31,11 +31,6 @@ namespace rpc
         rpc::shared_ptr<service_proxy> deep_copy_for_clone() override {return rpc::make_shared<local_service_proxy>(*this);}
         void clone_completed() override
         {
-            if(get_zone_id() == 2 && get_destination_zone_id() == 1 && get_caller_zone_id() == 4)
-            {
-                //this is for a custom breakpoint
-                get_zone_id();
-            }
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
             {
                 telemetry_service->on_service_proxy_creation("local_service_proxy", get_zone_id(), get_destination_zone_id(), get_caller_zone_id());

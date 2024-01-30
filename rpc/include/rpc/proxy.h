@@ -624,6 +624,7 @@ namespace rpc
 
         void add_object_proxy(rpc::shared_ptr<object_proxy> op)
         {
+            RPC_ASSERT(get_caller_zone_id() == get_zone_id().as_caller());
             std::lock_guard l(insert_control_);
             RPC_ASSERT(proxies_.find(op->get_object_id()) == proxies_.end());
             proxies_[op->get_object_id()] = op;
@@ -631,6 +632,7 @@ namespace rpc
 
         rpc::shared_ptr<object_proxy> get_object_proxy(object object_id)
         {
+            RPC_ASSERT(get_caller_zone_id() == get_zone_id().as_caller());
             std::lock_guard l(insert_control_);
             auto item = proxies_.find(object_id);
             if(item == proxies_.end())
