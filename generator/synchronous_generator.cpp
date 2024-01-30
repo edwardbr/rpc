@@ -940,6 +940,24 @@ namespace enclave_marshaller
 
                 proxy("if(__rpc_ret >= rpc::error::MIN() && __rpc_ret <= rpc::error::MAX())");
                 proxy("{{");
+                proxy("//if you fall into this rabbit hole ensure that you have added any error offsets compatible with your error code system to the rpc library");
+                proxy("//this is only here to handle rpc generated errors and not application errors");
+                proxy("//clean up any input stubs, this code has to assume that the destination is behaving correctly");
+                {
+                    uint64_t count = 1;
+                    for(auto& parameter : function->get_parameters())
+                    {
+                        std::string output;
+                        {
+                            if(!is_in_call(PROXY_CLEAN_IN, from_host, m_ob, parameter.get_name(), parameter.get_type(),
+                                            parameter.get_attributes(), count, output))
+                                continue;
+
+                            proxy(output);
+                        }
+                        count++;
+                    }
+                }
                 proxy("return __rpc_ret;");
                 proxy("}}");
 
