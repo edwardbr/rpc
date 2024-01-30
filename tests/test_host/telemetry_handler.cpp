@@ -31,28 +31,31 @@ extern "C"
         , char* data_out
         , size_t* data_out_sz)
     {
-        thread_local rpc::retry_buffer out_buf;
+        thread_local rpc::retry_buffer retry_buf;
 
         auto root_service = current_host_service.lock();
         if (!root_service)
         {
-            out_buf.data.clear();
+            retry_buf.data.clear();
             return rpc::error::TRANSPORT_ERROR();
         }
-        if (out_buf.data.empty())
+        if (retry_buf.data.empty())
         {
-            out_buf.data.resize(sz_out);
-            out_buf.return_value = root_service->send(protocol_version, rpc::encoding(encoding), tag, {caller_channel_zone_id}, {caller_zone_id}, {destination_zone_id}, {object_id}, {interface_id}, {method_id}, sz_int,
-                                         data_in, out_buf.data);
-            if (out_buf.return_value >= rpc::error::MIN() && out_buf.return_value <= rpc::error::MAX())
-                return out_buf.return_value;
+            std::vector<char> out_data(sz_out);
+            retry_buf.return_value = root_service->send(protocol_version, rpc::encoding(encoding), tag, {caller_channel_zone_id}, {caller_zone_id}, {destination_zone_id}, {object_id}, {interface_id}, {method_id}, sz_int,
+                                         data_in, out_data);
+            if (retry_buf.return_value >= rpc::error::MIN() && retry_buf.return_value <= rpc::error::MAX())
+            {
+                return retry_buf.return_value;
+            }
+            retry_buf.data.swap(out_data);
         }
-        *data_out_sz = out_buf.data.size();
+        *data_out_sz = retry_buf.data.size();
         if (*data_out_sz > sz_out)
             return rpc::error::NEED_MORE_MEMORY();
-        memcpy(data_out, out_buf.data.data(), out_buf.data.size());
-        out_buf.data.clear();
-        return out_buf.return_value;
+        memcpy(data_out, retry_buf.data.data(), retry_buf.data.size());
+        retry_buf.data.clear();
+        return retry_buf.return_value;
     }
     int try_cast_host(
         uint64_t protocol_version                          //version of the rpc call protocol
