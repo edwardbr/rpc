@@ -141,29 +141,39 @@ rpc::shared_ptr<rpc::child_service> rpc_server;
 int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t host_id, uint64_t child_zone_id, uint64_t* example_object_id)
 {
     const rpc::i_telemetry_service* p_telemetry_service = &telemetry_service;
-
-    //create a rpc::zone service for the enclave
-    rpc_server = rpc::make_shared<rpc::child_service>(rpc::zone{child_zone_id}, rpc::destination_zone{host_zone_id}, p_telemetry_service); 
-    example_import_idl_register_stubs(rpc_server);
-    example_shared_idl_register_stubs(rpc_server);
-    example_idl_register_stubs(rpc_server);
-
-    rpc::shared_ptr<yyy::i_host> host;
+    
+    rpc::interface_descriptor input_descr{};
+    rpc::interface_descriptor output_descr{};
     
     if(host_id)
     {
-        auto host_proxy = rpc::host_service_proxy::create({host_zone_id}, {host_id}, rpc_server, p_telemetry_service);
-        auto err_code = rpc::demarshall_interface_proxy<yyy::i_host>(rpc::get_version(), host_proxy, {{host_id}, {host_zone_id}}, {child_zone_id}, host);
-        if(err_code != rpc::error::OK())
-            return err_code;
+        input_descr = {{host_id}, {host_zone_id}};
     }
-
-    //create the root rpc::object
-    rpc::shared_ptr<yyy::i_example> ex(new example(p_telemetry_service, rpc_server, host));
     
-    auto example_encap = rpc::create_interface_stub(*rpc_server, ex);
-    *example_object_id = example_encap.object_id.get_val();
-
+    auto ret = rpc::child_service::create_child_zone<rpc::host_service_proxy, yyy::i_host, yyy::i_example>(
+        rpc::zone{child_zone_id}
+        , rpc::destination_zone{host_zone_id}
+        , p_telemetry_service
+        , input_descr
+        , output_descr
+        , [](
+            const rpc::shared_ptr<yyy::i_host>& host
+            , rpc::shared_ptr<yyy::i_example>& new_example
+            , const rpc::shared_ptr<rpc::child_service>& child_service_ptr) -> int
+        {
+            example_import_idl_register_stubs(child_service_ptr);
+            example_shared_idl_register_stubs(child_service_ptr);
+            example_idl_register_stubs(child_service_ptr);
+            new_example = rpc::shared_ptr<yyy::i_example>(new example(child_service_ptr->get_telemetry_service(), child_service_ptr, host));
+            return rpc::error::OK();
+        }
+        , rpc_server);
+        
+    if(ret != rpc::error::OK())
+        return ret;
+        
+    *example_object_id = output_descr.object_id.id;
+    
     return rpc::error::OK();
 }
 

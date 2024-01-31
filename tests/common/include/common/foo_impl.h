@@ -415,7 +415,7 @@ namespace marshalled_tests
                 {new_zone_id}
                 , host_ptr
                 , target
-                , [&](
+                , [](
                     const rpc::shared_ptr<yyy::i_host>& host
                     , rpc::shared_ptr<yyy::i_example>& new_example
                     , const rpc::shared_ptr<rpc::child_service>& child_service_ptr) -> int
@@ -423,8 +423,7 @@ namespace marshalled_tests
                     example_import_idl_register_stubs(child_service_ptr);
                     example_shared_idl_register_stubs(child_service_ptr);
                     example_idl_register_stubs(child_service_ptr);
-                    new_example = rpc::shared_ptr<yyy::i_example>(new example(telemetry_, child_service_ptr, nullptr));   
-                    new_example->set_host(host);
+                    new_example = rpc::shared_ptr<yyy::i_example>(new example(child_service_ptr->get_telemetry_service(), child_service_ptr, host));   
                     return rpc::error::OK();
                 });
             if(err_code != rpc::error::OK())

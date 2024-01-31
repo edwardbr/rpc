@@ -257,6 +257,72 @@ namespace rpc
             return ret;
         }
     }
+    
+    interface_descriptor service::prepare_remote_input_interface(uint64_t protocol_version, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, rpc::proxy_base* base, rpc::shared_ptr<service_proxy>& destination_zone)
+    {
+        auto object_proxy = base->get_object_proxy();
+        auto object_service_proxy = object_proxy->get_service_proxy();
+        RPC_ASSERT(object_service_proxy->get_zone_id() == zone_id_);
+        auto destination_zone_id = object_service_proxy->get_destination_zone_id();
+        auto destination_channel_zone_id = object_service_proxy->get_destination_channel_zone_id();
+        auto object_id = object_proxy->get_object_id();
+
+        RPC_ASSERT(caller_zone_id.is_set());
+        RPC_ASSERT(destination_zone_id.is_set());
+
+        uint64_t object_channel = caller_channel_zone_id.is_set() ? caller_channel_zone_id.id : caller_zone_id.id;
+        RPC_ASSERT(object_channel);
+
+        uint64_t destination_channel = destination_channel_zone_id.is_set() ? destination_channel_zone_id.id : destination_zone_id.id;
+        RPC_ASSERT(destination_channel);
+        
+        destination_zone = object_service_proxy;
+        {
+            std::lock_guard g(zone_control);
+            auto found = other_zones.find({destination_zone_id, caller_zone_id});//we dont need to get caller id for this
+            if(found != other_zones.end())
+            {
+                destination_zone = found->second.lock();
+            }
+            else
+            {
+                destination_zone = object_service_proxy->clone_for_zone(destination_zone_id, caller_zone_id);
+                other_zones[{destination_zone_id, caller_zone_id}] = destination_zone;
+            }
+            destination_zone->add_external_ref();
+        }
+
+        if(telemetry_service_)
+            telemetry_service_->on_service_add_ref(
+                "", 
+                get_zone_id(), 
+                destination_channel_zone_id, 
+                destination_zone_id, 
+                object_id, 
+                get_zone_id().as_caller_channel(), 
+                caller_zone_id, 
+                rpc::add_ref_options::build_destination_route);                
+
+        //the fork is here so we need to add ref the destination normally with caller info
+        //note the caller_channel_zone_id is is this zones id as the caller came from a route via this node
+        destination_zone->add_ref(
+            rpc::get_version(),
+            destination_channel_zone_id, 
+            destination_zone_id, 
+            object_id, 
+            get_zone_id().as_caller_channel(), 
+            caller_zone_id, 
+            rpc::add_ref_options::build_destination_route);
+
+        return {object_id, destination_zone_id};         
+    }
+    
+    void service::cleanup_remote_input_interface(rpc::shared_ptr<service_proxy>& destination_zone, rpc::proxy_base* base)
+    {
+        destination_zone->release(rpc::get_version(), destination_zone->get_destination_zone_id(), base->get_object_proxy()->get_object_id(), destination_zone->get_caller_zone_id());
+        destination_zone->release_external_ref();
+    }
+    
 
     interface_descriptor service::prepare_out_param(uint64_t protocol_version, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, rpc::proxy_base* base)
     {

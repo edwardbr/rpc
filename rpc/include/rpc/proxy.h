@@ -243,13 +243,12 @@ namespace rpc
 
         service_proxy(  destination_zone destination_zone_id,
                         const rpc::shared_ptr<service>& svc,
-                        caller_zone caller_zone_id,
-                        const rpc::i_telemetry_service* telemetry_service) : 
+                        caller_zone caller_zone_id) : 
             zone_id_(svc->get_zone_id()),
             destination_zone_id_(destination_zone_id),
             caller_zone_id_(caller_zone_id),
-            service_(svc),
-            telemetry_service_(telemetry_service)
+            service_(svc),            
+            telemetry_service_(svc->get_telemetry_service())//cache the telemetry server pointer
         {
 #ifdef USE_RPC_LOGGING
             auto message = std::string("service_proxy::service_proxy zone_id ") + std::to_string(zone_id_.get_val())

@@ -31,7 +31,9 @@ namespace rpc
 
     template<class T> 
     int demarshall_interface_proxy(uint64_t protocol_version, const rpc::shared_ptr<rpc::service_proxy>& sp, const rpc::interface_descriptor& encap, caller_zone caller_zone_id, rpc::shared_ptr<T>& val);    
-
+    template<class T> 
+    rpc::interface_descriptor create_interface_stub(rpc::service& serv, const rpc::shared_ptr<T>& iface);
+    
     class service_logger
     {
     public:
@@ -157,23 +159,27 @@ namespace rpc
             return rpc::static_pointer_cast<T>(get_castable_interface(object_id, T::get_id(protocol_version)));
         }
         
+        interface_descriptor prepare_remote_input_interface(uint64_t protocol_version, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, rpc::proxy_base* base, rpc::shared_ptr<service_proxy>& destination_zone);
+        void cleanup_remote_input_interface(rpc::shared_ptr<service_proxy>& destination_zone, rpc::proxy_base* base);
+        
         template<class proxy_class, class in_param_type, class out_param_type, typename... Args>
         int connect_to_zone(
             rpc::destination_zone new_zone_id,
             const rpc::shared_ptr<in_param_type>& input_interface, 
             rpc::shared_ptr<out_param_type>& output_interface,
-            Args... args)
+            Args&&... args)
         {
             RPC_ASSERT(input_interface == nullptr || !input_interface->query_proxy_base() || input_interface->query_proxy_base()->get_object_proxy()->get_service_proxy()->get_zone_id() == zone_id_);
 
             auto new_service_proxy = proxy_class::create(new_zone_id, shared_from_this(), args...);
-
+            add_zone_proxy(new_service_proxy);
             rpc::interface_descriptor input_descr{{0},{0}};
+            rpc::shared_ptr<service_proxy> destination_zone;
             if(input_interface)
             {
                 if(input_interface->query_proxy_base())
                 {
-                    input_descr = prepare_out_param(rpc::get_version(), {0}, new_service_proxy->get_destination_zone_id().as_caller(), input_interface->query_proxy_base());   
+                    input_descr = prepare_remote_input_interface(rpc::get_version(), {0}, new_service_proxy->get_destination_zone_id().as_caller(), input_interface->query_proxy_base(), destination_zone);   
                 }
                 else
                 {
@@ -191,6 +197,11 @@ namespace rpc
             if(err_code != rpc::error::OK())
             {
                 //clean up
+                if(destination_zone)
+                {
+                    cleanup_remote_input_interface(destination_zone, input_interface->query_proxy_base());
+                }
+                
                 return err_code;
             }
             
@@ -239,6 +250,53 @@ namespace rpc
         rpc::shared_ptr<rpc::service_proxy> get_parent() const override {return parent_service_proxy_;}
         void set_parent(const rpc::shared_ptr<rpc::service_proxy>& parent_service_proxy) override;
         destination_zone get_parent_zone_id() const override {return parent_zone_id_;}
+        
+        template<class SERVICE_PROXY, class PARENT_INTERFACE, class CHILD_INTERFACE, typename... Args>
+        static int create_child_zone(
+            zone zone_id
+            , destination_zone parent_zone_id
+            , const i_telemetry_service* telemetry_service
+            , rpc::interface_descriptor input_descr
+            , rpc::interface_descriptor& output_descr
+            , std::function<int(const rpc::shared_ptr<PARENT_INTERFACE>&, rpc::shared_ptr<CHILD_INTERFACE>&, const rpc::shared_ptr<rpc::child_service>&)> fn
+            , rpc::shared_ptr<child_service>& new_child_service
+            , Args&&... args)
+        {
+            auto child_svc = rpc::shared_ptr<rpc::child_service>(new rpc::child_service(zone_id, parent_zone_id, telemetry_service));
+
+            //link the child to the parent
+            auto parent_service_proxy = SERVICE_PROXY::create(parent_zone_id, child_svc, args...);            
+            if(!parent_service_proxy)
+                return rpc::error::UNABLE_TO_CREATE_SERVICE_PROXY();
+            child_svc->add_zone_proxy(parent_service_proxy);
+            child_svc->set_parent(parent_service_proxy);
+            parent_service_proxy->set_parent_channel(true);        
+            
+            rpc::shared_ptr<PARENT_INTERFACE> parent_ptr;
+            if(input_descr != interface_descriptor())
+            {
+                auto err_code = rpc::demarshall_interface_proxy(rpc::get_version(), parent_service_proxy, input_descr, zone_id.as_caller(), parent_ptr);
+                if(err_code != rpc::error::OK())
+                {
+                    ASSERT_ERROR_CODE(err_code);   
+                    return err_code;
+                }
+            }   
+            rpc::shared_ptr<CHILD_INTERFACE> child_ptr;
+            {
+                auto err_code = fn(parent_ptr, child_ptr, child_svc);
+                if(err_code != rpc::error::OK())
+                {
+                    return err_code;
+                }
+            }
+            if(child_ptr)
+            {
+                output_descr = rpc::create_interface_stub(*child_svc, child_ptr);
+            }
+            new_child_service = child_svc;
+            return rpc::error::OK();
+        }
     };
 
 
