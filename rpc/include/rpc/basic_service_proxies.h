@@ -103,8 +103,7 @@ namespace rpc
             , object object_id 
             , caller_channel_zone caller_channel_zone_id 
             , caller_zone caller_zone_id 
-            , add_ref_options build_out_param_channel 
-            , bool proxy_add_ref) override
+            , add_ref_options build_out_param_channel) override
         {
             if (get_telemetry_service())
             {
@@ -120,8 +119,7 @@ namespace rpc
                 object_id, 
                 caller_channel_zone_id, 
                 caller_zone_id, 
-                build_out_param_channel, 
-                proxy_add_ref);  
+                build_out_param_channel);  
             
             //auto svc = rpc::static_pointer_cast<child_service>(get_operating_zone_service());
             return ret;
@@ -254,7 +252,6 @@ namespace rpc
             , caller_channel_zone caller_channel_zone_id 
             , caller_zone caller_zone_id 
             , add_ref_options build_out_param_channel 
-            , bool proxy_add_ref
         ) override
         {
             if (get_telemetry_service())
@@ -269,8 +266,7 @@ namespace rpc
                 object_id, 
                 caller_channel_zone_id, 
                 caller_zone_id, 
-                build_out_param_channel, 
-                proxy_add_ref);       
+                build_out_param_channel);       
             return ret;
         }
         uint64_t release(

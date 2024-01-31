@@ -461,8 +461,7 @@ namespace rpc
             , object object_id 
             , caller_channel_zone caller_channel_zone_id 
             , caller_zone caller_zone_id 
-            , add_ref_options build_out_param_channel 
-            , bool proxy_add_ref)
+            , add_ref_options build_out_param_channel)
         {
             auto original_version = version_.load();
             auto version = original_version;
@@ -475,17 +474,12 @@ namespace rpc
                     , object_id 
                     , caller_channel_zone_id 
                     , caller_zone_id 
-                    , build_out_param_channel 
-                    , proxy_add_ref);
+                    , build_out_param_channel );
                 if(ret != std::numeric_limits<uint64_t>::max())
                 {
                     if(original_version != version)
                     {
                         version_.compare_exchange_strong( original_version, version);
-                    }
-                    if(proxy_add_ref)
-                    {
-                        add_external_ref();
                     }
                     return ret;
                 }
@@ -701,10 +695,14 @@ namespace rpc
                                 , encap.object_id
                                 , {0}
                                 , zone_id.as_caller()// this zone will now be the caller to this object
-                                , rpc::add_ref_options::normal
-                                , !new_proxy_added);
+                                , rpc::add_ref_options::normal);
                 if(ret == std::numeric_limits<uint64_t>::max())
                     return -1;
+                if(!new_proxy_added)
+                {
+                    service_proxy->add_external_ref();
+                }
+
             }
             auto ret = op->query_interface(iface, false);        
             return ret;
@@ -853,18 +851,18 @@ namespace rpc
             //     new_proxy_added);
         }
 
-        bool proxy_to_parent = serv->get_parent_zone_id() == service_proxy->get_destination_zone_id();
-
         auto ret = service_proxy->sp_add_ref(
             service_proxy->get_destination_channel_zone_id(), 
             service_proxy->get_destination_zone_id(), 
             {dummy_object_id}, 
             {0}, 
             serv->get_zone_id().as_caller(), 
-            rpc::add_ref_options::build_destination_route, 
-            proxy_to_parent);
+            rpc::add_ref_options::build_destination_route);
         if(ret == std::numeric_limits<uint64_t>::max())
             return -1;
+
+        if(serv->get_parent_zone_id() == service_proxy->get_destination_zone_id())
+            service_proxy->add_external_ref();
 
         rpc::shared_ptr<object_proxy> op = service_proxy->get_object_proxy(encap.object_id);
         if(!op)

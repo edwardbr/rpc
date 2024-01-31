@@ -92,8 +92,7 @@ extern "C"
             {object_id}, 
             {caller_channel_zone_id}, 
             {caller_zone_id}, 
-            static_cast<rpc::add_ref_options>(build_out_param_channel), 
-            false);
+            static_cast<rpc::add_ref_options>(build_out_param_channel));
     }
     uint64_t release_host(
         uint64_t protocol_version                          //version of the rpc call protocol

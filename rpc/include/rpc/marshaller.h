@@ -93,8 +93,7 @@ namespace rpc
             , object object_id 
             , caller_channel_zone caller_channel_zone_id 
             , caller_zone caller_zone_id 
-            , add_ref_options build_out_param_channel 
-            , bool proxy_add_ref) = 0;
+            , add_ref_options build_out_param_channel ) = 0;
         virtual uint64_t release(
             uint64_t protocol_version 
             , destination_zone destination_zone_id 

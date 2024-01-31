@@ -273,8 +273,7 @@ uint64_t add_ref_enclave(uint64_t protocol_version, uint64_t destination_channel
         {object_id}, 
         {caller_channel_zone_id}, 
         {caller_zone_id}, 
-        static_cast<rpc::add_ref_options>(build_out_param_channel), 
-        false);
+        static_cast<rpc::add_ref_options>(build_out_param_channel));
 }
 
 uint64_t release_enclave(uint64_t protocol_version, uint64_t zone_id, uint64_t object_id, uint64_t caller_zone_id)

@@ -298,8 +298,7 @@ namespace rpc
                 object_id, 
                 {0}, 
                 caller_zone_id, 
-                rpc::add_ref_options::build_caller_route | rpc::add_ref_options::build_destination_route, 
-                false);
+                rpc::add_ref_options::build_caller_route | rpc::add_ref_options::build_destination_route);
         }
         else
         {
@@ -345,8 +344,7 @@ namespace rpc
                 object_id, 
                 get_zone_id().as_caller_channel(), 
                 caller_zone_id, 
-                rpc::add_ref_options::build_destination_route, 
-                false);
+                rpc::add_ref_options::build_destination_route);
             
             
             if(telemetry_service_)
@@ -368,8 +366,7 @@ namespace rpc
                 object_id, 
                 {0}, 
                 caller_zone_id, 
-                rpc::add_ref_options::build_caller_route, 
-                false);
+                rpc::add_ref_options::build_caller_route);
         }
  
         return {object_id, destination_zone_id};
@@ -464,8 +461,7 @@ namespace rpc
                 stub->get_id(), 
                 {0}, 
                 caller_zone_id, 
-                rpc::add_ref_options::build_caller_route, 
-                false);        
+                rpc::add_ref_options::build_caller_route);        
         }        
         return {stub->get_id(), get_zone_id().as_destination()};
     }
@@ -541,8 +537,7 @@ namespace rpc
         object object_id, 
         caller_channel_zone caller_channel_zone_id, 
         caller_zone caller_zone_id, 
-        add_ref_options build_out_param_channel, 
-        bool proxy_add_ref
+        add_ref_options build_out_param_channel
     )
 {
         if(telemetry_service_)
@@ -601,8 +596,7 @@ namespace rpc
                     object_id, 
                     {0}, 
                     caller_zone_id, 
-                    build_out_param_channel, 
-                    false);                
+                    build_out_param_channel);                
             }
             else if(build_channel)
             {
@@ -685,8 +679,7 @@ namespace rpc
                                     object_id, 
                                     {0}, 
                                     caller_zone_id, 
-                                    build_out_param_channel, 
-                                    false);
+                                    build_out_param_channel);
                                 destination->release_external_ref();//perhaps this could be optimised
                                 if(ret == std::numeric_limits<uint64_t>::max())
                                 {
@@ -716,8 +709,7 @@ namespace rpc
                                 object_id, 
                                 get_zone_id().as_caller_channel(), 
                                 caller_zone_id, 
-                                add_ref_options::build_destination_route, 
-                                false);
+                                add_ref_options::build_destination_route);
                         }
                         //back fill the ref count to the caller
                         if(!!(build_out_param_channel & add_ref_options::build_caller_route))
@@ -739,8 +731,7 @@ namespace rpc
                                 object_id, 
                                 caller_channel_zone_id, 
                                 caller_zone_id, 
-                                add_ref_options::build_caller_route, 
-                                false);
+                                add_ref_options::build_caller_route);
                         }
                     }while(false);
                 }
@@ -796,8 +787,7 @@ namespace rpc
                     object_id, 
                     caller_channel_zone_id, 
                     caller_zone_id, 
-                    build_out_param_channel, 
-                    false);
+                    build_out_param_channel);
             }
         }
         else
@@ -853,8 +843,7 @@ namespace rpc
                     object_id, 
                     {}, 
                     caller_zone_id, 
-                    add_ref_options::build_caller_route, 
-                    false);
+                    add_ref_options::build_caller_route);
             }
             if(object_id == dummy_object_id)
             {
