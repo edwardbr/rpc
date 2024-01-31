@@ -15,7 +15,7 @@ namespace rpc
         destination_zone destination_zone_id
         , std::string filename
         , const rpc::shared_ptr<service>& svc)
-        : service_proxy(destination_zone_id, svc, svc->get_zone_id().as_caller())
+        : service_proxy(destination_zone_id, svc)
         , filename_(filename)
     {
         if (auto* telemetry_service = get_telemetry_service(); telemetry_service)

@@ -18,7 +18,7 @@ namespace rpc
 
         local_service_proxy(const rpc::shared_ptr<child_service>& child_svc,
                             const rpc::shared_ptr<service>& parent_svc)
-            : service_proxy(parent_svc->get_zone_id().as_destination(), child_svc, child_svc->get_zone_id().as_caller()),
+            : service_proxy(parent_svc->get_zone_id().as_destination(), child_svc),
             parent_service_(parent_svc)
         {
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
@@ -135,7 +135,7 @@ namespace rpc
             destination_zone destination_zone_id,
             const rpc::shared_ptr<service>& parent_svc,
             connect_fn fn)
-            : service_proxy(destination_zone_id, parent_svc, parent_svc->get_zone_id().as_caller())
+            : service_proxy(destination_zone_id, parent_svc)
             , fn_(fn)
         {
             if (auto* telemetry_service = get_telemetry_service(); telemetry_service)

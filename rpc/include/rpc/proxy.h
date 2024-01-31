@@ -242,11 +242,10 @@ namespace rpc
     protected:
 
         service_proxy(  destination_zone destination_zone_id,
-                        const rpc::shared_ptr<service>& svc,
-                        caller_zone caller_zone_id) : 
+                        const rpc::shared_ptr<service>& svc) : 
             zone_id_(svc->get_zone_id()),
             destination_zone_id_(destination_zone_id),
-            caller_zone_id_(caller_zone_id),
+            caller_zone_id_(svc->get_zone_id().as_caller()),
             service_(svc),            
             telemetry_service_(svc->get_telemetry_service())//cache the telemetry server pointer
         {
