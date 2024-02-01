@@ -284,6 +284,7 @@ namespace rpc
             }   
             rpc::shared_ptr<CHILD_INTERFACE> child_ptr;
             {
+                new_child_service = child_svc;
                 auto err_code = fn(parent_ptr, child_ptr, child_svc);
                 if(err_code != rpc::error::OK())
                 {
@@ -294,7 +295,6 @@ namespace rpc
             {
                 output_descr = rpc::create_interface_stub(*child_svc, child_ptr);
             }
-            new_child_service = child_svc;
             return rpc::error::OK();
         }
     };
