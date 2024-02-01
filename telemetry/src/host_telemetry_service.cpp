@@ -1,21 +1,13 @@
 #include <filesystem>
 #include <algorithm>
-#include <host_telemetry_service.h>
 #include <spdlog/spdlog.h>
 #include <fmt/os.h>
+
+#include <rpc/telemetry/host_telemetry_service.h>
+#include <rpc/assert.h>
 #include <rpc/service.h>
 
-#include "gtest/gtest.h"
 
-extern "C"
-{
-    void rpc_log(const char* str, size_t sz)
-    {
-#ifdef USE_RPC_LOGGING        
-        spdlog::info(std::string(str, sz));
-#endif
-    }
-}
 
 host_telemetry_service::host_telemetry_service(const std::string& test_suite_name, const std::string& name) : 
     test_suite_name_(test_suite_name),
@@ -77,7 +69,7 @@ host_telemetry_service::~host_telemetry_service()
     fmt::println(output, "end note");
     fmt::println(output, "@enduml");
     fclose(output);
-    EXPECT_TRUE(is_heathy);
+    RPC_ASSERT(is_heathy);
     output = nullptr;
     historical_impls.clear();
 }

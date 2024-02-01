@@ -17,7 +17,7 @@
 #include <example/example.h>
 
 #include <rpc/basic_service_proxies.h>
-#include <host_telemetry_service.h>
+#include <rpc/telemetry/host_telemetry_service.h>
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

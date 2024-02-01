@@ -1,5 +1,5 @@
 #include "common/host_service_proxy.h"
-#include "rpc/i_telemetry_service.h"
+#include "rpc/telemetry/i_telemetry_service.h"
 
 
 #ifdef _IN_ENCLAVE

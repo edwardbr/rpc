@@ -3,7 +3,7 @@
 #include <example/example.h>
 #include <rpc/types.h>
 #include <rpc/proxy.h>
-#include <rpc/i_telemetry_service.h>
+#include <rpc/telemetry/i_telemetry_service.h>
 #include <rpc/basic_service_proxies.h>
 
 #include <example_shared/example_shared_stub.h>

@@ -3,7 +3,7 @@
 #include <rpc/types.h>
 #include <rpc/proxy.h>
 #include <rpc/error_codes.h>
-#include <rpc/i_telemetry_service.h>
+#include <rpc/telemetry/i_telemetry_service.h>
 #include <rpc/service.h>
 
 namespace rpc
