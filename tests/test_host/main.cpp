@@ -65,11 +65,12 @@ std::string enclave_path_v1 = "./marshal_test_enclave_v1.signed.dll";
 std::string enclave_path = "./libmarshal_test_enclave.signed.so";
 std::string enclave_path_v1 = "./libmarshal_test_enclave_v1.signed.so";
 #endif
+
+TELEMETRY_SERVICE_MANAGER
 bool enable_telemetry_server = true;
 
 rpc::weak_ptr<rpc::service> current_host_service;
 
-const rpc::i_telemetry_service* telemetry_service = nullptr;
 std::atomic<uint64_t>* zone_gen = nullptr;
 
 
@@ -175,8 +176,6 @@ public:
 template<bool UseHostInChild>
 class in_memory_setup
 {
-    rpc::shared_ptr<host_telemetry_service> tm;
-
     rpc::shared_ptr<yyy::i_host> i_host_ptr_;
     rpc::weak_ptr<yyy::i_host> local_host_ptr_;
     rpc::shared_ptr<yyy::i_example> i_example_ptr_;
@@ -194,27 +193,24 @@ public:
     rpc::shared_ptr<yyy::i_host> get_host() const {return i_host_ptr_;}
     rpc::shared_ptr<yyy::i_host> get_local_host_ptr(){return local_host_ptr_.lock();}
     bool get_use_host_in_child() const {return use_host_in_child_;}
-    rpc::shared_ptr<host_telemetry_service> get_telemetry_service() const {return tm;}
 
     virtual void SetUp()
     {   
         zone_gen = &zone_gen_;
         auto test_info = ::testing::UnitTest::GetInstance()->current_test_info();
         if(enable_telemetry_server)
-            tm = rpc::make_shared<host_telemetry_service>(test_info->test_suite_name(), test_info->name());
-        telemetry_service = tm.get();
-        i_host_ptr_ = rpc::shared_ptr<yyy::i_host> (new host(tm.get(), {++zone_gen_}));
+            CREATE_TELEMETRY_SERVICE(rpc::host_telemetry_service, test_info->test_suite_name(), test_info->name(), "../../rpc_test_diagram/")
+        i_host_ptr_ = rpc::shared_ptr<yyy::i_host> (new host(rpc::telemetry_service_manager::get().get(), {++zone_gen_}));
         local_host_ptr_ = i_host_ptr_;
-        i_example_ptr_ = rpc::shared_ptr<yyy::i_example> (new example(telemetry_service, nullptr, use_host_in_child_ ? i_host_ptr_ : nullptr));
+        i_example_ptr_ = rpc::shared_ptr<yyy::i_example> (new example(rpc::telemetry_service_manager::get().get(), nullptr, use_host_in_child_ ? i_host_ptr_ : nullptr));
     }
 
     virtual void TearDown()
     {
         i_host_ptr_ = nullptr;
         i_example_ptr_ = nullptr;
-        telemetry_service = nullptr;
-        tm = nullptr;
         zone_gen = nullptr;
+        rpc::telemetry_service_manager::reset();
     }
 };
 
@@ -250,8 +246,6 @@ public:
 template<bool UseHostInChild, bool RunStandardTests, bool CreateNewZoneThenCreateSubordinatedZone>
 class inproc_setup
 {
-    rpc::shared_ptr<host_telemetry_service> tm;
-
     rpc::shared_ptr<rpc::service> root_service_;
     rpc::shared_ptr<rpc::child_service> child_service_;
     rpc::shared_ptr<yyy::i_host> i_host_ptr_;
@@ -274,21 +268,19 @@ public:
     rpc::shared_ptr<yyy::i_host> get_host() const {return i_host_ptr_;}
     rpc::shared_ptr<yyy::i_host> get_local_host_ptr(){return local_host_ptr_.lock();}
     bool get_use_host_in_child() const {return use_host_in_child_;}
-    rpc::shared_ptr<host_telemetry_service> get_telemetry_service() const {return tm;}
     
     virtual void SetUp()
     {
         zone_gen = &zone_gen_;
         auto test_info = ::testing::UnitTest::GetInstance()->current_test_info();
         if(enable_telemetry_server)
-            tm = rpc::make_shared<host_telemetry_service>(test_info->test_suite_name(), test_info->name());
+            CREATE_TELEMETRY_SERVICE(rpc::host_telemetry_service, test_info->test_suite_name(), test_info->name(), "../../rpc_test_diagram/")
 
-        telemetry_service = tm.get();
-        root_service_ = rpc::make_shared<rpc::service>(rpc::zone{++zone_gen_}, tm.get());
+        root_service_ = rpc::make_shared<rpc::service>(rpc::zone{++zone_gen_}, rpc::telemetry_service_manager::get().get());
         root_service_->add_service_logger(std::make_shared<test_service_logger>());
         current_host_service = root_service_;
 
-        rpc::shared_ptr<yyy::i_host> hst(new host(tm.get(), root_service_->get_zone_id()));
+        rpc::shared_ptr<yyy::i_host> hst(new host(rpc::telemetry_service_manager::get().get(), root_service_->get_zone_id()));
         local_host_ptr_ = hst;//assign to weak ptr
         
         auto err_code = root_service_->connect_to_zone<rpc::local_child_service_proxy<yyy::i_example, yyy::i_host>>(
@@ -319,9 +311,8 @@ public:
         i_host_ptr_ = nullptr;
         child_service_ = nullptr;
         root_service_ = nullptr;
-        telemetry_service = nullptr;
-        tm = nullptr;
         zone_gen = nullptr;
+        rpc::telemetry_service_manager::reset();
     }
 
     rpc::shared_ptr<yyy::i_example> create_new_zone()
@@ -373,8 +364,6 @@ public:
 template<bool UseHostInChild, bool RunStandardTests, bool CreateNewZoneThenCreateSubordinatedZone, bool use_v1_rpc_dll>
 class enclave_setup
 {
-    rpc::shared_ptr<host_telemetry_service> tm;
-
     rpc::shared_ptr<rpc::service> root_service_;
     rpc::shared_ptr<yyy::i_host> i_host_ptr_;
     rpc::weak_ptr<yyy::i_host> local_host_ptr_;
@@ -395,23 +384,23 @@ public:
     rpc::shared_ptr<yyy::i_example> get_example() const {return i_example_ptr_;}
     rpc::shared_ptr<yyy::i_host> get_host() const {return i_host_ptr_;}
     bool get_use_host_in_child() const {return use_host_in_child_;}
-    rpc::shared_ptr<host_telemetry_service> get_telemetry_service() const {return tm;}
     
     virtual void SetUp()
     {
         zone_gen = &zone_gen_;
         auto test_info = ::testing::UnitTest::GetInstance()->current_test_info();
         if(enable_telemetry_server)
-            tm = rpc::make_shared<host_telemetry_service>(test_info->test_suite_name(), test_info->name());
-        telemetry_service = tm.get();
-        root_service_ = rpc::make_shared<rpc::service>(rpc::zone{++zone_gen_}, tm.get());
+        {
+            CREATE_TELEMETRY_SERVICE(rpc::host_telemetry_service, test_info->test_suite_name(), test_info->name(), "../../rpc_test_diagram/")
+        }
+        root_service_ = rpc::make_shared<rpc::service>(rpc::zone{++zone_gen_}, rpc::telemetry_service_manager::get().get());
         root_service_->add_service_logger(std::make_shared<test_service_logger>());
         example_import_idl_register_stubs(root_service_);
         example_shared_idl_register_stubs(root_service_);
         example_idl_register_stubs(root_service_);
         current_host_service = root_service_;
         
-        i_host_ptr_ = rpc::shared_ptr<yyy::i_host> (new host(tm.get(), root_service_->get_zone_id(), use_v1_rpc_dll));
+        i_host_ptr_ = rpc::shared_ptr<yyy::i_host> (new host(rpc::telemetry_service_manager::get().get(), root_service_->get_zone_id(), use_v1_rpc_dll));
         local_host_ptr_ = i_host_ptr_;        
 
 
@@ -429,9 +418,8 @@ public:
         i_example_ptr_ = nullptr;
         i_host_ptr_ = nullptr;
         root_service_ = nullptr;
-        telemetry_service = nullptr;
-        tm = nullptr;
         zone_gen = nullptr;
+        rpc::telemetry_service_manager::reset();
     }
 
     rpc::shared_ptr<yyy::i_example> create_new_zone()
@@ -517,9 +505,9 @@ TYPED_TEST(type_test, standard_tests)
     else
         zone_id = {0};
 
-    foo f(telemetry_service, zone_id);
+    foo f(rpc::telemetry_service_manager::get().get(), zone_id);
     
-    standard_tests(f, this->get_lib().get_has_enclave(), telemetry_service);
+    standard_tests(f, this->get_lib().get_has_enclave(), rpc::telemetry_service_manager::get().get());
 }
 
 TYPED_TEST(type_test, dyanmic_cast_tests)
@@ -530,7 +518,7 @@ TYPED_TEST(type_test, dyanmic_cast_tests)
         zone_id = root_service->get_zone_id();
     else
         zone_id = {0};
-    auto f = rpc::shared_ptr<xxx::i_foo>(new foo(telemetry_service, zone_id));
+    auto f = rpc::shared_ptr<xxx::i_foo>(new foo(rpc::telemetry_service_manager::get().get(), zone_id));
 
     rpc::shared_ptr<xxx::i_baz> baz;
     ASSERT_EQ(f->create_baz_interface(baz), 0);
@@ -591,7 +579,7 @@ TYPED_TEST(remote_type_test, remote_standard_tests)
 {    
     rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
     ASSERT_EQ(this->get_lib().get_example()->create_foo(i_foo_ptr), 0);
-    standard_tests(*i_foo_ptr, true, telemetry_service);
+    standard_tests(*i_foo_ptr, true, rpc::telemetry_service_manager::get().get());
 }
 
 
@@ -605,7 +593,7 @@ TYPED_TEST(remote_type_test, multithreaded_standard_tests)
     for(auto& thread_target : threads)
     {
         thread_target = std::thread([&](){
-            standard_tests(*i_foo_ptr, true, telemetry_service);   
+            standard_tests(*i_foo_ptr, true, rpc::telemetry_service_manager::get().get());   
         });
     }
     for(auto& thread_target : threads)
@@ -623,7 +611,7 @@ TYPED_TEST(remote_type_test, multithreaded_standard_tests_with_and_foos)
         thread_target = std::thread([&](){
             rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
             ASSERT_EQ(this->get_lib().get_example()->create_foo(i_foo_ptr), 0);
-            standard_tests(*i_foo_ptr, true, telemetry_service);   
+            standard_tests(*i_foo_ptr, true, rpc::telemetry_service_manager::get().get());   
         });
     }
     for(auto& thread_target : threads)
@@ -640,7 +628,7 @@ TYPED_TEST(remote_type_test, remote_tests)
         zone_id = root_service->get_zone_id();
     else
         zone_id = {0};
-    remote_tests(this->get_lib().get_use_host_in_child(), this->get_lib().get_example(), telemetry_service, zone_id);
+    remote_tests(this->get_lib().get_use_host_in_child(), this->get_lib().get_example(), rpc::telemetry_service_manager::get().get(), zone_id);
 }
 
 TYPED_TEST(remote_type_test, multithreaded_remote_tests)
@@ -657,7 +645,7 @@ TYPED_TEST(remote_type_test, multithreaded_remote_tests)
     for(auto& thread_target : threads)
     {
         thread_target = std::thread([&](){
-            remote_tests(this->get_lib().get_use_host_in_child(), this->get_lib().get_example(), telemetry_service, zone_id);
+            remote_tests(this->get_lib().get_use_host_in_child(), this->get_lib().get_example(), rpc::telemetry_service_manager::get().get(), zone_id);
         });
     }
     for(auto& thread_target : threads)
@@ -693,12 +681,12 @@ TYPED_TEST(remote_type_test, create_new_zone_releasing_host_then_running_on_othe
     rpc::shared_ptr<xxx::i_foo> i_foo_relay_ptr;
     auto example_relay_ptr = this->get_lib().create_new_zone();
     example_relay_ptr->create_foo(i_foo_relay_ptr);
-    standard_tests(*i_foo_relay_ptr, true, telemetry_service);
+    standard_tests(*i_foo_relay_ptr, true, rpc::telemetry_service_manager::get().get());
 
     //rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
     //ASSERT_EQ(this->get_lib().get_example()->create_foo(i_foo_ptr), 0);
     example_relay_ptr = nullptr;
-    //standard_tests(*i_foo_ptr, true, telemetry_service);    
+    //standard_tests(*i_foo_ptr, true, rpc::telemetry_service_manager::get().get());    
 }
 
 TYPED_TEST(remote_type_test, multithreaded_create_new_zone_releasing_host_then_running_on_other_enclave)
@@ -710,7 +698,7 @@ TYPED_TEST(remote_type_test, multithreaded_create_new_zone_releasing_host_then_r
             rpc::shared_ptr<xxx::i_foo> i_foo_relay_ptr;
             auto example_relay_ptr = this->get_lib().create_new_zone();
             example_relay_ptr->create_foo(i_foo_relay_ptr);
-            standard_tests(*i_foo_relay_ptr, true, telemetry_service);
+            standard_tests(*i_foo_relay_ptr, true, rpc::telemetry_service_manager::get().get());
         });
     }
     for(auto& thread_target : threads)
@@ -800,7 +788,7 @@ TYPED_TEST(remote_type_test, check_for_multiple_sets)
     
     auto zone_id = i_foo_ptr->query_proxy_base()->get_object_proxy()->get_service_proxy()->get_zone_id();
 
-    auto b = rpc::make_shared<marshalled_tests::baz>(telemetry_service, zone_id);
+    auto b = rpc::make_shared<marshalled_tests::baz>(rpc::telemetry_service_manager::get().get(), zone_id);
     // set
     i_foo_ptr->set_interface(b);
     // reset
@@ -822,7 +810,7 @@ TYPED_TEST(remote_type_test, check_for_interface_storage)
     rpc::shared_ptr<xxx::i_baz> c;
     auto zone_id = i_foo_ptr->query_proxy_base()->get_object_proxy()->get_service_proxy()->get_zone_id();
 
-    auto b = rpc::make_shared<marshalled_tests::baz>(telemetry_service, zone_id);
+    auto b = rpc::make_shared<marshalled_tests::baz>(rpc::telemetry_service_manager::get().get(), zone_id);
     i_foo_ptr->set_interface(b);
     i_foo_ptr->get_interface(c);
     i_foo_ptr->set_interface(nullptr);
@@ -835,7 +823,7 @@ TYPED_TEST(remote_type_test, check_for_set_multiple_inheritance)
         return;
     auto proxy = this->get_lib().get_example()->query_proxy_base();        
     auto ret = this->get_lib().get_example()->give_interface(
-        rpc::shared_ptr<xxx::i_baz>(new multiple_inheritance(telemetry_service, proxy->get_object_proxy()->get_service_proxy()->get_zone_id())));
+        rpc::shared_ptr<xxx::i_baz>(new multiple_inheritance(rpc::telemetry_service_manager::get().get(), proxy->get_object_proxy()->get_service_proxy()->get_zone_id())));
     RPC_ASSERT(ret == rpc::error::OK());
 }
 
@@ -849,7 +837,7 @@ TYPED_TEST(remote_type_test, host_test)
         zone_id = root_service->get_zone_id();
     else
         zone_id = {0};
-    auto h = rpc::make_shared<host>(this->get_lib().get_telemetry_service().get(), zone_id);
+    auto h = rpc::make_shared<host>(rpc::telemetry_service_manager::get().get(), zone_id);
 
     rpc::shared_ptr<yyy::i_example> target;
     rpc::shared_ptr<yyy::i_example> target2;
@@ -876,7 +864,7 @@ TYPED_TEST(remote_type_test, check_for_call_enclave_zone)
     else
         zone_id = {0};
         
-    auto h = rpc::make_shared<host>(this->get_lib().get_telemetry_service().get(), zone_id);
+    auto h = rpc::make_shared<host>(rpc::telemetry_service_manager::get().get(), zone_id);
     auto ret = this->get_lib().get_example()->call_create_enclave_val(h);
     RPC_ASSERT(ret == rpc::error::OK());
 }
@@ -955,7 +943,7 @@ TYPED_TEST(remote_type_test, check_identity)
 
 
     auto proxy = lib.get_example()->query_proxy_base();
-    auto base_baz = rpc::shared_ptr<xxx::i_baz>(new baz(telemetry_service, proxy->get_object_proxy()->get_service_proxy()->get_zone_id()));
+    auto base_baz = rpc::shared_ptr<xxx::i_baz>(new baz(rpc::telemetry_service_manager::get().get(), proxy->get_object_proxy()->get_service_proxy()->get_zone_id()));
     auto input = base_baz;
 
     ASSERT_EQ(lib.get_example()->send_interface_back(input, output), rpc::error::OK());
@@ -1089,8 +1077,8 @@ TYPED_TEST(type_test_with_host, call_host_look_up_app_unload_app)
     ASSERT_NE(target, nullptr);
 
     ASSERT_EQ(this->get_lib().get_example()->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
-    if(telemetry_service)
-        telemetry_service->message(rpc::i_telemetry_service::info, "call_host_unload_app");
+    if(rpc::telemetry_service_manager::get())
+        rpc::telemetry_service_manager::get()->message(rpc::i_telemetry_service::info, "call_host_unload_app");
     ASSERT_EQ(this->get_lib().get_example()->call_host_unload_app("target"), rpc::error::OK());
     target = nullptr;
 }
@@ -1105,15 +1093,15 @@ TYPED_TEST(type_test_with_host, call_host_look_up_app_not_return)
     ASSERT_NE(target, nullptr);
 
     ASSERT_EQ(this->get_lib().get_example()->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
-    if(telemetry_service)
-        telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return");
+    if(rpc::telemetry_service_manager::get())
+        rpc::telemetry_service_manager::get()->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return");
     ASSERT_EQ(this->get_lib().get_example()->call_host_look_up_app_not_return("target", run_standard_tests), rpc::error::OK());
-    if(telemetry_service)
-        telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return complete");
+    if(rpc::telemetry_service_manager::get())
+        rpc::telemetry_service_manager::get()->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return complete");
     ASSERT_EQ(this->get_lib().get_example()->call_host_unload_app("target"), rpc::error::OK());
     target = nullptr;
-    if(telemetry_service)
-        telemetry_service->message(rpc::i_telemetry_service::info, "app released");
+    if(rpc::telemetry_service_manager::get())
+        rpc::telemetry_service_manager::get()->message(rpc::i_telemetry_service::info, "app released");
 }
 
 TYPED_TEST(type_test_with_host, create_store_fetch_delete)
@@ -1126,17 +1114,17 @@ TYPED_TEST(type_test_with_host, create_store_fetch_delete)
     ASSERT_NE(target, nullptr);
 
     ASSERT_EQ(this->get_lib().get_example()->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
-    if(telemetry_service)
-        telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app");
+    if(rpc::telemetry_service_manager::get())
+        rpc::telemetry_service_manager::get()->message(rpc::i_telemetry_service::info, "call_host_look_up_app");
     ASSERT_EQ(this->get_lib().get_example()->call_host_look_up_app("target", target2, run_standard_tests), rpc::error::OK());
-    if(telemetry_service)   
-        telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app complete");
+    if(rpc::telemetry_service_manager::get())
+        rpc::telemetry_service_manager::get()->message(rpc::i_telemetry_service::info, "call_host_look_up_app complete");
     ASSERT_EQ(this->get_lib().get_example()->call_host_unload_app("target"), rpc::error::OK());
     ASSERT_EQ(target, target2);
     target = nullptr;
     target2 = nullptr;
-    if(telemetry_service)
-        telemetry_service->message(rpc::i_telemetry_service::info, "app released");
+    if(rpc::telemetry_service_manager::get())
+        rpc::telemetry_service_manager::get()->message(rpc::i_telemetry_service::info, "app released");
 }
 
 TYPED_TEST(type_test_with_host, create_store_not_return_delete)
@@ -1148,14 +1136,14 @@ TYPED_TEST(type_test_with_host, create_store_not_return_delete)
     ASSERT_NE(target, nullptr);
 
     ASSERT_EQ(this->get_lib().get_example()->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
-    if(telemetry_service)
-        telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return");
+    if(rpc::telemetry_service_manager::get())
+        rpc::telemetry_service_manager::get()->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return");
     ASSERT_EQ(this->get_lib().get_example()->call_host_look_up_app_not_return_and_delete("target", run_standard_tests), rpc::error::OK());
-    if(telemetry_service)
-        telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return complete");
+    if(rpc::telemetry_service_manager::get())
+        rpc::telemetry_service_manager::get()->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return complete");
     target = nullptr;
-    if(telemetry_service)
-        telemetry_service->message(rpc::i_telemetry_service::info, "app released");
+    if(rpc::telemetry_service_manager::get())
+        rpc::telemetry_service_manager::get()->message(rpc::i_telemetry_service::info, "app released");
 }
 
 TYPED_TEST(type_test_with_host, create_store_delete)
@@ -1168,16 +1156,16 @@ TYPED_TEST(type_test_with_host, create_store_delete)
     ASSERT_NE(target, nullptr);
 
     ASSERT_EQ(this->get_lib().get_example()->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
-    if(telemetry_service)
-        telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_and_delete");
+    if(rpc::telemetry_service_manager::get())
+        rpc::telemetry_service_manager::get()->message(rpc::i_telemetry_service::info, "call_host_look_up_app_and_delete");
     ASSERT_EQ(this->get_lib().get_example()->call_host_look_up_app_and_delete("target", target2, run_standard_tests), rpc::error::OK());
-    if(telemetry_service)
-        telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_and_delete complete");
+    if(rpc::telemetry_service_manager::get())
+        rpc::telemetry_service_manager::get()->message(rpc::i_telemetry_service::info, "call_host_look_up_app_and_delete complete");
     ASSERT_EQ(target, target2);
     target = nullptr;
     target2 = nullptr;
-    if(telemetry_service)
-        telemetry_service->message(rpc::i_telemetry_service::info, "app released");
+    if(rpc::telemetry_service_manager::get())
+        rpc::telemetry_service_manager::get()->message(rpc::i_telemetry_service::info, "app released");
 }
 
 TYPED_TEST(type_test_with_host, create_subordinate_zone)

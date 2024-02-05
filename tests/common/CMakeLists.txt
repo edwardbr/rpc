@@ -18,7 +18,6 @@ if(${BUILD_ENCLAVE})
   target_link_options(common_enclave PRIVATE ${ENCLAVE_LINK_OPTIONS})
 
   target_link_libraries(common_enclave PRIVATE 
-    rpc::rpc_telemetry_interface
     rpc_enclave 
     marshal_test_edl_enclave 
     rpc_telemetry_edl_header_host
@@ -42,7 +41,6 @@ if(${BUILD_ENCLAVE})
 
   target_compile_definitions(common_enclave_v1 PUBLIC NO_RPC_V2)
   target_link_libraries(common_enclave_v1 PRIVATE 
-    rpc::rpc_telemetry_interface
     rpc_enclave_v1 
     marshal_test_edl_enclave 
     rpc_telemetry_edl_header_host
@@ -67,8 +65,6 @@ target_link_options(common_host PRIVATE ${HOST_LINK_OPTIONS})
 
 target_link_libraries(common_host PRIVATE 
   rpc::rpc_host 
-  rpc::rpc_telemetry_interface
-  rpc::rpc_telemetry_host
   marshal_test_edl_host 
   rpc_telemetry_edl_header_host
   example_idl_host 

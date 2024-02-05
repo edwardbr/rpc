@@ -6,6 +6,14 @@ else()
   set(REMOTE_PTR_CPP)
 endif()
 
+if(USE_RPC_TELEMETRY)
+set(ENCLAVE_TELEMETRY_SERVICE rpc::rpc_telemetry_enclave)
+set(HOST_TELEMETRY_SERVICE rpc::rpc_telemetry_host)
+else()
+set(ENCLAVE_TELEMETRY_SERVICE)
+set(HOST_TELEMETRY_SERVICE)
+endif()
+
 add_library(
   rpc_enclave
   include/rpc/marshaller.h
@@ -32,6 +40,7 @@ target_include_directories(
 target_link_libraries(rpc_enclave 
 PUBLIC
   rpc::rpc_telemetry_interface
+  ${ENCLAVE_TELEMETRY_SERVICE}
 PRIVATE 
   yas_common)
 target_link_options(rpc_enclave PRIVATE ${ENCLAVE_LINK_OPTIONS})
@@ -73,6 +82,7 @@ target_include_directories(
 target_link_libraries(rpc_enclave_v1 
 PUBLIC 
   rpc::rpc_telemetry_interface
+  ${ENCLAVE_TELEMETRY_SERVICE}
 PRIVATE 
   yas_common)
 target_link_options(rpc_enclave_v1 PRIVATE ${ENCLAVE_LINK_OPTIONS})
@@ -111,6 +121,7 @@ target_include_directories(
 target_link_libraries(rpc_host 
 PUBLIC
   rpc::rpc_telemetry_interface
+  ${HOST_TELEMETRY_SERVICE}
 PRIVATE 
   yas_common 
   ${HOST_LIBRARIES})

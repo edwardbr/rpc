@@ -1,4 +1,5 @@
 #pragma once
+
 #include <string>
 #include <rpc/types.h>
 #include <rpc/marshaller.h>
@@ -62,4 +63,35 @@ namespace rpc
 
         virtual void message(level_enum level, const char* message) const = 0;  
     };
+
+    //dont use this class directly use the macro below so that it can be conditionally compiled out
+    class telemetry_service_manager
+    {
+        static inline std::shared_ptr<i_telemetry_service> telemetry_service_ = nullptr;
+    public:
+        template<class TELEMETRY_SERVICE, typename... Args>
+        bool create(Args&&... args)
+        {
+            if(telemetry_service_)
+                return false;
+            return TELEMETRY_SERVICE::create(telemetry_service_, std::forward<Args>(args)...);
+        }
+        
+        static std::shared_ptr<i_telemetry_service> get() {return telemetry_service_;}
+        
+        telemetry_service_manager() = default;
+        ~telemetry_service_manager()
+        {
+            telemetry_service_.reset();
+        }
+        static void reset(){telemetry_service_.reset();}
+    };
 }
+
+#ifdef USE_RPC_TELEMETRY
+#define TELEMETRY_SERVICE_MANAGER rpc::telemetry_service_manager telemetry_service_manager_;
+#define CREATE_TELEMETRY_SERVICE(type, ...) telemetry_service_manager_.create<type>(__VA_ARGS__);
+#else
+#define TELEMETRY_SERVICE_MANAGER
+#define CREATE_TELEMETRY_SERVICE(...)
+#endif

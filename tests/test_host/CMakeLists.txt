@@ -20,8 +20,6 @@ target_link_libraries(
          common_host
          example_idl_host
          rpc::rpc_host
-         rpc::rpc_telemetry_interface
-         rpc::rpc_telemetry_host
          yas_common
          clipp::clipp
          fmt::fmt-header-only

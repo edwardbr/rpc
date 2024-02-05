@@ -11,7 +11,6 @@
 using namespace std::chrono_literals;
 
 extern rpc::weak_ptr<rpc::service> current_host_service;
-extern const rpc::i_telemetry_service* telemetry_service;
 
 // an ocall for logging the test
 extern "C"

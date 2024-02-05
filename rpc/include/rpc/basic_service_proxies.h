@@ -177,7 +177,7 @@ namespace rpc
             return rpc::child_service::create_child_zone<rpc::local_service_proxy>(
                 get_destination_zone_id().as_zone(),
                 get_zone_id().as_destination(), 
-                get_operating_zone_service()->get_telemetry_service(),
+                rpc::telemetry_service_manager::get().get(),
                 input_descr, 
                 output_descr,
                 fn_,

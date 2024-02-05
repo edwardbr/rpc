@@ -202,7 +202,6 @@ function(
 
     target_link_libraries(${name}_idl_host PUBLIC
       rpc::rpc_host
-      rpc::rpc_telemetry_interface
       yas_common
     )
 
@@ -247,7 +246,6 @@ function(
 
     target_link_libraries(${name}_idl_enclave PUBLIC
       rpc_enclave
-      rpc::rpc_telemetry_interface
       yas_common
     )
 
@@ -290,7 +288,6 @@ function(
 
     target_link_libraries(${name}_idl_enclave_v1 PUBLIC
       rpc_enclave_v1
-      rpc::rpc_telemetry_interface
       yas_common
     )
 
@@ -327,7 +324,6 @@ function(
 
     target_link_libraries(${name}_idl_host PUBLIC 
       rpc::rpc_host
-      rpc::rpc_telemetry_interface
       yas_common)
 
     add_dependencies(${name}_idl_host ${name}_idl_generate)
@@ -370,7 +366,6 @@ function(
 
     target_link_libraries(${name}_idl_enclave PUBLIC 
       rpc_enclave
-      rpc::rpc_telemetry_interface
       yas_common)
 
     add_dependencies(${name}_idl_enclave ${name}_idl_generate)
@@ -410,7 +405,6 @@ function(
 
     target_link_libraries(${name}_idl_enclave_v1 PUBLIC 
       rpc_enclave_v1
-      rpc::rpc_telemetry_interface
       yas_common)
 
     add_dependencies(${name}_idl_enclave_v1 ${name}_idl_generate)

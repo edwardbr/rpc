@@ -9,7 +9,6 @@ if(${BUILD_ENCLAVE})
     target_include_directories(rpc_telemetry_interface INTERFACE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>")
 
     add_library(rpc::rpc_telemetry_interface ALIAS rpc_telemetry_interface)        
-
     
     add_library(
         rpc_telemetry_enclave 
@@ -55,7 +54,6 @@ if(${BUILD_HOST})
     rpc_telemetry_host
     PRIVATE 
         rpc::rpc_host
-        rpc::rpc_telemetry_interface
         fmt::fmt-header-only
         yas_common
         spdlog::spdlog_header_only)

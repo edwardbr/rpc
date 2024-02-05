@@ -11,8 +11,6 @@ if(${BUILD_ENCLAVE})
     SRCS marshal_test_enclave.cpp
     HEADER_ONLY_LIBS
     TRUSTED_LIBS
-      rpc::rpc_telemetry_interface
-      rpc::rpc_telemetry_enclave
       rpc_enclave
       marshal_test_edl_enclave
       rpc_telemetry_edl_header_enclave
@@ -48,8 +46,6 @@ if(${BUILD_ENCLAVE})
     SRCS marshal_test_enclave.cpp
     HEADER_ONLY_LIBS
     TRUSTED_LIBS
-      rpc::rpc_telemetry_interface
-      rpc::rpc_telemetry_enclave
       rpc_enclave_v1
       marshal_test_edl_enclave
       rpc_telemetry_edl_header_enclave

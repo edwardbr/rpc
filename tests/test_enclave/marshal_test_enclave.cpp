@@ -18,14 +18,12 @@
 
 using namespace marshalled_tests;
 
-rpc::enclave_telemetry_service telemetry_service;
+TELEMETRY_SERVICE_MANAGER
 
 rpc::shared_ptr<rpc::child_service> rpc_server;
 
 int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t host_id, uint64_t child_zone_id, uint64_t* example_object_id)
 {
-    const rpc::i_telemetry_service* p_telemetry_service = &telemetry_service;
-    
     rpc::interface_descriptor input_descr{};
     rpc::interface_descriptor output_descr{};
     
@@ -34,10 +32,12 @@ int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t host_id, uint64_t 
         input_descr = {{host_id}, {host_zone_id}};
     }
     
+    CREATE_TELEMETRY_SERVICE(rpc::enclave_telemetry_service)
+    
     auto ret = rpc::child_service::create_child_zone<rpc::host_service_proxy, yyy::i_host, yyy::i_example>(
         rpc::zone{child_zone_id}
         , rpc::destination_zone{host_zone_id}
-        , p_telemetry_service
+        , rpc::telemetry_service_manager::get().get()
         , input_descr
         , output_descr
         , [](

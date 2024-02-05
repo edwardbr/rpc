@@ -4,8 +4,15 @@
 
 namespace rpc
 {
-    class enclave_telemetry_service : public rpc::i_telemetry_service
+    class enclave_telemetry_service : public i_telemetry_service
     {
+        enclave_telemetry_service() = default;
+        static bool create(std::shared_ptr<i_telemetry_service>& out)
+        {
+            out = std::shared_ptr<enclave_telemetry_service>(new enclave_telemetry_service());
+            return true;
+        }
+        friend telemetry_service_manager;
     public:
         virtual ~enclave_telemetry_service() = default;
 
