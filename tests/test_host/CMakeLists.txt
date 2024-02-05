@@ -25,7 +25,7 @@ target_link_libraries(
          fmt::fmt-header-only
          GTest::gtest_main
          GTest::gmock_main
-         spdlog::spdlog_header_only
+         spdlog::spdlog
          ${HOST_LIBRARIES})
 
 target_compile_options(rpc_test PRIVATE ${HOST_COMPILE_OPTIONS})

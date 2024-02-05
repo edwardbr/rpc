@@ -56,7 +56,7 @@ if(${BUILD_HOST})
         rpc::rpc_host
         fmt::fmt-header-only
         yas_common
-        spdlog::spdlog_header_only)
+        spdlog::spdlog)
         
     add_library(rpc::rpc_telemetry_host ALIAS rpc_telemetry_host)        
 endif()

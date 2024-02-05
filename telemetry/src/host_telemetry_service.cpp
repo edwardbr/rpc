@@ -23,9 +23,9 @@ namespace rpc
         }
 
         auto file_name = directory / (fixed_name + "." + name + ".pu");
-        const char* fn = file_name.c_str();
+        std::string fn = file_name.string();
             
-        auto output = ::fopen(fn, "w+");
+        auto output = ::fopen(fn.c_str(), "w+");
         if(!output)
             return false;
 
@@ -134,9 +134,13 @@ namespace rpc
     void host_telemetry_service::on_service_creation(const char* name, rpc::zone zone_id) const
     {
         std::lock_guard g(mux);
-        services.emplace(zone_id, name_count{name, 1});
-        fmt::println(output_, "participant \"{} zone {}\" as {} order {} #Moccasin", name, zone_id.get_val(), service_alias(zone_id), service_order(zone_id));
-        fmt::println(output_, "activate {} #Moccasin", service_alias(zone_id));
+        auto entry = services.find(zone_id);
+        if(entry == services.end())
+        {
+            services.emplace(zone_id, name_count{name, 1});
+            fmt::println(output_, "participant \"{} zone {}\" as {} order {} #Moccasin", name, zone_id.get_val(), service_alias(zone_id), service_order(zone_id));
+            fmt::println(output_, "activate {} #Moccasin", service_alias(zone_id));
+        }
         fflush(output_);
     }
 
@@ -350,14 +354,23 @@ namespace rpc
             }
         }
 
+        rpc::zone destination_channel_zone = {};
         if(destination_channel_zone_id == 0 || destination_channel_zone_id == destination_zone_id.as_destination_channel())
         {
-            fmt::println(output_, "{} -> {} : add_external_ref {}", service_proxy_alias(zone_id, destination_zone_id, caller_zone_id), service_alias({destination_zone_id.get_val()}), ref_count);  
+            destination_channel_zone = destination_zone_id.as_zone();
         }
         else
         {
-            fmt::println(output_, "{} -> {} : add_external_ref {}", service_proxy_alias(zone_id, destination_zone_id, caller_zone_id), service_alias({destination_channel_zone_id.get_val()}), ref_count);  
+            destination_channel_zone = {destination_channel_zone_id.get_val()};
         }
+        auto entry = services.find(destination_channel_zone);
+        if(entry == services.end())
+        {
+            services.emplace(destination_channel_zone, name_count{"", 1});
+            fmt::println(output_, "participant \"zone {}\" as {} order {} #Moccasin", destination_channel_zone.get_val(), service_alias(destination_channel_zone), service_order(destination_channel_zone));
+            fmt::println(output_, "activate {} #Moccasin", service_alias(destination_channel_zone));
+        }
+        fmt::println(output_, "{} -> {} : add_external_ref {}", service_proxy_alias(zone_id, destination_zone_id, caller_zone_id), service_alias(destination_channel_zone), ref_count);  
         fflush(output_);
     }
 
@@ -441,8 +454,10 @@ namespace rpc
         {
             if(hi->second == 0)
                 hi->second = zone_id;
-            else
+            else if(services.find(hi->second) != services.end())
                 RPC_ASSERT(!"object already assigned to a different zone");
+            else
+                hi->second = zone_id;
         }
         else
         {
