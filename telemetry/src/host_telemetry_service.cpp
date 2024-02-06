@@ -296,6 +296,23 @@ namespace rpc
 
     void host_telemetry_service::on_service_proxy_add_ref(const char* name, rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::destination_channel_zone destination_channel_zone_id, rpc::caller_zone caller_zone_id, rpc::object object_id, rpc::add_ref_options options) const
     {
+        std::string type;
+        if(!!(options & rpc::add_ref_options::build_caller_route) && !!(options & rpc::add_ref_options::build_destination_route))
+        {
+            type = "delegate linking";
+        }
+        else
+        {
+            if(!!(options & rpc::add_ref_options::build_destination_route))
+            {
+                type = "build destination";
+            }
+            if(!!(options & rpc::add_ref_options::build_caller_route))
+            {
+                type = "build caller";
+            }
+        }        
+        
         // std::lock_guard g(mux);
         // auto found = service_proxies.find(orig_zone{zone_id, destination_zone_id, caller_zone_id});
         // if(found == service_proxies.end())
@@ -311,11 +328,11 @@ namespace rpc
 
         if(object_id == rpc::dummy_object_id)
         {
-            fmt::println(output_, "{} -> {} : dummy add_ref {}", service_proxy_alias(zone_id, destination_zone_id, caller_zone_id), service_alias(dest), get_thread_id());
+            fmt::println(output_, "{} -> {} : dummy add_ref {} {}", service_proxy_alias(zone_id, destination_zone_id, caller_zone_id), service_alias(dest), type, get_thread_id());
         }
         else
         {
-            fmt::println(output_, "{} -> {} : add_ref {}", service_proxy_alias(zone_id, destination_zone_id, caller_zone_id), service_alias(dest), get_thread_id());    
+            fmt::println(output_, "{} -> {} : add_ref {} {}", service_proxy_alias(zone_id, destination_zone_id, caller_zone_id), service_alias(dest), type, get_thread_id());    
         }
         fflush(output_);
     }
