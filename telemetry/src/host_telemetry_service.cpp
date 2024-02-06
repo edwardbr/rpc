@@ -6,9 +6,17 @@
 #include <rpc/telemetry/host_telemetry_service.h>
 #include <rpc/assert.h>
 #include <rpc/service.h>
+#include <sstream>
 
 namespace rpc
 {
+    std::string get_thread_id()
+    {
+        std::stringstream ssr;
+        ssr << std::this_thread::get_id();
+        return ssr.str();
+    }
+    
     bool host_telemetry_service::create(std::shared_ptr<rpc::i_telemetry_service>& service, const std::string& test_suite_name, const std::string& name, const std::filesystem::path& directory) 
     { 
         std::string output_path_name("../../rpc_test_diagram/");
@@ -186,7 +194,7 @@ namespace rpc
         {
             if(zone_id != dest)
             {
-                fmt::println(output_, "{} -> {} : add_ref", service_alias(zone_id), service_alias(dest));
+                fmt::println(output_, "{} -> {} : add_ref", service_alias(zone_id), service_proxy_alias(zone_id, {dest.get_val()}, caller_zone_id));
             }
             else if(object_id != rpc::dummy_object_id)
             {
@@ -220,7 +228,7 @@ namespace rpc
 
         if(zone_id != dest)
         {
-            fmt::println(output_, "{} -> {} : release", service_alias(zone_id), service_alias(dest));
+            fmt::println(output_, "{} -> {} : release", service_alias(zone_id), service_proxy_alias(zone_id, {dest.get_val()}, caller_zone_id));
         }
         else if(object_id != rpc::dummy_object_id)
         {
@@ -286,7 +294,7 @@ namespace rpc
         fflush(output_);
     }
 
-    void host_telemetry_service::on_service_proxy_add_ref(const char* name, rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::destination_channel_zone destination_channel_zone_id, rpc::caller_zone caller_zone_id, rpc::object object_id) const
+    void host_telemetry_service::on_service_proxy_add_ref(const char* name, rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::destination_channel_zone destination_channel_zone_id, rpc::caller_zone caller_zone_id, rpc::object object_id, rpc::add_ref_options options) const
     {
         // std::lock_guard g(mux);
         // auto found = service_proxies.find(orig_zone{zone_id, destination_zone_id, caller_zone_id});
@@ -303,11 +311,11 @@ namespace rpc
 
         if(object_id == rpc::dummy_object_id)
         {
-            fmt::println(output_, "{} -> {} : dummy add_ref", service_proxy_alias(zone_id, destination_zone_id, caller_zone_id), service_alias(dest));
+            fmt::println(output_, "{} -> {} : dummy add_ref {}", service_proxy_alias(zone_id, destination_zone_id, caller_zone_id), service_alias(dest), get_thread_id());
         }
         else
         {
-            fmt::println(output_, "{} -> {} : add_ref", service_proxy_alias(zone_id, destination_zone_id, caller_zone_id), service_alias(dest));    
+            fmt::println(output_, "{} -> {} : add_ref {}", service_proxy_alias(zone_id, destination_zone_id, caller_zone_id), service_alias(dest), get_thread_id());    
         }
         fflush(output_);
     }
@@ -328,11 +336,11 @@ namespace rpc
 
         if(object_id == rpc::dummy_object_id)
         {
-            fmt::println(output_, "{} -> {} : dummy release", service_proxy_alias(zone_id, destination_zone_id, caller_zone_id), service_alias(dest));
+            fmt::println(output_, "{} -> {} : dummy release {}", service_proxy_alias(zone_id, destination_zone_id, caller_zone_id), service_alias(dest), get_thread_id());
         }
         else
         {
-            fmt::println(output_, "{} -> {} : release", service_proxy_alias(zone_id, destination_zone_id, caller_zone_id), service_alias(dest));    
+            fmt::println(output_, "{} -> {} : release {}", service_proxy_alias(zone_id, destination_zone_id, caller_zone_id), service_alias(dest), get_thread_id());    
         }
         fflush(output_);
     }
@@ -370,7 +378,7 @@ namespace rpc
             fmt::println(output_, "participant \"zone {}\" as {} order {} #Moccasin", destination_channel_zone.get_val(), service_alias(destination_channel_zone), service_order(destination_channel_zone));
             fmt::println(output_, "activate {} #Moccasin", service_alias(destination_channel_zone));
         }
-        fmt::println(output_, "{} -> {} : add_external_ref {}", service_proxy_alias(zone_id, destination_zone_id, caller_zone_id), service_alias(destination_channel_zone), ref_count);  
+        fmt::println(output_, "hnote over {} : add_external_ref {} {}", service_proxy_alias(zone_id, destination_zone_id, caller_zone_id), get_thread_id(), ref_count);
         fflush(output_);
     }
 
@@ -390,14 +398,13 @@ namespace rpc
                 message(level_enum::warn, fmt::format("release_external_ref count does not match zone_id {} destination_zone_id {} caller_zone_id {} {} - {}", zone_id.id, destination_zone_id.id, caller_zone_id.id, ref_count, count).c_str());
             }
         }
+        auto dest = destination_channel_zone_id.get_val();
         if(destination_channel_zone_id == 0 || destination_channel_zone_id == destination_zone_id.as_destination_channel())
         {
-            fmt::println(output_, "{} -> {} : release_external_ref {}", service_proxy_alias(zone_id, destination_zone_id, caller_zone_id), service_alias({destination_zone_id.get_val()}), ref_count);  
+            dest = destination_zone_id.get_val();
         }
-        else
-        {
-            fmt::println(output_, "{} -> {} : release_external_ref {}", service_proxy_alias(zone_id, destination_zone_id, caller_zone_id), service_alias({destination_channel_zone_id.get_val()}), ref_count);  
-        }
+        
+        fmt::println(output_, "hnote over {} : release_external_ref {} {}", service_proxy_alias(zone_id, destination_zone_id, caller_zone_id), get_thread_id(), ref_count);
         fflush(output_);
     }
 
@@ -463,6 +470,9 @@ namespace rpc
         {
             historical_impls[address] = zone_id;
         }
+
+        fmt::println(output_, "participant \"{}\" as {} order {}", object_alias(address), object_alias(address), object_order(zone_id, address)); 
+        fmt::println(output_, "activate {}", object_alias(address));
         
         stubs.emplace(zone_object{zone_id, object_id}, 0);
         fmt::println(output_, "participant \"object stub\\nzone {}\\nobject {}\" as {} order {} #lime"
@@ -640,19 +650,25 @@ namespace rpc
         {
         case debug:
             colour = "green";
+            break;
         case trace:
             colour = "blue";
+            break;
         case info:
-            colour = "black";
+            colour = "honeydew";
+            break;
         case warn:
-            colour = "amber";
+            colour = "orangered";
+            break;
         case err:
             colour = "red";
+            break;
         case off:
             return;
         case critical:
         default:
             colour = "red";
+            break;
         }
         fmt::println(output_, "note left #{}: {}", colour, message);
         fflush(output_);

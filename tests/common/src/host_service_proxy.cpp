@@ -129,7 +129,7 @@ namespace rpc
         if (get_telemetry_service())
         {
             get_telemetry_service()->on_service_proxy_add_ref("host_service_proxy", get_zone_id(),
-                                                            destination_zone_id, destination_channel_zone_id, get_caller_zone_id(), object_id);
+                                                            destination_zone_id, destination_channel_zone_id, get_caller_zone_id(), object_id, build_out_param_channel);
         }
         uint64_t ret = 0;
         sgx_status_t status = ::add_ref_host(&ret, protocol_version, destination_channel_zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), caller_channel_zone_id.get_val(), caller_zone_id.get_val(), (std::uint8_t)build_out_param_channel);

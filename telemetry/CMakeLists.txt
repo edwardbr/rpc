@@ -54,7 +54,7 @@ if(${BUILD_HOST})
     rpc_telemetry_host
     PRIVATE 
         rpc::rpc_host
-        fmt::fmt-header-only
+        fmt::fmt
         yas_common
         spdlog::spdlog)
         

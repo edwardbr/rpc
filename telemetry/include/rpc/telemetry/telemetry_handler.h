@@ -12,7 +12,7 @@ extern "C"
     void on_service_proxy_try_cast_host(const char* name, uint64_t zone_id, uint64_t destination_zone_id, uint64_t caller_zone_id,
                                         uint64_t object_id, uint64_t interface_id);
     void on_service_proxy_add_ref_host(const char* name, uint64_t zone_id, uint64_t destination_zone_id, uint64_t destination_channel_zone_id, 
-                                       uint64_t caller_zone_id, uint64_t object_id);
+                                       uint64_t caller_zone_id, uint64_t object_id, uint64_t options);
     void on_service_proxy_release_host(const char* name, uint64_t zone_id, uint64_t destination_zone_id, uint64_t destination_channel_zone_id,
                                        uint64_t caller_zone_id, uint64_t object_id);
 

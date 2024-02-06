@@ -906,6 +906,25 @@ TYPED_TEST(remote_type_test, multithreaded_check_sub_subordinate)
     }
 }
 
+TYPED_TEST(remote_type_test, send_interface_back)
+{
+    auto& lib = this->get_lib();
+    if(!lib.get_use_host_in_child())
+        return;
+
+    rpc::shared_ptr<xxx::i_baz> output;
+
+    rpc::shared_ptr<yyy::i_example> new_zone;
+    //lib.i_example_ptr_ //first level
+    ASSERT_EQ(lib.get_example()->create_example_in_subordnate_zone(new_zone, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK()); //second level
+
+    rpc::shared_ptr<xxx::i_baz> new_baz;
+    new_zone->create_baz(new_baz);
+
+    ASSERT_EQ(lib.get_example()->send_interface_back(new_baz, output), rpc::error::OK());
+    ASSERT_EQ(new_baz, output);
+}
+
 TYPED_TEST(remote_type_test, check_identity)
 {
     auto& lib = this->get_lib();

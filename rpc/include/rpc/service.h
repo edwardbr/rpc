@@ -160,7 +160,6 @@ namespace rpc
         }
         
         interface_descriptor prepare_remote_input_interface(uint64_t protocol_version, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, rpc::proxy_base* base, rpc::shared_ptr<service_proxy>& destination_zone);
-        void cleanup_remote_input_interface(rpc::shared_ptr<service_proxy>& destination_zone, rpc::proxy_base* base);
         
         template<class proxy_class, class in_param_type, class out_param_type, typename... Args>
         int connect_to_zone(
@@ -199,7 +198,12 @@ namespace rpc
                 //clean up
                 if(destination_zone)
                 {
-                    cleanup_remote_input_interface(destination_zone, input_interface->query_proxy_base());
+                    auto object_id = input_interface->query_proxy_base()->get_object_proxy()->get_object_id();
+                    auto ret = destination_zone->sp_release(object_id);                    
+                    if(ret != std::numeric_limits<uint64_t>::max())
+                    {
+                        destination_zone->release_external_ref();            
+                    }
                 }
                 
                 return err_code;

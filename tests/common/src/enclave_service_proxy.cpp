@@ -263,7 +263,8 @@ namespace rpc
                 , destination_zone_id
                 , destination_channel_zone_id
                 , get_caller_zone_id()
-                , object_id);
+                , object_id
+                , build_out_param_channel);
         }
         uint64_t ret = 0;
         constexpr auto add_ref_failed_val = std::numeric_limits<uint64_t>::max();

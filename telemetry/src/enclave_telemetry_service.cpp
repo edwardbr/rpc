@@ -38,9 +38,9 @@ namespace rpc
     {
         on_service_proxy_try_cast_host(name, zone_id.get_val(), destination_zone_id.get_val(), caller_zone_id.get_val(), object_id.get_val(), interface_id.get_val());
     }
-    void enclave_telemetry_service::on_service_proxy_add_ref(const char* name, rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::destination_channel_zone destination_channel_zone_id, rpc::caller_zone caller_zone_id, rpc::object object_id) const
+    void enclave_telemetry_service::on_service_proxy_add_ref(const char* name, rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::destination_channel_zone destination_channel_zone_id, rpc::caller_zone caller_zone_id, rpc::object object_id, rpc::add_ref_options options) const
     {
-        on_service_proxy_add_ref_host(name, zone_id.get_val(), destination_zone_id.get_val(), destination_channel_zone_id.get_val(), caller_zone_id.get_val(), object_id.get_val());
+        on_service_proxy_add_ref_host(name, zone_id.get_val(), destination_zone_id.get_val(), destination_channel_zone_id.get_val(), caller_zone_id.get_val(), object_id.get_val(), (uint64_t)options);
     }
     void enclave_telemetry_service::on_service_proxy_release(const char* name, rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::destination_channel_zone destination_channel_zone_id, rpc::caller_zone caller_zone_id, rpc::object object_id) const
     {

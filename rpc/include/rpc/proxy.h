@@ -77,7 +77,6 @@ namespace rpc
         virtual ~proxy_impl() = default;
     };
 
-    struct make_shared_object_proxy_enabler;
     class object_proxy : public rpc::enable_shared_from_this<object_proxy>
     {
         object object_id_;
@@ -92,12 +91,9 @@ namespace rpc
 
         int try_cast(std::function<interface_ordinal (uint64_t)> id_getter);
         
-        friend make_shared_object_proxy_enabler;     
+        friend service_proxy;
 
     public:
-        static rpc::shared_ptr<object_proxy> create(object object_id,
-                                                    const rpc::shared_ptr<service_proxy>& service_proxy, bool add_ref_done);
-
         virtual ~object_proxy();
 
         rpc::shared_ptr<service_proxy> get_service_proxy() const { return service_proxy_; }
@@ -454,24 +450,27 @@ namespace rpc
         }
         
         [[nodiscard]] uint64_t sp_add_ref(
-            destination_channel_zone destination_channel_zone_id 
-            , destination_zone destination_zone_id 
-            , object object_id 
+            object object_id 
             , caller_channel_zone caller_channel_zone_id 
-            , caller_zone caller_zone_id 
             , add_ref_options build_out_param_channel)
         {
+            if (telemetry_service_ && object_id != dummy_object_id)
+            {
+                telemetry_service_->on_service_proxy_add_ref("service_proxy", get_zone_id(),
+                                                                destination_zone_id_, destination_channel_zone_,  get_caller_zone_id(), object_id, build_out_param_channel);
+            }
+
             auto original_version = version_.load();
             auto version = original_version;
             while(version)
             {
                 auto ret = add_ref(
                     version
-                    , destination_channel_zone_id 
-                    , destination_zone_id 
+                    , destination_channel_zone_
+                    , destination_zone_id_ 
                     , object_id 
                     , caller_channel_zone_id 
-                    , caller_zone_id 
+                    , caller_zone_id_ 
                     , build_out_param_channel );
                 if(ret != std::numeric_limits<uint64_t>::max())
                 {
@@ -486,17 +485,12 @@ namespace rpc
             return rpc::error::INCOMPATIBLE_SERVICE();        
         }
         
-        uint64_t sp_release(
-              destination_zone destination_zone_id 
-            , object object_id 
-            , caller_zone caller_zone_id) 
+        uint64_t sp_release(object object_id) 
         {
-
-            RPC_ASSERT(destination_zone_id == destination_zone_id_);
             if (telemetry_service_ && object_id != dummy_object_id)
             {
                 telemetry_service_->on_service_proxy_release("service_proxy", get_zone_id(),
-                                                                destination_zone_id, destination_channel_zone_,  get_caller_zone_id(), object_id);
+                                                                destination_zone_id_, destination_channel_zone_,  get_caller_zone_id(), object_id);
             }
             
             auto original_version = version_.load();
@@ -505,13 +499,11 @@ namespace rpc
             {
                 auto ret = release(
                     version
-                    , destination_zone_id 
+                    , destination_zone_id_ 
                     , object_id 
-                    , caller_zone_id);
+                    , caller_zone_id_);
                 if(ret != std::numeric_limits<uint64_t>::max())
-                {
-                    release_external_ref();
-                   
+                {                   
                     if(original_version != version)
                     {
                         version_.compare_exchange_strong( original_version, version);
@@ -614,21 +606,23 @@ namespace rpc
         //for low level logging of rpc
         const rpc::i_telemetry_service* get_telemetry_service(){return telemetry_service_;}
 
-        void add_object_proxy(rpc::shared_ptr<object_proxy> op)
-        {
-            RPC_ASSERT(get_caller_zone_id() == get_zone_id().as_caller());
-            std::lock_guard l(insert_control_);
-            RPC_ASSERT(proxies_.find(op->get_object_id()) == proxies_.end());
-            proxies_[op->get_object_id()] = op;
-        }
-
-        rpc::shared_ptr<object_proxy> get_object_proxy(object object_id)
+        rpc::shared_ptr<object_proxy> get_object_proxy(object object_id, bool& is_new)
         {
             RPC_ASSERT(get_caller_zone_id() == get_zone_id().as_caller());
             std::lock_guard l(insert_control_);
             auto item = proxies_.find(object_id);
             if(item == proxies_.end())
-                return nullptr;
+            {
+                auto op = rpc::shared_ptr<object_proxy>(new object_proxy(object_id, shared_from_this()));
+                if(auto* telemetry_service = get_telemetry_service();telemetry_service)
+                {
+                    telemetry_service->on_object_proxy_creation(get_zone_id(), get_destination_zone_id(), object_id, true);
+                }        
+                proxies_[object_id] = op;    
+                is_new = true;            
+                return op;
+            }
+            is_new = false;
             return item->second.lock();            
         }
         
@@ -683,16 +677,13 @@ namespace rpc
             if(!service_proxy)
                 return rpc::error::OBJECT_NOT_FOUND();
 
-            rpc::shared_ptr<object_proxy> op = service_proxy->get_object_proxy(encap.object_id);
-            if(!op)
+            bool is_new = false;
+            rpc::shared_ptr<object_proxy> op = service_proxy->get_object_proxy(encap.object_id, is_new);
+            if(is_new)
             {
-                op = object_proxy::create(encap.object_id, service_proxy, true);
                 auto ret = service_proxy->sp_add_ref(
-                                service_proxy->get_destination_channel_zone_id()
-                                , encap.destination_zone_id
-                                , encap.object_id
+                                encap.object_id
                                 , {0}
-                                , zone_id.as_caller()// this zone will now be the caller to this object
                                 , rpc::add_ref_options::normal);
                 if(ret == std::numeric_limits<uint64_t>::max())
                     return -1;
@@ -787,17 +778,17 @@ namespace rpc
             service_proxy = serv->get_zone_proxy(caller_channel_zone_id, caller_zone_id, {encap.destination_zone_id}, sp->get_zone_id().as_caller(), new_proxy_added);
         }
 
-        rpc::shared_ptr<object_proxy> op = service_proxy->get_object_proxy(encap.object_id);
-        if(op)
+        bool is_new = false;
+        rpc::shared_ptr<object_proxy> op = service_proxy->get_object_proxy(encap.object_id, is_new);
+        if(!is_new)
         {
             //as this is an out parameter the callee will be doing an add ref if the object proxy is already found we can do a release
             RPC_ASSERT(!new_proxy_added);
-            service_proxy->sp_release(encap.destination_zone_id, encap.object_id, caller_zone_id);
-        }
-        else
-        {
-            //else we create an object_proxy and add ref to the service proxy as it has a new object to monitor
-            op = object_proxy::create(encap.object_id, service_proxy, true);
+            auto ret = service_proxy->sp_release(encap.object_id);
+            if(ret != std::numeric_limits<uint64_t>::max())
+            {
+                service_proxy->release_external_ref();            
+            }
         }
         return op->query_interface(val, false);
     }
@@ -849,24 +840,11 @@ namespace rpc
             //     new_proxy_added);
         }
 
-        auto ret = service_proxy->sp_add_ref(
-            service_proxy->get_destination_channel_zone_id(), 
-            service_proxy->get_destination_zone_id(), 
-            {dummy_object_id}, 
-            {0}, 
-            serv->get_zone_id().as_caller(), 
-            rpc::add_ref_options::build_destination_route);
-        if(ret == std::numeric_limits<uint64_t>::max())
-            return -1;
-
         if(serv->get_parent_zone_id() == service_proxy->get_destination_zone_id())
             service_proxy->add_external_ref();
 
-        rpc::shared_ptr<object_proxy> op = service_proxy->get_object_proxy(encap.object_id);
-        if(!op)
-        {
-            op = object_proxy::create(encap.object_id, service_proxy, true);
-        }
+        bool is_new = false;
+        rpc::shared_ptr<object_proxy> op = service_proxy->get_object_proxy(encap.object_id, is_new);
         return op->query_interface(val, false);
     }
 }

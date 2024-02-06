@@ -22,7 +22,7 @@ target_link_libraries(
          rpc::rpc_host
          yas_common
          clipp::clipp
-         fmt::fmt-header-only
+         fmt::fmt
          GTest::gtest_main
          GTest::gmock_main
          spdlog::spdlog

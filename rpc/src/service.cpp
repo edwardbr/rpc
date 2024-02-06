@@ -317,13 +317,6 @@ namespace rpc
         return {object_id, destination_zone_id};         
     }
     
-    void service::cleanup_remote_input_interface(rpc::shared_ptr<service_proxy>& destination_zone, rpc::proxy_base* base)
-    {
-        destination_zone->release(rpc::get_version(), destination_zone->get_destination_zone_id(), base->get_object_proxy()->get_object_id(), destination_zone->get_caller_zone_id());
-        destination_zone->release_external_ref();
-    }
-    
-
     interface_descriptor service::prepare_out_param(uint64_t protocol_version, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, rpc::proxy_base* base)
     {
         auto object_proxy = base->get_object_proxy();
@@ -980,7 +973,7 @@ namespace rpc
             }
             if(telemetry_service_)
                 telemetry_service_->on_service_release("service", zone_id_, other_zone->get_destination_channel_zone_id(), destination_zone_id, object_id, caller_zone_id);    
-            auto ret = other_zone->release(protocol_version, destination_zone_id, object_id, caller_zone_id);
+            auto ret = other_zone->sp_release(object_id);
             if(ret != std::numeric_limits<uint64_t>::max())
             {
                 other_zone->release_external_ref();
