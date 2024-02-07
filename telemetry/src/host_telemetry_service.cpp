@@ -207,17 +207,38 @@ namespace rpc
         }
         else if(!!(options & rpc::add_ref_options::build_caller_route) && !!(options & rpc::add_ref_options::build_destination_route))
         {
-            fmt::println(output_, "{} -->x {} : add_ref delegate linking", service_alias({caller_zone_id.get_val()}), service_alias(zone_id));
+            if(zone_id != dest)
+            {
+                fmt::println(output_, "{} -->x {} : add_ref delegate linking", service_alias({caller_zone_id.get_val()}), service_alias(zone_id));
+            }
+            else
+            {
+                fmt::println(output_, "{} -> {} : add_ref delegate linking", service_alias(zone_id), object_stub_alias(zone_id, object_id));
+            }
         }
         else
         {
             if(!!(options & rpc::add_ref_options::build_destination_route))
             {
-                fmt::println(output_, "{} -[#green]>o {} : add_ref build destination", service_alias(zone_id), service_alias(destination_zone_id.as_zone()));
+                if(zone_id != dest)
+                {
+                    fmt::println(output_, "{} -[#green]>o {} : add_ref build destination", service_alias(zone_id), service_alias(destination_zone_id.as_zone()));
+                }
+                else
+                {
+                    fmt::println(output_, "{} -> {} : add_ref build destination", service_alias(zone_id), object_stub_alias(zone_id, object_id));
+                }
             }
             if(!!(options & rpc::add_ref_options::build_caller_route))
             {
-                fmt::println(output_, "{} o-[#magenta]> {} : add_ref build caller", service_alias({caller_zone_id.get_val()}), service_alias(zone_id));
+                if(zone_id != dest)
+                {
+                    fmt::println(output_, "{} o-[#magenta]> {} : add_ref build caller {}", service_alias({caller_zone_id.get_val()}), service_alias(zone_id), get_thread_id());
+                }
+                else
+                {
+                    fmt::println(output_, "{} -> {} : add_ref build caller {}", service_alias(zone_id), object_stub_alias(zone_id, object_id), get_thread_id());
+                }
             }
         }
     }
@@ -687,7 +708,7 @@ namespace rpc
             colour = "red";
             break;
         }
-        fmt::println(output_, "note left #{}: {}", colour, message);
+        fmt::println(output_, "note left #{}: {} {}", colour, message, get_thread_id());
         fflush(output_);
     }
 

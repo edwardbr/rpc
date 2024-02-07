@@ -582,8 +582,6 @@ TYPED_TEST(remote_type_test, remote_standard_tests)
     standard_tests(*i_foo_ptr, true, rpc::telemetry_service_manager::get().get());
 }
 
-
-
 TYPED_TEST(remote_type_test, multithreaded_standard_tests)
 {
     rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
@@ -601,7 +599,6 @@ TYPED_TEST(remote_type_test, multithreaded_standard_tests)
         thread_target.join();
     }
 }
-
 
 TYPED_TEST(remote_type_test, multithreaded_standard_tests_with_and_foos)
 {
@@ -740,7 +737,6 @@ TYPED_TEST(remote_type_test, bounce_baz_between_two_interfaces)
     i_foo_relay_ptr->call_baz_interface(baz);
 }
 
-
 TYPED_TEST(remote_type_test, multithreaded_bounce_baz_between_two_interfaces)
 {
     if(this->get_lib().is_enclave_setup())
@@ -827,8 +823,6 @@ TYPED_TEST(remote_type_test, check_for_set_multiple_inheritance)
     RPC_ASSERT(ret == rpc::error::OK());
 }
 
-
-
 TYPED_TEST(remote_type_test, host_test)
 {    
     auto root_service = this->get_lib().get_root_service();
@@ -882,8 +876,6 @@ TYPED_TEST(remote_type_test, check_sub_subordinate)
     ASSERT_EQ(new_zone->create_example_in_subordnate_zone(new_new_zone, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK()); //third level
 }
 
-
-
 TYPED_TEST(remote_type_test, multithreaded_check_sub_subordinate)
 {
     auto& lib = this->get_lib();
@@ -923,6 +915,61 @@ TYPED_TEST(remote_type_test, send_interface_back)
 
     ASSERT_EQ(lib.get_example()->send_interface_back(new_baz, output), rpc::error::OK());
     ASSERT_EQ(new_baz, output);
+}
+
+TYPED_TEST(remote_type_test, two_zones_get_one_to_lookup_other)
+{
+    auto root_service = this->get_lib().get_root_service();
+
+    rpc::zone zone_id;
+    if(root_service)
+        zone_id = root_service->get_zone_id();
+    else
+        zone_id = {0};
+    auto h = this->get_lib().get_local_host_ptr();  
+    auto ex = this->get_lib().get_example();      
+    
+    auto enclaveb = this->get_lib().create_new_zone();
+    enclaveb->set_host(h);
+    ASSERT_EQ(h->set_app("enclaveb", enclaveb), rpc::error::OK());
+
+    ex->call_host_look_up_app_not_return("enclaveb", false);
+    
+    enclaveb->set_host(nullptr);
+}
+TYPED_TEST(remote_type_test, multithreaded_two_zones_get_one_to_lookup_other)
+{
+    auto root_service = this->get_lib().get_root_service();
+
+    rpc::zone zone_id;
+    if(root_service)
+        zone_id = root_service->get_zone_id();
+    else
+        zone_id = {0};
+    auto h = rpc::make_shared<host>(rpc::telemetry_service_manager::get().get(), zone_id);        
+    
+    auto enclavea = this->get_lib().create_new_zone();
+    enclavea->set_host(h);
+    ASSERT_EQ(h->set_app("enclavea", enclavea), rpc::error::OK());
+    
+    auto enclaveb = this->get_lib().create_new_zone();
+    enclaveb->set_host(h);
+    ASSERT_EQ(h->set_app("enclaveb", enclaveb), rpc::error::OK());
+    
+    const auto thread_size = 10;
+    std::array<std::thread, thread_size> threads;
+    for(auto& thread : threads)
+    {        
+        thread = std::thread([&](){
+            enclavea->call_host_look_up_app_not_return("enclaveb", true);
+        });
+    }
+    for(auto& thread : threads)
+    {        
+        thread.join();
+    }
+    enclavea->set_host(nullptr);
+    enclaveb->set_host(nullptr);
 }
 
 TYPED_TEST(remote_type_test, check_identity)
