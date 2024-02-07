@@ -348,9 +348,27 @@ namespace rpc
 
         uint64_t destination_channel = destination_channel_zone_id.is_set() ? destination_channel_zone_id.id : destination_zone_id.id;
         RPC_ASSERT(destination_channel);
+        
+        std::string diagnostics;
+        diagnostics += " zone_id " + std::to_string(zone_id_.id);
+        diagnostics += " destination_zone_id " + std::to_string(destination_zone_id.id);
+        diagnostics += " destination_channel_zone_id " + std::to_string(destination_channel_zone_id.id);
+        diagnostics += " object_id " + std::to_string(object_id.id);
+        diagnostics += " caller_channel_zone_id " + std::to_string(caller_channel_zone_id.id);
+        diagnostics += " caller_zone_id " + std::to_string(caller_zone_id.id);
+        diagnostics += " object_channel " + std::to_string(object_channel);
+        diagnostics += " destination_channel " + std::to_string(destination_channel);
+        if(telemetry_service_)
+            telemetry_service_->message(
+                rpc::i_telemetry_service::info
+                , diagnostics.c_str()); 
 
         if(object_channel == destination_channel)
         {
+            if(telemetry_service_)
+                telemetry_service_->message(
+                    rpc::i_telemetry_service::info
+                    , "service::prepare_out_param at destination");            
             //caller and destination are in the same channel let them fork where necessary
             //note the caller_channel_zone_id is 0 as both the caller and the destination are in from the same direction so any other value is wrong
             //Dont external_add_ref the local service proxy as we are return to source no channel is required
@@ -380,21 +398,50 @@ namespace rpc
             rpc::shared_ptr<service_proxy> caller;
             {
                 std::lock_guard g(zone_control);
-                auto found = other_zones.find({destination_zone_id, caller_zone_id});//we dont need to get caller id for this
-                if(found != other_zones.end())
                 {
-                    destination_zone = found->second.lock();
+                    auto found = other_zones.find({destination_zone_id, caller_zone_id});//we dont need to get caller id for this
+                    if(found != other_zones.end())
+                    {
+                        if(telemetry_service_)
+                            telemetry_service_->message(
+                                rpc::i_telemetry_service::info
+                                , "service::prepare_out_param found item");
+                        destination_zone = found->second.lock();
+                        destination_zone->add_external_ref();
+                    }
+                    else
+                    {
+                        destination_zone = object_service_proxy->clone_for_zone(destination_zone_id, caller_zone_id);
+                        inner_add_zone_proxy(destination_zone);
+                    }
                 }
-                else
-                {
-                    destination_zone = object_service_proxy->clone_for_zone(destination_zone_id, caller_zone_id);
-                    other_zones[{destination_zone_id, caller_zone_id}] = destination_zone;
-                }
-                destination_zone->add_external_ref();
                 //and the caller with destination info
-                found = other_zones.find({{object_channel}, zone_id_.as_caller()});//we dont need to get caller id for this
-                RPC_ASSERT(found != other_zones.end());
-                caller = found->second.lock();
+                {
+                    auto found = other_zones.find({{object_channel}, zone_id_.as_caller()});//we dont need to get caller id for this
+                    if(found == other_zones.end())
+                    {
+                        //this is working on the premise that the caller_channel_zone_id is not known but object_channel is
+                        RPC_ASSERT(object_channel == caller_channel_zone_id.get_val() && object_channel != caller_zone_id.get_val());
+                        
+                        auto alternative = other_zones.lower_bound({caller_zone_id.as_destination(), {0}});
+                        if(alternative == other_zones.end() || alternative->first.dest != caller_zone_id.as_destination())
+                        {
+                            RPC_ASSERT(!!"alternative route to caller zone is not found");
+                            return {};
+                        }
+                        
+                        auto alternative_caller_service_proxy = alternative->second.lock();
+                        RPC_ASSERT(alternative_caller_service_proxy != nullptr || !!"alternative caller proxy not found");
+                        
+                        //now make a copy of the original as we need it back
+                        caller = alternative_caller_service_proxy->clone_for_zone({caller_channel_zone_id.get_val()}, zone_id_.as_caller());
+                        other_zones[{{caller_channel_zone_id.get_val()}, zone_id_.as_caller()}] = caller;                    
+                    }
+                    else
+                    {
+                        caller = found->second.lock();
+                    }
+                }
                 RPC_ASSERT(caller);
             }
 
@@ -466,8 +513,26 @@ namespace rpc
             }
             if(proxy_base)
             {
+                if(telemetry_service_)
+                    telemetry_service_->message(
+                        rpc::i_telemetry_service::info
+                        , "get_proxy_stub_descriptor outcall for remote object");
                 return prepare_out_param(protocol_version, caller_channel_zone_id, caller_zone_id, proxy_base);
             }
+            else
+            {
+                if(telemetry_service_)
+                    telemetry_service_->message(
+                        rpc::i_telemetry_service::info
+                        , "get_proxy_stub_descriptor outcall for local object");
+            }
+        }
+        else
+        {
+            if(telemetry_service_)
+                telemetry_service_->message(
+                    rpc::i_telemetry_service::info
+                    , "get_proxy_stub_descriptor non outcall");            
         }
         
         //needed by the out call
@@ -1278,7 +1343,7 @@ namespace rpc
         }    
     }
 
-    void child_service::set_parent(const rpc::shared_ptr<rpc::service_proxy>& parent_service_proxy)
+    void child_service::set_parent_proxy(const rpc::shared_ptr<rpc::service_proxy>& parent_service_proxy)
     {
         if(parent_service_proxy_ && parent_service_proxy_ != parent_service_proxy)
         {

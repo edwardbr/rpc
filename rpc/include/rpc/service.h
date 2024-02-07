@@ -99,7 +99,7 @@ namespace rpc
         void set_zone_id(zone zone_id){zone_id_ = zone_id;}
         virtual destination_zone get_parent_zone_id() const {return {0};}
         virtual rpc::shared_ptr<rpc::service_proxy> get_parent() const {return nullptr;}
-        virtual void set_parent(const rpc::shared_ptr<rpc::service_proxy>&){RPC_ASSERT(false);};
+        virtual void set_parent_proxy(const rpc::shared_ptr<rpc::service_proxy>&){RPC_ASSERT(false);};
         const i_telemetry_service* get_telemetry_service() const {return telemetry_service_;}
         
         //passed by value implementing an implicit lock on the life time of ptr
@@ -245,7 +245,8 @@ namespace rpc
         virtual ~child_service();
 
         rpc::shared_ptr<rpc::service_proxy> get_parent() const override {return parent_service_proxy_;}
-        void set_parent(const rpc::shared_ptr<rpc::service_proxy>& parent_service_proxy) override;
+        void set_parent_proxy(const rpc::shared_ptr<rpc::service_proxy>& parent_service_proxy) override;
+        
         destination_zone get_parent_zone_id() const override {return parent_zone_id_;}
         
         template<class SERVICE_PROXY, class PARENT_INTERFACE, class CHILD_INTERFACE, typename... Args>
@@ -266,7 +267,7 @@ namespace rpc
             if(!parent_service_proxy)
                 return rpc::error::UNABLE_TO_CREATE_SERVICE_PROXY();
             child_svc->add_zone_proxy(parent_service_proxy);
-            child_svc->set_parent(parent_service_proxy);
+            child_svc->set_parent_proxy(parent_service_proxy);
             parent_service_proxy->set_parent_channel(true);        
             
             rpc::shared_ptr<PARENT_INTERFACE> parent_ptr;

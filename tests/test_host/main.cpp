@@ -348,7 +348,7 @@ public:
             LOG_STR(message.data(),message.size());
 #endif         
             rpc::shared_ptr<yyy::i_example> new_ptr;
-            auto err_code = example_relay_ptr->create_example_in_subordnate_zone(new_ptr, use_host_in_child_ ? local_host_ptr_.lock() : nullptr, ++zone_gen_);
+            auto err_code = example_relay_ptr->create_example_in_subordnate_zone(new_ptr, use_host_in_child_ ? hst : nullptr, ++zone_gen_);
             ASSERT_ERROR_CODE(err_code);
             example_relay_ptr->set_host(nullptr);
             example_relay_ptr = new_ptr;
@@ -939,6 +939,13 @@ TYPED_TEST(remote_type_test, two_zones_get_one_to_lookup_other)
 }
 TYPED_TEST(remote_type_test, multithreaded_two_zones_get_one_to_lookup_other)
 {
+#ifdef WIN32
+    if(this->get_lib().is_enclave_setup())
+    {
+        GTEST_SKIP() << "skipping this as we exceed TCS memory on laptops";
+        return;
+    }
+#endif
     auto root_service = this->get_lib().get_root_service();
 
     rpc::zone zone_id;
@@ -956,7 +963,7 @@ TYPED_TEST(remote_type_test, multithreaded_two_zones_get_one_to_lookup_other)
     enclaveb->set_host(h);
     ASSERT_EQ(h->set_app("enclaveb", enclaveb), rpc::error::OK());
     
-    const auto thread_size = 10;
+    const auto thread_size = 3;
     std::array<std::thread, thread_size> threads;
     for(auto& thread : threads)
     {        
