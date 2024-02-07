@@ -258,6 +258,19 @@ namespace rpc
         }
     }
     
+    void service::clean_up_on_failed_connection(const rpc::shared_ptr<service_proxy>& destination_zone, rpc::shared_ptr<rpc::casting_interface> input_interface)
+    {
+        if(destination_zone && input_interface)
+        {
+            auto object_id = input_interface->query_proxy_base()->get_object_proxy()->get_object_id();
+            auto ret = destination_zone->sp_release(object_id);                    
+            if(ret != std::numeric_limits<uint64_t>::max())
+            {
+                destination_zone->release_external_ref();            
+            }
+        }
+    }
+    
     interface_descriptor service::prepare_remote_input_interface(uint64_t protocol_version, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, rpc::proxy_base* base, rpc::shared_ptr<service_proxy>& destination_zone)
     {
         auto object_proxy = base->get_object_proxy();

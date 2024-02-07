@@ -1,12 +1,14 @@
 #include <filesystem>
 #include <algorithm>
+#include <thread>
+#include <sstream>
+
 #include <spdlog/spdlog.h>
 #include <fmt/os.h>
 
 #include <rpc/telemetry/host_telemetry_service.h>
 #include <rpc/assert.h>
 #include <rpc/service.h>
-#include <sstream>
 
 namespace rpc
 {
@@ -84,7 +86,6 @@ namespace rpc
         fmt::println(output_, "end note");
         fmt::println(output_, "@enduml");
         fclose(output_);
-        RPC_ASSERT(is_heathy);
         output_ = 0;
         historical_impls.clear();
     }
@@ -436,11 +437,6 @@ namespace rpc
                 message(level_enum::warn, fmt::format("release_external_ref count does not match zone_id {} destination_zone_id {} caller_zone_id {} {} - {}", zone_id.id, destination_zone_id.id, caller_zone_id.id, ref_count, count).c_str());
             }
         }
-        auto dest = destination_channel_zone_id.get_val();
-        if(destination_channel_zone_id == 0 || destination_channel_zone_id == destination_zone_id.as_destination_channel())
-        {
-            dest = destination_zone_id.get_val();
-        }
         
         fmt::println(output_, "hnote over {} : release_external_ref {} {}", service_proxy_alias(zone_id, destination_zone_id, caller_zone_id), get_thread_id(), ref_count);
         fflush(output_);
@@ -656,7 +652,7 @@ namespace rpc
         auto found = interface_proxies.find(interface_proxy_id{zone_id, destination_zone_id, object_id, interface_id});
         if(found == interface_proxies.end())
         {
-            spdlog::error("interface proxy not found name {} zone_id {} destination_zone_id {} object_id {}", name, zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val());
+            spdlog::warn("interface proxy not found name {} zone_id {} destination_zone_id {} object_id {}", name, zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val());
         }
         else
         {

@@ -534,7 +534,11 @@ namespace rpc
                 std::lock_guard l(insert_control_);
                 auto item = proxies_.find(object_id);
                 RPC_ASSERT(item  != proxies_.end());
-                proxies_.erase(item);  
+                if(item->second.lock() == nullptr)
+                {
+                    //the reason for this if statement is between an object weak pointer dying and this attempted entry being removed another object pointer object may have sneaked in and set to a non null value
+                    proxies_.erase(item);  
+                }
             }
 
             if (telemetry_service_ && object_id != dummy_object_id)
@@ -611,9 +615,12 @@ namespace rpc
             RPC_ASSERT(get_caller_zone_id() == get_zone_id().as_caller());
             std::lock_guard l(insert_control_);
             auto item = proxies_.find(object_id);
-            if(item == proxies_.end())
+            rpc::shared_ptr<object_proxy> op;
+            if(item != proxies_.end())
+                op = item->second.lock();
+            if(op == nullptr)
             {
-                auto op = rpc::shared_ptr<object_proxy>(new object_proxy(object_id, shared_from_this()));
+                op = rpc::shared_ptr<object_proxy>(new object_proxy(object_id, shared_from_this()));
                 if(auto* telemetry_service = get_telemetry_service();telemetry_service)
                 {
                     telemetry_service->on_object_proxy_creation(get_zone_id(), get_destination_zone_id(), object_id, true);
@@ -623,7 +630,7 @@ namespace rpc
                 return op;
             }
             is_new = false;
-            return item->second.lock();            
+            return op;            
         }
         
         friend service;
