@@ -404,7 +404,7 @@ namespace rpc
                     "service_proxy"
                     , zone_id_
                     , destination_zone_id
-                    , destination_channel_zone_id
+                    , {0}
                     ,  caller_zone_id
                     , object_id
                     , rpc::add_ref_options::build_destination_route);
@@ -415,7 +415,7 @@ namespace rpc
             //note the caller_channel_zone_id is is this zones id as the caller came from a route via this node
             destination_zone->add_ref(
                 protocol_version,
-                destination_channel_zone_id, 
+                {0}, 
                 destination_zone_id, 
                 object_id, 
                 zone_id_.as_caller_channel(), 
@@ -617,7 +617,7 @@ namespace rpc
         caller_zone caller_zone_id, 
         add_ref_options build_out_param_channel
     )
-{
+    {
         if(telemetry_service_)
         {
             telemetry_service_->on_service_add_ref(
@@ -631,7 +631,10 @@ namespace rpc
                 , build_out_param_channel);    
         }                
         
-        auto dest_channel = destination_channel_zone_id.is_set() ? destination_channel_zone_id.get_val() : destination_zone_id.get_val();
+        auto dest_channel = destination_zone_id.get_val();
+        if(destination_channel_zone_id != zone_id_.as_destination_channel() && 
+           destination_channel_zone_id.id != 0)
+            dest_channel = destination_channel_zone_id.get_val();
         auto caller_channel = caller_channel_zone_id.is_set() ? caller_channel_zone_id.id : caller_zone_id.id;
 
         if(destination_zone_id != zone_id_.as_destination())

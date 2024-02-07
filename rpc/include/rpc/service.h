@@ -290,6 +290,7 @@ namespace rpc
             }
             if(child_ptr)
             {
+                RPC_ASSERT(!child_ptr->query_proxy_base() && "we cannot support remote pointers to subordinate zones as it has not been registered yet");
                 output_descr = rpc::create_interface_stub(*child_svc, child_ptr);
             }
             return rpc::error::OK();
