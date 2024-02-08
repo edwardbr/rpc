@@ -643,8 +643,7 @@ namespace enclave_marshaller
 
                 proxy("auto __rpc_op = get_object_proxy();");
                 proxy("auto __rpc_sp = __rpc_op->get_service_proxy();");
-                proxy("if(auto* telemetry_service = "
-                      "__rpc_sp->get_telemetry_service();telemetry_service)");
+                proxy("if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)");
                 proxy("{{");
                 proxy("telemetry_service->on_interface_proxy_send(\"{0}::{1}\", "
                       "__rpc_sp->get_zone_id(), "
@@ -1493,8 +1492,7 @@ namespace enclave_marshaller
             proxy("{{");
             proxy("auto __rpc_op = get_object_proxy();");
             proxy("auto __rpc_sp = __rpc_op->get_service_proxy();");
-            proxy("   if(auto* telemetry_service = "
-                  "__rpc_sp->get_telemetry_service();telemetry_service)");
+            proxy("   if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)");
             proxy("{{");
             proxy("telemetry_service->on_interface_proxy_creation(\"{0}\", "
                   "__rpc_sp->get_zone_id(), "
@@ -1510,10 +1508,9 @@ namespace enclave_marshaller
             proxy("{{");
             proxy("auto __rpc_op = get_object_proxy();");
             proxy("auto __rpc_sp = __rpc_op->get_service_proxy();");
-            proxy("if(auto* telemetry_service = "
-                  "__rpc_sp->get_telemetry_service();telemetry_service)");
+            proxy("if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)");
             proxy("{{");
-            proxy("telemetry_service->on_interface_proxy_deletion(\"{0}\", "
+            proxy("telemetry_service->on_interface_proxy_deletion("
                   "__rpc_sp->get_zone_id(), "
                   "__rpc_sp->get_destination_zone_id(), __rpc_op->get_object_id(), "
                   "{{{0}_proxy::get_id(rpc::get_version())}});",

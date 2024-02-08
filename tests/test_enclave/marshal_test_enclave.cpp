@@ -35,9 +35,9 @@ int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t host_id, uint64_t 
     CREATE_TELEMETRY_SERVICE(rpc::enclave_telemetry_service)
     
     auto ret = rpc::child_service::create_child_zone<rpc::host_service_proxy, yyy::i_host, yyy::i_example>(
-        rpc::zone{child_zone_id}
+        "test_enclave"
+        , rpc::zone{child_zone_id}
         , rpc::destination_zone{host_zone_id}
-        , rpc::telemetry_service_manager::get().get()
         , input_descr
         , output_descr
         , [](
@@ -48,7 +48,7 @@ int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t host_id, uint64_t 
             example_import_idl_register_stubs(child_service_ptr);
             example_shared_idl_register_stubs(child_service_ptr);
             example_idl_register_stubs(child_service_ptr);
-            new_example = rpc::shared_ptr<yyy::i_example>(new example(child_service_ptr->get_telemetry_service(), child_service_ptr, host));
+            new_example = rpc::shared_ptr<yyy::i_example>(new example(child_service_ptr, host));
             return rpc::error::OK();
         }
         , rpc_server);

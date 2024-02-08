@@ -7,7 +7,7 @@
 namespace marshalled_tests
 {
 
-    void standard_tests(xxx::i_foo& foo, bool enclave, const rpc::i_telemetry_service* telemetry_service)
+    void standard_tests(xxx::i_foo& foo, bool enclave)
     {
         {
             ASSERT_ERROR_CODE(foo.do_something_in_val(33));
@@ -149,7 +149,6 @@ namespace marshalled_tests
     void remote_tests(
         bool use_host_in_child
         , rpc::shared_ptr<yyy::i_example> example_ptr
-        , const rpc::i_telemetry_service* telemetry_service
         , rpc::zone zone_id)
     {
         int val = 0;
@@ -179,7 +178,7 @@ namespace marshalled_tests
 
             if(use_host_in_child)
             {
-                rpc::shared_ptr<xxx::i_baz> b(new baz(telemetry_service, zone_id));
+                rpc::shared_ptr<xxx::i_baz> b(new baz(zone_id));
                 err_code = foo->call_baz_interface(b);
             }
 

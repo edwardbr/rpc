@@ -58,6 +58,7 @@ namespace rpc
         std::unordered_map<rpc::interface_ordinal, std::shared_ptr<std::function<rpc::shared_ptr<rpc::i_interface_stub>(const rpc::shared_ptr<rpc::i_interface_stub>&)>>> stub_factories;
         // map wrapped objects pointers to stubs
         std::map<void*, rpc::weak_ptr<object_stub>> wrapped_object_to_stub;
+        std::string name_;
 
         struct zone_route
         {
@@ -75,8 +76,6 @@ namespace rpc
         std::map<zone_route, rpc::weak_ptr<service_proxy>> other_zones;
         std::list<std::shared_ptr<service_logger>> service_loggers;
 
-        // hard lock on the root object
-        const i_telemetry_service* telemetry_service_ = nullptr;
         rpc::shared_ptr<casting_interface> get_castable_interface(object object_id, interface_ordinal interface_id);
                                                         
         template<class T> interface_descriptor proxy_bind_in_param(uint64_t protocol_version, const shared_ptr<T>& iface, shared_ptr<object_stub>& stub);
@@ -88,11 +87,12 @@ namespace rpc
         friend i_interface_stub;                          
 
     public:
-        explicit service(zone zone_id, const i_telemetry_service* telemetry_service);
+        explicit service(const char* name, zone zone_id);
         virtual ~service();
 
         static zone generate_new_zone_id();
         object generate_new_object_id() const;
+        std::string get_name() const {return name_;}
 
         virtual bool check_is_empty() const;
         zone get_zone_id() const {return zone_id_;}
@@ -100,7 +100,6 @@ namespace rpc
         virtual destination_zone get_parent_zone_id() const {return {0};}
         virtual rpc::shared_ptr<rpc::service_proxy> get_parent() const {return nullptr;}
         virtual void set_parent_proxy(const rpc::shared_ptr<rpc::service_proxy>&){RPC_ASSERT(false);};
-        const i_telemetry_service* get_telemetry_service() const {return telemetry_service_;}
         
         //passed by value implementing an implicit lock on the life time of ptr
         object get_object_id(shared_ptr<casting_interface> ptr) const;
@@ -165,6 +164,7 @@ namespace rpc
         
         template<class proxy_class, class in_param_type, class out_param_type, typename... Args>
         int connect_to_zone(
+            const char* name,
             rpc::destination_zone new_zone_id,
             const rpc::shared_ptr<in_param_type>& input_interface, 
             rpc::shared_ptr<out_param_type>& output_interface,
@@ -172,7 +172,7 @@ namespace rpc
         {
             RPC_ASSERT(input_interface == nullptr || !input_interface->query_proxy_base() || input_interface->query_proxy_base()->get_object_proxy()->get_service_proxy()->get_zone_id() == zone_id_);
 
-            auto new_service_proxy = proxy_class::create(new_zone_id, shared_from_this(), args...);
+            auto new_service_proxy = proxy_class::create(name, new_zone_id, shared_from_this(), args...);
             add_zone_proxy(new_service_proxy);
             rpc::interface_descriptor input_descr{{0},{0}};
             rpc::shared_ptr<service_proxy> destination_zone;
@@ -237,8 +237,8 @@ namespace rpc
         rpc::shared_ptr<rpc::service_proxy> parent_service_proxy_;
         destination_zone parent_zone_id_;
     public:
-        explicit child_service(zone zone_id, destination_zone parent_zone_id, const i_telemetry_service* telemetry_service) : 
-            service(zone_id, telemetry_service),
+        explicit child_service(const char* name, zone zone_id, destination_zone parent_zone_id) : 
+            service(name, zone_id),
             parent_zone_id_(parent_zone_id)
         {}
 
@@ -251,19 +251,19 @@ namespace rpc
         
         template<class SERVICE_PROXY, class PARENT_INTERFACE, class CHILD_INTERFACE, typename... Args>
         static int create_child_zone(
-            zone zone_id
+            const char* name
+            , zone zone_id
             , destination_zone parent_zone_id
-            , const i_telemetry_service* telemetry_service
             , rpc::interface_descriptor input_descr
             , rpc::interface_descriptor& output_descr
             , std::function<int(const rpc::shared_ptr<PARENT_INTERFACE>&, rpc::shared_ptr<CHILD_INTERFACE>&, const rpc::shared_ptr<rpc::child_service>&)> fn
             , rpc::shared_ptr<child_service>& new_child_service
             , Args&&... args)
         {
-            auto child_svc = rpc::shared_ptr<rpc::child_service>(new rpc::child_service(zone_id, parent_zone_id, telemetry_service));
+            auto child_svc = rpc::shared_ptr<rpc::child_service>(new rpc::child_service(name, zone_id, parent_zone_id));
 
             //link the child to the parent
-            auto parent_service_proxy = SERVICE_PROXY::create(parent_zone_id, child_svc, args...);            
+            auto parent_service_proxy = SERVICE_PROXY::create(name, parent_zone_id, child_svc, args...);            
             if(!parent_service_proxy)
                 return rpc::error::UNABLE_TO_CREATE_SERVICE_PROXY();
             child_svc->add_zone_proxy(parent_service_proxy);

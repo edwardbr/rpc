@@ -8,26 +8,16 @@
 
 namespace rpc
 {
-    host_service_proxy::host_service_proxy(destination_zone host_zone_id, const rpc::shared_ptr<rpc::child_service>& svc)
-        : service_proxy(host_zone_id, svc)
-    {
-        if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
-        {
-            telemetry_service->on_service_proxy_creation("host_service_proxy", get_zone_id(), get_destination_zone_id(), get_caller_zone_id());
-        }
-    }
+    host_service_proxy::host_service_proxy(
+        const char* name
+        , destination_zone host_zone_id
+        , const rpc::shared_ptr<rpc::child_service>& svc)
+        : service_proxy(name, host_zone_id, svc)
+    {}
 
-    rpc::shared_ptr<service_proxy> host_service_proxy::create(destination_zone host_zone_id, const rpc::shared_ptr<rpc::child_service>& svc)
+    rpc::shared_ptr<service_proxy> host_service_proxy::create(const char* name, destination_zone host_zone_id, const rpc::shared_ptr<rpc::child_service>& svc)
     {
-        return rpc::shared_ptr<host_service_proxy>(new host_service_proxy(host_zone_id, svc));
-    }
-
-    host_service_proxy::~host_service_proxy()
-    {
-        if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
-        {
-            telemetry_service->on_service_proxy_deletion("host_service_proxy", get_zone_id(), get_destination_zone_id(), get_caller_zone_id());
-        }
+        return rpc::shared_ptr<host_service_proxy>(new host_service_proxy(name, host_zone_id, svc));
     }
 
     int host_service_proxy::send(
@@ -55,7 +45,7 @@ namespace rpc
 
         if (status)
         {
-            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
+            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             {
                 telemetry_service->message(rpc::i_telemetry_service::err, "call_host failed");
             }
@@ -70,7 +60,7 @@ namespace rpc
             status = ::call_host(&err_code, protocol_version, (uint64_t)encoding, tag, caller_channel_zone_id.get_val(), caller_zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), interface_id.get_val(), method_id.get_val(), in_size_, in_buf_, out_buf_.size(), out_buf_.data(), &data_out_sz);
             if (status)
             {
-                if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
+                if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
                 {
                     telemetry_service->message(rpc::i_telemetry_service::err, "call_host failed");
                 }
@@ -107,7 +97,7 @@ namespace rpc
         sgx_status_t status = ::try_cast_host(&err_code, protocol_version, destination_zone_id.get_val(), object_id.get_val(), interface_id.get_val());
         if (status)
         {
-            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
+            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             {
                 telemetry_service->message(rpc::i_telemetry_service::err, "try_cast failed");
             }
@@ -126,16 +116,16 @@ namespace rpc
         add_ref_options build_out_param_channel
     )
     {
-        if (get_telemetry_service())
+        if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
         {
-            get_telemetry_service()->on_service_proxy_add_ref("host_service_proxy", get_zone_id(),
+            telemetry_service->on_service_proxy_add_ref(get_zone_id(),
                                                             destination_zone_id, destination_channel_zone_id, get_caller_zone_id(), object_id, build_out_param_channel);
         }
         uint64_t ret = 0;
         sgx_status_t status = ::add_ref_host(&ret, protocol_version, destination_channel_zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), caller_channel_zone_id.get_val(), caller_zone_id.get_val(), (std::uint8_t)build_out_param_channel);
         if (status)
         {
-            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
+            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             {
                 telemetry_service->message(rpc::i_telemetry_service::err, "add_ref_host failed");
             }
@@ -157,7 +147,7 @@ namespace rpc
         sgx_status_t status = ::release_host(&ret, protocol_version, destination_zone_id.get_val(), object_id.get_val(), caller_zone_id.get_val());
         if (status)
         {
-            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
+            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             {
                 telemetry_service->message(rpc::i_telemetry_service::err, "release_host failed");
             }

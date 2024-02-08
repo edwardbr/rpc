@@ -213,23 +213,23 @@ extern "C"
             telemetry_service->on_object_proxy_deletion({zone_id}, {destination_zone_id}, {object_id});
     }
 
-    void on_proxy_creation_host(const char* name, uint64_t zone_id, uint64_t destination_zone_id, uint64_t object_id,
+    void on_interface_proxy_creation_host(const char* name, uint64_t zone_id, uint64_t destination_zone_id, uint64_t object_id,
                                 uint64_t interface_id)
     {
         if (telemetry_service)
             telemetry_service->on_interface_proxy_creation(name, {zone_id}, {destination_zone_id}, {object_id}, {interface_id});
     }
-    void on_proxy_deletion_host(const char* name, uint64_t zone_id, uint64_t destination_zone_id, uint64_t object_id,
+    void on_interface_proxy_deletion_host(const char* name, uint64_t zone_id, uint64_t destination_zone_id, uint64_t object_id,
                                 uint64_t interface_id)
     {
         if (telemetry_service)
             telemetry_service->on_interface_proxy_deletion(name, {zone_id}, {destination_zone_id}, {object_id}, {interface_id});
     }
-    void on_proxy_send_host(const char* name, uint64_t zone_id, uint64_t destination_zone_id, uint64_t object_id,
+    void on_interface_proxy_send_host(const char* method_name, uint64_t zone_id, uint64_t destination_zone_id, uint64_t object_id,
                             uint64_t interface_id, uint64_t method_id)
     {
         if (telemetry_service)
-            telemetry_service->on_interface_proxy_send(name, {zone_id}, {destination_zone_id}, {object_id}, {interface_id},
+            telemetry_service->on_interface_proxy_send(method_name, {zone_id}, {destination_zone_id}, {object_id}, {interface_id},
                                                        {method_id});
     }
 

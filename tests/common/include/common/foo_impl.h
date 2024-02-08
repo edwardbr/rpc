@@ -19,7 +19,6 @@ namespace marshalled_tests
 {
     class baz : public xxx::i_baz, public xxx::i_bar
     {
-        const rpc::i_telemetry_service* telemetry_ = nullptr;
         rpc::zone zone_id_;
         void* get_address() const override { return (void*)this; }
         const rpc::casting_interface* query_interface(rpc::interface_ordinal interface_id) const override
@@ -32,18 +31,17 @@ namespace marshalled_tests
         }
 
     public:
-        baz(const rpc::i_telemetry_service* telemetry, rpc::zone zone_id)
-            : telemetry_(telemetry)
-            , zone_id_(zone_id)
+        baz(rpc::zone zone_id)
+            : zone_id_(zone_id)
         {
-            if (telemetry_)
-                telemetry_->on_impl_creation("baz", (uint64_t)this, zone_id_);
+            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+                telemetry_service->on_impl_creation("baz", (uint64_t)this, zone_id_);
         }
 
         virtual ~baz()
         {
-            if (telemetry_)
-                telemetry_->on_impl_deletion("baz", (uint64_t)this, zone_id_);
+            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+                telemetry_service->on_impl_deletion((uint64_t)this, zone_id_);
         }
         int callback(int val) override
         {
@@ -65,7 +63,6 @@ namespace marshalled_tests
 
     class foo : public xxx::i_foo
     {
-        const rpc::i_telemetry_service* telemetry_ = nullptr;
         rpc::zone zone_id_;
         void* get_address() const override { return (void*)this; }
         const rpc::casting_interface* query_interface(rpc::interface_ordinal interface_id) const override
@@ -78,17 +75,16 @@ namespace marshalled_tests
         rpc::shared_ptr<xxx::i_baz> cached_;
 
     public:
-        foo(const rpc::i_telemetry_service* telemetry, rpc::zone zone_id)
-            : telemetry_(telemetry)
-            , zone_id_(zone_id)
+        foo(rpc::zone zone_id)
+            :zone_id_(zone_id)
         {
-            if (telemetry_)
-                telemetry_->on_impl_creation("foo", (uint64_t)this, zone_id_);
+            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+                telemetry_service->on_impl_creation("foo", (uint64_t)this, zone_id_);
         }
         virtual ~foo()
         {
-            if (telemetry_)
-                telemetry_->on_impl_deletion("foo", (uint64_t)this, zone_id_);
+            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+                telemetry_service->on_impl_deletion((uint64_t)this, zone_id_);
         }
         error_code do_something_in_val(int val) override
         {
@@ -233,7 +229,7 @@ namespace marshalled_tests
 
         error_code recieve_interface(rpc::shared_ptr<i_foo>& val) override
         {
-            val = rpc::shared_ptr<xxx::i_foo>(new foo(telemetry_, zone_id_));
+            val = rpc::shared_ptr<xxx::i_foo>(new foo(zone_id_));
             auto val1 = rpc::dynamic_pointer_cast<xxx::i_bar>(val);
             return rpc::error::OK();
         }
@@ -272,7 +268,7 @@ namespace marshalled_tests
 
         error_code create_baz_interface(rpc::shared_ptr<xxx::i_baz>& val) override
         {
-            val = rpc::shared_ptr<xxx::i_baz>(new baz(telemetry_, zone_id_));
+            val = rpc::shared_ptr<xxx::i_baz>(new baz(zone_id_));
             return rpc::error::OK();
         }
 
@@ -295,8 +291,8 @@ namespace marshalled_tests
 
         error_code exception_test() override
         {
-            if(telemetry_)
-                telemetry_->message(rpc::i_telemetry_service::info, "exception_test");
+            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+                telemetry_service->message(rpc::i_telemetry_service::info, "exception_test");
             throw std::runtime_error("oops");
             return rpc::error::OK();
         }
@@ -304,7 +300,6 @@ namespace marshalled_tests
 
     class multiple_inheritance : public xxx::i_bar, public xxx::i_baz
     {
-        const rpc::i_telemetry_service* telemetry_ = nullptr;
         rpc::zone zone_id_;
 
         void* get_address() const override { return (void*)this; }
@@ -318,17 +313,16 @@ namespace marshalled_tests
         }
 
     public:
-        multiple_inheritance(const rpc::i_telemetry_service* telemetry, rpc::zone zone_id)
-            : telemetry_(telemetry),
-            zone_id_(zone_id)
+        multiple_inheritance(rpc::zone zone_id)
+            :zone_id_(zone_id)
         {
-            if (telemetry_)
-                telemetry_->on_impl_creation("multiple_inheritance", (uint64_t)this, zone_id_);
+            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+                telemetry_service->on_impl_creation("multiple_inheritance", (uint64_t)this, zone_id_);
         }
         virtual ~multiple_inheritance()
         {
-            if (telemetry_)
-                telemetry_->on_impl_deletion("multiple_inheritance", (uint64_t)this, zone_id_);
+            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+                telemetry_service->on_impl_deletion((uint64_t)this, zone_id_);
         }
 
         error_code do_something_else(int val) override { return rpc::error::OK(); }
@@ -346,7 +340,6 @@ namespace marshalled_tests
 
     class example : public yyy::i_example
     {
-        const rpc::i_telemetry_service* telemetry_ = nullptr;
         rpc::shared_ptr<yyy::i_host> host_;
         rpc::weak_ptr<rpc::child_service> this_service_;
         rpc::zone zone_id_;
@@ -360,22 +353,21 @@ namespace marshalled_tests
         }
 
     public:
-        example(const rpc::i_telemetry_service* telemetry, rpc::shared_ptr<rpc::child_service> this_service, rpc::shared_ptr<yyy::i_host> host)
-            : telemetry_(telemetry)
-            , host_(host)
+        example(rpc::shared_ptr<rpc::child_service> this_service, rpc::shared_ptr<yyy::i_host> host)
+            : host_(host)
             , this_service_(this_service)
             , zone_id_(0)
         {
             if(this_service)
                 zone_id_ = this_service->get_zone_id();
-            if (telemetry_)
-                telemetry_->on_impl_creation("example", (uint64_t)this, zone_id_);
+            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+                telemetry_service->on_impl_creation("example", (uint64_t)this, zone_id_);
 
         }
         virtual ~example()
         {
-            if (telemetry_)
-                telemetry_->on_impl_deletion("example", (uint64_t)this, zone_id_);
+            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+                telemetry_service->on_impl_deletion((uint64_t)this, zone_id_);
         }
         
         error_code get_host(rpc::shared_ptr<yyy::i_host>& host) override
@@ -391,19 +383,19 @@ namespace marshalled_tests
 
         error_code create_multiple_inheritance(rpc::shared_ptr<xxx::i_baz>& target) override
         {
-            target = rpc::shared_ptr<xxx::i_baz>(new multiple_inheritance(telemetry_, zone_id_));
+            target = rpc::shared_ptr<xxx::i_baz>(new multiple_inheritance(zone_id_));
             return rpc::error::OK();
         }
 
         error_code create_foo(rpc::shared_ptr<xxx::i_foo>& target) override
         {
-            target = rpc::shared_ptr<xxx::i_foo>(new foo(telemetry_, zone_id_));
+            target = rpc::shared_ptr<xxx::i_foo>(new foo(zone_id_));
             return rpc::error::OK();
         }
 
         error_code create_baz(rpc::shared_ptr<xxx::i_baz>& target) override
         {
-            target = rpc::shared_ptr<xxx::i_baz>(new baz(telemetry_, zone_id_));
+            target = rpc::shared_ptr<xxx::i_baz>(new baz(zone_id_));
             return rpc::error::OK();            
         }
         
@@ -412,7 +404,8 @@ namespace marshalled_tests
             auto this_service = this_service_.lock();
             
             auto err_code = this_service->connect_to_zone<rpc::local_child_service_proxy<yyy::i_example, yyy::i_host>>(
-                {new_zone_id}
+                "subordnate_zone"
+                , {new_zone_id}
                 , host_ptr
                 , target
                 , [](
@@ -423,7 +416,7 @@ namespace marshalled_tests
                     example_import_idl_register_stubs(child_service_ptr);
                     example_shared_idl_register_stubs(child_service_ptr);
                     example_idl_register_stubs(child_service_ptr);
-                    new_example = rpc::shared_ptr<yyy::i_example>(new example(child_service_ptr->get_telemetry_service(), child_service_ptr, host));   
+                    new_example = rpc::shared_ptr<yyy::i_example>(new example(child_service_ptr, host));   
                     return rpc::error::OK();
                 });
             if(err_code != rpc::error::OK())
@@ -524,20 +517,22 @@ namespace marshalled_tests
             if (!host_)
                 return rpc::error::INVALID_DATA();
 
+            auto telemetry_service = rpc::telemetry_service_manager::get();
+
             rpc::shared_ptr<i_example> app;
             {
-                if (telemetry_)
-                    telemetry_->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return");
+                if (telemetry_service)
+                    telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return");
 
                 auto err = host_->look_up_app(name, app);
 
-                if (telemetry_)
-                    telemetry_->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return complete");
+                if (telemetry_service)
+                    telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return complete");
                 if(err != rpc::error::OK())
                     return err;
             }
-            if (telemetry_)
-                telemetry_->message(rpc::i_telemetry_service::info, "app released");
+            if (telemetry_service)
+                telemetry_service->message(rpc::i_telemetry_service::info, "app released");
             if(run_standard_tests && app)
             {
                 int sum = 0;
@@ -553,17 +548,18 @@ namespace marshalled_tests
         // live app registry, it should have sole responsibility for the long term storage of app shared ptrs
         error_code call_host_look_up_app(const std::string& name, rpc::shared_ptr<i_example>& app, bool run_standard_tests) override
         {
+            auto telemetry_service = rpc::telemetry_service_manager::get();
             if (!host_)
                 return rpc::error::INVALID_DATA();
 
             {
-                if (telemetry_)
-                    telemetry_->message(rpc::i_telemetry_service::info, "look_up_app");
+                if (telemetry_service)
+                    telemetry_service->message(rpc::i_telemetry_service::info, "look_up_app");
 
                 auto err = host_->look_up_app(name, app);
 
-                if (telemetry_)
-                    telemetry_->message(rpc::i_telemetry_service::info, "look_up_app complete");
+                if (telemetry_service)
+                    telemetry_service->message(rpc::i_telemetry_service::info, "look_up_app complete");
 
                 if(err != rpc::error::OK())
                     return err;
@@ -585,18 +581,20 @@ namespace marshalled_tests
         {
             if (!host_)
                 return rpc::error::INVALID_DATA();
+                
+            auto telemetry_service = rpc::telemetry_service_manager::get();                
 
             rpc::shared_ptr<i_example> app;
             {
                 rpc::shared_ptr<i_example> app;
-                if (telemetry_)
-                    telemetry_->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return_and_delete");
+                if (telemetry_service)
+                    telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return_and_delete");
 
                 auto err = host_->look_up_app(name, app);
                 host_->unload_app(name);
 
-                if (telemetry_)
-                    telemetry_->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return_and_delete complete");
+                if (telemetry_service)
+                    telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return_and_delete complete");
                 if(err != rpc::error::OK())
                     return err;
                 if(run_standard_tests && app)
@@ -609,8 +607,8 @@ namespace marshalled_tests
                         return rpc::error::INVALID_DATA();
                 }
             }
-            if (telemetry_)
-                telemetry_->message(rpc::i_telemetry_service::info, "app released");
+            if (telemetry_service)
+                telemetry_service->message(rpc::i_telemetry_service::info, "app released");
             return rpc::error::OK();
         }  
         
@@ -618,16 +616,18 @@ namespace marshalled_tests
         {
             if (!host_)
                 return rpc::error::INVALID_DATA();
+            
+            auto telemetry_service = rpc::telemetry_service_manager::get();                
 
             {
-                if (telemetry_)
-                    telemetry_->message(rpc::i_telemetry_service::info, "call_host_look_up_app_and_delete");
+                if (telemetry_service)
+                    telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_and_delete");
 
                 auto err = host_->look_up_app(name, app);
                 host_->unload_app(name);
 
-                if (telemetry_)
-                    telemetry_->message(rpc::i_telemetry_service::info, "call_host_look_up_app_and_delete complete");
+                if (telemetry_service)
+                    telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_and_delete complete");
 
                 if(err != rpc::error::OK())
                     return err;
@@ -676,7 +676,7 @@ namespace marshalled_tests
 
         error_code recieve_interface(rpc::shared_ptr<xxx::i_foo>& val) override
         {
-            val = rpc::shared_ptr<xxx::i_foo>(new foo(telemetry_, zone_id_));
+            val = rpc::shared_ptr<xxx::i_foo>(new foo(zone_id_));
             auto val1 = rpc::dynamic_pointer_cast<xxx::i_bar>(val);
             return rpc::error::OK();
         }
@@ -689,8 +689,8 @@ namespace marshalled_tests
 
         error_code send_interface_back(const rpc::shared_ptr<xxx::i_baz>& input, rpc::shared_ptr<xxx::i_baz>& output) override
         {
-            if(telemetry_)
-                telemetry_->message(rpc::i_telemetry_service::info, "send_interface_back");
+            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+                telemetry_service->message(rpc::i_telemetry_service::info, "send_interface_back");
             output = input;
             return rpc::error::OK();
         }

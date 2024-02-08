@@ -18,30 +18,22 @@ namespace rpc
         };
 
         enclave_service_proxy(
-            destination_zone destination_zone_id
+            const char* name
+            , destination_zone destination_zone_id
             , std::string filename
             , const rpc::shared_ptr<service>& svc);
             
         enclave_service_proxy(const enclave_service_proxy& other) = default;
        
-        rpc::shared_ptr<service_proxy> deep_copy_for_clone() override;
-        void clone_completed() override;
+        rpc::shared_ptr<service_proxy> clone() override;
         
         static rpc::shared_ptr<enclave_service_proxy> create(
-            destination_zone destination_zone_id
+            const char* name
+            , destination_zone destination_zone_id
             , const rpc::shared_ptr<service>& svc
             , std::string filename);
         
         int connect(rpc::interface_descriptor input_descr, rpc::interface_descriptor& output_descr) override;
-
-        std::shared_ptr<enclave_owner> enclave_owner_;
-        uint64_t eid_ = 0;        
-        std::string filename_;
-
-        friend rpc::service;        
-    public:
-        
-        virtual ~enclave_service_proxy();
 
         int send(
             uint64_t protocol_version, 
@@ -75,5 +67,14 @@ namespace rpc
             destination_zone destination_zone_id, 
             object object_id, 
             caller_zone caller_zone_id) override;
+
+        std::shared_ptr<enclave_owner> enclave_owner_;
+        uint64_t eid_ = 0;        
+        std::string filename_;
+
+        friend rpc::service;        
+    public:
+        
+        virtual ~enclave_service_proxy() = default;
     };
 }

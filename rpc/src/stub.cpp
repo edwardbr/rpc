@@ -5,18 +5,17 @@
 
 namespace rpc
 {
-    object_stub::object_stub(object id, service& zone, void* target, const i_telemetry_service* telemetry_service)
+    object_stub::object_stub(object id, service& zone, void* target)
         : id_(id)
         , zone_(zone)
-        , telemetry_service_(telemetry_service)
     {
-        if(telemetry_service_)
-            telemetry_service_->on_stub_creation(zone_.get_zone_id(), id_, (uint64_t)target);
+        if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            telemetry_service->on_stub_creation(zone_.get_zone_id(), id_, (uint64_t)target);
     }
     object_stub::~object_stub()
     {
-        if(telemetry_service_)
-            telemetry_service_->on_stub_deletion(zone_.get_zone_id(), id_);
+        if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            telemetry_service->on_stub_deletion(zone_.get_zone_id(), id_);
     }
 
     rpc::shared_ptr<rpc::casting_interface> object_stub::get_castable_interface() const
@@ -96,8 +95,8 @@ namespace rpc
     uint64_t object_stub::add_ref()
     {
         uint64_t ret = ++reference_count;
-        if(telemetry_service_)
-            telemetry_service_->on_stub_add_ref(zone_.get_zone_id(), id_, {}, ret, {});
+        if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            telemetry_service->on_stub_add_ref(zone_.get_zone_id(), id_, {}, ret, {});
         RPC_ASSERT(ret != std::numeric_limits<uint64_t>::max());
         RPC_ASSERT(ret != 0);
         return ret;
@@ -106,8 +105,8 @@ namespace rpc
     uint64_t object_stub::release()
     {
         uint64_t count = --reference_count;
-        if(telemetry_service_)
-            telemetry_service_->on_stub_release(zone_.get_zone_id(), id_, {}, count, {});
+        if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            telemetry_service->on_stub_release(zone_.get_zone_id(), id_, {}, count, {});
         RPC_ASSERT(count != std::numeric_limits<uint64_t>::max());
         return count;
     }

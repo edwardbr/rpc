@@ -4,30 +4,16 @@
 
 namespace rpc
 {
-    struct make_shared_host_service_proxy_enabler;
     //This is for enclaves to call the host 
     class host_service_proxy : public service_proxy
     {
-        host_service_proxy(destination_zone host_zone_id, const rpc::shared_ptr<rpc::child_service>& svc);
-
-        rpc::shared_ptr<service_proxy> deep_copy_for_clone() override {return rpc::make_shared<host_service_proxy>(*this);}
-        void clone_completed() override
-        {
-            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
-            {
-                telemetry_service->on_service_proxy_creation("host_service_proxy", get_zone_id(), get_destination_zone_id(), get_caller_zone_id());
-            }
-        }
-        
-        friend make_shared_host_service_proxy_enabler;
-
-    public:
+        host_service_proxy(const char* name, destination_zone host_zone_id, const rpc::shared_ptr<rpc::child_service>& svc);
         host_service_proxy(const host_service_proxy& other) = default;
 
-        static rpc::shared_ptr<service_proxy> create(destination_zone host_zone_id, const rpc::shared_ptr<rpc::child_service>& svc);
+        rpc::shared_ptr<service_proxy> clone() override {return rpc::shared_ptr<host_service_proxy>(new host_service_proxy(*this));}
 
-    public:
-        virtual ~host_service_proxy();
+        static rpc::shared_ptr<service_proxy> create(const char* name, destination_zone host_zone_id, const rpc::shared_ptr<rpc::child_service>& svc);
+        
         int initialise();
 
         int send(
@@ -64,5 +50,11 @@ namespace rpc
             object object_id, 
             caller_zone caller_zone_id
         ) override;
+        
+                
+        friend rpc::child_service;
+
+    public:
+        virtual ~host_service_proxy() = default;
     };
 }

@@ -229,22 +229,27 @@ namespace rpc
         rpc::weak_ptr<service> service_;
         rpc::shared_ptr<service_proxy> lifetime_lock_;
         std::atomic<int> lifetime_lock_count_ = 0;
-        const rpc::i_telemetry_service* const telemetry_service_ = nullptr;
         std::atomic<uint64_t> version_ = rpc::get_version();
         encoding enc_ = encoding::enc_default;
         //if a service proxy is pointing to the zones parent zone then it needs to stay alive even if there are no active references going through it
         bool is_parent_channel_ = false;
+        std::string name_;
 
     protected:
 
-        service_proxy(  destination_zone destination_zone_id,
+        service_proxy(  const char* name,
+                        destination_zone destination_zone_id,
                         const rpc::shared_ptr<service>& svc) : 
             zone_id_(svc->get_zone_id()),
             destination_zone_id_(destination_zone_id),
             caller_zone_id_(svc->get_zone_id().as_caller()),
-            service_(svc),            
-            telemetry_service_(svc->get_telemetry_service())//cache the telemetry server pointer
+            service_(svc),
+            name_(name)
         {
+            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            {
+                telemetry_service->on_service_proxy_creation(name, get_zone_id(), get_destination_zone_id(), svc->get_zone_id().as_caller());
+            }
             RPC_ASSERT(svc != nullptr);
         }
 
@@ -255,9 +260,9 @@ namespace rpc
                 caller_zone_id_(other.caller_zone_id_),
                 service_(other.service_),
                 lifetime_lock_count_(0),
-                telemetry_service_(other.telemetry_service_),
-                enc_(other.enc_)
-        {
+                enc_(other.enc_),
+                name_(other.name_)
+        {       
             RPC_ASSERT(service_.lock() != nullptr);
         }
 
@@ -284,7 +289,13 @@ namespace rpc
             {
                 svc->remove_zone_proxy(destination_zone_id_, caller_zone_id_, destination_channel_zone_);
             }
+            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            {
+                telemetry_service->on_service_proxy_deletion(get_zone_id(), get_destination_zone_id(), get_caller_zone_id());
+            }            
         }
+        
+        std::string get_name() const { return name_; }
 
         uint64_t get_remote_rpc_version() const {return version_.load();}
 
@@ -307,9 +318,9 @@ namespace rpc
         {
             std::lock_guard g(insert_control_);
             auto count = ++lifetime_lock_count_;
-            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
+            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             {
-                telemetry_service->on_service_proxy_add_external_ref("service_proxy", zone_id_, destination_channel_zone_, destination_zone_id_, caller_zone_id_, count);
+                telemetry_service->on_service_proxy_add_external_ref(zone_id_, destination_channel_zone_, destination_zone_id_, caller_zone_id_, count);
             } 
             RPC_ASSERT(count >= 1);
             if(count == 1)
@@ -329,9 +340,9 @@ namespace rpc
         int inner_release_external_ref()
         {
             auto count = --lifetime_lock_count_;
-            if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
+            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             {
-                telemetry_service->on_service_proxy_release_external_ref("service_proxy", zone_id_, destination_channel_zone_, destination_zone_id_, caller_zone_id_, count);
+                telemetry_service->on_service_proxy_release_external_ref(zone_id_, destination_channel_zone_, destination_zone_id_, caller_zone_id_, count);
             }            
             RPC_ASSERT(count >= 0);
             if(count == 0 && is_parent_channel_ == false)
@@ -389,9 +400,9 @@ namespace rpc
             while(version)
             {
                 auto if_id = id_getter(version);
-                if (auto* telemetry_service = get_telemetry_service(); telemetry_service)
+                if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
                 {
-                    telemetry_service->on_service_proxy_try_cast("service_proxy", get_zone_id(),
+                    telemetry_service->on_service_proxy_try_cast(get_zone_id(),
                                                                     destination_zone_id, get_caller_zone_id(), object_id, if_id);
                 }
                 auto ret = try_cast(
@@ -417,9 +428,9 @@ namespace rpc
             , caller_channel_zone caller_channel_zone_id 
             , add_ref_options build_out_param_channel)
         {
-            if (telemetry_service_ && object_id != dummy_object_id)
+            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             {
-                telemetry_service_->on_service_proxy_add_ref("service_proxy", get_zone_id(),
+                telemetry_service->on_service_proxy_add_ref(get_zone_id(),
                                                                 destination_zone_id_, destination_channel_zone_,  get_caller_zone_id(), object_id, build_out_param_channel);
             }
 
@@ -450,9 +461,9 @@ namespace rpc
         
         uint64_t sp_release(object object_id) 
         {
-            if (telemetry_service_ && object_id != dummy_object_id)
+            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             {
-                telemetry_service_->on_service_proxy_release("service_proxy", get_zone_id(),
+                telemetry_service->on_service_proxy_release(get_zone_id(),
                                                                 destination_zone_id_, destination_channel_zone_,  get_caller_zone_id(), object_id);
             }
             
@@ -494,9 +505,9 @@ namespace rpc
                 }
             }
 
-            if (telemetry_service_ && object_id != dummy_object_id)
+            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             {
-                telemetry_service_->on_service_proxy_release("service_proxy", get_zone_id(),
+                telemetry_service->on_service_proxy_release(get_zone_id(),
                                                                 destination_zone_id_, destination_channel_zone_,  caller_zone_id, object_id);
             }
             
@@ -530,12 +541,18 @@ namespace rpc
 
         std::unordered_map<object, rpc::weak_ptr<object_proxy>> get_proxies(){return proxies_;}
 
-        virtual rpc::shared_ptr<service_proxy> deep_copy_for_clone() = 0;
-        virtual void clone_completed() = 0;
+        virtual rpc::shared_ptr<service_proxy> clone() = 0;
+        virtual void clone_completed()
+        {
+            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            {
+                telemetry_service->on_service_proxy_creation(name_.c_str(), get_zone_id(), get_destination_zone_id(), get_caller_zone_id());
+            }
+        }
         rpc::shared_ptr<service_proxy> clone_for_zone(destination_zone destination_zone_id, caller_zone caller_zone_id)
         {
             RPC_ASSERT(!(caller_zone_id_ == caller_zone_id && destination_zone_id_ == destination_zone_id));
-            auto ret = deep_copy_for_clone();
+            auto ret = clone();
             ret->is_parent_channel_ = false;
             ret->caller_zone_id_ = caller_zone_id;
             if(destination_zone_id_ != destination_zone_id)
@@ -560,9 +577,6 @@ namespace rpc
         //the service that this proxy lives in
         rpc::shared_ptr<service> get_operating_zone_service() const {return service_.lock();}
 
-        //for low level logging of rpc
-        const rpc::i_telemetry_service* get_telemetry_service(){return telemetry_service_;}
-
         rpc::shared_ptr<object_proxy> get_object_proxy(object object_id, bool& is_new)
         {
             RPC_ASSERT(get_caller_zone_id() == get_zone_id().as_caller());
@@ -574,7 +588,7 @@ namespace rpc
             if(op == nullptr)
             {
                 op = rpc::shared_ptr<object_proxy>(new object_proxy(object_id, shared_from_this()));
-                if(auto* telemetry_service = get_telemetry_service();telemetry_service)
+                if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
                 {
                     telemetry_service->on_object_proxy_creation(get_zone_id(), get_destination_zone_id(), object_id, true);
                 }        

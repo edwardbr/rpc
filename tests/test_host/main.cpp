@@ -100,7 +100,6 @@ class host :
     public yyy::i_host,
     public rpc::enable_shared_from_this<host>
 {
-    rpc::i_telemetry_service* telemetry_service_ = nullptr;
     bool use_v1_rpc_dll_ = false;
     rpc::zone zone_id_;
 
@@ -118,25 +117,25 @@ class host :
 
 public:
 
-    host(rpc::i_telemetry_service* telemetry_service, rpc::zone zone_id,  bool use_v1_rpc_dll = false) : 
-        telemetry_service_(telemetry_service), 
+    host(rpc::zone zone_id,  bool use_v1_rpc_dll = false) : 
         use_v1_rpc_dll_(use_v1_rpc_dll),
         zone_id_(zone_id)
     {
-        if(telemetry_service_)
-            telemetry_service_->on_impl_creation("host", (uint64_t)this, zone_id_);
+        if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            telemetry_service->on_impl_creation("host", (uint64_t)this, zone_id_);
     }
     virtual ~host()
     {
-        if(telemetry_service_)
-            telemetry_service_->on_impl_deletion("host", (uint64_t)this, zone_id_);
+        if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            telemetry_service->on_impl_deletion((uint64_t)this, zone_id_);
     }
     error_code create_enclave(rpc::shared_ptr<yyy::i_example>& target) override
     {
         rpc::shared_ptr<yyy::i_host> host = shared_from_this();
         auto serv = current_host_service.lock();
         auto err_code = serv->connect_to_zone<rpc::enclave_service_proxy>( 
-            {++(*zone_gen)}
+            "an enclave"
+            , {++(*zone_gen)}
             , host
             , target
             , use_v1_rpc_dll_ ? enclave_path_v1 : enclave_path);
@@ -200,9 +199,9 @@ public:
         auto test_info = ::testing::UnitTest::GetInstance()->current_test_info();
         if(enable_telemetry_server)
             CREATE_TELEMETRY_SERVICE(rpc::host_telemetry_service, test_info->test_suite_name(), test_info->name(), "../../rpc_test_diagram/")
-        i_host_ptr_ = rpc::shared_ptr<yyy::i_host> (new host(rpc::telemetry_service_manager::get().get(), {++zone_gen_}));
+        i_host_ptr_ = rpc::shared_ptr<yyy::i_host> (new host({++zone_gen_}));
         local_host_ptr_ = i_host_ptr_;
-        i_example_ptr_ = rpc::shared_ptr<yyy::i_example> (new example(rpc::telemetry_service_manager::get().get(), nullptr, use_host_in_child_ ? i_host_ptr_ : nullptr));
+        i_example_ptr_ = rpc::shared_ptr<yyy::i_example> (new example(nullptr, use_host_in_child_ ? i_host_ptr_ : nullptr));
     }
 
     virtual void TearDown()
@@ -276,15 +275,16 @@ public:
         if(enable_telemetry_server)
             CREATE_TELEMETRY_SERVICE(rpc::host_telemetry_service, test_info->test_suite_name(), test_info->name(), "../../rpc_test_diagram/")
 
-        root_service_ = rpc::make_shared<rpc::service>(rpc::zone{++zone_gen_}, rpc::telemetry_service_manager::get().get());
+        root_service_ = rpc::make_shared<rpc::service>("host", rpc::zone{++zone_gen_});
         root_service_->add_service_logger(std::make_shared<test_service_logger>());
         current_host_service = root_service_;
 
-        rpc::shared_ptr<yyy::i_host> hst(new host(rpc::telemetry_service_manager::get().get(), root_service_->get_zone_id()));
+        rpc::shared_ptr<yyy::i_host> hst(new host(root_service_->get_zone_id()));
         local_host_ptr_ = hst;//assign to weak ptr
         
         auto err_code = root_service_->connect_to_zone<rpc::local_child_service_proxy<yyy::i_example, yyy::i_host>>(
-            {++zone_gen_}
+            "main child"
+            , {++zone_gen_}
             , hst
             , i_example_ptr_
             , [&](
@@ -297,7 +297,7 @@ public:
                 example_import_idl_register_stubs(child_service_ptr);
                 example_shared_idl_register_stubs(child_service_ptr);
                 example_idl_register_stubs(child_service_ptr);
-                new_example = rpc::shared_ptr<yyy::i_example>(new example(child_service_ptr->get_telemetry_service(), child_service_ptr, nullptr));  
+                new_example = rpc::shared_ptr<yyy::i_example>(new example(child_service_ptr, nullptr));  
                 if(use_host_in_child_) 
                     new_example->set_host(host);
                 return rpc::error::OK();
@@ -324,7 +324,8 @@ public:
         rpc::shared_ptr<yyy::i_example> example_relay_ptr;
 
         auto err_code = root_service_->connect_to_zone<rpc::local_child_service_proxy<yyy::i_example, yyy::i_host>>(
-            {++zone_gen_}
+            "main child"
+            , {++zone_gen_}
             , hst
             , example_relay_ptr
             , [&](
@@ -335,7 +336,7 @@ public:
                 example_import_idl_register_stubs(child_service_ptr);
                 example_shared_idl_register_stubs(child_service_ptr);
                 example_idl_register_stubs(child_service_ptr);
-                new_example = rpc::shared_ptr<yyy::i_example>(new example(child_service_ptr->get_telemetry_service(), child_service_ptr, nullptr));  
+                new_example = rpc::shared_ptr<yyy::i_example>(new example(child_service_ptr, nullptr));  
                 if(use_host_in_child_) 
                     new_example->set_host(host);
                 return rpc::error::OK();
@@ -385,22 +386,23 @@ public:
         {
             CREATE_TELEMETRY_SERVICE(rpc::host_telemetry_service, test_info->test_suite_name(), test_info->name(), "../../rpc_test_diagram/")
         }
-        root_service_ = rpc::make_shared<rpc::service>(rpc::zone{++zone_gen_}, rpc::telemetry_service_manager::get().get());
+        root_service_ = rpc::make_shared<rpc::service>("host", rpc::zone{++zone_gen_});
         root_service_->add_service_logger(std::make_shared<test_service_logger>());
         example_import_idl_register_stubs(root_service_);
         example_shared_idl_register_stubs(root_service_);
         example_idl_register_stubs(root_service_);
         current_host_service = root_service_;
         
-        i_host_ptr_ = rpc::shared_ptr<yyy::i_host> (new host(rpc::telemetry_service_manager::get().get(), root_service_->get_zone_id(), use_v1_rpc_dll));
+        i_host_ptr_ = rpc::shared_ptr<yyy::i_host> (new host(root_service_->get_zone_id(), use_v1_rpc_dll));
         local_host_ptr_ = i_host_ptr_;        
 
 
         auto err_code = root_service_->connect_to_zone<rpc::enclave_service_proxy>(
-            {++(*zone_gen)}, 
-            use_host_in_child_ ? i_host_ptr_ : nullptr, 
-            i_example_ptr_, 
-            use_v1_rpc_dll ? enclave_path_v1 : enclave_path);
+            "main child"
+            , {++(*zone_gen)}
+            , use_host_in_child_ ? i_host_ptr_ : nullptr
+            , i_example_ptr_
+            , use_v1_rpc_dll ? enclave_path_v1 : enclave_path);
 
         ASSERT_ERROR_CODE(err_code);
     }
@@ -419,10 +421,11 @@ public:
         rpc::shared_ptr<yyy::i_example> ptr;
         
         auto err_code = root_service_->connect_to_zone<rpc::enclave_service_proxy>(
-            {++zone_gen_}, 
-            use_host_in_child_ ? i_host_ptr_ : nullptr, 
-            ptr, 
-            use_v1_rpc_dll ? enclave_path_v1 : enclave_path);
+            "main child"
+            , {++zone_gen_}
+            , use_host_in_child_ ? i_host_ptr_ : nullptr
+            , ptr
+            , use_v1_rpc_dll ? enclave_path_v1 : enclave_path);
             
         ASSERT_ERROR_CODE(err_code);
         if(CreateNewZoneThenCreateSubordinatedZone)
@@ -497,9 +500,9 @@ TYPED_TEST(type_test, standard_tests)
     else
         zone_id = {0};
 
-    foo f(rpc::telemetry_service_manager::get().get(), zone_id);
+    foo f(zone_id);
     
-    standard_tests(f, this->get_lib().get_has_enclave(), rpc::telemetry_service_manager::get().get());
+    standard_tests(f, this->get_lib().get_has_enclave());
 }
 
 TYPED_TEST(type_test, dyanmic_cast_tests)
@@ -510,7 +513,7 @@ TYPED_TEST(type_test, dyanmic_cast_tests)
         zone_id = root_service->get_zone_id();
     else
         zone_id = {0};
-    auto f = rpc::shared_ptr<xxx::i_foo>(new foo(rpc::telemetry_service_manager::get().get(), zone_id));
+    auto f = rpc::shared_ptr<xxx::i_foo>(new foo(zone_id));
 
     rpc::shared_ptr<xxx::i_baz> baz;
     ASSERT_EQ(f->create_baz_interface(baz), 0);
@@ -571,7 +574,7 @@ TYPED_TEST(remote_type_test, remote_standard_tests)
 {    
     rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
     ASSERT_EQ(this->get_lib().get_example()->create_foo(i_foo_ptr), 0);
-    standard_tests(*i_foo_ptr, true, rpc::telemetry_service_manager::get().get());
+    standard_tests(*i_foo_ptr, true);
 }
 
 TYPED_TEST(remote_type_test, multithreaded_standard_tests)
@@ -583,7 +586,7 @@ TYPED_TEST(remote_type_test, multithreaded_standard_tests)
     for(auto& thread_target : threads)
     {
         thread_target = std::thread([&](){
-            standard_tests(*i_foo_ptr, true, rpc::telemetry_service_manager::get().get());   
+            standard_tests(*i_foo_ptr, true);   
         });
     }
     for(auto& thread_target : threads)
@@ -600,7 +603,7 @@ TYPED_TEST(remote_type_test, multithreaded_standard_tests_with_and_foos)
         thread_target = std::thread([&](){
             rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
             ASSERT_EQ(this->get_lib().get_example()->create_foo(i_foo_ptr), 0);
-            standard_tests(*i_foo_ptr, true, rpc::telemetry_service_manager::get().get());   
+            standard_tests(*i_foo_ptr, true);   
         });
     }
     for(auto& thread_target : threads)
@@ -617,7 +620,7 @@ TYPED_TEST(remote_type_test, remote_tests)
         zone_id = root_service->get_zone_id();
     else
         zone_id = {0};
-    remote_tests(this->get_lib().get_use_host_in_child(), this->get_lib().get_example(), rpc::telemetry_service_manager::get().get(), zone_id);
+    remote_tests(this->get_lib().get_use_host_in_child(), this->get_lib().get_example(), zone_id);
 }
 
 TYPED_TEST(remote_type_test, multithreaded_remote_tests)
@@ -634,7 +637,7 @@ TYPED_TEST(remote_type_test, multithreaded_remote_tests)
     for(auto& thread_target : threads)
     {
         thread_target = std::thread([&](){
-            remote_tests(this->get_lib().get_use_host_in_child(), this->get_lib().get_example(), rpc::telemetry_service_manager::get().get(), zone_id);
+            remote_tests(this->get_lib().get_use_host_in_child(), this->get_lib().get_example(), zone_id);
         });
     }
     for(auto& thread_target : threads)
@@ -670,12 +673,12 @@ TYPED_TEST(remote_type_test, create_new_zone_releasing_host_then_running_on_othe
     rpc::shared_ptr<xxx::i_foo> i_foo_relay_ptr;
     auto example_relay_ptr = this->get_lib().create_new_zone();
     example_relay_ptr->create_foo(i_foo_relay_ptr);
-    standard_tests(*i_foo_relay_ptr, true, rpc::telemetry_service_manager::get().get());
+    standard_tests(*i_foo_relay_ptr, true);
 
     //rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
     //ASSERT_EQ(this->get_lib().get_example()->create_foo(i_foo_ptr), 0);
     example_relay_ptr = nullptr;
-    //standard_tests(*i_foo_ptr, true, rpc::telemetry_service_manager::get().get());    
+    //standard_tests(*i_foo_ptr, true);    
 }
 
 TYPED_TEST(remote_type_test, multithreaded_create_new_zone_releasing_host_then_running_on_other_enclave)
@@ -687,7 +690,7 @@ TYPED_TEST(remote_type_test, multithreaded_create_new_zone_releasing_host_then_r
             rpc::shared_ptr<xxx::i_foo> i_foo_relay_ptr;
             auto example_relay_ptr = this->get_lib().create_new_zone();
             example_relay_ptr->create_foo(i_foo_relay_ptr);
-            standard_tests(*i_foo_relay_ptr, true, rpc::telemetry_service_manager::get().get());
+            standard_tests(*i_foo_relay_ptr, true);
         });
     }
     for(auto& thread_target : threads)
@@ -776,7 +779,7 @@ TYPED_TEST(remote_type_test, check_for_multiple_sets)
     
     auto zone_id = i_foo_ptr->query_proxy_base()->get_object_proxy()->get_service_proxy()->get_zone_id();
 
-    auto b = rpc::make_shared<marshalled_tests::baz>(rpc::telemetry_service_manager::get().get(), zone_id);
+    auto b = rpc::make_shared<marshalled_tests::baz>(zone_id);
     // set
     i_foo_ptr->set_interface(b);
     // reset
@@ -798,7 +801,7 @@ TYPED_TEST(remote_type_test, check_for_interface_storage)
     rpc::shared_ptr<xxx::i_baz> c;
     auto zone_id = i_foo_ptr->query_proxy_base()->get_object_proxy()->get_service_proxy()->get_zone_id();
 
-    auto b = rpc::make_shared<marshalled_tests::baz>(rpc::telemetry_service_manager::get().get(), zone_id);
+    auto b = rpc::make_shared<marshalled_tests::baz>(zone_id);
     i_foo_ptr->set_interface(b);
     i_foo_ptr->get_interface(c);
     i_foo_ptr->set_interface(nullptr);
@@ -811,7 +814,7 @@ TYPED_TEST(remote_type_test, check_for_set_multiple_inheritance)
         return;
     auto proxy = this->get_lib().get_example()->query_proxy_base();        
     auto ret = this->get_lib().get_example()->give_interface(
-        rpc::shared_ptr<xxx::i_baz>(new multiple_inheritance(rpc::telemetry_service_manager::get().get(), proxy->get_object_proxy()->get_service_proxy()->get_zone_id())));
+        rpc::shared_ptr<xxx::i_baz>(new multiple_inheritance(proxy->get_object_proxy()->get_service_proxy()->get_zone_id())));
     RPC_ASSERT(ret == rpc::error::OK());
 }
 
@@ -823,7 +826,7 @@ TYPED_TEST(remote_type_test, host_test)
         zone_id = root_service->get_zone_id();
     else
         zone_id = {0};
-    auto h = rpc::make_shared<host>(rpc::telemetry_service_manager::get().get(), zone_id);
+    auto h = rpc::make_shared<host>(zone_id);
 
     rpc::shared_ptr<yyy::i_example> target;
     rpc::shared_ptr<yyy::i_example> target2;
@@ -850,7 +853,7 @@ TYPED_TEST(remote_type_test, check_for_call_enclave_zone)
     else
         zone_id = {0};
         
-    auto h = rpc::make_shared<host>(rpc::telemetry_service_manager::get().get(), zone_id);
+    auto h = rpc::make_shared<host>(zone_id);
     auto ret = this->get_lib().get_example()->call_create_enclave_val(h);
     RPC_ASSERT(ret == rpc::error::OK());
 }
@@ -945,7 +948,7 @@ TYPED_TEST(remote_type_test, multithreaded_two_zones_get_one_to_lookup_other)
         zone_id = root_service->get_zone_id();
     else
         zone_id = {0};
-    auto h = rpc::make_shared<host>(rpc::telemetry_service_manager::get().get(), zone_id);        
+    auto h = rpc::make_shared<host>(zone_id);        
     
     auto enclavea = this->get_lib().create_new_zone();
     enclavea->set_host(h);
@@ -1008,7 +1011,7 @@ TYPED_TEST(remote_type_test, check_identity)
 
 
     auto proxy = lib.get_example()->query_proxy_base();
-    auto base_baz = rpc::shared_ptr<xxx::i_baz>(new baz(rpc::telemetry_service_manager::get().get(), proxy->get_object_proxy()->get_service_proxy()->get_zone_id()));
+    auto base_baz = rpc::shared_ptr<xxx::i_baz>(new baz(proxy->get_object_proxy()->get_service_proxy()->get_zone_id()));
     auto input = base_baz;
 
     ASSERT_EQ(lib.get_example()->send_interface_back(input, output), rpc::error::OK());
