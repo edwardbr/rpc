@@ -245,12 +245,6 @@ namespace rpc
             service_(svc),            
             telemetry_service_(svc->get_telemetry_service())//cache the telemetry server pointer
         {
-#ifdef USE_RPC_LOGGING
-            auto message = std::string("service_proxy::service_proxy zone_id ") + std::to_string(zone_id_.get_val())
-            + std::string(" destination_zone_id ") + std::to_string(destination_zone_id_.get_val()) 
-            + std::string(" caller_zone_id ") + std::to_string(caller_zone_id.get_val());
-            LOG_STR(message.c_str(), message.size());
-#endif
             RPC_ASSERT(svc != nullptr);
         }
 
@@ -264,13 +258,6 @@ namespace rpc
                 telemetry_service_(other.telemetry_service_),
                 enc_(other.enc_)
         {
-#ifdef USE_RPC_LOGGING
-            auto message = std::string("service_proxy::service_proxy cloned zone_id ") + std::to_string(zone_id_.get_val())
-            + std::string(" destination_zone_id ") + std::to_string(destination_zone_id_.get_val()) 
-            + std::string(" destination_channel_zone_id ") + std::to_string(destination_channel_zone_.get_val())
-            + std::string(" caller_zone_id ") + std::to_string(caller_zone_id_.get_val());
-            LOG_STR(message.data(),message.size());
-#endif
             RPC_ASSERT(service_.lock() != nullptr);
         }
 
@@ -297,14 +284,6 @@ namespace rpc
             {
                 svc->remove_zone_proxy(destination_zone_id_, caller_zone_id_, destination_channel_zone_);
             }
-            
-#ifdef USE_RPC_LOGGING
-            auto message = std::string("service_proxy::~service_proxy zone_id ") + std::to_string(zone_id_.get_val())
-            + std::string(" destination_zone_id ") + std::to_string(destination_zone_id_.get_val()) 
-            + std::string(" destination_channel_zone_id ") + std::to_string(destination_channel_zone_.get_val())
-            + std::string(" caller_zone_id ") + std::to_string(caller_zone_id_.get_val());
-            LOG_STR(message.data(),message.size());
-#endif
         }
 
         uint64_t get_remote_rpc_version() const {return version_.load();}
@@ -332,14 +311,6 @@ namespace rpc
             {
                 telemetry_service->on_service_proxy_add_external_ref("service_proxy", zone_id_, destination_channel_zone_, destination_zone_id_, caller_zone_id_, count);
             } 
-#ifdef USE_RPC_LOGGING
-        auto message = std::string("service_proxy add_external_ref zone_id ") + std::to_string(zone_id_.get_val())
-            + std::string(" destination_zone_id ") + std::to_string(destination_zone_id_.get_val())
-            + std::string(" destination_channel_zone_id ") + std::to_string(destination_channel_zone_.get_val())
-            + std::string(" caller_zone_id ") + std::to_string(caller_zone_id_.get_val())
-            + std::string(" count ") + std::to_string(count);
-        LOG_STR(message.data(),message.size());
-#endif                       
             RPC_ASSERT(count >= 1);
             if(count == 1)
             {
@@ -362,14 +333,6 @@ namespace rpc
             {
                 telemetry_service->on_service_proxy_release_external_ref("service_proxy", zone_id_, destination_channel_zone_, destination_zone_id_, caller_zone_id_, count);
             }            
-#ifdef USE_RPC_LOGGING
-        auto message = std::string("service_proxy release_external_ref zone_id ") + std::to_string(zone_id_.get_val())
-            + std::string(" destination_zone_id ") + std::to_string(destination_zone_id_.get_val())
-            + std::string(" destination_channel_zone_id ") + std::to_string(destination_channel_zone_.get_val())
-            + std::string(" caller_zone_id ") + std::to_string(caller_zone_id_.get_val())
-            + std::string(" count ") + std::to_string(count);
-        LOG_STR(message.data(),message.size());
-#endif 
             RPC_ASSERT(count >= 0);
             if(count == 0 && is_parent_channel_ == false)
             {
@@ -519,16 +482,6 @@ namespace rpc
         {
             auto caller_zone_id = get_zone_id().as_caller();
             RPC_ASSERT(caller_zone_id == get_caller_zone_id());
-
-#ifdef USE_RPC_LOGGING
-            {
-                auto message = std::string("on_object_proxy_released zone_id ") + std::to_string(get_zone_id().get_val())
-                + std::string(", object_id ") + std::to_string(object_id.get_val())
-                + std::string(", destination_zone_id ") + std::to_string(destination_zone_id_.get_val()) 
-                + std::string(", called from ") + std::to_string(caller_zone_id.get_val());
-                LOG_STR(message.c_str(), message.size());
-            }
-#endif
 
             {
                 std::lock_guard l(insert_control_);

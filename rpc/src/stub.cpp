@@ -12,21 +12,11 @@ namespace rpc
     {
         if(telemetry_service_)
             telemetry_service_->on_stub_creation(zone_.get_zone_id(), id_, (uint64_t)target);
-#ifdef USE_RPC_LOGGING
-        auto message = std::string("object_stub::object_stub zone_id ") + std::to_string(zone_.get_zone_id()) 
-        + std::string(", object_id ") + std::to_string(id_);
-        LOG_STR(message.c_str(), message.size());
-#endif
     }
     object_stub::~object_stub()
     {
         if(telemetry_service_)
             telemetry_service_->on_stub_deletion(zone_.get_zone_id(), id_);
-#ifdef USE_RPC_LOGGING
-        auto message = std::string("object_stub::~object_stub zone_id ") + std::to_string(zone_.get_zone_id()) 
-        + std::string(", object_id ") + std::to_string(id_);
-        LOG_STR(message.c_str(), message.size());
-#endif
     }
 
     rpc::shared_ptr<rpc::casting_interface> object_stub::get_castable_interface() const

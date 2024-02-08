@@ -111,7 +111,7 @@ extern "C"
     void rpc_log(const char* str, size_t sz)
     {
 #ifdef USE_RPC_LOGGING        
-        spdlog::info(std::string(str, sz));
+        spdlog::error(std::string(str, sz));
 #endif
     }
     

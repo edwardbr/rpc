@@ -343,20 +343,12 @@ public:
         
         if(CreateNewZoneThenCreateSubordinatedZone)
         {
-#ifdef USE_RPC_LOGGING
-            auto message = std::string("******** create_example_in_subordnate_zone");
-            LOG_STR(message.data(),message.size());
-#endif         
             rpc::shared_ptr<yyy::i_example> new_ptr;
             auto err_code = example_relay_ptr->create_example_in_subordnate_zone(new_ptr, use_host_in_child_ ? hst : nullptr, ++zone_gen_);
             ASSERT_ERROR_CODE(err_code);
             example_relay_ptr->set_host(nullptr);
             example_relay_ptr = new_ptr;
         }
-#ifdef USE_RPC_LOGGING
-        auto message = std::string("******** returning");
-        LOG_STR(message.data(),message.size());
-#endif         
         return example_relay_ptr;
     }
 };

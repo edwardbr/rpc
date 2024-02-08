@@ -32,20 +32,12 @@ namespace rpc
     {
         if(telemetry_service_)
             telemetry_service_->on_service_creation("", zone_id);
-#ifdef USE_RPC_LOGGING
-        auto message = std::string("new service zone_id ") + std::to_string(zone_id.get_val());
-        LOG_STR(message.data(),message.size());
-#endif
     }
 
     service::~service() 
     {
         if(telemetry_service_)
             telemetry_service_->on_service_deletion("", zone_id_);        
-#ifdef USE_RPC_LOGGING
-        auto message = std::string("~service zone_id ") + std::to_string(zone_id_.get_val());
-        LOG_STR(message.data(),message.size());
-#endif
 
         object_id_generator = 0;
         // to do: RPC_ASSERT that there are no more object_stubs in memory

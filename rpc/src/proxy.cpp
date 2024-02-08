@@ -7,15 +7,7 @@ namespace rpc
                                 rpc::shared_ptr<service_proxy> service_proxy)
         : object_id_(object_id)
         , service_proxy_(service_proxy)
-    {
-#ifdef USE_RPC_LOGGING
-        auto message = std::string("object_proxy::object_proxy zone_id ") + std::to_string(service_proxy->get_zone_id().get_val())
-        + std::string(", object_id ") + std::to_string(object_id.get_val())
-        + std::string(", destination_zone_id ") + std::to_string(service_proxy_->get_destination_zone_id().get_val()) 
-        + std::string(", cloned from ") + std::to_string(service_proxy->get_destination_channel_zone_id().get_val());
-        LOG_STR(message.c_str(), message.size());
-#endif
-    }
+    {}
 
     object_proxy::~object_proxy() 
     { 
@@ -23,14 +15,6 @@ namespace rpc
         {
             telemetry_service->on_object_proxy_deletion(service_proxy_->get_zone_id(), service_proxy_->get_destination_zone_id(), object_id_);
         }
-
-#ifdef USE_RPC_LOGGING
-        auto message = std::string("object_proxy::~object_proxy zone_id ") + std::to_string(service_proxy_->get_zone_id().get_val())
-        + std::string(", object_id ") + std::to_string(object_id_.get_val())
-        + std::string(", destination_zone_id ") + std::to_string(service_proxy_->get_destination_zone_id().get_val()) 
-        + std::string(", cloned from ") + std::to_string(service_proxy_->get_destination_channel_zone_id().get_val());
-        LOG_STR(message.c_str(), message.size());
-#endif
 
         service_proxy_->on_object_proxy_released(object_id_);
         service_proxy_ = nullptr;
