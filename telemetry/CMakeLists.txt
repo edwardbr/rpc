@@ -2,15 +2,16 @@
 
 cmake_minimum_required(VERSION 3.24)
 
-message("rpc_telemetry_enclave")
-
 if(${BUILD_ENCLAVE})
-    add_library(rpc_telemetry_interface INTERFACE)
-    target_include_directories(rpc_telemetry_interface INTERFACE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>")
+  message("rpc_telemetry_interface")
+  add_library(rpc_telemetry_interface INTERFACE)
+  target_include_directories(rpc_telemetry_interface INTERFACE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>")
 
-    add_library(rpc::rpc_telemetry_interface ALIAS rpc_telemetry_interface)        
-    
-    add_library(
+  add_library(rpc::rpc_telemetry_interface ALIAS rpc_telemetry_interface)        
+  
+  message("rpc_telemetry_enclave")
+  if(USE_RPC_TELEMETRY)
+      add_library(
         rpc_telemetry_enclave 
         STATIC
         src/enclave_telemetry_service.cpp)
@@ -36,11 +37,12 @@ if(${BUILD_ENCLAVE})
     set_property(TARGET rpc_telemetry_enclave PROPERTY COMPILE_PDB_NAME rpc_telemetry_enclave)
   
     add_library(rpc::rpc_telemetry_enclave ALIAS rpc_telemetry_enclave)       
-
+  endif()
 endif()
 
 if(${BUILD_HOST})
 
+  message("rpc_telemetry_host")
   add_library(rpc_telemetry_host STATIC 
     src/host_telemetry_service.cpp
     src/telemetry_handler.cpp)

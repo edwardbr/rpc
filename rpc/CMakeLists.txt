@@ -7,11 +7,11 @@ else()
 endif()
 
 if(USE_RPC_TELEMETRY)
-set(ENCLAVE_TELEMETRY_SERVICE rpc::rpc_telemetry_enclave)
-set(HOST_TELEMETRY_SERVICE rpc::rpc_telemetry_host)
+  set(ENCLAVE_TELEMETRY_SERVICE rpc::rpc_telemetry_enclave)
+  set(HOST_TELEMETRY_SERVICE rpc::rpc_telemetry_host)
 else()
-set(ENCLAVE_TELEMETRY_SERVICE)
-set(HOST_TELEMETRY_SERVICE)
+  set(ENCLAVE_TELEMETRY_SERVICE)
+  set(HOST_TELEMETRY_SERVICE)
 endif()
 
 add_library(
