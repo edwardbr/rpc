@@ -24,18 +24,16 @@ namespace rpc
     
     bool host_telemetry_service::create(std::shared_ptr<rpc::i_telemetry_service>& service, const std::string& test_suite_name, const std::string& name, const std::filesystem::path& directory) 
     { 
-        std::string output_path_name("../../rpc_test_diagram/");
-        
-        std::filesystem::create_directory(directory);
-
         auto fixed_name = test_suite_name;
         for(auto& ch : fixed_name)
         {
             if(ch == '/')
                 ch = '#';
         }
+        std::error_code ec;
+        std::filesystem::create_directories(directory / fixed_name, ec);
 
-        auto file_name = directory / (fixed_name + "." + name + ".pu");
+        auto file_name = directory / fixed_name / (name + ".pu");
         std::string fn = file_name.string();
             
         auto output = ::fopen(fn.c_str(), "w+");
@@ -184,14 +182,17 @@ namespace rpc
 
     void host_telemetry_service::on_service_try_cast(rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::caller_zone caller_zone_id, rpc::object object_id, rpc::interface_ordinal interface_id) const
     {
+#ifdef USE_RPC_TELEMETRY_RAII_LOGGING
         if(zone_id.as_destination() == destination_zone_id)
             fmt::println(output_, "{} -> {} : try_cast {}", service_alias(zone_id), object_proxy_alias({zone_id}, destination_zone_id, object_id), interface_id.get_val());
         else
             fmt::println(output_, "{} -> {} : try_cast {}", service_alias(zone_id), service_proxy_alias({zone_id}, destination_zone_id, caller_zone_id), interface_id.get_val());
+#endif            
     }
 
     void host_telemetry_service::on_service_add_ref(rpc::zone zone_id, rpc::destination_channel_zone destination_channel_zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::caller_channel_zone caller_channel_zone_id, rpc::caller_zone caller_zone_id, rpc::add_ref_options options) const
     {
+#ifdef USE_RPC_TELEMETRY_RAII_LOGGING
         auto dest = destination_channel_zone_id.get_val() ? rpc::zone(destination_channel_zone_id.id) : destination_zone_id.as_zone();
 
         if(rpc::add_ref_options::normal == options)
@@ -245,10 +246,12 @@ namespace rpc
                 }
             }
         }
+#endif        
     }
 
     void host_telemetry_service::on_service_release(rpc::zone zone_id, rpc::destination_channel_zone destination_channel_zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::caller_zone caller_zone_id) const
     {
+#ifdef USE_RPC_TELEMETRY_RAII_LOGGING
         auto dest = destination_channel_zone_id.get_val() ? rpc::zone(destination_channel_zone_id.id) : destination_zone_id.as_zone();
 
         if(zone_id != dest)
@@ -263,11 +266,13 @@ namespace rpc
         // {
             fmt::println(output_, "{} -> {} : release", service_alias(zone_id), object_stub_alias(zone_id, object_id));
         }
+#endif        
     }  
 
 
     void host_telemetry_service::on_service_proxy_creation(const char* name, rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::caller_zone caller_zone_id) const
     {   
+#ifdef USE_RPC_TELEMETRY_RAII_LOGGING
         std::string route_name; 
         std::string destination_name; 
             
@@ -308,10 +313,12 @@ namespace rpc
             service_proxies.emplace(orig_zone{zone_id, destination_zone_id, caller_zone_id}, name_count{name, 0});
         }
         fflush(output_);
+#endif        
     }
 
     void host_telemetry_service::on_service_proxy_deletion(rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::caller_zone caller_zone_id) const
     {
+#ifdef USE_RPC_TELEMETRY_RAII_LOGGING
         std::lock_guard g(mux);
         std::string name;
         uint64_t count = 0;
@@ -340,16 +347,20 @@ namespace rpc
             fmt::println(output_, "hnote over {} #red : deleted (still being used!)", service_proxy_alias(zone_id, destination_zone_id, caller_zone_id));    
         }
         fflush(output_);
+#endif       
     }
 
     void host_telemetry_service::on_service_proxy_try_cast(rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::caller_zone caller_zone_id, rpc::object object_id, rpc::interface_ordinal interface_id) const
     {
+#ifdef USE_RPC_TELEMETRY_RAII_LOGGING
         fmt::println(output_, "{} -> {} : try_cast", service_proxy_alias(zone_id, destination_zone_id, caller_zone_id), service_alias(zone_id));    
         fflush(output_);
+#endif        
     }
 
     void host_telemetry_service::on_service_proxy_add_ref(rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::destination_channel_zone destination_channel_zone_id, rpc::caller_zone caller_zone_id, rpc::object object_id, rpc::add_ref_options options) const
     {
+#ifdef USE_RPC_TELEMETRY_RAII_LOGGING
         std::string type;
         if(!!(options & rpc::add_ref_options::build_caller_route) && !!(options & rpc::add_ref_options::build_destination_route))
         {
@@ -389,20 +400,12 @@ namespace rpc
             fmt::println(output_, "{} -> {} : add_ref {} {}", service_proxy_alias(zone_id, destination_zone_id, caller_zone_id), service_alias(dest), type, get_thread_id());    
         }
         fflush(output_);
+#endif        
     }
 
     void host_telemetry_service::on_service_proxy_release(rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::destination_channel_zone destination_channel_zone_id, rpc::caller_zone caller_zone_id, rpc::object object_id) const
     {
-        // std::lock_guard g(mux);
-        // auto found = service_proxies.find(orig_zone{zone_id, destination_zone_id, caller_zone_id});
-        // if(found == service_proxies.end())
-        // {
-        //     spdlog::error("object release not found name {} zone_id {} destination_zone_id {} caller_zone_id {}", name, zone_id.get_val(), destination_zone_id.get_val(), caller_zone_id.get_val());
-        // }
-        // else
-        // {
-        //     fmt::println(output_, "object release name {} zone_id {} destination_zone_id {} caller_zone_id {} object_id {}", name, zone_id.get_val(), destination_zone_id.get_val(), caller_zone_id.get_val(), object_id.get_val());
-        // }
+#ifdef USE_RPC_TELEMETRY_RAII_LOGGING
         auto dest = destination_channel_zone_id.get_val() ? rpc::zone(destination_channel_zone_id.id) : destination_zone_id.as_zone();
 
         if(object_id == rpc::dummy_object_id)
@@ -414,10 +417,12 @@ namespace rpc
             fmt::println(output_, "{} -> {} : release {}", service_proxy_alias(zone_id, destination_zone_id, caller_zone_id), service_alias(dest), get_thread_id());    
         }
         fflush(output_);
+#endif        
     }
 
     void host_telemetry_service::on_service_proxy_add_external_ref(rpc::zone zone_id, rpc::destination_channel_zone destination_channel_zone_id, rpc::destination_zone destination_zone_id, rpc::caller_zone caller_zone_id, int ref_count) const
     {
+#ifdef USE_RPC_TELEMETRY_RAII_LOGGING
         std::lock_guard g(mux);
         auto found = service_proxies.find(orig_zone{zone_id, destination_zone_id, caller_zone_id});
         if(found == service_proxies.end())
@@ -451,10 +456,12 @@ namespace rpc
         }
         fmt::println(output_, "hnote over {} : add_external_ref {} {}", service_proxy_alias(zone_id, destination_zone_id, caller_zone_id), get_thread_id(), ref_count);
         fflush(output_);
+#endif        
     }
 
     void host_telemetry_service::on_service_proxy_release_external_ref(rpc::zone zone_id, rpc::destination_channel_zone destination_channel_zone_id, rpc::destination_zone destination_zone_id, rpc::caller_zone caller_zone_id, int ref_count) const
     {
+#ifdef USE_RPC_TELEMETRY_RAII_LOGGING
         std::lock_guard g(mux);
         auto found = service_proxies.find(orig_zone{zone_id, destination_zone_id, caller_zone_id});
         if(found == service_proxies.end())
@@ -472,16 +479,12 @@ namespace rpc
         
         fmt::println(output_, "hnote over {} : release_external_ref {} {}", service_proxy_alias(zone_id, destination_zone_id, caller_zone_id), get_thread_id(), ref_count);
         fflush(output_);
+#endif        
     }
 
 
-    void host_telemetry_service::on_impl_creation(const char* name, uint64_t address, rpc::zone zone_id) const
+    void host_telemetry_service::add_new_object(const char* name, uint64_t address, rpc::zone zone_id) const
     {
-        std::lock_guard g(mux);
-        if(historical_impls.find(address) != historical_impls.end())
-        {
-            RPC_ASSERT(!"historical address reused");
-        }
         auto found = impls.find(address);
         if(found == impls.end())
         {
@@ -493,11 +496,22 @@ namespace rpc
             if(found->second.zone_id != zone_id)
                 RPC_ASSERT(!"object being registered in two zones");
             else
-                RPC_ASSERT(!"new object registered twice");
+                return;
         }
         
         fmt::println(output_, "participant \"{}\" as {} order {}", name, object_alias(address), object_order(zone_id, address)); 
         fmt::println(output_, "activate {}", object_alias(address));
+    }
+
+
+    void host_telemetry_service::on_impl_creation(const char* name, uint64_t address, rpc::zone zone_id) const
+    {
+        std::lock_guard g(mux);
+        if(historical_impls.find(address) != historical_impls.end())
+        {
+            RPC_ASSERT(!"historical address reused");
+        }
+        add_new_object(name, address, zone_id);
         fflush(output_);
     }
 
@@ -522,25 +536,10 @@ namespace rpc
     void host_telemetry_service::on_stub_creation(rpc::zone zone_id, rpc::object object_id, uint64_t address) const
     {
         std::lock_guard g(mux);
-        auto hi = historical_impls.find(address);
-        if(hi != historical_impls.end() && hi->second != zone_id)
-        {
-            if(hi->second == 0)
-                hi->second = zone_id;
-            else if(services.find(hi->second) != services.end())
-                RPC_ASSERT(!"object already assigned to a different zone");
-            else
-                hi->second = zone_id;
-        }
-        else
-        {
-            historical_impls[address] = zone_id;
-        }
-
-        fmt::println(output_, "participant \"{}\" as {} order {}", object_alias(address), object_alias(address), object_order(zone_id, address)); 
-        fmt::println(output_, "activate {}", object_alias(address));
         
-        stubs.emplace(zone_object{zone_id, object_id}, 0);
+        add_new_object("unknown", address, zone_id);
+        stubs.emplace(zone_object{zone_id, object_id}, address);
+#ifdef USE_RPC_TELEMETRY_RAII_LOGGING
         fmt::println(output_, "participant \"object stub\\nzone {}\\nobject {}\" as {} order {} #lime"
             , zone_id.get_val()
             , object_id.get_val()
@@ -549,6 +548,7 @@ namespace rpc
             );
         fmt::println(output_, "activate {} #lime", object_stub_alias(zone_id, object_id));
         fmt::println(output_, "{} --> {} : links to", object_stub_alias(zone_id, object_id), object_alias(address));
+#endif        
         fflush(output_);
     }
 
@@ -560,6 +560,7 @@ namespace rpc
         {
             spdlog::error("stub not found zone_id {}", zone_id.get_val());
         }
+#ifdef USE_RPC_TELEMETRY_RAII_LOGGING
         else
         {
             if(found->second == 0)
@@ -574,17 +575,23 @@ namespace rpc
             }
             fmt::println(output_, "hnote over {} : deleted", object_stub_alias(zone_id, object_id));        
         }
+#else
+                stubs.erase(found);
+#endif        
         fflush(output_);
     }
 
     void host_telemetry_service::on_stub_send(rpc::zone zone_id, rpc::object object_id, rpc::interface_ordinal interface_id, rpc::method method_id) const
     {
+#ifdef USE_RPC_TELEMETRY_RAII_LOGGING
         fmt::println(output_, "note over {} : send", object_stub_alias(zone_id, object_id));
         fflush(output_);
+#endif        
     }
 
     void host_telemetry_service::on_stub_add_ref(rpc::zone zone, rpc::object object_id, rpc::interface_ordinal interface_id, uint64_t count, rpc::caller_zone caller_zone_id) const
     {
+#ifdef USE_RPC_TELEMETRY_RAII_LOGGING
         std::lock_guard g(mux);
         auto found = stubs.find(zone_object{zone, object_id});
         if(found == stubs.end())
@@ -597,10 +604,12 @@ namespace rpc
             fmt::println(output_, "hnote over {} : begin add_ref count {} ", object_stub_alias(zone, object_id), count);
         }
         fflush(output_);
+#endif        
     }
 
     void host_telemetry_service::on_stub_release(rpc::zone zone, rpc::object object_id, rpc::interface_ordinal interface_id, uint64_t count, rpc::caller_zone caller_zone_id) const
     {
+#ifdef USE_RPC_TELEMETRY_RAII_LOGGING
         std::lock_guard g(mux);
         auto found = stubs.find(zone_object{zone, object_id});
         if(found == stubs.end())
@@ -619,10 +628,13 @@ namespace rpc
             }
         }
         fflush(output_);
+#endif        
     }
 
     void host_telemetry_service::on_object_proxy_creation(rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, bool add_ref_done) const
     {
+#ifdef USE_RPC_TELEMETRY_RAII_LOGGING
+
         std::lock_guard g(mux);
         object_proxies.emplace(interface_proxy_id{zone_id, destination_zone_id, object_id, {0}}, 1);
         fmt::println(output_, "participant \"object_proxy\\nzone {}\\ndestination {}\\nobject {}\" as {} order {} #pink"
@@ -642,10 +654,12 @@ namespace rpc
             fmt::println(output_, "{} -> {} : add_ref", object_proxy_alias(zone_id, destination_zone_id, object_id), service_proxy_alias(zone_id, destination_zone_id, zone_id.as_caller()));    
         }
         fflush(output_);
+#endif
     }
 
     void host_telemetry_service::on_object_proxy_deletion(rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id) const
     {
+#ifdef USE_RPC_TELEMETRY_RAII_LOGGING
         std::lock_guard g(mux);
         auto found = object_proxies.find(interface_proxy_id{zone_id, destination_zone_id, object_id, {0}});
         if(found == object_proxies.end())
@@ -668,18 +682,22 @@ namespace rpc
             }
         }
         fflush(output_);
+#endif        
     }
 
     void host_telemetry_service::on_interface_proxy_creation(const char* name, rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::interface_ordinal interface_id) const
     {
+#ifdef USE_RPC_TELEMETRY_RAII_LOGGING
         std::lock_guard g(mux);
         interface_proxies.emplace(interface_proxy_id{zone_id, destination_zone_id, object_id, interface_id}, name_count{name, 1});
         fmt::println(output_, "hnote over {} : new interface proxy \\n {}", object_proxy_alias(zone_id, destination_zone_id, object_id), name);
         fflush(output_);
+#endif        
     }
 
     void host_telemetry_service::on_interface_proxy_deletion(rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::interface_ordinal interface_id) const
     {
+#ifdef USE_RPC_TELEMETRY_RAII_LOGGING
         std::lock_guard g(mux);
         auto found = interface_proxies.find(interface_proxy_id{zone_id, destination_zone_id, object_id, interface_id});
         if(found == interface_proxies.end())
@@ -701,11 +719,24 @@ namespace rpc
             }
         }
         fflush(output_);
+#endif        
     }
 
     void host_telemetry_service::on_interface_proxy_send(const char* method_name, rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::interface_ordinal interface_id, rpc::method method_id) const
     {
+#ifdef USE_RPC_TELEMETRY_RAII_LOGGING
         fmt::println(output_, "{} -> {} : {}", object_proxy_alias(zone_id, destination_zone_id, object_id), object_stub_alias(destination_zone_id.as_zone(), object_id), method_name);
+#else      
+        auto ob = stubs.find({destination_zone_id.as_zone(), object_id});
+        if(ob != stubs.end())
+        {
+            fmt::println(output_, "{} -> {} : {}", service_alias(zone_id), object_alias(ob->second), method_name);
+        }
+        else
+        {
+            fmt::println(output_, "{} -> {} : {}", service_alias(zone_id), service_alias(destination_zone_id.as_zone()), method_name);
+        }
+#endif        
         fflush(output_);
     }
 

@@ -68,6 +68,7 @@ std::string enclave_path_v1 = "./libmarshal_test_enclave_v1.signed.so";
 
 TELEMETRY_SERVICE_MANAGER
 bool enable_telemetry_server = true;
+bool enable_multithreaded_tests = false;
 
 rpc::weak_ptr<rpc::service> current_host_service;
 
@@ -80,13 +81,16 @@ namespace {
 	extern "C" int main(int argc, char* argv[])
 	{
         std::string disable_telemetry_server;
+        std::string enable_multithreaded_tests_flag;
         auto cli = (
-			clipp::option("-t", "--disable_telemetry_server").doc("disable the telemetry_server") & clipp::value("disable_telemetry_server", disable_telemetry_server)
+			clipp::option("-t", "--disable_telemetry_server").doc("disable the telemetry_server") & clipp::value("disable_telemetry_server", disable_telemetry_server),
+			clipp::option("-m", "--enable_multithreaded_tests").doc("enable multithreaded tests") & clipp::value("enable_multithreaded_tests", enable_multithreaded_tests_flag)
         );
 
         clipp::parsing_result res = clipp::parse(argc, argv, cli);
         
         enable_telemetry_server = disable_telemetry_server != "true";
+        enable_multithreaded_tests = enable_multithreaded_tests_flag == "true";
         
         auto logger = spdlog::stdout_color_mt("console");
         logger->set_pattern("[%^%l%$] %v");        
@@ -579,6 +583,12 @@ TYPED_TEST(remote_type_test, remote_standard_tests)
 
 TYPED_TEST(remote_type_test, multithreaded_standard_tests)
 {
+    if(!enable_multithreaded_tests || this->get_lib().is_enclave_setup())
+    {
+        GTEST_SKIP() << "multithreaded tests are skipped";
+        return;
+    }
+
     rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
     ASSERT_EQ(this->get_lib().get_example()->create_foo(i_foo_ptr), 0);
     
@@ -597,6 +607,12 @@ TYPED_TEST(remote_type_test, multithreaded_standard_tests)
 
 TYPED_TEST(remote_type_test, multithreaded_standard_tests_with_and_foos)
 {
+    if(!enable_multithreaded_tests || this->get_lib().is_enclave_setup())
+    {
+        GTEST_SKIP() << "multithreaded tests are skipped";
+        return;
+    }
+
     std::vector<std::thread> threads(this->get_lib().is_enclave_setup() ? 3 : 100);
     for(auto& thread_target : threads)
     {
@@ -625,8 +641,12 @@ TYPED_TEST(remote_type_test, remote_tests)
 
 TYPED_TEST(remote_type_test, multithreaded_remote_tests)
 {
-    if(this->get_lib().is_enclave_setup())
-        return; // enclaves barf on memory exhastion;
+    if(!enable_multithreaded_tests || this->get_lib().is_enclave_setup())
+    {
+        GTEST_SKIP() << "multithreaded tests are skipped";
+        return;
+    }
+
     auto root_service = this->get_lib().get_root_service();
     rpc::zone zone_id;
     if(root_service)
@@ -654,6 +674,12 @@ TYPED_TEST(remote_type_test, create_new_zone)
 
 TYPED_TEST(remote_type_test, multithreaded_create_new_zone)
 {
+    if(!enable_multithreaded_tests || this->get_lib().is_enclave_setup())
+    {
+        GTEST_SKIP() << "multithreaded tests are skipped";
+        return;
+    }
+
     std::vector<std::thread> threads(this->get_lib().is_enclave_setup() ? 3 : 100);
     for(auto& thread_target : threads)
     {
@@ -683,6 +709,12 @@ TYPED_TEST(remote_type_test, create_new_zone_releasing_host_then_running_on_othe
 
 TYPED_TEST(remote_type_test, multithreaded_create_new_zone_releasing_host_then_running_on_other_enclave)
 {
+    if(!enable_multithreaded_tests || this->get_lib().is_enclave_setup())
+    {
+        GTEST_SKIP() << "multithreaded tests are skipped";
+        return;
+    }
+
     std::vector<std::thread> threads(this->get_lib().is_enclave_setup() ? 3 : 100);
     for(auto& thread_target : threads)
     {
@@ -734,8 +766,12 @@ TYPED_TEST(remote_type_test, bounce_baz_between_two_interfaces)
 
 TYPED_TEST(remote_type_test, multithreaded_bounce_baz_between_two_interfaces)
 {
-    if(this->get_lib().is_enclave_setup())
-        return; // enclaves barf on memory exhastion
+    if(!enable_multithreaded_tests || this->get_lib().is_enclave_setup())
+    {
+        GTEST_SKIP() << "multithreaded tests are skipped";
+        return;
+    }
+
     
     std::vector<std::thread> threads(this->get_lib().is_enclave_setup() ? 3 : 100);
     for(auto& thread_target : threads)
@@ -873,6 +909,12 @@ TYPED_TEST(remote_type_test, check_sub_subordinate)
 
 TYPED_TEST(remote_type_test, multithreaded_check_sub_subordinate)
 {
+    if(!enable_multithreaded_tests || this->get_lib().is_enclave_setup())
+    {
+        GTEST_SKIP() << "multithreaded tests are skipped";
+        return;
+    }
+
     auto& lib = this->get_lib();
     if(!lib.get_use_host_in_child())
         return;
@@ -934,13 +976,12 @@ TYPED_TEST(remote_type_test, two_zones_get_one_to_lookup_other)
 }
 TYPED_TEST(remote_type_test, multithreaded_two_zones_get_one_to_lookup_other)
 {
-#ifdef WIN32
-    if(this->get_lib().is_enclave_setup())
+    if(!enable_multithreaded_tests || this->get_lib().is_enclave_setup())
     {
-        GTEST_SKIP() << "skipping this as we exceed TCS memory on laptops";
+        GTEST_SKIP() << "multithreaded tests are skipped";
         return;
     }
-#endif
+
     auto root_service = this->get_lib().get_root_service();
 
     rpc::zone zone_id;
@@ -1145,8 +1186,6 @@ TYPED_TEST(type_test_with_host, call_host_look_up_app_unload_app)
     ASSERT_NE(target, nullptr);
 
     ASSERT_EQ(this->get_lib().get_example()->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
-    if(rpc::telemetry_service_manager::get())
-        rpc::telemetry_service_manager::get()->message(rpc::i_telemetry_service::info, "call_host_unload_app");
     ASSERT_EQ(this->get_lib().get_example()->call_host_unload_app("target"), rpc::error::OK());
     target = nullptr;
 }
@@ -1161,15 +1200,9 @@ TYPED_TEST(type_test_with_host, call_host_look_up_app_not_return)
     ASSERT_NE(target, nullptr);
 
     ASSERT_EQ(this->get_lib().get_example()->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
-    if(rpc::telemetry_service_manager::get())
-        rpc::telemetry_service_manager::get()->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return");
     ASSERT_EQ(this->get_lib().get_example()->call_host_look_up_app_not_return("target", run_standard_tests), rpc::error::OK());
-    if(rpc::telemetry_service_manager::get())
-        rpc::telemetry_service_manager::get()->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return complete");
     ASSERT_EQ(this->get_lib().get_example()->call_host_unload_app("target"), rpc::error::OK());
     target = nullptr;
-    if(rpc::telemetry_service_manager::get())
-        rpc::telemetry_service_manager::get()->message(rpc::i_telemetry_service::info, "app released");
 }
 
 TYPED_TEST(type_test_with_host, create_store_fetch_delete)
@@ -1182,17 +1215,11 @@ TYPED_TEST(type_test_with_host, create_store_fetch_delete)
     ASSERT_NE(target, nullptr);
 
     ASSERT_EQ(this->get_lib().get_example()->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
-    if(rpc::telemetry_service_manager::get())
-        rpc::telemetry_service_manager::get()->message(rpc::i_telemetry_service::info, "call_host_look_up_app");
     ASSERT_EQ(this->get_lib().get_example()->call_host_look_up_app("target", target2, run_standard_tests), rpc::error::OK());
-    if(rpc::telemetry_service_manager::get())
-        rpc::telemetry_service_manager::get()->message(rpc::i_telemetry_service::info, "call_host_look_up_app complete");
     ASSERT_EQ(this->get_lib().get_example()->call_host_unload_app("target"), rpc::error::OK());
     ASSERT_EQ(target, target2);
     target = nullptr;
     target2 = nullptr;
-    if(rpc::telemetry_service_manager::get())
-        rpc::telemetry_service_manager::get()->message(rpc::i_telemetry_service::info, "app released");
 }
 
 TYPED_TEST(type_test_with_host, create_store_not_return_delete)
@@ -1204,14 +1231,8 @@ TYPED_TEST(type_test_with_host, create_store_not_return_delete)
     ASSERT_NE(target, nullptr);
 
     ASSERT_EQ(this->get_lib().get_example()->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
-    if(rpc::telemetry_service_manager::get())
-        rpc::telemetry_service_manager::get()->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return");
     ASSERT_EQ(this->get_lib().get_example()->call_host_look_up_app_not_return_and_delete("target", run_standard_tests), rpc::error::OK());
-    if(rpc::telemetry_service_manager::get())
-        rpc::telemetry_service_manager::get()->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return complete");
     target = nullptr;
-    if(rpc::telemetry_service_manager::get())
-        rpc::telemetry_service_manager::get()->message(rpc::i_telemetry_service::info, "app released");
 }
 
 TYPED_TEST(type_test_with_host, create_store_delete)
@@ -1224,16 +1245,10 @@ TYPED_TEST(type_test_with_host, create_store_delete)
     ASSERT_NE(target, nullptr);
 
     ASSERT_EQ(this->get_lib().get_example()->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
-    if(rpc::telemetry_service_manager::get())
-        rpc::telemetry_service_manager::get()->message(rpc::i_telemetry_service::info, "call_host_look_up_app_and_delete");
     ASSERT_EQ(this->get_lib().get_example()->call_host_look_up_app_and_delete("target", target2, run_standard_tests), rpc::error::OK());
-    if(rpc::telemetry_service_manager::get())
-        rpc::telemetry_service_manager::get()->message(rpc::i_telemetry_service::info, "call_host_look_up_app_and_delete complete");
     ASSERT_EQ(target, target2);
     target = nullptr;
     target2 = nullptr;
-    if(rpc::telemetry_service_manager::get())
-        rpc::telemetry_service_manager::get()->message(rpc::i_telemetry_service::info, "app released");
 }
 
 TYPED_TEST(type_test_with_host, create_subordinate_zone)

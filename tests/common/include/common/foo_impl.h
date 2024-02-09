@@ -531,8 +531,6 @@ namespace marshalled_tests
                 if(err != rpc::error::OK())
                     return err;
             }
-            if (telemetry_service)
-                telemetry_service->message(rpc::i_telemetry_service::info, "app released");
             if(run_standard_tests && app)
             {
                 int sum = 0;
@@ -607,8 +605,6 @@ namespace marshalled_tests
                         return rpc::error::INVALID_DATA();
                 }
             }
-            if (telemetry_service)
-                telemetry_service->message(rpc::i_telemetry_service::info, "app released");
             return rpc::error::OK();
         }  
         

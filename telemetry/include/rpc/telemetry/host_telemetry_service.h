@@ -109,6 +109,8 @@ namespace rpc
         FILE* output_ = nullptr;
 
         host_telemetry_service(FILE* output);
+        
+        void add_new_object(const char* name, uint64_t address, rpc::zone zone_id) const;
 
     public:
         static bool create(std::shared_ptr<rpc::i_telemetry_service>& service, const std::string& test_suite_name, const std::string& name, const std::filesystem::path& directory);
