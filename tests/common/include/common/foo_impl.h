@@ -211,7 +211,10 @@ namespace marshalled_tests
         }
         error_code recieve_something_more_complicated_in_out_ref(xxx::something_more_complicated& val) override
         {
-            log(std::string("got ") + val.map_val.begin()->first);
+            if(val.map_val.size())
+                log(std::string("got ") + val.map_val.begin()->first);
+            else
+                RPC_ASSERT(!"value is null");
             val.map_val["22"] = xxx::something_complicated {33, "23"};
             return rpc::error::OK();
         }

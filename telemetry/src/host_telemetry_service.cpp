@@ -494,9 +494,13 @@ namespace rpc
         else
         {
             if(found->second.zone_id != zone_id)
+            {
                 RPC_ASSERT(!"object being registered in two zones");
+            }
             else
+            {
                 return;
+            }
         }
         
         fmt::println(output_, "participant \"{}\" as {} order {}", name, object_alias(address), object_order(zone_id, address)); 
