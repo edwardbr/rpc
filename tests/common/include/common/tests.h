@@ -2,11 +2,13 @@
 
 #include <example/example.h>
 #include <rpc/error_codes.h>
-#include <rpc/assert.h>
+#include "gtest/gtest.h"
+
+
+#define ASSERT_ERROR_CODE(x) ASSERT_EQ(x, rpc::error::OK())
 
 namespace marshalled_tests
 {
-
     void standard_tests(xxx::i_foo& foo, bool enclave)
     {
         {
@@ -117,20 +119,29 @@ namespace marshalled_tests
         {
             xxx::something_more_complicated val;
             ASSERT_ERROR_CODE(foo.recieve_something_more_complicated_ref(val));
-            log(std::string("got ") + val.map_val.begin()->first);
+            if(val.map_val.size() == 0)
+                log("error recieve_something_more_complicated_ref returned no data");
+            else
+                log(std::string("got ") + val.map_val.begin()->first);
         }
         if (!enclave)
         {
             xxx::something_more_complicated* val = nullptr;
             ASSERT_ERROR_CODE(foo.recieve_something_more_complicated_ptr(val));
-            log(std::string("got ") + val->map_val.begin()->first);
+            if(val->map_val.size() == 0)
+                log("error recieve_something_more_complicated_ref returned no data");
+            else
+                log(std::string("got ") + val->map_val.begin()->first);
             delete val;
         }
         {
             xxx::something_more_complicated val;
             val.map_val["22"] = xxx::something_complicated {33, "22"};
             ASSERT_ERROR_CODE(foo.recieve_something_more_complicated_in_out_ref(val));
-            log(std::string("got ") + val.map_val.begin()->first);
+            if(val.map_val.size() == 0)
+                log("error recieve_something_more_complicated_in_out_ref returned no data");
+            else
+                log(std::string("got ") + val.map_val.begin()->first);
         }
         {
             int val1 = 1;

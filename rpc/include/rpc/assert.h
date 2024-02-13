@@ -2,6 +2,7 @@
 
 #include <assert.h>
 #include <rpc/error_codes.h>
+#include <rpc/logger.h>
 
 #ifdef RPC_HANG_ON_FAILED_ASSERT
 #ifdef _IN_ENCLAVE
@@ -20,7 +21,9 @@ extern "C"
 
 #define RPC_ASSERT(x) if(!(x))(hang())
 #else
-#define RPC_ASSERT(x) assert(x)
+#ifdef _DEBUG
+#define RPC_ASSERT(x) if(!(x))assert(!"error failed " #x);
+#else
+#define RPC_ASSERT(x) if(!(x)){std::abort();}
 #endif
-
-#define ASSERT_ERROR_CODE(x) RPC_ASSERT(x == rpc::error::OK())
+#endif

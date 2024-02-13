@@ -27,6 +27,7 @@
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
+#include <rpc/error_codes.h>
 
 
 // This list should be kept sorted.
@@ -349,10 +350,11 @@ public:
         if(CreateNewZoneThenCreateSubordinatedZone)
         {
             rpc::shared_ptr<yyy::i_example> new_ptr;
-            auto err_code = example_relay_ptr->create_example_in_subordnate_zone(new_ptr, use_host_in_child_ ? hst : nullptr, ++zone_gen_);
-            ASSERT_ERROR_CODE(err_code);
-            example_relay_ptr->set_host(nullptr);
-            example_relay_ptr = new_ptr;
+            if(example_relay_ptr->create_example_in_subordnate_zone(new_ptr, use_host_in_child_ ? hst : nullptr, ++zone_gen_) == rpc::error::OK())
+            {
+                example_relay_ptr->set_host(nullptr);
+                example_relay_ptr = new_ptr;
+            }
         }
         return example_relay_ptr;
     }
@@ -431,12 +433,14 @@ public:
             , ptr
             , use_v1_rpc_dll ? enclave_path_v1 : enclave_path);
             
-        ASSERT_ERROR_CODE(err_code);
+        if(err_code != rpc::error::OK())
+            return nullptr;
         if(CreateNewZoneThenCreateSubordinatedZone)
         {
             rpc::shared_ptr<yyy::i_example> new_ptr;
             err_code = ptr->create_example_in_subordnate_zone(new_ptr, use_host_in_child_ ? i_host_ptr_ : nullptr, ++zone_gen_);
-            ASSERT_ERROR_CODE(err_code);
+            if(err_code != rpc::error::OK())
+                return nullptr;
             ptr = new_ptr;
         }
         return ptr;

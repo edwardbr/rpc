@@ -275,8 +275,7 @@ namespace rpc
             {
                 auto err_code = rpc::demarshall_interface_proxy(rpc::get_version(), parent_service_proxy, input_descr, zone_id.as_caller(), parent_ptr);
                 if(err_code != rpc::error::OK())
-                {
-                    ASSERT_ERROR_CODE(err_code);   
+                { 
                     return err_code;
                 }
             }   

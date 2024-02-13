@@ -14,6 +14,6 @@
 # else
 #  define LOG_STR(str, sz)
 # endif
+#define LOG_CSTR(str) rpc_log(str, strlen(str))
 #define LOG_STR_DEFINED
 #endif
-
