@@ -25,7 +25,7 @@
 
 //#include <crtdbg.h>
 //#include <crtdefs.h>
-#include <assert.h>
+#include <rpc/assert.h>
 
 #if defined(__clang__) || defined(__GNUC__) || defined(__GNUG__)
 #define THIS_CALL

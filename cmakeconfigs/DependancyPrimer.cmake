@@ -22,6 +22,7 @@ if(NOT DEPENDANCIES_LOADED)
   option(INCLUDE_DC_APPS_EMBEDDED "include dc apps in main enclave" ON)
   option(ENABLE_CLANG_TIDY "Enable clang-tidy in build" ON)
   option(ENABLE_CLANG_TIDY_FIX "Turn on auto fix in clang tidy" OFF)
+  option(ENABLE_COVERAGE "Turn on code coverage" OFF)
 
   if(NOT DEFINED DC_APPS)
     set(DC_APPS "ALL_DCAPPS")
@@ -346,6 +347,7 @@ if(NOT DEPENDANCIES_LOADED)
           -Wno-ignored-attributes
           -Wno-implicit-exception-spec-mismatch
           -Wno-trigraphs)
+      
       set(HOST_LINK_OPTIONS
           -L/usr/lib/llvm-10/lib
           -Wl,-rpath,/usr/lib/llvm-10/lib
@@ -353,6 +355,12 @@ if(NOT DEPENDANCIES_LOADED)
           -L/opt/intel/sgxsdk/lib64
           -lsgx_tcrypto
           linux_dependancies_host)
+      if(ENABLE_COVERAGE)
+        message("enabling code coverage")
+        #list(APPEND HOST_COMPILE_OPTIONS -fprofile-instr-generate -fcoverage-mapping)
+        list(APPEND HOST_COMPILE_OPTIONS --coverage)
+        list(APPEND HOST_LINK_OPTIONS -fprofile-arcs)
+      endif()
       set(OS_DEPENDANCIES_ENCLAVE linux_dependancies_enclave)
       set(ENCLAVE_SSL_INCLUDES "/opt/intel/sgxssl/include")
     endif()

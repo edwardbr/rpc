@@ -27,6 +27,7 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 include(FindRPCGenerator)
 
 add_subdirectory(generator)
+add_subdirectory(telemetry)
 add_subdirectory(rpc)
 if(${BUILD_TEST})
   add_subdirectory(tests)

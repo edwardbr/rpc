@@ -251,7 +251,8 @@ namespace enclave_marshaller
                 return fmt::format("rpc::shared_ptr<rpc::object_stub> {}_stub_;", name);
             case PROXY_PREPARE_IN_INTERFACE_ID:
                 return fmt::format(
-                    "auto {0}_stub_id_ = proxy_bind_in_param(__rpc_sp->get_remote_rpc_version(), {0}, {0}_stub_);",
+                    "RPC_ASSERT(rpc::are_in_same_zone(this, {0}.get()));\n"
+                    "\t\t\tauto {0}_stub_id_ = proxy_bind_in_param(__rpc_sp->get_remote_rpc_version(), {0}, {0}_stub_);",
                     name);
             case PROXY_MARSHALL_IN:
             {
@@ -309,7 +310,8 @@ namespace enclave_marshaller
                 return fmt::format("rpc::shared_ptr<rpc::object_stub> {}_stub_;", name);
             case PROXY_PREPARE_IN_INTERFACE_ID:
                 return fmt::format(
-                    "auto {0}_stub_id_ = proxy_bind_in_param(__rpc_sp->get_remote_rpc_version(), {0}, {0}_stub_);",
+                    "RPC_ASSERT(rpc::are_in_same_zone(this, {0}.get()));\n"
+                    "\t\t\tauto {0}_stub_id_ = proxy_bind_in_param(__rpc_sp->get_remote_rpc_version(), {0}, {0}_stub_);",
                     name);
             case PROXY_MARSHALL_IN:
             {
@@ -336,7 +338,7 @@ namespace enclave_marshaller
                 return fmt::format("rpc::interface_descriptor {0}_;", name);
             case STUB_ADD_REF_OUT:
                 return fmt::format(
-                    "{0}_ = zone_.stub_bind_out_param(protocol_version, caller_channel_zone_id, caller_zone_id, {0});",
+                    "{0}_ = stub_bind_out_param(zone_, protocol_version, caller_channel_zone_id, caller_zone_id, {0});",
                     name);
             case STUB_MARSHALL_OUT:
                 return fmt::format("  ,(\"{0}\", {0}_)", name);
@@ -641,14 +643,13 @@ namespace enclave_marshaller
 
                 proxy("auto __rpc_op = get_object_proxy();");
                 proxy("auto __rpc_sp = __rpc_op->get_service_proxy();");
-                proxy("if(auto* telemetry_service = "
-                      "__rpc_sp->get_telemetry_service();telemetry_service)");
+                proxy("if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)");
                 proxy("{{");
-                proxy("telemetry_service->on_interface_proxy_send(\"{0}_proxy\", "
+                proxy("telemetry_service->on_interface_proxy_send(\"{0}::{1}\", "
                       "__rpc_sp->get_zone_id(), "
                       "__rpc_sp->get_destination_zone_id(), "
-                      "__rpc_op->get_object_id(), {{{0}_proxy::get_id(rpc::get_version())}}, {{{1}}});",
-                      interface_name, function_count);
+                      "__rpc_op->get_object_id(), {{{0}_proxy::get_id(rpc::get_version())}}, {{{2}}});",
+                      interface_name, function->get_name(), function_count);
                 proxy("}}");
 
                 {
@@ -938,6 +939,24 @@ namespace enclave_marshaller
 
                 proxy("if(__rpc_ret >= rpc::error::MIN() && __rpc_ret <= rpc::error::MAX())");
                 proxy("{{");
+                proxy("//if you fall into this rabbit hole ensure that you have added any error offsets compatible with your error code system to the rpc library");
+                proxy("//this is only here to handle rpc generated errors and not application errors");
+                proxy("//clean up any input stubs, this code has to assume that the destination is behaving correctly");
+                {
+                    uint64_t count = 1;
+                    for(auto& parameter : function->get_parameters())
+                    {
+                        std::string output;
+                        {
+                            if(!is_in_call(PROXY_CLEAN_IN, from_host, m_ob, parameter.get_name(), parameter.get_type(),
+                                            parameter.get_attributes(), count, output))
+                                continue;
+
+                            proxy(output);
+                        }
+                        count++;
+                    }
+                }
                 proxy("return __rpc_ret;");
                 proxy("}}");
 
@@ -1473,10 +1492,9 @@ namespace enclave_marshaller
             proxy("{{");
             proxy("auto __rpc_op = get_object_proxy();");
             proxy("auto __rpc_sp = __rpc_op->get_service_proxy();");
-            proxy("   if(auto* telemetry_service = "
-                  "__rpc_sp->get_telemetry_service();telemetry_service)");
+            proxy("   if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)");
             proxy("{{");
-            proxy("telemetry_service->on_interface_proxy_creation(\"{0}_proxy\", "
+            proxy("telemetry_service->on_interface_proxy_creation(\"{0}\", "
                   "__rpc_sp->get_zone_id(), "
                   "__rpc_sp->get_destination_zone_id(), __rpc_op->get_object_id(), "
                   "{{{0}_proxy::get_id(rpc::get_version())}});",
@@ -1490,10 +1508,9 @@ namespace enclave_marshaller
             proxy("{{");
             proxy("auto __rpc_op = get_object_proxy();");
             proxy("auto __rpc_sp = __rpc_op->get_service_proxy();");
-            proxy("if(auto* telemetry_service = "
-                  "__rpc_sp->get_telemetry_service();telemetry_service)");
+            proxy("if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)");
             proxy("{{");
-            proxy("telemetry_service->on_interface_proxy_deletion(\"{0}_proxy\", "
+            proxy("telemetry_service->on_interface_proxy_deletion("
                   "__rpc_sp->get_zone_id(), "
                   "__rpc_sp->get_destination_zone_id(), __rpc_op->get_object_id(), "
                   "{{{0}_proxy::get_id(rpc::get_version())}});",

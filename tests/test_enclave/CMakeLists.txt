@@ -13,6 +13,7 @@ if(${BUILD_ENCLAVE})
     TRUSTED_LIBS
       rpc_enclave
       marshal_test_edl_enclave
+      rpc_telemetry_edl_header_enclave
       common_enclave
       example_import_idl_enclave
       example_idl_enclave
@@ -47,6 +48,7 @@ if(${BUILD_ENCLAVE})
     TRUSTED_LIBS
       rpc_enclave_v1
       marshal_test_edl_enclave
+      rpc_telemetry_edl_header_enclave
       common_enclave_v1
       example_import_idl_enclave
       example_idl_enclave

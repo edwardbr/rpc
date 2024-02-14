@@ -25,8 +25,8 @@ namespace rpc
     enum class add_ref_options : std::uint8_t
     {
         normal = 1,
-        build_destination_route = 2,
-        build_caller_route = 4
+        build_destination_route = 2,    //when unidirectionally addreffing the destination
+        build_caller_route = 4          //when unidirectionally addreffing the caller which prepares refcounts etc in the reverse direction
     };
 
     inline add_ref_options operator|(add_ref_options lhs,add_ref_options rhs)
@@ -93,8 +93,7 @@ namespace rpc
             , object object_id 
             , caller_channel_zone caller_channel_zone_id 
             , caller_zone caller_zone_id 
-            , add_ref_options build_out_param_channel 
-            , bool proxy_add_ref) = 0;
+            , add_ref_options build_out_param_channel ) = 0;
         virtual uint64_t release(
             uint64_t protocol_version 
             , destination_zone destination_zone_id 
@@ -195,4 +194,14 @@ namespace rpc
 			);
 		}
     };
+    
+    inline bool operator == (const interface_descriptor& first, const interface_descriptor& second)
+    {
+        return first.destination_zone_id == second.destination_zone_id && first.object_id == second.object_id;
+    }
+    inline bool operator != (const interface_descriptor& first, const interface_descriptor& second)
+    {
+        return !(first == second);
+    }
+
 }
