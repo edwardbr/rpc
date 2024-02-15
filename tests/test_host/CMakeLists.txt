@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.24)
 
-add_executable(rpc_test main.cpp host_telemetry_service.cpp telemetry_handler.cpp)
+add_executable(rpc_test 
+  main.cpp 
+  rpc_log.cpp)
 
 target_compile_definitions(rpc_test PRIVATE ${HOST_DEFINES})
 
@@ -14,14 +16,16 @@ target_include_directories(
 target_link_libraries(
   rpc_test
   PUBLIC marshal_test_edl_host
+        rpc_telemetry_edl_header_host
          common_host
          example_idl_host
          rpc::rpc_host
          yas_common
-         fmt::fmt-header-only
+         clipp::clipp
+         fmt::fmt
          GTest::gtest_main
          GTest::gmock_main
-         spdlog::spdlog_header_only
+         spdlog::spdlog
          ${HOST_LIBRARIES})
 
 target_compile_options(rpc_test PRIVATE ${HOST_COMPILE_OPTIONS})

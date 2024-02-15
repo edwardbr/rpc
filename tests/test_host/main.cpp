@@ -1,6 +1,7 @@
 #include <iostream>
 #include <unordered_map>
 #include <string_view>
+#include <thread>
 
 #include <sgx_urts.h>
 #include <sgx_quote.h>
@@ -16,14 +17,17 @@
 #include <example/example.h>
 
 #include <rpc/basic_service_proxies.h>
-#include <host_telemetry_service.h>
+#include <rpc/telemetry/host_telemetry_service.h>
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+#include <clipp.h>
+
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
+#include <rpc/error_codes.h>
 
 
 // This list should be kept sorted.
@@ -63,10 +67,13 @@ std::string enclave_path = "./libmarshal_test_enclave.signed.so";
 std::string enclave_path_v1 = "./libmarshal_test_enclave_v1.signed.so";
 #endif
 
+TELEMETRY_SERVICE_MANAGER
+bool enable_telemetry_server = true;
+bool enable_multithreaded_tests = false;
+
 rpc::weak_ptr<rpc::service> current_host_service;
 
-const rpc::i_telemetry_service* telemetry_service = nullptr;
-uint64_t* zone_gen = nullptr;
+std::atomic<uint64_t>* zone_gen = nullptr;
 
 
 // This line tests that we can define tests in an unnamed namespace.
@@ -74,6 +81,18 @@ namespace {
 
 	extern "C" int main(int argc, char* argv[])
 	{
+        std::string disable_telemetry_server;
+        std::string enable_multithreaded_tests_flag;
+        auto cli = (
+			clipp::option("-t", "--disable_telemetry_server").doc("disable the telemetry_server") & clipp::value("disable_telemetry_server", disable_telemetry_server),
+			clipp::option("-m", "--enable_multithreaded_tests").doc("enable multithreaded tests") & clipp::value("enable_multithreaded_tests", enable_multithreaded_tests_flag)
+        );
+
+        clipp::parsing_result res = clipp::parse(argc, argv, cli);
+        
+        enable_telemetry_server = disable_telemetry_server != "true";
+        enable_multithreaded_tests = enable_multithreaded_tests_flag == "true";
+        
         auto logger = spdlog::stdout_color_mt("console");
         logger->set_pattern("[%^%l%$] %v");        
         spdlog::set_default_logger(logger);
@@ -86,8 +105,8 @@ class host :
     public yyy::i_host,
     public rpc::enable_shared_from_this<host>
 {
-
     bool use_v1_rpc_dll_ = false;
+    rpc::zone zone_id_;
 
   	//perhaps this should be an unsorted list but map is easier to debug for now
     std::map<std::string, rpc::shared_ptr<yyy::i_example>> cached_apps_; 
@@ -103,19 +122,29 @@ class host :
 
 public:
 
-    host(bool use_v1_rpc_dll = false) : use_v1_rpc_dll_(use_v1_rpc_dll){}
-    ~host(){}
+    host(rpc::zone zone_id,  bool use_v1_rpc_dll = false) : 
+        use_v1_rpc_dll_(use_v1_rpc_dll),
+        zone_id_(zone_id)
+    {
+        if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            telemetry_service->on_impl_creation("host", (uint64_t)this, zone_id_);
+    }
+    virtual ~host()
+    {
+        if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            telemetry_service->on_impl_deletion((uint64_t)this, zone_id_);
+    }
     error_code create_enclave(rpc::shared_ptr<yyy::i_example>& target) override
     {
         rpc::shared_ptr<yyy::i_host> host = shared_from_this();
         auto serv = current_host_service.lock();
-        auto err_code = rpc::enclave_service_proxy::create(
-            {++(*zone_gen)}, 
-            use_v1_rpc_dll_ ? enclave_path_v1 : enclave_path, 
-            serv,
-            host,
-            target, 
-            telemetry_service);
+        auto err_code = serv->connect_to_zone<rpc::enclave_service_proxy>( 
+            "an enclave"
+            , {++(*zone_gen)}
+            , host
+            , target
+            , use_v1_rpc_dll_ ? enclave_path_v1 : enclave_path);
+
         return err_code;
     };
 
@@ -151,37 +180,41 @@ public:
 template<bool UseHostInChild>
 class in_memory_setup
 {
-    rpc::shared_ptr<host_telemetry_service> tm;
+    rpc::shared_ptr<yyy::i_host> i_host_ptr_;
+    rpc::weak_ptr<yyy::i_host> local_host_ptr_;
+    rpc::shared_ptr<yyy::i_example> i_example_ptr_;
 
-    rpc::shared_ptr<yyy::i_host> i_host_ptr;
-    rpc::shared_ptr<yyy::i_example> i_example_ptr;
+    const bool has_enclave_ = false;
+    bool use_host_in_child_ = UseHostInChild;
 
-    const bool has_enclave = false;
-    bool use_host_in_child = UseHostInChild;
-
-    uint64_t zone_gen_ = 0;
+    std::atomic<uint64_t> zone_gen_ = 0;
 public:
+    virtual ~in_memory_setup() = default;
 
-    bool get_has_enclave() const {return has_enclave;}
-    rpc::shared_ptr<yyy::i_example> get_example(){return i_example_ptr;}
-    bool get_use_host_in_child() const {return use_host_in_child;}
+    rpc::shared_ptr<rpc::service> get_root_service() const {return nullptr;}
+    bool get_has_enclave() const {return has_enclave_;}
+    rpc::shared_ptr<yyy::i_example> get_example() const {return i_example_ptr_;}
+    rpc::shared_ptr<yyy::i_host> get_host() const {return i_host_ptr_;}
+    rpc::shared_ptr<yyy::i_host> get_local_host_ptr(){return local_host_ptr_.lock();}
+    bool get_use_host_in_child() const {return use_host_in_child_;}
 
     virtual void SetUp()
     {   
         zone_gen = &zone_gen_;
-        tm = rpc::make_shared<host_telemetry_service>();
-        telemetry_service = tm.get();
-        i_host_ptr = rpc::shared_ptr<yyy::i_host> (new host());
-        i_example_ptr = rpc::shared_ptr<yyy::i_example> (new example(telemetry_service, nullptr, use_host_in_child ? i_host_ptr : nullptr));
+        auto test_info = ::testing::UnitTest::GetInstance()->current_test_info();
+        if(enable_telemetry_server)
+            CREATE_TELEMETRY_SERVICE(rpc::host_telemetry_service, test_info->test_suite_name(), test_info->name(), "../../rpc_test_diagram/")
+        i_host_ptr_ = rpc::shared_ptr<yyy::i_host> (new host({++zone_gen_}));
+        local_host_ptr_ = i_host_ptr_;
+        i_example_ptr_ = rpc::shared_ptr<yyy::i_example> (new example(nullptr, use_host_in_child_ ? i_host_ptr_ : nullptr));
     }
 
     virtual void TearDown()
     {
-        i_host_ptr = nullptr;
-        i_example_ptr = nullptr;
-        telemetry_service = nullptr;
-        tm = nullptr;
+        i_host_ptr_ = nullptr;
+        i_example_ptr_ = nullptr;
         zone_gen = nullptr;
+        rpc::telemetry_service_manager::reset();
     }
 };
 
@@ -217,124 +250,111 @@ public:
 template<bool UseHostInChild, bool RunStandardTests, bool CreateNewZoneThenCreateSubordinatedZone>
 class inproc_setup
 {
-    rpc::shared_ptr<host_telemetry_service> tm;
+    rpc::shared_ptr<rpc::service> root_service_;
+    rpc::shared_ptr<rpc::child_service> child_service_;
+    rpc::shared_ptr<yyy::i_host> i_host_ptr_;
+    rpc::weak_ptr<yyy::i_host> local_host_ptr_;
+    rpc::shared_ptr<yyy::i_example> i_example_ptr_;
 
-    rpc::shared_ptr<rpc::service> root_service;
-    rpc::shared_ptr<rpc::child_service> child_service;
-    rpc::shared_ptr<yyy::i_host> i_host_ptr;
-    rpc::shared_ptr<yyy::i_example> i_example_ptr;
+    const bool has_enclave_ = true;
+    bool use_host_in_child_ = UseHostInChild;
+    bool run_standard_tests_ = RunStandardTests;
 
-    const bool has_enclave = true;
-    bool use_host_in_child = UseHostInChild;
-    bool run_standard_tests = RunStandardTests;
-
-    uint64_t zone_gen_ = 0;
+    std::atomic<uint64_t> zone_gen_ = 0;
     
 public:
+    virtual ~inproc_setup() = default;
 
-    bool get_has_enclave() const {return has_enclave;}
-    rpc::shared_ptr<yyy::i_example> get_example(){return i_example_ptr;}
-    bool get_use_host_in_child() const {return use_host_in_child;}
+    rpc::shared_ptr<rpc::service> get_root_service() const {return root_service_;}
+    bool get_has_enclave() const {return has_enclave_;}
+    bool is_enclave_setup() const {return false;}
+    rpc::shared_ptr<yyy::i_example> get_example() const {return i_example_ptr_;}
+    rpc::shared_ptr<yyy::i_host> get_host() const {return i_host_ptr_;}
+    rpc::shared_ptr<yyy::i_host> get_local_host_ptr(){return local_host_ptr_.lock();}
+    bool get_use_host_in_child() const {return use_host_in_child_;}
     
     virtual void SetUp()
     {
         zone_gen = &zone_gen_;
-        tm = rpc::make_shared<host_telemetry_service>();
-        telemetry_service = tm.get();
-        root_service = rpc::make_shared<rpc::service>(rpc::zone{++zone_gen_});
-        root_service->add_service_logger(std::make_shared<test_service_logger>());
-        current_host_service = root_service;
-        child_service = rpc::make_shared<rpc::child_service>(rpc::zone{++zone_gen_});
-        example_import_idl_register_stubs(child_service);
-        example_shared_idl_register_stubs(child_service);
-        example_idl_register_stubs(child_service);
+        auto test_info = ::testing::UnitTest::GetInstance()->current_test_info();
+        if(enable_telemetry_server)
+            CREATE_TELEMETRY_SERVICE(rpc::host_telemetry_service, test_info->test_suite_name(), test_info->name(), "../../rpc_test_diagram/")
 
-        rpc::interface_descriptor host_encap {};
-        rpc::interface_descriptor example_encap {};
+        root_service_ = rpc::make_shared<rpc::service>("host", rpc::zone{++zone_gen_});
+        root_service_->add_service_logger(std::make_shared<test_service_logger>());
+        current_host_service = root_service_;
 
-        // create a proxy to the rpc::service hosting the child service
-        auto service_proxy_to_host
-            = rpc::local_service_proxy::create(root_service, child_service, telemetry_service, false);
-
-        // create a proxy to the rpc::service that contains the example object
-        auto service_proxy_to_child
-            = rpc::local_child_service_proxy::create(child_service, root_service, telemetry_service);
-
-        {
-            // create a host implementation object
-            rpc::shared_ptr<yyy::i_host> hst(new host());
-
-            // register implementation to the root service and held by a stub
-            // note! There is a memory leak if the interface_descriptor object is not bound to a proxy
-            host_encap = rpc::create_interface_stub(*root_service, hst);
-
-            // simple test to check that we can get a useful local interface based on type and object id
-            auto example_from_cast = root_service->get_local_interface<yyy::i_host>(rpc::get_version(), host_encap.object_id);
-            EXPECT_EQ(example_from_cast, hst);
-        }
-
-        ASSERT(!rpc::demarshall_interface_proxy(rpc::get_version(), service_proxy_to_host, host_encap,  child_service->get_zone_id().as_caller(), i_host_ptr));
-
-        {
-            // create the example object implementation
-            rpc::shared_ptr<yyy::i_example> remote_example(new example(telemetry_service, child_service, use_host_in_child ? i_host_ptr : nullptr));
-
-            example_encap
-                = rpc::create_interface_stub(*child_service, remote_example);
-
-            // simple test to check that we can get a usefule local interface based on type and object id
-            auto example_from_cast
-                = child_service->get_local_interface<yyy::i_example>(rpc::get_version(), example_encap.object_id);
-            EXPECT_EQ(example_from_cast, remote_example);
-        }
-
-        ASSERT(!rpc::demarshall_interface_proxy(rpc::get_version(), service_proxy_to_child, example_encap, root_service->get_zone_id().as_caller(), i_example_ptr));
+        rpc::shared_ptr<yyy::i_host> hst(new host(root_service_->get_zone_id()));
+        local_host_ptr_ = hst;//assign to weak ptr
+        
+        auto err_code = root_service_->connect_to_zone<rpc::local_child_service_proxy<yyy::i_example, yyy::i_host>>(
+            "main child"
+            , {++zone_gen_}
+            , hst
+            , i_example_ptr_
+            , [&](
+                const rpc::shared_ptr<yyy::i_host>& host
+                , rpc::shared_ptr<yyy::i_example>& new_example
+                , const rpc::shared_ptr<rpc::child_service>& child_service_ptr) -> int
+            {
+                i_host_ptr_ = host;
+                child_service_ = child_service_ptr;
+                example_import_idl_register_stubs(child_service_ptr);
+                example_shared_idl_register_stubs(child_service_ptr);
+                example_idl_register_stubs(child_service_ptr);
+                new_example = rpc::shared_ptr<yyy::i_example>(new example(child_service_ptr, nullptr));  
+                if(use_host_in_child_) 
+                    new_example->set_host(host);
+                return rpc::error::OK();
+            });
+        ASSERT_ERROR_CODE(err_code);
     }
 
     virtual void TearDown()
     {
-        i_example_ptr = nullptr;
-        child_service = nullptr;
-        i_host_ptr = nullptr;
-        root_service = nullptr;
-        telemetry_service = nullptr;
-        tm = nullptr;
+        i_example_ptr_ = nullptr;
+        i_host_ptr_ = nullptr;
+        child_service_ = nullptr;
+        root_service_ = nullptr;
         zone_gen = nullptr;
+        rpc::telemetry_service_manager::reset();
     }
 
     rpc::shared_ptr<yyy::i_example> create_new_zone()
     {        
-        rpc::shared_ptr<rpc::child_service> new_service = rpc::make_shared<rpc::child_service>(rpc::zone{++zone_gen_});
-        example_import_idl_register_stubs(child_service);
-        example_shared_idl_register_stubs(child_service);
-        example_idl_register_stubs(child_service);
-        
-        // create a proxy to the rpc::service hosting the child service
-        auto service_proxy_to_host
-            = rpc::local_service_proxy::create(root_service, new_service, telemetry_service, true);
-
-        // create a proxy to the rpc::service that contains the example object
-        auto service_proxy_to_child = rpc::local_child_service_proxy::create(new_service, root_service, telemetry_service);
-
-        // create the example object implementation
-        rpc::shared_ptr<yyy::i_example> remote_example(new example(telemetry_service, new_service, use_host_in_child ? i_host_ptr : nullptr));
-
-        rpc::interface_descriptor example_encap
-            = rpc::create_interface_stub(*new_service, remote_example);
-
-        // simple test to check that we can get a usefule local interface based on type and object id
-        auto example_from_cast
-            = new_service->get_local_interface<yyy::i_example>(rpc::get_version(), example_encap.object_id);
-        EXPECT_EQ(example_from_cast, remote_example);
-
+        rpc::shared_ptr<yyy::i_host> hst;
+        if(use_host_in_child_)
+            hst = local_host_ptr_.lock();
+            
         rpc::shared_ptr<yyy::i_example> example_relay_ptr;
-        ASSERT(!rpc::demarshall_interface_proxy(rpc::get_version(), service_proxy_to_child, example_encap, root_service->get_zone_id().as_caller(), example_relay_ptr));                
+
+        auto err_code = root_service_->connect_to_zone<rpc::local_child_service_proxy<yyy::i_example, yyy::i_host>>(
+            "main child"
+            , {++zone_gen_}
+            , hst
+            , example_relay_ptr
+            , [&](
+                const rpc::shared_ptr<yyy::i_host>& host
+                , rpc::shared_ptr<yyy::i_example>& new_example
+                , const rpc::shared_ptr<rpc::child_service>& child_service_ptr) -> int
+            {
+                example_import_idl_register_stubs(child_service_ptr);
+                example_shared_idl_register_stubs(child_service_ptr);
+                example_idl_register_stubs(child_service_ptr);
+                new_example = rpc::shared_ptr<yyy::i_example>(new example(child_service_ptr, nullptr));  
+                if(use_host_in_child_) 
+                    new_example->set_host(host);
+                return rpc::error::OK();
+            });
         
         if(CreateNewZoneThenCreateSubordinatedZone)
         {
             rpc::shared_ptr<yyy::i_example> new_ptr;
-            ASSERT(!example_relay_ptr->create_example_in_subordnate_zone(new_ptr, ++zone_gen_));
-            example_relay_ptr = new_ptr;
+            if(example_relay_ptr->create_example_in_subordnate_zone(new_ptr, use_host_in_child_ ? hst : nullptr, ++zone_gen_) == rpc::error::OK())
+            {
+                example_relay_ptr->set_host(nullptr);
+                example_relay_ptr = new_ptr;
+            }
         }
         return example_relay_ptr;
     }
@@ -343,74 +363,84 @@ public:
 template<bool UseHostInChild, bool RunStandardTests, bool CreateNewZoneThenCreateSubordinatedZone, bool use_v1_rpc_dll>
 class enclave_setup
 {
-    rpc::shared_ptr<host_telemetry_service> tm;
+    rpc::shared_ptr<rpc::service> root_service_;
+    rpc::shared_ptr<yyy::i_host> i_host_ptr_;
+    rpc::weak_ptr<yyy::i_host> local_host_ptr_;
+    rpc::shared_ptr<yyy::i_example> i_example_ptr_;
 
-    rpc::shared_ptr<rpc::service> root_service;
-    rpc::shared_ptr<yyy::i_host> i_host_ptr;
-    rpc::shared_ptr<yyy::i_example> i_example_ptr;
+    const bool has_enclave_ = true;
+    bool use_host_in_child_ = UseHostInChild;
+    bool run_standard_tests_ = RunStandardTests;
 
-    const bool has_enclave = true;
-    bool use_host_in_child = UseHostInChild;
-    bool run_standard_tests = RunStandardTests;
-
-    uint64_t zone_gen_ = 0;
+    std::atomic<uint64_t> zone_gen_ = 0;
 public:
+    virtual ~enclave_setup() = default;
 
-    bool get_has_enclave() const {return has_enclave;}
-    rpc::shared_ptr<yyy::i_example> get_example(){return i_example_ptr;}
-    bool get_use_host_in_child() const {return use_host_in_child;}
+    rpc::shared_ptr<rpc::service> get_root_service() const {return root_service_;}
+    bool get_has_enclave() const {return has_enclave_;}
+    bool is_enclave_setup() const {return true;}
+    rpc::shared_ptr<yyy::i_host> get_local_host_ptr(){return local_host_ptr_.lock();}
+    rpc::shared_ptr<yyy::i_example> get_example() const {return i_example_ptr_;}
+    rpc::shared_ptr<yyy::i_host> get_host() const {return i_host_ptr_;}
+    bool get_use_host_in_child() const {return use_host_in_child_;}
     
     virtual void SetUp()
     {
         zone_gen = &zone_gen_;
-        tm = rpc::make_shared<host_telemetry_service>();
-        telemetry_service = tm.get();
-        root_service = rpc::make_shared<rpc::service>(rpc::zone{++zone_gen_});
-        root_service->add_service_logger(std::make_shared<test_service_logger>());
-        example_import_idl_register_stubs(root_service);
-        example_shared_idl_register_stubs(root_service);
-        example_idl_register_stubs(root_service);
-        current_host_service = root_service;
+        auto test_info = ::testing::UnitTest::GetInstance()->current_test_info();
+        if(enable_telemetry_server)
+        {
+            CREATE_TELEMETRY_SERVICE(rpc::host_telemetry_service, test_info->test_suite_name(), test_info->name(), "../../rpc_test_diagram/")
+        }
+        root_service_ = rpc::make_shared<rpc::service>("host", rpc::zone{++zone_gen_});
+        root_service_->add_service_logger(std::make_shared<test_service_logger>());
+        example_import_idl_register_stubs(root_service_);
+        example_shared_idl_register_stubs(root_service_);
+        example_idl_register_stubs(root_service_);
+        current_host_service = root_service_;
         
-        i_host_ptr = rpc::shared_ptr<yyy::i_host> (new host(use_v1_rpc_dll));
+        i_host_ptr_ = rpc::shared_ptr<yyy::i_host> (new host(root_service_->get_zone_id(), use_v1_rpc_dll));
+        local_host_ptr_ = i_host_ptr_;        
 
-        auto err_code = rpc::enclave_service_proxy::create(
-            {++zone_gen_}, 
-            use_v1_rpc_dll ? enclave_path_v1 : enclave_path, 
-            root_service, 
-            use_host_in_child ? i_host_ptr : nullptr, 
-            i_example_ptr,
-            telemetry_service);
 
-        ASSERT(!err_code);
+        auto err_code = root_service_->connect_to_zone<rpc::enclave_service_proxy>(
+            "main child"
+            , {++(*zone_gen)}
+            , use_host_in_child_ ? i_host_ptr_ : nullptr
+            , i_example_ptr_
+            , use_v1_rpc_dll ? enclave_path_v1 : enclave_path);
+
+        ASSERT_ERROR_CODE(err_code);
     }
 
     virtual void TearDown()
     {
-        i_example_ptr = nullptr;
-        i_host_ptr = nullptr;
-        root_service = nullptr;
-        telemetry_service = nullptr;
-        tm = nullptr;
+        i_example_ptr_ = nullptr;
+        i_host_ptr_ = nullptr;
+        root_service_ = nullptr;
         zone_gen = nullptr;
+        rpc::telemetry_service_manager::reset();
     }
 
     rpc::shared_ptr<yyy::i_example> create_new_zone()
     {
         rpc::shared_ptr<yyy::i_example> ptr;
-        auto err_code = rpc::enclave_service_proxy::create(
-            {++zone_gen_}, 
-            use_v1_rpc_dll ? enclave_path_v1 : enclave_path, 
-            root_service, 
-            use_host_in_child ? i_host_ptr : nullptr, 
-            ptr,
-            telemetry_service);
-        ASSERT(!err_code);
+        
+        auto err_code = root_service_->connect_to_zone<rpc::enclave_service_proxy>(
+            "main child"
+            , {++zone_gen_}
+            , use_host_in_child_ ? i_host_ptr_ : nullptr
+            , ptr
+            , use_v1_rpc_dll ? enclave_path_v1 : enclave_path);
+            
+        if(err_code != rpc::error::OK())
+            return nullptr;
         if(CreateNewZoneThenCreateSubordinatedZone)
         {
             rpc::shared_ptr<yyy::i_example> new_ptr;
-            err_code = ptr->create_example_in_subordnate_zone(new_ptr, ++zone_gen_);
-            ASSERT(!err_code);
+            err_code = ptr->create_example_in_subordnate_zone(new_ptr, use_host_in_child_ ? i_host_ptr_ : nullptr, ++zone_gen_);
+            if(err_code != rpc::error::OK())
+                return nullptr;
             ptr = new_ptr;
         }
         return ptr;
@@ -471,29 +501,57 @@ TYPED_TEST(type_test, initialisation_test)
 
 TYPED_TEST(type_test, standard_tests)
 {
-    foo f(telemetry_service);
+    auto root_service = this->get_lib().get_root_service();
+    rpc::zone zone_id;
+    if(root_service)
+        zone_id = root_service->get_zone_id();
+    else
+        zone_id = {0};
+
+    foo f(zone_id);
     
-    standard_tests(f, this->get_lib().get_has_enclave(), telemetry_service);
+    standard_tests(f, this->get_lib().get_has_enclave());
 }
-
-
 
 TYPED_TEST(type_test, dyanmic_cast_tests)
 {
-    auto f = rpc::shared_ptr<xxx::i_foo>(new foo(telemetry_service));
+    auto root_service = this->get_lib().get_root_service();
+    rpc::zone zone_id;
+    if(root_service)
+        zone_id = root_service->get_zone_id();
+    else
+        zone_id = {0};
+    auto f = rpc::shared_ptr<xxx::i_foo>(new foo(zone_id));
 
     rpc::shared_ptr<xxx::i_baz> baz;
     ASSERT_EQ(f->create_baz_interface(baz), 0);
     ASSERT_EQ(f->call_baz_interface(nullptr), 0); // feed in a nullptr
     ASSERT_EQ(f->call_baz_interface(baz), 0);     // feed back to the implementation
 
-    auto x = rpc::dynamic_pointer_cast<xxx::i_baz>(baz);
-    ASSERT_NE(x, nullptr);
-    auto y = rpc::dynamic_pointer_cast<xxx::i_bar>(baz);
-    ASSERT_NE(y, nullptr);
-    y->do_something_else(1);
-    auto z = rpc::dynamic_pointer_cast<xxx::i_foo>(baz);
-    ASSERT_NE(y, nullptr);
+    {
+        //test for identity
+        auto x = rpc::dynamic_pointer_cast<xxx::i_baz>(baz);
+        ASSERT_NE(x, nullptr);
+        ASSERT_EQ(x, baz);
+        auto y = rpc::dynamic_pointer_cast<xxx::i_bar>(baz);
+        ASSERT_NE(y, nullptr);
+        y->do_something_else(1);
+        ASSERT_NE(y, nullptr);
+        auto z = rpc::dynamic_pointer_cast<xxx::i_foo>(baz);
+        ASSERT_EQ(z, nullptr);
+    }
+    //retest
+    {
+        auto x = rpc::dynamic_pointer_cast<xxx::i_baz>(baz);
+        ASSERT_NE(x, nullptr);
+        ASSERT_EQ(x, baz);
+        auto y = rpc::dynamic_pointer_cast<xxx::i_bar>(baz);
+        ASSERT_NE(y, nullptr);
+        y->do_something_else(1);
+        ASSERT_NE(y, nullptr);
+        auto z = rpc::dynamic_pointer_cast<xxx::i_foo>(baz);
+        ASSERT_EQ(z, nullptr);
+    }
 }
 
 
@@ -502,6 +560,8 @@ using remote_type_test = type_test<T>;
 
 
 typedef Types<
+    //inproc_setup<false, false, false>, 
+
     inproc_setup<true, false, false>, 
     inproc_setup<true, false, true>, 
     inproc_setup<true, true, false>, 
@@ -522,18 +582,120 @@ TYPED_TEST(remote_type_test, remote_standard_tests)
 {    
     rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
     ASSERT_EQ(this->get_lib().get_example()->create_foo(i_foo_ptr), 0);
-    standard_tests(*i_foo_ptr, true, telemetry_service);
+    standard_tests(*i_foo_ptr, true);
+}
+
+TYPED_TEST(remote_type_test, multithreaded_standard_tests)
+{
+    if(!enable_multithreaded_tests || this->get_lib().is_enclave_setup())
+    {
+        GTEST_SKIP() << "multithreaded tests are skipped";
+        return;
+    }
+
+    rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
+    ASSERT_EQ(this->get_lib().get_example()->create_foo(i_foo_ptr), 0);
+    
+    std::vector<std::thread> threads(this->get_lib().is_enclave_setup() ? 3 : 100);
+    for(auto& thread_target : threads)
+    {
+        thread_target = std::thread([&](){
+            standard_tests(*i_foo_ptr, true);   
+        });
+    }
+    for(auto& thread_target : threads)
+    {
+        thread_target.join();
+    }
+}
+
+TYPED_TEST(remote_type_test, multithreaded_standard_tests_with_and_foos)
+{
+    if(!enable_multithreaded_tests || this->get_lib().is_enclave_setup())
+    {
+        GTEST_SKIP() << "multithreaded tests are skipped";
+        return;
+    }
+
+    std::vector<std::thread> threads(this->get_lib().is_enclave_setup() ? 3 : 100);
+    for(auto& thread_target : threads)
+    {
+        thread_target = std::thread([&](){
+            rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
+            ASSERT_EQ(this->get_lib().get_example()->create_foo(i_foo_ptr), 0);
+            standard_tests(*i_foo_ptr, true);   
+        });
+    }
+    for(auto& thread_target : threads)
+    {
+        thread_target.join();
+    }
 }
 
 TYPED_TEST(remote_type_test, remote_tests)
 {    
-    remote_tests(this->get_lib().get_use_host_in_child(), this->get_lib().get_example(), telemetry_service);
+    auto root_service = this->get_lib().get_root_service();
+    rpc::zone zone_id;
+    if(root_service)
+        zone_id = root_service->get_zone_id();
+    else
+        zone_id = {0};
+    remote_tests(this->get_lib().get_use_host_in_child(), this->get_lib().get_example(), zone_id);
+}
+
+TYPED_TEST(remote_type_test, multithreaded_remote_tests)
+{
+    if(!enable_multithreaded_tests || this->get_lib().is_enclave_setup())
+    {
+        GTEST_SKIP() << "multithreaded tests are skipped";
+        return;
+    }
+
+    auto root_service = this->get_lib().get_root_service();
+    rpc::zone zone_id;
+    if(root_service)
+        zone_id = root_service->get_zone_id();
+    else
+        zone_id = {0};
+    std::vector<std::thread> threads(this->get_lib().is_enclave_setup() ? 3 : 100);
+    for(auto& thread_target : threads)
+    {
+        thread_target = std::thread([&](){
+            remote_tests(this->get_lib().get_use_host_in_child(), this->get_lib().get_example(), zone_id);
+        });
+    }
+    for(auto& thread_target : threads)
+    {
+        thread_target.join();
+    }
 }
 
 TYPED_TEST(remote_type_test, create_new_zone)
 {
-    rpc::shared_ptr<xxx::i_foo> i_foo_relay_ptr;
     auto example_relay_ptr = this->get_lib().create_new_zone();
+    example_relay_ptr->set_host(nullptr);
+}
+
+TYPED_TEST(remote_type_test, multithreaded_create_new_zone)
+{
+    if(!enable_multithreaded_tests || this->get_lib().is_enclave_setup())
+    {
+        GTEST_SKIP() << "multithreaded tests are skipped";
+        return;
+    }
+
+    std::vector<std::thread> threads(this->get_lib().is_enclave_setup() ? 3 : 100);
+    for(auto& thread_target : threads)
+    {
+        thread_target = std::thread([&](){
+            auto example_relay_ptr = this->get_lib().create_new_zone();
+            example_relay_ptr->set_host(nullptr);        
+        });
+    }
+    for(auto& thread_target : threads)
+    {
+        thread_target.join();
+    }
 }
 
 TYPED_TEST(remote_type_test, create_new_zone_releasing_host_then_running_on_other_enclave)
@@ -541,12 +703,36 @@ TYPED_TEST(remote_type_test, create_new_zone_releasing_host_then_running_on_othe
     rpc::shared_ptr<xxx::i_foo> i_foo_relay_ptr;
     auto example_relay_ptr = this->get_lib().create_new_zone();
     example_relay_ptr->create_foo(i_foo_relay_ptr);
-    standard_tests(*i_foo_relay_ptr, true, telemetry_service);
+    standard_tests(*i_foo_relay_ptr, true);
 
     //rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
     //ASSERT_EQ(this->get_lib().get_example()->create_foo(i_foo_ptr), 0);
     example_relay_ptr = nullptr;
-    //standard_tests(*i_foo_ptr, true, telemetry_service);    
+    //standard_tests(*i_foo_ptr, true);    
+}
+
+TYPED_TEST(remote_type_test, multithreaded_create_new_zone_releasing_host_then_running_on_other_enclave)
+{
+    if(!enable_multithreaded_tests || this->get_lib().is_enclave_setup())
+    {
+        GTEST_SKIP() << "multithreaded tests are skipped";
+        return;
+    }
+
+    std::vector<std::thread> threads(this->get_lib().is_enclave_setup() ? 3 : 100);
+    for(auto& thread_target : threads)
+    {
+        thread_target = std::thread([&](){
+            rpc::shared_ptr<xxx::i_foo> i_foo_relay_ptr;
+            auto example_relay_ptr = this->get_lib().create_new_zone();
+            example_relay_ptr->create_foo(i_foo_relay_ptr);
+            standard_tests(*i_foo_relay_ptr, true);
+        });
+    }
+    for(auto& thread_target : threads)
+    {
+        thread_target.join();
+    }
 }
 
 TYPED_TEST(remote_type_test, dyanmic_cast_tests)
@@ -582,6 +768,37 @@ TYPED_TEST(remote_type_test, bounce_baz_between_two_interfaces)
     i_foo_relay_ptr->call_baz_interface(baz);
 }
 
+TYPED_TEST(remote_type_test, multithreaded_bounce_baz_between_two_interfaces)
+{
+    if(!enable_multithreaded_tests || this->get_lib().is_enclave_setup())
+    {
+        GTEST_SKIP() << "multithreaded tests are skipped";
+        return;
+    }
+
+    
+    std::vector<std::thread> threads(this->get_lib().is_enclave_setup() ? 3 : 100);
+    for(auto& thread_target : threads)
+    {
+        thread_target = std::thread([&](){
+            rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
+            ASSERT_EQ(this->get_lib().get_example()->create_foo(i_foo_ptr), 0);
+
+            rpc::shared_ptr<xxx::i_foo> i_foo_relay_ptr;
+            auto example_relay_ptr = this->get_lib().create_new_zone();
+            example_relay_ptr->create_foo(i_foo_relay_ptr);
+
+            rpc::shared_ptr<xxx::i_baz> baz;
+            i_foo_ptr->create_baz_interface(baz);
+            i_foo_relay_ptr->call_baz_interface(baz);
+        });
+    }
+    for(auto& thread_target : threads)
+    {
+        thread_target.join();
+    }
+}
+
 // check for null
 TYPED_TEST(remote_type_test, check_for_null_interface)
 {
@@ -589,17 +806,20 @@ TYPED_TEST(remote_type_test, check_for_null_interface)
     ASSERT_EQ(this->get_lib().get_example()->create_foo(i_foo_ptr), 0);
     rpc::shared_ptr<xxx::i_baz> c;
     i_foo_ptr->get_interface(c);
-    assert(c == nullptr);
+    RPC_ASSERT(c == nullptr);
 }
 
 TYPED_TEST(remote_type_test, check_for_multiple_sets)
 {
     if(!this->get_lib().get_use_host_in_child())
         return;
+
     rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
     ASSERT_EQ(this->get_lib().get_example()->create_foo(i_foo_ptr), 0);
+    
+    auto zone_id = i_foo_ptr->query_proxy_base()->get_object_proxy()->get_service_proxy()->get_zone_id();
 
-    auto b = rpc::make_shared<marshalled_tests::baz>(telemetry_service);
+    auto b = rpc::make_shared<marshalled_tests::baz>(zone_id);
     // set
     i_foo_ptr->set_interface(b);
     // reset
@@ -619,27 +839,34 @@ TYPED_TEST(remote_type_test, check_for_interface_storage)
     ASSERT_EQ(this->get_lib().get_example()->create_foo(i_foo_ptr), 0);
 
     rpc::shared_ptr<xxx::i_baz> c;
-    auto b = rpc::make_shared<marshalled_tests::baz>(telemetry_service);
+    auto zone_id = i_foo_ptr->query_proxy_base()->get_object_proxy()->get_service_proxy()->get_zone_id();
+
+    auto b = rpc::make_shared<marshalled_tests::baz>(zone_id);
     i_foo_ptr->set_interface(b);
     i_foo_ptr->get_interface(c);
     i_foo_ptr->set_interface(nullptr);
-    assert(b == c);
+    RPC_ASSERT(b == c);
 }
 
 TYPED_TEST(remote_type_test, check_for_set_multiple_inheritance)
 {
     if(!this->get_lib().get_use_host_in_child())
         return;
+    auto proxy = this->get_lib().get_example()->query_proxy_base();        
     auto ret = this->get_lib().get_example()->give_interface(
-        rpc::shared_ptr<xxx::i_baz>(new multiple_inheritance(telemetry_service)));
-    assert(ret == rpc::error::OK());
+        rpc::shared_ptr<xxx::i_baz>(new multiple_inheritance(proxy->get_object_proxy()->get_service_proxy()->get_zone_id())));
+    RPC_ASSERT(ret == rpc::error::OK());
 }
-
-
 
 TYPED_TEST(remote_type_test, host_test)
 {    
-    auto h = rpc::make_shared<host>();
+    auto root_service = this->get_lib().get_root_service();
+    rpc::zone zone_id;
+    if(root_service)
+        zone_id = root_service->get_zone_id();
+    else
+        zone_id = {0};
+    auto h = rpc::make_shared<host>(zone_id);
 
     rpc::shared_ptr<yyy::i_example> target;
     rpc::shared_ptr<yyy::i_example> target2;
@@ -658,32 +885,160 @@ TYPED_TEST(remote_type_test, check_for_call_enclave_zone)
 {
     if(!this->get_lib().get_use_host_in_child())
         return;
-    auto h = rpc::make_shared<host>();
+
+    auto root_service = this->get_lib().get_root_service();
+    rpc::zone zone_id;
+    if(root_service)
+        zone_id = root_service->get_zone_id();
+    else
+        zone_id = {0};
+        
+    auto h = rpc::make_shared<host>(zone_id);
     auto ret = this->get_lib().get_example()->call_create_enclave_val(h);
-    assert(ret == rpc::error::OK());
+    RPC_ASSERT(ret == rpc::error::OK());
 }
 
-TYPED_TEST(remote_type_test, check_identity)
+TYPED_TEST(remote_type_test, check_sub_subordinate)
 {
-    if(!this->get_lib().get_use_host_in_child())
+    auto& lib = this->get_lib();
+    if(!lib.get_use_host_in_child())
+        return;
+
+    rpc::shared_ptr<yyy::i_example> new_zone;
+    ASSERT_EQ(lib.get_example()->create_example_in_subordnate_zone(new_zone, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK()); //second level
+
+    rpc::shared_ptr<yyy::i_example> new_new_zone;
+    ASSERT_EQ(new_zone->create_example_in_subordnate_zone(new_new_zone, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK()); //third level
+}
+
+TYPED_TEST(remote_type_test, multithreaded_check_sub_subordinate)
+{
+    if(!enable_multithreaded_tests || this->get_lib().is_enclave_setup())
+    {
+        GTEST_SKIP() << "multithreaded tests are skipped";
+        return;
+    }
+
+    auto& lib = this->get_lib();
+    if(!lib.get_use_host_in_child())
+        return;
+    std::vector<std::thread> threads(this->get_lib().is_enclave_setup() ? 3 : 100);
+    for(auto& thread_target : threads)
+    {
+        thread_target = std::thread([&](){
+            rpc::shared_ptr<yyy::i_example> new_zone;
+            ASSERT_EQ(lib.get_example()->create_example_in_subordnate_zone(new_zone, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK()); //second level
+
+            rpc::shared_ptr<yyy::i_example> new_new_zone;
+            ASSERT_EQ(new_zone->create_example_in_subordnate_zone(new_new_zone, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK()); //third level
+        });
+    }
+    for(auto& thread_target : threads)
+    {
+        thread_target.join();
+    }
+}
+
+TYPED_TEST(remote_type_test, send_interface_back)
+{
+    auto& lib = this->get_lib();
+    if(!lib.get_use_host_in_child())
         return;
 
     rpc::shared_ptr<xxx::i_baz> output;
 
     rpc::shared_ptr<yyy::i_example> new_zone;
-    //this->get_lib().i_example_ptr //first level
-    ASSERT_EQ(this->get_lib().get_example()->create_example_in_subordnate_zone(new_zone, ++(*zone_gen)), rpc::error::OK()); //second level
-
-    rpc::shared_ptr<yyy::i_example> new_new_zone;
-    ASSERT_EQ(new_zone->create_example_in_subordnate_zone(new_new_zone, ++(*zone_gen)), rpc::error::OK()); //third level
-
-    auto new_zone_fork = this->get_lib().create_new_zone();//second level
-
-    auto base_baz = rpc::shared_ptr<xxx::i_baz>(new baz(telemetry_service));
+    //lib.i_example_ptr_ //first level
+    ASSERT_EQ(lib.get_example()->create_example_in_subordnate_zone(new_zone, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK()); //second level
 
     rpc::shared_ptr<xxx::i_baz> new_baz;
     new_zone->create_baz(new_baz);
 
+    ASSERT_EQ(lib.get_example()->send_interface_back(new_baz, output), rpc::error::OK());
+    ASSERT_EQ(new_baz, output);
+}
+
+TYPED_TEST(remote_type_test, two_zones_get_one_to_lookup_other)
+{
+    auto root_service = this->get_lib().get_root_service();
+
+    rpc::zone zone_id;
+    if(root_service)
+        zone_id = root_service->get_zone_id();
+    else
+        zone_id = {0};
+    auto h = this->get_lib().get_local_host_ptr();  
+    auto ex = this->get_lib().get_example();      
+    
+    auto enclaveb = this->get_lib().create_new_zone();
+    enclaveb->set_host(h);
+    ASSERT_EQ(h->set_app("enclaveb", enclaveb), rpc::error::OK());
+
+    ex->call_host_look_up_app_not_return("enclaveb", false);
+    
+    enclaveb->set_host(nullptr);
+}
+TYPED_TEST(remote_type_test, multithreaded_two_zones_get_one_to_lookup_other)
+{
+    if(!enable_multithreaded_tests || this->get_lib().is_enclave_setup())
+    {
+        GTEST_SKIP() << "multithreaded tests are skipped";
+        return;
+    }
+
+    auto root_service = this->get_lib().get_root_service();
+
+    rpc::zone zone_id;
+    if(root_service)
+        zone_id = root_service->get_zone_id();
+    else
+        zone_id = {0};
+    auto h = rpc::make_shared<host>(zone_id);        
+    
+    auto enclavea = this->get_lib().create_new_zone();
+    enclavea->set_host(h);
+    ASSERT_EQ(h->set_app("enclavea", enclavea), rpc::error::OK());
+    
+    auto enclaveb = this->get_lib().create_new_zone();
+    enclaveb->set_host(h);
+    ASSERT_EQ(h->set_app("enclaveb", enclaveb), rpc::error::OK());
+    
+    const auto thread_size = 3;
+    std::array<std::thread, thread_size> threads;
+    for(auto& thread : threads)
+    {        
+        thread = std::thread([&](){
+            enclavea->call_host_look_up_app_not_return("enclaveb", true);
+        });
+    }
+    for(auto& thread : threads)
+    {        
+        thread.join();
+    }
+    enclavea->set_host(nullptr);
+    enclaveb->set_host(nullptr);
+}
+
+TYPED_TEST(remote_type_test, check_identity)
+{
+    auto& lib = this->get_lib();
+    if(!lib.get_use_host_in_child())
+        return;
+
+    rpc::shared_ptr<xxx::i_baz> output;
+
+    rpc::shared_ptr<yyy::i_example> new_zone;
+    //lib.i_example_ptr_ //first level
+    ASSERT_EQ(lib.get_example()->create_example_in_subordnate_zone(new_zone, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK()); //second level
+
+    rpc::shared_ptr<yyy::i_example> new_new_zone;
+    ASSERT_EQ(new_zone->create_example_in_subordnate_zone(new_new_zone, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK()); //third level
+
+    auto new_zone_fork = lib.create_new_zone();//second level
+
+    rpc::shared_ptr<xxx::i_baz> new_baz;
+    new_zone->create_baz(new_baz);
+    
     rpc::shared_ptr<xxx::i_baz> new_new_baz;
     new_new_zone->create_baz(new_new_baz);
 
@@ -700,9 +1055,11 @@ TYPED_TEST(remote_type_test, check_identity)
     //       1                      #
 
 
+    auto proxy = lib.get_example()->query_proxy_base();
+    auto base_baz = rpc::shared_ptr<xxx::i_baz>(new baz(proxy->get_object_proxy()->get_service_proxy()->get_zone_id()));
     auto input = base_baz;
 
-    ASSERT_EQ(this->get_lib().get_example()->send_interface_back(input, output), rpc::error::OK());
+    ASSERT_EQ(lib.get_example()->send_interface_back(input, output), rpc::error::OK());
     ASSERT_EQ(input, output);
     
     ASSERT_EQ(new_zone->send_interface_back(input, output), rpc::error::OK());
@@ -713,7 +1070,7 @@ TYPED_TEST(remote_type_test, check_identity)
 
     input = new_baz;
 
-    ASSERT_EQ(this->get_lib().get_example()->send_interface_back(input, output), rpc::error::OK());
+    ASSERT_EQ(lib.get_example()->send_interface_back(input, output), rpc::error::OK());
     ASSERT_EQ(input, output);
     
     ASSERT_EQ(new_zone->send_interface_back(input, output), rpc::error::OK());
@@ -725,7 +1082,7 @@ TYPED_TEST(remote_type_test, check_identity)
 
     input = new_new_baz;
 
-    ASSERT_EQ(this->get_lib().get_example()->send_interface_back(input, output), rpc::error::OK());
+    ASSERT_EQ(lib.get_example()->send_interface_back(input, output), rpc::error::OK());
     ASSERT_EQ(input, output);
     
     ASSERT_EQ(new_zone->send_interface_back(input, output), rpc::error::OK());
@@ -735,13 +1092,14 @@ TYPED_TEST(remote_type_test, check_identity)
     ASSERT_EQ(input, output);    
 
 
+
     input = new_baz_fork;
     
     // *z2   *i5                 #
     //  \  /                     #
     //   h1                      #
 
-    ASSERT_EQ(this->get_lib().get_example()->send_interface_back(input, output), rpc::error::OK());
+    ASSERT_EQ(lib.get_example()->send_interface_back(input, output), rpc::error::OK());
     ASSERT_EQ(input, output);
     
     // *z3                       #
@@ -763,7 +1121,7 @@ TYPED_TEST(remote_type_test, check_identity)
     //       h1                     #
 
     ASSERT_EQ(new_new_zone->send_interface_back(input, output), rpc::error::OK());
-    ASSERT_EQ(input, output); 
+    ASSERT_EQ(input, output);
 
 }
 
@@ -832,7 +1190,6 @@ TYPED_TEST(type_test_with_host, call_host_look_up_app_unload_app)
     ASSERT_NE(target, nullptr);
 
     ASSERT_EQ(this->get_lib().get_example()->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
-    telemetry_service->message(rpc::i_telemetry_service::info, "call_host_unload_app");
     ASSERT_EQ(this->get_lib().get_example()->call_host_unload_app("target"), rpc::error::OK());
     target = nullptr;
 }
@@ -847,12 +1204,9 @@ TYPED_TEST(type_test_with_host, call_host_look_up_app_not_return)
     ASSERT_NE(target, nullptr);
 
     ASSERT_EQ(this->get_lib().get_example()->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
-    telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return");
     ASSERT_EQ(this->get_lib().get_example()->call_host_look_up_app_not_return("target", run_standard_tests), rpc::error::OK());
-    telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return complete");
     ASSERT_EQ(this->get_lib().get_example()->call_host_unload_app("target"), rpc::error::OK());
     target = nullptr;
-    telemetry_service->message(rpc::i_telemetry_service::info, "app released");
 }
 
 TYPED_TEST(type_test_with_host, create_store_fetch_delete)
@@ -865,14 +1219,11 @@ TYPED_TEST(type_test_with_host, create_store_fetch_delete)
     ASSERT_NE(target, nullptr);
 
     ASSERT_EQ(this->get_lib().get_example()->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
-    telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app");
     ASSERT_EQ(this->get_lib().get_example()->call_host_look_up_app("target", target2, run_standard_tests), rpc::error::OK());
-    telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app complete");
     ASSERT_EQ(this->get_lib().get_example()->call_host_unload_app("target"), rpc::error::OK());
     ASSERT_EQ(target, target2);
     target = nullptr;
     target2 = nullptr;
-    telemetry_service->message(rpc::i_telemetry_service::info, "app released");
 }
 
 TYPED_TEST(type_test_with_host, create_store_not_return_delete)
@@ -884,11 +1235,8 @@ TYPED_TEST(type_test_with_host, create_store_not_return_delete)
     ASSERT_NE(target, nullptr);
 
     ASSERT_EQ(this->get_lib().get_example()->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
-    telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return");
     ASSERT_EQ(this->get_lib().get_example()->call_host_look_up_app_not_return_and_delete("target", run_standard_tests), rpc::error::OK());
-    telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return complete");
     target = nullptr;
-    telemetry_service->message(rpc::i_telemetry_service::info, "app released");
 }
 
 TYPED_TEST(type_test_with_host, create_store_delete)
@@ -901,17 +1249,24 @@ TYPED_TEST(type_test_with_host, create_store_delete)
     ASSERT_NE(target, nullptr);
 
     ASSERT_EQ(this->get_lib().get_example()->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
-    telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_and_delete");
     ASSERT_EQ(this->get_lib().get_example()->call_host_look_up_app_and_delete("target", target2, run_standard_tests), rpc::error::OK());
-    telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_and_delete complete");
     ASSERT_EQ(target, target2);
     target = nullptr;
     target2 = nullptr;
-    telemetry_service->message(rpc::i_telemetry_service::info, "app released");
 }
 
 TYPED_TEST(type_test_with_host, create_subordinate_zone)
 {  
     rpc::shared_ptr<yyy::i_example> target;
-    ASSERT_EQ(this->get_lib().get_example()->create_example_in_subordnate_zone(target, ++(*zone_gen)), rpc::error::OK());
+    ASSERT_EQ(this->get_lib().get_example()->create_example_in_subordnate_zone(target, this->get_lib().get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+}
+
+
+TYPED_TEST(type_test_with_host, create_subordinate_zone_and_set_in_host)
+{  
+    ASSERT_EQ(this->get_lib().get_example()->create_example_in_subordnate_zone_and_set_in_host(++(*zone_gen), "foo", this->get_lib().get_local_host_ptr()), rpc::error::OK());
+    rpc::shared_ptr<yyy::i_example> target;
+    this->get_lib().get_host()->look_up_app("foo", target);
+    this->get_lib().get_host()->unload_app("foo");
+    target->set_host(nullptr);
 }

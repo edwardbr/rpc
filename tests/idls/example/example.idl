@@ -9,7 +9,8 @@ namespace yyy
         error_code create_foo([out]rpc::shared_ptr<xxx::i_foo>& target);
         error_code create_baz([out]rpc::shared_ptr<xxx::i_baz>& val);
 
-        error_code create_example_in_subordnate_zone([out]rpc::shared_ptr<yyy::i_example>& target, uint64_t new_zone_id);
+        error_code create_example_in_subordnate_zone([out]rpc::shared_ptr<yyy::i_example>& target, const rpc::shared_ptr<i_host>& host_ptr, uint64_t new_zone_id);
+        error_code create_example_in_subordnate_zone_and_set_in_host(uint64_t new_zone_id, const std::string& name, const rpc::shared_ptr<i_host>& host_ptr);
         error_code create_multiple_inheritance([out]rpc::shared_ptr<xxx::i_baz>& target);
     
         error_code recieve_interface([out]rpc::shared_ptr<xxx::i_foo>& val);//can be null
@@ -29,6 +30,9 @@ namespace yyy
         error_code call_host_unload_app(const std::string& name);
         
         error_code send_interface_back([in]const rpc::shared_ptr<xxx::i_baz>& input, [out]rpc::shared_ptr<xxx::i_baz>& output);//can be null
+        
+        error_code get_host([out] rpc::shared_ptr<i_host>& app);
+        error_code set_host([in] const rpc::shared_ptr<i_host>& app);
     };
 
     interface i_host

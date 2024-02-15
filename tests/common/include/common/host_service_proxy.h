@@ -7,17 +7,13 @@ namespace rpc
     //This is for enclaves to call the host 
     class host_service_proxy : public service_proxy
     {
-        host_service_proxy(destination_zone host_zone_id, const rpc::shared_ptr<service>& svc, const rpc::i_telemetry_service* telemetry_service);
-
-        rpc::shared_ptr<service_proxy> deep_copy_for_clone() override {return rpc::make_shared<host_service_proxy>(*this);}
-
-    public:
+        host_service_proxy(const char* name, destination_zone host_zone_id, const rpc::shared_ptr<rpc::child_service>& svc);
         host_service_proxy(const host_service_proxy& other) = default;
 
-        static rpc::shared_ptr<service_proxy> create(destination_zone host_zone_id, object host_id, const rpc::shared_ptr<rpc::child_service>& svc, const rpc::i_telemetry_service* telemetry_service);
+        rpc::shared_ptr<service_proxy> clone() override {return rpc::shared_ptr<host_service_proxy>(new host_service_proxy(*this));}
 
-    public:
-        virtual ~host_service_proxy();
+        static rpc::shared_ptr<service_proxy> create(const char* name, destination_zone host_zone_id, const rpc::shared_ptr<rpc::child_service>& svc);
+        
         int initialise();
 
         int send(
@@ -46,8 +42,7 @@ namespace rpc
             object object_id, 
             caller_channel_zone caller_channel_zone_id, 
             caller_zone caller_zone_id, 
-            add_ref_options build_out_param_channel, 
-            bool proxy_add_ref
+            add_ref_options build_out_param_channel
         ) override;
         uint64_t release(
             uint64_t protocol_version, 
@@ -55,5 +50,11 @@ namespace rpc
             object object_id, 
             caller_zone caller_zone_id
         ) override;
+        
+                
+        friend rpc::child_service;
+
+    public:
+        virtual ~host_service_proxy() = default;
     };
 }

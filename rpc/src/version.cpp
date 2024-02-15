@@ -11,7 +11,7 @@ namespace rpc
 #elif defined(RPC_V1)
         return VERSION_1;
 #else
-        assert(false);
+        RPC_ASSERT(false);
 #endif
     }
 }
