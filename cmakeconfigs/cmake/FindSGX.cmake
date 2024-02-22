@@ -58,7 +58,7 @@ else() # Linux
     if(${BUILD_TYPE} STREQUAL "release") # SimulationOptimized aka SimulationPrerelease
       set(SGX_COMMON_CFLAGS "${SGX_COMMON_CFLAGS} -O2 -DNDEBUG -UEDEBUG")
     else() # Debug
-      set(SGX_COMMON_CFLAGS "${SGX_COMMON_CFLAGS} -O0 -g -UNDEBUG -UEDEBUG")
+      set(SGX_COMMON_CFLAGS "${SGX_COMMON_CFLAGS} -O0 -UNDEBUG -UEDEBUG")
     endif()
   elseif(SGX_MODE STREQUAL "prerelease")
     set(SGX_COMMON_CFLAGS "${SGX_COMMON_CFLAGS} -O2 -DNDEBUG -DEDEBUG")
@@ -654,7 +654,9 @@ if(SGX_FOUND)
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 
     endif()
-    post_build_strip_symbols("${target}" BINARY "$<TARGET_FILE_DIR:${target}>/${OUTPUT_NAME}")
+    if(STRIP_DEBUG OR GENERATE_DEBUG_INDEX)
+      post_build_symbol_tasks("${target}" BINARY "$<TARGET_FILE_DIR:${target}>/${OUTPUT_NAME}")
+    endif()
 
     set(CLEAN_FILES "$<TARGET_FILE_DIR:${target}>/${OUTPUT_NAME};$<TARGET_FILE_DIR:${target}>/${target}_hash.hex")
     set_property(
