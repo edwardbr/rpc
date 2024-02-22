@@ -28,5 +28,5 @@ if(ENABLE_CLANG_TIDY)
 endif()
 
 if(STRIP_DEBUG OR GENERATE_DEBUG_INDEX)
-  post_build_symbol_works(generator)
+  post_build_symbol_tasks(generator)
 endif()

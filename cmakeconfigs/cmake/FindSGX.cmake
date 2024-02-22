@@ -654,7 +654,9 @@ if(SGX_FOUND)
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 
     endif()
-    post_build_symbol_works("${target}" BINARY "$<TARGET_FILE_DIR:${target}>/${OUTPUT_NAME}")
+    if(STRIP_DEBUG OR GENERATE_DEBUG_INDEX)
+      post_build_symbol_tasks("${target}" BINARY "$<TARGET_FILE_DIR:${target}>/${OUTPUT_NAME}")
+    endif()
 
     set(CLEAN_FILES "$<TARGET_FILE_DIR:${target}>/${OUTPUT_NAME};$<TARGET_FILE_DIR:${target}>/${target}_hash.hex")
     set_property(
