@@ -3,6 +3,7 @@
 #ifndef LOG_STR_DEFINED
 # ifdef USE_RPC_LOGGING
 #  define LOG_STR(str, sz) rpc_log(str, sz)
+#  define LOG_CSTR(str) rpc_log(str, strlen(str))
 #  include <sgx_error.h>
    extern "C" {
 #  ifdef _IN_ENCLAVE
@@ -13,7 +14,7 @@
    }
 # else
 #  define LOG_STR(str, sz)
+#  define LOG_CSTR(str)
 # endif
-#define LOG_CSTR(str) rpc_log(str, strlen(str))
 #define LOG_STR_DEFINED
 #endif
