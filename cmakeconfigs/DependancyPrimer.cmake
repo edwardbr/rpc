@@ -414,36 +414,4 @@ if(NOT DEPENDANCIES_LOADED)
     include(GoogleTest)
   endif()
 
-  function(post_build_strip_symbols target)
-    if(UNIX)
-      if(DEFINED STRIP_SYMBOLS)
-        get_target_property(target_type ${target} TYPE)
-
-        if(${target_type} STREQUAL "EXECUTABLE"
-           OR ${target_type} STREQUAL "STATIC_LIBRARY"
-           OR ${target_type} STREQUAL "SHARED_LIBRARY")
-
-          # This is required as to define the correct output at configuration time.
-          # Default target file name is for executable. STATIC and SHARED libraries follow
-          set(target_file "${CMAKE_BINARY_DIR}/symbols/${target}.debug")
-          if(${target_type} STREQUAL "STATIC_LIBRARY")
-            set(target_file "${CMAKE_BINARY_DIR}/symbols/${target}.a.debug")
-          endif()
-
-          if(${target_type} STREQUAL "SHARED_LIBRARY")
-            set(target_file "${CMAKE_BINARY_DIR}/symbols/${target}.so.debug")
-          endif()
-
-          message("post_build_strip_symbols ${target}")
-
-          add_custom_command(
-            TARGET ${target}
-            POST_BUILD
-            COMMAND ${STRIP_SYMBOLS} "$<TARGET_FILE:${target}>"
-            VERBATIM)
-        endif()
-      endif()
-    endif()
-  endfunction()
-
 endif(NOT DEPENDANCIES_LOADED)

@@ -26,4 +26,7 @@ set_property(TARGET generator PROPERTY COMPILE_PDB_NAME generator)
 if(ENABLE_CLANG_TIDY)
   set_target_properties(generator PROPERTIES CXX_CLANG_TIDY "${CLANG_TIDY_COMMAND}")
 endif()
-post_build_strip_symbols(generator)
+
+if(STRIP_DEBUG OR GENERATE_DEBUG_INDEX)
+  post_build_symbol_tasks(generator)
+endif()
