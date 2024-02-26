@@ -26,6 +26,7 @@ namespace rpc
     class service;
     class child_service;
     class service_proxy;
+    struct current_service_tracker;
 
     const object dummy_object_id = {std::numeric_limits<uint64_t>::max()};
 
@@ -49,6 +50,7 @@ namespace rpc
     {
     protected:
         static std::atomic<uint64_t> zone_id_generator;
+        inline static thread_local service* current_service_ = nullptr;
         zone zone_id_ = {0};
         mutable std::atomic<uint64_t> object_id_generator = 0;
 
@@ -84,13 +86,17 @@ namespace rpc
         void inner_add_zone_proxy(const rpc::shared_ptr<service_proxy>& service_proxy);
 
         friend proxy_base;                  
-        friend i_interface_stub;                          
+        friend i_interface_stub;      
+        friend current_service_tracker;                    
 
     public:
         explicit service(const char* name, zone zone_id);
         virtual ~service();
 
         static zone generate_new_zone_id();
+        
+        //we are using a pointer as this is a thread local variable it will not change mid stream, only use this function when servicing an rpc call
+        inline static service* get_current_service() {return current_service_;}
         object generate_new_object_id() const;
         std::string get_name() const {return name_;}
 
@@ -227,6 +233,21 @@ namespace rpc
             service_loggers.push_back(logger);
         }
         friend service_proxy;
+    };
+    
+    //protect the current service local pointer
+    struct current_service_tracker
+    {
+        service* old_service_ = nullptr;
+        current_service_tracker(service* current_service)
+        {
+            old_service_ = service::current_service_;
+            service::current_service_ = current_service;
+        }
+        ~current_service_tracker()
+        {
+            service::current_service_ = old_service_;
+        }
     };
 
     //Child services need to maintain the lifetime of the root object in its zone 

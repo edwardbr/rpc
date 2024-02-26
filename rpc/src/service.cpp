@@ -187,6 +187,7 @@ namespace rpc
         std::vector<char>& out_buf_
     )
     {
+        current_service_tracker tracker(this);
         if(destination_zone_id != zone_id_.as_destination())
         {
             rpc::shared_ptr<service_proxy> other_zone;
@@ -577,6 +578,7 @@ namespace rpc
         object object_id, 
         interface_ordinal interface_id)
     {
+        current_service_tracker tracker(this);
         if(destination_zone_id != zone_id_.as_destination())
         {
             rpc::shared_ptr<service_proxy> other_zone;
@@ -632,6 +634,7 @@ namespace rpc
         add_ref_options build_out_param_channel
     )
     {
+        current_service_tracker tracker(this);
         if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
         {
             telemetry_service->on_service_add_ref(
@@ -999,6 +1002,7 @@ namespace rpc
         caller_zone caller_zone_id
     )
     {
+        current_service_tracker tracker(this);
 
         if(destination_zone_id != zone_id_.as_destination())
         {

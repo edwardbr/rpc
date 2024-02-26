@@ -41,11 +41,10 @@ if(${BUILD_HOST})
   target_link_options(rpc_telemetry_host PRIVATE ${HOST_LINK_OPTIONS})
   target_link_directories(rpc_telemetry_host PUBLIC ${SGX_LIBRARY_PATH})
   target_compile_definitions(rpc_telemetry_host PRIVATE ${HOST_DEFINES})
-  set_property(TARGET rpc_telemetry_host PROPERTY COMPILE_PDB_NAME rpc_telemetry_host)
-
   target_link_libraries(rpc_telemetry_host PRIVATE rpc::rpc_host fmt::fmt yas_common spdlog::spdlog)
 
   add_library(rpc::rpc_telemetry_host ALIAS rpc_telemetry_host)
+  set_property(TARGET rpc_telemetry_host PROPERTY COMPILE_PDB_NAME rpc_telemetry_host)
 endif()
 
 install(
