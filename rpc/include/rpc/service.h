@@ -158,7 +158,8 @@ namespace rpc
 
         virtual void add_zone_proxy(const rpc::shared_ptr<service_proxy>& zone);
         virtual rpc::shared_ptr<service_proxy> get_zone_proxy(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, destination_zone destination_zone_id, caller_zone new_caller_zone_id, bool& new_proxy_added);
-        virtual void remove_zone_proxy(destination_zone destination_zone_id, caller_zone caller_zone_id, destination_channel_zone destination_channel_zone_id);
+        virtual void remove_zone_proxy(destination_zone destination_zone_id, caller_zone caller_zone_id);
+        virtual void remove_zone_proxy_if_not_used(destination_zone destination_zone_id, caller_zone caller_zone_id);
         template<class T> rpc::shared_ptr<T> get_local_interface(uint64_t protocol_version, object object_id)
         {
             return rpc::static_pointer_cast<T>(get_castable_interface(object_id, T::get_id(protocol_version)));
@@ -211,6 +212,11 @@ namespace rpc
             if(output_descr.object_id != 0 && output_descr.destination_zone_id != 0)
             {
                 err_code = rpc::demarshall_interface_proxy(rpc::get_version(), new_service_proxy, output_descr, zone_id_.as_caller(), output_interface);
+            }
+            else
+            {
+                new_service_proxy->release_external_ref();
+                remove_zone_proxy_if_not_used(new_service_proxy->get_destination_zone_id(), new_service_proxy->get_caller_zone_id());
             }
             return err_code;
         }

@@ -165,9 +165,9 @@ namespace rpc
                         LOG_STR(message.c_str(), message.size());
 #endif
                     }
+                    success = false;
                 }
             }
-            success = false;
         }
         return success;
     }
@@ -1186,7 +1186,23 @@ namespace rpc
         return proxy;
     }
 
-    void service::remove_zone_proxy(destination_zone destination_zone_id, caller_zone caller_zone_id, destination_channel_zone destination_channel_zone_id)
+    void service::remove_zone_proxy(destination_zone destination_zone_id, caller_zone caller_zone_id)
+    {
+        {
+            std::lock_guard g(zone_control);
+            auto item = other_zones.find({destination_zone_id, caller_zone_id});
+            if (item == other_zones.end())
+            {
+                RPC_ASSERT(false);
+            }
+            else
+            {
+                other_zones.erase(item);
+            }
+        }
+    }
+
+    void service::remove_zone_proxy_if_not_used(destination_zone destination_zone_id, caller_zone caller_zone_id)
     {
         {
             std::lock_guard g(zone_control);
@@ -1198,7 +1214,10 @@ namespace rpc
             else
             {
                 auto sp = item->second.lock();
-                other_zones.erase(item);
+                if(!sp || sp->is_unused())
+                {
+                    other_zones.erase(item);
+                }
             }
         }
     }

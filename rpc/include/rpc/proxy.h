@@ -287,7 +287,7 @@ namespace rpc
             auto svc = service_.lock();
             if(svc)
             {
-                svc->remove_zone_proxy(destination_zone_id_, caller_zone_id_, destination_channel_zone_);
+                svc->remove_zone_proxy(destination_zone_id_, caller_zone_id_);
             }
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             {
@@ -298,6 +298,7 @@ namespace rpc
         std::string get_name() const { return name_; }
 
         uint64_t get_remote_rpc_version() const {return version_.load();}
+        bool is_unused() const {return lifetime_lock_count_ == 0;}
 
         uint64_t set_encoding(encoding enc)
         {
