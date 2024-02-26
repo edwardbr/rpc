@@ -654,7 +654,7 @@ if(SGX_FOUND)
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 
     endif()
-    if(STRIP_DEBUG OR GENERATE_DEBUG_INDEX)
+    if(STRIP_DEBUG OR GENERATE_DEBUG_INDEX OR STRIP_NO_DEBUG)
       post_build_symbol_tasks("${target}" BINARY "$<TARGET_FILE_DIR:${target}>/${OUTPUT_NAME}")
     endif()
 

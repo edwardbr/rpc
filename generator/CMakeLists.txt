@@ -27,6 +27,6 @@ if(ENABLE_CLANG_TIDY)
   set_target_properties(generator PROPERTIES CXX_CLANG_TIDY "${CLANG_TIDY_COMMAND}")
 endif()
 
-if(STRIP_DEBUG OR GENERATE_DEBUG_INDEX)
+if(STRIP_DEBUG OR GENERATE_DEBUG_INDEX OR STRIP_NO_DEBUG)
   post_build_symbol_tasks(generator)
 endif()
