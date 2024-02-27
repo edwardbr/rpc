@@ -38,6 +38,6 @@ if(ENABLE_CLANG_TIDY)
 endif()
 
 gtest_discover_tests(rpc_test)
-if(STRIP_DEBUG OR GENERATE_DEBUG_INDEX OR STRIP_NO_DEBUG)
+if(STRIP_DEBUG OR GENERATE_DEBUG_INDEX OR STRIP_AND_DELETE_SYMBOLS)
   post_build_symbol_tasks(rpc_test)
 endif()
