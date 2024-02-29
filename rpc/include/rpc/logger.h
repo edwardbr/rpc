@@ -4,7 +4,9 @@
 # ifdef USE_RPC_LOGGING
 #  define LOG_STR(str, sz) rpc_log(str, sz)
 #  define LOG_CSTR(str) rpc_log(str, strlen(str))
-#  include <sgx_error.h>
+#  ifdef _IN_ENCLAVE
+#   include <sgx_error.h>
+#  endif
    extern "C" {
 #  ifdef _IN_ENCLAVE
      sgx_status_t __cdecl rpc_log(const char* str, size_t sz);
