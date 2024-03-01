@@ -495,7 +495,7 @@ namespace rpc
         {
             if(found->second.zone_id != zone_id)
             {
-                RPC_ASSERT(!"object being registered in two zones");
+                fmt::println("[ warn  ] object being registered in two zones");
             }
             else
             {
