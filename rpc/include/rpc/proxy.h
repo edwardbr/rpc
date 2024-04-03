@@ -99,8 +99,18 @@ namespace rpc
         rpc::shared_ptr<service_proxy> get_service_proxy() const { return service_proxy_; }
         object get_object_id() const {return {object_id_};}
         destination_zone get_destination_zone_id() const;
+        
+        [[nodiscard]] int send(
+            uint64_t protocol_version 
+            , rpc::encoding encoding 
+            , uint64_t tag 
+            , rpc::interface_ordinal interface_id 
+            , rpc::method method_id 
+            , size_t in_size_
+            , const char* in_buf_ 
+            , std::vector<char>& out_buf_);
 
-        int send(uint64_t tag, std::function<interface_ordinal (uint64_t)> id_getter, method method_id, size_t in_size_, const char* in_buf_,
+        [[nodiscard]] int send(uint64_t tag, std::function<interface_ordinal (uint64_t)> id_getter, method method_id, size_t in_size_, const char* in_buf_,
                         std::vector<char>& out_buf_);
 
         size_t get_proxy_count()
@@ -353,8 +363,35 @@ namespace rpc
             }   
             return count;         
         }
+        
+        
+        [[nodiscard]] int send_from_this_zone(
+            uint64_t protocol_version 
+            , rpc::encoding encoding 
+            , uint64_t tag 
+            , rpc::object object_id 
+            , rpc::interface_ordinal interface_id 
+            , rpc::method method_id 
+            , size_t in_size_
+            , const char* in_buf_ 
+            , std::vector<char>& out_buf_)
+        {
+            return send(
+                protocol_version 
+                , encoding 
+                , tag 
+                , caller_channel_zone{} 
+                , caller_zone_id_ 
+                , destination_zone_id_ 
+                , object_id 
+                , interface_id 
+                , method_id 
+                , in_size_
+                , in_buf_ 
+                , out_buf_);
+        }            
 
-        [[nodiscard]] int sp_call(
+        [[nodiscard]] int send_from_this_zone(
                 encoding enc
                 , uint64_t tag
                 , object object_id
@@ -371,13 +408,10 @@ namespace rpc
             }
 
             auto version = version_.load();
-            auto ret = send(
+            auto ret = send_from_this_zone(
                 version,
                 enc_,
                 tag,
-                caller_channel_zone{}, 
-                get_zone_id().as_caller(), 
-                get_destination_zone_id(), 
                 object_id, 
                 id_getter(version), 
                 method_id, 
