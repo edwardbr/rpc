@@ -1076,7 +1076,7 @@ namespace enclave_marshaller
                         if(!has_preamble && !output.empty())
                         {
                             stub("auto& zone_ = target_stub_.lock()->get_zone();"); // add a nice option
-                            has_preamble = false;
+                            has_preamble = true;
                         }
                         stub(output);
                     }
