@@ -32,6 +32,7 @@ namespace rpc
         template <class _Ty>
         friend class _Ptr_base;
     };
+    bool are_in_same_zone(const casting_interface* first, const casting_interface* second);
 
     //this is a nice helper function to match an interface id to a interface in a version independant way
     template<class T>

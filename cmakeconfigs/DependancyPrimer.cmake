@@ -25,7 +25,7 @@ if(NOT DEPENDANCIES_LOADED)
   option(INCLUDE_DC_APPS_EMBEDDED "include dc apps in main enclave" ON)
   option(ENABLE_CLANG_TIDY "Enable clang-tidy in build" ON)
   option(ENABLE_CLANG_TIDY_FIX "Turn on auto fix in clang tidy" OFF)
-  option(RPC_USE_LOGGING "Turn on logging" OFF)
+  option(ENABLE_COVERAGE "Turn on code coverage" OFF)
 
   if(NOT DEFINED DC_APPS)
     set(DC_APPS "ALL_DCAPPS")
@@ -276,7 +276,7 @@ if(NOT DEPENDANCIES_LOADED)
         set(HOST_LINK_OPTIONS ${SHARED_HOST_LINK_OPTIONS} /INCREMENTAL:NO /debug)
         set(HOST_LINK_EXE_OPTIONS ${HOST_LINK_OPTIONS} /IGNORE:4099 /IGNORE:4098)
       else()
-        set(HOST_DEFINES ${SHARED_HOST_DEFINES} _DEBUG FMT_HEADER_ONLY=1)
+        set(HOST_DEFINES ${SHARED_HOST_DEFINES} _DEBUG)
 
         set(HOST_COMPILE_OPTIONS
           ${SHARED_HOST_COMPILE_OPTIONS}
@@ -342,18 +342,18 @@ if(NOT DEPENDANCIES_LOADED)
         ENCLAVE_OK=SGX_SUCCESS
         DISALLOW_BAD_JUMPS)
       set(ENCLAVE_COMPILE_OPTIONS
-        -Wno-c++17-extensions
-        -Wno-nonportable-include-path
-        -Wno-conversion
-        -Wno-unused-parameter
-        -Wno-tautological-undefined-compare
-        -Wno-dynamic-class-memaccess
-        -Wno-ignored-qualifiers
-        -Wno-exceptions
-        -Wno-null-dereference
-        -Wno-ignored-attributes
-        -Wno-implicit-exception-spec-mismatch
-        -I/usr/lib/llvm-10/include/c++/v1)
+          -Wno-c++17-extensions
+          -Wno-nonportable-include-path
+          -Wno-conversion
+          -Wno-unused-parameter
+          -Wno-tautological-undefined-compare
+          -Wno-dynamic-class-memaccess
+          -Wno-ignored-qualifiers
+          -Wno-exceptions
+          -Wno-null-dereference
+          -Wno-ignored-attributes
+          -Wno-implicit-exception-spec-mismatch
+          -I/usr/lib/llvm-10/include/c++/v1)
       set(HOST_COMPILE_OPTIONS
         -I/usr/lib/llvm-10/include/c++/v1
         -Wno-nonportable-include-path
@@ -389,6 +389,12 @@ if(NOT DEPENDANCIES_LOADED)
           sgx_capable
           sgx_urts_sim)
       endif()        
+      if(ENABLE_COVERAGE)
+        message("enabling code coverage")
+        #list(APPEND HOST_COMPILE_OPTIONS -fprofile-instr-generate -fcoverage-mapping)
+        list(APPEND HOST_COMPILE_OPTIONS --coverage)
+        list(APPEND HOST_LINK_OPTIONS -fprofile-arcs)
+      endif()
       set(OS_DEPENDANCIES_ENCLAVE linux_dependancies_enclave)
       set(ENCLAVE_SSL_INCLUDES "/opt/intel/sgxssl/include")
     endif()

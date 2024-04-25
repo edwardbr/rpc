@@ -206,7 +206,7 @@ function(
     set_property(TARGET ${name}_idl_host PROPERTY COMPILE_PDB_NAME ${name}_idl_host)
 
     target_link_libraries(${name}_idl_host PUBLIC
-      rpc_host
+      rpc::rpc_host
       yas_common
     )
 
@@ -327,7 +327,9 @@ function(
     target_link_directories(${name}_idl_host PUBLIC ${SGX_LIBRARY_PATH})
     set_property(TARGET ${name}_idl_host PROPERTY COMPILE_PDB_NAME ${name}_idl_host)
 
-    target_link_libraries(${name}_idl_host PUBLIC rpc_host yas_common)
+    target_link_libraries(${name}_idl_host PUBLIC 
+      rpc::rpc_host
+      yas_common)
 
     add_dependencies(${name}_idl_host ${name}_idl_generate)
 
@@ -367,7 +369,9 @@ function(
     target_link_directories(${name}_idl_enclave PRIVATE ${SGX_LIBRARY_PATH})
     set_property(TARGET ${name}_idl_enclave PROPERTY COMPILE_PDB_NAME ${name}_idl_enclave)
 
-    target_link_libraries(${name}_idl_enclave PUBLIC rpc_enclave yas_common)
+    target_link_libraries(${name}_idl_enclave PUBLIC 
+      rpc_enclave
+      yas_common)
 
     add_dependencies(${name}_idl_enclave ${name}_idl_generate)
 
@@ -404,7 +408,9 @@ function(
     target_link_directories(${name}_idl_enclave_v1 PRIVATE ${SGX_LIBRARY_PATH})
     set_property(TARGET ${name}_idl_enclave_v1 PROPERTY COMPILE_PDB_NAME ${name}_idl_enclave_v1)
 
-    target_link_libraries(${name}_idl_enclave_v1 PUBLIC rpc_enclave_v1 yas_common)
+    target_link_libraries(${name}_idl_enclave_v1 PUBLIC 
+      rpc_enclave_v1
+      yas_common)
 
     add_dependencies(${name}_idl_enclave_v1 ${name}_idl_generate)
 
