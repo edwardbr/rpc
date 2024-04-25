@@ -2041,6 +2041,9 @@ element_type*>::value>> shared_ptr(unique_ptr<_Yp, _Dp>&& __r) : __ptr_(__r.get(
     template<class T1, class T2>
     [[nodiscard]] inline shared_ptr<T1> dynamic_pointer_cast(const shared_ptr<T2>& from) noexcept
     {
+        if(!from)
+            return nullptr;
+            
         T1* ptr = nullptr;
 #ifdef RPC_V2
         ptr = const_cast<T1*>(static_cast<const T1*>(from->query_interface(T1::get_id(rpc::VERSION_2))));

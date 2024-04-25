@@ -24,10 +24,14 @@ target_link_libraries(
           macro_parser
           utils
           clipp::clipp
-          fmt::fmt-header-only)
+          fmt::fmt)
 target_link_options(generator PRIVATE ${HOST_LINK_EXE_OPTIONS})
 
 set_property(TARGET generator PROPERTY COMPILE_PDB_NAME generator)
 if(ENABLE_CLANG_TIDY)
   set_target_properties(generator PROPERTIES CXX_CLANG_TIDY "${CLANG_TIDY_COMMAND}")
+endif()
+
+if(STRIP_DEBUG OR GENERATE_DEBUG_INDEX OR STRIP_AND_DELETE_SYMBOLS)
+  post_build_symbol_tasks(generator)
 endif()

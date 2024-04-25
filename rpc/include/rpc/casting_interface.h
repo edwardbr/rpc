@@ -6,7 +6,6 @@
 
 #include <rpc/types.h>
 #include <rpc/version.h>
-#include <rpc/casting_interface.h>
 
 namespace rpc
 {
@@ -22,6 +21,7 @@ namespace rpc
         // this is only implemented by proxy_base
         virtual proxy_base* query_proxy_base() const {return nullptr;} 
     };
+    bool are_in_same_zone(const casting_interface* first, const casting_interface* second);
 
     //this is a nice helper function to match an interface id to a interface in a version independant way
     template<class T>
