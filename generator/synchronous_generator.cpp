@@ -281,8 +281,17 @@ namespace enclave_marshaller
                 {0} {1};
 				if(__rpc_ret == rpc::error::OK() && {1}_object_.destination_zone_id.is_set() && {1}_object_.object_id.is_set())
                 {{
-                    auto& zone_ = target_stub_.lock()->get_zone();
-                    __rpc_ret = rpc::stub_bind_in_param(protocol_version, zone_, caller_channel_zone_id, caller_zone_id, {1}_object_, {1});
+                    auto target_stub_strong = target_stub_.lock();
+                    if (target_stub_strong)
+                    {{
+                        auto& zone_ = target_stub_strong->get_zone();
+                        __rpc_ret = rpc::stub_bind_in_param(protocol_version, zone_, caller_channel_zone_id, caller_zone_id, {1}_object_, {1});
+                    }}
+                    else
+                    {{
+                        assert(false);
+                        __rpc_ret = rpc::error::ZONE_NOT_FOUND();
+                    }}
                 }}
 )__",
                                    object_type, name);
@@ -1075,10 +1084,21 @@ namespace enclave_marshaller
 
                         if(!has_preamble && !output.empty())
                         {
-                            stub("auto& zone_ = target_stub_.lock()->get_zone();"); // add a nice option
+                            stub("auto target_stub_strong = target_stub_.lock();");
+                            stub("if (target_stub_strong)");
+                            stub("{{");
+                            stub("auto& zone_ = target_stub_strong->get_zone();");
                             has_preamble = true;
                         }
                         stub(output);
+                    }
+                    if (has_preamble)
+                    {
+                        stub("}}");
+                        stub("else");
+                        stub("{{");
+                        stub("assert(false);");
+                        stub("}}");
                     }
                     stub("}}");
                 }
