@@ -47,8 +47,11 @@ namespace rpc
         (void)is_empty;
         RPC_ASSERT(is_empty);
 
-        stubs.clear();
-        wrapped_object_to_stub.clear();
+        {
+            std::lock_guard l(stub_control);
+            stubs.clear();
+            wrapped_object_to_stub.clear();
+        }
         other_zones.clear();
     }
     
@@ -77,8 +80,9 @@ namespace rpc
 
     bool service::check_is_empty() const
     {
+        std::lock_guard l(stub_control);
         bool success = true;
-        for(auto item : stubs)
+        for(const auto& item : stubs)
         {
             auto stub =  item.second.lock();
             if(!stub)
