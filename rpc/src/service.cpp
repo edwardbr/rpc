@@ -15,6 +15,10 @@ namespace rpc
     ////////////////////////////////////////////////////////////////////////////
     // service
 
+    thread_local service* current_service_ = nullptr;
+    service* service::get_current_service() {return current_service_;}
+    void service::set_current_service(service* svc) {current_service_ = svc;}
+    
     std::atomic<uint64_t> service::zone_id_generator = 0;
     zone service::generate_new_zone_id() 
     { 
