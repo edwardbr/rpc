@@ -2263,7 +2263,9 @@ namespace enclave_marshaller
             header("#include <vector>");
             header("#include <list>");
             header("#include <map>");
+            header("#include <unordered_map>");
             header("#include <set>");
+            header("#include <unordered_set>");
             header("#include <string>");
             header("#include <array>");
 
