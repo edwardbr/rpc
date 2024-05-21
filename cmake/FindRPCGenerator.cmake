@@ -26,12 +26,19 @@ function(
     "${multiValueArgs}"
     ${ARGN})
 
-  cmake_path(
-    APPEND
-    base_dir
-    ${idl}
-    OUTPUT_VARIABLE
-    idl)
+  # keep relative path of idl for install, else use only the file name
+  cmake_path(IS_RELATIVE idl idl_is_relative)
+  if(${idl_is_relative})
+    cmake_path(GET idl PARENT_PATH idl_relative_dir)
+    cmake_path(
+      APPEND
+      base_dir
+      ${idl}
+      OUTPUT_VARIABLE
+      idl)
+  else()
+    set(idl_relative_dir .)
+  endif()
 
   set(header_path ${sub_directory}/${name}.h)
   set(proxy_path ${sub_directory}/${name}_proxy.cpp)
@@ -186,7 +193,8 @@ function(
 
   if(BUILD_ENCLAVE)
     if(${DEBUG_RPC_GEN})
-      message("
+      message(
+        "
 # #specify a host specific target
       add_library(${name}_idl_host STATIC
       ${full_header_path}
@@ -200,10 +208,7 @@ function(
     target_link_directories(${name}_idl_host PUBLIC ${SGX_LIBRARY_PATH})
     set_property(TARGET ${name}_idl_host PROPERTY COMPILE_PDB_NAME ${name}_idl_host)
 
-    target_link_libraries(${name}_idl_host PUBLIC
-      rpc::rpc_host
-      yas_common
-    )
+    target_link_libraries(${name}_idl_host PUBLIC rpc::rpc_host yas_common)
 
     add_dependencies(${name}_idl_host ${name}_idl_generate)
 
@@ -235,19 +240,14 @@ function(
     target_compile_definitions(${name}_idl_enclave PRIVATE ${ENCLAVE_DEFINES})
     target_include_directories(${name}_idl_enclave PUBLIC \"$<BUILD_INTERFACE:${output_path}>\" \"$<BUILD_INTERFACE:${output_path}/include>\" PRIVATE \"${output_path}/include\" ${ENCLAVE_LIBCXX_INCLUDES} ${params_include_paths})
 
-    set(stripped_idl)
-    cmake_path(GET idl STEM stripped_idl)
     install(DIRECTORY \"$<BUILD_INTERFACE:${output_path}>\" DESTINATION include/secretarium/idls)
-    install(FILES     \"$<BUILD_INTERFACE:${idl}>\"         DESTINATION include/secretarium/idls/${stripped_idl})
+    install(FILES \"$<BUILD_INTERFACE:${idl}>\" DESTINATION include/secretarium/idls/${idl_relative_dir})
 
     target_compile_options(${name}_idl_enclave PRIVATE ${ENCLAVE_COMPILE_OPTIONS})
     target_link_directories(${name}_idl_enclave PRIVATE ${SGX_LIBRARY_PATH})
     set_property(TARGET ${name}_idl_enclave PROPERTY COMPILE_PDB_NAME ${name}_idl_enclave)
 
-    target_link_libraries(${name}_idl_enclave PUBLIC
-      rpc_enclave
-      yas_common
-    )
+    target_link_libraries(${name}_idl_enclave PUBLIC rpc_enclave yas_common)
 
     add_dependencies(${name}_idl_enclave ${name}_idl_generate)
 
@@ -286,10 +286,7 @@ function(
     target_link_directories(${name}_idl_enclave_v1 PRIVATE ${SGX_LIBRARY_PATH})
     set_property(TARGET ${name}_idl_enclave_v1 PROPERTY COMPILE_PDB_NAME ${name}_idl_enclave_v1)
 
-    target_link_libraries(${name}_idl_enclave_v1 PUBLIC
-      rpc_enclave_v1
-      yas_common
-    )
+    target_link_libraries(${name}_idl_enclave_v1 PUBLIC rpc_enclave_v1 yas_common)
 
     add_dependencies(${name}_idl_enclave_v1 ${name}_idl_generate)
 
@@ -322,9 +319,7 @@ function(
     target_link_directories(${name}_idl_host PUBLIC ${SGX_LIBRARY_PATH})
     set_property(TARGET ${name}_idl_host PROPERTY COMPILE_PDB_NAME ${name}_idl_host)
 
-    target_link_libraries(${name}_idl_host PUBLIC 
-      rpc::rpc_host
-      yas_common)
+    target_link_libraries(${name}_idl_host PUBLIC rpc::rpc_host yas_common)
 
     add_dependencies(${name}_idl_host ${name}_idl_generate)
 
@@ -355,18 +350,14 @@ function(
       PUBLIC "$<BUILD_INTERFACE:${output_path}>" "$<BUILD_INTERFACE:${output_path}/include>"
       PRIVATE "${output_path}/include" ${ENCLAVE_LIBCXX_INCLUDES} ${params_include_paths})
 
-    set(stripped_idl)
-    cmake_path(GET idl STEM stripped_idl)
     install(DIRECTORY "$<BUILD_INTERFACE:${output_path}>" DESTINATION include/secretarium/idls)
-    install(FILES "$<BUILD_INTERFACE:${idl}>" DESTINATION include/secretarium/idls/${stripped_idl})
+    install(FILES "$<BUILD_INTERFACE:${idl}>" DESTINATION include/secretarium/idls/${idl_relative_dir})
 
     target_compile_options(${name}_idl_enclave PRIVATE ${ENCLAVE_COMPILE_OPTIONS})
     target_link_directories(${name}_idl_enclave PRIVATE ${SGX_LIBRARY_PATH})
     set_property(TARGET ${name}_idl_enclave PROPERTY COMPILE_PDB_NAME ${name}_idl_enclave)
 
-    target_link_libraries(${name}_idl_enclave PUBLIC 
-      rpc_enclave
-      yas_common)
+    target_link_libraries(${name}_idl_enclave PUBLIC rpc_enclave yas_common)
 
     add_dependencies(${name}_idl_enclave ${name}_idl_generate)
 
@@ -403,9 +394,7 @@ function(
     target_link_directories(${name}_idl_enclave_v1 PRIVATE ${SGX_LIBRARY_PATH})
     set_property(TARGET ${name}_idl_enclave_v1 PROPERTY COMPILE_PDB_NAME ${name}_idl_enclave_v1)
 
-    target_link_libraries(${name}_idl_enclave_v1 PUBLIC 
-      rpc_enclave_v1
-      yas_common)
+    target_link_libraries(${name}_idl_enclave_v1 PUBLIC rpc_enclave_v1 yas_common)
 
     add_dependencies(${name}_idl_enclave_v1 ${name}_idl_generate)
 
