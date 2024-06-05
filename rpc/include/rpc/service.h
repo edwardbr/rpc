@@ -99,6 +99,10 @@ namespace rpc
         //we are using a pointer as this is a thread local variable it will not change mid stream, only use this function when servicing an rpc call
         static service* get_current_service();
         static void set_current_service(service* svc);
+
+        // a thread local value of the caller id in the current rpc call being serviced
+        static caller_zone get_current_caller();
+
         object generate_new_object_id() const;
         std::string get_name() const {return name_;}
 
