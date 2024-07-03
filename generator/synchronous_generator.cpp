@@ -1464,6 +1464,20 @@ namespace enclave_marshaller
                 proxy("std::vector<rpc::function_info> {0}::get_function_info()", interface_name);
                 proxy("{{");
                 proxy("std::vector<rpc::function_info> functions;");
+                
+                //generate unambiguous alias
+                auto full_name = m_ob.get_name() + ".";
+                {
+                    auto* tmp = m_ob.get_owner();
+                    while(tmp && !tmp->get_name().empty())
+                    {
+                        full_name = tmp->get_name() + "." + full_name;
+                        auto tmp1 = tmp->get_owner();
+                        if(!tmp1)
+                            break;
+                        tmp = tmp1;
+                    }
+                }
 
                 const auto& library = get_root(m_ob);
                 int function_count = 1;
@@ -1497,8 +1511,8 @@ namespace enclave_marshaller
                         }
                     }
 
-                    proxy("functions.emplace_back(rpc::function_info{{\"{}\", {{{}}}, (uint64_t){}, {}}});",
-                          function->get_name(), function_count, tag, marshalls_interfaces);
+                    proxy("functions.emplace_back(rpc::function_info{{\"{0}{1}\", \"{1}\", {{{2}}}, (uint64_t){3}, {4}}});",
+                        full_name, function->get_name(), function_count, tag, marshalls_interfaces);
                     function_count++;
                 }
                 proxy("return functions;");
