@@ -151,6 +151,7 @@ namespace enclave_marshaller
                 header("Matcher<{}> {}_matcher_;", function->get_return_type(), function->get_name());
             }
             header("public:");
+            header("using matched_type = {};", obj_type);
             header("{0}_matcher(", interface_name);
             header.set_count(header.get_count() + 1);
             bool is_first = true;
