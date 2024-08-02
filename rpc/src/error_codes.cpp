@@ -39,27 +39,27 @@ namespace rpc
 
         const char* to_string(int err)
         {
-            if(err == OUT_OF_MEMORY()){return " out of memory";}
-            if(err == NEED_MORE_MEMORY()){return " need more memory";}
-            if(err == SECURITY_ERROR()){return " security error";}
-            if(err == INVALID_DATA()){return " invalid data";}
-            if(err == TRANSPORT_ERROR()){return " transport error";}
-            if(err == INVALID_METHOD_ID()){return " invalid method id";}
-            if(err == INVALID_INTERFACE_ID()){return " invalid interface id";}
-            if(err == INVALID_CAST()){return " invalid cast";}
-            if(err == ZONE_NOT_SUPPORTED()){return " zone not supported";}
-            if(err == ZONE_NOT_INITIALISED()){return " zone not initialised";}
-            if(err == ZONE_NOT_FOUND()){return " zone not found";}
-            if(err == OBJECT_NOT_FOUND()){return " object not found";}
-            if(err == INVALID_VERSION()){return " invalid version";}
-            if(err == EXCEPTION()){return " exception";}
-            if(err == PROXY_DESERIALISATION_ERROR()){return " proxy deserialisation error";}
-            if(err == STUB_DESERIALISATION_ERROR()){return " stub deserialisation error";}
-            if(err == INCOMPATIBLE_SERVICE()){return " service proxy is incompatible with the client";}
-            if(err == INCOMPATIBLE_SERIALISATION()){return " service proxy does not support this serialisation format try JSON";}
-            if(err == REFERENCE_COUNT_ERROR()){return " reference count error";}
-            if(err == UNABLE_TO_CREATE_SERVICE_PROXY()){return " unable to create service proxy";}
-            return " invalid error code";
+            if(err == OUT_OF_MEMORY()){return "out of memory";}
+            if(err == NEED_MORE_MEMORY()){return "need more memory";}
+            if(err == SECURITY_ERROR()){return "security error";}
+            if(err == INVALID_DATA()){return "invalid data";}
+            if(err == TRANSPORT_ERROR()){return "transport error";}
+            if(err == INVALID_METHOD_ID()){return "invalid method id";}
+            if(err == INVALID_INTERFACE_ID()){return "invalid interface id";}
+            if(err == INVALID_CAST()){return "invalid cast";}
+            if(err == ZONE_NOT_SUPPORTED()){return "zone not supported";}
+            if(err == ZONE_NOT_INITIALISED()){return "zone not initialised";}
+            if(err == ZONE_NOT_FOUND()){return "zone not found";}
+            if(err == OBJECT_NOT_FOUND()){return "object not found";}
+            if(err == INVALID_VERSION()){return "invalid version";}
+            if(err == EXCEPTION()){return "exception";}
+            if(err == PROXY_DESERIALISATION_ERROR()){return "proxy deserialisation error";}
+            if(err == STUB_DESERIALISATION_ERROR()){return "stub deserialisation error";}
+            if(err == INCOMPATIBLE_SERVICE()){return "service proxy is incompatible with the client";}
+            if(err == INCOMPATIBLE_SERIALISATION()){return "service proxy does not support this serialisation format try JSON";}
+            if(err == REFERENCE_COUNT_ERROR()){return "reference count error";}
+            if(err == UNABLE_TO_CREATE_SERVICE_PROXY()){return "unable to create service proxy";}
+            return "invalid error code";
         }
     };
 }
