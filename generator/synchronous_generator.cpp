@@ -1831,13 +1831,36 @@ namespace enclave_marshaller
             header("struct {}{}", m_ob.get_name(), base_class_declaration);
             header("{{");
 
-            header("static uint64_t get_id(uint64_t rpc_version)");
+            header("static constexpr uint64_t get_id(uint64_t rpc_version)");
             header("{{");
             header("//if(rpc_version == rpc::VERSION_1) not implemented");
             header("#ifdef RPC_V2");
             header("if(rpc_version == rpc::VERSION_2)");
             header("{{");
-            header("return {}ull;", fingerprint::generate(m_ob, {}, &header));
+            header("auto id = {}ull;", fingerprint::generate(m_ob, {}, &header));
+            auto val = m_ob.get_attribute_value("use_template_param_in_id");
+            if(val != "false")
+            {
+                for(const auto& param : m_ob.get_template_params())
+                {
+                    header("if(std::is_function_v<decltype(rpc::get_id<{}>)>)", param.name);
+                    header("{{");
+                    header("id ^= rpc::get_id<{}>(rpc::VERSION_2);", param.name);
+                    header("id = (i << 1)|(i >> (sizeof(id) - 1));//rotl");
+                    header("}}");
+                    header("else if(std::is_function_v<decltype({}::get_id)>)", param.name);
+                    header("{{");
+                    header("id ^= {}::get_id(rpc::VERSION_2);", param.name);
+                    header("id = (i << 1)|(i >> (sizeof(id) - 1));//rotl");
+                    header("}}");
+                    header("else");
+                    header("{{");
+                    header("//unable to deduce means for generating fingerprint;");
+                    header("static_assert(false);");
+                    header("}}");
+                }
+            }
+            header("return id;");
             header("}}");
             header("#endif");
             header("return 0;");
