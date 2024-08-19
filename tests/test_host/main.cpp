@@ -1270,3 +1270,13 @@ TYPED_TEST(type_test_with_host, create_subordinate_zone_and_set_in_host)
     this->get_lib().get_host()->unload_app("foo");
     target->set_host(nullptr);
 }
+
+
+static_assert(!rpc::has_get_id_member<std::string>::value);
+static_assert(rpc::has_id_get_member<std::string>::value);
+
+static_assert(rpc::has_get_id_member<xxx::test_template<std::string, xxx::tag::TAG1>>::value);
+static_assert(!rpc::has_id_get_member<xxx::test_template<std::string, xxx::tag::TAG1>>::value);
+
+static_assert(rpc::has_get_id_member<xxx::test_template_without_params_in_id<std::string, xxx::tag::TAG1>>::value);
+static_assert(!rpc::has_id_get_member<xxx::test_template_without_params_in_id<std::string, xxx::tag::TAG1>>::value);

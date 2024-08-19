@@ -1843,12 +1843,12 @@ namespace enclave_marshaller
             {
                 for(const auto& param : m_ob.get_template_params())
                 {
-                    header("if(std::is_function_v<decltype(rpc::get_id<{}>)>)", param.name);
+                    header("if constexpr(rpc::has_id_get_member<{}>::value)", param.name);
                     header("{{");
-                    header("id ^= rpc::get_id<{}>(rpc::VERSION_2);", param.name);
+                    header("id ^= rpc::id<{}>::get(rpc::VERSION_2);", param.name);
                     header("id = (i << 1)|(i >> (sizeof(id) - 1));//rotl");
                     header("}}");
-                    header("else if(std::is_function_v<decltype({}::get_id)>)", param.name);
+                    header("else if constexpr(rpc::has_get_id_member<{}>::value)", param.name);
                     header("{{");
                     header("id ^= {}::get_id(rpc::VERSION_2);", param.name);
                     header("id = (i << 1)|(i >> (sizeof(id) - 1));//rotl");
