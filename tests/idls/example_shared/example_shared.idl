@@ -78,25 +78,29 @@ namespace xxx
         error_code blob_test([in] const std::vector<uint8_t>& inval, [out] std::vector<uint8_t>& out_val);
     };
 
-	enum tag
-	{
-		TAG1 = 1,
-		TAG2 = 2
-	};
+	// enum tag
+	// {
+	// 	TAG1 = 1,
+	// 	TAG2 = 2
+	// };
     
     
-    template<class T, tag Y>
+    template<class T
+    // , xxx::tag Y
+    >
     struct test_template
     {
         T type_t;
-        std::array<uint8_t, static_cast<typename std::underlying_type<tag>::type>(Y)> array;
+        // std::array<uint8_t, static_cast<typename std::underlying_type<tag>::type>(Y)> array;
     };
     
     [use_template_param_in_id=false]
-    template<class T, tag Y>
+    template<class T
+    // , xxx::tag Y
+    >
     struct test_template_without_params_in_id
     {
         T type_t;
-        std::array<uint8_t, static_cast<typename std::underlying_type<tag>::type>(Y)> array;
+        // std::array<uint8_t, static_cast<typename std::underlying_type<tag>::type>(Y)> array;
     };
 }

@@ -21,6 +21,14 @@ namespace rpc
     };
     bool are_in_same_zone(const casting_interface* first, const casting_interface* second);
 
+    //the route to all fingerprinting
+    template<typename T>
+    class id
+    {
+        //not implemented here! only in the concrete derivations
+        //static constexpr uint64_t get(uint64_t)
+    };
+
     //this is a nice helper function to match an interface id to a interface in a version independant way
     template<class T>
     bool match(rpc::interface_ordinal interface_id)
@@ -41,6 +49,7 @@ namespace rpc
             ;
     }
     
+    //these will soon be superfluous
     template <typename T>
     class has_get_id_member
     {
@@ -54,12 +63,6 @@ namespace rpc
         enum { value = sizeof(test<T>(0)) == sizeof(char) };
     };
     
-    template<typename T>
-    class id
-    {
-        
-    };
-    
     template <typename T>
     class has_id_get_member
     {
@@ -71,23 +74,8 @@ namespace rpc
 
     public:
         enum { value = sizeof(test<T>(0)) == sizeof(char) };
+
     };    
-    
-    // auto test_for_get_id_presence = [](auto &lhs) -> decltype(rpc::get_id<std::remove_reference_t<decltype(lhs)>>(0ULL)) {
-    //     return rpc::get_id<std::remove_reference_t<decltype(lhs)>>(rpc::VERSION_2);
-    // };
-
-    // template <typename T>
-    // constexpr bool has_rpc_get_id_fn = std::is_invocable_v<decltype(test_for_get_id_presence), T&>;
-    
-    
-    auto test_for_get_id_presence = [](auto &lhs) -> decltype(rpc::id<std::remove_reference_t<std::remove_cv_t<decltype(lhs)>>>::get_id(rpc::VERSION_2)) {
-        return rpc::id<std::remove_reference_t<std::remove_cv_t<decltype(lhs)>>>::get_id(rpc::VERSION_2);
-    };
-
-    template <typename T>
-    constexpr bool has_rpc_get_id_fn = std::is_invocable_v<decltype(test_for_get_id_presence), T&>;
-
 
     constexpr uint64_t STD_STRING_ID = 0x71FC1FAC5CD5E6F9;
     constexpr uint64_t UINT_8_ID = 0x71FC1FAC5CD5E6F8;
@@ -108,7 +96,7 @@ namespace rpc
     class id<std::string>
     {
     public:
-        static uint64_t get(uint64_t)
+        static constexpr uint64_t get(uint64_t)
         {
             return STD_STRING_ID;
         }
@@ -118,7 +106,7 @@ namespace rpc
     class id<uint8_t>
     {
     public:
-        static uint64_t get(uint64_t)
+        static constexpr uint64_t get(uint64_t)
         {
             return UINT_8_ID;
         }
@@ -128,7 +116,7 @@ namespace rpc
     class id<uint16_t>
     {
     public:
-        static uint64_t get(uint64_t)
+        static constexpr uint64_t get(uint64_t)
         {
             return UINT_16_ID;
         }
@@ -138,7 +126,7 @@ namespace rpc
     class id<uint32_t>
     {
     public:
-        static uint64_t get(uint64_t)
+        static constexpr uint64_t get(uint64_t)
         {
             return UINT_32_ID;
         }
@@ -148,7 +136,7 @@ namespace rpc
     class id<uint64_t>
     {
     public:
-        static uint64_t get(uint64_t)
+        static constexpr uint64_t get(uint64_t)
         {
             return UINT_64_ID;
         }
@@ -158,7 +146,7 @@ namespace rpc
     class id<int8_t>
     {
     public:
-        static uint64_t get(uint64_t)
+        static constexpr uint64_t get(uint64_t)
         {
             return INT_8_ID;
         }
@@ -168,7 +156,7 @@ namespace rpc
     class id<int16_t>
     {
     public:
-        static uint64_t get(uint64_t)
+        static constexpr uint64_t get(uint64_t)
         {
             return INT_16_ID;
         }
@@ -178,7 +166,7 @@ namespace rpc
     class id<int32_t>
     {
     public:
-        static uint64_t get(uint64_t)
+        static constexpr uint64_t get(uint64_t)
         {
             return INT_32_ID;
         }
@@ -188,7 +176,7 @@ namespace rpc
     class id<int64_t>
     {
     public:
-        static uint64_t get(uint64_t)
+        static constexpr uint64_t get(uint64_t)
         {
             return INT_64_ID;
         }
@@ -199,7 +187,7 @@ namespace rpc
     class id<float>
     {
     public:
-        static uint64_t get(uint64_t)
+        static constexpr uint64_t get(uint64_t)
         {
             return FLOAT_32_ID;
         }
@@ -210,7 +198,7 @@ namespace rpc
     class id<double>
     {
     public:
-        static uint64_t get(uint64_t)
+        static constexpr uint64_t get(uint64_t)
         {
             return FLOAT_64_ID;
         }

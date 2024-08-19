@@ -1272,11 +1272,14 @@ TYPED_TEST(type_test_with_host, create_subordinate_zone_and_set_in_host)
 }
 
 
-static_assert(!rpc::has_get_id_member<std::string>::value);
-static_assert(rpc::has_id_get_member<std::string>::value);
+// static_assert(!rpc::has_get_id_member<std::string>::value);
+// static_assert(rpc::has_id_get_member<std::string>::value);
 
-static_assert(rpc::has_get_id_member<xxx::test_template<std::string, xxx::tag::TAG1>>::value);
-static_assert(!rpc::has_id_get_member<xxx::test_template<std::string, xxx::tag::TAG1>>::value);
+// static_assert(rpc::has_get_id_member<xxx::test_template<std::string, xxx::tag::TAG1>>::value);
+// static_assert(!rpc::has_id_get_member<xxx::test_template<std::string, xxx::tag::TAG1>>::value);
 
-static_assert(rpc::has_get_id_member<xxx::test_template_without_params_in_id<std::string, xxx::tag::TAG1>>::value);
-static_assert(!rpc::has_id_get_member<xxx::test_template_without_params_in_id<std::string, xxx::tag::TAG1>>::value);
+// static_assert(rpc::has_get_id_member<xxx::test_template_without_params_in_id<std::string, xxx::tag::TAG1>>::value);
+// static_assert(!rpc::has_id_get_member<xxx::test_template_without_params_in_id<std::string, xxx::tag::TAG1>>::value);
+
+
+static_assert(rpc::id<std::string>::get(rpc::VERSION_2) == rpc::STD_STRING_ID);

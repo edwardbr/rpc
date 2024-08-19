@@ -1795,6 +1795,75 @@ namespace enclave_marshaller
             }
         }
 
+        void write_struct_id(const class_entity& m_ob, writer& header)
+        {
+            if(m_ob.is_in_import())
+                return;
+                
+            if(!m_ob.get_is_template())
+                header("template<>");
+            else
+            {
+                header.print_tabs();
+                header.raw("template<");
+                bool first_pass = true;
+                for(const auto& param : m_ob.get_template_params())
+                {
+                    if(!first_pass)
+                        header.raw(", ");
+                    first_pass = false;
+                    header.raw("{} {}", param.type, param.name);
+                }
+                header.raw(">\n");
+            }            
+            
+            header.print_tabs();
+            header.raw("class id<{}", get_full_name(m_ob, true));
+            if(m_ob.get_is_template())
+            {
+                header.raw("<");
+                bool first_pass = true;
+                for(const auto& param : m_ob.get_template_params())
+                {
+                    if(!first_pass)
+                        header.raw(", ");
+                    first_pass = false;
+                    header.raw("{}", param.name);
+                }
+                header.raw(">");
+            }   
+            header.raw(">\n");
+                        
+            header("{{");
+            header("public:");
+            header("static uint64_t get(uint64_t rpc_version)");
+            header("{{");
+            header("//if(rpc_version == rpc::VERSION_1) not implemented");
+            header("#ifdef RPC_V2");
+            header("if(rpc_version == rpc::VERSION_2)");
+            header("{{");
+            header("auto id = {}ull;", fingerprint::generate(m_ob, {}, &header));
+            auto val = m_ob.get_attribute_value("use_template_param_in_id");
+            if(val != "false")
+            {
+                for(const auto& param : m_ob.get_template_params())
+                {
+                    std::string type = param.type;
+                    if(param.type == "class" || param.type == "typename")
+                        type = param.name;
+                    header("id ^= rpc::id<{}>::get(rpc::VERSION_2);", type);
+                    header("id = (id << 1)|(id >> (sizeof(id) - 1));//rotl");
+                }
+            }
+            header("return id;");
+            header("}}");
+            header("#endif");
+            header("return 0;");
+            header("}}");
+            header("}};");
+            header("");
+        }
+
         void write_struct(const class_entity& m_ob, writer& header)
         {
             if(m_ob.is_in_import())
@@ -1830,41 +1899,6 @@ namespace enclave_marshaller
             }
             header("struct {}{}", m_ob.get_name(), base_class_declaration);
             header("{{");
-
-            header("static constexpr uint64_t get_id(uint64_t rpc_version)");
-            header("{{");
-            header("//if(rpc_version == rpc::VERSION_1) not implemented");
-            header("#ifdef RPC_V2");
-            header("if(rpc_version == rpc::VERSION_2)");
-            header("{{");
-            header("auto id = {}ull;", fingerprint::generate(m_ob, {}, &header));
-            auto val = m_ob.get_attribute_value("use_template_param_in_id");
-            if(val != "false")
-            {
-                for(const auto& param : m_ob.get_template_params())
-                {
-                    header("if constexpr(rpc::has_id_get_member<{}>::value)", param.name);
-                    header("{{");
-                    header("id ^= rpc::id<{}>::get(rpc::VERSION_2);", param.name);
-                    header("id = (i << 1)|(i >> (sizeof(id) - 1));//rotl");
-                    header("}}");
-                    header("else if constexpr(rpc::has_get_id_member<{}>::value)", param.name);
-                    header("{{");
-                    header("id ^= {}::get_id(rpc::VERSION_2);", param.name);
-                    header("id = (i << 1)|(i >> (sizeof(id) - 1));//rotl");
-                    header("}}");
-                    header("else");
-                    header("{{");
-                    header("//unable to deduce means for generating fingerprint;");
-                    header("static_assert(false);");
-                    header("}}");
-                }
-            }
-            header("return id;");
-            header("}}");
-            header("#endif");
-            header("return 0;");
-            header("}}");
 
             for(auto& field : m_ob.get_elements(entity_type::STRUCTURE_MEMBERS))
             {
@@ -2219,6 +2253,11 @@ namespace enclave_marshaller
 
                     write_epilog(from_host, *cls, header, proxy, stub, namespaces);
                 }
+                else if(cls->get_entity_type() == entity_type::STRUCT)
+                {
+                    auto& ent = static_cast<const class_entity&>(*cls);
+                    write_struct_id(ent, header);
+                }
                 else
                 {
                     if(cls->get_entity_type() == entity_type::LIBRARY
@@ -2382,11 +2421,14 @@ namespace enclave_marshaller
                 stub_header("}}");
             }
 
+            header("namespace rpc");
+            header("{{");
             stub("namespace rpc");
             stub("{{");
             proxy("namespace rpc");
             proxy("{{");
             write_epilog(from_host, lib, header, proxy, stub, namespaces);
+            header("}}");
             proxy("}}");
             stub("}}");
 
