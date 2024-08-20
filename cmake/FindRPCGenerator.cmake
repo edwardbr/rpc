@@ -16,7 +16,9 @@ function(
       link_libraries
       include_paths
       defines
-      additional_headers)
+      additional_headers
+      rethrow_stub_exception
+      additional_stub_header)
 
   # split out multivalue variables
   cmake_parse_arguments(
@@ -59,6 +61,8 @@ function(
     message("dependencies ${params_dependencies}")
     message("link_libraries ${params_link_libraries}")
     message("additional_headers ${params_additional_headers}")
+    message("rethrow_stub_exception ${params_rethrow_stub_exception}")
+    message("additional_stub_header ${params_additional_stub_header}")
     message("paths ${params_include_paths}")
     message("defines ${params_defines}")
     message("mock ${params_mock}")
@@ -80,6 +84,8 @@ function(
 
   set(PATHS_PARAMS "")
   set(ADDITIONAL_HEADERS "")
+  set(RETHROW_STUB_EXCEPTION "")
+  set(ADDITIONAL_STUB_HEADER "")
 
   foreach(path ${params_include_paths})
     set(PATHS_PARAMS ${PATHS_PARAMS} --path "${path}")
@@ -92,6 +98,21 @@ function(
   foreach(additional_headers ${params_additional_headers})
     set(ADDITIONAL_HEADERS ${ADDITIONAL_HEADERS} --additional_headers "${additional_headers}")
   endforeach()
+
+  message("params_rethrow_stub_exception ${params_rethrow_stub_exception}")
+
+  foreach(rethrow ${params_rethrow_stub_exception})
+    set(RETHROW_STUB_EXCEPTION ${RETHROW_STUB_EXCEPTION} --rethrow_stub_exception "${rethrow}")
+  endforeach()
+
+
+
+  message("params_additional_stub_header ${params_additional_stub_header}")
+
+  foreach(stub_header ${params_additional_stub_header})
+    set(ADDITIONAL_STUB_HEADER ${ADDITIONAL_STUB_HEADER} --additional_stub_header "${stub_header}")
+  endforeach()
+
 
   foreach(dep ${params_dependencies})
     if(TARGET ${dep}_generate)
@@ -132,6 +153,8 @@ function(
     --stub_header ${stub_header_path}
     ${PATHS_PARAMS}
     ${ADDITIONAL_HEADERS}
+    ${RETHROW_STUB_EXCEPTION}
+    ${ADDITIONAL_STUB_HEADER}
     MAIN_DEPENDENCY ${idl}
     IMPLICIT_DEPENDS ${idl}
     DEPENDS ${GENERATED_DEPENDANCIES}
@@ -164,11 +187,21 @@ function(
     OUTPUT ${full_header_path} ${full_proxy_path} ${full_stub_header_path} ${full_stub_path}
     COMMAND
       ${ENCLAVE_MARSHALLER} --idl ${idl} --module_name ${name}_idl --output_path ${output_path} --header ${header_path}
-      --proxy ${proxy_path} --stub ${stub_path} --stub_header ${stub_header_path} ${PATHS_PARAMS} ${ADDITIONAL_HEADERS}
+      --proxy ${proxy_path} --stub ${stub_path} --stub_header ${stub_header_path} ${PATHS_PARAMS} ${ADDITIONAL_HEADERS} ${RETHROW_STUB_EXCEPTION} ${ADDITIONAL_STUB_HEADER}
     MAIN_DEPENDENCY ${idl}
     IMPLICIT_DEPENDS ${idl}
     DEPENDS ${GENERATED_DEPENDANCIES}
     COMMENT "Running generator ${idl}")
+
+message("add_custom_command(
+    OUTPUT ${full_header_path} ${full_proxy_path} ${full_stub_header_path} ${full_stub_path}
+    COMMAND
+      ${ENCLAVE_MARSHALLER} --idl ${idl} --module_name ${name}_idl --output_path ${output_path} --header ${header_path}
+      --proxy ${proxy_path} --stub ${stub_path} --stub_header ${stub_header_path} ${PATHS_PARAMS} ${ADDITIONAL_HEADERS} ${RETHROW_STUB_EXCEPTION} ${ADDITIONAL_STUB_HEADER}
+    MAIN_DEPENDENCY ${idl}
+    IMPLICIT_DEPENDS ${idl}
+    DEPENDS ${GENERATED_DEPENDANCIES}
+    COMMENT Running generator ${idl})")
 
   add_custom_target(${name}_idl_generate DEPENDS ${full_header_path} ${full_proxy_path} ${full_stub_header_path}
                                                  ${full_stub_path})

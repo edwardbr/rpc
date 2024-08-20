@@ -71,8 +71,10 @@ int main(const int argc, char* argv[])
         std::vector<std::string> namespaces;
         std::vector<std::string> include_paths;
         std::vector<std::string> defines;
+        std::vector<std::string> rethrow_exceptions;
         std::vector<std::string> wrong_elements;
         std::vector<std::string> additional_headers;
+        std::vector<std::string> additional_stub_headers;
         bool dump_preprocessor_output_and_die = false;
 
         auto cli = (
@@ -89,6 +91,8 @@ int main(const int argc, char* argv[])
 			clipp::option("-d","--dump_preprocessor_output_and_die").set(dump_preprocessor_output_and_die).doc("dump preprocessor output and die"),
 			clipp::repeatable(clipp::option("-D") & clipp::value("define",defines)).doc("macro define"),
 			clipp::repeatable(clipp::option("-H", "--additional_headers") & clipp::value("additional_headers",additional_headers)).doc("additional header to be added to the idl generated header"),
+			clipp::repeatable(clipp::option("-r", "--rethrow_stub_exception") & clipp::value("rethrow_stub_exception",rethrow_exceptions)).doc("rethrow exception"),
+			clipp::repeatable(clipp::option("-A", "--additional_stub_header") & clipp::value("additional_stub_header",additional_stub_headers)).doc("additional stub header"),
 			clipp::any_other(wrong_elements)
 		);
 
@@ -243,7 +247,7 @@ int main(const int argc, char* argv[])
         {
             enclave_marshaller::synchronous_generator::write_files(module_name, true, *objects, header_stream, proxy_stream,
                                                                    stub_stream, stub_header_stream, 
-                                                                   namespaces, headerPath, stubHeaderPath, imports, additional_headers);
+                                                                   namespaces, headerPath, stubHeaderPath, imports, additional_headers, rethrow_exceptions, additional_stub_headers);
 
             header_stream << ends;
             proxy_stream << ends;
