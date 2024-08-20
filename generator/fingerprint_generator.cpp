@@ -114,6 +114,7 @@ namespace fingerprint
         return output;
     }
 
+    //this is too simplistic, it only supports one template parameter without nested templates
     std::string substitute_template_params(const std::string& type, const std::string& alternative)
     {
         std::string output;
@@ -163,10 +164,27 @@ namespace fingerprint
         }
         entity_stack.push_back(&cls);
 
+        std::string use_legacy_empty_template_struct_id_attr = "use_legacy_empty_template_struct_id";
+        std::string use_template_param_in_id_attr = "use_template_param_in_id";
+
         std::string seed;
         for(auto& item : cls.get_attributes())
         {
-            seed += item;
+            {
+                auto tmp = item.substr(0, use_legacy_empty_template_struct_id_attr.size());
+                if (tmp == use_legacy_empty_template_struct_id_attr && item[use_legacy_empty_template_struct_id_attr.size()] == '=')
+                {
+                    continue;
+                }
+            }
+            
+            {
+                auto tmp = item.substr(0, use_template_param_in_id_attr.size());
+                if (tmp == use_template_param_in_id_attr && item[use_template_param_in_id_attr.size()] == '=')
+                {
+                    continue;
+                }
+            }
         }
         if(cls.get_entity_type() == entity_type::INTERFACE || cls.get_entity_type() == entity_type::LIBRARY)
         {
@@ -276,70 +294,98 @@ namespace fingerprint
             }
             seed += "}";
         }
-        if(!cls.get_is_template() && cls.get_entity_type() == entity_type::STRUCT)
+        else if(cls.get_entity_type() == entity_type::STRUCT)
         {
-            // template classes cannot know what type they are until the template parameters are specified
-            seed += "struct";
-            seed += get_full_name(cls);
-            auto bc = cls.get_base_classes();
-            if(!bc.empty())
+            if(cls.get_is_template() && cls.get_attribute_value("use_legacy_empty_template_struct_id") == "true")
             {
-                seed += " : ";
-                int i = 0;
-                for(auto base_class : bc)
+                //this is a bad bug that needs to be preserved for legacy template structures
+                std::ignore = cls;
+            }
+            else
+            {
+                // template classes cannot know what type they are until the template parameters are specified
+                if(cls.get_is_template() && cls.get_attribute_value("use_template_param_in_id") != "false")
                 {
+                    seed += "template<";
+                    bool first_pass = true;
+                    for(const auto& param : cls.get_template_params())
+                    {
+                        if(!first_pass)
+                            seed += ",";
+                        first_pass = false;
+                        seed += param.type;
+                        seed += " ";
+                        seed += param.name;
+                    }
+                    seed += ">";
+                }
+                seed += "struct";
+                seed += get_full_name(cls);
+                auto bc = cls.get_base_classes();
+                if(!bc.empty())
+                {
+                    seed += " : ";
+                    int i = 0;
+                    for(auto base_class : bc)
+                    {
+                        if(i)
+                            seed += ", ";
+                        uint64_t type_id = generate(*base_class, {}, nullptr);
+                        seed += std::to_string(type_id) + " ";
+                        i++;
+                    }
+                }
+                seed += "{";
+
+                int i = 0;
+                for(auto& field : cls.get_functions())
+                {
+                    if(field->get_entity_type() != entity_type::FUNCTION_VARIABLE)
+                        continue;
+
                     if(i)
                         seed += ", ";
-                    uint64_t type_id = generate(*base_class, {}, nullptr);
-                    seed += std::to_string(type_id) + " ";
-                    i++;
-                }
-            }
-            seed += "{";
 
-            int i = 0;
-            for(auto& field : cls.get_functions())
-            {
-                if(field->get_entity_type() != entity_type::FUNCTION_VARIABLE)
-                    continue;
-
-                if(i)
-                    seed += ", ";
-
-                auto param_type = field->get_return_type();
-                std::string reference_modifiers;
-                strip_reference_modifiers(param_type, reference_modifiers);
-                auto template_params = get_template_param(param_type);
-                if(!template_params.empty())
-                {
-                    auto substituted_template_param
-                        = extract_subsituted_templates(template_params, cls, entity_stack);
-                    seed += substitute_template_params(param_type, substituted_template_param);
-                }
-                else
-                {
-                    const class_entity* type_info = find_type(param_type, cls);
-                    if(type_info && type_info != &cls)
+                    auto param_type = field->get_return_type();
+                    std::string reference_modifiers;
+                    strip_reference_modifiers(param_type, reference_modifiers);
+                    auto template_params = get_template_param(param_type);
+                    if(!template_params.empty())
                     {
-                        uint64_t type_id = generate(*type_info, entity_stack, nullptr);
-                        seed += std::to_string(type_id);
+                        auto substituted_template_param
+                            = extract_subsituted_templates(template_params, cls, entity_stack);
+                        seed += substitute_template_params(param_type, substituted_template_param);
                     }
                     else
                     {
-                        seed += param_type;
+                        const class_entity* type_info = find_type(param_type, cls);
+                        if(type_info && type_info != &cls)
+                        {
+                            uint64_t type_id = generate(*type_info, entity_stack, nullptr);
+                            seed += std::to_string(type_id);
+                        }
+                        else
+                        {
+                            seed += param_type;
+                        }
                     }
+                    seed += reference_modifiers + " ";
+                    seed += field->get_name();
+                    if(field->get_array_string().size())
+                        seed += "[" + field->get_array_string() + "]";
+                    i++;
                 }
-                seed += reference_modifiers + " ";
-                seed += field->get_name();
-                if(field->get_array_string().size())
-                    seed += "[" + field->get_array_string() + "]";
-                i++;
+                seed += "}";
             }
-            seed += "}";
         }
 
         if(comment)
-            (*comment)("//{}", seed);
+        {
+            if(seed.empty())
+               (*comment)("//EMPTY_SEED!");
+            else
+               (*comment)("//{}", seed);
+        }
 
         entity_stack.pop_back();
 

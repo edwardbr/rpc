@@ -78,29 +78,48 @@ namespace xxx
         error_code blob_test([in] const std::vector<uint8_t>& inval, [out] std::vector<uint8_t>& out_val);
     };
 
-	// enum tag
-	// {
-	// 	TAG1 = 1,
-	// 	TAG2 = 2
-	// };
+    //some template tests with attributes
     
-    
-    template<class T
-    // , xxx::tag Y
-    >
+    //bog standard    
+    template<class T>
     struct test_template
     {
         T type_t;
-        // std::array<uint8_t, static_cast<typename std::underlying_type<tag>::type>(Y)> array;
+        static constexpr int x = 3;
     };
     
+    //dont include the template parameters when generating the constexpr value
     [use_template_param_in_id=false]
-    template<class T
-    // , xxx::tag Y
-    >
+    template<class T>
     struct test_template_without_params_in_id
     {
         T type_t;
-        // std::array<uint8_t, static_cast<typename std::underlying_type<tag>::type>(Y)> array;
     };
+    
+    //maintain a bug for backward compatibility, use an empty seed for template types seed will be 7410425521722818471ull or 0x66D71EBFF8C6FFA7
+    [use_legacy_empty_template_struct_id=true]
+    template<class T>
+    struct test_template_use_legacy_empty_template_struct_id
+    {
+        T type_t;
+    };
+    
+    //use both dodgy flags
+    [use_template_param_in_id=false,use_legacy_empty_template_struct_id=true]
+    template<class T>
+    struct test_template_use_old
+    {
+        T type_t;
+    };
+    
+    //interfaces use existing logic for now
+    interface i_interface_with_templates
+    {
+        error_code one(test_template<int> val);
+        error_code two(test_template_without_params_in_id<int> val);
+        error_code three(test_template_use_legacy_empty_template_struct_id<int> val);
+        error_code four(test_template_use_old<int> val);
+    };
+    
+
 }

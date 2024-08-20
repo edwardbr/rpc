@@ -1836,7 +1836,7 @@ namespace enclave_marshaller
                         
             header("{{");
             header("public:");
-            header("static uint64_t get(uint64_t rpc_version)");
+            header("static constexpr uint64_t get(uint64_t rpc_version)");
             header("{{");
             header("//if(rpc_version == rpc::VERSION_1) not implemented");
             header("#ifdef RPC_V2");
