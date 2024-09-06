@@ -1272,29 +1272,9 @@ TYPED_TEST(type_test_with_host, create_subordinate_zone_and_set_in_host)
 }
 
 
-// static_assert(!rpc::has_get_id_member<std::string>::value);
-// static_assert(rpc::has_id_get_member<std::string>::value);
-
-// static_assert(rpc::has_get_id_member<xxx::test_template<std::string, xxx::tag::TAG1>>::value);
-// static_assert(!rpc::has_id_get_member<xxx::test_template<std::string, xxx::tag::TAG1>>::value);
-
-// static_assert(rpc::has_get_id_member<xxx::test_template_without_params_in_id<std::string, xxx::tag::TAG1>>::value);
-// static_assert(!rpc::has_id_get_member<xxx::test_template_without_params_in_id<std::string, xxx::tag::TAG1>>::value);
-
-
 static_assert(rpc::id<std::string>::get(rpc::VERSION_2) == rpc::STD_STRING_ID);
 
 static_assert(rpc::id<xxx::test_template<std::string>>::get(rpc::VERSION_2) == 0xAFFFFFEB79FBFBFB);
 static_assert(rpc::id<xxx::test_template_without_params_in_id<std::string>>::get(rpc::VERSION_2) == 0x62C84BEB07545E2B);
 static_assert(rpc::id<xxx::test_template_use_legacy_empty_template_struct_id<std::string>>::get(rpc::VERSION_2) == 0x2E7E56276F6E36BE);
 static_assert(rpc::id<xxx::test_template_use_old<std::string>>::get(rpc::VERSION_2) == 0x66D71EBFF8C6FFA7);
-
-
-
-// TEST(template, test_id_gen)
-// {  
-//     auto a = rpc::id<xxx::test_template<std::string>>::get(rpc::VERSION_2);
-//     auto b = rpc::id<xxx::test_template_without_params_in_id<std::string>>::get(rpc::VERSION_2);
-//     auto c = rpc::id<xxx::test_template_use_legacy_empty_template_struct_id<std::string>>::get(rpc::VERSION_2);
-//     auto d = rpc::id<xxx::test_template_use_old<std::string>>::get(rpc::VERSION_2);
-// }
