@@ -121,5 +121,22 @@ namespace xxx
         error_code four(test_template_use_old<int> val);
     };
     
-
+    struct iii
+    {
+        static constexpr int x = 3;
+    };
+    
+    template<class T>
+    struct iii_test
+    {
+        std::array<uint, T::x> y;
+    };    
+    
+    template<class T>
+    struct test_template
+    {
+        T type_t;
+        static constexpr int x = 3;
+    };    
+    
 }

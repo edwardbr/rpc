@@ -77,6 +77,7 @@ namespace rpc
 
     };    
 
+    constexpr uint64_t STD_VECTOR_UINT_8_ID = 0x71FC1FAC5CD5E6FA;
     constexpr uint64_t STD_STRING_ID = 0x71FC1FAC5CD5E6F9;
     constexpr uint64_t UINT_8_ID = 0x71FC1FAC5CD5E6F8;
     constexpr uint64_t UINT_16_ID = 0x71FC1FAC5CD5E6F7;
@@ -99,6 +100,16 @@ namespace rpc
         static constexpr uint64_t get(uint64_t)
         {
             return STD_STRING_ID;
+        }
+    };
+    
+    template<>
+    class id<std::vector<uint8_t>>
+    {
+    public:
+        static constexpr uint64_t get(uint64_t)
+        {
+            return STD_VECTOR_UINT_8_ID;
         }
     };
 

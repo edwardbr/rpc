@@ -1926,11 +1926,15 @@ namespace enclave_marshaller
             bool first_pass = true;
             for(auto& field : m_ob.get_functions())
             {
+                if(field->get_entity_type() == entity_type::CONSTEXPR)
+                    continue;
                 header.raw("\n");
                 header.print_tabs();
                 header.raw("{1}lhs.{0} != rhs.{0}", field->get_name(), first_pass ? "" : "|| ");
                 first_pass = false;
             }
+            if(first_pass == true)
+                header.raw("false");
             header.raw(";\n");
             header("}}");
 
