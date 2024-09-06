@@ -1759,7 +1759,7 @@ namespace enclave_marshaller
             
             header.print_tabs();
             header.raw("class id<{}", get_full_name(m_ob, true));
-            if(m_ob.get_is_template())
+            if(m_ob.get_is_template() && !m_ob.get_template_params().empty())
             {
                 header.raw("<");
                 bool first_pass = true;
