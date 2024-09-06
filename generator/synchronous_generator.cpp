@@ -1921,22 +1921,41 @@ namespace enclave_marshaller
             header.raw(sstr.str());
             header("inline bool operator != (const {0}& lhs, const {0}& rhs)", obj_type);
             header("{{");
-            header.print_tabs();
-            header.raw("return ");
-            bool first_pass = true;
-            for(auto& field : m_ob.get_functions())
+            bool has_params = true;
             {
-                if(field->get_entity_type() == entity_type::CONSTEXPR)
-                    continue;
-                header.raw("\n");
-                header.print_tabs();
-                header.raw("{1}lhs.{0} != rhs.{0}", field->get_name(), first_pass ? "" : "|| ");
-                first_pass = false;
+                bool first_pass = true;
+                for(auto& field : m_ob.get_functions())
+                {
+                    if(field->get_entity_type() == entity_type::CONSTEXPR)
+                        continue;
+                    first_pass = false;
+                }    
+                has_params = !first_pass;
             }
-            if(first_pass == true)
-                header.raw("false");
-            header.raw(";\n");
-            header("}}");
+            if(has_params)
+            {
+                header.print_tabs();
+                header.raw("return ");
+               
+                bool first_pass = true;
+                for(auto& field : m_ob.get_functions())
+                {
+                    if(field->get_entity_type() == entity_type::CONSTEXPR)
+                        continue;
+                    header.raw("\n");
+                    header.print_tabs();
+                    header.raw("{1}lhs.{0} != rhs.{0}", field->get_name(), first_pass ? "" : "|| ");
+                    first_pass = false;
+                }
+                header.raw(";\n");
+            }
+            else
+            {
+                header("std::ignore = lhs;");    
+                header("std::ignore = rhs;");    
+                header("return false;");    
+            }
+            header("}}\n");
 
             header.raw(sstr.str());
             header("inline bool operator == (const {0}& lhs, const {0}& rhs)", obj_type);

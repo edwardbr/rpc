@@ -121,15 +121,15 @@ namespace xxx
         error_code four(test_template_use_old<int> val);
     };
     
-    struct iii
+    struct type_determinant
     {
         static constexpr int x = 3;
     };
     
     template<class T>
-    struct iii_test
+    struct type_determinant_test
     {
-        std::array<uint, T::x> y;
+        std::array<uint8_t, T::x> y;
     };    
     
     template<class T>
