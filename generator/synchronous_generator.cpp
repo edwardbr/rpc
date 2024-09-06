@@ -1881,7 +1881,8 @@ namespace enclave_marshaller
 
             for(auto& field : m_ob.get_functions())
             {
-                header("  ,(\"{0}\", {0})", field->get_name());
+                if(field->get_entity_type() != entity_type::CONSTEXPR)
+                    header("  ,(\"{0}\", {0})", field->get_name());
             }
             header(");");
 
