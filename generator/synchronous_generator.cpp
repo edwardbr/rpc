@@ -756,18 +756,12 @@ namespace enclave_marshaller
                         count++;
                     }
                     proxy("  );");
-                    proxy("yas::count_ostream __rpc_counter;");
 
-                    proxy("{{");
-                    proxy("yas::binary_oarchive<yas::count_ostream, yas::mem|yas::binary|yas::no_header> "
-                          "__rpc_oa(__rpc_counter);");
-                    proxy("__rpc_oa(__rpc_in_yas_mapping);");
-                    proxy("}}");
-
-                    proxy("__rpc_in_buf.resize(__rpc_counter.total_size);");
-                    proxy("yas::mem_ostream __rpc_writer(__rpc_in_buf.data(), __rpc_counter.total_size);");
+                    proxy("yas::mem_ostream __rpc_writer(4096);");
                     proxy("{{");
                     proxy("yas::save<yas::mem|yas::binary|yas::no_header>(__rpc_writer, __rpc_in_yas_mapping);");
+                    proxy("auto __rpc_writer_buf = __rpc_writer.get_intrusive_buffer();");
+                    proxy("__rpc_in_buf = std::vector<char>(__rpc_writer_buf.data, __rpc_writer_buf.data + __rpc_writer_buf.size);");
                     proxy("}}");
                     stub("  );");
                     stub("{{");
@@ -895,18 +889,12 @@ namespace enclave_marshaller
                         count++;
                     }
                     proxy("  );");
-                    proxy("yas::count_ostream __rpc_counter;");
 
-                    proxy("{{");
-                    proxy("yas::binary_oarchive<yas::count_ostream, yas::mem|yas::binary|yas::no_header> "
-                          "__rpc_oa(__rpc_counter);");
-                    proxy("__rpc_oa(__rpc_in_yas_mapping);");
-                    proxy("}}");
-
-                    proxy("__rpc_in_buf.resize(__rpc_counter.total_size);");
-                    proxy("yas::mem_ostream __rpc_writer(__rpc_in_buf.data(), __rpc_counter.total_size);");
+                    proxy("yas::mem_ostream __rpc_writer(4096);");
                     proxy("{{");
                     proxy("yas::save<yas::mem|yas::binary|yas::no_header>(__rpc_writer, __rpc_in_yas_mapping);");
+                    proxy("auto __rpc_writer_buf = __rpc_writer.get_intrusive_buffer();");
+                    proxy("__rpc_in_buf = std::vector<char>(__rpc_writer_buf.data, __rpc_writer_buf.data + __rpc_writer_buf.size);");
                     proxy("}}");
                     stub("  );");
                     stub("{{");
@@ -1176,52 +1164,7 @@ namespace enclave_marshaller
 
                     stub("  );");
 
-                    stub("yas::count_ostream __rpc_counter;");
-
-                    stub("switch(enc)");
-                    stub("{{");
-                    stub("case rpc::encoding::yas_compressed_binary:");
-                    stub("{{");
-                    stub("yas::binary_oarchive<yas::count_ostream, yas::mem|yas::binary|yas::compacted|yas::no_header> "
-                         "__rpc_oa(__rpc_counter);");
-                    stub("__rpc_oa(__rpc_out_yas_mapping);");
-                    stub("break;");
-                    stub("}}");
-                    stub("case rpc::encoding::yas_text:");
-                    stub("{{");
-                    stub("yas::binary_oarchive<yas::count_ostream, yas::mem|yas::text|yas::no_header> "
-                         "__rpc_oa(__rpc_counter);");
-                    stub("__rpc_oa(__rpc_out_yas_mapping);");
-                    stub("break;");
-                    stub("}}");
-                    stub("case rpc::encoding::yas_json:");
-                    stub("{{");
-                    stub("yas::binary_oarchive<yas::count_ostream, yas::mem|yas::json|yas::no_header> "
-                         "__rpc_oa(__rpc_counter);");
-                    stub("__rpc_oa(__rpc_out_yas_mapping);");
-                    stub("break;");
-                    stub("}}");
-                    stub("case rpc::encoding::enc_default:");
-                    stub("case rpc::encoding::yas_binary:");
-                    stub("{{");
-                    stub("yas::binary_oarchive<yas::count_ostream, yas::mem|yas::binary|yas::no_header> "
-                         "__rpc_oa(__rpc_counter);");
-                    stub("__rpc_oa(__rpc_out_yas_mapping);");
-                    stub("break;");
-                    stub("}}");
-                    stub("default:");
-                    stub("#ifdef USE_RPC_LOGGING");
-                    stub("{{");
-                    stub("auto error_message = std::string(\"An invalid rpc encoding has been specified when trying to "
-                         "call {} in an implementation of {} \");",
-                         function->get_name(), interface_name);
-                    stub("LOG_STR(error_message.data(), error_message.length());");
-                    stub("}}");
-                    stub("#endif");
-                    stub("return rpc::error::STUB_DESERIALISATION_ERROR();");
-                    stub("}}");
-                    stub("__rpc_out_buf.resize(__rpc_counter.total_size);");
-                    stub("yas::mem_ostream __rpc_writer(__rpc_out_buf.data(), __rpc_counter.total_size);");
+                    stub("yas::mem_ostream __rpc_writer(4096);");
                     stub("switch(enc)");
                     stub("{{");
                     stub("case rpc::encoding::yas_compressed_binary:");
@@ -1249,6 +1192,8 @@ namespace enclave_marshaller
                     stub("#endif");
                     stub("return rpc::error::STUB_DESERIALISATION_ERROR();");
                     stub("}}");
+                    stub("auto __rpc_writer_buf = __rpc_writer.get_intrusive_buffer();");
+                    stub("__rpc_out_buf = std::vector<char>(__rpc_writer_buf.data, __rpc_writer_buf.data + __rpc_writer_buf.size);");
                     stub("return __rpc_ret;");
 
                     proxy("}}");
@@ -1340,16 +1285,11 @@ namespace enclave_marshaller
 
                     stub("  );");
 
-                    stub("yas::count_ostream __rpc_counter;");
-                    stub("{{");
-                    stub("yas::binary_oarchive<yas::count_ostream, yas::mem|yas::binary|yas::no_header> "
-                         "__rpc_oa(__rpc_counter);");
-                    stub("__rpc_oa(__rpc_out_yas_mapping);");
-                    stub("}}");
-                    stub("__rpc_out_buf.resize(__rpc_counter.total_size);");
-                    stub("yas::mem_ostream __rpc_writer(__rpc_out_buf.data(), __rpc_counter.total_size);");
+                    stub("yas::mem_ostream __rpc_writer(4096);");
                     stub("{{");
                     stub("yas::save<yas::mem|yas::binary|yas::no_header>(__rpc_writer, __rpc_out_yas_mapping);");
+                    stub("auto __rpc_writer_buf = __rpc_writer.get_intrusive_buffer();");
+                    stub("__rpc_out_buf = std::vector<char>(__rpc_writer_buf.data, __rpc_writer_buf.data + __rpc_writer_buf.size);");
                     stub("}}");
                     stub("return __rpc_ret;");
 
