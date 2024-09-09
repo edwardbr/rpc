@@ -268,44 +268,7 @@ function(
       endif()
     endforeach()
 
-    ###############################################################################
-    # #and an enclave specific target
-    add_library(${name}_idl_enclave_v1 STATIC
-      ${full_header_path}
-      ${full_stub_header_path}
-      ${full_stub_path}
-      ${full_proxy_path}
-    )
-    target_compile_definitions(${name}_idl_enclave_v1
-      PUBLIC
-        NO_RPC_V2
-      PRIVATE
-        ${ENCLAVE_DEFINES})
-    target_include_directories(${name}_idl_enclave_v1 PUBLIC \"$<BUILD_INTERFACE:${output_path}>\" \"$<BUILD_INTERFACE:${output_path}/include>\" PRIVATE ${ENCLAVE_LIBCXX_INCLUDES} ${params_include_paths})
-    target_compile_options(${name}_idl_enclave_v1 PRIVATE ${ENCLAVE_COMPILE_OPTIONS})
-    target_link_directories(${name}_idl_enclave_v1 PRIVATE ${SGX_LIBRARY_PATH})
-    set_property(TARGET ${name}_idl_enclave_v1 PROPERTY COMPILE_PDB_NAME ${name}_idl_enclave_v1)
 
-    target_link_libraries(${name}_idl_enclave_v1 PUBLIC rpc_enclave_v1 yas_common)
-
-    add_dependencies(${name}_idl_enclave_v1 ${name}_idl_generate)
-
-    foreach(dep ${params_dependencies})
-      if(TARGET ${dep}_generate)
-        add_dependencies(${name}_idl_enclave_v1 ${dep}_generate)
-      else()
-        message(\"target ${dep}_generate does not exist so skipped\")
-      endif()
-      target_link_libraries(${name}_idl_enclave_v1 PUBLIC ${dep}_enclave)
-    endforeach()
-
-    foreach(dep ${params_link_libraries})
-      if(TARGET ${dep}_enclave)
-        target_link_libraries(${name}_idl_enclave_v1 PRIVATE ${dep}_enclave)
-      else()
-        message(\"target ${dep}_enclave does not exist so skipped\")
-      endif()
-    endforeach()")
     endif()
     # #specify a host specific target
     add_library(${name}_idl_host STATIC ${full_header_path} ${full_stub_header_path} ${full_stub_path}
@@ -378,41 +341,6 @@ function(
       endif()
     endforeach()
 
-    # ##################################################################################################################
-    # #and an enclave specific target
-    add_library(${name}_idl_enclave_v1 STATIC ${full_header_path} ${full_stub_header_path} ${full_stub_path}
-                                              ${full_proxy_path})
-    target_compile_definitions(
-      ${name}_idl_enclave_v1
-      PUBLIC NO_RPC_V2
-      PRIVATE ${ENCLAVE_DEFINES})
-    target_include_directories(
-      ${name}_idl_enclave_v1
-      PUBLIC "$<BUILD_INTERFACE:${output_path}>" "$<BUILD_INTERFACE:${output_path}/include>"
-      PRIVATE ${ENCLAVE_LIBCXX_INCLUDES} ${params_include_paths})
-    target_compile_options(${name}_idl_enclave_v1 PRIVATE ${ENCLAVE_COMPILE_OPTIONS})
-    target_link_directories(${name}_idl_enclave_v1 PRIVATE ${SGX_LIBRARY_PATH})
-    set_property(TARGET ${name}_idl_enclave_v1 PROPERTY COMPILE_PDB_NAME ${name}_idl_enclave_v1)
 
-    target_link_libraries(${name}_idl_enclave_v1 PUBLIC rpc_enclave_v1 yas_common)
-
-    add_dependencies(${name}_idl_enclave_v1 ${name}_idl_generate)
-
-    foreach(dep ${params_dependencies})
-      if(TARGET ${dep}_generate)
-        add_dependencies(${name}_idl_enclave_v1 ${dep}_generate)
-      else()
-        message("target ${dep}_generate does not exist so skipped")
-      endif()
-      target_link_libraries(${name}_idl_enclave_v1 PUBLIC ${dep}_enclave)
-    endforeach()
-
-    foreach(dep ${params_link_libraries})
-      if(TARGET ${dep}_enclave)
-        target_link_libraries(${name}_idl_enclave_v1 PRIVATE ${dep}_enclave)
-      else()
-        message("target ${dep}_enclave does not exist so skipped")
-      endif()
-    endforeach()
   endif()
 endfunction()
