@@ -266,9 +266,7 @@ function(
       else()
         message(\"target ${dep}_enclave does not exist so skipped\")
       endif()
-    endforeach()
-
-
+    endforeach()")
     endif()
     # #specify a host specific target
     add_library(${name}_idl_host STATIC ${full_header_path} ${full_stub_header_path} ${full_stub_path}
