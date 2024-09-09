@@ -1356,6 +1356,10 @@ namespace enclave_marshaller
         {
             if(m_ob.is_in_import())
                 return;
+
+            header("");
+            header("/****************************************************************************/");
+
             auto interface_name
                 = std::string(m_ob.get_entity_type() == entity_type::LIBRARY ? "i_" : "") + m_ob.get_name();
 
@@ -1740,6 +1744,9 @@ namespace enclave_marshaller
             if(m_ob.is_in_import())
                 return;
                 
+                
+            header("");
+            header("/****************************************************************************/");
             if(!m_ob.get_is_template())
                 header("template<>");
             else
@@ -1840,6 +1847,10 @@ namespace enclave_marshaller
         {
             if(m_ob.is_in_import())
                 return;
+
+            header("");
+            header("/****************************************************************************/");
+
             std::string base_class_declaration;
             auto bc = m_ob.get_base_classes();
             if(!bc.empty())
@@ -2422,6 +2433,8 @@ namespace enclave_marshaller
                 stub_header("}}");
             }
 
+            header("");
+            header("/****************************************************************************/");
             header("namespace rpc");
             header("{{");
             stub("namespace rpc");
