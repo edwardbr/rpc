@@ -315,7 +315,7 @@ namespace fingerprint
                         first_pass = false;
                         seed += param.type;
                         seed += " ";
-                        seed += param.name;
+                        seed += param.get_name();
                     }
                     seed += ">";
                 }

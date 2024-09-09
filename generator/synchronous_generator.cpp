@@ -1752,7 +1752,19 @@ namespace enclave_marshaller
                     if(!first_pass)
                         header.raw(", ");
                     first_pass = false;
-                    header.raw("{} {}", param.type, param.name);
+
+                    template_deduction deduction;
+                    m_ob.deduct_template_type(param, deduction);
+
+                    if(deduction.type == template_deduction_type::OTHER && deduction.identified_type)
+                    {
+                        auto full_name = get_full_name(*deduction.identified_type, true);
+                        header.raw("{} {}", full_name, param.get_name());
+                    }
+                    else
+                    {
+                        header.raw("{} {}", param.type, param.get_name());
+                    }
                 }
                 header.raw(">\n");
             }            
@@ -1768,7 +1780,7 @@ namespace enclave_marshaller
                     if(!first_pass)
                         header.raw(", ");
                     first_pass = false;
-                    header.raw("{}", param.name);
+                    header.raw("{}", param.get_name());
                 }
                 header.raw(">");
             }   
@@ -1788,11 +1800,31 @@ namespace enclave_marshaller
             {
                 for(const auto& param : m_ob.get_template_params())
                 {
-                    std::string type = param.type;
-                    if(param.type == "class" || param.type == "typename")
-                        type = param.name;
-                    header("id ^= rpc::id<{}>::get(rpc::VERSION_2);", type);
-                    header("id = (id << 1)|(id >> (sizeof(id) - 1));//rotl");
+                    template_deduction deduction;
+                    m_ob.deduct_template_type(param, deduction);
+                    if(deduction.type == template_deduction_type::CLASS || deduction.type == template_deduction_type::TYPENAME)
+                    {
+                        header("id ^= rpc::id<{}>::get(rpc::VERSION_2);", param.get_name());
+                        header("id = (id << 1)|(id >> (sizeof(id) - 1));//rotl");
+                    }
+                    else if(deduction.identified_type)
+                    {
+                        if(deduction.identified_type->get_entity_type() == entity_type::ENUM)
+                        {
+                            header("id ^= static_cast<uint64_t>({});", param.get_name());
+                            header("id = (id << 1)|(id >> (sizeof(id) - 1));//rotl");
+                            break;
+                        }
+                        else
+                        {
+                            header("static_assert(!\"not supported\"));//rotl");
+                        }                        
+                    }
+                    else
+                    {
+                        header("id ^= static_cast<uint64_t>({});", param.get_name());
+                        header("id = (id << 1)|(id >> (sizeof(id) - 1));//rotl");
+                    }
                 }
             }
             header("return id;");
@@ -1833,7 +1865,9 @@ namespace enclave_marshaller
                     if(!first_pass)
                         header.raw(", ");
                     first_pass = false;
-                    header.raw("{} {}", param.type, param.name);
+                    header.raw("{} {}", param.type, param.get_name());
+                    if(!param.default_value.empty())
+                        header.raw(" = {}", param.default_value);
                 }
                 header.raw(">\n");
             }
@@ -1900,21 +1934,24 @@ namespace enclave_marshaller
                     tmpl.print_tabs();
                     tmpl.raw("template<");
                     if(!m_ob.get_template_params().empty())
-                        obj_type += "<";
-                    bool first_pass = true;
-                    for(const auto& param : m_ob.get_template_params())
                     {
-                        if(!first_pass)
+                        obj_type += "<";
+                        bool first_pass = true;
+                        for(const auto& param : m_ob.get_template_params())
                         {
-                            tmpl.raw(", ");
-                            obj_type += ", ";
+                            if(!first_pass)
+                            {
+                                tmpl.raw(", ");
+                                obj_type += ", ";
+                            }
+                            first_pass = false;
+                            tmpl.raw("{} {}", param.type, param.get_name());
+                            if(!param.default_value.empty())
+                                tmpl.raw(" = {}", param.default_value);
+                            obj_type += param.get_name();
                         }
-                        first_pass = false;
-                        tmpl.raw("{} {}", param.type, param.name);
-                        obj_type += param.name;
-                    }
-                    if(!m_ob.get_template_params().empty())
                         obj_type += ">";
+                    }
                     tmpl.raw(">\n");
                 }
             }

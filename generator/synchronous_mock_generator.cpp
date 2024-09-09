@@ -124,8 +124,7 @@ namespace enclave_marshaller
                         return; //too complicated for now
                     tmpl.print_tabs();
                     tmpl.raw("template<");
-                    if(!m_ob.get_template_params().empty())
-                        obj_type += "<";
+                    obj_type += "<";
                     bool first_pass = true;
                     for (const auto& param : m_ob.get_template_params())
                     {
@@ -135,11 +134,12 @@ namespace enclave_marshaller
                             obj_type += ", ";
                         }
                         first_pass = false;
-                        tmpl.raw("{} {}", param.type, param.name);
-                        obj_type += param.name;
+                        tmpl.raw("{} {}", param.type, param.get_name());
+                        if(!param.default_value.empty())
+                            tmpl.raw(" = {}", param.default_value);
+                        obj_type += param.get_name();
                     }
-                    if(!m_ob.get_template_params().empty())
-                        obj_type += ">";
+                    obj_type += ">";
                     tmpl.raw(">\n");
                 }
             }
