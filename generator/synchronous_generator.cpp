@@ -594,7 +594,7 @@ namespace enclave_marshaller
         }
 
         void write_method(bool from_host, const class_entity& m_ob, writer& header, writer& proxy, writer& stub,
-                          const std::string& interface_name, const std::shared_ptr < function_entity >& function, int& function_count, const std::vector<std::string>& rethrow_exceptions)
+                          const std::string& interface_name, const std::shared_ptr < function_entity >& function, int& function_count, bool catch_stub_exceptions, const std::vector<std::string>& rethrow_exceptions)
         {
             if(function->get_entity_type() == entity_type::FUNCTION_METHOD)
             {
@@ -976,8 +976,11 @@ namespace enclave_marshaller
                 stub("//STUB_PARAM_CAST");
                 stub("if(__rpc_ret == rpc::error::OK())");
                 stub("{{");
-                stub("try");
-                stub("{{");
+                if(catch_stub_exceptions)
+                {
+                    stub("try");
+                    stub("{{");
+                }
 
                 stub.print_tabs();
                 stub.raw("__rpc_ret = __rpc_target_->{}(", function->get_name());
@@ -1001,36 +1004,40 @@ namespace enclave_marshaller
                     }
                 }
                 stub.raw(");\n");
-                stub("}}");
-
-                for(auto& rethrow_stub_exception : rethrow_exceptions)
+                if(catch_stub_exceptions)
                 {
-                    stub("catch({}& __ex)", rethrow_stub_exception);
-                    stub("{{");
-                    stub("throw __ex;");
                     stub("}}");
-                }                
-                
-                stub("#ifdef USE_RPC_LOGGING");
-                stub("catch(std::exception ex)");
-                stub("{{");
-                stub("auto error_message = std::string(\"exception has occurred in an {} implementation in function {} "
-                     "\") + ex.what();",
-                     interface_name, function->get_name());
-                stub("LOG_STR(error_message.data(), error_message.length());");
-                stub("__rpc_ret = rpc::error::EXCEPTION();");
-                stub("}}");
-                stub("#endif");
-                stub("catch(...)");
-                stub("{{");
-                stub("#ifdef USE_RPC_LOGGING");
-                stub("auto error_message = std::string(\"exception has occurred in an {} implementation in function "
-                     "{}\");",
-                     interface_name, function->get_name());
-                stub("LOG_STR(error_message.data(), error_message.length());");
-                stub("#endif");
-                stub("__rpc_ret = rpc::error::EXCEPTION();");
-                stub("}}");
+
+                    for(auto& rethrow_stub_exception : rethrow_exceptions)
+                    {
+                        stub("catch({}& __ex)", rethrow_stub_exception);
+                        stub("{{");
+                        stub("throw __ex;");
+                        stub("}}");
+                    }
+
+                    stub("#ifdef USE_RPC_LOGGING");
+                    stub("catch(std::exception ex)");
+                    stub("{{");
+                    stub("auto error_message = std::string(\"exception has occurred in an {} implementation in function {} "
+                        "\") + ex.what();",
+                        interface_name, function->get_name());
+                    stub("LOG_STR(error_message.data(), error_message.length());");
+                    stub("__rpc_ret = rpc::error::EXCEPTION();");
+                    stub("}}");
+                    stub("#endif");
+                    stub("catch(...)");
+                    stub("{{");
+                    stub("#ifdef USE_RPC_LOGGING");
+                    stub("auto error_message = std::string(\"exception has occurred in an {} implementation in function "
+                        "{}\");",
+                        interface_name, function->get_name());
+                    stub("LOG_STR(error_message.data(), error_message.length());");
+                    stub("#endif");
+                    stub("__rpc_ret = rpc::error::EXCEPTION();");
+                    stub("}}");
+                }
+
                 stub("}}");
 
                 {
@@ -1362,7 +1369,7 @@ namespace enclave_marshaller
 
         }
         void write_interface(bool from_host, const class_entity& m_ob, writer& header, writer& proxy, writer& stub,
-                             size_t id, const std::vector<std::string>& rethrow_exceptions)
+                             size_t id, bool catch_stub_exceptions, const std::vector<std::string>& rethrow_exceptions)
         {
             if(m_ob.is_in_import())
                 return;
@@ -1573,7 +1580,7 @@ namespace enclave_marshaller
                         continue;
                     }
                     if(function->get_entity_type() == entity_type::FUNCTION_METHOD)
-                        write_method(from_host, m_ob, header, proxy, stub, interface_name, function, function_count, rethrow_exceptions);
+                        write_method(from_host, m_ob, header, proxy, stub, interface_name, function, function_count, catch_stub_exceptions, rethrow_exceptions);
                 }
 
                 stub("default:");
@@ -1932,14 +1939,26 @@ namespace enclave_marshaller
             header("template<typename Ar>");
             header("void serialize(Ar &ar)");
             header("{{");
-            header("ar & YAS_OBJECT_NVP(\"{}\"", m_ob.get_name());
-
+            bool has_fields = false;
             for(auto& field : m_ob.get_functions())
             {
                 if(field->get_entity_type() != entity_type::CONSTEXPR)
-                    header("  ,(\"{0}\", {0})", field->get_name());
+                {
+                    has_fields = true;
+                    break;
+                }
             }
-            header(");");
+            if(has_fields)
+            {
+                header("ar & YAS_OBJECT_NVP(\"{}\"", m_ob.get_name());
+
+                for(auto& field : m_ob.get_functions())
+                {
+                    if(field->get_entity_type() != entity_type::CONSTEXPR)
+                        header("  ,(\"{0}\", {0})", field->get_name());
+                }
+                header(");");
+            }
 
             header("}}");
 
@@ -2197,7 +2216,7 @@ namespace enclave_marshaller
 
         // entry point
         void write_namespace(bool from_host, const class_entity& lib, std::string prefix, writer& header, writer& proxy,
-                             writer& stub, const std::vector<std::string>& rethrow_exceptions)
+                             writer& stub, bool catch_stub_exceptions, const std::vector<std::string>& rethrow_exceptions)
         {
             for(auto& elem : lib.get_elements(entity_type::NAMESPACE_MEMBERS))
             {
@@ -2230,7 +2249,7 @@ namespace enclave_marshaller
                     proxy("{{");
                     stub("{{");
                     auto& ent = static_cast<const class_entity&>(*elem);
-                    write_namespace(from_host, ent, prefix + elem->get_name() + "::", header, proxy, stub, rethrow_exceptions);
+                    write_namespace(from_host, ent, prefix + elem->get_name() + "::", header, proxy, stub, catch_stub_exceptions, rethrow_exceptions);
                     header("}}");
                     proxy("}}");
                     stub("}}");
@@ -2245,7 +2264,7 @@ namespace enclave_marshaller
                          || elem->get_entity_type() == entity_type::LIBRARY)
                 {
                     auto& ent = static_cast<const class_entity&>(*elem);
-                    write_interface(from_host, ent, header, proxy, stub, hash, rethrow_exceptions);
+                    write_interface(from_host, ent, header, proxy, stub, hash, catch_stub_exceptions, rethrow_exceptions);
                 }
                 else if(elem->get_entity_type() == entity_type::CONSTEXPR)
                 {
@@ -2344,7 +2363,7 @@ namespace enclave_marshaller
                          std::ostream& pos, std::ostream& sos, std::ostream& shos,
                          const std::vector<std::string>& namespaces, const std::string& header_filename,
                          const std::string& stub_header_filename, const std::list<std::string>& imports,
-                         const std::vector<std::string>& additional_headers, const std::vector<std::string>& rethrow_exceptions,
+                         const std::vector<std::string>& additional_headers, bool catch_stub_exceptions, const std::vector<std::string>& rethrow_exceptions,
                          const std::vector<std::string>& additional_stub_headers)
         {
             writer header(hos);
@@ -2436,7 +2455,7 @@ namespace enclave_marshaller
 
             write_namespace_predeclaration(lib, header, proxy, stub);
 
-            write_namespace(from_host, lib, prefix, header, proxy, stub, rethrow_exceptions);
+            write_namespace(from_host, lib, prefix, header, proxy, stub, catch_stub_exceptions, rethrow_exceptions);
 
             for(auto& ns : namespaces)
             {

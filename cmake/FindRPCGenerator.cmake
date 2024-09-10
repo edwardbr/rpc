@@ -10,7 +10,7 @@ function(
   # "include_paths" multivalue expects string "defines" multivalue expects string "additional_headers" optional_val mock
 )
   set(options)
-  set(singleValueArgs mock)
+  set(singleValueArgs mock suppress_catch_stub_exceptions)
   set(multiValueArgs
       dependencies
       link_libraries
@@ -58,6 +58,7 @@ function(
     message("output_path ${output_path}")
     message("sub_directory ${sub_directory}")
     message("namespace ${namespace}")
+    message("suppress_catch_stub_exceptions ${suppress_catch_stub_exceptions}")
     message("dependencies ${params_dependencies}")
     message("link_libraries ${params_link_libraries}")
     message("additional_headers ${params_additional_headers}")
@@ -138,6 +139,11 @@ function(
   if(DEFINED params_mock AND NOT ${params_mock} STREQUAL "")
     set(PATHS_PARAMS ${PATHS_PARAMS} --mock "${params_mock}")
   endif()
+
+  if(${params_suppress_catch_stub_exceptions})
+    set(PATHS_PARAMS ${PATHS_PARAMS} --suppress_catch_stub_exceptions)
+  endif()
+
 
   if(${DEBUG_RPC_GEN})
     message(

@@ -71,6 +71,7 @@ int main(const int argc, char* argv[])
         std::vector<std::string> namespaces;
         std::vector<std::string> include_paths;
         std::vector<std::string> defines;
+        bool suppress_catch_stub_exceptions = false;
         std::vector<std::string> rethrow_exceptions;
         std::vector<std::string> wrong_elements;
         std::vector<std::string> additional_headers;
@@ -85,6 +86,7 @@ int main(const int argc, char* argv[])
 			clipp::required("-s", "--stub").doc("the generated stub relative filename") & clipp::value("stub",stubPath),
             clipp::required("-t", "--stub_header").doc("the generated stub header relative filename") & clipp::value("stub_header",stubHeaderPath),
 			clipp::option("-m", "--mock").doc("the generated mock relative filename") & clipp::value("mock",mockPath),
+			clipp::option("-c", "--suppress_catch_stub_exceptions").set(suppress_catch_stub_exceptions).doc("catch stub exceptions"),
 			clipp::option("-M", "--module_name").doc("the name given to the stub_factory") & clipp::value("module_name",module_name),
 			clipp::repeatable(clipp::option("-P", "--path") & clipp::value("path",include_paths)).doc("locations of include files used by the idl"),
 			clipp::option("-n","--namespace").doc("namespace of the generated interface") & clipp::value("namespace",namespaces),
@@ -247,7 +249,7 @@ int main(const int argc, char* argv[])
         {
             enclave_marshaller::synchronous_generator::write_files(module_name, true, *objects, header_stream, proxy_stream,
                                                                    stub_stream, stub_header_stream, 
-                                                                   namespaces, headerPath, stubHeaderPath, imports, additional_headers, rethrow_exceptions, additional_stub_headers);
+                                                                   namespaces, headerPath, stubHeaderPath, imports, additional_headers, !suppress_catch_stub_exceptions, rethrow_exceptions, additional_stub_headers);
 
             header_stream << ends;
             proxy_stream << ends;
