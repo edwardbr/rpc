@@ -1839,6 +1839,12 @@ namespace enclave_marshaller
                             header("id = (id << 1)|(id >> (sizeof(id) - 1));//rotl");
                             break;
                         }
+                        else if(param.get_name() == "size_t")
+                        {
+                            header("id ^= static_cast<uint64_t>({});", param.get_name());
+                            header("id = (id << 1)|(id >> (sizeof(id) - 1));//rotl");
+                            break;
+                        }
                         else
                         {
                             header("static_assert(!\"not supported\"));//rotl");
