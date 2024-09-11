@@ -2,6 +2,8 @@
 
 #include <rpc/types.h>
 #include <rpc/version.h>
+#include <string>
+#include <vector>
 #include <type_traits>
 #include <stdint.h>
 
