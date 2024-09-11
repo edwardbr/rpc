@@ -1919,7 +1919,7 @@ namespace enclave_marshaller
                         header.raw("[{}]", function_variable->get_array_string());
                     if(!function_variable->get_default_value().empty())
                     {
-                        header.raw(" = {}::{};\n", function_variable->get_return_type(), function_variable->get_default_value());
+                        header.raw(" = {};\n", function_variable->get_default_value());
                     }
                     else
                     {
