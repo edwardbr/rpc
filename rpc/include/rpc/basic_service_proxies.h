@@ -35,7 +35,8 @@ namespace rpc
             , destination_zone parent_zone_id
             , const rpc::shared_ptr<child_service>& child_svc
             , const rpc::shared_ptr<service>& parent_svc)
-        {        
+        {
+            std::ignore = parent_zone_id;
             return rpc::shared_ptr<local_service_proxy>(new local_service_proxy(name, child_svc, parent_svc));
         }
         

@@ -9,6 +9,7 @@
 #include <rpc/stl_clang12/rpc_yvals_core.h>
 #if _STL_COMPILER_PREPROCESSOR
 #include <cstdint>
+#include <stdexcept>
 #include <cstdlib>
 #include <limits>
 #include <new>
