@@ -204,7 +204,7 @@ if(NOT DEPENDANCIES_LOADED)
 
       set(SHARED_ENCLAVE_COMPILE_OPTIONS ${SHARED_COMPILE_OPTIONS} /d2FH4- /Qspectre)
 
-      set(LINK_OPTIONS /machine:x64 /WX)
+      set(LINK_OPTIONS /MACHINE:x64 /WX)
 
       set(SHARED_ENCLAVE_LINK_OPTIONS ${LINK_OPTIONS})
       set(SHARED_HOST_LINK_OPTIONS ${LINK_OPTIONS})
@@ -249,12 +249,13 @@ if(NOT DEPENDANCIES_LOADED)
         set(ENCLAVE_COMPILE_OPTIONS
             ${SHARED_ENCLAVE_COMPILE_OPTIONS}
             # /GL
-            /MT
+            /MD
             /O2
             /Oi
             /Ob2)
         set(ENCLAVE_LINK_OPTIONS ${SHARED_ENCLAVE_LINK_OPTIONS} /INCREMENTAL:NO ${ENCLAVE_MEMLEAK_LINK_FLAGS} /debug)
         set(HOST_LINK_OPTIONS ${SHARED_HOST_LINK_OPTIONS} /INCREMENTAL:NO /debug)
+        set(HOST_LINK_DLL_OPTIONS ${HOST_LINK_OPTIONS})
         set(HOST_LINK_EXE_OPTIONS ${HOST_LINK_OPTIONS} /IGNORE:4099 /IGNORE:4098)
       else()
         set(HOST_DEFINES ${SHARED_HOST_DEFINES} _DEBUG FMT_HEADER_ONLY=1)
@@ -279,6 +280,7 @@ if(NOT DEPENDANCIES_LOADED)
             /INCREMENTAL:NO
             ${ENCLAVE_MEMLEAK_LINK_FLAGS})
         set(HOST_LINK_OPTIONS ${SHARED_HOST_LINK_OPTIONS} /debug /INCREMENTAL)
+        set(HOST_LINK_DLL_OPTIONS ${HOST_LINK_OPTIONS})
         set(HOST_LINK_EXE_OPTIONS
             ${HOST_LINK_OPTIONS}
             /IGNORE:4099
@@ -355,6 +357,7 @@ if(NOT DEPENDANCIES_LOADED)
           -L/opt/intel/sgxsdk/lib64
           -lsgx_tcrypto
           linux_dependancies_host)
+      set(HOST_LINK_DLL_OPTIONS ${HOST_LINK_OPTIONS} -fPIC)
       if(ENABLE_COVERAGE)
         message("enabling code coverage")
         #list(APPEND HOST_COMPILE_OPTIONS -fprofile-instr-generate -fcoverage-mapping)

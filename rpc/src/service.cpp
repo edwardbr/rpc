@@ -94,7 +94,7 @@ namespace rpc
 #ifdef USE_RPC_LOGGING
                 auto message = std::string("stub zone_id ") + std::to_string(zone_id_)
                      + std::string(", object stub ") + std::to_string(item.first)
-                     + std::string(" has been released but not deregisted in the service suspected unclean shutdown");
+                     + std::string(" has been released but not deregistered in the service suspected unclean shutdown");
                 LOG_STR(message.c_str(), message.size());
 #endif
             }
@@ -116,7 +116,7 @@ namespace rpc
             {
 #ifdef USE_RPC_LOGGING
                 auto message = std::string("wrapped stub zone_id ") + std::to_string(zone_id_) 
-                    + std::string(", wrapped_object has been released but not deregisted in the service suspected unclean shutdown");
+                    + std::string(", wrapped_object has been released but not deregistered in the service suspected unclean shutdown");
                 LOG_STR(message.c_str(), message.size());
 #endif
             }
@@ -141,7 +141,7 @@ namespace rpc
                 auto message = std::string("service proxy zone_id ") + std::to_string(zone_id_) 
                     + std::string(", caller_zone_id ") + std::to_string(item.first.source.id) 
                     + std::string(", destination_zone_id ") + std::to_string(item.first.dest.id) 
-                    + std::string(", has been released but not deregisted in the service");
+                    + std::string(", has been released but not deregistered in the service");
                 LOG_STR(message.c_str(), message.size());
 #endif
             }
