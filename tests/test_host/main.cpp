@@ -63,10 +63,8 @@ using namespace marshalled_tests;
 
 #ifdef _WIN32 // windows
 std::string enclave_path = "./marshal_test_enclave.signed.dll";
-std::string enclave_path_v1 = "./marshal_test_enclave_v1.signed.dll";
 #else         // Linux
 std::string enclave_path = "./libmarshal_test_enclave.signed.so";
-std::string enclave_path_v1 = "./libmarshal_test_enclave_v1.signed.so";
 #endif
 
 #ifdef USE_RPC_TELEMETRY
@@ -109,7 +107,6 @@ class host :
     public yyy::i_host,
     public rpc::enable_shared_from_this<host>
 {
-    bool use_v1_rpc_dll_ = false;
     rpc::zone zone_id_;
 
   	//perhaps this should be an unsorted list but map is easier to debug for now
@@ -126,8 +123,7 @@ class host :
 
 public:
 
-    host(rpc::zone zone_id,  bool use_v1_rpc_dll = false) : 
-        use_v1_rpc_dll_(use_v1_rpc_dll),
+    host(rpc::zone zone_id) : 
         zone_id_(zone_id)
     {
 #ifdef USE_RPC_TELEMETRY
@@ -151,7 +147,7 @@ public:
             , {++(*zone_gen)}
             , host
             , target
-            , use_v1_rpc_dll_ ? enclave_path_v1 : enclave_path);
+            , enclave_path);
 
         return err_code;
     };
@@ -376,7 +372,7 @@ public:
     }
 };
 
-template<bool UseHostInChild, bool RunStandardTests, bool CreateNewZoneThenCreateSubordinatedZone, bool use_v1_rpc_dll>
+template<bool UseHostInChild, bool RunStandardTests, bool CreateNewZoneThenCreateSubordinatedZone>
 class enclave_setup
 {
     rpc::shared_ptr<rpc::service> root_service_;
@@ -417,7 +413,7 @@ public:
         example_idl_register_stubs(root_service_);
         current_host_service = root_service_;
         
-        i_host_ptr_ = rpc::shared_ptr<yyy::i_host> (new host(root_service_->get_zone_id(), use_v1_rpc_dll));
+        i_host_ptr_ = rpc::shared_ptr<yyy::i_host> (new host(root_service_->get_zone_id()));
         local_host_ptr_ = i_host_ptr_;        
 
 
@@ -426,7 +422,7 @@ public:
             , {++(*zone_gen)}
             , use_host_in_child_ ? i_host_ptr_ : nullptr
             , i_example_ptr_
-            , use_v1_rpc_dll ? enclave_path_v1 : enclave_path);
+            , enclave_path);
 
         ASSERT_ERROR_CODE(err_code);
     }
@@ -451,7 +447,7 @@ public:
             , {++zone_gen_}
             , use_host_in_child_ ? i_host_ptr_ : nullptr
             , ptr
-            , use_v1_rpc_dll ? enclave_path_v1 : enclave_path);
+            , enclave_path);
             
         if(err_code != rpc::error::OK())
             return nullptr;
@@ -496,23 +492,14 @@ using local_implementations = ::testing::Types<
     inproc_setup<true, true, true>, 
 
 
-    enclave_setup<false, false, false, false>, 
-    enclave_setup<false, false, true, false>, 
-    enclave_setup<false, true, false, false>, 
-    enclave_setup<false, true, true, false>, 
-    enclave_setup<true, false, false, false>, 
-    enclave_setup<true, false, true, false>, 
-    enclave_setup<true, true, false, false>, 
-    enclave_setup<true, true, true, false>,
-
-    enclave_setup<false, false, false, true>, 
-    enclave_setup<false, false, true, true>, 
-    enclave_setup<false, true, false, true>, 
-    enclave_setup<false, true, true, true>, 
-    enclave_setup<true, false, false, true>, 
-    enclave_setup<true, false, true, true>, 
-    enclave_setup<true, true, false, true>, 
-    enclave_setup<true, true, true, true>>;
+    enclave_setup<false, false, false>, 
+    enclave_setup<false, false, true>, 
+    enclave_setup<false, true, false>, 
+    enclave_setup<false, true, true>, 
+    enclave_setup<true, false, false>, 
+    enclave_setup<true, false, true>, 
+    enclave_setup<true, true, false>, 
+    enclave_setup<true, true, true>>;
 TYPED_TEST_SUITE(type_test, local_implementations);
 
 TYPED_TEST(type_test, initialisation_test)
@@ -587,15 +574,10 @@ typedef Types<
     inproc_setup<true, true, false>, 
     inproc_setup<true, true, true>, 
 
-    enclave_setup<true, false, false, false>, 
-    enclave_setup<true, false, true, false>, 
-    enclave_setup<true, true, false, false>, 
-    enclave_setup<true, true, true, false>, 
-
-    enclave_setup<true, false, false, true>, 
-    enclave_setup<true, false, true, true>, 
-    enclave_setup<true, true, false, true>, 
-    enclave_setup<true, true, true, true>> remote_implementations;
+    enclave_setup<true, false, false>, 
+    enclave_setup<true, false, true>, 
+    enclave_setup<true, true, false>, 
+    enclave_setup<true, true, true>> remote_implementations;
 TYPED_TEST_SUITE(remote_type_test, remote_implementations);
 
 TYPED_TEST(remote_type_test, remote_standard_tests)
@@ -1158,15 +1140,10 @@ typedef Types<
     inproc_setup<true, true, false>, 
     inproc_setup<true, true, true>, 
 
-    enclave_setup<true, false, false, false>, 
-    enclave_setup<true, false, true, false>, 
-    enclave_setup<true, true, false, false>, 
-    enclave_setup<true, true, true, false>, 
-
-    enclave_setup<true, false, false, true>, 
-    enclave_setup<true, false, true, true>, 
-    enclave_setup<true, true, false, true>, 
-    enclave_setup<true, true, true, true>> type_test_with_host_implementations;
+    enclave_setup<true, false, false>, 
+    enclave_setup<true, false, true>, 
+    enclave_setup<true, true, false>, 
+    enclave_setup<true, true, true>> type_test_with_host_implementations;
 TYPED_TEST_SUITE(type_test_with_host, type_test_with_host_implementations);
 
 

@@ -237,11 +237,6 @@ namespace rpc
             ;
             else 
 #endif
-#ifdef RPC_V1
-            if(protocol_version == rpc::VERSION_1)
-            ;
-            else
-#endif
             {
                 return rpc::error::INCOMPATIBLE_SERVICE();
             }
@@ -631,11 +626,6 @@ namespace rpc
             ;
             else 
 #endif
-#ifdef RPC_V1
-            if(protocol_version == rpc::VERSION_1)
-            ;
-            else
-#endif
             {
                 return rpc::error::INCOMPATIBLE_SERVICE();
             }
@@ -941,11 +931,6 @@ namespace rpc
             ;
             else 
 #endif
-#ifdef RPC_V1
-            if(protocol_version == rpc::VERSION_1)
-            ;
-            else
-#endif
             {
                 return std::numeric_limits<uint64_t>::max();
             }
@@ -1081,11 +1066,6 @@ namespace rpc
             if(protocol_version == rpc::VERSION_2)
             ;
             else 
-#endif
-#ifdef RPC_V1
-            if(protocol_version == rpc::VERSION_1)
-            ;
-            else
 #endif
             {
                 return std::numeric_limits<uint64_t>::max();
@@ -1272,13 +1252,7 @@ namespace rpc
 #ifdef RPC_V2
                 interface_getter(rpc::VERSION_2) == interface_id
 #endif
-#if defined(RPC_V1) && defined(RPC_V2)
-                ||
-#endif
-#ifdef RPC_V1
-                interface_getter(rpc::VERSION_1) == interface_id
-#endif            
-#if !defined(RPC_V1) && !defined(RPC_V2)
+#if !defined(RPC_V2)
                 false
 #endif
         )
@@ -1305,19 +1279,9 @@ namespace rpc
     //note this function is not thread safe!  Use it before using the service class for normal operation
     void service::add_interface_stub_factory(std::function<interface_ordinal (uint8_t)> id_getter, std::shared_ptr<std::function<rpc::shared_ptr<rpc::i_interface_stub>(const rpc::shared_ptr<rpc::i_interface_stub>&)>> factory)
     {
-#ifdef RPC_V1
-        auto interface_id = id_getter(rpc::VERSION_1);
-        auto it = stub_factories.find({interface_id});
-        if(it != stub_factories.end())
-        {
-            rpc::error::INVALID_DATA();
-        }
-        stub_factories[{interface_id}] = factory;
-#endif
-
 #ifdef RPC_V2
-        interface_id = id_getter(rpc::VERSION_2);
-        it = stub_factories.find({interface_id});
+        auto interface_id = id_getter(rpc::VERSION_2);
+        auto it = stub_factories.find({interface_id});
         if(it != stub_factories.end())
         {
             rpc::error::INVALID_DATA();

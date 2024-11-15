@@ -39,13 +39,7 @@ namespace rpc
             #ifdef RPC_V2
                 T::get_id(rpc::VERSION_2) == interface_id
             #endif
-            #if defined(RPC_V1) && defined(RPC_V2)
-                ||
-            #endif
-            #ifdef RPC_V1
-                T::get_id(rpc::VERSION_1) == interface_id
-            #endif            
-            #if !defined(RPC_V1) && !defined(RPC_V2)
+            #if !defined(RPC_V2)
                 false
             #endif
             ;

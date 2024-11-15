@@ -70,10 +70,6 @@ namespace rpc
             if(T::get_id(rpc::VERSION_2) == interface_id)
                 return static_cast<const T*>(this);  
             #endif
-            #ifdef RPC_V1
-            if(T::get_id(rpc::VERSION_1) == interface_id)
-                return static_cast<const T*>(this);  
-            #endif
             return nullptr;
         }
         virtual ~proxy_impl() = default;
@@ -153,25 +149,9 @@ namespace rpc
                     }
                 }
 #endif
-#ifdef RPC_V1
-                if(T::get_id(rpc::VERSION_1) == 0)
-                {
-                    return rpc::error::OK();
-                }
-                {
-                    auto item = proxy_map.find(T::get_id(rpc::VERSION_1));
-                    if (item != proxy_map.end())
-                    {
-                        return create(item);
-                    }
-                }
-#endif
                 if (!do_remote_check)
                 {
                     create_interface_proxy<T>(iface);
-#ifdef RPC_V1
-                    proxy_map[T::get_id(rpc::VERSION_1)] = rpc::reinterpret_pointer_cast<proxy_base>(iface);
-#endif
 #ifdef RPC_V2
                     proxy_map[T::get_id(rpc::VERSION_2)] = rpc::reinterpret_pointer_cast<proxy_base>(iface);
 #endif                    
@@ -202,20 +182,7 @@ namespace rpc
                     }
                 }
 #endif
-#ifdef RPC_V1
-                {
-                    auto item = proxy_map.find(T::get_id(rpc::VERSION_1));
-                    if (item != proxy_map.end())
-                    {
-                        return create(item);
-                    }
-                }
-#endif
-
                 create_interface_proxy<T>(iface);
-#ifdef RPC_V1
-                proxy_map[T::get_id(rpc::VERSION_1)] = rpc::reinterpret_pointer_cast<proxy_base>(iface);
-#endif
 #ifdef RPC_V2
                 proxy_map[T::get_id(rpc::VERSION_2)] = rpc::reinterpret_pointer_cast<proxy_base>(iface);
 #endif
@@ -318,8 +285,6 @@ namespace rpc
 
         uint64_t set_encoding(encoding enc)
         {
-            if(version_ == rpc::VERSION_1)
-                return error::INCOMPATIBLE_SERVICE();
             enc_ = enc;
             return error::OK();
         }       
@@ -778,19 +743,10 @@ namespace rpc
             auto interface_stub = ob->get_interface(T::get_id(rpc::VERSION_2));
             if(!interface_stub)
             {
-#ifdef RPC_V1
-                interface_stub = ob->get_interface(T::get_id(rpc::VERSION_1));
-#endif                
                 if(!interface_stub)
                 {
                     return rpc::error::INVALID_INTERFACE_ID();
                 }
-            }
-#elif defined(RPC_V1)
-            auto interface_stub = ob->get_interface(T::get_id(rpc::VERSION_1));
-            if(!interface_stub)
-            {
-                return rpc::error::INVALID_INTERFACE_ID();
             }
 #endif
 

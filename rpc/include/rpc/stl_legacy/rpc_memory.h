@@ -2050,11 +2050,6 @@ element_type*>::value>> shared_ptr(unique_ptr<_Yp, _Dp>&& __r) : __ptr_(__r.get(
         if (ptr)
             return shared_ptr<T1>(from, ptr);
 #endif
-#ifdef RPC_V1
-        ptr = const_cast<T1*>(static_cast<const T1*>(from->query_interface(T1::get_id(rpc::VERSION_1))));
-        if (ptr)
-            return shared_ptr<T1>(from, ptr);
-#endif
         auto proxy_ = from->query_proxy_base();
         if (!proxy_)
         {

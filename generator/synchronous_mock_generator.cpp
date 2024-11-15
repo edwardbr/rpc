@@ -45,12 +45,6 @@ namespace enclave_marshaller
             header("#ifdef RPC_V2");
             header("{0}::get_id(rpc::VERSION_2) == interface_id", interface_name);
             header("#endif");
-            header("#if defined(RPC_V1) && defined(RPC_V2)");
-            header("||");
-            header("#endif");
-            header("#ifdef RPC_V1");
-            header("{0}::get_id(rpc::VERSION_1) == interface_id)", interface_name);
-            header("#endif");
             header("return static_cast<const {0}*>(this); ",interface_name);
             header("return nullptr;");
             header("}}");            

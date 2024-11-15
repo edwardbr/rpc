@@ -2004,11 +2004,6 @@ _NODISCARD shared_ptr<_Ty1> dynamic_pointer_cast(const shared_ptr<_Ty2>& _Other)
     if (ptr)
         return shared_ptr<_Ty1>(_Other, ptr);
 #endif
-#ifdef RPC_V1
-    ptr = const_cast<_Ty1*>(static_cast<const _Ty1*>(_Other->query_interface(_Ty1::get_id(rpc::VERSION_1))));
-    if (ptr)
-        return shared_ptr<_Ty1>(_Other, ptr);
-#endif
     auto proxy_ = _Other->query_proxy_base();
     if (!proxy_)
     {
@@ -2040,11 +2035,6 @@ _NODISCARD shared_ptr<_Ty1> dynamic_pointer_cast(shared_ptr<_Ty2>&& _Other) noex
     _Ty1* ptr = nullptr;
 #ifdef RPC_V2
     ptr = const_cast<_Ty1*>(static_cast<const _Ty1*>(_Other->query_interface(_Ty1::get_id(rpc::VERSION_2))));
-    if (ptr)
-        return shared_ptr<_Ty1>(_Other, ptr);
-#endif
-#ifdef RPC_V1
-    ptr = const_cast<_Ty1*>(static_cast<const _Ty1*>(_Other->query_interface(_Ty1::get_id(rpc::VERSION_1))));
     if (ptr)
         return shared_ptr<_Ty1>(_Other, ptr);
 #endif
