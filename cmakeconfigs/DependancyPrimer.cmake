@@ -349,7 +349,7 @@ if(NOT DEPENDANCIES_LOADED)
           -Wno-ignored-attributes
           -Wno-implicit-exception-spec-mismatch
           -Wno-trigraphs)
-      
+
       set(HOST_LINK_OPTIONS
           -L/usr/lib/llvm-10/lib
           -Wl,-rpath,/usr/lib/llvm-10/lib
@@ -360,7 +360,7 @@ if(NOT DEPENDANCIES_LOADED)
       set(HOST_LINK_DLL_OPTIONS ${HOST_LINK_OPTIONS} -fPIC)
       if(ENABLE_COVERAGE)
         message("enabling code coverage")
-        #list(APPEND HOST_COMPILE_OPTIONS -fprofile-instr-generate -fcoverage-mapping)
+        # list(APPEND HOST_COMPILE_OPTIONS -fprofile-instr-generate -fcoverage-mapping)
         list(APPEND HOST_COMPILE_OPTIONS --coverage)
         list(APPEND HOST_LINK_OPTIONS -fprofile-arcs)
       endif()

@@ -11,7 +11,9 @@
 #include <rpc/marshaller.h>
 #include <rpc/service.h>
 #include <rpc/remote_pointer.h>
+#ifdef USE_RPC_TELEMETRY
 #include <rpc/telemetry/i_telemetry_service.h>
+#endif
 #include "rpc/stub.h"
 
 namespace rpc
@@ -256,10 +258,12 @@ namespace rpc
             service_(svc),
             name_(name)
         {
+#ifdef USE_RPC_TELEMETRY
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             {
                 telemetry_service->on_service_proxy_creation(name, get_zone_id(), get_destination_zone_id(), svc->get_zone_id().as_caller());
             }
+#endif            
             RPC_ASSERT(svc != nullptr);
         }
 
@@ -299,10 +303,12 @@ namespace rpc
             {
                 svc->remove_zone_proxy(destination_zone_id_, caller_zone_id_);
             }
+#ifdef USE_RPC_TELEMETRY
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             {
                 telemetry_service->on_service_proxy_deletion(get_zone_id(), get_destination_zone_id(), get_caller_zone_id());
             }            
+#endif
         }
         
         std::string get_name() const { return name_; }
@@ -329,10 +335,12 @@ namespace rpc
         {
             std::lock_guard g(insert_control_);
             auto count = ++lifetime_lock_count_;
+#ifdef USE_RPC_TELEMETRY
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             {
                 telemetry_service->on_service_proxy_add_external_ref(zone_id_, destination_channel_zone_, destination_zone_id_, caller_zone_id_, count);
             } 
+#endif
             RPC_ASSERT(count >= 1);
             if(count == 1)
             {
@@ -351,10 +359,12 @@ namespace rpc
         int inner_release_external_ref()
         {
             auto count = --lifetime_lock_count_;
+#ifdef USE_RPC_TELEMETRY
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             {
                 telemetry_service->on_service_proxy_release_external_ref(zone_id_, destination_channel_zone_, destination_zone_id_, caller_zone_id_, count);
             }            
+#endif            
             RPC_ASSERT(count >= 0);
             if(count == 0 && is_parent_channel_ == false)
             {
@@ -435,11 +445,13 @@ namespace rpc
             while(version)
             {
                 auto if_id = id_getter(version);
+#ifdef USE_RPC_TELEMETRY                
                 if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
                 {
                     telemetry_service->on_service_proxy_try_cast(get_zone_id(),
                                                                     destination_zone_id, get_caller_zone_id(), object_id, if_id);
                 }
+#endif                
                 auto ret = try_cast(
                     version
                     , destination_zone_id
@@ -463,11 +475,14 @@ namespace rpc
             , caller_channel_zone caller_channel_zone_id 
             , add_ref_options build_out_param_channel)
         {
+#ifdef USE_RPC_TELEMETRY
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             {
                 telemetry_service->on_service_proxy_add_ref(get_zone_id(),
                                                                 destination_zone_id_, destination_channel_zone_,  get_caller_zone_id(), object_id, build_out_param_channel);
+
             }
+#endif            
 
             auto original_version = version_.load();
             auto version = original_version;
@@ -496,11 +511,13 @@ namespace rpc
         
         uint64_t sp_release(object object_id) 
         {
+#ifdef USE_RPC_TELEMETRY            
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             {
                 telemetry_service->on_service_proxy_release(get_zone_id(),
                                                                 destination_zone_id_, destination_channel_zone_,  get_caller_zone_id(), object_id);
             }
+#endif            
             
             auto original_version = version_.load();
             auto version = original_version;
@@ -540,11 +557,13 @@ namespace rpc
                 }
             }
 
+#ifdef USE_RPC_TELEMETRY
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             {
                 telemetry_service->on_service_proxy_release(get_zone_id(),
                                                                 destination_zone_id_, destination_channel_zone_,  caller_zone_id, object_id);
             }
+#endif            
             
             auto original_version = version_.load();
             auto version = original_version;
@@ -579,10 +598,12 @@ namespace rpc
         virtual rpc::shared_ptr<service_proxy> clone() = 0;
         virtual void clone_completed()
         {
+#ifdef USE_RPC_TELEMETRY            
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             {
                 telemetry_service->on_service_proxy_creation(name_.c_str(), get_zone_id(), get_destination_zone_id(), get_caller_zone_id());
             }
+#endif            
         }
         rpc::shared_ptr<service_proxy> clone_for_zone(destination_zone destination_zone_id, caller_zone caller_zone_id)
         {
@@ -623,10 +644,12 @@ namespace rpc
             if(op == nullptr)
             {
                 op = rpc::shared_ptr<object_proxy>(new object_proxy(object_id, shared_from_this()));
+#ifdef USE_RPC_TELEMETRY
                 if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
                 {
                     telemetry_service->on_object_proxy_creation(get_zone_id(), get_destination_zone_id(), object_id, true);
                 }        
+#endif                
                 proxies_[object_id] = op;    
                 is_new = true;            
                 return op;

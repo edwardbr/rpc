@@ -17,7 +17,9 @@
 #include <example/example.h>
 
 #include <rpc/basic_service_proxies.h>
+#ifdef USE_RPC_TELEMETRY
 #include <rpc/telemetry/host_telemetry_service.h>
+#endif
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -67,7 +69,9 @@ std::string enclave_path = "./libmarshal_test_enclave.signed.so";
 std::string enclave_path_v1 = "./libmarshal_test_enclave_v1.signed.so";
 #endif
 
+#ifdef USE_RPC_TELEMETRY
 TELEMETRY_SERVICE_MANAGER
+#endif
 bool enable_telemetry_server = true;
 bool enable_multithreaded_tests = false;
 
@@ -126,13 +130,17 @@ public:
         use_v1_rpc_dll_(use_v1_rpc_dll),
         zone_id_(zone_id)
     {
+#ifdef USE_RPC_TELEMETRY
         if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             telemetry_service->on_impl_creation("host", (uint64_t)this, zone_id_);
+#endif            
     }
     virtual ~host()
     {
+#ifdef USE_RPC_TELEMETRY
         if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             telemetry_service->on_impl_deletion((uint64_t)this, zone_id_);
+#endif            
     }
     error_code create_enclave(rpc::shared_ptr<yyy::i_example>& target) override
     {
@@ -202,8 +210,10 @@ public:
     {   
         zone_gen = &zone_gen_;
         auto test_info = ::testing::UnitTest::GetInstance()->current_test_info();
+#ifdef USE_RPC_TELEMETRY
         if(enable_telemetry_server)
             CREATE_TELEMETRY_SERVICE(rpc::host_telemetry_service, test_info->test_suite_name(), test_info->name(), "../../rpc_test_diagram/")
+#endif            
         i_host_ptr_ = rpc::shared_ptr<yyy::i_host> (new host({++zone_gen_}));
         local_host_ptr_ = i_host_ptr_;
         i_example_ptr_ = rpc::shared_ptr<yyy::i_example> (new example(nullptr, use_host_in_child_ ? i_host_ptr_ : nullptr));
@@ -214,7 +224,9 @@ public:
         i_host_ptr_ = nullptr;
         i_example_ptr_ = nullptr;
         zone_gen = nullptr;
-        rpc::telemetry_service_manager::reset();
+#ifdef USE_RPC_TELEMETRY
+        RESET_TELEMETRY_SERVICE
+#endif        
     }
 };
 
@@ -277,8 +289,10 @@ public:
     {
         zone_gen = &zone_gen_;
         auto test_info = ::testing::UnitTest::GetInstance()->current_test_info();
+#ifdef USE_RPC_TELEMETRY
         if(enable_telemetry_server)
             CREATE_TELEMETRY_SERVICE(rpc::host_telemetry_service, test_info->test_suite_name(), test_info->name(), "../../rpc_test_diagram/")
+#endif
 
         root_service_ = rpc::make_shared<rpc::service>("host", rpc::zone{++zone_gen_});
         root_service_->add_service_logger(std::make_shared<test_service_logger>());
@@ -317,7 +331,9 @@ public:
         child_service_ = nullptr;
         root_service_ = nullptr;
         zone_gen = nullptr;
-        rpc::telemetry_service_manager::reset();
+#ifdef USE_RPC_TELEMETRY
+        RESET_TELEMETRY_SERVICE
+#endif        
     }
 
     rpc::shared_ptr<yyy::i_example> create_new_zone()
@@ -388,10 +404,12 @@ public:
     {
         zone_gen = &zone_gen_;
         auto test_info = ::testing::UnitTest::GetInstance()->current_test_info();
+#ifdef USE_RPC_TELEMETRY
         if(enable_telemetry_server)
         {
             CREATE_TELEMETRY_SERVICE(rpc::host_telemetry_service, test_info->test_suite_name(), test_info->name(), "../../rpc_test_diagram/")
         }
+#endif        
         root_service_ = rpc::make_shared<rpc::service>("host", rpc::zone{++zone_gen_});
         root_service_->add_service_logger(std::make_shared<test_service_logger>());
         example_import_idl_register_stubs(root_service_);
@@ -419,7 +437,9 @@ public:
         i_host_ptr_ = nullptr;
         root_service_ = nullptr;
         zone_gen = nullptr;
-        rpc::telemetry_service_manager::reset();
+#ifdef USE_RPC_TELEMETRY
+        RESET_TELEMETRY_SERVICE
+#endif        
     }
 
     rpc::shared_ptr<yyy::i_example> create_new_zone()

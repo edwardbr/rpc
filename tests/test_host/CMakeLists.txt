@@ -1,8 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-add_executable(rpc_test 
-  main.cpp 
-  rpc_log.cpp)
+add_executable(rpc_test main.cpp rpc_log.cpp)
 
 target_compile_definitions(rpc_test PRIVATE ${HOST_DEFINES})
 
@@ -16,7 +14,7 @@ target_include_directories(
 target_link_libraries(
   rpc_test
   PUBLIC marshal_test_edl_host
-        rpc_telemetry_edl_header_host
+         rpc_telemetry_edl_header_host
          common_host
          example_idl_host
          rpc::rpc_host
@@ -38,6 +36,8 @@ if(ENABLE_CLANG_TIDY)
 endif()
 
 gtest_discover_tests(rpc_test)
-if(STRIP_DEBUG OR GENERATE_DEBUG_INDEX OR STRIP_AND_DELETE_SYMBOLS)
+if(STRIP_DEBUG
+   OR GENERATE_DEBUG_INDEX
+   OR STRIP_AND_DELETE_SYMBOLS)
   post_build_symbol_tasks(rpc_test)
 endif()

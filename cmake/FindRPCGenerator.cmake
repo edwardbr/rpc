@@ -107,14 +107,11 @@ function(
     set(RETHROW_STUB_EXCEPTION ${RETHROW_STUB_EXCEPTION} --rethrow_stub_exception "${rethrow}")
   endforeach()
 
-
-
   message("params_additional_stub_header ${params_additional_stub_header}")
 
   foreach(stub_header ${params_additional_stub_header})
     set(ADDITIONAL_STUB_HEADER ${ADDITIONAL_STUB_HEADER} --additional_stub_header "${stub_header}")
   endforeach()
-
 
   foreach(dep ${params_dependencies})
     if(TARGET ${dep}_generate)
@@ -144,7 +141,6 @@ function(
   if(${params_suppress_catch_stub_exceptions})
     set(PATHS_PARAMS ${PATHS_PARAMS} --suppress_catch_stub_exceptions)
   endif()
-
 
   if(${DEBUG_RPC_GEN})
     message(
@@ -194,13 +190,15 @@ function(
     OUTPUT ${full_header_path} ${full_proxy_path} ${full_stub_header_path} ${full_stub_path}
     COMMAND
       ${ENCLAVE_MARSHALLER} --idl ${idl} --module_name ${name}_idl --output_path ${output_path} --header ${header_path}
-      --proxy ${proxy_path} --stub ${stub_path} --stub_header ${stub_header_path} ${PATHS_PARAMS} ${ADDITIONAL_HEADERS} ${RETHROW_STUB_EXCEPTION} ${ADDITIONAL_STUB_HEADER}
+      --proxy ${proxy_path} --stub ${stub_path} --stub_header ${stub_header_path} ${PATHS_PARAMS} ${ADDITIONAL_HEADERS}
+      ${RETHROW_STUB_EXCEPTION} ${ADDITIONAL_STUB_HEADER}
     MAIN_DEPENDENCY ${idl}
     IMPLICIT_DEPENDS ${idl}
     DEPENDS ${GENERATED_DEPENDANCIES}
     COMMENT "Running generator ${idl}")
 
-message("add_custom_command(
+  message(
+    "add_custom_command(
     OUTPUT ${full_header_path} ${full_proxy_path} ${full_stub_header_path} ${full_stub_path}
     COMMAND
       ${ENCLAVE_MARSHALLER} --idl ${idl} --module_name ${name}_idl --output_path ${output_path} --header ${header_path}
@@ -378,7 +376,6 @@ message("add_custom_command(
         message("target ${dep}_enclave does not exist so skipped")
       endif()
     endforeach()
-
 
   endif()
 endfunction()

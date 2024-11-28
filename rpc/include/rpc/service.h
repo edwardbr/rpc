@@ -17,7 +17,9 @@
 #include <rpc/marshaller.h>
 #include <rpc/remote_pointer.h>
 #include <rpc/casting_interface.h>
+#ifdef USE_RPC_TELEMETRY
 #include <rpc/telemetry/i_telemetry_service.h>
+#endif
 
 namespace rpc
 {

@@ -9,9 +9,11 @@ endif()
 if(USE_RPC_TELEMETRY)
   set(ENCLAVE_TELEMETRY_SERVICE rpc::rpc_telemetry_enclave)
   set(HOST_TELEMETRY_SERVICE rpc::rpc_telemetry_host)
+  set(TELEMETRY_INTERFACE rpc::rpc_telemetry_interface)
 else()
   set(ENCLAVE_TELEMETRY_SERVICE)
   set(HOST_TELEMETRY_SERVICE)
+  set(TELEMETRY_INTERFACE)
 endif()
 
 add_library(
@@ -37,12 +39,10 @@ target_include_directories(
   rpc_enclave
   PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>" "$<INSTALL_INTERFACE:include/rpc>"
   PRIVATE ${ENCLAVE_LIBCXX_INCLUDES})
-target_link_libraries(rpc_enclave 
-PUBLIC
-  rpc::rpc_telemetry_interface
-  ${ENCLAVE_TELEMETRY_SERVICE}
-PRIVATE 
-  yas_common)
+target_link_libraries(
+  rpc_enclave
+  PUBLIC ${TELEMETRY_INTERFACE} ${ENCLAVE_TELEMETRY_SERVICE}
+  PRIVATE yas_common)
 target_link_options(rpc_enclave PRIVATE ${ENCLAVE_LINK_OPTIONS})
 
 set_property(TARGET rpc_enclave PROPERTY COMPILE_PDB_NAME rpc_enclave)
@@ -79,12 +79,10 @@ target_include_directories(
   rpc_enclave_v1
   PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>" "$<INSTALL_INTERFACE:include/rpc>"
   PRIVATE ${ENCLAVE_LIBCXX_INCLUDES})
-target_link_libraries(rpc_enclave_v1 
-PUBLIC 
-  rpc::rpc_telemetry_interface
-  ${ENCLAVE_TELEMETRY_SERVICE}
-PRIVATE 
-  yas_common)
+target_link_libraries(
+  rpc_enclave_v1
+  PUBLIC ${TELEMETRY_INTERFACE} ${ENCLAVE_TELEMETRY_SERVICE}
+  PRIVATE yas_common)
 target_link_options(rpc_enclave_v1 PRIVATE ${ENCLAVE_LINK_OPTIONS})
 
 set_property(TARGET rpc_enclave_v1 PROPERTY COMPILE_PDB_NAME rpc_enclave_v1)
@@ -118,19 +116,15 @@ target_include_directories(
   PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>" "$<INSTALL_INTERFACE:include/rpc>"
   PRIVATE ${HOST_INCLUDES})
 
-target_link_libraries(rpc_host 
-PUBLIC
-  rpc::rpc_telemetry_interface
-  ${HOST_TELEMETRY_SERVICE}
-PRIVATE 
-  yas_common 
-  ${HOST_LIBRARIES})
+target_link_libraries(
+  rpc_host
+  PUBLIC ${TELEMETRY_INTERFACE} ${HOST_TELEMETRY_SERVICE}
+  PRIVATE yas_common ${HOST_LIBRARIES})
 
 target_compile_options(rpc_host PRIVATE ${HOST_COMPILE_OPTIONS})
 target_link_options(rpc_host PRIVATE ${HOST_LINK_EXE_OPTIONS})
 target_link_directories(rpc_host PUBLIC ${SGX_LIBRARY_PATH})
-set_property(TARGET rpc_host PROPERTY COMPILE_PDB_NAME 
-  rpc_host)
+set_property(TARGET rpc_host PROPERTY COMPILE_PDB_NAME rpc_host)
 
 if(ENABLE_CLANG_TIDY)
   set_target_properties(rpc_host PROPERTIES CXX_CLANG_TIDY "${CLANG_TIDY_COMMAND}")

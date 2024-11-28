@@ -652,6 +652,7 @@ namespace enclave_marshaller
 
                 proxy("auto __rpc_op = get_object_proxy();");
                 proxy("auto __rpc_sp = __rpc_op->get_service_proxy();");
+                proxy("#ifdef USE_RPC_TELEMETRY");
                 proxy("if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)");
                 proxy("{{");
                 proxy("telemetry_service->on_interface_proxy_send(\"{0}::{1}\", "
@@ -660,7 +661,7 @@ namespace enclave_marshaller
                       "__rpc_op->get_object_id(), {{{0}_proxy::get_id(rpc::get_version())}}, {{{2}}});",
                       interface_name, function->get_name(), function_count);
                 proxy("}}");
-
+                proxy("#endif");
                 {
                     stub("//STUB_DEMARSHALL_DECLARATION");
                     stub("#if defined(__clang__) || defined(__GNUC__) || defined(__GNUG__)");
@@ -1487,7 +1488,8 @@ namespace enclave_marshaller
             proxy("{{");
             proxy("auto __rpc_op = get_object_proxy();");
             proxy("auto __rpc_sp = __rpc_op->get_service_proxy();");
-            proxy("   if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)");
+            proxy("#ifdef USE_RPC_TELEMETRY");
+            proxy("if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)");
             proxy("{{");
             proxy("telemetry_service->on_interface_proxy_creation(\"{0}\", "
                   "__rpc_sp->get_zone_id(), "
@@ -1495,6 +1497,7 @@ namespace enclave_marshaller
                   "{{{0}_proxy::get_id(rpc::get_version())}});",
                   interface_name);
             proxy("}}");
+            proxy("#endif");
             proxy("}}");
             proxy("mutable rpc::weak_ptr<{}_proxy> weak_this_;", interface_name);
             proxy("public:");
@@ -1503,6 +1506,7 @@ namespace enclave_marshaller
             proxy("{{");
             proxy("auto __rpc_op = get_object_proxy();");
             proxy("auto __rpc_sp = __rpc_op->get_service_proxy();");
+            proxy("#ifdef USE_RPC_TELEMETRY");
             proxy("if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)");
             proxy("{{");
             proxy("telemetry_service->on_interface_proxy_deletion("
@@ -1511,6 +1515,7 @@ namespace enclave_marshaller
                   "{{{0}_proxy::get_id(rpc::get_version())}});",
                   interface_name);
             proxy("}}");
+            proxy("#endif");
             proxy("}}");
             proxy("[[nodiscard]] static rpc::shared_ptr<{}> create(const rpc::shared_ptr<rpc::object_proxy>& "
                   "object_proxy)",

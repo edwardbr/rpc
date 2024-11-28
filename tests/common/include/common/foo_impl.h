@@ -3,7 +3,9 @@
 #include <example/example.h>
 #include <rpc/types.h>
 #include <rpc/proxy.h>
+#ifdef USE_RPC_TELEMETRY
 #include <rpc/telemetry/i_telemetry_service.h>
+#endif
 #include <rpc/basic_service_proxies.h>
 
 #include <example_shared/example_shared_stub.h>
@@ -34,14 +36,18 @@ namespace marshalled_tests
         baz(rpc::zone zone_id)
             : zone_id_(zone_id)
         {
+#ifdef USE_RPC_TELEMETRY            
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
                 telemetry_service->on_impl_creation("baz", (uint64_t)this, zone_id_);
+#endif                
         }
 
         virtual ~baz()
         {
+#ifdef USE_RPC_TELEMETRY
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
                 telemetry_service->on_impl_deletion((uint64_t)this, zone_id_);
+#endif                
         }
         int callback(int val) override
         {
@@ -78,13 +84,17 @@ namespace marshalled_tests
         foo(rpc::zone zone_id)
             :zone_id_(zone_id)
         {
+#ifdef USE_RPC_TELEMETRY            
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
                 telemetry_service->on_impl_creation("foo", (uint64_t)this, zone_id_);
+#endif                
         }
         virtual ~foo()
         {
+#ifdef USE_RPC_TELEMETRY            
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
                 telemetry_service->on_impl_deletion((uint64_t)this, zone_id_);
+#endif                
         }
         error_code do_something_in_val(int val) override
         {
@@ -294,8 +304,10 @@ namespace marshalled_tests
 
         error_code exception_test() override
         {
+#ifdef USE_RPC_TELEMETRY            
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
                 telemetry_service->message(rpc::i_telemetry_service::info, "exception_test");
+#endif                
             throw std::runtime_error("oops");
             return rpc::error::OK();
         }
@@ -319,13 +331,17 @@ namespace marshalled_tests
         multiple_inheritance(rpc::zone zone_id)
             :zone_id_(zone_id)
         {
+#ifdef USE_RPC_TELEMETRY            
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
                 telemetry_service->on_impl_creation("multiple_inheritance", (uint64_t)this, zone_id_);
+#endif                
         }
         virtual ~multiple_inheritance()
         {
+#ifdef USE_RPC_TELEMETRY            
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
                 telemetry_service->on_impl_deletion((uint64_t)this, zone_id_);
+#endif                
         }
 
         error_code do_something_else(int val) override { return rpc::error::OK(); }
@@ -363,14 +379,17 @@ namespace marshalled_tests
         {
             if(this_service)
                 zone_id_ = this_service->get_zone_id();
+#ifdef USE_RPC_TELEMETRY                
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
                 telemetry_service->on_impl_creation("example", (uint64_t)this, zone_id_);
-
+#endif
         }
         virtual ~example()
         {
+#ifdef USE_RPC_TELEMETRY            
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
                 telemetry_service->on_impl_deletion((uint64_t)this, zone_id_);
+#endif                
         }
         
         error_code get_host(rpc::shared_ptr<yyy::i_host>& host) override
@@ -520,17 +539,20 @@ namespace marshalled_tests
             if (!host_)
                 return rpc::error::INVALID_DATA();
 
-            auto telemetry_service = rpc::telemetry_service_manager::get();
 
             rpc::shared_ptr<i_example> app;
             {
+#ifdef USE_RPC_TELEMETRY
+                auto telemetry_service = rpc::telemetry_service_manager::get();
                 if (telemetry_service)
                     telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return");
-
+#endif
                 auto err = host_->look_up_app(name, app);
 
+#ifdef USE_RPC_TELEMETRY
                 if (telemetry_service)
                     telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return complete");
+#endif
                 if(err != rpc::error::OK())
                     return err;
             }
@@ -549,18 +571,22 @@ namespace marshalled_tests
         // live app registry, it should have sole responsibility for the long term storage of app shared ptrs
         error_code call_host_look_up_app(const std::string& name, rpc::shared_ptr<i_example>& app, bool run_standard_tests) override
         {
-            auto telemetry_service = rpc::telemetry_service_manager::get();
             if (!host_)
                 return rpc::error::INVALID_DATA();
 
             {
+#ifdef USE_RPC_TELEMETRY
+                auto telemetry_service = rpc::telemetry_service_manager::get();
                 if (telemetry_service)
                     telemetry_service->message(rpc::i_telemetry_service::info, "look_up_app");
+#endif
 
                 auto err = host_->look_up_app(name, app);
 
+#ifdef USE_RPC_TELEMETRY
                 if (telemetry_service)
                     telemetry_service->message(rpc::i_telemetry_service::info, "look_up_app complete");
+#endif                    
 
                 if(err != rpc::error::OK())
                     return err;
@@ -583,19 +609,22 @@ namespace marshalled_tests
             if (!host_)
                 return rpc::error::INVALID_DATA();
                 
-            auto telemetry_service = rpc::telemetry_service_manager::get();                
-
             rpc::shared_ptr<i_example> app;
             {
                 rpc::shared_ptr<i_example> app;
+#ifdef USE_RPC_TELEMETRY
+                auto telemetry_service = rpc::telemetry_service_manager::get();                
                 if (telemetry_service)
                     telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return_and_delete");
+#endif
 
                 auto err = host_->look_up_app(name, app);
                 host_->unload_app(name);
 
+#ifdef USE_RPC_TELEMETRY
                 if (telemetry_service)
                     telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return_and_delete complete");
+#endif                    
                 if(err != rpc::error::OK())
                     return err;
                 if(run_standard_tests && app)
@@ -616,18 +645,19 @@ namespace marshalled_tests
             if (!host_)
                 return rpc::error::INVALID_DATA();
             
-            auto telemetry_service = rpc::telemetry_service_manager::get();                
-
             {
+#ifdef USE_RPC_TELEMETRY
+                auto telemetry_service = rpc::telemetry_service_manager::get();                
                 if (telemetry_service)
                     telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_and_delete");
-
+#endif
                 auto err = host_->look_up_app(name, app);
                 host_->unload_app(name);
 
+#ifdef USE_RPC_TELEMETRY
                 if (telemetry_service)
                     telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_and_delete complete");
-
+#endif
                 if(err != rpc::error::OK())
                     return err;
             }
@@ -688,8 +718,10 @@ namespace marshalled_tests
 
         error_code send_interface_back(const rpc::shared_ptr<xxx::i_baz>& input, rpc::shared_ptr<xxx::i_baz>& output) override
         {
+#ifdef USE_RPC_TELEMETRY
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
                 telemetry_service->message(rpc::i_telemetry_service::info, "send_interface_back");
+#endif                
             output = input;
             return rpc::error::OK();
         }
