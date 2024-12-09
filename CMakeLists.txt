@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.24)
 
 project(
   rpc
-  VERSION 2.1.0
+  VERSION 2.2.0
   LANGUAGES CXX)
 
 if(RPC_STANDALONE)
@@ -15,7 +15,7 @@ if(RPC_STANDALONE)
   set(CMAKE_CXX_STANDARD 17)
   set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-  project(enclave_marshaller VERSION 0.1.0)
+  project(rpc_tests VERSION 2.2.0)
 
   list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmakeconfigs")
   include(DependancyPrimer)

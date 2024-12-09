@@ -13,6 +13,7 @@
 
 #include "synchronous_generator.h"
 #include "synchronous_mock_generator.h"
+#include "yas_generator.h"
 #include "component_checksum.h"
 
 using namespace std;
@@ -195,59 +196,63 @@ int main(const int argc, char* argv[])
             get_imports(*objects, imports, imports_cache);
         }
 
-        string interfaces_h_data;
-        string interfaces_proxy_data;
-        string interfaces_proxy_header_data;
-        string interfaces_stub_data;
-        string interfaces_stub_header_data;
-        string interfaces_mock_data;
-
         stubHeaderPath = stubHeaderPath.size() ? stubHeaderPath : (stubPath + ".h");
 
-        auto header_path = std::filesystem::path(output_path) / "include" / headerPath;
-        auto proxy_path = std::filesystem::path(output_path) / "src" / proxyPath;
-        auto stub_path = std::filesystem::path(output_path) / "src" / stubPath;
-        auto stub_header_path = std::filesystem::path(output_path) / "include" / stubHeaderPath;
-        auto mock_path = std::filesystem::path(output_path) / "include" / mockPath;
+        // do the generation of the checksums
+        auto checksums_path = std::filesystem::path(output_path)/"check_sums";
+        std::filesystem::create_directory(checksums_path);
+        component_checksum::write_namespace(*objects, checksums_path);
 
-        std::filesystem::create_directories(header_path.parent_path());
-        std::filesystem::create_directories(proxy_path.parent_path());
-        std::filesystem::create_directories(stub_path.parent_path());
-        std::filesystem::create_directories(stub_header_path.parent_path());
-        if (mockPath.length())
-            std::filesystem::create_directories(mock_path.parent_path());
-
-        // read the original data and close the files afterwards
+        // do the generation of the proxy and stubs
         {
-            std::error_code ec;
-            ifstream hfs(header_path);
-            std::getline(hfs, interfaces_h_data, '\0');
+            auto header_path = std::filesystem::path(output_path) / "include" / headerPath;
+            auto proxy_path = std::filesystem::path(output_path) / "src" / proxyPath;
+            auto stub_path = std::filesystem::path(output_path) / "src" / stubPath;
+            auto stub_header_path = std::filesystem::path(output_path) / "include" / stubHeaderPath;
+            auto mock_path = std::filesystem::path(output_path) / "include" / mockPath;
 
-            ifstream proxy_fs(proxy_path);
-            std::getline(proxy_fs, interfaces_proxy_data, '\0');
-
-            ifstream stub_fs(stub_path);
-            std::getline(stub_fs, interfaces_stub_data, '\0');
-
-            ifstream stub_header_fs(stub_header_path);
-            std::getline(stub_header_fs, interfaces_stub_header_data, '\0');
-
+            std::filesystem::create_directories(header_path.parent_path());
+            std::filesystem::create_directories(proxy_path.parent_path());
+            std::filesystem::create_directories(stub_path.parent_path());
+            std::filesystem::create_directories(stub_header_path.parent_path());
             if (mockPath.length())
+                std::filesystem::create_directories(mock_path.parent_path());
+
+            // read the original data and close the files afterwards
+            string interfaces_h_data;
+            string interfaces_proxy_data;
+            string interfaces_proxy_header_data;
+            string interfaces_stub_data;
+            string interfaces_stub_header_data;
+            string interfaces_mock_data;
+
             {
-                ifstream mock_fs(mock_path);
-                std::getline(mock_fs, interfaces_mock_data, '\0');
+                ifstream hfs(header_path);
+                std::getline(hfs, interfaces_h_data, '\0');
+
+                ifstream proxy_fs(proxy_path);
+                std::getline(proxy_fs, interfaces_proxy_data, '\0');
+
+                ifstream stub_fs(stub_path);
+                std::getline(stub_fs, interfaces_stub_data, '\0');
+
+                ifstream stub_header_fs(stub_header_path);
+                std::getline(stub_header_fs, interfaces_stub_header_data, '\0');
+
+                if (mockPath.length())
+                {
+                    ifstream mock_fs(mock_path);
+                    std::getline(mock_fs, interfaces_mock_data, '\0');
+                }
             }
-        }
 
-        std::stringstream header_stream;
-        std::stringstream proxy_stream;
-        std::stringstream stub_stream;
-        std::stringstream stub_header_stream;
-        std::stringstream mock_stream;
-
-        // do the generation to the ostrstreams
-        {
-            enclave_marshaller::synchronous_generator::write_files(module_name, true, *objects, header_stream, proxy_stream,
+            std::stringstream header_stream;
+            std::stringstream proxy_stream;
+            std::stringstream stub_stream;
+            std::stringstream stub_header_stream;
+            std::stringstream mock_stream;
+                    
+            rpc_generator::synchronous_generator::write_files(module_name, true, *objects, header_stream, proxy_stream,
                                                                    stub_stream, stub_header_stream, 
                                                                    namespaces, headerPath, stubHeaderPath, imports, additional_headers, !suppress_catch_stub_exceptions, rethrow_exceptions, additional_stub_headers);
 
@@ -257,45 +262,87 @@ int main(const int argc, char* argv[])
             stub_header_stream << ends;
             if (mockPath.length())
             {
-                enclave_marshaller::synchronous_mock_generator::write_files(true, *objects, mock_stream, namespaces,
+                rpc_generator::synchronous_mock_generator::write_files(true, *objects, mock_stream, namespaces,
                                                                             headerPath, imports);
                 mock_stream << ends;
             }
             
-            auto checksums_path = std::filesystem::path(output_path)/"check_sums";
-            std::filesystem::create_directory(checksums_path);
-            component_checksum::write_namespace(*objects, checksums_path);
-        }
-
-        // compare and write if different
-        if (is_different(header_stream, interfaces_h_data))
-        {
-            ofstream file(header_path);
-            file << header_stream.str();
-        }
-        if (is_different(proxy_stream, interfaces_proxy_data))
-        {
-            ofstream file(proxy_path);
-            file << proxy_stream.str();
-        }
-        if (is_different(stub_stream, interfaces_stub_data))
-        {
-            ofstream file(stub_path);
-            file << stub_stream.str();
-        }
-        if (is_different(stub_header_stream, interfaces_stub_header_data))
-        {
-            ofstream file(stub_header_path);
-            file << stub_header_stream.str();
-        }
-        if (mockPath.length())
-        {
-            if (interfaces_mock_data != mock_stream.str())
+            // compare and write if different
+            if (is_different(header_stream, interfaces_h_data))
             {
-                ofstream file(mock_path);
-                file << mock_stream.str();
+                ofstream file(header_path);
+                file << header_stream.str();
+            }
+            if (is_different(proxy_stream, interfaces_proxy_data))
+            {
+                ofstream file(proxy_path);
+                file << proxy_stream.str();
+            }
+            if (is_different(stub_stream, interfaces_stub_data))
+            {
+                ofstream file(stub_path);
+                file << stub_stream.str();
+            }
+            if (is_different(stub_header_stream, interfaces_stub_header_data))
+            {
+                ofstream file(stub_header_path);
+                file << stub_header_stream.str();
+            }
+            if (mockPath.length())
+            {
+                if (interfaces_mock_data != mock_stream.str())
+                {
+                    ofstream file(mock_path);
+                    file << mock_stream.str();
+                }
             }
         }
+        
+        // do the generation of the yas serialisation
+        {
+            //get default paths
+            auto tmp_header_path = std::filesystem::path(output_path) / "include" / headerPath;
+
+            //then generate yas subdirectories
+            auto header_path = tmp_header_path.parent_path() / "yas" / tmp_header_path.filename();
+
+            std::filesystem::create_directories(header_path.parent_path());
+            
+            // read the original data and close the files afterwards
+            string interfaces_h_data;
+            string interfaces_implementation_data;
+
+            {
+                std::error_code ec;
+                ifstream hfs(header_path);
+                std::getline(hfs, interfaces_h_data, '\0');
+            }
+            
+            std::stringstream header_stream;
+            
+            rpc_generator::yas_generator::write_files(
+                module_name
+                , true
+                , *objects
+                , header_stream
+                , namespaces
+                , headerPath
+                , imports
+                , additional_headers
+                , !suppress_catch_stub_exceptions
+                , rethrow_exceptions
+                , additional_stub_headers);
+                
+            header_stream << ends;
+
+            // compare and write if different
+            if (is_different(header_stream, interfaces_h_data))
+            {
+                ofstream file(header_path);
+                file << header_stream.str();
+            }
+        }
+
     }
     catch (const std::exception& e)
     {

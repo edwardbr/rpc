@@ -11,7 +11,7 @@
 
 #include "synchronous_mock_generator.h"
 
-namespace enclave_marshaller
+namespace rpc_generator
 {
     namespace synchronous_mock_generator
     {

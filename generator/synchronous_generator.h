@@ -1,5 +1,5 @@
 
-namespace enclave_marshaller
+namespace rpc_generator
 {
     namespace synchronous_generator
     {

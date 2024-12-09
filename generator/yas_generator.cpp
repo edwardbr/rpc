@@ -1,0 +1,1286 @@
+#include <type_traits>
+#include <algorithm>
+#include <tuple>
+#include <type_traits>
+#include "coreclasses.h"
+#include "cpp_parser.h"
+extern "C"
+{
+#include "sha3.h"
+}
+#include <filesystem>
+#include <sstream>
+
+#include "writer.h"
+
+#include "fingerprint_generator.h"
+#include "yas_generator.h"
+
+namespace rpc_generator
+{
+    namespace yas_generator
+    {
+        enum print_type
+        {
+            PROXY_PARAM_IN,
+            PROXY_MARSHALL_IN,
+            PROXY_PARAM_OUT,
+            PROXY_MARSHALL_OUT,
+
+            STUB_PARAM_IN,
+            STUB_MARSHALL_IN,
+            STUB_PARAM_OUT,
+            STUB_MARSHALL_OUT
+        };
+
+        struct renderer
+        {
+            enum param_type
+            {
+                BY_VALUE,
+                REFERANCE,
+                MOVE,
+                POINTER,
+                POINTER_REFERENCE,
+                POINTER_POINTER,
+                INTERFACE,
+                INTERFACE_REFERENCE
+            };
+
+            template<param_type type>
+            std::string render(print_type option, bool from_host, const class_entity& lib, const std::string& name,
+                               bool is_in, bool is_out, bool is_const, const std::string& object_type,
+                               uint64_t& count) const
+            {
+                assert(false);
+            }
+        };
+
+        template<>
+        std::string renderer::render<renderer::BY_VALUE>(print_type option, bool from_host, const class_entity& lib,
+                                                         const std::string& name, bool is_in, bool is_out,
+                                                         bool is_const, const std::string& object_type,
+                                                         uint64_t& count) const
+        {
+            switch(option)
+            {
+            case PROXY_PARAM_IN:
+                return fmt::format("{} {}", object_type, name);
+            case PROXY_MARSHALL_IN:
+                return fmt::format("  ,(\"{0}\", {0})", name);
+            case PROXY_MARSHALL_OUT:
+                return fmt::format("  ,(\"{0}\", {0})", name);
+            case STUB_MARSHALL_IN:
+                return fmt::format("  ,(\"{0}\", {0})", name);
+            case STUB_MARSHALL_OUT:
+                return fmt::format("  ,(\"{0}\", {0})", name);
+            case STUB_PARAM_IN:
+                return fmt::format("{}& {}", object_type, name);
+            case STUB_PARAM_OUT:
+                return fmt::format("{}& {}", object_type, name);
+            case PROXY_PARAM_OUT:
+                return fmt::format("{}& {}", object_type, name);
+            default:
+                return "";
+            }
+        };
+
+        template<>
+        std::string renderer::render<renderer::REFERANCE>(print_type option, bool from_host, const class_entity& lib,
+                                                          const std::string& name, bool is_in, bool is_out,
+                                                          bool is_const, const std::string& object_type,
+                                                          uint64_t& count) const
+        {
+            if(is_out)
+            {
+                throw std::runtime_error("REFERANCE does not support out vals");
+            }
+
+            switch(option)
+            {
+            case PROXY_PARAM_IN:
+                return fmt::format("{}& {}", object_type, name);
+            case PROXY_MARSHALL_IN:
+                return fmt::format("  ,(\"{0}\", {0})", name);
+            case PROXY_MARSHALL_OUT:
+                return fmt::format("  ,(\"{0}\", {0})", name);
+            case STUB_MARSHALL_IN:
+                return fmt::format("  ,(\"{0}\", {0})", name);
+            case STUB_PARAM_IN:
+                return fmt::format("{}& {}", object_type, name);
+            case STUB_PARAM_OUT:
+                return fmt::format("{}& {}", object_type, name);
+            case PROXY_PARAM_OUT:
+                return fmt::format("{}& {}", object_type, name);
+            default:
+                return "";
+            }
+        };
+
+        template<>
+        std::string renderer::render<renderer::MOVE>(print_type option, bool from_host, const class_entity& lib,
+                                                     const std::string& name, bool is_in, bool is_out, bool is_const,
+                                                     const std::string& object_type, uint64_t& count) const
+        {
+            if(is_out)
+            {
+                throw std::runtime_error("MOVE does not support out vals");
+            }
+            if(is_const)
+            {
+                throw std::runtime_error("MOVE does not support const vals");
+            }
+
+            switch(option)
+            {
+            case PROXY_PARAM_IN:
+                return fmt::format("{}&& {}", object_type, name);
+            case PROXY_MARSHALL_IN:
+                return fmt::format("  ,(\"{0}\", {0})", name);
+            case PROXY_MARSHALL_OUT:
+                return fmt::format("  ,(\"{0}\", {0})", name);
+            case STUB_PARAM_IN:
+                return fmt::format("{}& {}", object_type, name);
+            case STUB_MARSHALL_IN:
+                return fmt::format("  ,(\"{0}\", {0})", name);
+            case STUB_MARSHALL_OUT:
+                return fmt::format("  ,(\"{0}\", {0})", name);
+            default:
+                return "";
+            }
+        };
+
+        template<>
+        std::string renderer::render<renderer::POINTER>(print_type option, bool from_host, const class_entity& lib,
+                                                        const std::string& name, bool is_in, bool is_out, bool is_const,
+                                                        const std::string& object_type, uint64_t& count) const
+        {
+            if(is_out)
+            {
+                throw std::runtime_error("POINTER does not support out vals");
+            }
+
+            switch(option)
+            {
+            case PROXY_PARAM_IN:
+                return fmt::format("uint64_t {}", name);
+            case PROXY_MARSHALL_IN:
+                return fmt::format("  ,(\"{0}\", (uint64_t){0})", name);
+            case PROXY_MARSHALL_OUT:
+                return fmt::format("  ,(\"{}\", (uint64_t) {})", count, name);
+            case STUB_PARAM_IN:
+                return fmt::format("uint64_t {}", name);
+            case STUB_MARSHALL_IN:
+                return fmt::format("  ,(\"{0}\", {0})", name);
+            default:
+                return "";
+            }
+        };
+
+        template<>
+        std::string renderer::render<renderer::POINTER_REFERENCE>(print_type option, bool from_host,
+                                                                  const class_entity& lib, const std::string& name,
+                                                                  bool is_in, bool is_out, bool is_const,
+                                                                  const std::string& object_type, uint64_t& count) const
+        {
+            if(is_const && is_out)
+            {
+                throw std::runtime_error("POINTER_REFERENCE does not support const out vals");
+            }
+            switch(option)
+            {
+            case PROXY_PARAM_IN:
+                return fmt::format("uint64_t& {}", name);
+            case PROXY_MARSHALL_IN:
+                return fmt::format("  ,(\"{0}\", {0}_)", name);
+            case PROXY_MARSHALL_OUT:
+                return fmt::format("  ,(\"{0}\", {0})", name);
+            case STUB_PARAM_IN:
+                return fmt::format("{}*& {}", object_type, name);
+            case STUB_PARAM_OUT:
+                return fmt::format("uint64_t {}", name);
+            case PROXY_PARAM_OUT:
+                return fmt::format("uint64_t& {}", name);
+            case STUB_MARSHALL_OUT:
+                return fmt::format("  ,(\"_{}\", (uint64_t){})", count, name);
+
+            default:
+                return "";
+            }
+        };
+
+        template<>
+        std::string renderer::render<renderer::POINTER_POINTER>(print_type option, bool from_host,
+                                                                const class_entity& lib, const std::string& name,
+                                                                bool is_in, bool is_out, bool is_const,
+                                                                const std::string& object_type, uint64_t& count) const
+        {
+            switch(option)
+            {
+            case PROXY_PARAM_IN:
+                return fmt::format("{}** {}", object_type, name);
+            case PROXY_MARSHALL_IN:
+                return fmt::format("  ,(\"{0}\", {0}_)", name);
+            case PROXY_MARSHALL_OUT:
+                return fmt::format("  ,(\"{0}\", {0})", name);
+            case STUB_PARAM_IN:
+                return fmt::format("{}** {}", object_type, name);
+            case STUB_PARAM_OUT:
+                return fmt::format("uint64_t {}", name);
+            case PROXY_PARAM_OUT:
+                return fmt::format("uint64_t& {}", name);
+            case STUB_MARSHALL_OUT:
+                return fmt::format("  ,(\"_{}\", (uint64_t){})", count, name);
+            default:
+                return "";
+            }
+        };
+
+        template<>
+        std::string renderer::render<renderer::INTERFACE>(print_type option, bool from_host, const class_entity& lib,
+                                                          const std::string& name, bool is_in, bool is_out,
+                                                          bool is_const, const std::string& object_type,
+                                                          uint64_t& count) const
+        {
+            if(is_out)
+            {
+                throw std::runtime_error("INTERFACE does not support out vals");
+            }
+
+            switch(option)
+            {
+            case PROXY_PARAM_IN:
+                return fmt::format("const rpc::interface_descriptor& {}_stub_id_", name);
+            case PROXY_MARSHALL_IN:
+            {
+                auto ret = fmt::format(",(\"_{1}\", {0}_stub_id_)", name, count);
+                count++;
+                return ret;
+            }
+            case PROXY_MARSHALL_OUT:
+                return fmt::format("  ,(\"{0}\", {0})", name);
+
+            case STUB_PARAM_IN:
+                return fmt::format("rpc::interface_descriptor& {}", name);
+            case STUB_MARSHALL_IN:
+            {
+                auto ret = fmt::format("  ,(\"_{1}\", {0})", name, count);
+                count++;
+                return ret;
+            }
+            case STUB_MARSHALL_OUT:
+                return fmt::format("  ,(\"{0}\", (uint64_t){0})", name);
+            case PROXY_PARAM_OUT:
+                return fmt::format("rpc::interface_descriptor& {}", name);
+            case STUB_PARAM_OUT:
+                return fmt::format("rpc::interface_descriptor& {}", name);
+            default:
+                return "";
+            }
+        };
+
+        template<>
+        std::string
+        renderer::render<renderer::INTERFACE_REFERENCE>(print_type option, bool from_host, const class_entity& lib,
+                                                        const std::string& name, bool is_in, bool is_out, bool is_const,
+                                                        const std::string& object_type, uint64_t& count) const
+        {
+            switch(option)
+            {
+            case PROXY_PARAM_IN:
+                return fmt::format("rpc::interface_descriptor& {}_stub_id_", name);
+            case PROXY_MARSHALL_IN:
+            {
+                auto ret = fmt::format(",(\"_{1}\", {0}_stub_id_)", name, count);
+                count++;
+                return ret;
+            }
+            case PROXY_MARSHALL_OUT:
+                return fmt::format("  ,(\"{0}\", {0})", name);
+
+            case STUB_PARAM_IN:
+                return fmt::format("rpc::interface_descriptor& {}", name);
+
+            case PROXY_PARAM_OUT:
+                return fmt::format("rpc::interface_descriptor& {}", name);
+            case STUB_PARAM_OUT:
+                return fmt::format("rpc::interface_descriptor& {}", name);
+            case STUB_MARSHALL_OUT:
+                return fmt::format("  ,(\"{0}\", {0})", name);
+            default:
+                return "";
+            }
+        };
+
+        std::string get_encapsulated_shared_ptr_type(const std::string& type_name)
+        {
+            const std::string template_pattern = "rpc::shared_ptr<";
+            auto pos = type_name.find(template_pattern);
+            if(pos != std::string::npos)
+            {
+                pos += template_pattern.length();
+                while(type_name[pos] == ' ' || type_name[pos] == '\n' || type_name[pos] == '\r'
+                      || type_name[pos] == '\t')
+                    pos++;
+                auto rpos = type_name.rfind(">");
+                if(rpos == std::string::npos)
+                {
+                    std::cerr << fmt::format("template parameter is malformed {}", type_name);
+                    throw fmt::format("template parameter is malformed {}", type_name);
+                }
+                while(type_name[rpos] == ' ' || type_name[rpos] == '\n' || type_name[rpos] == '\r'
+                      || type_name[rpos] == '\t')
+                    rpos++;
+                return type_name.substr(pos, rpos - pos);
+            }
+            return type_name;
+        }
+
+        bool is_in_call(print_type option, bool from_host, const class_entity& lib, const std::string& name,
+                        const std::string& type, const std::list<std::string>& attributes, uint64_t& count,
+                        std::string& output)
+        {
+            auto in = std::find(attributes.begin(), attributes.end(), "in") != attributes.end();
+            auto out = std::find(attributes.begin(), attributes.end(), "out") != attributes.end();
+            auto is_const = std::find(attributes.begin(), attributes.end(), "const") != attributes.end();
+            auto by_value = std::find(attributes.begin(), attributes.end(), "by_value") != attributes.end();
+
+            if(out && !in)
+                return false;
+
+            std::string type_name = type;
+            std::string reference_modifiers;
+            strip_reference_modifiers(type_name, reference_modifiers);
+
+            std::string encapsulated_type = get_encapsulated_shared_ptr_type(type_name);
+
+            bool is_interface = false;
+            std::shared_ptr<class_entity> obj;
+            if(lib.find_class(encapsulated_type, obj))
+            {
+                if(obj->get_entity_type() == entity_type::INTERFACE)
+                {
+                    is_interface = true;
+                }
+            }
+
+            if(!is_interface)
+            {
+                if(reference_modifiers.empty())
+                {
+                    output = renderer().render<renderer::BY_VALUE>(option, from_host, lib, name, in, out, is_const,
+                                                                   type_name, count);
+                }
+                else if(reference_modifiers == "&")
+                {
+                    if(by_value)
+                    {
+                        output = renderer().render<renderer::BY_VALUE>(option, from_host, lib, name, in, out, is_const,
+                                                                       type_name, count);
+                    }
+                    else if(from_host == false)
+                    {
+                        throw std::runtime_error("passing data by reference from a non host zone is not allowed");
+                    }
+                    else
+                    {
+                        output = renderer().render<renderer::REFERANCE>(option, from_host, lib, name, in, out, is_const,
+                                                                        type_name, count);
+                    }
+                }
+                else if(reference_modifiers == "&&")
+                {
+                    output = renderer().render<renderer::MOVE>(option, from_host, lib, name, in, out, is_const,
+                                                               type_name, count);
+                }
+                else if(reference_modifiers == "*")
+                {
+                    output = renderer().render<renderer::POINTER>(option, from_host, lib, name, in, out, is_const,
+                                                                  type_name, count);
+                }
+                else if(reference_modifiers == "*&")
+                {
+                    output = renderer().render<renderer::POINTER_REFERENCE>(option, from_host, lib, name, in, out,
+                                                                            is_const, type_name, count);
+                }
+                else if(reference_modifiers == "**")
+                {
+                    output = renderer().render<renderer::POINTER_POINTER>(option, from_host, lib, name, in, out,
+                                                                          is_const, type_name, count);
+                }
+                else
+                {
+
+                    std::cerr << fmt::format("passing data by {} as in {} {} is not supported", reference_modifiers,
+                                             type, name);
+                    throw fmt::format("passing data by {} as in {} {} is not supported", reference_modifiers, type,
+                                      name);
+                }
+            }
+            else
+            {
+                if(reference_modifiers.empty() || (reference_modifiers == "&" && (is_const || !out)))
+                {
+                    output = renderer().render<renderer::INTERFACE>(option, from_host, lib, name, in, out, is_const,
+                                                                    type_name, count);
+                }
+                else if(reference_modifiers == "&")
+                {
+                    output = renderer().render<renderer::INTERFACE_REFERENCE>(option, from_host, lib, name, in, out,
+                                                                              is_const, type_name, count);
+                }
+                else
+                {
+                    std::cerr << fmt::format("passing interface by {} as in {} {} is not supported",
+                                             reference_modifiers, type, name);
+                    throw fmt::format("passing interface by {} as in {} {} is not supported", reference_modifiers, type,
+                                      name);
+                }
+            }
+            return true;
+        }
+
+        bool is_out_call(print_type option, bool from_host, const class_entity& lib, const std::string& name,
+                         const std::string& type, const std::list<std::string>& attributes, uint64_t& count,
+                         std::string& output)
+        {
+            auto in = std::find(attributes.begin(), attributes.end(), "in") != attributes.end();
+            auto out = std::find(attributes.begin(), attributes.end(), "out") != attributes.end();
+            auto is_const = std::find(attributes.begin(), attributes.end(), "const") != attributes.end();
+
+            if(!out)
+                return false;
+
+            if(is_const)
+            {
+                std::cerr << fmt::format("out parameters cannot be null");
+                throw fmt::format("out parameters cannot be null");
+            }
+
+            std::string type_name = type;
+            std::string reference_modifiers;
+            strip_reference_modifiers(type_name, reference_modifiers);
+
+            std::string encapsulated_type = get_encapsulated_shared_ptr_type(type_name);
+
+            bool is_interface = false;
+            std::shared_ptr<class_entity> obj;
+            if(lib.find_class(encapsulated_type, obj))
+            {
+                if(obj->get_entity_type() == entity_type::INTERFACE)
+                {
+                    is_interface = true;
+                }
+            }
+
+            if(reference_modifiers.empty())
+            {
+                std::cerr << fmt::format("out parameters require data to be sent by pointer or reference {} {} ", type,
+                                         name);
+                throw fmt::format("out parameters require data to be sent by pointeror reference {} {} ", type, name);
+            }
+
+            if(!is_interface)
+            {
+                if(reference_modifiers == "&")
+                {
+                    output = renderer().render<renderer::BY_VALUE>(option, from_host, lib, name, in, out, is_const,
+                                                                   type_name, count);
+                }
+                else if(reference_modifiers == "&&")
+                {
+                    throw std::runtime_error("out call rvalue references is not possible");
+                }
+                else if(reference_modifiers == "*")
+                {
+                    throw std::runtime_error("passing [out] by_pointer data by * will not work use a ** or *&");
+                }
+                else if(reference_modifiers == "*&")
+                {
+                    output = renderer().render<renderer::POINTER_REFERENCE>(option, from_host, lib, name, in, out,
+                                                                            is_const, type_name, count);
+                }
+                else if(reference_modifiers == "**")
+                {
+                    output = renderer().render<renderer::POINTER_POINTER>(option, from_host, lib, name, in, out,
+                                                                          is_const, type_name, count);
+                }
+                else
+                {
+
+                    std::cerr << fmt::format("passing data by {} as in {} {} is not supported", reference_modifiers,
+                                             type, name);
+                    throw fmt::format("passing data by {} as in {} {} is not supported", reference_modifiers, type,
+                                      name);
+                }
+            }
+            else
+            {
+                if(reference_modifiers == "&")
+                {
+                    output = renderer().render<renderer::INTERFACE_REFERENCE>(option, from_host, lib, name, in, out,
+                                                                              is_const, type_name, count);
+                }
+                else
+                {
+                    std::cerr << fmt::format("passing interface by {} as in {} {} is not supported",
+                                             reference_modifiers, type, name);
+                    throw fmt::format("passing interface by {} as in {} {} is not supported", reference_modifiers, type,
+                                      name);
+                }
+            }
+            return true;
+        }
+
+        void build_fully_scoped_name(const class_entity* entity, std::string& name)
+        {
+            auto* owner = entity->get_owner();
+            if(owner && !owner->get_name().empty())
+            {
+                build_fully_scoped_name(owner, name);
+            }
+            name += "::" + entity->get_name();
+        }
+
+        std::string deduct_parameter_type_name(const class_entity& m_ob, const std::string& type_name)
+        {
+            auto ret = type_name;
+            std::string reference_modifiers;
+            std::string template_modifier;
+            strip_reference_modifiers(ret, reference_modifiers);
+
+            auto template_start = ret.find('<');
+            if(template_start != std::string::npos)
+            {
+                int template_count = 1;
+                auto pData = ret.data() + template_start + 1;
+                while(*pData != 0 && template_count > 0)
+                {
+                    if(*pData == '<')
+                        template_count++;
+                    else if(*pData == '>')
+                        template_count--;
+                    pData++;
+                }
+                template_modifier = ret.substr(template_start, pData - (ret.data() + template_start));
+                ret = ret.substr(0, template_start);
+            }
+
+            std::shared_ptr<class_entity> param_type;
+            m_ob.find_class(ret, param_type);
+
+            if(param_type.get())
+            {
+                ret.clear();
+                build_fully_scoped_name(param_type.get(), ret);
+            }
+            return ret + template_modifier + reference_modifiers;
+        }
+
+        void write_proxy_send_method(bool from_host, const class_entity& m_ob, writer& proxy,
+                                     const std::string& interface_name,
+                                     const std::shared_ptr<function_entity>& function, int& function_count,
+                                     bool catch_stub_exceptions, const std::vector<std::string>& rethrow_exceptions)
+        {
+            if(function->get_entity_type() == entity_type::FUNCTION_METHOD)
+            {
+                proxy.print_tabs();
+                proxy.raw("std::vector<char> {}(rpc::encoding __rpc_enc", function->get_name());
+                bool has_inparams = false;
+                {
+                    uint64_t count = 1;
+                    for(auto& parameter : function->get_parameters())
+                    {
+                        auto& attributes = parameter.get_attributes();
+                        auto in = std::find(attributes.begin(), attributes.end(), "in") != attributes.end();
+                        auto out = std::find(attributes.begin(), attributes.end(), "out") != attributes.end();
+
+                        if(out && !in)
+                            continue;
+
+                        has_inparams = true;
+                        proxy.raw(", ");
+
+                        std::string modifier;
+                        for(auto& item : parameter.get_attributes())
+                        {
+                            if(item == "const")
+                                modifier = "const " + modifier;
+                        }
+
+                        std::string output;
+                        if(!is_in_call(PROXY_PARAM_IN, from_host, m_ob, parameter.get_name(),
+                                       modifier + deduct_parameter_type_name(m_ob, parameter.get_type()),
+                                       parameter.get_attributes(), count, output))
+                            continue;
+
+                        proxy.raw(output);
+                        count++;
+                    }
+                }
+                bool function_is_const = false;
+                for(auto& item : function->get_attributes())
+                {
+                    if(item == "const")
+                        function_is_const = true;
+                }
+                if(function_is_const)
+                {
+                    proxy.raw(") const\n");
+                }
+                else
+                {
+                    proxy.raw(")\n");
+                }
+                proxy("{{");
+
+                proxy("std::vector<char> __rpc_buf;");
+                if(has_inparams)
+                {
+                    proxy("auto __yas_mapping = YAS_OBJECT_NVP(");
+                    proxy("  \"in\"");
+
+                    uint64_t count = 1;
+                    for(auto& parameter : function->get_parameters())
+                    {
+                        std::string output;
+                        {
+                            if(!is_in_call(PROXY_MARSHALL_IN, from_host, m_ob, parameter.get_name(),
+                                           parameter.get_type(), parameter.get_attributes(), count, output))
+                                continue;
+
+                            proxy(output);
+                        }
+                        count++;
+                    }
+
+                    proxy("  );");
+
+                    proxy("switch(__rpc_enc)");
+                    proxy("{{");
+                    proxy("case rpc::encoding::yas_compressed_binary:");
+                    proxy("::yas::save<::yas::mem|::yas::binary|::yas::compacted|::yas::no_header>(::yas::vector_"
+                          "ostream(__rpc_buf), "
+                          "__yas_mapping);");
+                    proxy("break;");
+                    proxy("case rpc::encoding::yas_text:");
+                    proxy("::yas::save<::yas::mem|::yas::text|::yas::no_header>(::yas::vector_ostream(__rpc_buf), "
+                          "__yas_mapping);");
+                    proxy("break;");
+                    proxy("case rpc::encoding::yas_json:");
+                    proxy("::yas::save<::yas::mem|::yas::json|::yas::no_header>(::yas::vector_ostream(__rpc_buf), "
+                          "__yas_mapping);");
+                    proxy("break;");
+                    proxy("case rpc::encoding::enc_default:");
+                    proxy("case rpc::encoding::yas_binary:");
+                    proxy(
+                        "::yas::save<::yas::mem|::yas::binary|::yas::no_header>(::yas::vector_ostream(__rpc_buf), "
+                        "__yas_mapping);");
+                    proxy("break;");
+                    proxy("}}");
+                }
+                else
+                {
+                    proxy("if(__rpc_enc == rpc::encoding::yas_json)");
+                    proxy("  __rpc_buf = {{'{{','}}'}};");
+                }
+                proxy("return __rpc_buf;");
+            }
+            proxy("}}");
+            proxy("");
+
+            function_count++;
+        }
+
+        void write_proxy_receive_method(bool from_host, const class_entity& m_ob, writer& proxy,
+                                        const std::string& interface_name,
+                                        const std::shared_ptr<function_entity>& function, int& function_count,
+                                        bool catch_stub_exceptions, const std::vector<std::string>& rethrow_exceptions)
+        {
+            if(function->get_entity_type() == entity_type::FUNCTION_METHOD)
+            {
+                proxy.print_tabs();
+                proxy.raw("{} {}(rpc::encoding __rpc_enc, [[maybe_unused]] const char* __rpc_buf, size_t __rpc_buf_size",
+                          function->get_return_type(), function->get_name());
+                bool has_outparams = false;
+
+                uint64_t count = 1;
+                for(auto& parameter : function->get_parameters())
+                {
+                    auto& attributes = parameter.get_attributes();
+                    auto out = std::find(attributes.begin(), attributes.end(), "out") != attributes.end();
+
+                    if(!out)
+                        continue;
+                    proxy.raw(", ");
+                    has_outparams = true;
+
+                    std::string modifier;
+                    for(auto& item : parameter.get_attributes())
+                    {
+                        if(item == "const")
+                            modifier = "const " + modifier;
+                    }
+
+                    std::string output;
+                    if(!is_out_call(PROXY_PARAM_OUT, from_host, m_ob, parameter.get_name(),
+                                    modifier + deduct_parameter_type_name(m_ob, parameter.get_type()),
+                                    parameter.get_attributes(), count, output))
+                        continue;
+                    proxy.raw(output);
+                    count++;
+                }
+                bool function_is_const = false;
+                for(auto& item : function->get_attributes())
+                {
+                    if(item == "const")
+                        function_is_const = true;
+                }
+                if(function_is_const)
+                {
+                    proxy.raw(") const\n");
+                }
+                else
+                {
+                    proxy.raw(")\n");
+                }
+                proxy("{{");
+
+                if(has_outparams)
+                {
+                    uint64_t count = 1;
+                    proxy("try");
+                    proxy("{{");
+                    proxy("auto __yas_mapping = YAS_OBJECT_NVP(");
+                    proxy("  \"out\"");
+
+                    for(auto& parameter : function->get_parameters())
+                    {
+                        count++;
+                        std::string output;
+                        if(!is_out_call(PROXY_MARSHALL_OUT, from_host, m_ob, parameter.get_name(), parameter.get_type(),
+                                        parameter.get_attributes(), count, output))
+                            continue;
+                        proxy(output);
+                    }
+                    proxy("  );");
+                    proxy("switch(__rpc_enc)");
+                    proxy("{{");
+                    proxy("case rpc::encoding::yas_compressed_binary:");
+                    proxy("::yas::load<::yas::mem|::yas::binary|::yas::compacted|::yas::no_header>(::yas::intrusive_buffer(__rpc_buf,__rpc_buf_size), "
+                          "__yas_mapping);");
+                    proxy("break;");
+                    proxy("case rpc::encoding::yas_text:");
+                    proxy("::yas::load<::yas::mem|::yas::text|::yas::no_header>(::yas::intrusive_buffer(__rpc_buf,__rpc_buf_size), __yas_mapping);");
+                    proxy("break;");
+                    proxy("case rpc::encoding::yas_json:");
+                    proxy("::yas::load<::yas::mem|::yas::json|::yas::no_header>(::yas::intrusive_buffer(__rpc_buf,__rpc_buf_size), __yas_mapping);");
+                    proxy("break;");
+                    proxy("case rpc::encoding::enc_default:");
+                    proxy("case rpc::encoding::yas_binary:");
+                    proxy("::yas::load<::yas::mem|::yas::binary|::yas::no_header>(::yas::intrusive_buffer(__rpc_buf,__rpc_buf_size), __yas_mapping);");
+                    proxy("break;");
+                    proxy("default:");
+                    proxy("return rpc::error::PROXY_DESERIALISATION_ERROR();");
+                    proxy("}}");
+                    proxy("}}");
+                    proxy("#ifdef USE_RPC_LOGGING");
+                    proxy("catch(std::exception& ex)");
+                    proxy("{{");
+                    proxy("auto error_message = std::string(\"A proxy deserialisation error has occurred in an {} "
+                          "implementation in function {} \") + ex.what();",
+                          interface_name, function->get_name());
+                    proxy("LOG_STR(error_message.data(), error_message.length());");
+                    proxy("return rpc::error::PROXY_DESERIALISATION_ERROR();");
+                    proxy("}}");
+                    proxy("#endif");
+                    proxy("catch(...)");
+                    proxy("{{");
+                    proxy("#ifdef USE_RPC_LOGGING");
+                    proxy("auto error_message = std::string(\"exception has occurred in an {} implementation in "
+                          "function {}\");",
+                          interface_name, function->get_name());
+                    proxy("LOG_STR(error_message.data(), error_message.length());");
+                    proxy("#endif");
+                    proxy("return rpc::error::STUB_DESERIALISATION_ERROR();");
+                    proxy("}}");
+                }
+                proxy("return rpc::error::OK();");
+                proxy("}}");
+                proxy("");
+
+                function_count++;
+            }
+        }
+
+        void write_stub_receive_method(bool from_host, const class_entity& m_ob, writer& proxy,
+                                       const std::string& interface_name,
+                                       const std::shared_ptr<function_entity>& function, int& function_count,
+                                       bool catch_stub_exceptions, const std::vector<std::string>& rethrow_exceptions)
+        {
+            if(function->get_entity_type() == entity_type::FUNCTION_METHOD)
+            {
+                proxy.print_tabs();
+                proxy.raw("{} {}(rpc::encoding __rpc_enc, [[maybe_unused]] const char* __rpc_buf, size_t __rpc_buf_size",
+                          function->get_return_type(), function->get_name());
+                bool has_outparams = false;
+
+                uint64_t count = 1;
+                for(auto& parameter : function->get_parameters())
+                {
+                    auto& attributes = parameter.get_attributes();
+                    auto out = std::find(attributes.begin(), attributes.end(), "out") != attributes.end();
+                    auto in = std::find(attributes.begin(), attributes.end(), "in") != attributes.end();
+
+                    if(!in && out)
+                        continue;
+                    proxy.raw(", ");
+                    has_outparams = true;
+
+                    std::string modifier;
+                    for(auto& item : parameter.get_attributes())
+                    {
+                        // if(item == "const") // we dont do const here as we need to load a temporary
+                        //     modifier = "const " + modifier;
+                    }
+
+                    std::string output;
+                    if(!is_in_call(STUB_PARAM_IN, from_host, m_ob, parameter.get_name(),
+                                   modifier + deduct_parameter_type_name(m_ob, parameter.get_type()),
+                                   parameter.get_attributes(), count, output))
+                        continue;
+                    proxy.raw(output);
+                    count++;
+                }
+                bool function_is_const = false;
+                for(auto& item : function->get_attributes())
+                {
+                    if(item == "const")
+                        function_is_const = true;
+                }
+                if(function_is_const)
+                {
+                    proxy.raw(") const\n");
+                }
+                else
+                {
+                    proxy.raw(")\n");
+                }
+                proxy("{{");
+
+                if(has_outparams)
+                {
+                    uint64_t count = 1;
+                    proxy("try");
+                    proxy("{{");
+                    proxy("auto __yas_mapping = YAS_OBJECT_NVP(");
+                    proxy("  \"out\"");
+
+                    for(auto& parameter : function->get_parameters())
+                    {
+                        count++;
+                        std::string output;
+                        if(!is_in_call(STUB_MARSHALL_IN, from_host, m_ob, parameter.get_name(), parameter.get_type(),
+                                       parameter.get_attributes(), count, output))
+                            continue;
+                        proxy(output);
+                    }
+                    proxy("  );");
+
+                    proxy("switch(__rpc_enc)");
+                    proxy("{{");
+                    proxy("case rpc::encoding::yas_compressed_binary:");
+                    proxy("::yas::load<::yas::mem|::yas::binary|::yas::compacted|::yas::no_header>(::yas::intrusive_buffer(__rpc_buf,__rpc_buf_size), "
+                          "__yas_mapping);");
+                    proxy("break;");
+                    proxy("case rpc::encoding::yas_text:");
+                    proxy("::yas::load<::yas::mem|::yas::text|::yas::no_header>(::yas::intrusive_buffer(__rpc_buf,__rpc_buf_size), __yas_mapping);");
+                    proxy("break;");
+                    proxy("case rpc::encoding::yas_json:");
+                    proxy("::yas::load<::yas::mem|::yas::json|::yas::no_header>(::yas::intrusive_buffer(__rpc_buf,__rpc_buf_size), __yas_mapping);");
+                    proxy("break;");
+                    proxy("case rpc::encoding::enc_default:");
+                    proxy("case rpc::encoding::yas_binary:");
+                    proxy("::yas::load<::yas::mem|::yas::binary|::yas::no_header>(::yas::intrusive_buffer(__rpc_buf,__rpc_buf_size), __yas_mapping);");
+                    proxy("break;");
+                    proxy("default:");
+                    proxy("return rpc::error::PROXY_DESERIALISATION_ERROR();");
+                    proxy("}}");
+                    proxy("}}");
+                    proxy("#ifdef USE_RPC_LOGGING");
+                    proxy("catch(std::exception& ex)");
+                    proxy("{{");
+                    proxy("auto error_message = std::string(\"A proxy deserialisation error has occurred in an {} "
+                          "implementation in function {} \") + ex.what();",
+                          interface_name, function->get_name());
+                    proxy("LOG_STR(error_message.data(), error_message.length());");
+                    proxy("return rpc::error::PROXY_DESERIALISATION_ERROR();");
+                    proxy("}}");
+                    proxy("#endif");
+                    proxy("catch(...)");
+                    proxy("{{");
+                    proxy("#ifdef USE_RPC_LOGGING");
+                    proxy("auto error_message = std::string(\"exception has occurred in an {} implementation in "
+                          "function {}\");",
+                          interface_name, function->get_name());
+                    proxy("LOG_STR(error_message.data(), error_message.length());");
+                    proxy("#endif");
+                    proxy("return rpc::error::STUB_DESERIALISATION_ERROR();");
+                    proxy("}}");
+                }
+                proxy("return rpc::error::OK();");
+                proxy("}}");
+                proxy("");
+
+                function_count++;
+            }
+        }
+
+        void write_stub_reply_method(bool from_host, const class_entity& m_ob, writer& proxy,
+                                     const std::string& interface_name,
+                                     const std::shared_ptr<function_entity>& function, int& function_count,
+                                     bool catch_stub_exceptions, const std::vector<std::string>& rethrow_exceptions)
+        {
+            if(function->get_entity_type() == entity_type::FUNCTION_METHOD)
+            {
+                proxy.print_tabs();
+                proxy.raw("std::vector<char> {}(rpc::encoding __rpc_enc", function->get_name());
+                bool has_outparams = false;
+                {
+                    uint64_t count = 1;
+                    for(auto& parameter : function->get_parameters())
+                    {
+                        auto& attributes = parameter.get_attributes();
+                        auto out = std::find(attributes.begin(), attributes.end(), "out") != attributes.end();
+
+                        if(!out)
+                            continue;
+
+                        proxy.raw(", ");
+
+                        has_outparams = true;
+                        std::string modifier;
+                        for(auto& item : parameter.get_attributes())
+                        {
+                            if(item == "const")
+                                modifier = "const " + modifier;
+                        }
+
+                        std::string output;
+                        if(!is_out_call(STUB_PARAM_OUT, from_host, m_ob, parameter.get_name(),
+                                        modifier + deduct_parameter_type_name(m_ob, parameter.get_type()),
+                                        parameter.get_attributes(), count, output))
+                            continue;
+
+                        proxy.raw(output);
+                        count++;
+                    }
+                }
+                bool function_is_const = false;
+                for(auto& item : function->get_attributes())
+                {
+                    if(item == "const")
+                        function_is_const = true;
+                }
+                if(function_is_const)
+                {
+                    proxy.raw(") const\n");
+                }
+                else
+                {
+                    proxy.raw(")\n");
+                }
+                proxy("{{");
+
+                proxy("std::vector<char> __rpc_buf;");
+                if(has_outparams)
+                {
+                    proxy("auto __yas_mapping = YAS_OBJECT_NVP(");
+                    proxy("  \"out\"");
+
+                    uint64_t count = 1;
+                    for(auto& parameter : function->get_parameters())
+                    {
+                        std::string output;
+                        {
+                            if(!is_out_call(STUB_MARSHALL_OUT, from_host, m_ob, parameter.get_name(),
+                                            parameter.get_type(), parameter.get_attributes(), count, output))
+                                continue;
+
+                            proxy(output);
+                        }
+                        count++;
+                    }
+
+                    proxy("  );");
+
+                    proxy("switch(__rpc_enc)");
+                    proxy("{{");
+                    proxy("case rpc::encoding::yas_compressed_binary:");
+                    proxy("::yas::save<::yas::mem|::yas::binary|::yas::compacted|::yas::no_header>(::yas::vector_"
+                          "ostream(__rpc_buf), "
+                          "__yas_mapping);");
+                    proxy("break;");
+                    proxy("case rpc::encoding::yas_text:");
+                    proxy("::yas::save<::yas::mem|::yas::text|::yas::no_header>(::yas::vector_ostream(__rpc_buf), "
+                          "__yas_mapping);");
+                    proxy("break;");
+                    proxy("case rpc::encoding::yas_json:");
+                    proxy("::yas::save<::yas::mem|::yas::json|::yas::no_header>(::yas::vector_ostream(__rpc_buf), "
+                          "__yas_mapping);");
+                    proxy("break;");
+                    proxy("case rpc::encoding::enc_default:");
+                    proxy("case rpc::encoding::yas_binary:");
+                    proxy(
+                        "::yas::save<::yas::mem|::yas::binary|::yas::no_header>(::yas::vector_ostream(__rpc_buf), "
+                        "__yas_mapping);");
+                    proxy("break;");
+                    proxy("}}");
+                }
+                else
+                {
+                    proxy("if(__rpc_enc == rpc::encoding::yas_json)");
+                    proxy("  __rpc_buf = {{'{{','}}'}};");
+                }
+                proxy("return __rpc_buf;");
+            }
+            proxy("}}");
+            proxy("");
+
+            function_count++;
+        }
+
+        void write_interface(bool from_host, const class_entity& m_ob, writer& proxy, size_t id,
+                             bool catch_stub_exceptions, const std::vector<std::string>& rethrow_exceptions)
+        {
+            if(m_ob.is_in_import())
+                return;
+
+            auto interface_name
+                = std::string(m_ob.get_entity_type() == entity_type::LIBRARY ? "i_" : "") + m_ob.get_name();
+
+            std::string base_class_declaration;
+            auto bc = m_ob.get_base_classes();
+            if(!bc.empty())
+            {
+
+                base_class_declaration = " : ";
+                int i = 0;
+                for(auto base_class : bc)
+                {
+                    if(i)
+                        base_class_declaration += ", ";
+                    base_class_declaration += base_class->get_name();
+                    i++;
+                }
+            }
+
+            proxy("namespace {}", interface_name);
+            proxy("{{");
+
+            {
+                proxy("namespace proxy_sender");
+                proxy("{{");
+
+                bool has_methods = false;
+                for(auto& function : m_ob.get_functions())
+                {
+                    if(function->get_entity_type() != entity_type::FUNCTION_METHOD)
+                        continue;
+                    has_methods = true;
+                }
+
+                if(has_methods)
+                {
+                    int function_count = 1;
+                    for(auto& function : m_ob.get_functions())
+                    {
+                        if(function->get_entity_type() == entity_type::FUNCTION_METHOD)
+                            write_proxy_send_method(from_host, m_ob, proxy, interface_name, function, function_count,
+                                                    catch_stub_exceptions, rethrow_exceptions);
+                    }
+                }
+
+                proxy("}};");
+                proxy("");
+            }
+
+            {
+                proxy("namespace proxy_receiver");
+                proxy("{{");
+
+                bool has_methods = false;
+                for(auto& function : m_ob.get_functions())
+                {
+                    if(function->get_entity_type() != entity_type::FUNCTION_METHOD)
+                        continue;
+                    has_methods = true;
+                }
+
+                if(has_methods)
+                {
+                    int function_count = 1;
+                    for(auto& function : m_ob.get_functions())
+                    {
+                        if(function->get_entity_type() == entity_type::FUNCTION_METHOD)
+                            write_proxy_receive_method(from_host, m_ob, proxy, interface_name, function, function_count,
+                                                       catch_stub_exceptions, rethrow_exceptions);
+                    }
+                }
+
+                proxy("}};");
+                proxy("");
+            }
+
+            {
+                proxy("namespace stub_receiver");
+                proxy("{{");
+
+                bool has_methods = false;
+                for(auto& function : m_ob.get_functions())
+                {
+                    if(function->get_entity_type() != entity_type::FUNCTION_METHOD)
+                        continue;
+                    has_methods = true;
+                }
+
+                if(has_methods)
+                {
+                    int function_count = 1;
+                    for(auto& function : m_ob.get_functions())
+                    {
+                        if(function->get_entity_type() == entity_type::FUNCTION_METHOD)
+                            write_stub_receive_method(from_host, m_ob, proxy, interface_name, function, function_count,
+                                                      catch_stub_exceptions, rethrow_exceptions);
+                    }
+                }
+
+                proxy("}};");
+                proxy("");
+            }
+
+            {
+                proxy("namespace stub_reply");
+                proxy("{{");
+
+                bool has_methods = false;
+                for(auto& function : m_ob.get_functions())
+                {
+                    if(function->get_entity_type() != entity_type::FUNCTION_METHOD)
+                        continue;
+                    has_methods = true;
+                }
+
+                if(has_methods)
+                {
+                    int function_count = 1;
+                    for(auto& function : m_ob.get_functions())
+                    {
+                        if(function->get_entity_type() == entity_type::FUNCTION_METHOD)
+                            write_stub_reply_method(from_host, m_ob, proxy, interface_name, function, function_count,
+                                                    catch_stub_exceptions, rethrow_exceptions);
+                    }
+                }
+
+                proxy("}};");
+                proxy("");
+            }
+
+            proxy("}}");
+        };
+
+        // entry point
+        void write_namespace(bool from_host, const class_entity& lib, std::string prefix, writer& proxy,
+                             bool catch_stub_exceptions, const std::vector<std::string>& rethrow_exceptions)
+        {
+            for(auto& elem : lib.get_elements(entity_type::NAMESPACE_MEMBERS))
+            {
+                // this is deprecated and only to be used with rpc v1, delete when no longer needed
+                std::size_t hash = std::hash<std::string> {}(prefix + "::" + elem->get_name());
+
+                if(elem->is_in_import())
+                    continue;
+                else if(elem->get_entity_type() == entity_type::NAMESPACE)
+                {
+                    bool is_inline = elem->get_attribute("inline") == "inline";
+
+                    if(is_inline)
+                    {
+                        proxy("inline namespace {}", elem->get_name());
+                    }
+                    else
+                    {
+                        proxy("namespace {}", elem->get_name());
+                    }
+                    proxy("{{");
+                    auto& ent = static_cast<const class_entity&>(*elem);
+                    write_namespace(from_host, ent, prefix + elem->get_name() + "::", proxy, catch_stub_exceptions,
+                                    rethrow_exceptions);
+                    proxy("}}");
+                }
+                else if(elem->get_entity_type() == entity_type::INTERFACE
+                        || elem->get_entity_type() == entity_type::LIBRARY)
+                {
+                    auto& ent = static_cast<const class_entity&>(*elem);
+                    write_interface(from_host, ent, proxy, hash, catch_stub_exceptions, rethrow_exceptions);
+                }
+            }
+        }
+
+        // entry point
+        void write_files(std::string module_name, bool from_host, const class_entity& lib, std::ostream& header_stream,
+                         const std::vector<std::string>& namespaces, const std::string& header_filename,
+                         const std::list<std::string>& imports, const std::vector<std::string>& additional_headers,
+                         bool catch_stub_exceptions, const std::vector<std::string>& rethrow_exceptions,
+                         const std::vector<std::string>& additional_stub_headers)
+        {
+            std::stringstream tmpstr;
+            std::ostream& t = tmpstr;
+            writer tmp(t);
+            writer header(header_stream);
+
+            std::for_each(additional_stub_headers.begin(), additional_stub_headers.end(),
+                          [&](const std::string& additional_stub_header)
+                          { header("#include <{}>", additional_stub_header); });
+
+            header("#pragma once");
+            header("#include <yas/mem_streams.hpp>");
+            header("#include <yas/binary_iarchive.hpp>");
+            header("#include <yas/binary_oarchive.hpp>");
+            header("#include <yas/serialize.hpp>");
+            header("#include <yas/std_types.hpp>");
+            header("#include <rpc/proxy.h>");
+            header("#include <rpc/stub.h>");
+            header("#include <rpc/marshaller.h>");
+            header("#include <rpc/service.h>");
+            header("#include \"{}\"", header_filename);
+            header("");
+
+            header("namespace rpc");
+            header("{{");
+            header("inline namespace v2");
+            header("{{");
+            header("namespace yas");
+            header("{{");
+            std::string prefix;
+            for(auto& ns : namespaces)
+            {
+                header("namespace {}", ns);
+                header("{{");
+
+                prefix += ns + "::";
+            }
+
+            write_namespace(from_host, lib, prefix, header, catch_stub_exceptions, rethrow_exceptions);
+
+            for(auto& ns : namespaces)
+            {
+                (void)ns;
+                header("}}");
+            }
+            header("}}");
+            header("}}");
+            header("}}");
+        }
+    }
+}
