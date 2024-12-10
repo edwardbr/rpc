@@ -373,20 +373,6 @@ if(NOT DEPENDANCIES_LOADED)
     set(HOST_INCLUDES ${SGX_INCLUDE_DIR})
     set(ENCLAVE_LIBC_INCLUDES ${SGX_INCLUDE_DIR} ${SGX_TLIBC_INCLUDE_DIR})
     set(ENCLAVE_LIBCXX_INCLUDES ${ENCLAVE_LIBC_INCLUDES} ${SGX_LIBCXX_INCLUDE_DIR} ${SGX_LIBSTDCXX_INCLUDE_DIR})
-  elseif(${ENCLAVE_TARGET} STREQUAL "OPEN_ENCLAVE")
-    # remove sgx when fixed
-    list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/submodules/SGX-CMake/cmake)
-    find_package(SGX REQUIRED)
-    set(ENCLAVE_COMPILE_OPTIONS)
-    set(ENCLAVE_DEFINES
-        OE_API_VERSION=2
-        _IN_ENCLAVE
-        _IN_OE
-        CLEAN_LIBC
-        ENCLAVE_STATUS=oe_result_t
-        ENCLAVE_OK=OE_OK
-        DISALLOW_BAD_JUMPS)
-    set(ENCLAVE_LIBRARIES openenclave::oeenclave oecrypto::oecrypto openenclave::oelibc openenclave::oelibcxx)
   else()
     message(FATAL_ERROR "Invalid ENCLAVE_TARGET value")
   endif()
