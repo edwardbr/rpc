@@ -13,6 +13,7 @@ extern "C"
 
 #include "writer.h"
 
+#include "interface_declaration_generator.h"
 #include "fingerprint_generator.h"
 #include "synchronous_generator.h"
 
@@ -71,7 +72,7 @@ namespace rpc_generator
             switch (option)
             {
             case PROXY_MARSHALL_IN:
-                return fmt::format("  ,{0}", name);
+                return fmt::format(", {0}", name);
             case PROXY_MARSHALL_OUT:
                 return fmt::format("  ,{0}", name);
             case STUB_DEMARSHALL_DECLARATION:
@@ -101,7 +102,7 @@ namespace rpc_generator
             switch (option)
             {
             case PROXY_MARSHALL_IN:
-                return fmt::format("  ,{0}", name);
+                return fmt::format(", {0}", name);
             case PROXY_MARSHALL_OUT:
                 return fmt::format("  ,{0}", name);
             case STUB_DEMARSHALL_DECLARATION:
@@ -132,7 +133,7 @@ namespace rpc_generator
             switch (option)
             {
             case PROXY_MARSHALL_IN:
-                return fmt::format("  ,std::move({0})", name);
+                return fmt::format(", std::move({0})", name);
             case PROXY_MARSHALL_OUT:
                 return fmt::format("  ,{0}", name);
             case STUB_DEMARSHALL_DECLARATION:
@@ -161,7 +162,7 @@ namespace rpc_generator
             switch (option)
             {
             case PROXY_MARSHALL_IN:
-                return fmt::format(" ,(uint64_t){}", name);
+                return fmt::format(", (uint64_t){}", name);
             case PROXY_MARSHALL_OUT:
                 return fmt::format(" ,(uint64_t){}", count, name);
             case STUB_DEMARSHALL_DECLARATION:
@@ -188,7 +189,7 @@ namespace rpc_generator
             switch (option)
             {
             case PROXY_MARSHALL_IN:
-                return fmt::format("  ,{0}_", name);
+                return fmt::format(", {0}_", name);
             case PROXY_MARSHALL_OUT:
                 return fmt::format("  ,{0}_", name);
             case STUB_DEMARSHALL_DECLARATION:
@@ -216,7 +217,7 @@ namespace rpc_generator
             switch (option)
             {
             case PROXY_MARSHALL_IN:
-                return fmt::format("  ,{0}_", name);
+                return fmt::format(", {0}_", name);
             case PROXY_MARSHALL_OUT:
                 return fmt::format("  ,{0}_", name);
             case STUB_DEMARSHALL_DECLARATION:
@@ -256,7 +257,7 @@ namespace rpc_generator
                     name);
             case PROXY_MARSHALL_IN:
             {
-                auto ret = fmt::format(",{0}_stub_id_", name, count);
+                auto ret = fmt::format(", {0}_stub_id_", name, count);
                 count++;
                 return ret;
             }
@@ -324,7 +325,7 @@ namespace rpc_generator
                     name);
             case PROXY_MARSHALL_IN:
             {
-                auto ret = fmt::format(",{0}_stub_id_", name, count);
+                auto ret = fmt::format(", {0}_stub_id_", name, count);
                 count++;
                 return ret;
             }
@@ -356,15 +357,7 @@ namespace rpc_generator
             }
         };
 
-        void build_scoped_name(const class_entity* entity, std::string& name)
-        {
-            auto* owner = entity->get_owner();
-            if(owner && !owner->get_name().empty())
-            {
-                build_scoped_name(owner, name);
-            }
-            name += entity->get_name() + "::";
-        }
+
 
         std::string get_encapsulated_shared_ptr_type(const std::string& type_name)
         {
@@ -586,49 +579,25 @@ namespace rpc_generator
             return true;
         }
 
-        void write_constexpr(writer& header, const entity& constexpression)
-        {
-            if(constexpression.is_in_import())
-                return;
-            auto& function = static_cast<const function_entity&>(constexpression);
-            header.print_tabs();
-            header.raw("static constexpr {} {}", function.get_return_type(), function.get_name());
-            if(!function.get_default_value().empty())
-            {
-                header.raw(" = {};\n", function.get_default_value());
-            }
-            else
-            {
-                header.raw("{{}};\n");
-            }
-        }
 
-        void write_method(bool from_host, const class_entity& m_ob, writer& header, writer& proxy, writer& stub,
+        void write_method(bool from_host, const class_entity& m_ob, writer& proxy, writer& stub,
                           const std::string& interface_name, const std::shared_ptr < function_entity >& function, int& function_count, bool catch_stub_exceptions, const std::vector<std::string>& rethrow_exceptions)
         {
             if(function->get_entity_type() == entity_type::FUNCTION_METHOD)
             {
                 std::string scoped_namespace;
-                build_scoped_name(&m_ob, scoped_namespace);
+                ::rpc_generator::build_scoped_name(&m_ob, scoped_namespace);
                 
                 stub("case {}:", function_count);
                 stub("{{");
 
-                header.print_tabs();
                 proxy.print_tabs();
-                for(auto& item : function->get_attributes())
-                {
-                    if(item == "deprecated" || item == "_deprecated")
-                        header.raw("[[deprecated]] ");
-                }
-                header.raw("virtual {} {}(", function->get_return_type(), function->get_name());
                 proxy.raw("virtual {} {}(", function->get_return_type(), function->get_name());
                 bool has_parameter = false;
                 for(auto& parameter : function->get_parameters())
                 {
                     if(has_parameter)
                     {
-                        header.raw(", ");
                         proxy.raw(", ");
                     }
                     has_parameter = true;
@@ -638,7 +607,6 @@ namespace rpc_generator
                         if(item == "const")
                             modifier = "const " + modifier;
                     }
-                    header.raw("{}{} {}", modifier, parameter.get_type(), parameter.get_name());
                     proxy.raw("{}{} {}", modifier, parameter.get_type(), parameter.get_name());
                 }
                 bool function_is_const = false;
@@ -649,12 +617,10 @@ namespace rpc_generator
                 }
                 if(function_is_const)
                 {
-                    header.raw(") const = 0;\n");
                     proxy.raw(") const override\n");
                 }
                 else
                 {
-                    header.raw(") = 0;\n");
                     proxy.raw(") override\n");
                 }
                 proxy("{{");
@@ -716,9 +682,9 @@ namespace rpc_generator
                 if(has_inparams)
                 {
                     proxy.print_tabs();
-                    proxy.raw("__rpc_in_buf = rpc::yas::{}proxy_sender::{}(rpc::encoding::enc_default", scoped_namespace, function->get_name());
+                    proxy.raw("{}proxy_sender<rpc::serialiser::yas>::{}(rpc::encoding::enc_default, __rpc_in_buf", scoped_namespace, function->get_name());
                     stub.print_tabs();
-                    stub.raw("auto __rpc_ret = rpc::yas::{}stub_receiver::{}(rpc::encoding::enc_default, in_buf_, in_size_",scoped_namespace, function->get_name());
+                    stub.raw("auto __rpc_ret = {}stub_receiver<rpc::serialiser::yas>::{}(rpc::encoding::enc_default, in_buf_, in_size_",scoped_namespace, function->get_name());
                     count = 1;
                     for(auto& parameter : function->get_parameters())
                     {
@@ -754,7 +720,7 @@ namespace rpc_generator
                 }
                 else
                 {
-                    stub("error_code __rpc_ret = rpc::error::OK();");
+                    stub("int __rpc_ret = rpc::error::OK();");
                 }
 
                 std::string tag = function->get_attribute_value("tag");
@@ -952,10 +918,10 @@ namespace rpc_generator
                 {
                     uint64_t count = 1;
                     proxy.print_tabs();
-                    proxy.raw("auto __receiver_result = rpc::yas::{}proxy_receiver::{}(rpc::encoding::enc_default, __rpc_out_buf.data(), __rpc_out_buf.size()", scoped_namespace, function->get_name());
+                    proxy.raw("auto __receiver_result = {}proxy_receiver<rpc::serialiser::yas>::{}(rpc::encoding::enc_default, __rpc_out_buf.data(), __rpc_out_buf.size()", scoped_namespace, function->get_name());
 
                     stub.print_tabs();
-                    stub.raw("__rpc_out_buf = rpc::yas::{}stub_reply::{}(rpc::encoding::enc_default ",scoped_namespace, function->get_name());
+                    stub.raw("{}stub_sender<rpc::serialiser::yas>::{}(rpc::encoding::enc_default, __rpc_out_buf ",scoped_namespace, function->get_name());
 
                     for(auto& parameter : function->get_parameters())
                     {
@@ -1023,125 +989,14 @@ namespace rpc_generator
                 stub("}}");
                 stub("break;");
             }
-            else if(function->get_entity_type() == entity_type::FUNCTION_PRIVATE)
-            {
-                header("private:");
-            }
-            else if(function->get_entity_type() == entity_type::FUNCTION_PUBLIC)
-            {
-                header("public:");
-            }
+        }
+        
 
-        }
-        
-        void write_send_method(writer& header, const std::shared_ptr < function_entity >& function)
-        {
-            if(function->get_entity_type() == entity_type::FUNCTION_METHOD)
-            {
-                header.print_tabs();
-                for(auto& item : function->get_attributes())
-                {
-                    if(item == "deprecated" || item == "_deprecated")
-                        header.raw("[[deprecated]] ");
-                }
-                header.raw("virtual void {}(", function->get_name());
-                bool has_parameter = false;
-                for(auto& parameter : function->get_parameters())
-                {
-                    auto& attributes =  parameter.get_attributes();
-                    auto in = std::find(attributes.begin(), attributes.end(), "in") != attributes.end();
-                    auto out = std::find(attributes.begin(), attributes.end(), "out") != attributes.end();
-                    if(out && !in)
-                        continue;                
-                    
-                    if(has_parameter)
-                    {
-                        header.raw(", ");
-                    }
-                    has_parameter = true;
-                    std::string modifier;
-                    for(auto& item : parameter.get_attributes())
-                    {
-                        if(item == "const")
-                            modifier = "const " + modifier;
-                    }
-                    header.raw("{}{} {}", modifier, parameter.get_type(), parameter.get_name());
-                }
-                bool function_is_const = false;
-                for(auto& item : function->get_attributes())
-                {
-                    if(item == "const")
-                        function_is_const = true;
-                }
-                if(function_is_const)
-                {
-                    header.raw(") const = 0;\n");
-                }
-                else
-                {
-                    header.raw(") = 0;\n");
-                }
-            }
-        }
-        
-        
-        void write_receive_method(writer& header, const std::shared_ptr < function_entity >& function)
-        {
-            if(function->get_entity_type() == entity_type::FUNCTION_METHOD)
-            {
-                header.print_tabs();
-                for(auto& item : function->get_attributes())
-                {
-                    if(item == "deprecated" || item == "_deprecated")
-                        header.raw("[[deprecated]] ");
-                }
-                header.raw("virtual {} {}(", function->get_return_type(), function->get_name());
-                bool has_parameter = false;
-                for(auto& parameter : function->get_parameters())
-                {
-                    auto& attributes =  parameter.get_attributes();
-                    auto out = std::find(attributes.begin(), attributes.end(), "out") != attributes.end();
-                    if(!out)
-                        continue;                
-                    
-                    if(has_parameter)
-                    {
-                        header.raw(", ");
-                    }
-                    has_parameter = true;
-                    std::string modifier;
-                    for(auto& item : parameter.get_attributes())
-                    {
-                        if(item == "const")
-                            modifier = "const " + modifier;
-                    }
-                    header.raw("{}{} {}", modifier, parameter.get_type(), parameter.get_name());
-                }
-                bool function_is_const = false;
-                for(auto& item : function->get_attributes())
-                {
-                    if(item == "const")
-                        function_is_const = true;
-                }
-                if(function_is_const)
-                {
-                    header.raw(") const = 0;\n");
-                }
-                else
-                {
-                    header.raw(") = 0;\n");
-                }
-            }
-        }
-                
-        void write_interface(bool from_host, const class_entity& m_ob, writer& header, writer& proxy, writer& stub,
+        void write_interface(bool from_host, const class_entity& m_ob, writer& proxy, writer& stub,
                              size_t id, bool catch_stub_exceptions, const std::vector<std::string>& rethrow_exceptions)
         {
             if(m_ob.is_in_import())
                 return;
-
-            header("");
-            header("/****************************************************************************/");
 
             auto interface_name
                 = std::string(m_ob.get_entity_type() == entity_type::LIBRARY ? "i_" : "") + m_ob.get_name();
@@ -1161,24 +1016,7 @@ namespace rpc_generator
                     i++;
                 }
             }
-            header("class {}_stub;", interface_name);
-            header("class {}{} : public rpc::casting_interface", interface_name, base_class_declaration);
-            header("{{");
-            header("public:");
-            header("static rpc::interface_ordinal get_id(uint64_t rpc_version)");
-            header("{{");
-            header("#ifdef RPC_V2");
-            header("if(rpc_version == rpc::VERSION_2)");
-            header("{{");
-            header("return {{{}ull}};", fingerprint::generate(m_ob, {}, &header));
-            header("}}");
-            header("#endif");
-            header("return {{0}};");
-            header("}}");
-            header("");
-            header("static std::vector<rpc::function_info> get_function_info();");
-            header("");
-            header("virtual ~{}() = default;", interface_name);
+
 
             // generate the get_function_info function for the interface
             {
@@ -1312,69 +1150,14 @@ namespace rpc_generator
                 int function_count = 1;
                 for(auto& function : m_ob.get_functions())
                 {
-                    if(function->get_entity_type() == entity_type::CPPQUOTE)
-                    {
-                        if(function->is_in_import())
-                            continue;
-                        auto text = function->get_name();
-                        header.write_buffer(text);
-                        continue;
-                    }
-                    if(function->get_entity_type() == entity_type::FUNCTION_PUBLIC)
-                    {
-                        header("public:");
-                        continue;
-                    }
-                    if(function->get_entity_type() == entity_type::FUNCTION_PRIVATE)
-                    {
-                        header("private:");
-                        continue;
-                    }
-                    if(function->get_entity_type() == entity_type::CONSTEXPR)
-                    {
-                        write_constexpr(header, *function);
-                        continue;
-                    }
-                    else if(function->get_entity_type() == entity_type::CPPQUOTE)
-                    {
-                        if(function->is_in_import())
-                            continue;
-                        auto text = function->get_name();
-                        header.write_buffer(text);
-                        continue;
-                    }
                     if(function->get_entity_type() == entity_type::FUNCTION_METHOD)
-                        write_method(from_host, m_ob, header, proxy, stub, interface_name, function, function_count, catch_stub_exceptions, rethrow_exceptions);
+                        write_method(from_host, m_ob, proxy, stub, interface_name, function, function_count, catch_stub_exceptions, rethrow_exceptions);
                 }
 
                 stub("default:");
                 stub("return rpc::error::INVALID_METHOD_ID();");
                 stub("}};");
             }
-            header("");
-            header("class send", interface_name);
-            header("{{");
-                int function_count = 1;
-                for(auto& function : m_ob.get_functions())
-                {
-                    if(function->get_entity_type() == entity_type::FUNCTION_METHOD)
-                        write_send_method(header, function);
-                }
-            header("}};");
-            
-            header("");
-            header("class receive", interface_name);
-            header("{{");
-                for(auto& function : m_ob.get_functions())
-                {
-                    if(function->get_entity_type() == entity_type::FUNCTION_METHOD)
-                        write_receive_method(header, function);
-                }
-            header("}};");
-
-            header("friend {}_stub;", interface_name);
-            header("}};");
-            header("");
             proxy("}};");
             proxy("");
 
@@ -2029,7 +1812,8 @@ namespace rpc_generator
                          || elem->get_entity_type() == entity_type::LIBRARY)
                 {
                     auto& ent = static_cast<const class_entity&>(*elem);
-                    write_interface(from_host, ent, header, proxy, stub, hash, catch_stub_exceptions, rethrow_exceptions);
+                    ::rpc_generator::write_interface(ent, header);
+                    write_interface(from_host, ent, proxy, stub, hash, catch_stub_exceptions, rethrow_exceptions);
                 }
                 else if(elem->get_entity_type() == entity_type::CONSTEXPR)
                 {
@@ -2173,13 +1957,13 @@ namespace rpc_generator
 
             header("");
 
-            std::string yas_header_filename;
-            {
-                auto pos = header_filename.rfind('/');
-                auto prefix = header_filename.substr(0, pos + 1);
-                auto suffix = header_filename.substr(pos);
-                yas_header_filename = prefix + "yas" + suffix;
-            }
+            // std::string yas_header_filename;
+            // {
+            //     auto pos = header_filename.rfind('/');
+            //     auto prefix = header_filename.substr(0, pos + 1);
+            //     auto suffix = header_filename.substr(pos);
+            //     yas_header_filename = prefix + "yas" + suffix;
+            // }
             proxy("#include <yas/mem_streams.hpp>");
             proxy("#include <yas/binary_iarchive.hpp>");
             proxy("#include <yas/binary_oarchive.hpp>");
@@ -2193,7 +1977,7 @@ namespace rpc_generator
             proxy("#include <rpc/stub.h>");
             proxy("#include <rpc/service.h>");
             proxy("#include \"{}\"", header_filename);
-            proxy("#include \"{}\"", yas_header_filename);
+            //proxy("#include \"{}\"", yas_header_filename);
 
             proxy("");
 
@@ -2209,7 +1993,7 @@ namespace rpc_generator
             stub("#include <rpc/stub.h>");
             stub("#include <rpc/proxy.h>");
             stub("#include \"{}\"", header_filename);
-            stub("#include \"{}\"", yas_header_filename);
+            // stub("#include \"{}\"", yas_header_filename);
             stub("#include \"{}\"", stub_header_filename);
             stub("");
 

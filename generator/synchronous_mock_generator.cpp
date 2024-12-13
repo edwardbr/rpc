@@ -41,11 +41,10 @@ namespace rpc_generator
             header("public:");
             header("const rpc::casting_interface* query_interface(rpc::interface_ordinal interface_id) const override ");
             header("{{");
-            header("if(");
-            header("#ifdef RPC_V2");
-            header("{0}::get_id(rpc::VERSION_2) == interface_id", interface_name);
-            header("#endif");
+            header("if({0}::get_id(rpc::VERSION_2) == interface_id)", interface_name);
+            header("{{");
             header("return static_cast<const {0}*>(this); ",interface_name);
+            header("}}");            
             header("return nullptr;");
             header("}}");            
 

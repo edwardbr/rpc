@@ -301,7 +301,15 @@ int main(const int argc, char* argv[])
         // do the generation of the yas serialisation
         {
             //get default paths
-            auto tmp_header_path = std::filesystem::path(output_path) / "include" / headerPath;
+            auto pos = headerPath.rfind(".h");
+            if(pos == std::string::npos)
+            {
+                std::cerr << "failed looking for a .h suffix " << headerPath << '\n';
+                return -1;
+            }
+
+            auto file_path = headerPath.substr(0, pos) + ".cpp";
+            auto tmp_header_path = std::filesystem::path(output_path) / "src" / file_path;
 
             //then generate yas subdirectories
             auto header_path = tmp_header_path.parent_path() / "yas" / tmp_header_path.filename();

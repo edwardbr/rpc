@@ -19,7 +19,20 @@ namespace rpc
         yas_binary = 1,
         yas_compressed_binary = 2,
         yas_text = 4,
-        yas_json = 8        //we may have different json parsers that have a better implementation e.g. glaze
+        yas_json = 8,        //we may have different json parsers that have a better implementation e.g. glaze
+        protocol_buffers = 16,
+        flat_buffers = 32,
+        mpi = 64
+    };
+    
+    //note a serialiser may support more than one encoding
+    namespace serialiser
+    {
+        class yas{};
+        class protocol_buffers{};
+        class flat_buffers{};
+        class open_mpi{};
+        // etc..
     };
 
     enum class add_ref_options : std::uint8_t

@@ -1156,18 +1156,6 @@ namespace rpc_generator
                 int function_count = 1;
                 for(auto& function : m_ob.get_functions())
                 {
-                    if(function->get_entity_type() == entity_type::CPPQUOTE)
-                    {
-                        if(function->is_in_import())
-                            continue;
-                        continue;
-                    }
-                    else if(function->get_entity_type() == entity_type::CPPQUOTE)
-                    {
-                        if(function->is_in_import())
-                            continue;
-                        continue;
-                    }
                     if(function->get_entity_type() == entity_type::FUNCTION_METHOD)
                         write_method(from_host, m_ob, proxy, stub, interface_name, function, function_count, catch_stub_exceptions, rethrow_exceptions);
                 }

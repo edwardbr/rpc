@@ -6,19 +6,20 @@ function(
   output_path
   sub_directory
   namespace
+
   # multivalue expects string "dependencies" multivalue expects string "link_libraries" multivalue expects string
   # "include_paths" multivalue expects string "defines" multivalue expects string "additional_headers" optional_val mock
 )
   set(options)
   set(singleValueArgs mock suppress_catch_stub_exceptions)
   set(multiValueArgs
-      dependencies
-      link_libraries
-      include_paths
-      defines
-      additional_headers
-      rethrow_stub_exception
-      additional_stub_header)
+    dependencies
+    link_libraries
+    include_paths
+    defines
+    additional_headers
+    rethrow_stub_exception
+    additional_stub_header)
 
   # split out multivalue variables
   cmake_parse_arguments(
@@ -30,6 +31,7 @@ function(
 
   # keep relative path of idl for install, else use only the file name
   cmake_path(IS_RELATIVE idl idl_is_relative)
+
   if(${idl_is_relative})
     cmake_path(GET idl PARENT_PATH idl_relative_dir)
     cmake_path(
@@ -51,6 +53,8 @@ function(
   set(full_proxy_path ${output_path}/src/${proxy_path})
   set(full_stub_path ${output_path}/src/${stub_path})
   set(full_stub_header_path ${output_path}/include/${stub_header_path})
+  set(yas_path ${sub_directory}/yas/${base_file_name}.cpp)
+  set(full_yas_path ${output_path}/src/${yas_path})
 
   if(${DEBUG_RPC_GEN})
     message("RPCGenerate name ${name}")
@@ -76,6 +80,8 @@ function(
     message("full_proxy_path ${full_proxy_path}")
     message("full_stub_path ${full_stub_path}")
     message("full_stub_header_path ${full_stub_header_path}")
+    message("yas_path ${yas_path}")
+    message("full_yas_path ${full_yas_path}")
   endif()
 
   if(EXISTS ENCLAVE_MARSHALLER_EXECUTABLE)
@@ -88,6 +94,7 @@ function(
   set(ADDITIONAL_HEADERS "")
   set(RETHROW_STUB_EXCEPTION "")
   set(ADDITIONAL_STUB_HEADER "")
+  set(GENERATED_DEPENDANCIES generator)
 
   foreach(path ${params_include_paths})
     set(PATHS_PARAMS ${PATHS_PARAMS} --path "${path}")
@@ -120,6 +127,7 @@ function(
       if(dep_base_dir)
         set(PATHS_PARAMS ${PATHS_PARAMS} --path "${dep_base_dir}")
       endif()
+
       if(BUILD_ENCLAVE)
         set(GENERATED_DEPENDANCIES ${GENERATED_DEPENDANCIES} ${dep}_generate)
       else()
@@ -145,7 +153,7 @@ function(
   if(${DEBUG_RPC_GEN})
     message(
       "
-    add_custom_command(OUTPUT ${full_header_path} ${full_proxy_path} ${full_stub_header_path} ${full_stub_path}
+    add_custom_command(OUTPUT ${full_header_path} ${full_proxy_path} ${full_stub_header_path} ${full_stub_path} ${full_yas_path}
     COMMAND ${ENCLAVE_MARSHALLER}
     --idl ${idl}
     --module_name ${name}_idl
@@ -164,7 +172,7 @@ function(
     COMMENT \"Running generator ${idl}\"
   )
 
-  add_custom_target(${name}_idl_generate DEPENDS ${full_header_path} ${full_proxy_path} ${full_stub_header_path} ${full_stub_path})
+  add_custom_target(${name}_idl_generate DEPENDS ${full_header_path} ${full_proxy_path} ${full_stub_header_path} ${full_stub_path} ${full_yas_path})
 
   set_target_properties(${name}_idl_generate PROPERTIES base_dir ${base_dir})
 
@@ -187,19 +195,18 @@ function(
   endif()
 
   add_custom_command(
-    OUTPUT ${full_header_path} ${full_proxy_path} ${full_stub_header_path} ${full_stub_path}
+    OUTPUT ${full_header_path} ${full_proxy_path} ${full_stub_header_path} ${full_stub_path} ${full_yas_path}
     COMMAND
-      ${ENCLAVE_MARSHALLER} --idl ${idl} --module_name ${name}_idl --output_path ${output_path} --header ${header_path}
-      --proxy ${proxy_path} --stub ${stub_path} --stub_header ${stub_header_path} ${PATHS_PARAMS} ${ADDITIONAL_HEADERS}
-      ${RETHROW_STUB_EXCEPTION} ${ADDITIONAL_STUB_HEADER}
+    ${ENCLAVE_MARSHALLER} --idl ${idl} --module_name ${name}_idl --output_path ${output_path} --header ${header_path}
+    --proxy ${proxy_path} --stub ${stub_path} --stub_header ${stub_header_path} ${PATHS_PARAMS} ${ADDITIONAL_HEADERS} ${RETHROW_STUB_EXCEPTION} ${ADDITIONAL_STUB_HEADER}
     MAIN_DEPENDENCY ${idl}
     IMPLICIT_DEPENDS ${idl}
     DEPENDS ${GENERATED_DEPENDANCIES}
     COMMENT "Running generator ${idl}")
 
-  message(
-    "add_custom_command(
-    OUTPUT ${full_header_path} ${full_proxy_path} ${full_stub_header_path} ${full_stub_path}
+  if(${DEBUG_RPC_GEN})
+    message("add_custom_command(
+    OUTPUT ${full_header_path} ${full_proxy_path} ${full_stub_header_path} ${full_stub_path} ${full_yas_path}
     COMMAND
       ${ENCLAVE_MARSHALLER} --idl ${idl} --module_name ${name}_idl --output_path ${output_path} --header ${header_path}
       --proxy ${proxy_path} --stub ${stub_path} --stub_header ${stub_header_path} ${PATHS_PARAMS} ${ADDITIONAL_HEADERS} ${RETHROW_STUB_EXCEPTION} ${ADDITIONAL_STUB_HEADER}
@@ -207,9 +214,10 @@ function(
     IMPLICIT_DEPENDS ${idl}
     DEPENDS ${GENERATED_DEPENDANCIES}
     COMMENT Running generator ${idl})")
+  endif()
 
   add_custom_target(${name}_idl_generate DEPENDS ${full_header_path} ${full_proxy_path} ${full_stub_header_path}
-                                                 ${full_stub_path})
+    ${full_stub_path} ${full_yas_path})
 
   set_target_properties(${name}_idl_generate PROPERTIES base_dir ${base_dir})
 
@@ -239,6 +247,7 @@ function(
       ${full_stub_header_path}
       ${full_stub_path}
       ${full_proxy_path}
+      ${full_yas_path}
     )
     target_compile_definitions(${name}_idl_host PRIVATE ${HOST_DEFINES})
     target_include_directories(${name}_idl_host PUBLIC \"$<BUILD_INTERFACE:${output_path}>\" \"$<BUILD_INTERFACE:${output_path}/include>\" PRIVATE ${HOST_INCLUDES} ${params_include_paths})
@@ -274,6 +283,7 @@ function(
       ${full_stub_header_path}
       ${full_stub_path}
       ${full_proxy_path}
+      ${full_yas_path}
     )
     target_compile_definitions(${name}_idl_enclave PRIVATE ${ENCLAVE_DEFINES})
     target_include_directories(${name}_idl_enclave PUBLIC \"$<BUILD_INTERFACE:${output_path}>\" \"$<BUILD_INTERFACE:${output_path}/include>\" PRIVATE \"${output_path}/include\" ${ENCLAVE_LIBCXX_INCLUDES} ${params_include_paths})
@@ -306,9 +316,10 @@ function(
       endif()
     endforeach()")
     endif()
+
     # #specify a host specific target
     add_library(${name}_idl_host STATIC ${full_header_path} ${full_stub_header_path} ${full_stub_path}
-                                        ${full_proxy_path})
+      ${full_proxy_path} ${full_yas_path})
     target_compile_definitions(${name}_idl_host PRIVATE ${HOST_DEFINES})
     target_include_directories(
       ${name}_idl_host
@@ -328,6 +339,7 @@ function(
       else()
         message("target ${dep}_generate does not exist so skipped")
       endif()
+
       target_link_libraries(${name}_idl_host PUBLIC ${dep}_host)
     endforeach()
 
@@ -342,7 +354,7 @@ function(
     # ##################################################################################################################
     # #and an enclave specific target
     add_library(${name}_idl_enclave STATIC ${full_header_path} ${full_stub_header_path} ${full_stub_path}
-                                           ${full_proxy_path})
+      ${full_proxy_path} ${full_yas_path})
     target_compile_definitions(${name}_idl_enclave PRIVATE ${ENCLAVE_DEFINES})
     target_include_directories(
       ${name}_idl_enclave
@@ -366,6 +378,7 @@ function(
       else()
         message("target ${dep}_generate does not exist so skipped")
       endif()
+
       target_link_libraries(${name}_idl_enclave PUBLIC ${dep}_enclave)
     endforeach()
 
@@ -376,6 +389,5 @@ function(
         message("target ${dep}_enclave does not exist so skipped")
       endif()
     endforeach()
-
   endif()
 endfunction()

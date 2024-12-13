@@ -5,6 +5,7 @@ enable_testing()
 add_executable(generator 
                 synchronous_generator.cpp 
                 synchronous_mock_generator.cpp 
+                interface_declaration_generator.cpp
                 yas_generator.cpp 
                 main.cpp 
                 sha3.c
