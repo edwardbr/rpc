@@ -8,6 +8,7 @@ add_executable(generator
                 interface_declaration_generator.cpp
                 yas_generator.cpp 
                 main.cpp 
+                helpers.cpp
                 sha3.c
                 component_checksum.cpp
                 fingerprint_generator.cpp)

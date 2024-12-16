@@ -4,6 +4,7 @@
 #include <type_traits>
 #include "coreclasses.h"
 #include "cpp_parser.h"
+#include "helpers.h"
 extern "C"
 {
 #include "sha3.h"
@@ -357,37 +358,15 @@ namespace rpc_generator
             }
         };
 
-        std::string get_encapsulated_shared_ptr_type(const std::string& type_name)
-        {
-            const std::string template_pattern = "rpc::shared_ptr<";
-            auto pos = type_name.find(template_pattern);
-            if(pos != std::string::npos)
-            {
-                pos += template_pattern.length();
-                while(type_name[pos] == ' ' || type_name[pos] == '\n' || type_name[pos] == '\r'
-                      || type_name[pos] == '\t')
-                    pos++;
-                auto rpos = type_name.rfind(">");
-                if(rpos == std::string::npos)
-                {
-                    std::cerr << fmt::format("template parameter is malformed {}", type_name);
-                    throw fmt::format("template parameter is malformed {}", type_name);
-                }
-                while(type_name[rpos] == ' ' || type_name[rpos] == '\n' || type_name[rpos] == '\r'
-                      || type_name[rpos] == '\t')
-                    rpos++;
-                return type_name.substr(pos, rpos - pos);
-            }
-            return type_name;
-        }
 
-        bool is_in_call(print_type option, bool from_host, const class_entity& lib, const std::string& name,
+
+        bool do_in_param(print_type option, bool from_host, const class_entity& lib, const std::string& name,
                         const std::string& type, const std::list<std::string>& attributes, uint64_t& count,
                         std::string& output)
         {
-            auto in = std::find(attributes.begin(), attributes.end(), "in") != attributes.end();
-            auto out = std::find(attributes.begin(), attributes.end(), "out") != attributes.end();
-            auto is_const = std::find(attributes.begin(), attributes.end(), "const") != attributes.end();
+            auto in = is_in_param(attributes);
+            auto out = is_out_param(attributes);
+            auto is_const = is_const_param(attributes);
             auto by_value = std::find(attributes.begin(), attributes.end(), "by_value") != attributes.end();
 
             if(out && !in)
@@ -396,18 +375,8 @@ namespace rpc_generator
             std::string type_name = type;
             std::string reference_modifiers;
             strip_reference_modifiers(type_name, reference_modifiers);
-
-            std::string encapsulated_type = get_encapsulated_shared_ptr_type(type_name);
-
-            bool is_interface = false;
-            std::shared_ptr<class_entity> obj;
-            if(lib.find_class(encapsulated_type, obj))
-            {
-                if(obj->get_entity_type() == entity_type::INTERFACE)
-                {
-                    is_interface = true;
-                }
-            }
+            
+            bool is_interface = is_interface_param(lib, type);
 
             if(!is_interface)
             {
@@ -485,13 +454,13 @@ namespace rpc_generator
             return true;
         }
 
-        bool is_out_call(print_type option, bool from_host, const class_entity& lib, const std::string& name,
+        bool do_out_param(print_type option, bool from_host, const class_entity& lib, const std::string& name,
                          const std::string& type, const std::list<std::string>& attributes, uint64_t& count,
                          std::string& output)
         {
-            auto in = std::find(attributes.begin(), attributes.end(), "in") != attributes.end();
-            auto out = std::find(attributes.begin(), attributes.end(), "out") != attributes.end();
-            auto is_const = std::find(attributes.begin(), attributes.end(), "const") != attributes.end();
+            auto in = is_in_param(attributes);
+            auto out = is_out_param(attributes);
+            auto is_const = is_const_param(attributes);
 
             if(!out)
                 return false;
@@ -506,17 +475,7 @@ namespace rpc_generator
             std::string reference_modifiers;
             strip_reference_modifiers(type_name, reference_modifiers);
 
-            std::string encapsulated_type = get_encapsulated_shared_ptr_type(type_name);
-
-            bool is_interface = false;
-            std::shared_ptr<class_entity> obj;
-            if(lib.find_class(encapsulated_type, obj))
-            {
-                if(obj->get_entity_type() == entity_type::INTERFACE)
-                {
-                    is_interface = true;
-                }
-            }
+            bool is_interface = is_interface_param(lib, type);
 
             if(reference_modifiers.empty())
             {
@@ -645,11 +604,11 @@ namespace rpc_generator
                     for(auto& parameter : function->get_parameters())
                     {
                         std::string output;
-                        if(is_in_call(STUB_DEMARSHALL_DECLARATION, from_host, m_ob, parameter.get_name(),
+                        if(do_in_param(STUB_DEMARSHALL_DECLARATION, from_host, m_ob, parameter.get_name(),
                                       parameter.get_type(), parameter.get_attributes(), count, output))
                             has_inparams = true;
                         else
-                            is_out_call(STUB_DEMARSHALL_DECLARATION, from_host, m_ob, parameter.get_name(),
+                            do_out_param(STUB_DEMARSHALL_DECLARATION, from_host, m_ob, parameter.get_name(),
                                         parameter.get_type(), parameter.get_attributes(), count, output);
                         stub("{};", output);
                     }
@@ -665,12 +624,12 @@ namespace rpc_generator
                 {
                     std::string output;
                     {
-                        if(!is_in_call(PROXY_PREPARE_IN, from_host, m_ob, parameter.get_name(), parameter.get_type(),
+                        if(!do_in_param(PROXY_PREPARE_IN, from_host, m_ob, parameter.get_name(), parameter.get_type(),
                                        parameter.get_attributes(), count, output))
                             continue;
                         proxy(output);
 
-                        if(!is_in_call(PROXY_PREPARE_IN_INTERFACE_ID, from_host, m_ob, parameter.get_name(),
+                        if(!do_in_param(PROXY_PREPARE_IN_INTERFACE_ID, from_host, m_ob, parameter.get_name(),
                                        parameter.get_type(), parameter.get_attributes(), count, output))
                             continue;
 
@@ -681,17 +640,17 @@ namespace rpc_generator
                 if(has_inparams)
                 {
                     proxy.print_tabs();
-                    proxy.raw("{}proxy_sender<rpc::serialiser::yas, rpc::encoding>::{}(", scoped_namespace,
+                    proxy.raw("{}proxy_serialiser<rpc::serialiser::yas, rpc::encoding>::{}(", scoped_namespace,
                               function->get_name());
                     stub.print_tabs();
-                    stub.raw("auto __rpc_ret = {}stub_receiver<rpc::serialiser::yas, rpc::encoding>::{}(",
+                    stub.raw("auto __rpc_ret = {}stub_deserialiser<rpc::serialiser::yas, rpc::encoding>::{}(",
                              scoped_namespace, function->get_name());
                     count = 1;
                     for(auto& parameter : function->get_parameters())
                     {
                         std::string output;
                         {
-                            if(!is_in_call(PROXY_MARSHALL_IN, from_host, m_ob, parameter.get_name(),
+                            if(!do_in_param(PROXY_MARSHALL_IN, from_host, m_ob, parameter.get_name(),
                                            parameter.get_type(), parameter.get_attributes(), count, output))
                                 continue;
 
@@ -705,7 +664,7 @@ namespace rpc_generator
                     {
                         std::string output;
                         {
-                            if(!is_in_call(STUB_MARSHALL_IN, from_host, m_ob, parameter.get_name(),
+                            if(!do_in_param(STUB_MARSHALL_IN, from_host, m_ob, parameter.get_name(),
                                            parameter.get_type(), parameter.get_attributes(), count, output))
                                 continue;
 
@@ -744,7 +703,7 @@ namespace rpc_generator
                     {
                         std::string output;
                         {
-                            if(!is_in_call(PROXY_CLEAN_IN, from_host, m_ob, parameter.get_name(), parameter.get_type(),
+                            if(!do_in_param(PROXY_CLEAN_IN, from_host, m_ob, parameter.get_name(), parameter.get_type(),
                                            parameter.get_attributes(), count, output))
                                 continue;
 
@@ -763,9 +722,9 @@ namespace rpc_generator
                     for(auto& parameter : function->get_parameters())
                     {
                         std::string output;
-                        if(!is_in_call(STUB_PARAM_WRAP, from_host, m_ob, parameter.get_name(), parameter.get_type(),
+                        if(!do_in_param(STUB_PARAM_WRAP, from_host, m_ob, parameter.get_name(), parameter.get_type(),
                                        parameter.get_attributes(), count, output))
-                            is_out_call(STUB_PARAM_WRAP, from_host, m_ob, parameter.get_name(), parameter.get_type(),
+                            do_out_param(STUB_PARAM_WRAP, from_host, m_ob, parameter.get_name(), parameter.get_type(),
                                         parameter.get_attributes(), count, output);
                         stub.raw("{}", output);
                     }
@@ -789,9 +748,9 @@ namespace rpc_generator
                     for(auto& parameter : function->get_parameters())
                     {
                         std::string output;
-                        if(!is_in_call(STUB_PARAM_CAST, from_host, m_ob, parameter.get_name(), parameter.get_type(),
+                        if(!do_in_param(STUB_PARAM_CAST, from_host, m_ob, parameter.get_name(), parameter.get_type(),
                                        parameter.get_attributes(), count, output))
-                            is_out_call(STUB_PARAM_CAST, from_host, m_ob, parameter.get_name(), parameter.get_type(),
+                            do_out_param(STUB_PARAM_CAST, from_host, m_ob, parameter.get_name(), parameter.get_type(),
                                         parameter.get_attributes(), count, output);
                         if(has_param)
                         {
@@ -847,10 +806,10 @@ namespace rpc_generator
                     {
                         count++;
                         std::string output;
-                        if(is_in_call(PROXY_OUT_DECLARATION, from_host, m_ob, parameter.get_name(),
+                        if(do_in_param(PROXY_OUT_DECLARATION, from_host, m_ob, parameter.get_name(),
                                       parameter.get_type(), parameter.get_attributes(), count, output))
                             continue;
-                        if(!is_out_call(PROXY_OUT_DECLARATION, from_host, m_ob, parameter.get_name(),
+                        if(!do_out_param(PROXY_OUT_DECLARATION, from_host, m_ob, parameter.get_name(),
                                         parameter.get_type(), parameter.get_attributes(), count, output))
                             continue;
 
@@ -865,7 +824,7 @@ namespace rpc_generator
                         count++;
                         std::string output;
 
-                        if(!is_out_call(STUB_ADD_REF_OUT_PREDECLARE, from_host, m_ob, parameter.get_name(),
+                        if(!do_out_param(STUB_ADD_REF_OUT_PREDECLARE, from_host, m_ob, parameter.get_name(),
                                         parameter.get_type(), parameter.get_attributes(), count, output))
                             continue;
 
@@ -883,7 +842,7 @@ namespace rpc_generator
                         count++;
                         std::string output;
 
-                        if(!is_out_call(STUB_ADD_REF_OUT, from_host, m_ob, parameter.get_name(), parameter.get_type(),
+                        if(!do_out_param(STUB_ADD_REF_OUT, from_host, m_ob, parameter.get_name(), parameter.get_type(),
                                         parameter.get_attributes(), count, output))
                             continue;
 
@@ -911,7 +870,7 @@ namespace rpc_generator
                 for(auto& parameter : function->get_parameters())
                 {
                     std::string output;
-                    if(is_out_call(PROXY_MARSHALL_OUT, from_host, m_ob, parameter.get_name(), parameter.get_type(),
+                    if(do_out_param(PROXY_MARSHALL_OUT, from_host, m_ob, parameter.get_name(), parameter.get_type(),
                                    parameter.get_attributes(), count, output))
                     {
                         has_out_parameter = true;
@@ -922,23 +881,23 @@ namespace rpc_generator
                 {
                     uint64_t count = 1;
                     proxy.print_tabs();
-                    proxy.raw("auto __receiver_result = {}proxy_receiver<rpc::serialiser::yas, rpc::encoding>::{}(",
+                    proxy.raw("auto __receiver_result = {}proxy_deserialiser<rpc::serialiser::yas, rpc::encoding>::{}(",
                               scoped_namespace, function->get_name());
 
                     stub.print_tabs();
-                    stub.raw("{}stub_sender<rpc::serialiser::yas, rpc::encoding>::{}(", scoped_namespace,
+                    stub.raw("{}stub_serialiser<rpc::serialiser::yas, rpc::encoding>::{}(", scoped_namespace,
                              function->get_name());
 
                     for(auto& parameter : function->get_parameters())
                     {
                         count++;
                         std::string output;
-                        if(!is_out_call(PROXY_MARSHALL_OUT, from_host, m_ob, parameter.get_name(), parameter.get_type(),
+                        if(!do_out_param(PROXY_MARSHALL_OUT, from_host, m_ob, parameter.get_name(), parameter.get_type(),
                                         parameter.get_attributes(), count, output))
                             continue;
                         proxy.raw(output);
 
-                        if(!is_out_call(STUB_MARSHALL_OUT, from_host, m_ob, parameter.get_name(), parameter.get_type(),
+                        if(!do_out_param(STUB_MARSHALL_OUT, from_host, m_ob, parameter.get_name(), parameter.get_type(),
                                         parameter.get_attributes(), count, output))
                             continue;
 
@@ -960,10 +919,10 @@ namespace rpc_generator
                     {
                         count++;
                         std::string output;
-                        if(is_in_call(PROXY_VALUE_RETURN, from_host, m_ob, parameter.get_name(), parameter.get_type(),
+                        if(do_in_param(PROXY_VALUE_RETURN, from_host, m_ob, parameter.get_name(), parameter.get_type(),
                                       parameter.get_attributes(), count, output))
                             continue;
-                        if(!is_out_call(PROXY_VALUE_RETURN, from_host, m_ob, parameter.get_name(), parameter.get_type(),
+                        if(!do_out_param(PROXY_VALUE_RETURN, from_host, m_ob, parameter.get_name(), parameter.get_type(),
                                         parameter.get_attributes(), count, output))
                             continue;
 
@@ -977,7 +936,7 @@ namespace rpc_generator
                     {
                         std::string output;
                         {
-                            if(!is_in_call(PROXY_CLEAN_IN, from_host, m_ob, parameter.get_name(), parameter.get_type(),
+                            if(!do_in_param(PROXY_CLEAN_IN, from_host, m_ob, parameter.get_name(), parameter.get_type(),
                                            parameter.get_attributes(), count, output))
                                 continue;
 
@@ -994,6 +953,92 @@ namespace rpc_generator
                 function_count++;
                 stub("}}");
                 stub("break;");
+            }
+        }
+        
+        void write_send_method(bool from_host, const class_entity& m_ob, writer& proxy,
+                          const std::string& interface_name, const std::shared_ptr<function_entity>& function,
+                          int& function_count)
+        {
+            if(function->get_entity_type() == entity_type::FUNCTION_METHOD)
+            {
+                std::stringstream stream;
+                writer output(stream, proxy.get_tab_count());
+                
+                std::string scoped_namespace;
+                ::rpc_generator::build_scoped_name(&m_ob, scoped_namespace);
+
+                output.print_tabs();
+                
+                output.raw("{} {}::buffered_proxy_serialiser::{}(", function->get_return_type(), interface_name, function->get_name());
+                bool has_parameter = false;
+                for(auto& parameter : function->get_parameters())
+                {
+                    if(is_out_param(parameter.get_attributes()))
+                    {
+                        //this function is not suitable as it is an out parameter
+                        return;
+                    }
+                    if(is_interface_param(m_ob, parameter.get_type()))
+                    {
+                        //this function is not suitable as it is an interface parameter
+                        return;
+                    }
+                    if(has_parameter)
+                    {
+                        output.raw(", ");
+                    }
+                    has_parameter = true;
+                    std::string modifier;
+                    if(is_const_param(parameter.get_attributes()))
+                        modifier = "const " + modifier;
+                    output.raw("{}{} {}", modifier, parameter.get_type(), parameter.get_name());
+                }
+                if(!has_parameter)
+                {
+                    //this function is not suitable as it has no in parameters
+                    return;
+                }
+                
+                bool function_is_const = false;
+                for(auto& item : function->get_attributes())
+                {
+                    if(item == "const")
+                        function_is_const = true;
+                }
+                if(function_is_const)
+                {
+                    output.raw(") const\n");
+                }
+                else
+                {
+                    output.raw(")\n");
+                }
+                output("{{");
+
+                uint64_t count = 1;
+                {
+                    output.print_tabs();
+                    output.raw("return {}proxy_serialiser<rpc::serialiser::yas, rpc::encoding>::{}(", scoped_namespace,
+                              function->get_name());
+                    for(auto& parameter : function->get_parameters())
+                    {
+                        std::string mshl_val;
+                        {
+                            if(!do_in_param(PROXY_MARSHALL_IN, from_host, m_ob, parameter.get_name(),
+                                           parameter.get_type(), parameter.get_attributes(), count, mshl_val))
+                                continue;
+
+                            output.raw(mshl_val);
+                        }
+                        count++;
+                    }
+
+                    output.raw("__buffer, __encoding);\n");
+                }
+
+                output("}}");
+                proxy.write_buffer(stream.str());
             }
         }
 
@@ -1061,17 +1106,7 @@ namespace rpc_generator
                         std::string reference_modifiers;
                         strip_reference_modifiers(type_name, reference_modifiers);
 
-                        std::string encapsulated_type = get_encapsulated_shared_ptr_type(type_name);
-
-                        std::shared_ptr<class_entity> obj;
-                        if(library.find_class(encapsulated_type, obj))
-                        {
-                            if(obj->get_entity_type() == entity_type::INTERFACE)
-                            {
-                                marshalls_interfaces = true;
-                                break;
-                            }
-                        }
+                        marshalls_interfaces = is_interface_param(library, parameter.get_type());
                     }
 
                     proxy("functions.emplace_back(rpc::function_info{{\"{0}{1}\", \"{1}\", {{{2}}}, (uint64_t){3}, "
@@ -1170,6 +1205,17 @@ namespace rpc_generator
             stub("return rpc::error::INVALID_METHOD_ID();");
             stub("}}");
             stub("");
+            
+            
+            if(has_methods)
+            {
+                int function_count = 1;
+                for(auto& function : m_ob.get_functions())
+                {
+                    if(function->get_entity_type() == entity_type::FUNCTION_METHOD)
+                        write_send_method(from_host, m_ob, proxy, interface_name, function, function_count);
+                }
+            }            
         };
 
         void write_stub_factory(const class_entity& lib, const class_entity& m_ob, writer& stub,
@@ -1532,8 +1578,7 @@ namespace rpc_generator
             std::stringstream sstr;
             std::string obj_type(m_ob.get_name());
             {
-                writer tmpl(sstr);
-                tmpl.set_count(header.get_count());
+                writer tmpl(sstr, header.get_tab_count());
                 if(m_ob.get_is_template())
                 {
                     tmpl.print_tabs();

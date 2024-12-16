@@ -382,7 +382,7 @@ namespace rpc
                 , std::vector<char>& out_buf_)
         {
             //force a lowest common denominator
-            if(enc != encoding::yas_json && enc_ != encoding::enc_default && enc != enc_)
+            if(enc != encoding::enc_default && enc != encoding::yas_binary && enc != encoding::yas_compressed_binary && enc != encoding::yas_json)
             {
                 return error::INCOMPATIBLE_SERIALISATION();
             }

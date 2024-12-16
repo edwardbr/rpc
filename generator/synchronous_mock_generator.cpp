@@ -111,8 +111,7 @@ namespace rpc_generator
             std::stringstream sstr;
             std::string obj_type(interface_name);
             {
-                writer tmpl(sstr);
-                tmpl.set_count(header.get_count());
+                writer tmpl(sstr, header.get_tab_count());
                 if(m_ob.get_is_template())
                 {
                     if(m_ob.get_template_params().empty())
@@ -148,7 +147,7 @@ namespace rpc_generator
             header("public:");
             header("using matched_type = {};", obj_type);
             header("{0}_matcher(", interface_name);
-            header.set_count(header.get_count() + 1);
+            header.set_tab_count(header.get_tab_count() + 1);
             bool is_first = true;
             for(auto& function : m_ob.get_functions())
             {
@@ -170,7 +169,7 @@ namespace rpc_generator
                     header(", {0}_matcher_({0}_matcher)", function->get_name());
                 is_first = false;
             }
-            header.set_count(header.get_count() - 1);
+            header.set_tab_count(header.get_tab_count() - 1);
             header("{{}}");
 
             header("virtual bool MatchAndExplain({} request, MatchResultListener* listener) const", obj_type);

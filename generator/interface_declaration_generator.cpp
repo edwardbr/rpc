@@ -3,6 +3,7 @@
 
 #include "interface_declaration_generator.h"
 #include "fingerprint_generator.h"
+#include "helpers.h"
 
 namespace rpc_generator
 {
@@ -12,7 +13,7 @@ namespace rpc_generator
         PROXY_PARAM_OUT,
 
         STUB_PARAM_IN,
-        STUB_PARAM_OUT,
+        STUB_PARAM_OUT
     };
 
     struct renderer
@@ -222,35 +223,12 @@ namespace rpc_generator
         }
     };
 
-    std::string get_encapsulated_shared_ptr_type(const std::string& type_name)
-    {
-        const std::string template_pattern = "rpc::shared_ptr<";
-        auto pos = type_name.find(template_pattern);
-        if(pos != std::string::npos)
-        {
-            pos += template_pattern.length();
-            while(type_name[pos] == ' ' || type_name[pos] == '\n' || type_name[pos] == '\r' || type_name[pos] == '\t')
-                pos++;
-            auto rpos = type_name.rfind(">");
-            if(rpos == std::string::npos)
-            {
-                std::cerr << fmt::format("template parameter is malformed {}", type_name);
-                throw fmt::format("template parameter is malformed {}", type_name);
-            }
-            while(type_name[rpos] == ' ' || type_name[rpos] == '\n' || type_name[rpos] == '\r'
-                  || type_name[rpos] == '\t')
-                rpos++;
-            return type_name.substr(pos, rpos - pos);
-        }
-        return type_name;
-    }
-
-    bool is_in_call(print_type option, const class_entity& lib, const std::string& name, const std::string& type,
+    bool do_in_param(print_type option, const class_entity& lib, const std::string& name, const std::string& type,
                     const std::list<std::string>& attributes, uint64_t& count, std::string& output)
     {
-        auto in = std::find(attributes.begin(), attributes.end(), "in") != attributes.end();
-        auto out = std::find(attributes.begin(), attributes.end(), "out") != attributes.end();
-        auto is_const = std::find(attributes.begin(), attributes.end(), "const") != attributes.end();
+        auto in = is_in_param(attributes);
+        auto out = is_out_param(attributes);
+        auto is_const = is_const_param(attributes);
         auto by_value = std::find(attributes.begin(), attributes.end(), "by_value") != attributes.end();
 
         if(out && !in)
@@ -260,17 +238,7 @@ namespace rpc_generator
         std::string reference_modifiers;
         strip_reference_modifiers(type_name, reference_modifiers);
 
-        std::string encapsulated_type = get_encapsulated_shared_ptr_type(type_name);
-
-        bool is_interface = false;
-        std::shared_ptr<class_entity> obj;
-        if(lib.find_class(encapsulated_type, obj))
-        {
-            if(obj->get_entity_type() == entity_type::INTERFACE)
-            {
-                is_interface = true;
-            }
-        }
+        bool is_interface = is_interface_param(lib, type);
 
         if(!is_interface)
         {
@@ -339,12 +307,12 @@ namespace rpc_generator
         return true;
     }
 
-    bool is_out_call(print_type option, const class_entity& lib, const std::string& name, const std::string& type,
+    bool do_out_param(print_type option, const class_entity& lib, const std::string& name, const std::string& type,
                      const std::list<std::string>& attributes, uint64_t& count, std::string& output)
     {
-        auto in = std::find(attributes.begin(), attributes.end(), "in") != attributes.end();
-        auto out = std::find(attributes.begin(), attributes.end(), "out") != attributes.end();
-        auto is_const = std::find(attributes.begin(), attributes.end(), "const") != attributes.end();
+        auto in = is_in_param(attributes);
+        auto out = is_out_param(attributes);
+        auto is_const = is_const_param(attributes);
 
         if(!out)
             return false;
@@ -359,17 +327,7 @@ namespace rpc_generator
         std::string reference_modifiers;
         strip_reference_modifiers(type_name, reference_modifiers);
 
-        std::string encapsulated_type = get_encapsulated_shared_ptr_type(type_name);
-
-        bool is_interface = false;
-        std::shared_ptr<class_entity> obj;
-        if(lib.find_class(encapsulated_type, obj))
-        {
-            if(obj->get_entity_type() == entity_type::INTERFACE)
-            {
-                is_interface = true;
-            }
-        }
+        bool is_interface = is_interface_param(lib, type);
 
         if(reference_modifiers.empty())
         {
@@ -471,8 +429,8 @@ namespace rpc_generator
             for(auto& parameter : function->get_parameters())
             {
                 auto& attributes = parameter.get_attributes();
-                auto in = std::find(attributes.begin(), attributes.end(), "in") != attributes.end();
-                auto out = std::find(attributes.begin(), attributes.end(), "out") != attributes.end();
+                auto in = is_in_param(attributes);
+                auto out = is_out_param(attributes);
 
                 if(out && !in)
                     continue;
@@ -487,7 +445,7 @@ namespace rpc_generator
                 }
 
                 std::string output;
-                if(!is_in_call(PROXY_PARAM_IN, m_ob, parameter.get_name(), modifier + parameter.get_type(),
+                if(!do_in_param(PROXY_PARAM_IN, m_ob, parameter.get_name(), modifier + parameter.get_type(),
                                parameter.get_attributes(), count, output))
                     continue;
 
@@ -519,7 +477,7 @@ namespace rpc_generator
         for(auto& parameter : function->get_parameters())
         {
             auto& attributes = parameter.get_attributes();
-            auto out = std::find(attributes.begin(), attributes.end(), "out") != attributes.end();
+            auto out = is_out_param(attributes);
 
             if(!out)
                 continue;
@@ -533,7 +491,7 @@ namespace rpc_generator
             }
 
             std::string output;
-            if(!is_out_call(PROXY_PARAM_OUT, m_ob, parameter.get_name(), modifier + parameter.get_type(),
+            if(!do_out_param(PROXY_PARAM_OUT, m_ob, parameter.get_name(), modifier + parameter.get_type(),
                             parameter.get_attributes(), count, output))
                 continue;
             header.raw(output);
@@ -563,8 +521,8 @@ namespace rpc_generator
         for(auto& parameter : function->get_parameters())
         {
             auto& attributes = parameter.get_attributes();
-            auto out = std::find(attributes.begin(), attributes.end(), "out") != attributes.end();
-            auto in = std::find(attributes.begin(), attributes.end(), "in") != attributes.end();
+            auto out = is_out_param(attributes);
+            auto in = is_in_param(attributes);
 
             if(!in && out)
                 continue;
@@ -578,7 +536,7 @@ namespace rpc_generator
             }
 
             std::string output;
-            if(!is_in_call(STUB_PARAM_IN, m_ob, parameter.get_name(), modifier + parameter.get_type(),
+            if(!do_in_param(STUB_PARAM_IN, m_ob, parameter.get_name(), modifier + parameter.get_type(),
                            parameter.get_attributes(), count, output))
                 continue;
             header.raw(output);
@@ -607,7 +565,7 @@ namespace rpc_generator
             for(auto& parameter : function->get_parameters())
             {
                 auto& attributes = parameter.get_attributes();
-                auto out = std::find(attributes.begin(), attributes.end(), "out") != attributes.end();
+                auto out = is_out_param(attributes);
 
                 if(!out)
                     continue;
@@ -621,7 +579,7 @@ namespace rpc_generator
                 }
 
                 std::string output;
-                if(!is_out_call(STUB_PARAM_OUT, m_ob, parameter.get_name(), modifier + parameter.get_type(),
+                if(!do_out_param(STUB_PARAM_OUT, m_ob, parameter.get_name(), modifier + parameter.get_type(),
                                 parameter.get_attributes(), count, output))
                     continue;
 
@@ -635,6 +593,61 @@ namespace rpc_generator
         if(include_variadics)
             header.raw(", __Args... __args");
         header.raw(")");
+        return stream.str();
+    }
+
+    std::string client_sender_declaration(const class_entity& m_ob, const std::shared_ptr<function_entity>& function,
+                                          int function_count, bool& is_suitable)
+    {
+        std::stringstream stream;
+        writer header(stream);
+
+        header.raw("int {}(", function->get_name());
+        is_suitable = true;
+        {
+            uint64_t count = 1;
+            for(auto& parameter : function->get_parameters())
+            {
+                if(is_out_param(parameter.get_attributes()))
+                {
+                    is_suitable = false;
+                    //this function is not suitable as it is an out parameter
+                    break;
+                }
+                if(is_interface_param(m_ob, parameter.get_type()))
+                {
+                    is_suitable = false;
+                    //this function is not suitable as it is an interface parameter
+                    break;
+                }
+                
+                if(is_pointer(parameter.get_type()) || is_pointer_to_pointer(parameter.get_type()))
+                {
+                    is_suitable = false;
+                    //this function is not suitable as it is an interface parameter
+                    break;
+                }
+
+                if(count > 1)
+                    header.raw(", ");
+                    
+                std::string modifier;
+                if(is_const_param(parameter.get_attributes()))
+                    modifier = "const " + modifier;
+                header.raw("{}{} {}", modifier, parameter.get_type(), parameter.get_name());
+
+                count++;
+            }
+            if(count == 1)
+            {
+                //this function is not suitable as it has no parameters to serialise
+                is_suitable = false;
+            }
+        }
+        header.raw(")");
+        
+        if(is_const_param(function->get_attributes()))
+            header.raw(" const");
         return stream.str();
     }
 
@@ -792,9 +805,9 @@ namespace rpc_generator
         header("");
         header("public:");
         header("// ********************* compile time polymorphic serialisers *********************");
-        header("// template class for serialising request data to a stub or some other target");
+        header("// template pure static class for serialising proxy request data to a stub or some other target");
         header("template<typename __Serialiser, typename... __Args>");
-        header("struct proxy_sender");
+        header("struct proxy_serialiser");
         header("{{");
         {
             int function_count = 0;
@@ -817,9 +830,9 @@ namespace rpc_generator
         }
         header("}};");
         header("");
-        header("// template class for serialising reply data to a proxy or some other target");
+        header("// template pure static class for deserialising data from a proxy or some other target into a stub");
         header("template<typename __Serialiser, typename... __Args>");
-        header("struct stub_receiver");
+        header("struct stub_deserialiser");
         header("{{");
         {
             int function_count = 0;
@@ -842,9 +855,9 @@ namespace rpc_generator
         }
         header("}};");
         header("");
-        header("// template class for deserialising request data from a proxy or some other target");
+        header("// template pure static class for serialising reply data from a stub");
         header("template<typename __Serialiser, typename... __Args>");
-        header("struct stub_sender");
+        header("struct stub_serialiser");
         header("{{");
         {
             int function_count = 0;
@@ -867,9 +880,9 @@ namespace rpc_generator
         }
         header("}};");
         header("");
-        header("// template class for deserialising reply data from a stub or some other target");
+        header("// template pure static class for a proxy deserialising reply data from a stub");
         header("template<typename __Serialiser, typename... __Args>");
-        header("struct proxy_receiver");
+        header("struct proxy_deserialiser");
         header("{{");
         {
             int function_count = 0;
@@ -893,6 +906,51 @@ namespace rpc_generator
         }
         header("}};");
         header("");
+        
+        {
+            std::stringstream stream;
+            writer output(stream, header.get_tab_count());
+            bool has_usable_functions = false;
+        
+            output("// proxy class for serialising requests into a buffer for optional dispatch at a future time");
+            output("class buffered_proxy_serialiser");
+            output("{{");
+            output("std::vector<char>& __buffer;");
+            output("rpc::encoding __encoding;");
+            output("public:");
+            output("buffered_proxy_serialiser(std::vector<char>& buffer, rpc::encoding encoding) : __buffer(buffer), __encoding(encoding){{}}");
+            {
+                int function_count = 0;
+                std::unordered_set<std::string> unique_signatures;
+                for(auto& function : m_ob.get_functions())
+                {
+                    if(function->get_entity_type() == entity_type::FUNCTION_METHOD)
+                    {
+                        function_count++;
+
+                        bool is_suitable = true;
+                        auto key
+                            = ::rpc_generator::client_sender_declaration(m_ob, function, function_count, is_suitable);
+                        if(!is_suitable)
+                            continue;
+                            
+                        has_usable_functions = true;
+
+                        if(unique_signatures.emplace(key).second)
+                        {
+                            output("{};", key);
+                        }
+                    }
+                }
+            }
+            output("}};");
+            output("");
+            
+            if(has_usable_functions)
+                header.write_buffer(stream.str());
+            else
+                header("// no usable functions for a buffered_proxy_serialiser class");
+        }
         header("friend {}_stub;", interface_name);
         header("}};");
         header("");
