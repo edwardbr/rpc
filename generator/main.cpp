@@ -28,14 +28,13 @@ namespace javascript_json
     }
 }
 
-void get_imports(const class_entity& object, std::list<std::string>& imports,
-                 std::set<std::string>& imports_cache)
+void get_imports(const class_entity& object, std::list<std::string>& imports, std::set<std::string>& imports_cache)
 {
-    for (auto& cls : object.get_classes())
+    for(auto& cls : object.get_classes())
     {
-        if (!cls->get_import_lib().empty())
+        if(!cls->get_import_lib().empty())
         {
-            if (imports_cache.find(cls->get_import_lib()) == imports_cache.end())
+            if(imports_cache.find(cls->get_import_lib()) == imports_cache.end())
             {
                 imports_cache.insert(cls->get_import_lib());
                 imports.push_back(cls->get_import_lib());
@@ -47,9 +46,9 @@ void get_imports(const class_entity& object, std::list<std::string>& imports,
 bool is_different(const std::stringstream& stream, const std::string& data)
 {
     auto stream_str = stream.str();
-    if (stream_str.empty())
+    if(stream_str.empty())
     {
-        if (data.empty())
+        if(data.empty())
             return true;
         return false;
     }
@@ -79,31 +78,48 @@ int main(const int argc, char* argv[])
         std::vector<std::string> additional_stub_headers;
         bool dump_preprocessor_output_and_die = false;
 
-        auto cli = (
-			clipp::required("-i", "--idl").doc("the idl to be parsed") & clipp::value("idl",rootIdl),
-			clipp::required("-p", "--output_path").doc("base output path") & clipp::value("output_path",output_path),
-			clipp::required("-h", "--header").doc("the generated header relative filename") & clipp::value("header",headerPath),
-			clipp::required("-x", "--proxy").doc("the generated proxy relative filename") & clipp::value("proxy",proxyPath),
-			clipp::required("-s", "--stub").doc("the generated stub relative filename") & clipp::value("stub",stubPath),
-            clipp::required("-t", "--stub_header").doc("the generated stub header relative filename") & clipp::value("stub_header",stubHeaderPath),
-			clipp::option("-m", "--mock").doc("the generated mock relative filename") & clipp::value("mock",mockPath),
-			clipp::option("-c", "--suppress_catch_stub_exceptions").set(suppress_catch_stub_exceptions).doc("catch stub exceptions"),
-			clipp::option("-M", "--module_name").doc("the name given to the stub_factory") & clipp::value("module_name",module_name),
-			clipp::repeatable(clipp::option("-P", "--path") & clipp::value("path",include_paths)).doc("locations of include files used by the idl"),
-			clipp::option("-n","--namespace").doc("namespace of the generated interface") & clipp::value("namespace",namespaces),
-			clipp::option("-d","--dump_preprocessor_output_and_die").set(dump_preprocessor_output_and_die).doc("dump preprocessor output and die"),
-			clipp::repeatable(clipp::option("-D") & clipp::value("define",defines)).doc("macro define"),
-			clipp::repeatable(clipp::option("-H", "--additional_headers") & clipp::value("additional_headers",additional_headers)).doc("additional header to be added to the idl generated header"),
-			clipp::repeatable(clipp::option("-r", "--rethrow_stub_exception") & clipp::value("rethrow_stub_exception",rethrow_exceptions)).doc("rethrow exception"),
-			clipp::repeatable(clipp::option("-A", "--additional_stub_header") & clipp::value("additional_stub_header",additional_stub_headers)).doc("additional stub header"),
-			clipp::any_other(wrong_elements)
-		);
+        auto cli = (clipp::required("-i", "--idl").doc("the idl to be parsed") & clipp::value("idl", rootIdl),
+                    clipp::required("-p", "--output_path").doc("base output path")
+                        & clipp::value("output_path", output_path),
+                    clipp::required("-h", "--header").doc("the generated header relative filename")
+                        & clipp::value("header", headerPath),
+                    clipp::required("-x", "--proxy").doc("the generated proxy relative filename")
+                        & clipp::value("proxy", proxyPath),
+                    clipp::required("-s", "--stub").doc("the generated stub relative filename")
+                        & clipp::value("stub", stubPath),
+                    clipp::required("-t", "--stub_header").doc("the generated stub header relative filename")
+                        & clipp::value("stub_header", stubHeaderPath),
+                    clipp::option("-m", "--mock").doc("the generated mock relative filename")
+                        & clipp::value("mock", mockPath),
+                    clipp::option("-c", "--suppress_catch_stub_exceptions")
+                        .set(suppress_catch_stub_exceptions)
+                        .doc("catch stub exceptions"),
+                    clipp::option("-M", "--module_name").doc("the name given to the stub_factory")
+                        & clipp::value("module_name", module_name),
+                    clipp::repeatable(clipp::option("-P", "--path") & clipp::value("path", include_paths))
+                        .doc("locations of include files used by the idl"),
+                    clipp::option("-n", "--namespace").doc("namespace of the generated interface")
+                        & clipp::value("namespace", namespaces),
+                    clipp::option("-d", "--dump_preprocessor_output_and_die")
+                        .set(dump_preprocessor_output_and_die)
+                        .doc("dump preprocessor output and die"),
+                    clipp::repeatable(clipp::option("-D") & clipp::value("define", defines)).doc("macro define"),
+                    clipp::repeatable(clipp::option("-H", "--additional_headers")
+                                      & clipp::value("additional_headers", additional_headers))
+                        .doc("additional header to be added to the idl generated header"),
+                    clipp::repeatable(clipp::option("-r", "--rethrow_stub_exception")
+                                      & clipp::value("rethrow_stub_exception", rethrow_exceptions))
+                        .doc("rethrow exception"),
+                    clipp::repeatable(clipp::option("-A", "--additional_stub_header")
+                                      & clipp::value("additional_stub_header", additional_stub_headers))
+                        .doc("additional stub header"),
+                    clipp::any_other(wrong_elements));
 
         clipp::parsing_result res = clipp::parse(argc, argv, cli);
-        if (!wrong_elements.empty())
+        if(!wrong_elements.empty())
         {
             std::cout << "Error unrecognised parameters\n";
-            for (auto& element : wrong_elements)
+            for(auto& element : wrong_elements)
             {
                 std::cout << element << "\n";
             }
@@ -111,7 +127,7 @@ int main(const int argc, char* argv[])
             std::cout << "Please read documentation\n" << clipp::make_man_page(cli, argv[0]);
             return -1;
         }
-        if (!res)
+        if(!res)
         {
             cout << clipp::make_man_page(cli, argv[0]);
             return -1;
@@ -120,19 +136,19 @@ int main(const int argc, char* argv[])
         std::replace(headerPath.begin(), headerPath.end(), '\\', '/');
         std::replace(proxyPath.begin(), proxyPath.end(), '\\', '/');
         std::replace(stubPath.begin(), stubPath.end(), '\\', '/');
-        if (mockPath.length())
+        if(mockPath.length())
             std::replace(mockPath.begin(), mockPath.end(), '\\', '/');
         std::replace(output_path.begin(), output_path.end(), '\\', '/');
 
         std::unique_ptr<macro_parser> parser = std::unique_ptr<macro_parser>(new macro_parser());
 
-        for (auto& define : defines)
+        for(auto& define : defines)
         {
             auto elems = split(define, '=');
             {
                 macro_parser::definition def;
                 std::string defName = elems[0];
-                if (elems.size() > 1)
+                if(elems.size() > 1)
                 {
                     def.m_substitutionString = elems[1];
                 }
@@ -147,18 +163,18 @@ int main(const int argc, char* argv[])
             def.m_substitutionString = "1";
             parser->AddDefine("GENERATOR", def);
         }
-		
+
         std::error_code ec;
 
         auto idl = std::filesystem::absolute(rootIdl, ec);
-        if (!std::filesystem::exists(idl))
+        if(!std::filesystem::exists(idl))
         {
             cout << "Error file " << idl << " does not exist";
             return -1;
         }
 
         std::vector<std::filesystem::path> parsed_paths;
-        for (auto& path : include_paths)
+        for(auto& path : include_paths)
         {
             parsed_paths.emplace_back(std::filesystem::canonical(path, ec).make_preferred());
         }
@@ -171,9 +187,9 @@ int main(const int argc, char* argv[])
         {
             std::cerr << "unable to load " << rootIdl << '\n';
             return -1;
-        }  
+        }
         pre_parsed_data = output_stream.str();
-        if (dump_preprocessor_output_and_die)
+        if(dump_preprocessor_output_and_die)
         {
             std::cout << pre_parsed_data << '\n';
             return 0;
@@ -187,7 +203,7 @@ int main(const int argc, char* argv[])
         std::list<std::string> imports;
         {
             std::set<std::string> imports_cache;
-            if (!objects->get_import_lib().empty())
+            if(!objects->get_import_lib().empty())
             {
                 std::cout << "root object has a non empty import lib\n";
                 return -1;
@@ -199,7 +215,7 @@ int main(const int argc, char* argv[])
         stubHeaderPath = stubHeaderPath.size() ? stubHeaderPath : (stubPath + ".h");
 
         // do the generation of the checksums
-        auto checksums_path = std::filesystem::path(output_path)/"check_sums";
+        auto checksums_path = std::filesystem::path(output_path) / "check_sums";
         std::filesystem::create_directory(checksums_path);
         component_checksum::write_namespace(*objects, checksums_path);
 
@@ -215,7 +231,7 @@ int main(const int argc, char* argv[])
             std::filesystem::create_directories(proxy_path.parent_path());
             std::filesystem::create_directories(stub_path.parent_path());
             std::filesystem::create_directories(stub_header_path.parent_path());
-            if (mockPath.length())
+            if(mockPath.length())
                 std::filesystem::create_directories(mock_path.parent_path());
 
             // read the original data and close the files afterwards
@@ -239,7 +255,7 @@ int main(const int argc, char* argv[])
                 ifstream stub_header_fs(stub_header_path);
                 std::getline(stub_header_fs, interfaces_stub_header_data, '\0');
 
-                if (mockPath.length())
+                if(mockPath.length())
                 {
                     ifstream mock_fs(mock_path);
                     std::getline(mock_fs, interfaces_mock_data, '\0');
@@ -251,56 +267,57 @@ int main(const int argc, char* argv[])
             std::stringstream stub_stream;
             std::stringstream stub_header_stream;
             std::stringstream mock_stream;
-                    
-            rpc_generator::synchronous_generator::write_files(module_name, true, *objects, header_stream, proxy_stream,
-                                                                   stub_stream, stub_header_stream, 
-                                                                   namespaces, headerPath, stubHeaderPath, imports, additional_headers, !suppress_catch_stub_exceptions, rethrow_exceptions, additional_stub_headers);
+
+            rpc_generator::synchronous_generator::write_files(
+                module_name, true, *objects, header_stream, proxy_stream, stub_stream, stub_header_stream, namespaces,
+                headerPath, stubHeaderPath, imports, additional_headers, !suppress_catch_stub_exceptions,
+                rethrow_exceptions, additional_stub_headers);
 
             header_stream << ends;
             proxy_stream << ends;
             stub_stream << ends;
             stub_header_stream << ends;
-            if (mockPath.length())
+            if(mockPath.length())
             {
                 rpc_generator::synchronous_mock_generator::write_files(true, *objects, mock_stream, namespaces,
-                                                                            headerPath, imports);
+                                                                       headerPath, imports);
                 mock_stream << ends;
             }
-            
+
             // compare and write if different
-            if (is_different(header_stream, interfaces_h_data))
+            if(is_different(header_stream, interfaces_h_data))
             {
                 ofstream file(header_path);
                 file << header_stream.str();
             }
-            if (is_different(proxy_stream, interfaces_proxy_data))
+            if(is_different(proxy_stream, interfaces_proxy_data))
             {
                 ofstream file(proxy_path);
                 file << proxy_stream.str();
             }
-            if (is_different(stub_stream, interfaces_stub_data))
+            if(is_different(stub_stream, interfaces_stub_data))
             {
                 ofstream file(stub_path);
                 file << stub_stream.str();
             }
-            if (is_different(stub_header_stream, interfaces_stub_header_data))
+            if(is_different(stub_header_stream, interfaces_stub_header_data))
             {
                 ofstream file(stub_header_path);
                 file << stub_header_stream.str();
             }
-            if (mockPath.length())
+            if(mockPath.length())
             {
-                if (interfaces_mock_data != mock_stream.str())
+                if(interfaces_mock_data != mock_stream.str())
                 {
                     ofstream file(mock_path);
                     file << mock_stream.str();
                 }
             }
         }
-        
+
         // do the generation of the yas serialisation
         {
-            //get default paths
+            // get default paths
             auto pos = headerPath.rfind(".h");
             if(pos == std::string::npos)
             {
@@ -311,11 +328,11 @@ int main(const int argc, char* argv[])
             auto file_path = headerPath.substr(0, pos) + ".cpp";
             auto tmp_header_path = std::filesystem::path(output_path) / "src" / file_path;
 
-            //then generate yas subdirectories
+            // then generate yas subdirectories
             auto header_path = tmp_header_path.parent_path() / "yas" / tmp_header_path.filename();
 
             std::filesystem::create_directories(header_path.parent_path());
-            
+
             // read the original data and close the files afterwards
             string interfaces_h_data;
             string interfaces_implementation_data;
@@ -325,34 +342,24 @@ int main(const int argc, char* argv[])
                 ifstream hfs(header_path);
                 std::getline(hfs, interfaces_h_data, '\0');
             }
-            
+
             std::stringstream header_stream;
-            
+
             rpc_generator::yas_generator::write_files(
-                module_name
-                , true
-                , *objects
-                , header_stream
-                , namespaces
-                , headerPath
-                , imports
-                , additional_headers
-                , !suppress_catch_stub_exceptions
-                , rethrow_exceptions
-                , additional_stub_headers);
-                
+                module_name, true, *objects, header_stream, namespaces, headerPath, imports, additional_headers,
+                !suppress_catch_stub_exceptions, rethrow_exceptions, additional_stub_headers);
+
             header_stream << ends;
 
             // compare and write if different
-            if (is_different(header_stream, interfaces_h_data))
+            if(is_different(header_stream, interfaces_h_data))
             {
                 ofstream file(header_path);
                 file << header_stream.str();
             }
         }
-
     }
-    catch (const std::exception& e)
+    catch(const std::exception& e)
     {
         std::cerr << e.what() << std::endl;
         return 1;

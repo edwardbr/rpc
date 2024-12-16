@@ -5,14 +5,12 @@
 
 extern "C"
 {
-    #include "sha3.h"
+#include "sha3.h"
 }
-
 
 namespace fingerprint
 {
 
-    
     const class_entity* find_type(std::string type_name, const class_entity& cls)
     {
         auto type_namespace = split_namespaces(type_name);
@@ -62,7 +60,7 @@ namespace fingerprint
     };
 
     std::string extract_subsituted_templates(const std::string& source, const class_entity& cls,
-                                                std::vector<const class_entity*> entity_stack)
+                                             std::vector<const class_entity*> entity_stack)
     {
         std::stringstream sstr;
         std::stringstream temp;
@@ -114,7 +112,7 @@ namespace fingerprint
         return output;
     }
 
-    //this is too simplistic, it only supports one template parameter without nested templates
+    // this is too simplistic, it only supports one template parameter without nested templates
     std::string substitute_template_params(const std::string& type, const std::string& alternative)
     {
         std::string output;
@@ -149,9 +147,7 @@ namespace fingerprint
         return output;
     }
 
-                                                 
-    uint64_t generate(const class_entity& cls, std::vector<const class_entity*> entity_stack,
-                                    writer* comment)
+    uint64_t generate(const class_entity& cls, std::vector<const class_entity*> entity_stack, writer* comment)
     {
         for(const auto* tmp : entity_stack)
         {
@@ -172,15 +168,16 @@ namespace fingerprint
         {
             {
                 auto tmp = item.substr(0, use_legacy_empty_template_struct_id_attr.size());
-                if (tmp == use_legacy_empty_template_struct_id_attr && item[use_legacy_empty_template_struct_id_attr.size()] == '=')
+                if(tmp == use_legacy_empty_template_struct_id_attr
+                   && item[use_legacy_empty_template_struct_id_attr.size()] == '=')
                 {
                     continue;
                 }
             }
-            
+
             {
                 auto tmp = item.substr(0, use_template_param_in_id_attr.size());
-                if (tmp == use_template_param_in_id_attr && item[use_template_param_in_id_attr.size()] == '=')
+                if(tmp == use_template_param_in_id_attr && item[use_template_param_in_id_attr.size()] == '=')
                 {
                     continue;
                 }
@@ -204,7 +201,7 @@ namespace fingerprint
             for(auto& func : cls.get_functions())
             {
                 {
-                    //this is to tell the fingerprinter that an element does not want to be added to the fingerprint
+                    // this is to tell the fingerprinter that an element does not want to be added to the fingerprint
                     bool no_fingerprint = false;
                     for(auto& item : func->get_attributes())
                     {
@@ -217,18 +214,20 @@ namespace fingerprint
                     if(no_fingerprint)
                         continue;
                 }
-                
+
                 seed += "[";
                 for(auto& item : func->get_attributes())
                 {
-                    //this keyword should not contaminate the interface fingerprint, so that we can deprecate a method and warn developers that this method is for the chop
-                    //unfortunately for legacy reasons "deprecated" does contaminate the fingerprint we need to flush through all prior interface versions before we can rehabilitate this as "deprecated"
+                    // this keyword should not contaminate the interface fingerprint, so that we can deprecate a method
+                    // and warn developers that this method is for the chop unfortunately for legacy reasons
+                    // "deprecated" does contaminate the fingerprint we need to flush through all prior interface
+                    // versions before we can rehabilitate this as "deprecated"
                     if(item == "_deprecated")
                         continue;
                     seed += item;
                 }
                 seed += "]";
-                
+
                 if(func->get_entity_type() == entity_type::CPPQUOTE)
                 {
                     if(func->is_in_import())
@@ -298,7 +297,7 @@ namespace fingerprint
         {
             if(cls.get_is_template() && cls.get_attribute_value("use_legacy_empty_template_struct_id") == "true")
             {
-                //this is a bad bug that needs to be preserved for legacy template structures
+                // this is a bad bug that needs to be preserved for legacy template structures
                 std::ignore = cls;
             }
             else
@@ -382,9 +381,9 @@ namespace fingerprint
         if(comment)
         {
             if(seed.empty())
-               (*comment)("//EMPTY_SEED!");
+                (*comment)("//EMPTY_SEED!");
             else
-               (*comment)("//{}", seed);
+                (*comment)("//{}", seed);
         }
 
         entity_stack.pop_back();

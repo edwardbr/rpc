@@ -500,19 +500,19 @@ namespace rpc_generator
         header.raw(additional_params);
         if(include_variadics)
             header.raw(", __Args... __args");
-        header.raw(")");            
+        header.raw(")");
         return stream.str();
     }
 
     std::string write_proxy_receive_declaration(const class_entity& m_ob, const std::string& scope,
                                                 const std::shared_ptr<function_entity>& function, int& function_count,
-                                                bool& has_inparams, std::string additional_params, bool include_variadics)
+                                                bool& has_inparams, std::string additional_params,
+                                                bool include_variadics)
     {
         std::stringstream stream;
         writer header(stream);
 
-        header.raw("int {}{}(", scope,
-                   function->get_name());
+        header.raw("int {}{}(", scope, function->get_name());
         has_inparams = false;
 
         uint64_t count = 1;
@@ -544,20 +544,20 @@ namespace rpc_generator
         header.raw(additional_params);
         if(include_variadics)
             header.raw(", __Args... __args");
-        header.raw(")");            
+        header.raw(")");
         return stream.str();
     }
 
     std::string write_stub_receive_declaration(const class_entity& m_ob, const std::string& scope,
                                                const std::shared_ptr<function_entity>& function, int function_count,
-                                               bool& has_outparams, std::string additional_params, bool include_variadics)
+                                               bool& has_outparams, std::string additional_params,
+                                               bool include_variadics)
     {
         std::stringstream stream;
         writer header(stream);
 
         has_outparams = false;
-        header.raw("int {}{}(", scope,
-                   function->get_name());
+        header.raw("int {}{}(", scope, function->get_name());
 
         uint64_t count = 1;
         for(auto& parameter : function->get_parameters())
@@ -567,7 +567,7 @@ namespace rpc_generator
             auto in = std::find(attributes.begin(), attributes.end(), "in") != attributes.end();
 
             if(!in && out)
-                continue;            
+                continue;
             has_outparams = true;
 
             std::string modifier;
@@ -589,7 +589,7 @@ namespace rpc_generator
         header.raw(additional_params);
         if(include_variadics)
             header.raw(", __Args... __args");
-        header.raw(")");            
+        header.raw(")");
         return stream.str();
     }
 
@@ -634,7 +634,7 @@ namespace rpc_generator
         header.raw(additional_params);
         if(include_variadics)
             header.raw(", __Args... __args");
-        header.raw(")");            
+        header.raw(")");
         return stream.str();
     }
 
@@ -806,8 +806,8 @@ namespace rpc_generator
                 {
                     function_count++;
                     bool has_params = false;
-                    auto key
-                        = ::rpc_generator::write_proxy_send_declaration(m_ob, "", function, function_count, has_params, "", true);
+                    auto key = ::rpc_generator::write_proxy_send_declaration(m_ob, "", function, function_count,
+                                                                             has_params, "", true);
                     if(unique_signatures.emplace(key).second)
                     {
                         header("static {};", key);
@@ -856,8 +856,8 @@ namespace rpc_generator
                 {
                     function_count++;
                     bool has_params = false;
-                    auto key
-                        = ::rpc_generator::write_stub_reply_declaration(m_ob, "", function, function_count, has_params,"",  true);
+                    auto key = ::rpc_generator::write_stub_reply_declaration(m_ob, "", function, function_count,
+                                                                             has_params, "", true);
                     if(unique_signatures.emplace(key).second)
                     {
                         header("static {};", key);

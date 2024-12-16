@@ -68,7 +68,7 @@ namespace rpc_generator
                                                          bool is_const, const std::string& object_type,
                                                          uint64_t& count) const
         {
-            switch (option)
+            switch(option)
             {
             case PROXY_MARSHALL_IN:
                 return fmt::format("  ,(\"{0}\", {0})", name);
@@ -98,7 +98,7 @@ namespace rpc_generator
                 throw std::runtime_error("REFERANCE does not support out vals");
             }
 
-            switch (option)
+            switch(option)
             {
             case PROXY_MARSHALL_IN:
                 return fmt::format("  ,(\"{0}\", {0})", name);
@@ -129,7 +129,7 @@ namespace rpc_generator
                 throw std::runtime_error("MOVE does not support const vals");
             }
 
-            switch (option)
+            switch(option)
             {
             case PROXY_MARSHALL_IN:
                 return fmt::format("  ,(\"{0}\", {0})", name);
@@ -158,7 +158,7 @@ namespace rpc_generator
                 throw std::runtime_error("POINTER does not support out vals");
             }
 
-            switch (option)
+            switch(option)
             {
             case PROXY_MARSHALL_IN:
                 return fmt::format("  ,(\"{0}\", (uint64_t){0})", name);
@@ -185,7 +185,7 @@ namespace rpc_generator
             {
                 throw std::runtime_error("POINTER_REFERENCE does not support const out vals");
             }
-            switch (option)
+            switch(option)
             {
             case PROXY_MARSHALL_IN:
                 return fmt::format("  ,(\"{0}\", {0}_)", name);
@@ -213,7 +213,7 @@ namespace rpc_generator
                                                                 bool is_in, bool is_out, bool is_const,
                                                                 const std::string& object_type, uint64_t& count) const
         {
-            switch (option)
+            switch(option)
             {
             case PROXY_MARSHALL_IN:
                 return fmt::format("  ,(\"{0}\", {0}_)", name);
@@ -245,15 +245,15 @@ namespace rpc_generator
                 throw std::runtime_error("INTERFACE does not support out vals");
             }
 
-            switch (option)
+            switch(option)
             {
             case PROXY_PREPARE_IN:
                 return fmt::format("rpc::shared_ptr<rpc::object_stub> {}_stub_;", name);
             case PROXY_PREPARE_IN_INTERFACE_ID:
-                return fmt::format(
-                    "RPC_ASSERT(rpc::are_in_same_zone(this, {0}.get()));\n"
-                    "\t\t\tauto {0}_stub_id_ = proxy_bind_in_param(__rpc_sp->get_remote_rpc_version(), {0}, {0}_stub_);",
-                    name);
+                return fmt::format("RPC_ASSERT(rpc::are_in_same_zone(this, {0}.get()));\n"
+                                   "\t\t\tauto {0}_stub_id_ = proxy_bind_in_param(__rpc_sp->get_remote_rpc_version(), "
+                                   "{0}, {0}_stub_);",
+                                   name);
             case PROXY_MARSHALL_IN:
             {
                 auto ret = fmt::format(",(\"_{1}\", {0}_stub_id_)", name, count);
@@ -313,15 +313,15 @@ namespace rpc_generator
                                                         const std::string& name, bool is_in, bool is_out, bool is_const,
                                                         const std::string& object_type, uint64_t& count) const
         {
-            switch (option)
+            switch(option)
             {
             case PROXY_PREPARE_IN:
                 return fmt::format("rpc::shared_ptr<rpc::object_stub> {}_stub_;", name);
             case PROXY_PREPARE_IN_INTERFACE_ID:
-                return fmt::format(
-                    "RPC_ASSERT(rpc::are_in_same_zone(this, {0}.get()));\n"
-                    "\t\t\tauto {0}_stub_id_ = proxy_bind_in_param(__rpc_sp->get_remote_rpc_version(), {0}, {0}_stub_);",
-                    name);
+                return fmt::format("RPC_ASSERT(rpc::are_in_same_zone(this, {0}.get()));\n"
+                                   "\t\t\tauto {0}_stub_id_ = proxy_bind_in_param(__rpc_sp->get_remote_rpc_version(), "
+                                   "{0}, {0}_stub_);",
+                                   name);
             case PROXY_MARSHALL_IN:
             {
                 auto ret = fmt::format(",(\"_{1}\", {0}_stub_id_)", name, count);
@@ -364,7 +364,7 @@ namespace rpc_generator
             {
                 pos += template_pattern.length();
                 while(type_name[pos] == ' ' || type_name[pos] == '\n' || type_name[pos] == '\r'
-                       || type_name[pos] == '\t')
+                      || type_name[pos] == '\t')
                     pos++;
                 auto rpos = type_name.rfind(">");
                 if(rpos == std::string::npos)
@@ -373,7 +373,7 @@ namespace rpc_generator
                     throw fmt::format("template parameter is malformed {}", type_name);
                 }
                 while(type_name[rpos] == ' ' || type_name[rpos] == '\n' || type_name[rpos] == '\r'
-                       || type_name[rpos] == '\t')
+                      || type_name[rpos] == '\t')
                     rpos++;
                 return type_name.substr(pos, rpos - pos);
             }
@@ -577,7 +577,9 @@ namespace rpc_generator
         }
 
         void write_method(bool from_host, const class_entity& m_ob, writer& proxy, writer& stub,
-                          const std::string& interface_name, const std::shared_ptr < function_entity >& function, int& function_count, bool catch_stub_exceptions, const std::vector<std::string>& rethrow_exceptions)
+                          const std::string& interface_name, const std::shared_ptr<function_entity>& function,
+                          int& function_count, bool catch_stub_exceptions,
+                          const std::vector<std::string>& rethrow_exceptions)
         {
             if(function->get_entity_type() == entity_type::FUNCTION_METHOD)
             {
@@ -643,7 +645,7 @@ namespace rpc_generator
                     {
                         std::string output;
                         if(is_in_call(STUB_DEMARSHALL_DECLARATION, from_host, m_ob, parameter.get_name(),
-                                       parameter.get_type(), parameter.get_attributes(), count, output))
+                                      parameter.get_type(), parameter.get_attributes(), count, output))
                             has_inparams = true;
                         else
                             is_out_call(STUB_DEMARSHALL_DECLARATION, from_host, m_ob, parameter.get_name(),
@@ -666,12 +668,12 @@ namespace rpc_generator
                     std::string output;
                     {
                         if(!is_in_call(PROXY_PREPARE_IN, from_host, m_ob, parameter.get_name(), parameter.get_type(),
-                                        parameter.get_attributes(), count, output))
+                                       parameter.get_attributes(), count, output))
                             continue;
                         proxy(output);
 
                         if(!is_in_call(PROXY_PREPARE_IN_INTERFACE_ID, from_host, m_ob, parameter.get_name(),
-                                        parameter.get_type(), parameter.get_attributes(), count, output))
+                                       parameter.get_type(), parameter.get_attributes(), count, output))
                             continue;
 
                         proxy(output);
@@ -701,7 +703,7 @@ namespace rpc_generator
                         std::string output;
                         {
                             if(!is_in_call(PROXY_MARSHALL_IN, from_host, m_ob, parameter.get_name(),
-                                            parameter.get_type(), parameter.get_attributes(), count, output))
+                                           parameter.get_type(), parameter.get_attributes(), count, output))
                                 continue;
 
                             proxy(output);
@@ -715,7 +717,7 @@ namespace rpc_generator
                         std::string output;
                         {
                             if(!is_in_call(STUB_MARSHALL_IN, from_host, m_ob, parameter.get_name(),
-                                            parameter.get_type(), parameter.get_attributes(), count, output))
+                                           parameter.get_type(), parameter.get_attributes(), count, output))
                                 continue;
 
                             stub(output);
@@ -728,7 +730,8 @@ namespace rpc_generator
                     proxy("{{");
                     proxy("yas::save<yas::mem|yas::binary|yas::no_header>(__rpc_writer, __rpc_in_yas_mapping);");
                     proxy("auto __rpc_writer_buf = __rpc_writer.get_intrusive_buffer();");
-                    proxy("__rpc_in_buf = std::vector<char>(__rpc_writer_buf.data, __rpc_writer_buf.data + __rpc_writer_buf.size);");
+                    proxy("__rpc_in_buf = std::vector<char>(__rpc_writer_buf.data, __rpc_writer_buf.data + "
+                          "__rpc_writer_buf.size);");
                     proxy("}}");
                     stub("  );");
                     stub("{{");
@@ -783,8 +786,6 @@ namespace rpc_generator
                     stub("}}");
                 }
 
-
-
                 stub("}}");
 
                 stub("#endif");
@@ -796,7 +797,7 @@ namespace rpc_generator
                     {
                         std::string output;
                         if(!is_in_call(STUB_PARAM_WRAP, from_host, m_ob, parameter.get_name(), parameter.get_type(),
-                                        parameter.get_attributes(), count, output))
+                                       parameter.get_attributes(), count, output))
                             is_out_call(STUB_PARAM_WRAP, from_host, m_ob, parameter.get_name(), parameter.get_type(),
                                         parameter.get_attributes(), count, output);
                         stub.raw("{}", output);
@@ -822,7 +823,7 @@ namespace rpc_generator
                     {
                         std::string output;
                         if(!is_in_call(STUB_PARAM_CAST, from_host, m_ob, parameter.get_name(), parameter.get_type(),
-                                        parameter.get_attributes(), count, output))
+                                       parameter.get_attributes(), count, output))
                             is_out_call(STUB_PARAM_CAST, from_host, m_ob, parameter.get_name(), parameter.get_type(),
                                         parameter.get_attributes(), count, output);
                         if(has_param)
@@ -849,9 +850,10 @@ namespace rpc_generator
                     stub("#ifdef USE_RPC_LOGGING");
                     stub("catch(std::exception ex)");
                     stub("{{");
-                    stub("auto error_message = std::string(\"exception has occurred in an {} implementation in function {} "
-                        "\") + ex.what();",
-                        interface_name, function->get_name());
+                    stub("auto error_message = std::string(\"exception has occurred in an {} implementation in "
+                         "function {} "
+                         "\") + ex.what();",
+                         interface_name, function->get_name());
                     stub("LOG_STR(error_message.data(), error_message.length());");
                     stub("__rpc_ret = rpc::error::EXCEPTION();");
                     stub("}}");
@@ -859,7 +861,8 @@ namespace rpc_generator
                     stub("catch(...)");
                     stub("{{");
                     stub("#ifdef USE_RPC_LOGGING");
-                    stub("auto error_message = std::string(\"exception has occurred in an {} implementation in function "
+                    stub(
+                        "auto error_message = std::string(\"exception has occurred in an {} implementation in function "
                         "{}\");",
                         interface_name, function->get_name());
                     stub("LOG_STR(error_message.data(), error_message.length());");
@@ -878,10 +881,10 @@ namespace rpc_generator
                         count++;
                         std::string output;
                         if(is_in_call(PROXY_OUT_DECLARATION, from_host, m_ob, parameter.get_name(),
-                                       parameter.get_type(), parameter.get_attributes(), count, output))
+                                      parameter.get_type(), parameter.get_attributes(), count, output))
                             continue;
                         if(!is_out_call(PROXY_OUT_DECLARATION, from_host, m_ob, parameter.get_name(),
-                                         parameter.get_type(), parameter.get_attributes(), count, output))
+                                        parameter.get_type(), parameter.get_attributes(), count, output))
                             continue;
 
                         proxy(output);
@@ -896,7 +899,7 @@ namespace rpc_generator
                         std::string output;
 
                         if(!is_out_call(STUB_ADD_REF_OUT_PREDECLARE, from_host, m_ob, parameter.get_name(),
-                                         parameter.get_type(), parameter.get_attributes(), count, output))
+                                        parameter.get_type(), parameter.get_attributes(), count, output))
                             continue;
 
                         stub(output);
@@ -914,7 +917,7 @@ namespace rpc_generator
                         std::string output;
 
                         if(!is_out_call(STUB_ADD_REF_OUT, from_host, m_ob, parameter.get_name(), parameter.get_type(),
-                                         parameter.get_attributes(), count, output))
+                                        parameter.get_attributes(), count, output))
                             continue;
 
                         if(!has_preamble && !output.empty())
@@ -927,7 +930,7 @@ namespace rpc_generator
                         }
                         stub(output);
                     }
-                    if (has_preamble)
+                    if(has_preamble)
                     {
                         stub("}}");
                         stub("else");
@@ -942,7 +945,7 @@ namespace rpc_generator
                 {
                     std::string output;
                     if(is_out_call(PROXY_MARSHALL_OUT, from_host, m_ob, parameter.get_name(), parameter.get_type(),
-                                    parameter.get_attributes(), count, output))
+                                   parameter.get_attributes(), count, output))
                     {
                         has_out_parameter = true;
                         break;
@@ -971,13 +974,13 @@ namespace rpc_generator
                     {
                         count++;
                         std::string output;
-                        if(!is_out_call(PROXY_MARSHALL_OUT, from_host, m_ob, parameter.get_name(),
-                                         parameter.get_type(), parameter.get_attributes(), count, output))
+                        if(!is_out_call(PROXY_MARSHALL_OUT, from_host, m_ob, parameter.get_name(), parameter.get_type(),
+                                        parameter.get_attributes(), count, output))
                             continue;
                         proxy(output);
 
                         if(!is_out_call(STUB_MARSHALL_OUT, from_host, m_ob, parameter.get_name(), parameter.get_type(),
-                                         parameter.get_attributes(), count, output))
+                                        parameter.get_attributes(), count, output))
                             continue;
 
                         stub(output);
@@ -1040,7 +1043,8 @@ namespace rpc_generator
                     stub("return rpc::error::STUB_DESERIALISATION_ERROR();");
                     stub("}}");
                     stub("auto __rpc_writer_buf = __rpc_writer.get_intrusive_buffer();");
-                    stub("__rpc_out_buf = std::vector<char>(__rpc_writer_buf.data, __rpc_writer_buf.data + __rpc_writer_buf.size);");
+                    stub("__rpc_out_buf = std::vector<char>(__rpc_writer_buf.data, __rpc_writer_buf.data + "
+                         "__rpc_writer_buf.size);");
                     stub("return __rpc_ret;");
 
                     proxy("}}");
@@ -1073,10 +1077,10 @@ namespace rpc_generator
                         count++;
                         std::string output;
                         if(is_in_call(PROXY_VALUE_RETURN, from_host, m_ob, parameter.get_name(), parameter.get_type(),
-                                       parameter.get_attributes(), count, output))
+                                      parameter.get_attributes(), count, output))
                             continue;
-                        if(!is_out_call(PROXY_VALUE_RETURN, from_host, m_ob, parameter.get_name(),
-                                         parameter.get_type(), parameter.get_attributes(), count, output))
+                        if(!is_out_call(PROXY_VALUE_RETURN, from_host, m_ob, parameter.get_name(), parameter.get_type(),
+                                        parameter.get_attributes(), count, output))
                             continue;
 
                         proxy(output);
@@ -1090,7 +1094,7 @@ namespace rpc_generator
                         std::string output;
                         {
                             if(!is_in_call(PROXY_CLEAN_IN, from_host, m_ob, parameter.get_name(), parameter.get_type(),
-                                            parameter.get_attributes(), count, output))
+                                           parameter.get_attributes(), count, output))
                                 continue;
 
                             proxy(output);
@@ -1108,8 +1112,8 @@ namespace rpc_generator
                 stub("break;");
             }
         }
-        void write_interface(bool from_host, const class_entity& m_ob, writer& proxy, writer& stub,
-                             size_t id, bool catch_stub_exceptions, const std::vector<std::string>& rethrow_exceptions)
+        void write_interface(bool from_host, const class_entity& m_ob, writer& proxy, writer& stub, size_t id,
+                             bool catch_stub_exceptions, const std::vector<std::string>& rethrow_exceptions)
         {
             if(m_ob.is_in_import())
                 return;
@@ -1157,7 +1161,8 @@ namespace rpc_generator
                 for(auto& function : m_ob.get_functions())
                 {
                     if(function->get_entity_type() == entity_type::FUNCTION_METHOD)
-                        write_method(from_host, m_ob, proxy, stub, interface_name, function, function_count, catch_stub_exceptions, rethrow_exceptions);
+                        write_method(from_host, m_ob, proxy, stub, interface_name, function, function_count,
+                                     catch_stub_exceptions, rethrow_exceptions);
                 }
 
                 stub("default:");
@@ -1173,8 +1178,6 @@ namespace rpc_generator
             stub("");
         };
 
-
-  
         void build_scoped_name(const class_entity* entity, std::string& name)
         {
             auto* owner = entity->get_owner();
@@ -1186,8 +1189,8 @@ namespace rpc_generator
         }
 
         // entry point
-        void write_namespace(bool from_host, const class_entity& lib, std::string prefix, writer& proxy,
-                             writer& stub, bool catch_stub_exceptions, const std::vector<std::string>& rethrow_exceptions)
+        void write_namespace(bool from_host, const class_entity& lib, std::string prefix, writer& proxy, writer& stub,
+                             bool catch_stub_exceptions, const std::vector<std::string>& rethrow_exceptions)
         {
             for(auto& elem : lib.get_elements(entity_type::NAMESPACE_MEMBERS))
             {
@@ -1213,12 +1216,13 @@ namespace rpc_generator
                     proxy("{{");
                     stub("{{");
                     auto& ent = static_cast<const class_entity&>(*elem);
-                    write_namespace(from_host, ent, prefix + elem->get_name() + "::", proxy, stub, catch_stub_exceptions, rethrow_exceptions);
+                    write_namespace(from_host, ent, prefix + elem->get_name() + "::", proxy, stub,
+                                    catch_stub_exceptions, rethrow_exceptions);
                     proxy("}}");
                     stub("}}");
                 }
                 else if(elem->get_entity_type() == entity_type::INTERFACE
-                         || elem->get_entity_type() == entity_type::LIBRARY)
+                        || elem->get_entity_type() == entity_type::LIBRARY)
                 {
                     auto& ent = static_cast<const class_entity&>(*elem);
                     write_interface(from_host, ent, proxy, stub, hash, catch_stub_exceptions, rethrow_exceptions);
@@ -1227,25 +1231,20 @@ namespace rpc_generator
         }
 
         // entry point
-        void write_files(std::string module_name
-                        , bool from_host
-                        , const class_entity& lib
-                        , std::ostream& header_stream
-                        , const std::vector<std::string>& namespaces
-                        , const std::string& header_filename
-                        , const std::list<std::string>& imports
-                        , const std::vector<std::string>& additional_headers
-                        , bool catch_stub_exceptions
-                        , const std::vector<std::string>& rethrow_exceptions
-                        , const std::vector<std::string>& additional_stub_headers)
+        void write_files(std::string module_name, bool from_host, const class_entity& lib, std::ostream& header_stream,
+                         const std::vector<std::string>& namespaces, const std::string& header_filename,
+                         const std::list<std::string>& imports, const std::vector<std::string>& additional_headers,
+                         bool catch_stub_exceptions, const std::vector<std::string>& rethrow_exceptions,
+                         const std::vector<std::string>& additional_stub_headers)
         {
             std::stringstream tmpstr;
-            std::ostream& t= tmpstr;
+            std::ostream& t = tmpstr;
             writer tmp(t);
             writer header(header_stream);
 
             std::for_each(additional_stub_headers.begin(), additional_stub_headers.end(),
-                          [&](const std::string& additional_stub_header) { impl("#include <{}>", additional_stub_header); });
+                          [&](const std::string& additional_stub_header)
+                          { impl("#include <{}>", additional_stub_header); });
 
             header("#include <yas/mem_streams.hpp>");
             header("#include <yas/binary_iarchive.hpp>");
