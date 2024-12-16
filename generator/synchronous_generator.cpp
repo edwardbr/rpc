@@ -713,9 +713,9 @@ namespace rpc_generator
                         }
                         count++;
                     }
-                    proxy.raw("__rpc_in_buf, rpc::encoding::enc_default);\n");
+                    proxy.raw("__rpc_in_buf, __rpc_sp->get_encoding());\n");
 
-                    stub.raw("in_buf_, in_size_, rpc::encoding::enc_default);\n");
+                    stub.raw("in_buf_, in_size_, enc);\n");
                     stub("if(__rpc_ret != rpc::error::OK())");
                     stub("  return __rpc_ret;");
                 }
@@ -944,11 +944,11 @@ namespace rpc_generator
 
                         stub.raw(output);
                     }
-                    proxy.raw("__rpc_out_buf.data(), __rpc_out_buf.size(), rpc::encoding::enc_default);\n");
+                    proxy.raw("__rpc_out_buf.data(), __rpc_out_buf.size(), __rpc_sp->get_encoding());\n");
                     proxy("if(__receiver_result != rpc::error::OK())");
                     proxy("  __rpc_ret = __receiver_result;");
 
-                    stub.raw("__rpc_out_buf, rpc::encoding::enc_default);\n");
+                    stub.raw("__rpc_out_buf, enc);\n");
 
                     stub("return __rpc_ret;");
                 }

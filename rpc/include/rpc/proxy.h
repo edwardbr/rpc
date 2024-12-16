@@ -283,6 +283,11 @@ namespace rpc
         uint64_t get_remote_rpc_version() const {return version_.load();}
         bool is_unused() const {return lifetime_lock_count_ == 0;}
 
+        encoding get_encoding() const
+        {
+            return enc_;
+        }       
+
         uint64_t set_encoding(encoding enc)
         {
             enc_ = enc;
