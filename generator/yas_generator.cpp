@@ -588,8 +588,8 @@ namespace rpc_generator
             bool has_inparams = false;
             proxy("template<>");
             proxy("{}", ::rpc_generator::write_proxy_send_declaration(
-                            m_ob, interface_name + "::proxy_sender<rpc::serialiser::yas>::", function, function_count,
-                            has_inparams));
+                            m_ob, interface_name + "::proxy_sender<rpc::serialiser::yas, rpc::encoding>::", function, function_count,
+                            has_inparams, ", rpc::encoding __rpc_enc", false));
             proxy("{{");
 
             proxy("std::vector<char> __rpc_buf;");
@@ -656,8 +656,8 @@ namespace rpc_generator
             bool has_inparams = false;
             proxy("template<>");
             proxy("{}", ::rpc_generator::write_proxy_receive_declaration(
-                            m_ob, interface_name + "::proxy_receiver<rpc::serialiser::yas>::", function, function_count,
-                            has_inparams));
+                            m_ob, interface_name + "::proxy_receiver<rpc::serialiser::yas, rpc::encoding>::", function, function_count,
+                            has_inparams, ", rpc::encoding __rpc_enc", false));
             proxy("{{");
 
             if(has_inparams)
@@ -738,8 +738,8 @@ namespace rpc_generator
             bool has_outparams = false;
             proxy("template<>");
             proxy("{}", ::rpc_generator::write_stub_receive_declaration(
-                            m_ob, interface_name + "::stub_receiver<rpc::serialiser::yas>::", function, function_count,
-                            has_outparams));
+                            m_ob, interface_name + "::stub_receiver<rpc::serialiser::yas, rpc::encoding>::", function, function_count,
+                            has_outparams, ", rpc::encoding __rpc_enc", false));
             proxy("{{");
 
             if(has_outparams)
@@ -821,8 +821,8 @@ namespace rpc_generator
             bool has_outparams = false;
             proxy("template<>");
             proxy("{}", ::rpc_generator::write_stub_reply_declaration(
-                            m_ob, interface_name + "::stub_sender<rpc::serialiser::yas>::", function, function_count,
-                            has_outparams));
+                            m_ob, interface_name + "::stub_sender<rpc::serialiser::yas, rpc::encoding>::", function, function_count,
+                            has_outparams, ", rpc::encoding __rpc_enc", false));
             proxy("{{");
 
             proxy("std::vector<char> __rpc_buf;");
@@ -927,7 +927,7 @@ namespace rpc_generator
                             bool has_params = false;
                             if(unique_signatures
                                    .emplace(::rpc_generator::write_proxy_send_declaration(m_ob, "", function,
-                                                                                          function_count, has_params))
+                                                                                          function_count, has_params, ", rpc::encoding __rpc_enc", false))
                                    .second)
                             {
                                 write_proxy_send_method(from_host, m_ob, proxy, interface_name, function,
@@ -959,7 +959,7 @@ namespace rpc_generator
                             bool has_params = false;
                             if(unique_signatures
                                    .emplace(::rpc_generator::write_proxy_receive_declaration(
-                                       m_ob, "", function, function_count, has_params))
+                                       m_ob, "", function, function_count, has_params, ", rpc::encoding __rpc_enc", false))
                                    .second)
                             {
                                 write_proxy_receive_method(from_host, m_ob, proxy, interface_name, function,
@@ -991,7 +991,7 @@ namespace rpc_generator
                             bool has_params = false;
                             if(unique_signatures
                                    .emplace(::rpc_generator::write_stub_receive_declaration(m_ob, "", function,
-                                                                                            function_count, has_params))
+                                                                                            function_count, has_params, ", rpc::encoding __rpc_enc", false))
                                    .second)
                             {
                                 write_stub_receive_method(from_host, m_ob, proxy, interface_name, function,
@@ -1023,7 +1023,7 @@ namespace rpc_generator
                             bool has_params = false;
                             if(unique_signatures
                                    .emplace(::rpc_generator::write_stub_reply_declaration(m_ob, "", function,
-                                                                                          function_count, has_params))
+                                                                                          function_count, has_params, ", rpc::encoding __rpc_enc", false))
                                    .second)
                             {
                                 write_stub_reply_method(from_host, m_ob, proxy, interface_name, function,

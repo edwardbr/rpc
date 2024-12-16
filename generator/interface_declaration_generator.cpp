@@ -459,12 +459,12 @@ namespace rpc_generator
 
     std::string write_proxy_send_declaration(const class_entity& m_ob, const std::string& scope,
                                              const std::shared_ptr<function_entity>& function, int function_count,
-                                             bool& has_inparams)
+                                             bool& has_inparams, std::string additional_params, bool include_variadics)
     {
         std::stringstream stream;
         writer header(stream);
 
-        header.raw("int {}{}(rpc::encoding __rpc_enc, std::vector<char>& buffer", scope, function->get_name());
+        header.raw("int {}{}(", scope, function->get_name());
         has_inparams = false;
         {
             uint64_t count = 1;
@@ -478,7 +478,6 @@ namespace rpc_generator
                     continue;
 
                 has_inparams = true;
-                header.raw(", ");
 
                 std::string modifier;
                 for(auto& item : parameter.get_attributes())
@@ -493,21 +492,26 @@ namespace rpc_generator
                     continue;
 
                 header.raw(output);
+                header.raw(", ");
                 count++;
             }
         }
-        header.raw(")");
+        header.raw("std::vector<char>& __buffer");
+        header.raw(additional_params);
+        if(include_variadics)
+            header.raw(", __Args... __args");
+        header.raw(")");            
         return stream.str();
     }
 
     std::string write_proxy_receive_declaration(const class_entity& m_ob, const std::string& scope,
                                                 const std::shared_ptr<function_entity>& function, int& function_count,
-                                                bool& has_inparams)
+                                                bool& has_inparams, std::string additional_params, bool include_variadics)
     {
         std::stringstream stream;
         writer header(stream);
 
-        header.raw("int {}{}(rpc::encoding __rpc_enc, const char* __rpc_buf, size_t __rpc_buf_size", scope,
+        header.raw("int {}{}(", scope,
                    function->get_name());
         has_inparams = false;
 
@@ -519,7 +523,6 @@ namespace rpc_generator
 
             if(!out)
                 continue;
-            header.raw(", ");
             has_inparams = true;
 
             std::string modifier;
@@ -534,21 +537,26 @@ namespace rpc_generator
                             parameter.get_attributes(), count, output))
                 continue;
             header.raw(output);
+            header.raw(", ");
             count++;
         }
-        header.raw(")");
+        header.raw("const char* __rpc_buf, size_t __rpc_buf_size");
+        header.raw(additional_params);
+        if(include_variadics)
+            header.raw(", __Args... __args");
+        header.raw(")");            
         return stream.str();
     }
 
     std::string write_stub_receive_declaration(const class_entity& m_ob, const std::string& scope,
                                                const std::shared_ptr<function_entity>& function, int function_count,
-                                               bool& has_outparams)
+                                               bool& has_outparams, std::string additional_params, bool include_variadics)
     {
         std::stringstream stream;
         writer header(stream);
 
         has_outparams = false;
-        header.raw("int {}{}(rpc::encoding __rpc_enc, const char* __rpc_buf, size_t __rpc_buf_size", scope,
+        header.raw("int {}{}(", scope,
                    function->get_name());
 
         uint64_t count = 1;
@@ -559,8 +567,7 @@ namespace rpc_generator
             auto in = std::find(attributes.begin(), attributes.end(), "in") != attributes.end();
 
             if(!in && out)
-                continue;
-            header.raw(", ");
+                continue;            
             has_outparams = true;
 
             std::string modifier;
@@ -575,20 +582,25 @@ namespace rpc_generator
                            parameter.get_attributes(), count, output))
                 continue;
             header.raw(output);
+            header.raw(", ");
             count++;
         }
-        header.raw(")");
+        header.raw("const char* __rpc_buf, size_t __rpc_buf_size");
+        header.raw(additional_params);
+        if(include_variadics)
+            header.raw(", __Args... __args");
+        header.raw(")");            
         return stream.str();
     }
 
     std::string write_stub_reply_declaration(const class_entity& m_ob, const std::string& scope,
                                              const std::shared_ptr<function_entity>& function, int function_count,
-                                             bool& has_outparams)
+                                             bool& has_outparams, std::string additional_params, bool include_variadics)
     {
         std::stringstream stream;
         writer header(stream);
 
-        header.raw("int {}{}(rpc::encoding __rpc_enc, std::vector<char>& buffer", scope, function->get_name());
+        header.raw("int {}{}(", scope, function->get_name());
         has_outparams = false;
         {
             uint64_t count = 1;
@@ -599,8 +611,6 @@ namespace rpc_generator
 
                 if(!out)
                     continue;
-
-                header.raw(", ");
 
                 has_outparams = true;
                 std::string modifier;
@@ -616,111 +626,17 @@ namespace rpc_generator
                     continue;
 
                 header.raw(output);
+                header.raw(", ");
                 count++;
             }
         }
-        header.raw(")");
+        header.raw("std::vector<char>& __buffer");
+        header.raw(additional_params);
+        if(include_variadics)
+            header.raw(", __Args... __args");
+        header.raw(")");            
         return stream.str();
     }
-
-    // void write_send_method(writer& header, const std::shared_ptr<function_entity>& function)
-    // {
-    //     if(function->get_entity_type() == entity_type::FUNCTION_METHOD)
-    //     {
-    //         header.print_tabs();
-    //         for(auto& item : function->get_attributes())
-    //         {
-    //             if(item == "deprecated" || item == "_deprecated")
-    //                 header.raw("[[deprecated]] ");
-    //         }
-    //         header.raw("virtual void {}(", function->get_name());
-    //         bool has_parameter = false;
-    //         for(auto& parameter : function->get_parameters())
-    //         {
-    //             auto& attributes = parameter.get_attributes();
-    //             auto in = std::find(attributes.begin(), attributes.end(), "in") != attributes.end();
-    //             auto out = std::find(attributes.begin(), attributes.end(), "out") != attributes.end();
-    //             if(out && !in)
-    //                 continue;
-
-    //             if(has_parameter)
-    //             {
-    //                 header.raw(", ");
-    //             }
-    //             has_parameter = true;
-    //             std::string modifier;
-    //             for(auto& item : parameter.get_attributes())
-    //             {
-    //                 if(item == "const")
-    //                     modifier = "const " + modifier;
-    //             }
-    //             header.raw("{}{} {}", modifier, parameter.get_type(), parameter.get_name());
-    //         }
-    //         bool function_is_const = false;
-    //         for(auto& item : function->get_attributes())
-    //         {
-    //             if(item == "const")
-    //                 function_is_const = true;
-    //         }
-    //         if(function_is_const)
-    //         {
-    //             header.raw(") const = 0;\n");
-    //         }
-    //         else
-    //         {
-    //             header.raw(") = 0;\n");
-    //         }
-    //     }
-    // }
-
-    // void write_receive_method(writer& header, const std::shared_ptr<function_entity>& function)
-    // {
-    //     if(function->get_entity_type() == entity_type::FUNCTION_METHOD)
-    //     {
-    //         header.print_tabs();
-    //         for(auto& item : function->get_attributes())
-    //         {
-    //             if(item == "deprecated" || item == "_deprecated")
-    //                 header.raw("[[deprecated]] ");
-    //         }
-    //         header.raw("virtual {} {}(", function->get_return_type(), function->get_name());
-    //         bool has_parameter = false;
-    //         for(auto& parameter : function->get_parameters())
-    //         {
-    //             auto& attributes = parameter.get_attributes();
-    //             auto out = std::find(attributes.begin(), attributes.end(), "out") != attributes.end();
-    //             if(!out)
-    //                 continue;
-
-    //             if(has_parameter)
-    //             {
-    //                 header.raw(", ");
-    //             }
-    //             has_parameter = true;
-    //             std::string modifier;
-    //             for(auto& item : parameter.get_attributes())
-    //             {
-    //                 if(item == "const")
-    //                     modifier = "const " + modifier;
-    //             }
-    //             header.raw("{}{} {}", modifier, parameter.get_type(), parameter.get_name());
-    //         }
-    //         bool function_is_const = false;
-    //         for(auto& item : function->get_attributes())
-    //         {
-    //             if(item == "const")
-    //                 function_is_const = true;
-    //         }
-    //         if(function_is_const)
-    //         {
-    //             header.raw(") const = 0;\n");
-    //         }
-    //         else
-    //         {
-    //             header.raw(") = 0;\n");
-    //         }
-    //     }
-    // }
 
     void write_method(const class_entity& m_ob, writer& header, const std::string& interface_name,
                       const std::shared_ptr<function_entity>& function, int& function_count)
@@ -877,7 +793,7 @@ namespace rpc_generator
         header("public:");
         header("// ********************* compile time polymorphic serialisers *********************");
         header("// template class for serialising request data to a stub or some other target");
-        header("template<typename Serialiser>");
+        header("template<typename __Serialiser, typename... __Args>");
         header("struct proxy_sender");
         header("{{");
         {
@@ -891,7 +807,7 @@ namespace rpc_generator
                     function_count++;
                     bool has_params = false;
                     auto key
-                        = ::rpc_generator::write_proxy_send_declaration(m_ob, "", function, function_count, has_params);
+                        = ::rpc_generator::write_proxy_send_declaration(m_ob, "", function, function_count, has_params, "", true);
                     if(unique_signatures.emplace(key).second)
                     {
                         header("static {};", key);
@@ -902,7 +818,7 @@ namespace rpc_generator
         header("}};");
         header("");
         header("// template class for serialising reply data to a proxy or some other target");
-        header("template<typename Serialiser>");
+        header("template<typename __Serialiser, typename... __Args>");
         header("struct stub_receiver");
         header("{{");
         {
@@ -916,7 +832,7 @@ namespace rpc_generator
                     function_count++;
                     bool has_params = false;
                     auto key = ::rpc_generator::write_stub_receive_declaration(m_ob, "", function, function_count,
-                                                                               has_params);
+                                                                               has_params, "", true);
                     if(unique_signatures.emplace(key).second)
                     {
                         header("static {};", key);
@@ -927,7 +843,7 @@ namespace rpc_generator
         header("}};");
         header("");
         header("// template class for deserialising request data from a proxy or some other target");
-        header("template<typename Serialiser>");
+        header("template<typename __Serialiser, typename... __Args>");
         header("struct stub_sender");
         header("{{");
         {
@@ -941,7 +857,7 @@ namespace rpc_generator
                     function_count++;
                     bool has_params = false;
                     auto key
-                        = ::rpc_generator::write_stub_reply_declaration(m_ob, "", function, function_count, has_params);
+                        = ::rpc_generator::write_stub_reply_declaration(m_ob, "", function, function_count, has_params,"",  true);
                     if(unique_signatures.emplace(key).second)
                     {
                         header("static {};", key);
@@ -952,7 +868,7 @@ namespace rpc_generator
         header("}};");
         header("");
         header("// template class for deserialising reply data from a stub or some other target");
-        header("template<typename Serialiser>");
+        header("template<typename __Serialiser, typename... __Args>");
         header("struct proxy_receiver");
         header("{{");
         {
@@ -967,7 +883,7 @@ namespace rpc_generator
 
                     bool has_params = false;
                     auto key = ::rpc_generator::write_proxy_receive_declaration(m_ob, "", function, function_count,
-                                                                                has_params);
+                                                                                has_params, "", true);
                     if(unique_signatures.emplace(key).second)
                     {
                         header("static {};", key);

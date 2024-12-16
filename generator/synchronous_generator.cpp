@@ -72,17 +72,17 @@ namespace rpc_generator
             switch (option)
             {
             case PROXY_MARSHALL_IN:
-                return fmt::format(", {0}", name);
+                return fmt::format("{0}, ", name);
             case PROXY_MARSHALL_OUT:
-                return fmt::format("  ,{0}", name);
+                return fmt::format("{0}, ", name);
             case STUB_DEMARSHALL_DECLARATION:
                 return fmt::format("{} {}_{{}}", object_type, name);
             case STUB_MARSHALL_IN:
-                return fmt::format(" ,{}_", name);
+                return fmt::format("{}_, ", name);
             case STUB_PARAM_CAST:
                 return fmt::format("{}_", name);
             case STUB_MARSHALL_OUT:
-                return fmt::format(" ,{0}_", name);
+                return fmt::format("{0}_, ", name);
             default:
                 return "";
             }
@@ -102,13 +102,13 @@ namespace rpc_generator
             switch (option)
             {
             case PROXY_MARSHALL_IN:
-                return fmt::format(", {0}", name);
+                return fmt::format("{0}, ", name);
             case PROXY_MARSHALL_OUT:
-                return fmt::format("  ,{0}", name);
+                return fmt::format("{0}, ", name);
             case STUB_DEMARSHALL_DECLARATION:
                 return fmt::format("{} {}_{{}}", object_type, name);
             case STUB_MARSHALL_IN:
-                return fmt::format(" ,{}_", name);
+                return fmt::format("{}_, ", name);
             case STUB_PARAM_CAST:
                 return fmt::format("{}_", name);
             default:
@@ -133,17 +133,17 @@ namespace rpc_generator
             switch (option)
             {
             case PROXY_MARSHALL_IN:
-                return fmt::format(", std::move({0})", name);
+                return fmt::format("std::move({0}), ", name);
             case PROXY_MARSHALL_OUT:
-                return fmt::format("  ,{0}", name);
+                return fmt::format("{0}, ", name);
             case STUB_DEMARSHALL_DECLARATION:
                 return fmt::format("{} {}_{{}}", object_type, name);
             case STUB_MARSHALL_IN:
-                return fmt::format(" ,{}_", name);
+                return fmt::format("{}_, ", name);
             case STUB_PARAM_CAST:
                 return fmt::format("std::move({}_)", name);
             case STUB_MARSHALL_OUT:
-                return fmt::format(" ,{0}_", name);
+                return fmt::format("{0}_, ", name);
             default:
                 return "";
             }
@@ -162,13 +162,13 @@ namespace rpc_generator
             switch (option)
             {
             case PROXY_MARSHALL_IN:
-                return fmt::format(", (uint64_t){}", name);
+                return fmt::format("(uint64_t){}, ", name);
             case PROXY_MARSHALL_OUT:
-                return fmt::format(" ,(uint64_t){}", count, name);
+                return fmt::format("(uint64_t){}, ", count, name);
             case STUB_DEMARSHALL_DECLARATION:
                 return fmt::format("uint64_t {}_{{}}", name);
             case STUB_MARSHALL_IN:
-                return fmt::format(" ,{}_", name);
+                return fmt::format("{}_, ", name);
             case STUB_PARAM_CAST:
                 return fmt::format("({}*){}_", object_type, name);
             default:
@@ -189,9 +189,9 @@ namespace rpc_generator
             switch (option)
             {
             case PROXY_MARSHALL_IN:
-                return fmt::format(", {0}_", name);
+                return fmt::format("{0}_, ", name);
             case PROXY_MARSHALL_OUT:
-                return fmt::format("  ,{0}_", name);
+                return fmt::format("{0}_, ", name);
             case STUB_DEMARSHALL_DECLARATION:
                 return fmt::format("{}* {}_ = nullptr", object_type, name);
             case STUB_PARAM_CAST:
@@ -199,7 +199,7 @@ namespace rpc_generator
             case PROXY_OUT_DECLARATION:
                 return fmt::format("uint64_t {}_ = 0;", name);
             case STUB_MARSHALL_OUT:
-                return fmt::format(" ,(uint64_t){}_", name);
+                return fmt::format("(uint64_t){}_, ", name);
             case PROXY_VALUE_RETURN:
                 return fmt::format("{} = ({}*){}_;", name, object_type, name);
 
@@ -217,9 +217,9 @@ namespace rpc_generator
             switch (option)
             {
             case PROXY_MARSHALL_IN:
-                return fmt::format(", {0}_", name);
+                return fmt::format("{0}_, ", name);
             case PROXY_MARSHALL_OUT:
-                return fmt::format("  ,{0}_", name);
+                return fmt::format("{0}_, ", name);
             case STUB_DEMARSHALL_DECLARATION:
                 return fmt::format("{}* {}_ = nullptr", object_type, name);
             case STUB_PARAM_CAST:
@@ -229,7 +229,7 @@ namespace rpc_generator
             case PROXY_OUT_DECLARATION:
                 return fmt::format("uint64_t {}_ = 0;", name);
             case STUB_MARSHALL_OUT:
-                return fmt::format(" ,(uint64_t){}_", name);
+                return fmt::format("(uint64_t){}_, ", name);
             default:
                 return "";
             }
@@ -257,12 +257,12 @@ namespace rpc_generator
                     name);
             case PROXY_MARSHALL_IN:
             {
-                auto ret = fmt::format(", {0}_stub_id_", name, count);
+                auto ret = fmt::format("{0}_stub_id_, ", name, count);
                 count++;
                 return ret;
             }
             case PROXY_MARSHALL_OUT:
-                return fmt::format("  ,{0}_", name);
+                return fmt::format("{0}_, ", name);
 
             case PROXY_CLEAN_IN:
                 return fmt::format("if({0}_stub_) {0}_stub_->release_from_service();", name);
@@ -273,7 +273,7 @@ namespace rpc_generator
                                    name);
             case STUB_MARSHALL_IN:
             {
-                auto ret = fmt::format(" ,{}_object_", name);
+                auto ret = fmt::format("{}_object_, ", name);
                 count++;
                 return ret;
             }
@@ -299,7 +299,7 @@ namespace rpc_generator
             case STUB_PARAM_CAST:
                 return fmt::format("{}", name);
             case STUB_MARSHALL_OUT:
-                return fmt::format(" ,(uint64_t){}", name);
+                return fmt::format("(uint64_t){}, ", name);
             case PROXY_VALUE_RETURN:
             case PROXY_OUT_DECLARATION:
                 return fmt::format("  rpc::interface_descriptor {}_;", name);
@@ -325,12 +325,12 @@ namespace rpc_generator
                     name);
             case PROXY_MARSHALL_IN:
             {
-                auto ret = fmt::format(", {0}_stub_id_", name, count);
+                auto ret = fmt::format("{0}_stub_id_, ", name, count);
                 count++;
                 return ret;
             }
             case PROXY_MARSHALL_OUT:
-                return fmt::format("  ,{0}_", name);
+                return fmt::format("{0}_, ", name);
 
             case PROXY_CLEAN_IN:
                 return fmt::format("if({0}_stub_) {0}_stub_->release_from_service();", name);
@@ -351,7 +351,7 @@ namespace rpc_generator
                     "{0}_ = stub_bind_out_param(zone_, protocol_version, caller_channel_zone_id, caller_zone_id, {0});",
                     name);
             case STUB_MARSHALL_OUT:
-                return fmt::format(" ,{}_", name);
+                return fmt::format("{}_, ", name);
             default:
                 return "";
             }
@@ -682,9 +682,9 @@ namespace rpc_generator
                 if(has_inparams)
                 {
                     proxy.print_tabs();
-                    proxy.raw("{}proxy_sender<rpc::serialiser::yas>::{}(rpc::encoding::enc_default, __rpc_in_buf", scoped_namespace, function->get_name());
+                    proxy.raw("{}proxy_sender<rpc::serialiser::yas, rpc::encoding>::{}(", scoped_namespace, function->get_name());
                     stub.print_tabs();
-                    stub.raw("auto __rpc_ret = {}stub_receiver<rpc::serialiser::yas>::{}(rpc::encoding::enc_default, in_buf_, in_size_",scoped_namespace, function->get_name());
+                    stub.raw("auto __rpc_ret = {}stub_receiver<rpc::serialiser::yas, rpc::encoding>::{}(",scoped_namespace, function->get_name());
                     count = 1;
                     for(auto& parameter : function->get_parameters())
                     {
@@ -712,9 +712,9 @@ namespace rpc_generator
                         }
                         count++;
                     }
-                    proxy.raw(");\n");
+                    proxy.raw("__rpc_in_buf, rpc::encoding::enc_default);\n");
 
-                    stub.raw(");\n");
+                    stub.raw("in_buf_, in_size_, rpc::encoding::enc_default);\n");
                     stub("if(__rpc_ret != rpc::error::OK())");
                     stub("  return __rpc_ret;");
                 }
@@ -918,10 +918,10 @@ namespace rpc_generator
                 {
                     uint64_t count = 1;
                     proxy.print_tabs();
-                    proxy.raw("auto __receiver_result = {}proxy_receiver<rpc::serialiser::yas>::{}(rpc::encoding::enc_default, __rpc_out_buf.data(), __rpc_out_buf.size()", scoped_namespace, function->get_name());
+                    proxy.raw("auto __receiver_result = {}proxy_receiver<rpc::serialiser::yas, rpc::encoding>::{}(", scoped_namespace, function->get_name());
 
                     stub.print_tabs();
-                    stub.raw("{}stub_sender<rpc::serialiser::yas>::{}(rpc::encoding::enc_default, __rpc_out_buf ",scoped_namespace, function->get_name());
+                    stub.raw("{}stub_sender<rpc::serialiser::yas, rpc::encoding>::{}(",scoped_namespace, function->get_name());
 
                     for(auto& parameter : function->get_parameters())
                     {
@@ -938,11 +938,11 @@ namespace rpc_generator
 
                         stub.raw(output);
                     }
-                    proxy.raw(");\n");
+                    proxy.raw("__rpc_out_buf.data(), __rpc_out_buf.size(), rpc::encoding::enc_default);\n");
                     proxy("if(__receiver_result != rpc::error::OK())");
                     proxy("  __rpc_ret = __receiver_result;");
 
-                    stub.raw(");\n");
+                    stub.raw("__rpc_out_buf, rpc::encoding::enc_default);\n");
 
                     stub("return __rpc_ret;");
                 }
@@ -1957,13 +1957,6 @@ namespace rpc_generator
 
             header("");
 
-            // std::string yas_header_filename;
-            // {
-            //     auto pos = header_filename.rfind('/');
-            //     auto prefix = header_filename.substr(0, pos + 1);
-            //     auto suffix = header_filename.substr(pos);
-            //     yas_header_filename = prefix + "yas" + suffix;
-            // }
             proxy("#include <yas/mem_streams.hpp>");
             proxy("#include <yas/binary_iarchive.hpp>");
             proxy("#include <yas/binary_oarchive.hpp>");
@@ -1977,7 +1970,6 @@ namespace rpc_generator
             proxy("#include <rpc/stub.h>");
             proxy("#include <rpc/service.h>");
             proxy("#include \"{}\"", header_filename);
-            //proxy("#include \"{}\"", yas_header_filename);
 
             proxy("");
 
