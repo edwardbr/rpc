@@ -1050,7 +1050,6 @@ namespace rpc_generator
                           [&](const std::string& additional_stub_header)
                           { header("#include <{}>", additional_stub_header); });
 
-            header("#pragma once");
             header("#include <yas/mem_streams.hpp>");
             header("#include <yas/binary_iarchive.hpp>");
             header("#include <yas/binary_oarchive.hpp>");
