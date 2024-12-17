@@ -549,7 +549,6 @@ namespace rpc_generator
                             function_count, has_inparams, ", rpc::encoding __rpc_enc", false));
             proxy("{{");
 
-            proxy("std::vector<char> __rpc_buf;");
             if(has_inparams)
             {
                 proxy("auto __yas_mapping = YAS_OBJECT_NVP(");
@@ -575,20 +574,20 @@ namespace rpc_generator
                 proxy("{{");
                 proxy("case rpc::encoding::yas_compressed_binary:");
                 proxy("::yas::save<::yas::mem|::yas::binary|::yas::compacted|::yas::no_header>(::yas::vector_"
-                      "ostream(__rpc_buf), "
+                      "ostream(__buffer), "
                       "__yas_mapping);");
                 proxy("break;");
                 proxy("case rpc::encoding::yas_text:");
-                proxy("::yas::save<::yas::mem|::yas::text|::yas::no_header>(::yas::vector_ostream(__rpc_buf), "
+                proxy("::yas::save<::yas::mem|::yas::text|::yas::no_header>(::yas::vector_ostream(__buffer), "
                       "__yas_mapping);");
                 proxy("break;");
                 proxy("case rpc::encoding::yas_json:");
-                proxy("::yas::save<::yas::mem|::yas::json|::yas::no_header>(::yas::vector_ostream(__rpc_buf), "
+                proxy("::yas::save<::yas::mem|::yas::json|::yas::no_header>(::yas::vector_ostream(__buffer), "
                       "__yas_mapping);");
                 proxy("break;");
                 proxy("case rpc::encoding::enc_default:");
                 proxy("case rpc::encoding::yas_binary:");
-                proxy("::yas::save<::yas::mem|::yas::binary|::yas::no_header>(::yas::vector_ostream(__rpc_buf), "
+                proxy("::yas::save<::yas::mem|::yas::binary|::yas::no_header>(::yas::vector_ostream(__buffer), "
                       "__yas_mapping);");
                 proxy("break;");
                 proxy("}}");
@@ -596,7 +595,7 @@ namespace rpc_generator
             else
             {
                 proxy("if(__rpc_enc == rpc::encoding::yas_json)");
-                proxy("  __rpc_buf = {{'{{','}}'}};");
+                proxy("  __buffer = {{'{{','}}'}};");
             }
             proxy("return rpc::error::OK();");
             proxy("}}");
@@ -782,7 +781,6 @@ namespace rpc_generator
                             function_count, has_outparams, ", rpc::encoding __rpc_enc", false));
             proxy("{{");
 
-            proxy("std::vector<char> __rpc_buf;");
             if(has_outparams)
             {
                 proxy("auto __yas_mapping = YAS_OBJECT_NVP(");
@@ -808,20 +806,20 @@ namespace rpc_generator
                 proxy("{{");
                 proxy("case rpc::encoding::yas_compressed_binary:");
                 proxy("::yas::save<::yas::mem|::yas::binary|::yas::compacted|::yas::no_header>(::yas::vector_"
-                      "ostream(__rpc_buf), "
+                      "ostream(__buffer), "
                       "__yas_mapping);");
                 proxy("break;");
                 proxy("case rpc::encoding::yas_text:");
-                proxy("::yas::save<::yas::mem|::yas::text|::yas::no_header>(::yas::vector_ostream(__rpc_buf), "
+                proxy("::yas::save<::yas::mem|::yas::text|::yas::no_header>(::yas::vector_ostream(__buffer), "
                       "__yas_mapping);");
                 proxy("break;");
                 proxy("case rpc::encoding::yas_json:");
-                proxy("::yas::save<::yas::mem|::yas::json|::yas::no_header>(::yas::vector_ostream(__rpc_buf), "
+                proxy("::yas::save<::yas::mem|::yas::json|::yas::no_header>(::yas::vector_ostream(__buffer), "
                       "__yas_mapping);");
                 proxy("break;");
                 proxy("case rpc::encoding::enc_default:");
                 proxy("case rpc::encoding::yas_binary:");
-                proxy("::yas::save<::yas::mem|::yas::binary|::yas::no_header>(::yas::vector_ostream(__rpc_buf), "
+                proxy("::yas::save<::yas::mem|::yas::binary|::yas::no_header>(::yas::vector_ostream(__buffer), "
                       "__yas_mapping);");
                 proxy("break;");
                 proxy("}}");
@@ -829,7 +827,7 @@ namespace rpc_generator
             else
             {
                 proxy("if(__rpc_enc == rpc::encoding::yas_json)");
-                proxy("  __rpc_buf = {{'{{','}}'}};");
+                proxy("  __buffer = {{'{{','}}'}};");
             }
             proxy("return rpc::error::OK();");
             proxy("}}");
