@@ -923,7 +923,7 @@ namespace rpc_generator
                             uint64_t count = 1;
                             {
                                 output("std::vector<char> __buffer;");
-                                output("auto p_this = static_cast<subclass>(this);");
+                                output("auto p_this = static_cast<subclass*>(this);");
                                 output.print_tabs();
                                 output.raw("auto ret = proxy_serialiser<rpc::serialiser::yas, rpc::encoding>::{}(",
                                         function->get_name());
@@ -941,14 +941,15 @@ namespace rpc_generator
                                 }
 
                                 output.raw("__buffer, p_this->get_encoding());\n");
-                                output("if(ret != rpc::error::OK)");
+                                output("if(ret != rpc::error::OK())");
                                 output("{{");
                                 output("return ret;");
                                 output("}}");
-                                output("return p_this->register_call(\"{}\", 0, __buffer);\n", function->get_name()); // get the method id later
+                                output("return p_this->register_call(\"{}\", {{0}}, __buffer);\n", function->get_name()); // get the method id later
                             }
 
-                            output("}}");                        }
+                            output("}}");                        
+                        }
                     }
                 }
             }
