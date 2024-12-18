@@ -1621,9 +1621,9 @@ namespace rpc_generator
                 bool first_pass = true;
                 for(auto& field : m_ob.get_functions())
                 {
-                    if(field->get_entity_type() == entity_type::CONSTEXPR)
-                        continue;
-                    first_pass = false;
+                    auto type = field->get_entity_type();
+                    if(type != entity_type::CPPQUOTE && type != entity_type::FUNCTION_PUBLIC && type != entity_type::FUNCTION_PRIVATE && type != entity_type::CONSTEXPR)
+                        first_pass = false;
                 }
                 has_params = !first_pass;
             }
@@ -1635,12 +1635,14 @@ namespace rpc_generator
                 bool first_pass = true;
                 for(auto& field : m_ob.get_functions())
                 {
-                    if(field->get_entity_type() == entity_type::CONSTEXPR)
-                        continue;
-                    header.raw("\n");
-                    header.print_tabs();
-                    header.raw("{1}lhs.{0} != rhs.{0}", field->get_name(), first_pass ? "" : "|| ");
-                    first_pass = false;
+                    auto type = field->get_entity_type();
+                    if(type != entity_type::CPPQUOTE && type != entity_type::FUNCTION_PUBLIC && type != entity_type::FUNCTION_PRIVATE && type != entity_type::CONSTEXPR)
+                    {
+                        header.raw("\n");
+                        header.print_tabs();
+                        header.raw("{1}lhs.{0} != rhs.{0}", field->get_name(), first_pass ? "" : "|| ");
+                        first_pass = false;
+                    }
                 }
                 header.raw(";\n");
             }
