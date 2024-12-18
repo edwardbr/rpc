@@ -73,7 +73,7 @@ bool is_reference(std::string type_name)
     std::string reference_modifiers;
     strip_reference_modifiers(type_name, reference_modifiers);
 
-    return type_name == "&";
+    return reference_modifiers == "&";
 }
 
 bool is_rvalue(std::string type_name)
@@ -81,7 +81,7 @@ bool is_rvalue(std::string type_name)
     std::string reference_modifiers;
     strip_reference_modifiers(type_name, reference_modifiers);
 
-    return type_name == "&&";
+    return reference_modifiers == "&&";
 }
 
 bool is_pointer(std::string type_name)
@@ -89,7 +89,7 @@ bool is_pointer(std::string type_name)
     std::string reference_modifiers;
     strip_reference_modifiers(type_name, reference_modifiers);
 
-    return type_name == "*";
+    return reference_modifiers == "*";
 }
 
 bool is_pointer_reference(std::string type_name)
@@ -97,7 +97,7 @@ bool is_pointer_reference(std::string type_name)
     std::string reference_modifiers;
     strip_reference_modifiers(type_name, reference_modifiers);
 
-    return type_name == "*&";
+    return reference_modifiers == "*&";
 }
 
 bool is_pointer_to_pointer(std::string type_name)
@@ -105,5 +105,5 @@ bool is_pointer_to_pointer(std::string type_name)
     std::string reference_modifiers;
     strip_reference_modifiers(type_name, reference_modifiers);
 
-    return type_name == "**";
+    return reference_modifiers == "**";
 }

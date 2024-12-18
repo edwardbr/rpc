@@ -13,7 +13,9 @@ namespace rpc_generator
         PROXY_PARAM_OUT,
 
         STUB_PARAM_IN,
-        STUB_PARAM_OUT
+        STUB_PARAM_OUT,
+        
+        SEND_PARAM_IN
     };
 
     struct renderer
@@ -53,6 +55,8 @@ namespace rpc_generator
             return fmt::format("const {}& {}", object_type, name);
         case PROXY_PARAM_OUT:
             return fmt::format("{}& {}", object_type, name);
+        case SEND_PARAM_IN:
+            return fmt::format("{0}, ", name);
         default:
             return "";
         }
@@ -78,6 +82,8 @@ namespace rpc_generator
             return fmt::format("const {}& {}", object_type, name);
         case PROXY_PARAM_OUT:
             return fmt::format("{}& {}", object_type, name);
+        case SEND_PARAM_IN:
+            return fmt::format("{0}, ", name);
         default:
             return "";
         }
@@ -103,6 +109,8 @@ namespace rpc_generator
             return fmt::format("{}&& {}", object_type, name);
         case STUB_PARAM_IN:
             return fmt::format("{}& {}", object_type, name);
+        case SEND_PARAM_IN:
+            return fmt::format("std::move({0}), ", name);
         default:
             return "";
         }
@@ -885,12 +893,11 @@ namespace rpc_generator
             bool has_usable_functions = false;
         
             output("// proxy class for serialising requests into a buffer for optional dispatch at a future time");
+            output("template<class Parent>");
             output("class buffered_proxy_serialiser");
             output("{{");
-            output("std::vector<char>& __buffer;");
-            output("rpc::encoding __encoding;");
             output("public:");
-            output("buffered_proxy_serialiser(std::vector<char>& buffer, rpc::encoding encoding) : __buffer(buffer), __encoding(encoding){{}}");
+            output("using subclass = Parent;");
             {
                 int function_count = 0;
                 std::unordered_set<std::string> unique_signatures;
@@ -910,8 +917,38 @@ namespace rpc_generator
 
                         if(unique_signatures.emplace(key).second)
                         {
-                            output("{};", key);
-                        }
+                            output("{}", key);
+                            output("{{");
+
+                            uint64_t count = 1;
+                            {
+                                output("std::vector<char> __buffer;");
+                                output("auto p_this = static_cast<subclass>(this);");
+                                output.print_tabs();
+                                output.raw("auto ret = proxy_serialiser<rpc::serialiser::yas, rpc::encoding>::{}(",
+                                        function->get_name());
+                                for(auto& parameter : function->get_parameters())
+                                {
+                                    std::string mshl_val;
+                                    {
+                                        if(!do_in_param(SEND_PARAM_IN, m_ob, parameter.get_name(),
+                                                    parameter.get_type(), parameter.get_attributes(), count, mshl_val))
+                                            continue;
+
+                                        output.raw(mshl_val);
+                                    }
+                                    count++;
+                                }
+
+                                output.raw("__buffer, p_this->get_encoding());\n");
+                                output("if(ret != rpc::error::OK)");
+                                output("{{");
+                                output("return ret;");
+                                output("}}");
+                                output("return p_this->register_call(\"{}\", 0, __buffer);\n", function->get_name()); // get the method id later
+                            }
+
+                            output("}}");                        }
                     }
                 }
             }

@@ -954,92 +954,6 @@ namespace rpc_generator
             }
         }
         
-        void write_send_method(bool from_host, const class_entity& m_ob, writer& proxy,
-                          const std::string& interface_name, const std::shared_ptr<function_entity>& function,
-                          int& function_count)
-        {
-            if(function->get_entity_type() == entity_type::FUNCTION_METHOD)
-            {
-                std::stringstream stream;
-                writer output(stream, proxy.get_tab_count());
-                
-                std::string scoped_namespace;
-                ::rpc_generator::build_scoped_name(&m_ob, scoped_namespace);
-
-                output.print_tabs();
-                
-                output.raw("{} {}::buffered_proxy_serialiser::{}(", function->get_return_type(), interface_name, function->get_name());
-                bool has_parameter = false;
-                for(auto& parameter : function->get_parameters())
-                {
-                    if(is_out_param(parameter.get_attributes()))
-                    {
-                        //this function is not suitable as it is an out parameter
-                        return;
-                    }
-                    if(is_interface_param(m_ob, parameter.get_type()))
-                    {
-                        //this function is not suitable as it is an interface parameter
-                        return;
-                    }
-                    if(has_parameter)
-                    {
-                        output.raw(", ");
-                    }
-                    has_parameter = true;
-                    std::string modifier;
-                    if(is_const_param(parameter.get_attributes()))
-                        modifier = "const " + modifier;
-                    output.raw("{}{} {}", modifier, parameter.get_type(), parameter.get_name());
-                }
-                if(!has_parameter)
-                {
-                    //this function is not suitable as it has no in parameters
-                    return;
-                }
-                
-                bool function_is_const = false;
-                for(auto& item : function->get_attributes())
-                {
-                    if(item == "const")
-                        function_is_const = true;
-                }
-                if(function_is_const)
-                {
-                    output.raw(") const\n");
-                }
-                else
-                {
-                    output.raw(")\n");
-                }
-                output("{{");
-
-                uint64_t count = 1;
-                {
-                    output.print_tabs();
-                    output.raw("return {}proxy_serialiser<rpc::serialiser::yas, rpc::encoding>::{}(", scoped_namespace,
-                              function->get_name());
-                    for(auto& parameter : function->get_parameters())
-                    {
-                        std::string mshl_val;
-                        {
-                            if(!do_in_param(PROXY_MARSHALL_IN, from_host, m_ob, parameter.get_name(),
-                                           parameter.get_type(), parameter.get_attributes(), count, mshl_val))
-                                continue;
-
-                            output.raw(mshl_val);
-                        }
-                        count++;
-                    }
-
-                    output.raw("__buffer, __encoding);\n");
-                }
-
-                output("}}");
-                proxy.write_buffer(stream.str());
-            }
-        }
-
         void write_interface(bool from_host, const class_entity& m_ob, writer& proxy, writer& stub, size_t id,
                              bool catch_stub_exceptions, const std::vector<std::string>& rethrow_exceptions)
         {
@@ -1202,18 +1116,7 @@ namespace rpc_generator
 
             stub("return rpc::error::INVALID_METHOD_ID();");
             stub("}}");
-            stub("");
-            
-            
-            if(has_methods)
-            {
-                int function_count = 1;
-                for(auto& function : m_ob.get_functions())
-                {
-                    if(function->get_entity_type() == entity_type::FUNCTION_METHOD)
-                        write_send_method(from_host, m_ob, proxy, interface_name, function, function_count);
-                }
-            }            
+            stub("");   
         };
 
         void write_stub_factory(const class_entity& lib, const class_entity& m_ob, writer& stub,
