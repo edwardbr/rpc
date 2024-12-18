@@ -831,10 +831,6 @@ namespace rpc_generator
                         stub(output);
                     }
 
-                    stub("//STUB_ADD_REF_OUT");
-                    stub("if(__rpc_ret < rpc::error::MIN() || __rpc_ret > rpc::error::MAX())");
-                    stub("{{");
-
                     count = 1;
                     bool has_preamble = false;
                     for(auto& parameter : function->get_parameters())
@@ -848,6 +844,9 @@ namespace rpc_generator
 
                         if(!has_preamble && !output.empty())
                         {
+                            stub("//STUB_ADD_REF_OUT");
+                            stub("if(__rpc_ret < rpc::error::MIN() || __rpc_ret > rpc::error::MAX())");
+                            stub("{{");
                             stub("auto target_stub_strong = target_stub_.lock();");
                             stub("if (target_stub_strong)");
                             stub("{{");
@@ -863,8 +862,8 @@ namespace rpc_generator
                         stub("{{");
                         stub("assert(false);");
                         stub("}}");
+                        stub("}}");
                     }
-                    stub("}}");
                 }
                 bool has_out_parameter = false;
                 for(auto& parameter : function->get_parameters())
@@ -908,9 +907,8 @@ namespace rpc_generator
                     proxy("  __rpc_ret = __receiver_result;");
 
                     stub.raw("__rpc_out_buf, enc);\n");
-
-                    stub("return __rpc_ret;");
                 }
+                stub("return __rpc_ret;");
 
                 proxy("//PROXY_VALUE_RETURN");
                 {

@@ -69,21 +69,20 @@ namespace rpc_generator
             switch(option)
             {
             case PROXY_PARAM_IN:
-                return fmt::format("{} {}", object_type, name);
-            case PROXY_MARSHALL_IN:
-                return fmt::format("  ,(\"{0}\", {0})", name);
-            case PROXY_MARSHALL_OUT:
-                return fmt::format("  ,(\"{0}\", {0})", name);
-            case STUB_MARSHALL_IN:
-                return fmt::format("  ,(\"{0}\", {0})", name);
-            case STUB_MARSHALL_OUT:
-                return fmt::format("  ,(\"{0}\", {0})", name);
+                return fmt::format("const {}& {}", object_type, name);
             case STUB_PARAM_IN:
                 return fmt::format("{}& {}", object_type, name);
             case STUB_PARAM_OUT:
-                return fmt::format("{}& {}", object_type, name);
+                return fmt::format("const {}& {}", object_type, name);
             case PROXY_PARAM_OUT:
                 return fmt::format("{}& {}", object_type, name);
+
+            case PROXY_MARSHALL_IN:
+            case PROXY_MARSHALL_OUT:
+            case STUB_MARSHALL_IN:
+            case STUB_MARSHALL_OUT:
+                return fmt::format("  ,(\"{0}\", {0})", name);
+
             default:
                 return "";
             }
@@ -103,19 +102,19 @@ namespace rpc_generator
             switch(option)
             {
             case PROXY_PARAM_IN:
-                return fmt::format("{}& {}", object_type, name);
-            case PROXY_MARSHALL_IN:
-                return fmt::format("  ,(\"{0}\", {0})", name);
-            case PROXY_MARSHALL_OUT:
-                return fmt::format("  ,(\"{0}\", {0})", name);
-            case STUB_MARSHALL_IN:
-                return fmt::format("  ,(\"{0}\", {0})", name);
+                return fmt::format("const {}& {}", object_type, name);
             case STUB_PARAM_IN:
                 return fmt::format("{}& {}", object_type, name);
             case STUB_PARAM_OUT:
-                return fmt::format("{}& {}", object_type, name);
+                return fmt::format("const {}& {}", object_type, name);
             case PROXY_PARAM_OUT:
                 return fmt::format("{}& {}", object_type, name);
+
+            case PROXY_MARSHALL_IN:
+            case PROXY_MARSHALL_OUT:
+            case STUB_MARSHALL_IN:
+            case STUB_MARSHALL_OUT:
+                return fmt::format("  ,(\"{0}\", {0})", name);
             default:
                 return "";
             }
@@ -139,14 +138,11 @@ namespace rpc_generator
             {
             case PROXY_PARAM_IN:
                 return fmt::format("{}&& {}", object_type, name);
-            case PROXY_MARSHALL_IN:
-                return fmt::format("  ,(\"{0}\", {0})", name);
-            case PROXY_MARSHALL_OUT:
-                return fmt::format("  ,(\"{0}\", {0})", name);
             case STUB_PARAM_IN:
                 return fmt::format("{}& {}", object_type, name);
+            case PROXY_MARSHALL_IN:
+            case PROXY_MARSHALL_OUT:
             case STUB_MARSHALL_IN:
-                return fmt::format("  ,(\"{0}\", {0})", name);
             case STUB_MARSHALL_OUT:
                 return fmt::format("  ,(\"{0}\", {0})", name);
             default:
@@ -168,13 +164,12 @@ namespace rpc_generator
             {
             case PROXY_PARAM_IN:
                 return fmt::format("uint64_t {}", name);
-            case PROXY_MARSHALL_IN:
-                return fmt::format("  ,(\"{0}\", (uint64_t){0})", name);
-            case PROXY_MARSHALL_OUT:
-                return fmt::format("  ,(\"{}\", (uint64_t) {})", count, name);
             case STUB_PARAM_IN:
                 return fmt::format("uint64_t {}", name);
+            case PROXY_MARSHALL_IN:
+            case PROXY_MARSHALL_OUT:
             case STUB_MARSHALL_IN:
+            case STUB_MARSHALL_OUT:
                 return fmt::format("  ,(\"{0}\", {0})", name);
             default:
                 return "";
@@ -194,19 +189,18 @@ namespace rpc_generator
             switch(option)
             {
             case PROXY_PARAM_IN:
-                return fmt::format("uint64_t& {}", name);
-            case PROXY_MARSHALL_IN:
-                return fmt::format("  ,(\"{0}\", {0}_)", name);
-            case PROXY_MARSHALL_OUT:
-                return fmt::format("  ,(\"{0}\", {0})", name);
+                return fmt::format("uint64_t {}", name);
             case STUB_PARAM_IN:
-                return fmt::format("{}*& {}", object_type, name);
+                return fmt::format("uint64_t& {}", name);
             case STUB_PARAM_OUT:
                 return fmt::format("uint64_t {}", name);
             case PROXY_PARAM_OUT:
                 return fmt::format("uint64_t& {}", name);
+            case PROXY_MARSHALL_IN:
+            case PROXY_MARSHALL_OUT:
+            case STUB_MARSHALL_IN:
             case STUB_MARSHALL_OUT:
-                return fmt::format("  ,(\"_{}\", (uint64_t){})", count, name);
+                return fmt::format("  ,(\"{0}\", {0})", name);
 
             default:
                 return "";
@@ -222,19 +216,18 @@ namespace rpc_generator
             switch(option)
             {
             case PROXY_PARAM_IN:
-                return fmt::format("{}** {}", object_type, name);
-            case PROXY_MARSHALL_IN:
-                return fmt::format("  ,(\"{0}\", {0})", name);
-            case PROXY_MARSHALL_OUT:
-                return fmt::format("  ,(\"{0}\", {0})", name);
+                return fmt::format("uint64_t {}", name);
             case STUB_PARAM_IN:
-                return fmt::format("{}** {}", object_type, name);
+                return fmt::format("uint64_t& {}", name);
             case STUB_PARAM_OUT:
                 return fmt::format("uint64_t {}", name);
             case PROXY_PARAM_OUT:
                 return fmt::format("uint64_t& {}", name);
+            case PROXY_MARSHALL_IN:
+            case PROXY_MARSHALL_OUT:
+            case STUB_MARSHALL_IN:
             case STUB_MARSHALL_OUT:
-                return fmt::format("  ,(\"{0}\", (uint64_t){0})", name);
+                return fmt::format("  ,(\"{0}\", {0})", name);
             default:
                 return "";
             }
@@ -255,29 +248,17 @@ namespace rpc_generator
             {
             case PROXY_PARAM_IN:
                 return fmt::format("const rpc::interface_descriptor& {}", name);
-            case PROXY_MARSHALL_IN:
-            {
-                auto ret = fmt::format("  ,(\"{0}\", {0})", name);
-                count++;
-                return ret;
-            }
-            case PROXY_MARSHALL_OUT:
-                return fmt::format("  ,(\"{0}\", {0})", name);
-
             case STUB_PARAM_IN:
                 return fmt::format("rpc::interface_descriptor& {}", name);
-            case STUB_MARSHALL_IN:
-            {
-                auto ret = fmt::format("  ,(\"{0}\", {0})", name);
-                count++;
-                return ret;
-            }
-            case STUB_MARSHALL_OUT:
-                return fmt::format("  ,(\"{0}\", (uint64_t){0})", name);
             case PROXY_PARAM_OUT:
-                return fmt::format("rpc::interface_descriptor& {}", name);
+                return fmt::format("const rpc::interface_descriptor& {}", name);
             case STUB_PARAM_OUT:
                 return fmt::format("rpc::interface_descriptor& {}", name);
+            case PROXY_MARSHALL_IN:
+            case PROXY_MARSHALL_OUT:
+            case STUB_MARSHALL_IN:
+            case STUB_MARSHALL_OUT:
+                return fmt::format("  ,(\"{0}\", {0})", name);
             default:
                 return "";
             }
@@ -292,23 +273,16 @@ namespace rpc_generator
             switch(option)
             {
             case PROXY_PARAM_IN:
-                return fmt::format("rpc::interface_descriptor& {}", name);
-            case PROXY_MARSHALL_IN:
-            {
-                auto ret = fmt::format("  ,(\"_{1}\", {0})", name, count);
-                count++;
-                return ret;
-            }
-            case PROXY_MARSHALL_OUT:
-                return fmt::format("  ,(\"{0}\", {0})", name);
-
+                return fmt::format("const rpc::interface_descriptor& {}", name);
             case STUB_PARAM_IN:
                 return fmt::format("rpc::interface_descriptor& {}", name);
-
             case PROXY_PARAM_OUT:
-                return fmt::format("rpc::interface_descriptor& {}", name);
+                return fmt::format("const rpc::interface_descriptor& {}", name);
             case STUB_PARAM_OUT:
                 return fmt::format("rpc::interface_descriptor& {}", name);
+            case PROXY_MARSHALL_IN:
+            case PROXY_MARSHALL_OUT:
+            case STUB_MARSHALL_IN:
             case STUB_MARSHALL_OUT:
                 return fmt::format("  ,(\"{0}\", {0})", name);
             default:
@@ -570,6 +544,7 @@ namespace rpc_generator
 
                 proxy("  );");
 
+                proxy("__buffer.clear(); // this does not change the capacity of the vector so this is a low cost reset to the buffer");
                 proxy("switch(__rpc_enc)");
                 proxy("{{");
                 proxy("case rpc::encoding::yas_compressed_binary:");
@@ -802,6 +777,7 @@ namespace rpc_generator
 
                 proxy("  );");
 
+                proxy("__buffer.clear(); // this does not change the capacity of the vector so this is a low cost reset to the buffer");
                 proxy("switch(__rpc_enc)");
                 proxy("{{");
                 proxy("case rpc::encoding::yas_compressed_binary:");

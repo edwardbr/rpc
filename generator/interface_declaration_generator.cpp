@@ -46,11 +46,11 @@ namespace rpc_generator
         switch(option)
         {
         case PROXY_PARAM_IN:
-            return fmt::format("{} {}", object_type, name);
+            return fmt::format("const {}& {}", object_type, name);
         case STUB_PARAM_IN:
             return fmt::format("{}& {}", object_type, name);
         case STUB_PARAM_OUT:
-            return fmt::format("{}& {}", object_type, name);
+            return fmt::format("const {}& {}", object_type, name);
         case PROXY_PARAM_OUT:
             return fmt::format("{}& {}", object_type, name);
         default:
@@ -71,11 +71,11 @@ namespace rpc_generator
         switch(option)
         {
         case PROXY_PARAM_IN:
-            return fmt::format("{}& {}", object_type, name);
+            return fmt::format("const {}& {}", object_type, name);
         case STUB_PARAM_IN:
             return fmt::format("{}& {}", object_type, name);
         case STUB_PARAM_OUT:
-            return fmt::format("{}& {}", object_type, name);
+            return fmt::format("const {}& {}", object_type, name);
         case PROXY_PARAM_OUT:
             return fmt::format("{}& {}", object_type, name);
         default:
@@ -123,7 +123,7 @@ namespace rpc_generator
         case PROXY_PARAM_IN:
             return fmt::format("uint64_t {}", name);
         case STUB_PARAM_IN:
-            return fmt::format("uint64_t {}", name);
+            return fmt::format("uint64_t& {}", name);
         default:
             return "";
         }
@@ -144,7 +144,7 @@ namespace rpc_generator
         case PROXY_PARAM_IN:
             return fmt::format("uint64_t& {}", name);
         case STUB_PARAM_IN:
-            return fmt::format("{}*& {}", object_type, name);
+            return fmt::format("uint64_t& {}", name);
         case STUB_PARAM_OUT:
             return fmt::format("uint64_t {}", name);
         case PROXY_PARAM_OUT:
@@ -437,15 +437,8 @@ namespace rpc_generator
 
                 has_inparams = true;
 
-                std::string modifier;
-                for(auto& item : parameter.get_attributes())
-                {
-                    if(item == "const")
-                        modifier = "const " + modifier;
-                }
-
                 std::string output;
-                if(!do_in_param(PROXY_PARAM_IN, m_ob, parameter.get_name(), modifier + parameter.get_type(),
+                if(!do_in_param(PROXY_PARAM_IN, m_ob, parameter.get_name(), parameter.get_type(),
                                parameter.get_attributes(), count, output))
                     continue;
 
@@ -483,15 +476,8 @@ namespace rpc_generator
                 continue;
             has_inparams = true;
 
-            std::string modifier;
-            for(auto& item : parameter.get_attributes())
-            {
-                if(item == "const")
-                    modifier = "const " + modifier;
-            }
-
             std::string output;
-            if(!do_out_param(PROXY_PARAM_OUT, m_ob, parameter.get_name(), modifier + parameter.get_type(),
+            if(!do_out_param(PROXY_PARAM_OUT, m_ob, parameter.get_name(), parameter.get_type(),
                             parameter.get_attributes(), count, output))
                 continue;
             header.raw(output);
@@ -528,15 +514,8 @@ namespace rpc_generator
                 continue;
             has_outparams = true;
 
-            std::string modifier;
-            for(auto& item : parameter.get_attributes())
-            {
-                // if(item == "const") // we dont do const here as we need to load a temporary
-                //     modifier = "const " + modifier;
-            }
-
             std::string output;
-            if(!do_in_param(STUB_PARAM_IN, m_ob, parameter.get_name(), modifier + parameter.get_type(),
+            if(!do_in_param(STUB_PARAM_IN, m_ob, parameter.get_name(), parameter.get_type(),
                            parameter.get_attributes(), count, output))
                 continue;
             header.raw(output);
@@ -571,15 +550,8 @@ namespace rpc_generator
                     continue;
 
                 has_outparams = true;
-                std::string modifier;
-                for(auto& item : parameter.get_attributes())
-                {
-                    if(item == "const")
-                        modifier = "const " + modifier;
-                }
-
                 std::string output;
-                if(!do_out_param(STUB_PARAM_OUT, m_ob, parameter.get_name(), modifier + parameter.get_type(),
+                if(!do_out_param(STUB_PARAM_OUT, m_ob, parameter.get_name(), parameter.get_type(),
                                 parameter.get_attributes(), count, output))
                     continue;
 
