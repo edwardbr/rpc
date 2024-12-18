@@ -1529,10 +1529,6 @@ namespace rpc_generator
                         header.raw("{{}};\n");
                     }
                 }
-                else if(field->get_entity_type() == entity_type::CONSTEXPR)
-                {
-                    write_constexpr(header, *field);
-                }
                 else if(field->get_entity_type() == entity_type::CPPQUOTE)
                 {
                     if(field->is_in_import())
@@ -1541,6 +1537,18 @@ namespace rpc_generator
                     header.write_buffer(text);
                     continue;
                 }
+                else if(field->get_entity_type() == entity_type::FUNCTION_PRIVATE)
+                {
+                    header("private:");
+                }
+                else if(field->get_entity_type() == entity_type::FUNCTION_PUBLIC)
+                {
+                    header("public:");
+                }
+                else if(field->get_entity_type() == entity_type::CONSTEXPR)
+                {
+                    write_constexpr(header, *field);
+                }                
             }
 
             header("");
@@ -1551,7 +1559,8 @@ namespace rpc_generator
             bool has_fields = false;
             for(auto& field : m_ob.get_functions())
             {
-                if(field->get_entity_type() != entity_type::CONSTEXPR)
+                auto type = field->get_entity_type();
+                if(type != entity_type::CPPQUOTE && type != entity_type::FUNCTION_PUBLIC && type != entity_type::FUNCTION_PRIVATE && type != entity_type::CONSTEXPR)
                 {
                     has_fields = true;
                     break;
@@ -1563,7 +1572,8 @@ namespace rpc_generator
 
                 for(auto& field : m_ob.get_functions())
                 {
-                    if(field->get_entity_type() != entity_type::CONSTEXPR)
+                    auto type = field->get_entity_type();
+                    if(type != entity_type::CPPQUOTE && type != entity_type::FUNCTION_PUBLIC && type != entity_type::FUNCTION_PRIVATE && type != entity_type::CONSTEXPR)
                         header("  ,(\"{0}\", {0})", field->get_name());
                 }
                 header(");");
