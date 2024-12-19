@@ -865,18 +865,6 @@ namespace rpc_generator
                         stub("}}");
                     }
                 }
-                bool has_out_parameter = false;
-                for(auto& parameter : function->get_parameters())
-                {
-                    std::string output;
-                    if(do_out_param(PROXY_MARSHALL_OUT, from_host, m_ob, parameter.get_name(), parameter.get_type(),
-                                   parameter.get_attributes(), count, output))
-                    {
-                        has_out_parameter = true;
-                        break;
-                    }
-                }
-                if(has_out_parameter)
                 {
                     uint64_t count = 1;
                     proxy.print_tabs();
