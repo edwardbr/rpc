@@ -583,8 +583,6 @@ namespace rpc_generator
                 }
                 proxy("{{");
 
-                bool has_inparams = false;
-
                 proxy("auto __rpc_op = get_object_proxy();");
                 proxy("auto __rpc_sp = __rpc_op->get_service_proxy();");
                 proxy("#ifdef USE_RPC_TELEMETRY");
@@ -606,7 +604,7 @@ namespace rpc_generator
                         std::string output;
                         if(do_in_param(STUB_DEMARSHALL_DECLARATION, from_host, m_ob, parameter.get_name(),
                                       parameter.get_type(), parameter.get_attributes(), count, output))
-                            has_inparams = true;
+                                      ;
                         else
                             do_out_param(STUB_DEMARSHALL_DECLARATION, from_host, m_ob, parameter.get_name(),
                                         parameter.get_type(), parameter.get_attributes(), count, output);
@@ -637,7 +635,6 @@ namespace rpc_generator
                     }
                     count++;
                 }
-                if(has_inparams)
                 {
                     proxy.print_tabs();
                     proxy.raw("{}proxy_serialiser<rpc::serialiser::yas, rpc::encoding>::{}(", scoped_namespace,
@@ -677,10 +674,6 @@ namespace rpc_generator
                     stub.raw("in_buf_, in_size_, enc);\n");
                     stub("if(__rpc_ret != rpc::error::OK())");
                     stub("  return __rpc_ret;");
-                }
-                else
-                {
-                    stub("int __rpc_ret = rpc::error::OK();");
                 }
 
                 std::string tag = function->get_attribute_value("tag");
