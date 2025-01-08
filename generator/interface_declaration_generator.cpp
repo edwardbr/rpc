@@ -582,7 +582,7 @@ namespace rpc_generator
         std::stringstream stream;
         writer header(stream);
 
-        header.raw("int {}(", function->get_name());
+        header.raw("ReturnType {}(", function->get_name());
         is_suitable = true;
         {
             uint64_t count = 1;
@@ -893,7 +893,7 @@ namespace rpc_generator
             bool has_usable_functions = false;
         
             output("// proxy class for serialising requests into a buffer for optional dispatch at a future time");
-            output("template<class Parent>");
+            output("template<class Parent, typename ReturnType>");
             output("class buffered_proxy_serialiser");
             output("{{");
             output("public:");
@@ -923,9 +923,9 @@ namespace rpc_generator
                             uint64_t count = 1;
                             {
                                 output("std::vector<char> __buffer;");
-                                output("auto p_this = static_cast<subclass*>(this);");
+                                output("auto __this = static_cast<subclass*>(this);");
                                 output.print_tabs();
-                                output.raw("auto ret = proxy_serialiser<rpc::serialiser::yas, rpc::encoding>::{}(",
+                                output.raw("auto __err = proxy_serialiser<rpc::serialiser::yas, rpc::encoding>::{}(",
                                         function->get_name());
                                 for(auto& parameter : function->get_parameters())
                                 {
@@ -940,12 +940,8 @@ namespace rpc_generator
                                     count++;
                                 }
 
-                                output.raw("__buffer, p_this->get_encoding());\n");
-                                output("if(ret != rpc::error::OK())");
-                                output("{{");
-                                output("return ret;");
-                                output("}}");
-                                output("return p_this->register_call(\"{}\", {{0}}, __buffer);\n", function->get_name()); // get the method id later
+                                output.raw("__buffer, __this->get_encoding());\n");
+                                output("return __this->register_call(__err, \"{}\", {{0}}, __buffer);\n", function->get_name()); // get the method id later
                             }
 
                             output("}}");                        
