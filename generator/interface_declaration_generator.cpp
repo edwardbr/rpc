@@ -899,6 +899,8 @@ namespace rpc_generator
             output("public:");
             output("using subclass = Parent;");
             {
+                
+                auto class_alias = get_full_name(m_ob, true, false, ".");
                 int function_count = 0;
                 std::unordered_set<std::string> unique_signatures;
                 for(auto& function : m_ob.get_functions())
@@ -941,7 +943,7 @@ namespace rpc_generator
                                 }
 
                                 output.raw("__buffer, __this->get_encoding());\n");
-                                output("return __this->register_call(__err, \"{}\", {{0}}, __buffer);\n", function->get_name()); // get the method id later
+                                output("return __this->register_call(__err, \"{}.{}\", {{0}}, __buffer);\n", class_alias, function->get_name()); // get the method id later
                             }
 
                             output("}}");                        

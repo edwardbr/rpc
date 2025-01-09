@@ -967,18 +967,7 @@ namespace rpc_generator
                 proxy("std::vector<rpc::function_info> functions;");
 
                 // generate unambiguous alias
-                auto full_name = m_ob.get_name() + ".";
-                {
-                    auto* tmp = m_ob.get_owner();
-                    while(tmp && !tmp->get_name().empty())
-                    {
-                        full_name = tmp->get_name() + "." + full_name;
-                        auto tmp1 = tmp->get_owner();
-                        if(!tmp1)
-                            break;
-                        tmp = tmp1;
-                    }
-                }
+                auto full_name = get_full_name(m_ob, true, false, ".");
 
                 const auto& library = get_root(m_ob);
                 int function_count = 1;
@@ -1002,7 +991,7 @@ namespace rpc_generator
                         marshalls_interfaces = is_interface_param(library, parameter.get_type());
                     }
 
-                    proxy("functions.emplace_back(rpc::function_info{{\"{0}{1}\", \"{1}\", {{{2}}}, (uint64_t){3}, "
+                    proxy("functions.emplace_back(rpc::function_info{{\"{0}.{1}\", \"{1}\", {{{2}}}, (uint64_t){3}, "
                           "{4}}});",
                           full_name, function->get_name(), function_count, tag, marshalls_interfaces);
                     function_count++;
