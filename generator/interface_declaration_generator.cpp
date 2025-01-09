@@ -618,11 +618,6 @@ namespace rpc_generator
 
                 count++;
             }
-            if(count == 1)
-            {
-                //this function is not suitable as it has no parameters to serialise
-                is_suitable = false;
-            }
         }
         header.raw(")");
         
