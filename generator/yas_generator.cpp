@@ -552,10 +552,10 @@ namespace rpc_generator
                       "ostream(__buffer), "
                       "__yas_mapping);");
                 proxy("break;");
-                proxy("case rpc::encoding::yas_text:");
-                proxy("::yas::save<::yas::mem|::yas::text|::yas::no_header>(::yas::vector_ostream(__buffer), "
-                      "__yas_mapping);");
-                proxy("break;");
+                // proxy("case rpc::encoding::yas_text:");
+                // proxy("::yas::save<::yas::mem|::yas::text|::yas::no_header>(::yas::vector_ostream(__buffer), "
+                //       "__yas_mapping);");
+                // proxy("break;");
                 proxy("case rpc::encoding::yas_json:");
                 proxy("::yas::save<::yas::mem|::yas::json|::yas::no_header>(::yas::vector_ostream(__buffer), "
                       "__yas_mapping);");
@@ -616,10 +616,10 @@ namespace rpc_generator
                       "buffer(__rpc_buf,__rpc_buf_size), "
                       "__yas_mapping);");
                 proxy("break;");
-                proxy("case rpc::encoding::yas_text:");
-                proxy("::yas::load<::yas::mem|::yas::text|::yas::no_header>(::yas::intrusive_buffer(__rpc_buf,__"
-                      "rpc_buf_size), __yas_mapping);");
-                proxy("break;");
+                // proxy("case rpc::encoding::yas_text:");
+                // proxy("::yas::load<::yas::mem|::yas::text|::yas::no_header>(::yas::intrusive_buffer(__rpc_buf,__"
+                //       "rpc_buf_size), __yas_mapping);");
+                // proxy("break;");
                 proxy("case rpc::encoding::yas_json:");
                 proxy("::yas::load<::yas::mem|::yas::json|::yas::no_header>(::yas::intrusive_buffer(__rpc_buf,__"
                       "rpc_buf_size), __yas_mapping);");
@@ -699,10 +699,10 @@ namespace rpc_generator
                       "buffer(__rpc_buf,__rpc_buf_size), "
                       "__yas_mapping);");
                 proxy("break;");
-                proxy("case rpc::encoding::yas_text:");
-                proxy("::yas::load<::yas::mem|::yas::text|::yas::no_header>(::yas::intrusive_buffer(__rpc_buf,__"
-                      "rpc_buf_size), __yas_mapping);");
-                proxy("break;");
+                // proxy("case rpc::encoding::yas_text:");
+                // proxy("::yas::load<::yas::mem|::yas::text|::yas::no_header>(::yas::intrusive_buffer(__rpc_buf,__"
+                //       "rpc_buf_size), __yas_mapping);");
+                // proxy("break;");
                 proxy("case rpc::encoding::yas_json:");
                 proxy("::yas::load<::yas::mem|::yas::json|::yas::no_header>(::yas::intrusive_buffer(__rpc_buf,__"
                       "rpc_buf_size), __yas_mapping);");
@@ -785,10 +785,10 @@ namespace rpc_generator
                       "ostream(__buffer), "
                       "__yas_mapping);");
                 proxy("break;");
-                proxy("case rpc::encoding::yas_text:");
-                proxy("::yas::save<::yas::mem|::yas::text|::yas::no_header>(::yas::vector_ostream(__buffer), "
-                      "__yas_mapping);");
-                proxy("break;");
+                // proxy("case rpc::encoding::yas_text:");
+                // proxy("::yas::save<::yas::mem|::yas::text|::yas::no_header>(::yas::vector_ostream(__buffer), "
+                //       "__yas_mapping);");
+                // proxy("break;");
                 proxy("case rpc::encoding::yas_json:");
                 proxy("::yas::save<::yas::mem|::yas::json|::yas::no_header>(::yas::vector_ostream(__buffer), "
                       "__yas_mapping);");
@@ -1033,6 +1033,7 @@ namespace rpc_generator
             header("#include <rpc/stub.h>");
             header("#include <rpc/error_codes.h>");
             header("#include <rpc/marshaller.h>");
+            header("#include <rpc/serialiser.h>");
             header("#include <rpc/service.h>");
             header("#include \"{}\"", header_filename);
             header("");

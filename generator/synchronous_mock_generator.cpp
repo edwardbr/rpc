@@ -269,6 +269,7 @@ namespace rpc_generator
             header("#include <gmock/gmock-matchers.h>");
 
             header("#include <rpc/marshaller.h>");
+            header("#include <rpc/serialiser.h>");
             header("#include <rpc/service.h>");
 
             header("#include \"{}\"", header_filename);

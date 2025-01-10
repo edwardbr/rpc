@@ -1340,6 +1340,371 @@ namespace rpc_generator
             header("}}");
             header("}};");
             header("");
+            
+            
+/*
+            ///////////////////////////
+            // to_json
+            
+            int template_param_count = 0;
+            
+            header.print_tabs();
+            header.raw("template<");
+            if(m_ob.get_is_template())
+            {
+                for(const auto& param : m_ob.get_template_params())
+                {
+                    template_param_count++;
+                    
+                    template_deduction deduction;
+                    m_ob.deduct_template_type(param, deduction);
+
+                    if(deduction.type == template_deduction_type::OTHER && deduction.identified_type)
+                    {
+                        auto full_name = get_full_name(*deduction.identified_type, true);
+                        header.raw("{} {},", full_name, param.get_name());
+                    }
+                    else
+                    {
+                        header.raw("{} {},", param.type, param.get_name());
+                    }
+                }
+            }
+            
+            header.raw("class OutputBlob = std::vector<std::uint8_t>>\n");
+            
+            header.print_tabs();
+            header.raw("OutputBlob to_json(const {}", get_full_name(m_ob, true));
+            if(template_param_count > 0 && m_ob.get_is_template())
+            {
+                header.raw("<");
+                bool first_pass = true;
+                for(const auto& param : m_ob.get_template_params())
+                {
+                    template_deduction deduction;
+                    m_ob.deduct_template_type(param, deduction);
+                    
+                    if(!first_pass)
+                    {
+                        header.raw(", ");
+                    }
+                    first_pass = false;
+
+                    header.raw("{}", param.get_name());
+                }
+                header.raw(">");
+            }
+            header.raw("& obj)\n");
+            header("{{");
+            header("yas::shared_buffer yas_buffer = yas::save<::yas::mem|::yas::json|::yas::no_header>(obj);");
+            header("return OutputBlob(yas_buffer.data.get(), yas_buffer.data.get() + yas_buffer.size);");
+            header("}}");
+            header("");                        
+
+            ///////////////////////////
+            // to_yas_binary            
+            header.print_tabs();
+            header.raw("template<");
+            if(m_ob.get_is_template())
+            {
+                for(const auto& param : m_ob.get_template_params())
+                {
+                    template_deduction deduction;
+                    m_ob.deduct_template_type(param, deduction);
+
+                    if(deduction.type == template_deduction_type::OTHER && deduction.identified_type)
+                    {
+                        auto full_name = get_full_name(*deduction.identified_type, true);
+                        header.raw("{} {},", full_name, param.get_name());
+                    }
+                    else
+                    {
+                        header.raw("{} {},", param.type, param.get_name());
+                    }
+                }
+            }
+            
+            header.raw("class OutputBlob = std::vector<std::uint8_t>>\n");
+            
+            header.print_tabs();
+            header.raw("OutputBlob to_yas_binary(const {}", get_full_name(m_ob, true));
+            if(template_param_count > 0 && m_ob.get_is_template())
+            {
+                header.raw("<");
+                bool first_pass = true;
+                for(const auto& param : m_ob.get_template_params())
+                {
+                    template_deduction deduction;
+                    m_ob.deduct_template_type(param, deduction);
+                    
+                    if(!first_pass)
+                    {
+                        header.raw(", ");
+                    }
+                    first_pass = false;
+
+                    header.raw("{}", param.get_name());
+                }
+                header.raw(">");
+            }
+            header.raw("& obj)\n");
+            header("{{");
+            header("yas::shared_buffer yas_buffer = yas::save<::yas::mem|::yas::binary|::yas::no_header>(obj);");
+            header("return OutputBlob(yas_buffer.data.get(), yas_buffer.data.get() + yas_buffer.size);");
+            header("}}");
+            header("");            
+
+            ///////////////////////////
+            // to_compressed_yas_binary                                     
+            header.print_tabs();
+            header.raw("template<");
+            if(m_ob.get_is_template())
+            {
+                for(const auto& param : m_ob.get_template_params())
+                {
+                    template_deduction deduction;
+                    m_ob.deduct_template_type(param, deduction);
+
+                    if(deduction.type == template_deduction_type::OTHER && deduction.identified_type)
+                    {
+                        auto full_name = get_full_name(*deduction.identified_type, true);
+                        header.raw("{} {},", full_name, param.get_name());
+                    }
+                    else
+                    {
+                        header.raw("{} {},", param.type, param.get_name());
+                    }
+                }
+            }
+            
+            header.raw("class OutputBlob = std::vector<std::uint8_t>>\n");
+            
+            header.print_tabs();
+            header.raw("OutputBlob to_compressed_yas_binary(const {}", get_full_name(m_ob, true));
+            if(template_param_count > 0 && m_ob.get_is_template())
+            {
+                header.raw("<");
+                bool first_pass = true;
+                for(const auto& param : m_ob.get_template_params())
+                {
+                    template_deduction deduction;
+                    m_ob.deduct_template_type(param, deduction);
+                    
+                    if(!first_pass)
+                    {
+                        header.raw(", ");
+                    }
+                    first_pass = false;
+
+                    header.raw("{}", param.get_name());
+                }
+                header.raw(">");
+            }
+            header.raw("& obj)\n");
+            header("{{");
+            header("yas::shared_buffer yas_buffer = yas::save<::yas::mem|::yas::binary|::yas::compacted|::yas::no_header>(obj);");
+            header("return OutputBlob(yas_buffer.data.get(), yas_buffer.data.get() + yas_buffer.size);");
+            header("}}");
+            header("");
+
+            ///////////////////////////
+            // to_compressed_yas_binary               
+            
+            header.print_tabs();
+            header.raw("template<");
+            if(m_ob.get_is_template())
+            {
+                for(const auto& param : m_ob.get_template_params())
+                {
+                    template_deduction deduction;
+                    m_ob.deduct_template_type(param, deduction);
+                    
+                    if(deduction.type == template_deduction_type::OTHER && deduction.identified_type)
+                    {
+                        auto full_name = get_full_name(*deduction.identified_type, true);
+                        header.raw("{} {}, ", full_name, param.get_name());
+                    }
+                    else
+                    {
+                        header.raw("{} {}, ", param.type, param.get_name());
+                    }
+                }
+            }            
+            
+            header.raw("class InputBlob>\n");
+            header.print_tabs();
+            header.raw("std::string from_json(const InputBlob& data, {}", get_full_name(m_ob, true));
+            if(template_param_count > 0 && m_ob.get_is_template())
+            {
+                header.raw("<");
+                bool first_pass = true;
+                for(const auto& param : m_ob.get_template_params())
+                {
+                    template_deduction deduction;
+                    m_ob.deduct_template_type(param, deduction);
+                    
+                    if(!first_pass)
+                    {
+                        header.raw(", ");
+                    }
+                    first_pass = false;
+
+                    header.raw("{}", param.get_name());
+                }
+                header.raw(">");
+            }
+            header.raw("& obj)\n");
+            header("{{");
+            header("try");
+            header("{{");
+            header("yas::load<yas::mem|yas::json|yas::no_header>(yas::intrusive_buffer{{(const char*)data, data.size()}}, obj);");
+            header("return \"\";");
+            header("}}");
+            header("catch(const std::exception& ex)");
+            header("{{");
+            header("// an error has occurred so do the best one can and set the type_id to 0");
+            header("return std::string(\"An exception has occured a data blob was incompatible with the type that is deserialising to: \") + ex.what();");
+            header("}}");
+            header("catch(...)");
+            header("{{");
+            header("// an error has occurred so do the best one can and set the type_id to 0");
+            header("return \"An exception has occured a data blob was incompatible with the type that is deserialising to\";");
+            header("}}");
+            header("}}");
+            header("");
+
+            ///////////////////////////
+            // from_yas_binary               
+            
+            header.print_tabs();
+            header.raw("template<");
+            if(m_ob.get_is_template())
+            {
+                for(const auto& param : m_ob.get_template_params())
+                {
+                    template_deduction deduction;
+                    m_ob.deduct_template_type(param, deduction);
+                    
+                    if(deduction.type == template_deduction_type::OTHER && deduction.identified_type)
+                    {
+                        auto full_name = get_full_name(*deduction.identified_type, true);
+                        header.raw("{} {}, ", full_name, param.get_name());
+                    }
+                    else
+                    {
+                        header.raw("{} {}, ", param.type, param.get_name());
+                    }
+                }
+            }            
+            
+            header.raw("class InputBlob>\n");
+            header.print_tabs();
+            header.raw("std::string from_yas_binary(const InputBlob& data, {}", get_full_name(m_ob, true));
+            if(template_param_count > 0 && m_ob.get_is_template())
+            {
+                header.raw("<");
+                bool first_pass = true;
+                for(const auto& param : m_ob.get_template_params())
+                {
+                    template_deduction deduction;
+                    m_ob.deduct_template_type(param, deduction);
+                    
+                    if(!first_pass)
+                    {
+                        header.raw(", ");
+                    }
+                    first_pass = false;
+
+                    header.raw("{}", param.get_name());
+                }
+                header.raw(">");
+            }
+            header.raw("& obj)\n");
+            header("{{");
+            header("try");
+            header("{{");
+            header("yas::load<yas::mem|::yas::binary|::yas::no_header>(yas::intrusive_buffer{{(const char*)data, data.size()}}, obj);");
+            header("return \"\";");
+            header("}}");
+            header("catch(const std::exception& ex)");
+            header("{{");
+            header("// an error has occurred so do the best one can and set the type_id to 0");
+            header("return std::string(\"An exception has occured a data blob was incompatible with the type that is deserialising to: \") + ex.what();");
+            header("}}");
+            header("catch(...)");
+            header("{{");
+            header("// an error has occurred so do the best one can and set the type_id to 0");
+            header("return \"An exception has occured a data blob was incompatible with the type that is deserialising to\";");
+            header("}}");
+            header("}}");
+            header("");
+            
+            ///////////////////////////
+            // from_compressed_yas_binary               
+            
+            header.print_tabs();
+            header.raw("template<");
+            if(m_ob.get_is_template())
+            {
+                for(const auto& param : m_ob.get_template_params())
+                {
+                    template_deduction deduction;
+                    m_ob.deduct_template_type(param, deduction);
+                    
+                    if(deduction.type == template_deduction_type::OTHER && deduction.identified_type)
+                    {
+                        auto full_name = get_full_name(*deduction.identified_type, true);
+                        header.raw("{} {}, ", full_name, param.get_name());
+                    }
+                    else
+                    {
+                        header.raw("{} {}, ", param.type, param.get_name());
+                    }
+                }
+            }            
+            
+            header.raw("class InputBlob>\n");
+            header.print_tabs();
+            header.raw("std::string from_yas_compressed_binary(const InputBlob& data, {}", get_full_name(m_ob, true));
+            if(template_param_count > 0 && m_ob.get_is_template())
+            {
+                header.raw("<");
+                bool first_pass = true;
+                for(const auto& param : m_ob.get_template_params())
+                {
+                    template_deduction deduction;
+                    m_ob.deduct_template_type(param, deduction);
+                    
+                    if(!first_pass)
+                    {
+                        header.raw(", ");
+                    }
+                    first_pass = false;
+
+                    header.raw("{}", param.get_name());
+                }
+                header.raw(">");
+            }
+            header.raw("& obj)\n");
+            header("{{");
+            header("try");
+            header("{{");
+            header("yas::load<yas::mem|::yas::binary|::yas::compacted|::yas::no_header>(yas::intrusive_buffer{{(const char*)data, data.size()}}, obj);");
+            header("return \"\";");
+            header("}}");
+            header("catch(const std::exception& ex)");
+            header("{{");
+            header("// an error has occurred so do the best one can and set the type_id to 0");
+            header("return std::string(\"An exception has occured a data blob was incompatible with the type that is deserialising to: \") + ex.what();");
+            header("}}");
+            header("catch(...)");
+            header("{{");
+            header("// an error has occurred so do the best one can and set the type_id to 0");
+            header("return \"An exception has occured a data blob was incompatible with the type that is deserialising to\";");
+            header("}}");
+            header("}}");
+            header("");
+*/            
         }
 
         void write_struct(const class_entity& m_ob, writer& header)
@@ -1880,6 +2245,7 @@ namespace rpc_generator
 
             header("#include <rpc/version.h>");
             header("#include <rpc/marshaller.h>");
+            header("#include <rpc/serialiser.h>");
             header("#include <rpc/service.h>");
             header("#include <rpc/error_codes.h>");
             header("#include <rpc/types.h>");
