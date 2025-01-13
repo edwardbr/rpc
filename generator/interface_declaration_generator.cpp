@@ -938,7 +938,12 @@ namespace rpc_generator
                                 }
 
                                 output.raw("__buffer, __this->get_encoding());\n");
-                                output("return __this->register_call(__err, \"{}.{}\", {{0}}, __buffer);\n", class_alias, function->get_name()); // get the method id later
+                               
+                                std::string tag = function->get_attribute_value("tag");
+                                if(tag.empty())
+                                    tag = "0";
+                                
+                                output("return __this->register_call(__err, \"{}.{}\", {}, {{{}}}, __buffer);\n", class_alias, function->get_name(), tag, function_count); // get the method id later
                             }
 
                             output("}}");                        
