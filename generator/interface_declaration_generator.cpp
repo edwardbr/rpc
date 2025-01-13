@@ -943,7 +943,7 @@ namespace rpc_generator
                                 if(tag.empty())
                                     tag = "0";
                                 
-                                output("return __this->register_call(__err, \"{}.{}\", {}, {{{}}}, __buffer);\n", class_alias, function->get_name(), tag, function_count); // get the method id later
+                                output("return __this->register_call(__err, \"{}.{}\", {{{}}}, {}, __buffer);\n", class_alias, function->get_name(), function_count, tag); // get the method id later
                             }
 
                             output("}}");                        
