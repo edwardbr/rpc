@@ -1,32 +1,49 @@
-# Copyright 2021 Secretarium Ltd <contact@secretarium.org>
+# formatted using cmake-format
 cmake_minimum_required(VERSION 3.24)
 
 if(NOT DEPENDANCIES_LOADED)
   # if this is loaded in a parent module then dont do this
   set(DEPENDANCIES_LOADED ON)
 
-  option(HUNTER_KEEP_PACKAGE_SOURCES "Keep hunter source in folders" ON)
+  # ####################################################################################################################
+  # settings
+
   option(BUILD_ENCLAVE "build enclave code" ON)
   option(BUILD_HOST "build host code" ON)
   option(BUILD_EXE "build exe code" ON)
-  option(BUILD_DC_APPS "build dc apps" ON)
-  option(BUILD_TEST "build test code" ON)
-  option(BUILD_MEASUREMENT "measure enclave code" ON)
+  # When building Core, BUILD_TEST is always explicitly defined to ON or OFF, but not necessarily when used in
+  # standalone apps, where we want OFF by default
+  option(BUILD_TEST "build test code, including backdoors in raft idl" OFF)
+  # secretarium exe is needed for measurement, so don't default to ON if it is not built
+  option(DEBUG_HOST_LEAK "enable leak sanitizer (only use when ptrace is accessible)" OFF)
+  option(DEBUG_HOST_ADDRESS "enable address sanitizer" OFF)
+  option(DEBUG_HOST_THREAD "enable thread sanitizer (cannot be used with leak sanitizer)" OFF)
+  option(DEBUG_HOST_UNDEFINED "enable undefined behaviour sanitizer" OFF)
+  option(DEBUG_HOST_ALL "enable all sanitizers" OFF)
   option(DEBUG_ENCLAVE_MEMLEAK "detect memory leaks in enclaves" OFF)
   option(SECRETARIUM_UNITY_BUILD "enable unity build" OFF)
-
-  option(CMAKE_VERBOSE_MAKEFILE "verbose build step" ON)
-  option(CMAKE_RULE_MESSAGES "verbose cmake" ON)
-
-  option(INCLUDE_DC_APPS_DLLS "include dc apps as dlls" ON)
-  option(INCLUDE_DC_APPS_EMBEDDED "include dc apps in main enclave" ON)
   option(ENABLE_CLANG_TIDY "Enable clang-tidy in build" ON)
   option(ENABLE_CLANG_TIDY_FIX "Turn on auto fix in clang tidy" OFF)
   option(ENABLE_COVERAGE "Turn on code coverage" OFF)
 
-  if(NOT DEFINED DC_APPS)
-    set(DC_APPS "ALL_DCAPPS")
-  endif()
+  option(CMAKE_VERBOSE_MAKEFILE "verbose build step" OFF)
+  option(CMAKE_RULE_MESSAGES "verbose cmake" OFF)
+
+  option(FORCE_DEBUG_INFORMATION "force inclusion of debug information" ON)
+
+  option(STRIP_DEBUG "strip debug information from binaries" ON)
+  option(
+    STRIP_AND_DELETE_SYMBOLS
+    "strip debug information from binaries but don't preserve any debug information, takes precedence if STRIP_DEBUG is also set"
+    OFF)
+  option(MITIGATE_READELF_WARNINGS "use GDWARFv4 to prevent some readelf warnings" ON)
+  option(GENERATE_DEBUG_INDEX "generate debug symbol index (speed-up debugging)" OFF)
+
+  option(USE_RPC_LOGGING "turn on rpc logging" OFF)
+  option(RPC_HANG_ON_FAILED_ASSERT "hang on failed assert" OFF)
+  option(USE_RPC_TELEMETRY "turn on rpc telemetry" OFF)
+  option(USE_RPC_TELEMETRY_RAII_LOGGING
+         "turn on the logging of the addref release and try cast activity of the services, proxies and stubs" OFF)
 
   message("BUILD_TYPE ${BUILD_TYPE}")
   message("CMAKE_BUILD_TYPE ${CMAKE_BUILD_TYPE}")
@@ -34,95 +51,32 @@ if(NOT DEPENDANCIES_LOADED)
   message("SGX_HW ${SGX_HW}")
   message("SGX_KEY ${SGX_KEY}")
 
+  message("BUILD_ENCLAVE ${BUILD_ENCLAVE}")
+  message("BUILD_HOST ${BUILD_HOST}")
+  message("BUILD_EXE  ${BUILD_EXE}")
+  message("BUILD_TEST ${BUILD_TEST}")
+
+  message("AWAIT_ATTACH_ON_ENCLAVE_ERRORS  ${AWAIT_ATTACH_ON_ENCLAVE_ERRORS}")
+  message("DEBUG_ENCLAVE_MEMLEAK  ${DEBUG_ENCLAVE_MEMLEAK}")
+  message("SECRETARIUM_UNITY_BUILD  ${SECRETARIUM_UNITY_BUILD}")
+
+  message("CMAKE_VERBOSE_MAKEFILE  ${CMAKE_VERBOSE_MAKEFILE}")
+  message("CMAKE_RULE_MESSAGES  ${CMAKE_RULE_MESSAGES}")
+
+  message("STRIP_DEBUG  ${STRIP_DEBUG}")
+  message("STRIP_AND_DELETE_SYMBOLS  ${STRIP_AND_DELETE_SYMBOLS}")
+  message("MITIGATE_READELF_WARNINGS ${MITIGATE_READELF_WARNINGS}")
+  message("GENERATE_DEBUG_INDEX  ${GENERATE_DEBUG_INDEX}")
+  message("ENABLE_CLANG_TIDY  ${ENABLE_CLANG_TIDY}")
+  message("ENABLE_CLANG_TIDY_FIX  ${ENABLE_CLANG_TIDY_FIX}")
+
+  set(CMAKE_CXX_STANDARD 17)
+  set(CMAKE_CXX_STANDARD_REQUIRED ON)
+  set(CMAKE_CXX_EXTENSIONS OFF)
+  set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+  set(ENCLAVE_TARGET "SGX")
+
   list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
-
-  if(WIN32)
-    # we dont want os specific libraries for our enclaves
-    set(CMAKE_C_STANDARD_LIBRARIES
-        ""
-        CACHE STRING "override default windows libraries" FORCE)
-    set(CMAKE_CXX_STANDARD_LIBRARIES
-        ""
-        CACHE STRING "override default windows libraries" FORCE)
-    set(CMAKE_CXX_FLAGS
-        ""
-        CACHE STRING "override default windows flags" FORCE)
-    set(CMAKE_C_FLAGS
-        ""
-        CACHE STRING "override default windows flags" FORCE)
-    set(CMAKE_CXX_FLAGS_DEBUG
-        ""
-        CACHE STRING "override default windows flags" FORCE)
-    set(CMAKE_C_FLAGS_DEBUG
-        ""
-        CACHE STRING "override default windows flags" FORCE)
-    set(CMAKE_CXX_FLAGS_RELEASE
-        ""
-        CACHE STRING "override default windows flags" FORCE)
-    set(CMAKE_C_FLAGS_RELEASE
-        ""
-        CACHE STRING "override default windows flags" FORCE)
-
-    set(CMAKE_MODULE_LINKER_FLAGS
-        ""
-        CACHE STRING "override default windows flags" FORCE)
-    set(CMAKE_MODULE_LINKER_FLAGS_DEBUG
-        ""
-        CACHE STRING "override default windows flags" FORCE)
-    set(CMAKE_MODULE_LINKER_FLAGS_MINSIZEREL
-        ""
-        CACHE STRING "override default windows flags" FORCE)
-    set(CMAKE_MODULE_LINKER_FLAGS_RELEASE
-        ""
-        CACHE STRING "override default windows flags" FORCE)
-    set(CMAKE_MODULE_LINKER_FLAGS_RELWITHDEBINFO
-        ""
-        CACHE STRING "override default windows flags" FORCE)
-    set(CMAKE_SHARED_LINKER_FLAGS
-        ""
-        CACHE STRING "override default windows flags" FORCE)
-    set(CMAKE_SHARED_LINKER_FLAGS_DEBUG
-        ""
-        CACHE STRING "override default windows flags" FORCE)
-    set(CMAKE_SHARED_LINKER_FLAGS_MINSIZEREL
-        ""
-        CACHE STRING "override default windows flags" FORCE)
-    set(CMAKE_SHARED_LINKER_FLAGS_RELEASE
-        ""
-        CACHE STRING "override default windows flags" FORCE)
-    set(CMAKE_SHARED_LINKER_FLAGS_RELWITHDEBINFO
-        ""
-        CACHE STRING "override default windows flags" FORCE)
-    set(CMAKE_EXE_LINKER_FLAGS
-        ""
-        CACHE STRING "override default windows flags" FORCE)
-    set(CMAKE_EXE_LINKER_FLAGS_DEBUG
-        ""
-        CACHE STRING "override default windows flags" FORCE)
-    set(CMAKE_EXE_LINKER_FLAGS_MINSIZEREL
-        ""
-        CACHE STRING "override default windows flags" FORCE)
-    set(CMAKE_EXE_LINKER_FLAGS_RELEASE
-        ""
-        CACHE STRING "override default windows flags" FORCE)
-    set(CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO
-        ""
-        CACHE STRING "override default windows flags" FORCE)
-
-    # https://www.youtube.com/watch?v=JuZPu4yJA7k
-    set(CMAKE_INSTALL_PREFIX
-        ${CMAKE_BINARY_DIR}/install
-        CACHE STRING "override default windows flags" FORCE)
-  else()
-    # this is generally frowned apon as it forces all libraries to include this it is needed to force feed gtest with
-    # the right c++ runtime perhaps moving this command to a sub project would be sensible
-    include_directories(BEFORE SYSTEM "/usr/lib/llvm-10/include/c++/v1")
-
-    set(DESTDIR ${CMAKE_BINARY_DIR}/tmp)
-  endif()
-
-  # ####################################################################################################################
-  # settings
 
   if(CMAKE_GENERATOR STREQUAL "Ninja")
     set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/output/${BUILD_TYPE})
@@ -138,43 +92,233 @@ if(NOT DEPENDANCIES_LOADED)
     set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/output)
   endif()
 
-  set(CMAKE_CXX_STANDARD 17)
-  set(CMAKE_CXX_STANDARD_REQUIRED ON)
-  set(CMAKE_CXX_EXTENSIONS OFF)
+  # https://www.youtube.com/watch?v=JuZPu4yJA7k
+  message(INSTALL_LOCATION ${INSTALL_LOCATION})
+  if(DEFINED INSTALL_LOCATION)
+    message(CMAKE_INSTALL_PREFIX ${INSTALL_LOCATION})
+    set(CMAKE_INSTALL_PREFIX
+        ${INSTALL_LOCATION}
+        CACHE STRING "override location of installation files" FORCE)
+  else()
+    set(CMAKE_INSTALL_PREFIX
+        ${CMAKE_BINARY_DIR}/install
+        CACHE STRING "override location of installation files" FORCE)
+  endif()
 
-  set(ENCLAVE_TARGET "SGX")
+  # ####################################################################################################################
+  # load the submodules
+  message("submodules")
 
-  include(GNUInstallDirs)
+  find_package(Git QUIET)
+
+  # ####################################################################################################################
+  # reset and apply cmake separate enclave and host compile flags
+  if(BUILD_TEST)
+    set(BUILD_TEST_FLAG BUILD_TEST)
+    set(HOST_DEBUG_OPTIONS)
+    if(DEBUG_HOST_ALL)
+      set(DEBUG_HOST_LEAK ON)
+      set(DEBUG_HOST_ADDRESS ON)
+      set(DEBUG_HOST_THREAD OFF)
+      set(DEBUG_HOST_UNDEFINED ON)
+    endif()
+    if(DEBUG_HOST_ADDRESS)
+      set(HOST_DEBUG_OPTIONS ${HOST_DEBUG_OPTIONS} -fsanitize=address -fno-omit-frame-pointer)
+    endif()
+    if(DEBUG_HOST_THREAD)
+      set(HOST_DEBUG_OPTIONS ${HOST_DEBUG_OPTIONS} -fsanitize=thread -fno-omit-frame-pointer)
+      set(CMAKE_GTEST_DISCOVER_TESTS_DISCOVERY_MODE PRE_TEST)
+    endif()
+    if(DEBUG_HOST_UNDEFINED)
+      set(HOST_DEBUG_OPTIONS ${HOST_DEBUG_OPTIONS} -fsanitize=undefined)
+    endif()
+    if(DEBUG_HOST_LEAK)
+      if(DEBUG_HOST_ADDRESS)
+        set(HOST_DEBUG_OPTIONS ${HOST_DEBUG_OPTIONS} -fsanitize=leak -fno-omit-frame-pointer)
+      else()
+        set(HOST_DEBUG_OPTIONS ${HOST_DEBUG_OPTIONS} -fsanitize=leak)
+      endif()
+    endif()
+    if(DEBUG_HOST_MEMORY)
+      if(DEBUG_HOST_ADDRESS)
+        set(HOST_DEBUG_OPTIONS ${HOST_DEBUG_OPTIONS} -fsanitize=leak -fno-omit-frame-pointer)
+      else()
+        set(HOST_DEBUG_OPTIONS ${HOST_DEBUG_OPTIONS} -fsanitize=leak)
+      endif()
+    endif()
+    if(DEBUG_HOST_MEMORY)
+      set(DEBUG_HOST_FLAG DEBUG_HOST_LEAK)
+      if(DEBUG_HOST_ADDRESS)
+        set(HOST_DEBUG_OPTIONS ${HOST_DEBUG_OPTIONS} -fsanitize=leak -fno-omit-frame-pointer)
+      else()
+        set(HOST_DEBUG_OPTIONS ${HOST_DEBUG_OPTIONS} -fsanitize=leak)
+      endif()
+    endif()
+  else()
+    set(BUILD_TEST_FLAG)
+  endif()
+
+  if(USE_RPC_LOGGING)
+    set(USE_RPC_LOGGING_FLAG USE_RPC_LOGGING)
+  else()
+    set(USE_RPC_LOGGING_FLAG)
+  endif()
+  if(RPC_HANG_ON_FAILED_ASSERT)
+    set(RPC_HANG_ON_FAILED_ASSERT_FLAG RPC_HANG_ON_FAILED_ASSERT)
+  else()
+    set(RPC_HANG_ON_FAILED_ASSERT_FLAG)
+  endif()
+  if(USE_RPC_TELEMETRY)
+    set(USE_RPC_TELEMETRY_FLAG USE_RPC_TELEMETRY)
+  else()
+    set(USE_RPC_TELEMETRY_FLAG)
+  endif()
+  if(USE_RPC_TELEMETRY_RAII_LOGGING)
+    set(USE_RPC_TELEMETRY_RAII_LOGGING_FLAG USE_RPC_TELEMETRY_RAII_LOGGING)
+  else()
+    set(USE_RPC_TELEMETRY_RAII_LOGGING_FLAG)
+  endif()
+  if((STRIP_DEBUG OR STRIP_AND_DELETE_SYMBOLS) AND NOT ENABLE_COVERAGE)
+    if(STRIP_AND_DELETE_SYMBOLS)
+      set(STRIP_SYMBOLS strip --strip-debug --strip-unneeded)
+    else() # STRIP_DEBUG
+      set(STRIP_SYMBOLS "${CMAKE_CURRENT_SOURCE_DIR}/secretarium/scripts/linux/strip_symbols.sh")
+    endif()
+  endif()
+  if(GENERATE_DEBUG_INDEX AND NOT STRIP_AND_DELETE_SYMBOLS)
+    set(GENERATE_SYMBOLS_INDEX "${CMAKE_CURRENT_SOURCE_DIR}/secretarium/scripts/linux/generate_symbols_index.sh")
+  endif()
 
   if(${ENCLAVE_TARGET} STREQUAL "SGX")
-    if(WIN32)
-      set(WARNING_FLAG /W3 /WX)
+    if(${SGX_HW}) # not simulation
+      set(SGX_HW_OR_SIM_DEFINE SGX_HW)
+    else()
+      set(SGX_HW_OR_SIM_DEFINE SGX_SIM)
+    endif()
+
+    set(SHARED_DEFINES
+        ENCLAVE_STATUS=sgx_status_t
+        ENCLAVE_OK=SGX_SUCCESS
+        _LIB
+        NOMINMAX
+        _SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS
+        ${USE_RPC_LOGGING_FLAG}
+        ${RPC_HANG_ON_FAILED_ASSERT_FLAG}
+        ${USE_RPC_TELEMETRY_FLAG}
+        ${USE_RPC_TELEMETRY_RAII_LOGGING_FLAG}
+        ${BUILD_TEST_FLAG}
+        ${ENCLAVE_MEMLEAK_DEFINES}
+        ${ENABLE_EXTERNAL_VERIFICATION_FLAG}
+        ${SGX_HW_OR_SIM_DEFINE})
+
+    if(WIN32) # Windows
+      find_package(SGX REQUIRED)
+      
+      # we dont want os specific libraries for our enclaves
+      set(CMAKE_C_STANDARD_LIBRARIES
+      ""
+      CACHE STRING "override default windows libraries" FORCE)
+      set(CMAKE_C_COMPILE_OBJECT
+          ""
+          CACHE STRING "override default windows libraries" FORCE)
+          set(CMAKE_C_ARCHIVE_FINISH
+              ""
+              CACHE STRING "override default windows libraries" FORCE)
+              set(CMAKE_C_ARCHIVE_CREATE
+                  ""
+                  CACHE STRING "override default windows libraries" FORCE)
+      set(CMAKE_CXX_STANDARD_LIBRARIES
+          ""
+          CACHE STRING "override default windows libraries" FORCE)
+      set(CMAKE_CXX_FLAGS
+          ""
+          CACHE STRING "override default windows flags" FORCE)
+      set(CMAKE_C_FLAGS
+          ""
+          CACHE STRING "override default windows flags" FORCE)
+      set(CMAKE_CXX_FLAGS_DEBUG
+          ""
+          CACHE STRING "override default windows flags" FORCE)
+      set(CMAKE_C_FLAGS_DEBUG
+          ""
+          CACHE STRING "override default windows flags" FORCE)
+      set(CMAKE_CXX_FLAGS_RELEASE
+          ""
+          CACHE STRING "override default windows flags" FORCE)
+      set(CMAKE_C_FLAGS_RELEASE
+          ""
+          CACHE STRING "override default windows flags" FORCE)
+
+      set(CMAKE_MODULE_LINKER_FLAGS
+          ""
+          CACHE STRING "override default windows flags" FORCE)
+      set(CMAKE_MODULE_LINKER_FLAGS_DEBUG
+          ""
+          CACHE STRING "override default windows flags" FORCE)
+      set(CMAKE_MODULE_LINKER_FLAGS_MINSIZEREL
+          ""
+          CACHE STRING "override default windows flags" FORCE)
+      set(CMAKE_MODULE_LINKER_FLAGS_RELEASE
+          ""
+          CACHE STRING "override default windows flags" FORCE)
+      set(CMAKE_MODULE_LINKER_FLAGS_RELWITHDEBINFO
+          ""
+          CACHE STRING "override default windows flags" FORCE)
+      set(CMAKE_SHARED_LINKER_FLAGS
+          ""
+          CACHE STRING "override default windows flags" FORCE)
+      set(CMAKE_SHARED_LINKER_FLAGS_DEBUG
+          ""
+          CACHE STRING "override default windows flags" FORCE)
+      set(CMAKE_SHARED_LINKER_FLAGS_MINSIZEREL
+          ""
+          CACHE STRING "override default windows flags" FORCE)
+      set(CMAKE_SHARED_LINKER_FLAGS_RELEASE
+          ""
+          CACHE STRING "override default windows flags" FORCE)
+      set(CMAKE_SHARED_LINKER_FLAGS_RELWITHDEBINFO
+          ""
+          CACHE STRING "override default windows flags" FORCE)
+      set(CMAKE_EXE_LINKER_FLAGS
+          ""
+          CACHE STRING "override default windows flags" FORCE)
+      set(CMAKE_EXE_LINKER_FLAGS_DEBUG
+          ""
+          CACHE STRING "override default windows flags" FORCE)
+      set(CMAKE_EXE_LINKER_FLAGS_MINSIZEREL
+          ""
+          CACHE STRING "override default windows flags" FORCE)
+      set(CMAKE_EXE_LINKER_FLAGS_RELEASE
+          ""
+          CACHE STRING "override default windows flags" FORCE)
+      set(CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO
+          ""
+          CACHE STRING "override default windows flags" FORCE)
+
+      set(WARNING_FLAG /W3 /WX /w34265 /wd4996)
 
       if(DEBUG_ENCLAVE_MEMLEAK)
         set(ENCLAVE_MEMLEAK_LINK_FLAGS /IGNORE:4006 /IGNORE:4088 /FORCE:MULTIPLE /WX:NO)
         set(ENCLAVE_MEMLEAK_DEFINES MEMLEAK_CHECK)
-        set(DEFAULT_LOG_LEVEL "spdlog::level::trace")
-      else()
-        set(DEFAULT_LOG_LEVEL "spdlog::level::info")
       endif()
 
-      if(RPC_SERIALISATION_TEXT)
-        set(RPC_SERIALISATION_FMT RPC_SERIALISATION_TEXT)
-      elseif(RPC_SERIALISATION_JSON)
-        set(RPC_SERIALISATION_FMT RPC_SERIALISATION_JSON)
-      else()
-        set(RPC_SERIALISATION_FMT RPC_SERIALISATION_BINARY)
-      endif()
+      cmake_path(SET TEMP_DIR NORMALIZE "c:/temp/")
+      cmake_path(SET RUNTIME_DIR NORMALIZE "c:/Secretarium/Runtime/")
 
-      set(SHARED_DEFINES
-          ENCLAVE_STATUS=sgx_status_t
-          ENCLAVE_OK=SGX_SUCCESS
-          _LIB
-          NOMINMAX
-          ${RPC_SERIALISATION_FMT}
-          DEFAULT_LOG_LEVEL=${DEFAULT_LOG_LEVEL})
-      set(SHARED_HOST_DEFINES ${SHARED_DEFINES} WIN32 _WINDOWS)
-      set(SHARED_ENCLAVE_DEFINES ${SHARED_DEFINES} _IN_ENCLAVE)
+      set(SHARED_DEFINES ${SHARED_DEFINES} TEMP_DIR="${TEMP_DIR}" RUNTIME_DIR="${RUNTIME_DIR}")
+
+      # to fill out later
+      set(WARN_PEDANTIC /DWARN_PEDANTIC)
+      set(WARN_OK /DWARN_OK)
+      # the are conflicts between winsock.h and winsock2.h, the latter being the preferred one (and sometimes actually
+      # required), but the former getting included through windows.h for instance, unless winsock2.h has already been
+      # included OR WIN32_LEAN_AND_MEAN is defined, which is therefore a good solution to handle the problem everywhere
+      set(SHARED_HOST_DEFINES
+          ${SHARED_DEFINES}
+          WIN32
+          _WINDOWS
+          WIN32_LEAN_AND_MEAN)
+      set(SHARED_ENCLAVE_DEFINES ${SHARED_DEFINES} _IN_ENCLAVE ${ENCLAVE_MEMLEAK_DEFINES})
 
       set(SHARED_COMPILE_OPTIONS
           ${WARNING_FLAG}
@@ -196,18 +340,19 @@ if(NOT DEPENDANCIES_LOADED)
           /Zc:inline
           /Zc:rvalueCast
           /Zc:wchar_t
+          /Zc:__cplusplus
           /Zi
           /wd4996 # allow deprecated functions
       )
 
-      set(SHARED_HOST_COMPILE_OPTIONS ${SHARED_COMPILE_OPTIONS})
+      set(SHARED_HOST_COMPILE_OPTIONS ${SHARED_COMPILE_OPTIONS} ${HOST_DEBUG_OPTIONS})
 
       set(SHARED_ENCLAVE_COMPILE_OPTIONS ${SHARED_COMPILE_OPTIONS} /d2FH4- /Qspectre)
 
       set(LINK_OPTIONS /MACHINE:x64 /WX)
 
       set(SHARED_ENCLAVE_LINK_OPTIONS ${LINK_OPTIONS})
-      set(SHARED_HOST_LINK_OPTIONS ${LINK_OPTIONS})
+      set(SHARED_HOST_LINK_OPTIONS ${LINK_OPTIONS} ${HOST_DEBUG_OPTIONS})
 
       set(SHARED_HOST_LIBRARIES
           advapi32.lib
@@ -220,13 +365,18 @@ if(NOT DEPENDANCIES_LOADED)
           user32.lib
           uuid.lib
           winspool.lib
-          Crypt32.lib)
+          Crypt32.lib
+          # ${DCAP_LIBRARY_DIR}/sgx_dcap_quoteverify.lib
+          # ${DCAP_LIBRARY_DIR}/sgx_dcap_ql.lib
+          )
 
       if(${BUILD_TYPE} STREQUAL "release")
         if(${SGX_MODE} STREQUAL "release")
-          set(HOST_DEFINES ${SHARED_HOST_DEFINES} NDEBUG)
+          set(HOST_DEFINES ${SHARED_HOST_DEFINES} NDEBUG PREVENT_DEBUG_ENCLAVE # what is this?
+          )
         else()
-          set(HOST_DEFINES ${SHARED_HOST_DEFINES} NDEBUG EDEBUG # sets SGX_DEBUG_FLAG to 1
+          set(HOST_DEFINES ${SHARED_HOST_DEFINES} NDEBUG PREVENT_DEBUG_ENCLAVE # what is this?
+                           EDEBUG # sets SGX_DEBUG_FLAG to 1
           )
         endif()
 
@@ -239,26 +389,26 @@ if(NOT DEPENDANCIES_LOADED)
             /Ob2)
 
         if(${SGX_MODE} STREQUAL "release")
-          set(ENCLAVE_DEFINES ${SHARED_ENCLAVE_DEFINES} NDEBUG ${ENCLAVE_MEMLEAK_DEFINES})
+          set(ENCLAVE_DEFINES ${SHARED_ENCLAVE_DEFINES} NDEBUG)
         else()
           set(ENCLAVE_DEFINES ${SHARED_ENCLAVE_DEFINES} NDEBUG EDEBUG # sets SGX_DEBUG_FLAG to 1
-                              ${ENCLAVE_MEMLEAK_DEFINES})
+          )
         endif()
 
         message("!!!!! /GL needs to be renabled for performance reasons")
         set(ENCLAVE_COMPILE_OPTIONS
             ${SHARED_ENCLAVE_COMPILE_OPTIONS}
             # /GL
-            /MD
+            /MT
             /O2
             /Oi
             /Ob2)
-        set(ENCLAVE_LINK_OPTIONS ${SHARED_ENCLAVE_LINK_OPTIONS} /INCREMENTAL:NO ${ENCLAVE_MEMLEAK_LINK_FLAGS} /debug)
-        set(HOST_LINK_OPTIONS ${SHARED_HOST_LINK_OPTIONS} /INCREMENTAL:NO /debug)
-        set(HOST_LINK_DLL_OPTIONS ${HOST_LINK_OPTIONS})
+        set(ENCLAVE_LINK_OPTIONS ${SHARED_ENCLAVE_LINK_OPTIONS} /INCREMENTAL:NO ${ENCLAVE_MEMLEAK_LINK_FLAGS} /DEBUG)
+        set(HOST_LINK_OPTIONS ${SHARED_HOST_LINK_OPTIONS} /INCREMENTAL:NO /DEBUG)
+        set(HOST_LINK_DYNAMIC_LIBRARY_OPTIONS ${HOST_LINK_OPTIONS})
         set(HOST_LINK_EXE_OPTIONS ${HOST_LINK_OPTIONS} /IGNORE:4099 /IGNORE:4098)
       else()
-        set(HOST_DEFINES ${SHARED_HOST_DEFINES} _DEBUG FMT_HEADER_ONLY=1)
+        set(HOST_DEFINES ${SHARED_HOST_DEFINES} _DEBUG)
 
         set(HOST_COMPILE_OPTIONS
             ${SHARED_HOST_COMPILE_OPTIONS}
@@ -276,11 +426,12 @@ if(NOT DEPENDANCIES_LOADED)
             ${SHARED_ENCLAVE_LINK_OPTIONS}
             /IGNORE:4099
             /IGNORE:4204
-            /debug
+            /IGNORE:4217
+            /DEBUG
             /INCREMENTAL:NO
             ${ENCLAVE_MEMLEAK_LINK_FLAGS})
-        set(HOST_LINK_OPTIONS ${SHARED_HOST_LINK_OPTIONS} /debug /INCREMENTAL)
-        set(HOST_LINK_DLL_OPTIONS ${HOST_LINK_OPTIONS})
+        set(HOST_LINK_OPTIONS ${SHARED_HOST_LINK_OPTIONS} /DEBUG /INCREMENTAL)
+        set(HOST_LINK_DYNAMIC_LIBRARY_OPTIONS ${HOST_LINK_OPTIONS})
         set(HOST_LINK_EXE_OPTIONS
             ${HOST_LINK_OPTIONS}
             /IGNORE:4099
@@ -288,7 +439,6 @@ if(NOT DEPENDANCIES_LOADED)
             /IGNORE:4204
             /IGNORE:4203)
       endif()
-
       if(${SGX_HW}) # not simulation
         set(HOST_LIBRARIES
             ${SHARED_HOST_LIBRARIES}
@@ -304,103 +454,293 @@ if(NOT DEPENDANCIES_LOADED)
             sgx_capable.lib
             sgx_urts_sim.lib)
       endif()
-      set(ENCLAVE_SSL_INCLUDES "C:/Dev/Libs/VS2015/x64/openssl-1.1.1/include")
 
-    else()
-      find_program(CLANG_TIDY_EXE NAMES "clang-tidy" REQUIRED)
+    else() # Linux
+      if(ENABLE_CLANG_TIDY)
+        find_program(CLANG_TIDY_EXE NAMES "clang-tidy" REQUIRED)
 
-      # setup clang-tidy command from executable + options
-      if(ENABLE_CLANG_TIDY_FIX)
-        set(CLANG_TIDY_COMMAND "${CLANG_TIDY_EXE}" -fix-errors -fix)
+        # setup clang-tidy command from executable + options
+        if(ENABLE_CLANG_TIDY_FIX)
+          set(CLANG_TIDY_COMMAND "${CLANG_TIDY_EXE}" -fix-errors -fix)
+        else()
+          set(CLANG_TIDY_COMMAND "${CLANG_TIDY_EXE}")
+        endif()
       else()
-        set(CLANG_TIDY_COMMAND "${CLANG_TIDY_EXE}")
+        set(CLANG_TIDY_COMMAND)
       endif()
 
-      set(HOST_DEFINES ENCLAVE_STATUS=sgx_status_t ENCLAVE_OK=SGX_SUCCESS DISALLOW_BAD_JUMPS)
-      set(ENCLAVE_DEFINES
+      # Review the below(*) if it's necessary to be re-enabled again: this needs a complete rewrite
+      # *include(GNUInstallDirs)
+
+      # this is generally frowned apon as it forces all libraries to include this it is needed to force feed gtest with
+      # the right c++ runtime perhaps moving this command to a sub project would be sensible *include_directories(BEFORE
+      # SYSTEM "/usr/lib/llvm-10/include/c++/v1")
+
+      if(DEBUG_ENCLAVE_MEMLEAK)
+        set(ENCLAVE_MEMLEAK_DEFINES MEMLEAK_CHECK)
+      endif()
+
+      # *set(DESTDIR ${CMAKE_BINARY_DIR}/tmp)
+      cmake_path(SET TEMP_DIR NORMALIZE "/tmp/")
+      cmake_path(SET RUNTIME_DIR NORMALIZE "/var/secretarium/runtime/")
+
+      message("SGX_SDK_CONTAINS_DEBUG_INFORMATION is ${SGX_SDK_CONTAINS_DEBUG_INFORMATION}")
+      set(SHARED_DEFINES ${SHARED_DEFINES} TEMP_DIR="${TEMP_DIR}" RUNTIME_DIR="${RUNTIME_DIR}")
+
+      if(${BUILD_TYPE} STREQUAL "release")
+        if(${SGX_MODE} STREQUAL "release")
+          set(HOST_DEFINES ${SHARED_DEFINES} NDEBUG PREVENT_DEBUG_ENCLAVE # what is this?
+                           DISALLOW_BAD_JUMPS)
+        else() # Prerelease "possibly"
+          set(HOST_DEFINES
+              ${SHARED_DEFINES}
+              NDEBUG
+              PREVENT_DEBUG_ENCLAVE # what is this?
+              DISALLOW_BAD_JUMPS
+              EDEBUG # sets SGX_DEBUG_FLAG to 1
+          )
+        endif()
+      else() # debug
+        set(HOST_DEFINES ${SHARED_DEFINES} _DEBUG)
+      endif()
+
+      set(SHARED_ENCLAVE_DEFINES
           _IN_ENCLAVE
+          ${SHARED_DEFINES}
           CLEAN_LIBC
           ENCLAVE_STATUS=sgx_status_t
           ENCLAVE_OK=SGX_SUCCESS
           DISALLOW_BAD_JUMPS)
-      set(ENCLAVE_COMPILE_OPTIONS
-          -Wno-c++17-extensions
-          -Wno-nonportable-include-path
-          -Wno-conversion
-          -Wno-unused-parameter
-          -Wno-tautological-undefined-compare
-          -Wno-dynamic-class-memaccess
-          -Wno-ignored-qualifiers
-          -Wno-exceptions
-          -Wno-null-dereference
-          -Wno-ignored-attributes
-          -Wno-implicit-exception-spec-mismatch
-          -I/usr/lib/llvm-10/include/c++/v1)
-      set(HOST_COMPILE_OPTIONS
-          -I/usr/lib/llvm-10/include/c++/v1
-          -Wno-nonportable-include-path
-          -Wno-conversion
-          -Wno-unused-parameter
-          -Wno-tautological-undefined-compare
-          -Wno-dynamic-class-memaccess
-          -Wno-ignored-qualifiers
-          -Wno-exceptions
-          -Wno-null-dereference
-          -Wno-ignored-attributes
-          -Wno-implicit-exception-spec-mismatch
-          -Wno-trigraphs)
 
-      set(HOST_LINK_OPTIONS
-          -L/usr/lib/llvm-10/lib
-          -Wl,-rpath,/usr/lib/llvm-10/lib
-          -lc++
-          -L/opt/intel/sgxsdk/lib64
-          -lsgx_tcrypto
-          linux_dependancies_host)
-      set(HOST_LINK_DLL_OPTIONS ${HOST_LINK_OPTIONS} -fPIC)
+      if(MITIGATE_READELF_WARNINGS)
+        set(GDWARF4_FLAG "-gdwarf-4")
+      endif()
+
+      if(NOT STRIP_AND_DELETE_SYMBOLS)
+        set(DEBUG_HOST_ENCLAVE_OPTIONS -ggdb3 -fno-limit-debug-info ${GDWARF4_FLAG})
+        set(DEBUG_COMPILE_FLAGS "-ggdb3 -fno-limit-debug-info ${GDWARF4_FLAG}")
+      endif()
+      if(${BUILD_TYPE} STREQUAL "release")
+        if(FORCE_DEBUG_INFORMATION AND NOT STRIP_AND_DELETE_SYMBOLS)
+          set(CMAKE_CXX_FLAGS_DEBUG ${DEBUG_COMPILE_FLAGS}) # -g -fno-limit-debug-info
+          set(CMAKE_C_FLAGS_DEBUG ${CMAKE_CXX_FLAGS_DEBUG})
+        else()
+          set(CMAKE_CXX_FLAGS_DEBUG "")
+          set(CMAKE_C_FLAGS_DEBUG "")
+        endif()
+        set(OPTIMIZER_FLAGS -O3)
+
+        if(${SGX_MODE} STREQUAL "release")
+          set(ENCLAVE_DEFINES ${SHARED_ENCLAVE_DEFINES} NDEBUG ${ENCLAVE_MEMLEAK_DEFINES})
+        else() # Prerelease "possibly"
+          set(ENCLAVE_DEFINES ${SHARED_ENCLAVE_DEFINES} NDEBUG EDEBUG ${ENCLAVE_MEMLEAK_DEFINES}) # sets SGX_DEBUG_FLAG
+        endif()
+      else() # debug
+        if(STRIP_AND_DELETE_SYMBOLS) # Effort to reduce size of artifacts generated in GitLab
+          set(CMAKE_CXX_FLAGS_DEBUG "")
+          set(CMAKE_C_FLAGS_DEBUG "")
+        else()
+          set(EXTRA_COMPILE_OPTIONS ${DEBUG_HOST_ENCLAVE_OPTIONS}) # The one actually used by HOST and ENCLAVE instead
+                                                                   # ofq
+          set(CMAKE_CXX_FLAGS_DEBUG ${DEBUG_COMPILE_FLAGS})
+          set(CMAKE_C_FLAGS_DEBUG ${CMAKE_CXX_FLAGS_DEBUG})
+        endif()
+        set(OPTIMIZER_FLAGS -O0)
+        set(ENCLAVE_DEFINES ${SHARED_ENCLAVE_DEFINES} _DEBUG ${ENCLAVE_MEMLEAK_DEFINES}) # sets SGX_DEBUG_FLAG to 1
+      endif()
+      message("CMAKE_CXX_FLAGS_DEBUG [${CMAKE_CXX_FLAGS_DEBUG}]")
+      message("OPTIMIZER_FLAGS [${OPTIMIZER_FLAGS}]")
+
+      set(SHARED_COMPILE_OPTIONS
+          -Wno-implicit-exception-spec-mismatch # thisis a big sgx problem
+          -Wno-unknown-pragmas
+          # this has a ticket to remove
+          -Wno-deprecated-declarations
+          ${EXTRA_COMPILE_OPTIONS}
+          ${OPTIMIZER_FLAGS})
+
+      set(WARN_BASELINE
+          -Werror # convert warnings into errors
+          -Wc99-extensions
+          # -Wdeprecated-dynamic-exception-spec   #sgx is riddled with throws() -Wsuggest-destructor-override #sgx is
+          # not using override in its stl -Wdocumentation-unknown-command       #yes this would be nice
+          # -Wexit-time-destructors               #not really an error -Wglobal-constructors                 #not really
+          # an error -Wshadow-all                          #a nice to have but a big change -Wsuggest-override
+          # #RapidJson is riddled with this problem -Wold-style-cast                      #this would be a massive
+          # change -Wconversion                          #this is recommended but causes an explosion in our code
+          -Wall
+          -Wextra
+          -Wpedantic
+          # this is needed by yas
+          -Wno-variadic-macros
+          -Wno-gnu-zero-variadic-macro-arguments
+          # some extra checks
+          -Wzero-length-array
+          -Wflexible-array-extensions
+          -Wpragma-pack-suspicious-include
+          -Wshadow-field-in-constructor
+          -Wnon-virtual-dtor
+          -Wdelete-non-virtual-dtor)
+      set(WARN_PEDANTIC -DWARN_PEDANTIC ${WARN_BASELINE})
+      set(WARN_SIGN_CONVERSION -Wsign-conversion)
+      set(WARN_TYPE_SIZES -Wshorten-64-to-32 -Wsign-compare -Wshift-sign-overflow)
+
+      set(WARN_OK
+          -DWARN_OK
+          ${WARN_BASELINE}
+          -Wno-unused-parameter
+          -Wno-unused-variable
+          -Wno-sign-compare)
+
+      set(ENCLAVE_COMPILE_OPTIONS ${SHARED_COMPILE_OPTIONS} -Wno-c++17-extensions -ffunction-sections -fdata-sections)
+      set(HOST_COMPILE_OPTIONS ${SHARED_COMPILE_OPTIONS} -Wno-trigraphs ${HOST_DEBUG_OPTIONS})
+
+      set(HOST_LINK_OPTIONS -L/opt/intel/sgxsdk/lib64 -lsgx_tcrypto ${HOST_DEBUG_OPTIONS})
+      set(HOST_LINK_DYNAMIC_LIBRARY_OPTIONS ${HOST_LINK_OPTIONS} -fPIC)
+      set(HOST_LINK_EXE_OPTIONS -lsgx_dcap_quoteverify -lsgx_dcap_ql ${HOST_DEBUG_OPTIONS})
+      # this is here as we need to override the rpath we cannot use the ${HOST_LINK_EXE_OPTIONS} as cmake scrambles the
+      # $
+      set(CMAKE_EXE_LINKER_FLAGS [[-Wl,-rpath,'$ORIGIN']])
+
       if(ENABLE_COVERAGE)
         message("enabling code coverage")
-        # list(APPEND HOST_COMPILE_OPTIONS -fprofile-instr-generate -fcoverage-mapping)
-        list(APPEND HOST_COMPILE_OPTIONS --coverage)
-        list(APPEND HOST_LINK_OPTIONS -fprofile-arcs)
+        # clang specific list(APPEND HOST_COMPILE_OPTIONS -fprofile-instr-generate -fcoverage-mapping)
+        # set(CMAKE_EXE_LINKER_FLAGS [[-Wl,-rpath,'$ORIGIN' -fprofile-instr-generate -fcoverage-mapping ]])
+
+        # gcc lcov list(APPEND HOST_COMPILE_OPTIONS -fprofile-instr-generate -fcoverage-mapping)
+        # set(CMAKE_EXE_LINKER_FLAGS [[-Wl,-rpath,'$ORIGIN' -fprofile-instr-generate ]])
+
+        # list(APPEND HOST_COMPILE_OPTIONS --coverage) set(CMAKE_EXE_LINKER_FLAGS [[-Wl,-rpath,'$ORIGIN'
+        # -fprofile-instr-generate ]])
+
+        # finally gcc gcov
+        list(APPEND HOST_COMPILE_OPTIONS -fprofile-arcs -ftest-coverage)
+        set(CMAKE_EXE_LINKER_FLAGS [[-Wl,-rpath,'$ORIGIN' -fprofile-arcs -ftest-coverage ]])
+
       endif()
-      set(OS_DEPENDANCIES_ENCLAVE linux_dependancies_enclave)
-      set(ENCLAVE_SSL_INCLUDES "/opt/intel/sgxssl/include")
     endif()
 
     find_package(SGX REQUIRED)
+    # need for SGX_SDK_CONTAINS_DEBUG_INFORMATION has just been determined in FindSGX.cmake
+    if(SGX_SDK_CONTAINS_DEBUG_INFORMATION)
+      list(APPEND ENCLAVE_DEFINES SGX_SDK_CONTAINS_DEBUG_INFORMATION)
+    endif()
 
     set(HOST_INCLUDES ${SGX_INCLUDE_DIR})
     set(ENCLAVE_LIBC_INCLUDES ${SGX_INCLUDE_DIR} ${SGX_TLIBC_INCLUDE_DIR})
     set(ENCLAVE_LIBCXX_INCLUDES ${ENCLAVE_LIBC_INCLUDES} ${SGX_LIBCXX_INCLUDE_DIR} ${SGX_LIBSTDCXX_INCLUDE_DIR})
+
+    set(HOST_LIBRARIES
+        ${SHARED_HOST_LIBRARIES}
+        ${SGX_USVC_LIB}
+        sgx_capable
+        ${SGX_URTS_LIB})
   else()
     message(FATAL_ERROR "Invalid ENCLAVE_TARGET value")
   endif()
 
   message("HOST_DEFINES ${HOST_DEFINES}")
   message("HOST_COMPILE_OPTIONS ${HOST_COMPILE_OPTIONS}")
+  message("HOST_LINK_OPTIONS ${HOST_LINK_OPTIONS}")
+  message("HOST_LINK_EXE_OPTIONS ${HOST_LINK_EXE_OPTIONS}")
+  message("HOST_DEBUG_OPTIONS ${HOST_DEBUG_OPTIONS}")
+
   message("ENCLAVE_DEFINES ${ENCLAVE_DEFINES}")
   message("ENCLAVE_COMPILE_OPTIONS ${ENCLAVE_COMPILE_OPTIONS}")
-
-  # create vc140.pdb so that we do not have nasty projects not making their own pdb file
-  if(WIN32)
-    set(PDB_PATH ${CMAKE_BINARY_DIR}/output/${BUILD_TYPE})
-    execute_process(COMMAND "cmd.exe" "/C" "mkdir ${PDB_PATH}")
-    message("ignore Access is denied message if on next line")
-    execute_process(COMMAND "cmd.exe" "/C" "copy nul vc140.pdb" WORKING_DIRECTORY "${PDB_PATH}")
-    execute_process(COMMAND "cmd.exe" "/C" "attrib +R vc140.pdb" WORKING_DIRECTORY "${PDB_PATH}")
-  endif()
+  message("ENCLAVE_LINK_OPTIONS ${ENCLAVE_LINK_OPTIONS}")
 
   # ####################################################################################################################
-
+  # this gets rid of the 'd' suffix to file names needed to prevent confusion with the enclave measurement logic, it
+  # will be nice to remove this limitation
   set(CMAKE_DEBUG_POSTFIX
       ""
       CACHE STRING "Adds a postfix for debug-built libraries." FORCE)
 
+  # ####################################################################################################################
   # enable testing
   if(BUILD_TEST)
-    include(CTest)
     include(GoogleTest)
+    enable_testing()
   endif()
+
+
+  # Generate debug symbol index on the "post-build" step of a target. By default, the $<TARGET_FILE:${target}> is used,
+  # optionally BINARY argument can be specified act upon a specific file.
+  function(post_build_index_symbols target)
+    cmake_parse_arguments(
+      "INDEX"
+      ""
+      "BINARY"
+      ""
+      ${ARGN})
+
+    if(UNIX)
+      if(DEFINED GENERATE_SYMBOLS_INDEX)
+        if(DEFINED INDEX_BINARY)
+          set(binary "${INDEX_BINARY}")
+          message("post_build_index_symbols ${target} / ${INDEX_BINARY}")
+        else()
+          set(binary "$<TARGET_FILE:${target}>")
+          message("post_build_index_symbols ${target}")
+        endif()
+
+        add_custom_command(
+          TARGET ${target}
+          POST_BUILD
+          COMMAND ${GENERATE_SYMBOLS_INDEX} "${binary}"
+          VERBATIM)
+      endif()
+    endif()
+  endfunction()
+
+  # Strip down debug information on the "post-build" step of a target. By default, the $<TARGET_FILE:${target}> is used,
+  # optionally BINARY argument can be specified act upon a specific file.
+  function(post_build_strip_symbols target)
+    cmake_parse_arguments(
+      "STRIP"
+      ""
+      "BINARY"
+      ""
+      ${ARGN})
+
+    if(UNIX)
+      if(DEFINED STRIP_SYMBOLS)
+        if(DEFINED STRIP_BINARY)
+          set(binary "${STRIP_BINARY}")
+          message("post_build_strip_symbols ${target} / ${STRIP_BINARY}")
+        else()
+          set(binary "$<TARGET_FILE:${target}>")
+          message("post_build_strip_symbols ${target}")
+        endif()
+
+        add_custom_command(
+          TARGET ${target}
+          POST_BUILD
+          COMMAND ${STRIP_SYMBOLS} "${binary}"
+          VERBATIM)
+      endif()
+    endif()
+  endfunction()
+
+  # Calls both post_build_index_symbols and post_build_strip_symbols (in this order), optionally BINARY argument can be
+  # specified upon a specific file via the BINARY argument.
+  function(post_build_symbol_tasks target)
+    cmake_parse_arguments(
+      "WORK"
+      ""
+      "BINARY"
+      ""
+      ${ARGN})
+
+    if(UNIX)
+      if(DEFINED WORK_BINARY)
+        post_build_index_symbols(${target} BINARY ${WORK_BINARY})
+        post_build_strip_symbols(${target} BINARY ${WORK_BINARY})
+      else()
+        post_build_index_symbols(${target})
+        post_build_strip_symbols(${target})
+      endif()
+    endif()
+  endfunction()
 
 endif(NOT DEPENDANCIES_LOADED)

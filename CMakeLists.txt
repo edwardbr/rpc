@@ -34,3 +34,10 @@ if(${BUILD_TEST})
 endif()
 
 install(FILES "${CMAKE_CURRENT_LIST_DIR}/cmake/FindRPCGenerator.cmake" DESTINATION ${CMAKE_INSTALL_PREFIX}/cmake/rpc)
+
+if(RPC_STANDALONE)
+install(
+  TARGETS spdlog spdlog_header_only 
+  fmt
+  fmt-header-only)
+endif()
