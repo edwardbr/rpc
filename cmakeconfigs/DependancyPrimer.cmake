@@ -1,7 +1,9 @@
 # formatted using cmake-format
 cmake_minimum_required(VERSION 3.24)
 
+message("DEPENDANCIES_LOADED ${DEPENDANCIES_LOADED}")
 if(NOT DEPENDANCIES_LOADED)
+  message("configuring dependancies")
   # if this is loaded in a parent module then dont do this
   set(DEPENDANCIES_LOADED ON)
 
@@ -31,14 +33,7 @@ if(NOT DEPENDANCIES_LOADED)
 
   option(FORCE_DEBUG_INFORMATION "force inclusion of debug information" ON)
 
-  option(STRIP_DEBUG "strip debug information from binaries" ON)
-  option(
-    STRIP_AND_DELETE_SYMBOLS
-    "strip debug information from binaries but don't preserve any debug information, takes precedence if STRIP_DEBUG is also set"
-    OFF)
-  option(MITIGATE_READELF_WARNINGS "use GDWARFv4 to prevent some readelf warnings" ON)
-  option(GENERATE_DEBUG_INDEX "generate debug symbol index (speed-up debugging)" OFF)
-
+  option(RPC_STANDALONE "enable the building of RPC as a standalone library for testing" OFF)
   option(USE_RPC_LOGGING "turn on rpc logging" OFF)
   option(RPC_HANG_ON_FAILED_ASSERT "hang on failed assert" OFF)
   option(USE_RPC_TELEMETRY "turn on rpc telemetry" OFF)
@@ -63,10 +58,6 @@ if(NOT DEPENDANCIES_LOADED)
   message("CMAKE_VERBOSE_MAKEFILE  ${CMAKE_VERBOSE_MAKEFILE}")
   message("CMAKE_RULE_MESSAGES  ${CMAKE_RULE_MESSAGES}")
 
-  message("STRIP_DEBUG  ${STRIP_DEBUG}")
-  message("STRIP_AND_DELETE_SYMBOLS  ${STRIP_AND_DELETE_SYMBOLS}")
-  message("MITIGATE_READELF_WARNINGS ${MITIGATE_READELF_WARNINGS}")
-  message("GENERATE_DEBUG_INDEX  ${GENERATE_DEBUG_INDEX}")
   message("ENABLE_CLANG_TIDY  ${ENABLE_CLANG_TIDY}")
   message("ENABLE_CLANG_TIDY_FIX  ${ENABLE_CLANG_TIDY_FIX}")
 
@@ -107,9 +98,32 @@ if(NOT DEPENDANCIES_LOADED)
 
   # ####################################################################################################################
   # load the submodules
-  message("submodules")
 
   find_package(Git QUIET)
+  message("submodules GIT_FOUND ${GIT_FOUND}")
+  if(GIT_FOUND AND EXISTS "${CMAKE_SOURCE_DIR}/.git")
+    # Update submodules as needed
+    option(GIT_SUBMODULE "Check submodules during build" ON)
+    message("doing GIT_SUBMODULE ${GIT_SUBMODULE}")
+    if(GIT_SUBMODULE)
+      message(STATUS "Submodule init")
+      execute_process(
+        COMMAND ${GIT_EXECUTABLE} submodule init
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        RESULT_VARIABLE GIT_SUBMOD_INIT_RESULT)
+      if(NOT GIT_SUBMOD_INIT_RESULT EQUAL "0")
+        message(FATAL_ERROR "submodule init")
+      endif()
+      message(STATUS "Submodule update")
+      execute_process(
+        COMMAND ${GIT_EXECUTABLE} submodule update
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        RESULT_VARIABLE GIT_SUBMOD_RESULT)
+      if(NOT GIT_SUBMOD_RESULT EQUAL "0")
+        message(FATAL_ERROR "git submodule update --init failed with ${GIT_SUBMOD_RESULT}, please checkout submodules")
+      endif()
+    endif()
+  endif()  
 
   # ####################################################################################################################
   # reset and apply cmake separate enclave and host compile flags
@@ -177,16 +191,6 @@ if(NOT DEPENDANCIES_LOADED)
     set(USE_RPC_TELEMETRY_RAII_LOGGING_FLAG USE_RPC_TELEMETRY_RAII_LOGGING)
   else()
     set(USE_RPC_TELEMETRY_RAII_LOGGING_FLAG)
-  endif()
-  if((STRIP_DEBUG OR STRIP_AND_DELETE_SYMBOLS) AND NOT ENABLE_COVERAGE)
-    if(STRIP_AND_DELETE_SYMBOLS)
-      set(STRIP_SYMBOLS strip --strip-debug --strip-unneeded)
-    else() # STRIP_DEBUG
-      set(STRIP_SYMBOLS "${CMAKE_CURRENT_SOURCE_DIR}/secretarium/scripts/linux/strip_symbols.sh")
-    endif()
-  endif()
-  if(GENERATE_DEBUG_INDEX AND NOT STRIP_AND_DELETE_SYMBOLS)
-    set(GENERATE_SYMBOLS_INDEX "${CMAKE_CURRENT_SOURCE_DIR}/secretarium/scripts/linux/generate_symbols_index.sh")
   endif()
 
   if(${ENCLAVE_TARGET} STREQUAL "SGX")
@@ -512,22 +516,9 @@ if(NOT DEPENDANCIES_LOADED)
           ENCLAVE_OK=SGX_SUCCESS
           DISALLOW_BAD_JUMPS)
 
-      if(MITIGATE_READELF_WARNINGS)
-        set(GDWARF4_FLAG "-gdwarf-4")
-      endif()
-
-      if(NOT STRIP_AND_DELETE_SYMBOLS)
-        set(DEBUG_HOST_ENCLAVE_OPTIONS -ggdb3 -fno-limit-debug-info ${GDWARF4_FLAG})
-        set(DEBUG_COMPILE_FLAGS "-ggdb3 -fno-limit-debug-info ${GDWARF4_FLAG}")
-      endif()
       if(${BUILD_TYPE} STREQUAL "release")
-        if(FORCE_DEBUG_INFORMATION AND NOT STRIP_AND_DELETE_SYMBOLS)
-          set(CMAKE_CXX_FLAGS_DEBUG ${DEBUG_COMPILE_FLAGS}) # -g -fno-limit-debug-info
-          set(CMAKE_C_FLAGS_DEBUG ${CMAKE_CXX_FLAGS_DEBUG})
-        else()
-          set(CMAKE_CXX_FLAGS_DEBUG "")
-          set(CMAKE_C_FLAGS_DEBUG "")
-        endif()
+        set(CMAKE_CXX_FLAGS_DEBUG "")
+        set(CMAKE_C_FLAGS_DEBUG "")
         set(OPTIMIZER_FLAGS -O3)
 
         if(${SGX_MODE} STREQUAL "release")
@@ -536,15 +527,10 @@ if(NOT DEPENDANCIES_LOADED)
           set(ENCLAVE_DEFINES ${SHARED_ENCLAVE_DEFINES} NDEBUG EDEBUG ${ENCLAVE_MEMLEAK_DEFINES}) # sets SGX_DEBUG_FLAG
         endif()
       else() # debug
-        if(STRIP_AND_DELETE_SYMBOLS) # Effort to reduce size of artifacts generated in GitLab
-          set(CMAKE_CXX_FLAGS_DEBUG "")
-          set(CMAKE_C_FLAGS_DEBUG "")
-        else()
-          set(EXTRA_COMPILE_OPTIONS ${DEBUG_HOST_ENCLAVE_OPTIONS}) # The one actually used by HOST and ENCLAVE instead
-                                                                   # ofq
-          set(CMAKE_CXX_FLAGS_DEBUG ${DEBUG_COMPILE_FLAGS})
-          set(CMAKE_C_FLAGS_DEBUG ${CMAKE_CXX_FLAGS_DEBUG})
-        endif()
+        set(EXTRA_COMPILE_OPTIONS ${DEBUG_HOST_ENCLAVE_OPTIONS}) # The one actually used by HOST and ENCLAVE instead
+                                                                  # ofq
+        set(CMAKE_CXX_FLAGS_DEBUG ${DEBUG_COMPILE_FLAGS})
+        set(CMAKE_C_FLAGS_DEBUG ${CMAKE_CXX_FLAGS_DEBUG})
         set(OPTIMIZER_FLAGS -O0)
         set(ENCLAVE_DEFINES ${SHARED_ENCLAVE_DEFINES} _DEBUG ${ENCLAVE_MEMLEAK_DEFINES}) # sets SGX_DEBUG_FLAG to 1
       endif()
@@ -663,84 +649,5 @@ if(NOT DEPENDANCIES_LOADED)
     enable_testing()
   endif()
 
-
-  # Generate debug symbol index on the "post-build" step of a target. By default, the $<TARGET_FILE:${target}> is used,
-  # optionally BINARY argument can be specified act upon a specific file.
-  function(post_build_index_symbols target)
-    cmake_parse_arguments(
-      "INDEX"
-      ""
-      "BINARY"
-      ""
-      ${ARGN})
-
-    if(UNIX)
-      if(DEFINED GENERATE_SYMBOLS_INDEX)
-        if(DEFINED INDEX_BINARY)
-          set(binary "${INDEX_BINARY}")
-          message("post_build_index_symbols ${target} / ${INDEX_BINARY}")
-        else()
-          set(binary "$<TARGET_FILE:${target}>")
-          message("post_build_index_symbols ${target}")
-        endif()
-
-        add_custom_command(
-          TARGET ${target}
-          POST_BUILD
-          COMMAND ${GENERATE_SYMBOLS_INDEX} "${binary}"
-          VERBATIM)
-      endif()
-    endif()
-  endfunction()
-
-  # Strip down debug information on the "post-build" step of a target. By default, the $<TARGET_FILE:${target}> is used,
-  # optionally BINARY argument can be specified act upon a specific file.
-  function(post_build_strip_symbols target)
-    cmake_parse_arguments(
-      "STRIP"
-      ""
-      "BINARY"
-      ""
-      ${ARGN})
-
-    if(UNIX)
-      if(DEFINED STRIP_SYMBOLS)
-        if(DEFINED STRIP_BINARY)
-          set(binary "${STRIP_BINARY}")
-          message("post_build_strip_symbols ${target} / ${STRIP_BINARY}")
-        else()
-          set(binary "$<TARGET_FILE:${target}>")
-          message("post_build_strip_symbols ${target}")
-        endif()
-
-        add_custom_command(
-          TARGET ${target}
-          POST_BUILD
-          COMMAND ${STRIP_SYMBOLS} "${binary}"
-          VERBATIM)
-      endif()
-    endif()
-  endfunction()
-
-  # Calls both post_build_index_symbols and post_build_strip_symbols (in this order), optionally BINARY argument can be
-  # specified upon a specific file via the BINARY argument.
-  function(post_build_symbol_tasks target)
-    cmake_parse_arguments(
-      "WORK"
-      ""
-      "BINARY"
-      ""
-      ${ARGN})
-
-    if(UNIX)
-      if(DEFINED WORK_BINARY)
-        post_build_index_symbols(${target} BINARY ${WORK_BINARY})
-        post_build_strip_symbols(${target} BINARY ${WORK_BINARY})
-      else()
-        post_build_index_symbols(${target})
-        post_build_strip_symbols(${target})
-      endif()
-    endif()
-  endfunction()
 
 endif(NOT DEPENDANCIES_LOADED)

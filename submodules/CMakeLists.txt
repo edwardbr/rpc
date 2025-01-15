@@ -15,13 +15,15 @@ if(RPC_STANDALONE)
 
   add_subdirectory(idlparser)
 
-  message("spdlog this is used in tests only and does not need to be installed for other users")
-  set(SPDLOG_FMT_EXTERNAL
-      ON
-      CACHE BOOL "external fmt" FORCE)
-  set(SPDLOG_NO_EXCEPTIONS
-      ON
-      CACHE BOOL "no exceptions" FORCE)
-  set(SPDLOG_INSTALL OFF)
-  add_subdirectory(spdlog)
+  if(BUILD_TEST)
+    message("spdlog this is used in tests only and does not need to be installed for other users")
+    set(SPDLOG_FMT_EXTERNAL
+        ON
+        CACHE BOOL "external fmt" FORCE)
+    set(SPDLOG_NO_EXCEPTIONS
+        ON
+        CACHE BOOL "no exceptions" FORCE)
+    set(SPDLOG_INSTALL OFF)
+    add_subdirectory(spdlog)
+  endif(BUILD_TEST)
 endif()

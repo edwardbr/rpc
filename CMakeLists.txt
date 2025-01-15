@@ -5,7 +5,10 @@ project(
   VERSION 2.2.0
   LANGUAGES CXX)
 
+message("configuring RPC")
 if(RPC_STANDALONE)
+  message("RPC standalone")
+  # set(DEPENDANCIES_LOADED OFF)
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/output)
   set(CMAKE_PDB_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/output)
   set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/output)
@@ -35,9 +38,10 @@ endif()
 
 install(FILES "${CMAKE_CURRENT_LIST_DIR}/cmake/FindRPCGenerator.cmake" DESTINATION ${CMAKE_INSTALL_PREFIX}/cmake/rpc)
 
-if(RPC_STANDALONE)
-install(
-  TARGETS spdlog spdlog_header_only 
-  fmt
-  fmt-header-only)
-endif()
+# if(RPC_STANDALONE)
+#   install(
+#     TARGETS fmt fmt-header-only)
+#   if(BUILD_TEST)  
+#     install(TARGETS spdlog spdlog_header_only)    
+#   endif()
+# endif()

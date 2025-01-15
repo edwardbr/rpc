@@ -35,9 +35,5 @@ if(ENABLE_CLANG_TIDY)
   set_target_properties(rpc_test PROPERTIES CXX_CLANG_TIDY "${CLANG_TIDY_COMMAND}")
 endif()
 
+include(CTest)
 gtest_discover_tests(rpc_test)
-if(STRIP_DEBUG
-   OR GENERATE_DEBUG_INDEX
-   OR STRIP_AND_DELETE_SYMBOLS)
-  post_build_symbol_tasks(rpc_test)
-endif()
