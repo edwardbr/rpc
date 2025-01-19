@@ -13,13 +13,17 @@ namespace rpc
         : id_(id)
         , zone_(zone)
     {
+#ifdef USE_RPC_TELEMETRY
         if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             telemetry_service->on_stub_creation(zone_.get_zone_id(), id_, (uint64_t)target);
+#endif            
     }
     object_stub::~object_stub()
     {
+#ifdef USE_RPC_TELEMETRY
         if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             telemetry_service->on_stub_deletion(zone_.get_zone_id(), id_);
+#endif            
     }
 
     rpc::shared_ptr<rpc::casting_interface> object_stub::get_castable_interface() const
@@ -34,9 +38,6 @@ namespace rpc
     //or by an internal call by this class
     void object_stub::add_interface(const rpc::shared_ptr<i_interface_stub>& iface)
     {
-#ifdef RPC_V1        
-        stub_map[iface->get_interface_id(rpc::VERSION_1)] = iface;
-#endif
 #ifdef RPC_V2
         stub_map[iface->get_interface_id(rpc::VERSION_2)] = iface;
 #endif
@@ -99,8 +100,10 @@ namespace rpc
     uint64_t object_stub::add_ref()
     {
         uint64_t ret = ++reference_count;
+#ifdef USE_RPC_TELEMETRY
         if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             telemetry_service->on_stub_add_ref(zone_.get_zone_id(), id_, {}, ret, {});
+#endif            
         RPC_ASSERT(ret != std::numeric_limits<uint64_t>::max());
         RPC_ASSERT(ret != 0);
         return ret;
@@ -109,8 +112,10 @@ namespace rpc
     uint64_t object_stub::release()
     {
         uint64_t count = --reference_count;
+#ifdef USE_RPC_TELEMETRY
         if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             telemetry_service->on_stub_release(zone_.get_zone_id(), id_, {}, count, {});
+#endif            
         RPC_ASSERT(count != std::numeric_limits<uint64_t>::max());
         return count;
     }

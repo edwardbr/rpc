@@ -21,7 +21,9 @@
 #include <rpc/marshaller.h>
 #include <rpc/remote_pointer.h>
 #include <rpc/casting_interface.h>
+#ifdef USE_RPC_TELEMETRY
 #include <rpc/telemetry/i_telemetry_service.h>
+#endif
 
 namespace rpc
 {
@@ -54,7 +56,6 @@ namespace rpc
     {
     protected:
         static std::atomic<uint64_t> zone_id_generator;
-        inline static thread_local service* current_service_ = nullptr;
         zone zone_id_ = {0};
         mutable std::atomic<uint64_t> object_id_generator = 0;
 
@@ -100,7 +101,8 @@ namespace rpc
         static zone generate_new_zone_id();
         
         //we are using a pointer as this is a thread local variable it will not change mid stream, only use this function when servicing an rpc call
-        inline static service* get_current_service() {return current_service_;}
+        static service* get_current_service();
+        static void set_current_service(service* svc);
         object generate_new_object_id() const;
         std::string get_name() const {return name_;}
 
@@ -251,12 +253,12 @@ namespace rpc
         service* old_service_ = nullptr;
         current_service_tracker(service* current_service)
         {
-            old_service_ = service::current_service_;
-            service::current_service_ = current_service;
+            old_service_ = service::get_current_service();
+            service::set_current_service(current_service);
         }
         ~current_service_tracker()
         {
-            service::current_service_ = old_service_;
+            service::set_current_service(old_service_);
         }
     };
 

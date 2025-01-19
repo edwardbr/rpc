@@ -36,7 +36,14 @@ namespace rpc
         auto file_name = directory / fixed_name / (name + ".pu");
         std::string fn = file_name.string();
             
-        auto output = ::fopen(fn.c_str(), "w+");
+#ifndef _MSC_VER
+        FILE output = ::fopen(fn.c_str(), "w+");
+#else        
+        FILE* output;
+        auto err = ::fopen_s(&output, fn.c_str(), "w+");
+        if(!err)
+            return false;
+#endif        
         if(!output)
             return false;
 
@@ -64,9 +71,9 @@ namespace rpc
         std::for_each(services.begin(), services.end(), [this](std::pair<rpc::zone, name_count> const& it)
         {fmt::print(output_, "error service zone_id {} service {} count {}\n", it.first.id, it.second.name, it.second.count);});
         std::for_each(impls.begin(), impls.end(), [this](std::pair<uint64_t, impl> const& it)
-        {fmt::print(output_, "error implementation {} zone_id {} count {}\n", it.second.name, it.second.zone_id.id, it.second.count);});
-        std::for_each(stubs.begin(), stubs.end(), [this](std::pair<zone_object, uint64_t> const& it)
-        {fmt::print(output_, "error stub zone_id {} object_id {} count {}\n", it.first.zone_id.id, it.first.object_id.id, it.second);});
+        {fmt::println(output_, "error implementation {} zone_id {} count {}", it.second.name, it.second.zone_id.id, it.second.count);});
+        std::for_each(stubs.begin(), stubs.end(), [this](std::pair<zone_object, stub_info> const& it)
+        {fmt::println(output_, "error stub zone_id {} object_id {} count {} address {}", it.first.zone_id.id, it.first.object_id.id, it.second.count, it.second.address);});
         std::for_each(service_proxies.begin(), service_proxies.end(), [this](std::pair<orig_zone, name_count> const& it)
         {fmt::print(output_, "error service proxy zone_id {} destination_zone_id {} caller_id {} name {} count {}\n", it.first.zone_id.id, it.first.destination_zone_id.id, it.first.caller_zone_id.id, it.second.name, it.second.count);});
         std::for_each(object_proxies.begin(), object_proxies.end(), [this](std::pair<interface_proxy_id, uint64_t> const& it)
@@ -542,7 +549,7 @@ namespace rpc
         std::lock_guard g(mux);
         
         add_new_object("unknown", address, zone_id);
-        stubs.emplace(zone_object{zone_id, object_id}, address);
+        stubs.emplace(zone_object{zone_id, object_id}, stub_info{address, 0});
 #ifdef USE_RPC_TELEMETRY_RAII_LOGGING
         fmt::print(output_, "participant \\n"object stub\\nzone {}\\nobject {}\" as {} order {} #lime"
             , zone_id.get_val()
@@ -567,15 +574,15 @@ namespace rpc
 #ifdef USE_RPC_TELEMETRY_RAII_LOGGING
         else
         {
-            if(found->second == 0)
+            if(found->second.count == 0)
             {
+                fmt::println(output_, "deactivate {}", object_stub_alias(zone_id, object_id));
                 stubs.erase(found);
-                fmt::print(output_, "deactivate {}\n", object_stub_alias(zone_id, object_id));
             }
             else
             {            
-                spdlog::error("stub still being used! zone_id {}", zone_id.get_val());
-                fmt::print(output_, "deactivate {}\n", object_stub_alias(zone_id, object_id));
+                spdlog::error("stub still being used! zone_id {} object id {} address {}", zone_id.get_val(), object_id.get_val(), found->second.address);
+                fmt::println(output_, "deactivate {}", object_stub_alias(zone_id, object_id));
             }
             fmt::print(output_, "hnote over {} : deleted\n", object_stub_alias(zone_id, object_id));        
         }
@@ -604,8 +611,8 @@ namespace rpc
         }
         else
         {            
-            found->second++;     
-            fmt::print(output_, "hnote over {} : begin add_ref count {} \n", object_stub_alias(zone, object_id), count);
+            found->second.count++;     
+            fmt::println(output_, "hnote over {} : begin add_ref count {} ", object_stub_alias(zone, object_id), count);
         }
         fflush(output_);
 #endif        
@@ -621,7 +628,7 @@ namespace rpc
             spdlog::error("stub not found zone_id {} caller_zone_id {} object_id {}", zone.get_val(), caller_zone_id.get_val(), object_id.get_val());
         }
         {
-            auto new_count = --found->second;
+            auto new_count = --found->second.count;
             if(new_count == 0)
             {
                 fmt::print(output_, "hnote over {} : release count {}\n", object_stub_alias(zone, object_id), count);
@@ -734,7 +741,7 @@ namespace rpc
         auto ob = stubs.find({destination_zone_id.as_zone(), object_id});
         if(ob != stubs.end())
         {
-            fmt::print(output_, "{} -> {} : {}\n", service_alias(zone_id), object_alias(ob->second), method_name);
+            fmt::println(output_, "{} -> {} : {}", service_alias(zone_id), object_alias(ob->second.address), method_name);
         }
         else
         {

@@ -26,49 +26,46 @@ namespace component_checksum
     {
         if(!entity || entity->get_name().empty())
             return "";
-            
+
         std::string ns;
         auto* tmp = entity->get_owner();
         if(tmp)
             ns = get_namespace(tmp);
 
-#ifdef WIN32        
+#ifdef WIN32
         ns += entity->get_name() + ".";
 #else
         ns += entity->get_name() + "::";
-#endif        
+#endif
         return ns;
     }
-    
+
     void write_interface(const class_entity& m_ob, std::filesystem::path& output_path)
     {
         if(m_ob.is_in_import())
             return;
-        auto interface_name
-            = std::string(m_ob.get_entity_type() == entity_type::LIBRARY ? "i_" : "") + m_ob.get_name();
-            
+        auto interface_name = std::string(m_ob.get_entity_type() == entity_type::LIBRARY ? "i_" : "") + m_ob.get_name();
+
         auto name = get_namespace(m_ob.get_owner()) + interface_name;
-        
-        auto file = output_path/name;
-        
+
+        auto file = output_path / name;
+
         std::ofstream out(file);
         out << fingerprint::generate(m_ob, {}, nullptr);
-
     };
 
     void write_struct(const class_entity& m_ob, std::filesystem::path& output_path)
     {
         if(m_ob.is_in_import())
             return;
-       
+
         auto name = get_namespace(m_ob.get_owner()) + m_ob.get_name();
 
-        auto file = output_path/name;
+        auto file = output_path / name;
 
         std::ofstream out(file);
         out << fingerprint::generate(m_ob, {}, nullptr);
     };
-
 
     // entry point
     void write_namespace(const class_entity& lib, std::filesystem::path& output_path)
@@ -88,7 +85,7 @@ namespace component_checksum
                 write_struct(ent, output_path);
             }
             else if(elem->get_entity_type() == entity_type::INTERFACE
-                        || elem->get_entity_type() == entity_type::LIBRARY)
+                    || elem->get_entity_type() == entity_type::LIBRARY)
             {
                 auto& ent = static_cast<const class_entity&>(*elem);
                 write_interface(ent, output_path);

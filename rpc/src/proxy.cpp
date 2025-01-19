@@ -15,10 +15,12 @@ namespace rpc
 
     object_proxy::~object_proxy() 
     { 
+#ifdef USE_RPC_TELEMETRY
         if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
         {
             telemetry_service->on_object_proxy_deletion(service_proxy_->get_zone_id(), service_proxy_->get_destination_zone_id(), object_id_);
         }
+#endif
 
         service_proxy_->on_object_proxy_released(object_id_);
         service_proxy_ = nullptr;

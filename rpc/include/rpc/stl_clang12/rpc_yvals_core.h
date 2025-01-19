@@ -1231,7 +1231,7 @@
 #endif // _HAS_STD_BYTE
 // #define __cpp_lib_clamp                             201603L
 // #define __cpp_lib_filesystem                        201703L
-#define __cpp_lib_gcd_lcm                           201606L
+// #define __cpp_lib_gcd_lcm                           201606L
 #define __cpp_lib_hardware_interference_size        201703L
 // #define __cpp_lib_has_unique_object_representations 201606L
 // #define __cpp_lib_hypot                             201603L

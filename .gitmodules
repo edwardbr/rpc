@@ -15,4 +15,4 @@
 	url = https://github.com/google/googletest.git
 [submodule "submodules/spdlog"]
 	path = submodules/spdlog
-	url = https://github.com/gabime/spdlog
+	url = https://github.com/gabime/spdlog.git

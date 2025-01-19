@@ -19,6 +19,10 @@ namespace rpc
     ////////////////////////////////////////////////////////////////////////////
     // service
 
+    thread_local service* current_service_ = nullptr;
+    service* service::get_current_service() {return current_service_;}
+    void service::set_current_service(service* svc) {current_service_ = svc;}
+    
     std::atomic<uint64_t> service::zone_id_generator = 0;
     zone service::generate_new_zone_id() 
     { 
@@ -36,14 +40,18 @@ namespace rpc
         : zone_id_(zone_id)
         , name_(name)
     {
+#ifdef USE_RPC_TELEMETRY
         if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             telemetry_service->on_service_creation(name, zone_id);
+#endif            
     }
 
     service::~service() 
     {
+#ifdef USE_RPC_TELEMETRY
         if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             telemetry_service->on_service_deletion(zone_id_);        
+#endif            
 
         object_id_generator = 0;
         // to do: RPC_ASSERT that there are no more object_stubs in memory
@@ -51,8 +59,11 @@ namespace rpc
         (void)is_empty;
         RPC_ASSERT(is_empty);
 
-        stubs.clear();
-        wrapped_object_to_stub.clear();
+        {
+            std::lock_guard l(stub_control);
+            stubs.clear();
+            wrapped_object_to_stub.clear();
+        }
         other_zones.clear();
     }
     
@@ -81,8 +92,9 @@ namespace rpc
 
     bool service::check_is_empty() const
     {
+        std::lock_guard l(stub_control);
         bool success = true;
-        for(auto item : stubs)
+        for(const auto& item : stubs)
         {
             auto stub =  item.second.lock();
             if(!stub)
@@ -90,7 +102,7 @@ namespace rpc
 #ifdef USE_RPC_LOGGING
                 auto message = std::string("stub zone_id ") + std::to_string(zone_id_)
                      + std::string(", object stub ") + std::to_string(item.first)
-                     + std::string(" has been released but not deregisted in the service suspected unclean shutdown");
+                     + std::string(" has been released but not deregistered in the service suspected unclean shutdown");
                 LOG_STR(message.c_str(), message.size());
 #endif
             }
@@ -112,7 +124,7 @@ namespace rpc
             {
 #ifdef USE_RPC_LOGGING
                 auto message = std::string("wrapped stub zone_id ") + std::to_string(zone_id_) 
-                    + std::string(", wrapped_object has been released but not deregisted in the service suspected unclean shutdown");
+                    + std::string(", wrapped_object has been released but not deregistered in the service suspected unclean shutdown");
                 LOG_STR(message.c_str(), message.size());
 #endif
             }
@@ -137,7 +149,7 @@ namespace rpc
                 auto message = std::string("service proxy zone_id ") + std::to_string(zone_id_) 
                     + std::string(", caller_zone_id ") + std::to_string(item.first.source.id) 
                     + std::string(", destination_zone_id ") + std::to_string(item.first.dest.id) 
-                    + std::string(", has been released but not deregisted in the service");
+                    + std::string(", has been released but not deregistered in the service");
                 LOG_STR(message.c_str(), message.size());
 #endif
             }
@@ -229,11 +241,6 @@ namespace rpc
             ;
             else 
 #endif
-#ifdef RPC_V1
-            if(protocol_version == rpc::VERSION_1)
-            ;
-            else
-#endif
             {
                 return rpc::error::INCOMPATIBLE_SERVICE();
             }
@@ -304,6 +311,7 @@ namespace rpc
             destination_zone->add_external_ref();
         }
 
+#ifdef USE_RPC_TELEMETRY
         if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
         {
             telemetry_service->on_service_proxy_add_ref(
@@ -314,6 +322,7 @@ namespace rpc
                 , object_id
                 , add_ref_options::build_destination_route);    
         }     
+#endif        
 
         //the fork is here so we need to add ref the destination normally with caller info
         //note the caller_channel_zone_id is is this zones id as the caller came from a route via this node
@@ -352,6 +361,7 @@ namespace rpc
             //caller and destination are in the same channel let them fork where necessary
             //note the caller_channel_zone_id is 0 as both the caller and the destination are in from the same direction so any other value is wrong
             //Dont external_add_ref the local service proxy as we are return to source no channel is required
+#ifdef USE_RPC_TELEMETRY
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             {
                 telemetry_service->on_service_proxy_add_ref(
@@ -361,7 +371,8 @@ namespace rpc
                     , caller_zone_id
                     , object_id
                     , rpc::add_ref_options::build_caller_route | rpc::add_ref_options::build_destination_route);    
-            }                    
+            }   
+#endif                             
             object_service_proxy->add_ref(
                 protocol_version,
                 {0}, 
@@ -420,6 +431,7 @@ namespace rpc
                 RPC_ASSERT(caller);
             }
 
+#ifdef USE_RPC_TELEMETRY
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             {
                 telemetry_service->on_service_proxy_add_ref(
@@ -430,7 +442,7 @@ namespace rpc
                     , object_id
                     , rpc::add_ref_options::build_destination_route);
             }
-           
+#endif           
 
             //the fork is here so we need to add ref the destination normally with caller info
             //note the caller_channel_zone_id is is this zones id as the caller came from a route via this node
@@ -444,6 +456,7 @@ namespace rpc
                 rpc::add_ref_options::build_destination_route);
             
             
+#ifdef USE_RPC_TELEMETRY
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             {
                 telemetry_service->on_service_proxy_add_ref(
@@ -453,7 +466,8 @@ namespace rpc
                     ,  caller_zone_id
                     , object_id
                     , rpc::add_ref_options::build_caller_route);
-            }               
+            }       
+#endif                    
             
             //note the caller_channel_zone_id is 0 as the caller came from this route 
             caller->add_ref(
@@ -540,6 +554,7 @@ namespace rpc
         }
         if(outcall)
         {
+#ifdef USE_RPC_TELEMETRY
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             {
                 telemetry_service->on_service_proxy_add_ref(
@@ -549,7 +564,8 @@ namespace rpc
                     ,  caller_zone_id
                     , stub->get_id()
                     , rpc::add_ref_options::build_caller_route);
-            }                
+            }      
+#endif                      
                 //note the caller_channel_zone_id is 0 as the caller came from this route 
             caller->add_ref(
                 protocol_version,
@@ -599,10 +615,12 @@ namespace rpc
                 RPC_ASSERT(false);
                 return rpc::error::ZONE_NOT_FOUND();
             }
+#ifdef USE_RPC_TELEMETRY
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             {
                 telemetry_service->on_service_try_cast(zone_id_, destination_zone_id, {0}, object_id, interface_id);
             }
+#endif            
             return other_zone->try_cast(protocol_version, destination_zone_id, object_id, interface_id);
         }
         else
@@ -611,11 +629,6 @@ namespace rpc
             if(protocol_version == rpc::VERSION_2)
             ;
             else 
-#endif
-#ifdef RPC_V1
-            if(protocol_version == rpc::VERSION_1)
-            ;
-            else
 #endif
             {
                 return rpc::error::INCOMPATIBLE_SERVICE();
@@ -639,6 +652,7 @@ namespace rpc
     )
     {
         current_service_tracker tracker(this);
+#ifdef USE_RPC_TELEMETRY
         if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
         {
             telemetry_service->on_service_add_ref(
@@ -649,7 +663,8 @@ namespace rpc
                 , caller_channel_zone_id
                 , caller_zone_id
                 , build_out_param_channel);    
-        }                
+        }      
+#endif                  
         
         auto dest_channel = destination_zone_id.get_val();
         if(destination_channel_zone_id != zone_id_.as_destination_channel() && 
@@ -690,6 +705,7 @@ namespace rpc
 
                 } while(false);
                 
+#ifdef USE_RPC_TELEMETRY
                 if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
                 {
                     telemetry_service->on_service_proxy_add_ref(
@@ -700,6 +716,7 @@ namespace rpc
                         , object_id
                         , build_out_param_channel);
                 }    
+#endif                
                 return destination->add_ref(
                     protocol_version, 
                     {0}, 
@@ -772,6 +789,7 @@ namespace rpc
                             auto cc = caller->get_destination_channel_zone_id().is_set() ? caller->get_destination_channel_zone_id().get_val() : caller->get_destination_zone_id().get_val();
                             if(dc == cc)
                             {
+#ifdef USE_RPC_TELEMETRY
                                 if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
                                 {
                                     telemetry_service->on_service_proxy_add_ref(
@@ -781,7 +799,8 @@ namespace rpc
                                         , caller_zone_id
                                         , object_id
                                         , build_out_param_channel);
-                                }                                        
+                                }  
+#endif                                                                      
 
                                 auto ret = destination->add_ref(
                                     protocol_version, 
@@ -803,6 +822,7 @@ namespace rpc
                         //then call the add ref to the destination
                         if(!!(build_out_param_channel & add_ref_options::build_destination_route))
                         {
+#ifdef USE_RPC_TELEMETRY
                             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
                             {
                                 telemetry_service->on_service_proxy_add_ref(
@@ -812,7 +832,8 @@ namespace rpc
                                     , caller_zone_id
                                     , object_id
                                     , add_ref_options::build_destination_route);
-                            }                                    
+                            }        
+#endif                                                        
                             destination->add_ref(
                                 protocol_version, 
                                 {0}, 
@@ -825,6 +846,7 @@ namespace rpc
                         //back fill the ref count to the caller
                         if(!!(build_out_param_channel & add_ref_options::build_caller_route))
                         {
+#ifdef USE_RPC_TELEMETRY
                             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
                             {
                                 telemetry_service->on_service_proxy_add_ref(
@@ -834,7 +856,9 @@ namespace rpc
                                     , caller_zone_id
                                     , object_id
                                     , add_ref_options::build_caller_route);
-                            }                                    
+                            }        
+#endif
+                                                        
                             caller->add_ref(
                                 protocol_version, 
                                 zone_id_.as_destination_channel(), 
@@ -881,6 +905,7 @@ namespace rpc
                         inner_add_zone_proxy(other_zone);
                     }
                 }
+#ifdef USE_RPC_TELEMETRY
                 if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
                 {
                     telemetry_service->on_service_proxy_add_ref(
@@ -891,6 +916,8 @@ namespace rpc
                         , object_id
                         , build_out_param_channel);
                 }
+#endif
+                
                 return other_zone->add_ref(
                     protocol_version, 
                     {0}, 
@@ -907,11 +934,6 @@ namespace rpc
             if(protocol_version == rpc::VERSION_2)
             ;
             else 
-#endif
-#ifdef RPC_V1
-            if(protocol_version == rpc::VERSION_1)
-            ;
-            else
 #endif
             {
                 return std::numeric_limits<uint64_t>::max();
@@ -937,6 +959,7 @@ namespace rpc
                     }
                     RPC_ASSERT(caller);
                 }
+#ifdef USE_RPC_TELEMETRY
                 if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
                 {
                     telemetry_service->on_service_proxy_add_ref(
@@ -946,7 +969,8 @@ namespace rpc
                         , caller_zone_id
                         , object_id
                         , add_ref_options::build_caller_route);
-                }                        
+                }      
+#endif                                  
                 caller->add_ref(
                     protocol_version, 
                     {0},
@@ -1024,8 +1048,10 @@ namespace rpc
                 RPC_ASSERT(false);
                 return std::numeric_limits<uint64_t>::max();
             }
+#ifdef USE_RPC_TELEMETRY
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
                 telemetry_service->on_service_release(zone_id_, other_zone->get_destination_channel_zone_id(), destination_zone_id, object_id, caller_zone_id);    
+#endif                
             auto ret = other_zone->sp_release(object_id);
             if(ret != std::numeric_limits<uint64_t>::max())
             {
@@ -1035,18 +1061,15 @@ namespace rpc
         }
         else
         {
+#ifdef USE_RPC_TELEMETRY
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
                 telemetry_service->on_service_release(zone_id_, {0}, destination_zone_id, object_id, caller_zone_id);    
+#endif                
 
 #ifdef RPC_V2
             if(protocol_version == rpc::VERSION_2)
             ;
             else 
-#endif
-#ifdef RPC_V1
-            if(protocol_version == rpc::VERSION_1)
-            ;
-            else
 #endif
             {
                 return std::numeric_limits<uint64_t>::max();
@@ -1233,13 +1256,7 @@ namespace rpc
 #ifdef RPC_V2
                 interface_getter(rpc::VERSION_2) == interface_id
 #endif
-#if defined(RPC_V1) && defined(RPC_V2)
-                ||
-#endif
-#ifdef RPC_V1
-                interface_getter(rpc::VERSION_1) == interface_id
-#endif            
-#if !defined(RPC_V1) && !defined(RPC_V2)
+#if !defined(RPC_V2)
                 false
 #endif
         )
@@ -1266,19 +1283,9 @@ namespace rpc
     //note this function is not thread safe!  Use it before using the service class for normal operation
     void service::add_interface_stub_factory(std::function<interface_ordinal (uint8_t)> id_getter, std::shared_ptr<std::function<rpc::shared_ptr<rpc::i_interface_stub>(const rpc::shared_ptr<rpc::i_interface_stub>&)>> factory)
     {
-#ifdef RPC_V1
-        auto interface_id = id_getter(rpc::VERSION_1);
-        auto it = stub_factories.find({interface_id});
-        if(it != stub_factories.end())
-        {
-            rpc::error::INVALID_DATA();
-        }
-        stub_factories[{interface_id}] = factory;
-#endif
-
 #ifdef RPC_V2
-        interface_id = id_getter(rpc::VERSION_2);
-        it = stub_factories.find({interface_id});
+        auto interface_id = id_getter(rpc::VERSION_2);
+        auto it = stub_factories.find({interface_id});
         if(it != stub_factories.end())
         {
             rpc::error::INVALID_DATA();
