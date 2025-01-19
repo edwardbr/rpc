@@ -1970,11 +1970,19 @@ namespace enclave_marshaller
                 build_scoped_name(owner, ns);
             }
 
-            proxy("template<> void object_proxy::create_interface_proxy(shared_ptr<::{}{}>& "
+            proxy("template<> void object_proxy::create_shared_interface_proxy(shared_ptr<::{}{}>& "
                   "inface)",
                   ns, interface_name);
             proxy("{{");
             proxy("inface = ::{1}{0}_proxy::create(shared_from_this());", interface_name, ns);
+            proxy("}}");
+            proxy("");
+
+            proxy("template<> void object_proxy::create_optimistic_interface_proxy(optimistic_ptr<::{}{}>& "
+                  "inface)",
+                  ns, interface_name);
+            proxy("{{");
+            proxy("inface = ::{1}{0}_proxy::create(optimistic_from_this());", interface_name, ns);
             proxy("}}");
             proxy("");
 

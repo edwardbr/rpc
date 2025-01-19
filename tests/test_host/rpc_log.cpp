@@ -92,7 +92,8 @@ extern "C"
             {object_id}, 
             {caller_channel_zone_id}, 
             {caller_zone_id}, 
-            static_cast<rpc::add_ref_options>(build_out_param_channel));
+            static_cast<rpc::add_ref_options>(build_out_param_channel),
+            false);
     }
     uint64_t release_host(
         uint64_t protocol_version                          //version of the rpc call protocol
@@ -105,7 +106,7 @@ extern "C"
         {
             return rpc::error::TRANSPORT_ERROR();
         }
-        return root_service->release(protocol_version, {zone_id}, {object_id}, {caller_zone_id});
+        return root_service->release(protocol_version, {zone_id}, {object_id}, {caller_zone_id}, false);
     }
 
     void rpc_log(const char* str, size_t sz)

@@ -216,6 +216,7 @@ if(NOT DEPENDANCIES_LOADED)
         /Zc:wchar_t
         /Zi
         /wd4996 # allow deprecated functions
+        /std:c++17
       )
 
       set(SHARED_HOST_COMPILE_OPTIONS ${SHARED_COMPILE_OPTIONS})

@@ -97,12 +97,14 @@ namespace rpc
             , object object_id 
             , caller_channel_zone caller_channel_zone_id 
             , caller_zone caller_zone_id 
-            , add_ref_options build_out_param_channel ) = 0;
+            , add_ref_options build_out_param_channel
+            , bool optimistic) = 0;
         virtual uint64_t release(
             uint64_t protocol_version 
             , destination_zone destination_zone_id 
             , object object_id 
-            , caller_zone caller_zone_id) = 0;
+            , caller_zone caller_zone_id
+            , bool optimistic) = 0;
     };
 
     //this class is responsible for (de)coding and logging of data streams  

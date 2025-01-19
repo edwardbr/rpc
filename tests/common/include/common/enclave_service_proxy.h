@@ -65,12 +65,14 @@ namespace rpc
             object object_id, 
             caller_channel_zone caller_channel_zone_id, 
             caller_zone caller_zone_id, 
-            add_ref_options build_out_param_channel) override;
+            add_ref_options build_out_param_channel,
+            bool optimistic) override;
         uint64_t release(
             uint64_t protocol_version, 
             destination_zone destination_zone_id, 
             object object_id, 
-            caller_zone caller_zone_id) override;
+            caller_zone caller_zone_id,
+            bool optimistic) override;
 
         std::shared_ptr<enclave_owner> enclave_owner_;
         uint64_t eid_ = 0;        

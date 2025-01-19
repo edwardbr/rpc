@@ -4,8 +4,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #pragma once
-#ifndef _YVALS
-#define _YVALS
+#ifndef _RPC_YVALS
+#define _RPC_YVALS
 
 ///////////////////////////////////////////////////////////////
 // Definitions of calling conventions used code sometimes compiled as managed
@@ -33,11 +33,11 @@
 #define _ALLOW_ITERATOR_DEBUG_LEVEL_MISMATCH
 #define _ALLOW_RUNTIME_LIBRARY_MISMATCH
 #else
-#pragma pack(push, _CRT_PACKING)
-#pragma warning(push, _STL_WARNING_LEVEL)
-#pragma warning(disable : _STL_DISABLED_WARNINGS)
-_STL_DISABLE_CLANG_WARNINGS
-#pragma push_macro("new")
+// #pragma pack(push, _CRT_PACKING)
+// #pragma warning(push, _STL_WARNING_LEVEL)
+// #pragma warning(disable : _STL_DISABLED_WARNINGS)
+// _STL_DISABLE_CLANG_WARNINGS
+// #pragma push_macro("new")
 #define THIS_CALL __thiscall
 #endif
 #undef new
@@ -192,6 +192,43 @@ _STL_DISABLE_CLANG_WARNINGS
 #endif // _DEBUG
 #endif // _STL_CRT_SECURE_INVALID_PARAMETER
 
+#define _RPC_REPORT_ERROR(mesg)                  \
+    do {                                         \
+        assert(!mesg);               \
+        _STL_CRT_SECURE_INVALID_PARAMETER(mesg); \
+    } while (false)
+#ifdef __clang__
+#define _RPC_VERIFY(cond, mesg)                                                            \
+    _Pragma("clang diagnostic push") _Pragma("clang diagnostic ignored \"-Wassume\"") do { \
+        if (cond) { /* contextually convertible to bool paranoia */                        \
+        } else {                                                                           \
+            assert(!mesg);                                                       \
+        }                                                                                  \
+                                                                                           \
+        /*_Analysis_assume_(cond);*/                                                           \
+    }                                                                                      \
+    while (false)                                                                          \
+    _Pragma("clang diagnostic pop")
+#else // ^^^ Clang // MSVC vvv
+#define _RPC_VERIFY(cond, mesg)                                     \
+    do {                                                            \
+        if (cond) { /* contextually convertible to bool paranoia */ \
+        } else {                                                    \
+            _RPC_REPORT_ERROR(mesg);                                \
+        }                                                           \
+                                                                    \
+        /*_Analysis_assume_(cond);*/                                    \
+    } while (false)
+#endif // ^^^ MSVC ^^^
+
+#ifdef _DEBUG
+#define _RPC_ASSERT(cond, mesg) _RPC_VERIFY(cond, mesg)
+#else // ^^^ _DEBUG ^^^ // vvv !_DEBUG vvv
+#define _RPC_ASSERT(cond, mesg) _Analysis_assume_(cond)
+#endif // _DEBUG
+
+
+#ifndef _MSC_VER
 #define _STL_REPORT_ERROR(mesg)                  \
     do {                                         \
         assert(!mesg);               \
@@ -221,18 +258,26 @@ _STL_DISABLE_CLANG_WARNINGS
         /*_Analysis_assume_(cond);*/                                    \
     } while (false)
 #endif // ^^^ MSVC ^^^
-
 #ifdef _DEBUG
 #define _STL_ASSERT(cond, mesg) _STL_VERIFY(cond, mesg)
 #else // ^^^ _DEBUG ^^^ // vvv !_DEBUG vvv
 #define _STL_ASSERT(cond, mesg) _Analysis_assume_(cond)
 #endif // _DEBUG
+#endif
 
 #ifdef _ENABLE_STL_INTERNAL_CHECK
+#ifndef _MSC_VER
 #define _STL_INTERNAL_CHECK(...)         _STL_VERIFY(__VA_ARGS__, "STL internal check: " #__VA_ARGS__)
+#endif
 #define _STL_INTERNAL_STATIC_ASSERT(...) static_assert(__VA_ARGS__, #__VA_ARGS__)
 #else // ^^^ _ENABLE_STL_INTERNAL_CHECK ^^^ // vvv !_ENABLE_STL_INTERNAL_CHECK vvv
+#ifndef _MSC_VER
 #define _STL_INTERNAL_CHECK(...) //_Analysis_assume_(__VA_ARGS__)
+#else
+#ifndef _STL_INTERNAL_CHECK
+#define _STL_INTERNAL_CHECK(...) //_Analysis_assume_(__VA_ARGS__)
+#endif
+#endif
 #define _STL_INTERNAL_STATIC_ASSERT(...)
 #endif // _ENABLE_STL_INTERNAL_CHECK
 
@@ -499,6 +544,7 @@ private:
     static void __cdecl _Init_locks_dtor(_Init_locks*) noexcept;
 };
 
+#if !defined(_MSC_VER) || defined(_IN_ENCLAVE)
 #if _HAS_EXCEPTIONS
 #define _TRY_BEGIN try {
 #define _CATCH(x) \
@@ -535,6 +581,7 @@ private:
 #define _RERAISE
 #define _THROW(x) x._Raise()
 #endif // _HAS_EXCEPTIONS
+#endif    
 _RPC_END
 
 #ifndef _RELIABILITY_CONTRACT
@@ -543,10 +590,10 @@ _RPC_END
 
 #if defined(__clang__) || defined(__GNUC__) || defined(__GNUG__)
 #else
-#pragma pop_macro("new")
-_STL_RESTORE_CLANG_WARNINGS
-#pragma warning(pop)
-#pragma pack(pop)
+// #pragma pop_macro("new")
+// _STL_RESTORE_CLANG_WARNINGS
+// #pragma warning(pop)
+// #pragma pack(pop)
 #endif
 #endif // _STL_COMPILER_PREPROCESSOR
-#endif // _YVALS
+#endif // _RPC_YVALS

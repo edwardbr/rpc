@@ -75,7 +75,8 @@ namespace rpc
             , object object_id 
             , caller_channel_zone caller_channel_zone_id 
             , caller_zone caller_zone_id 
-            , add_ref_options build_out_param_channel) override
+            , add_ref_options build_out_param_channel
+            , bool optimistic) override
         {
             RPC_ASSERT(((std::uint8_t)build_out_param_channel & (std::uint8_t)rpc::add_ref_options::build_caller_route) || destination_channel_zone_id == 0 || destination_channel_zone_id == get_destination_channel_zone_id());
             auto dest = parent_service_.lock();
@@ -86,7 +87,8 @@ namespace rpc
                 object_id, 
                 caller_channel_zone_id, 
                 caller_zone_id, 
-                build_out_param_channel);  
+                build_out_param_channel,
+                optimistic);  
             
             //auto svc = rpc::static_pointer_cast<child_service>(get_operating_zone_service());
             return ret;
@@ -95,9 +97,10 @@ namespace rpc
             uint64_t protocol_version 
             , destination_zone destination_zone_id 
             , object object_id 
-            , caller_zone caller_zone_id) override
+            , caller_zone caller_zone_id
+            , bool optimistic) override
         {
-            auto ret = parent_service_.lock()->release(protocol_version, destination_zone_id, object_id, caller_zone_id);
+            auto ret = parent_service_.lock()->release(protocol_version, destination_zone_id, object_id, caller_zone_id, optimistic);
             if(ret != std::numeric_limits<uint64_t>::max())
             {
                 release_external_ref();
@@ -192,6 +195,7 @@ namespace rpc
             , caller_channel_zone caller_channel_zone_id 
             , caller_zone caller_zone_id 
             , add_ref_options build_out_param_channel 
+            , bool optimistic
         ) override
         {
             auto ret = child_service_->add_ref(
@@ -201,16 +205,18 @@ namespace rpc
                 object_id, 
                 caller_channel_zone_id, 
                 caller_zone_id, 
-                build_out_param_channel);       
+                build_out_param_channel,
+                optimistic);       
             return ret;
         }
         uint64_t release(
             uint64_t protocol_version 
             , destination_zone destination_zone_id 
             , object object_id 
-            , caller_zone caller_zone_id) override
+            , caller_zone caller_zone_id
+            , bool optimistic) override
         {
-            auto ret = child_service_->release(protocol_version, destination_zone_id, object_id, caller_zone_id);
+            auto ret = child_service_->release(protocol_version, destination_zone_id, object_id, caller_zone_id, optimistic);
             if(ret != std::numeric_limits<uint64_t>::max())
             {
                 release_external_ref();

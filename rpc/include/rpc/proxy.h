@@ -84,7 +84,13 @@ namespace rpc
     {
         object object_id_;
         std::shared_ptr<service_proxy> service_proxy_;
-        std::unordered_map<interface_ordinal, rpc::weak_ptr<interface_proxy>> proxy_map;
+        std::unordered_map<
+            interface_ordinal
+            , std::pair<
+                rpc::weak_ptr<interface_proxy>
+                , rpc::weak_ptr<interface_proxy>
+            >
+        > proxy_map;
         std::mutex insert_control_;
 
         object_proxy(object object_id, std::shared_ptr<service_proxy> service_proxy);
@@ -95,6 +101,116 @@ namespace rpc
         int try_cast(std::function<interface_ordinal (uint64_t)> id_getter);
         
         friend service_proxy;
+        
+        template<class T> 
+        int query_interface(T& iface, bool optimistic, bool do_remote_check = true)
+        {
+            auto create = [&](const std::unordered_map<
+                        interface_ordinal
+                        , std::pair<
+                            rpc::weak_ptr<interface_proxy>
+                            , rpc::weak_ptr<interface_proxy>
+                        >
+                    >::iterator& item) -> int {
+                rpc::shared_ptr<interface_proxy> proxy = item->second.first.lock();
+                if (!proxy)
+                {
+                    // weak pointer needs refreshing
+                    if constexpr(T::is_optimistic)
+                        create_optimistic_interface_proxy<T::element_type>(iface);
+                    else
+                        create_shared_interface_proxy<T::element_type>(iface);
+                    item->second.first = rpc::reinterpret_pointer_cast<interface_proxy>(iface);
+                    return rpc::error::OK();
+                }
+                iface = rpc::reinterpret_pointer_cast<T::element_type>(proxy);
+                return rpc::error::OK();
+            };
+
+            { // scope for the lock
+                std::lock_guard guard(insert_control_);
+#ifdef RPC_V2
+                if(T::element_type::get_id(rpc::VERSION_2) == 0)
+                {
+                    return rpc::error::OK();
+                }
+                {
+                    auto item = proxy_map.find(T::element_type::get_id(rpc::VERSION_2));
+                    if (item != proxy_map.end())
+                    {
+                        return create(item);
+                    }
+                }
+#endif
+#ifdef RPC_V1
+                if(T::element_type::get_id(rpc::VERSION_1) == 0)
+                {
+                    return rpc::error::OK();
+                }
+                {
+                    auto item = proxy_map.find(T::element_type::get_id(rpc::VERSION_1));
+                    if (item != proxy_map.end())
+                    {
+                        return create(item);
+                    }
+                }
+#endif
+                if (!do_remote_check)
+                {
+                    create_shared_interface_proxy<T::element_type>(iface);
+#ifdef RPC_V1
+                    proxy_map[T::element_type::get_id(rpc::VERSION_1)] = std::pair<rpc::weak_ptr<interface_proxy>, rpc::weak_ptr<interface_proxy>>(rpc::reinterpret_pointer_cast<interface_proxy>(iface), {});
+#endif
+#ifdef RPC_V2
+                    proxy_map[T::element_type::get_id(rpc::VERSION_2)] = std::pair<rpc::weak_ptr<interface_proxy>, rpc::weak_ptr<interface_proxy>>(rpc::reinterpret_pointer_cast<interface_proxy>(iface), {});
+#endif                    
+                    return rpc::error::OK();
+                }
+            }
+
+            // release the lock and then check for casting
+            if (do_remote_check)
+            {
+                // see if object_id can implement interface
+                int ret = try_cast(T::element_type::get_id);
+                if (ret != rpc::error::OK())
+                {
+                    return ret;
+                }
+            }
+            { // another scope for the lock
+                std::lock_guard guard(insert_control_);
+
+                // check again...
+#ifdef RPC_V2
+                {
+                    auto item = proxy_map.find(T::element_type::get_id(rpc::VERSION_2));
+                    if (item != proxy_map.end())
+                    {
+                        return create(item);
+                    }
+                }
+#endif
+#ifdef RPC_V1
+                {
+                    auto item = proxy_map.find(T::element_type::get_id(rpc::VERSION_1));
+                    if (item != proxy_map.end())
+                    {
+                        return create(item);
+                    }
+                }
+#endif
+
+                create_shared_interface_proxy<T::element_type>(iface);
+#ifdef RPC_V1
+                proxy_map[T::element_type::get_id(rpc::VERSION_1)] = std::pair<rpc::weak_ptr<interface_proxy>, rpc::weak_ptr<interface_proxy>>(rpc::reinterpret_pointer_cast<interface_proxy>(iface), {});
+#endif
+#ifdef RPC_V2
+                proxy_map[T::element_type::get_id(rpc::VERSION_2)] = std::pair<rpc::weak_ptr<interface_proxy>, rpc::weak_ptr<interface_proxy>>(rpc::reinterpret_pointer_cast<interface_proxy>(iface), {});
+#endif
+                return rpc::error::OK();
+            }
+        }        
 
     public:
         virtual ~object_proxy();
@@ -116,112 +232,17 @@ namespace rpc
         [[nodiscard]] int send(uint64_t tag, std::function<interface_ordinal (uint64_t)> id_getter, method method_id, size_t in_size_, const char* in_buf_,
                         std::vector<char>& out_buf_);
 
-        size_t get_proxy_count()
-        {
-            std::lock_guard guard(insert_control_);
-            return proxy_map.size();
-        }
-
-        template<class T> void create_interface_proxy(rpc::shared_ptr<T>& inface);
+        template<class T> void create_shared_interface_proxy(rpc::shared_ptr<T>& inface);
+        template<class T> void create_shared_interface_proxy(rpc::optimistic_ptr<T>& inface);
 
         template<class T> int query_interface(rpc::shared_ptr<T>& iface, bool do_remote_check = true)
         {
-            auto create = [&](std::unordered_map<interface_ordinal, rpc::weak_ptr<interface_proxy>>::iterator item) -> int {
-                rpc::shared_ptr<interface_proxy> proxy = item->second.lock();
-                if (!proxy)
-                {
-                    // weak pointer needs refreshing
-                    create_interface_proxy<T>(iface);
-                    item->second = rpc::reinterpret_pointer_cast<interface_proxy>(iface);
-                    return rpc::error::OK();
-                }
-                iface = rpc::reinterpret_pointer_cast<T>(proxy);
-                return rpc::error::OK();
-            };
+            return query_interface(iface, false, do_remote_check);
+        }
 
-            { // scope for the lock
-                std::lock_guard guard(insert_control_);
-#ifdef RPC_V2
-                if(T::get_id(rpc::VERSION_2) == 0)
-                {
-                    return rpc::error::OK();
-                }
-                {
-                    auto item = proxy_map.find(T::get_id(rpc::VERSION_2));
-                    if (item != proxy_map.end())
-                    {
-                        return create(item);
-                    }
-                }
-#endif
-#ifdef RPC_V1
-                if(T::get_id(rpc::VERSION_1) == 0)
-                {
-                    return rpc::error::OK();
-                }
-                {
-                    auto item = proxy_map.find(T::get_id(rpc::VERSION_1));
-                    if (item != proxy_map.end())
-                    {
-                        return create(item);
-                    }
-                }
-#endif
-                if (!do_remote_check)
-                {
-                    create_interface_proxy<T>(iface);
-#ifdef RPC_V1
-                    proxy_map[T::get_id(rpc::VERSION_1)] = rpc::reinterpret_pointer_cast<interface_proxy>(iface);
-#endif
-#ifdef RPC_V2
-                    proxy_map[T::get_id(rpc::VERSION_2)] = rpc::reinterpret_pointer_cast<interface_proxy>(iface);
-#endif                    
-                    return rpc::error::OK();
-                }
-            }
-
-            // release the lock and then check for casting
-            if (do_remote_check)
-            {
-                // see if object_id can implement interface
-                int ret = try_cast(T::get_id);
-                if (ret != rpc::error::OK())
-                {
-                    return ret;
-                }
-            }
-            { // another scope for the lock
-                std::lock_guard guard(insert_control_);
-
-                // check again...
-#ifdef RPC_V2
-                {
-                    auto item = proxy_map.find(T::get_id(rpc::VERSION_2));
-                    if (item != proxy_map.end())
-                    {
-                        return create(item);
-                    }
-                }
-#endif
-#ifdef RPC_V1
-                {
-                    auto item = proxy_map.find(T::get_id(rpc::VERSION_1));
-                    if (item != proxy_map.end())
-                    {
-                        return create(item);
-                    }
-                }
-#endif
-
-                create_interface_proxy<T>(iface);
-#ifdef RPC_V1
-                proxy_map[T::get_id(rpc::VERSION_1)] = rpc::reinterpret_pointer_cast<interface_proxy>(iface);
-#endif
-#ifdef RPC_V2
-                proxy_map[T::get_id(rpc::VERSION_2)] = rpc::reinterpret_pointer_cast<interface_proxy>(iface);
-#endif
-                return rpc::error::OK();
-            }
+        template<class T> int query_interface(rpc::optimistic_ptr<T>& iface, bool do_remote_check = true)
+        {
+            return query_interface(iface, false, do_remote_check);
         }
     };
 
@@ -464,7 +485,8 @@ namespace rpc
         [[nodiscard]] uint64_t sp_add_ref(
             object object_id 
             , caller_channel_zone caller_channel_zone_id 
-            , add_ref_options build_out_param_channel)
+            , add_ref_options build_out_param_channel
+            , bool optimistic)
         {
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             {
@@ -483,7 +505,8 @@ namespace rpc
                     , object_id 
                     , caller_channel_zone_id 
                     , caller_zone_id_ 
-                    , build_out_param_channel );
+                    , build_out_param_channel
+                    , optimistic );
                 if(ret != std::numeric_limits<uint64_t>::max())
                 {
                     if(original_version != version)
@@ -497,7 +520,7 @@ namespace rpc
             return rpc::error::INCOMPATIBLE_SERVICE();        
         }
         
-        uint64_t sp_release(object object_id) 
+        uint64_t sp_release(object object_id, bool optimistic) 
         {
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             {
@@ -513,7 +536,8 @@ namespace rpc
                     version
                     , destination_zone_id_ 
                     , object_id 
-                    , caller_zone_id_);
+                    , caller_zone_id_
+                    , optimistic);
                 if(ret != std::numeric_limits<uint64_t>::max())
                 {                   
                     if(original_version != version)
@@ -527,7 +551,7 @@ namespace rpc
             return rpc::error::INCOMPATIBLE_SERVICE();   
         }
         
-        void on_object_proxy_released(object object_id)
+        void on_object_proxy_released(object object_id, bool optimistic)
         {
             auto caller_zone_id = get_zone_id().as_caller();
             RPC_ASSERT(caller_zone_id == get_caller_zone_id());
@@ -557,7 +581,8 @@ namespace rpc
                     version
                     , destination_zone_id_ 
                     , object_id 
-                    , caller_zone_id);
+                    , caller_zone_id
+                    , optimistic);
                 if(ret != std::numeric_limits<uint64_t>::max())
                 {
                     inner_release_external_ref();
@@ -662,7 +687,7 @@ namespace rpc
         return operating_service->__proxy_bind_in_param(protocol_version, iface, stub);
     }
 
-    //do not use directly it is for the interface generator use rpc::create_interface_proxy if you want to get a proxied pointer to a remote implementation
+    //do not use directly it is for the interface generator use rpc::create_shared_interface_proxy if you want to get a proxied pointer to a remote implementation
     template<class T> 
     int stub_bind_in_param(uint64_t protocol_version, rpc::service& serv, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, const rpc::interface_descriptor& encap, rpc::shared_ptr<T>& iface)
     {
@@ -696,7 +721,8 @@ namespace rpc
                 auto ret = service_proxy->sp_add_ref(
                                 encap.object_id
                                 , {0}
-                                , rpc::add_ref_options::normal);
+                                , rpc::add_ref_options::normal
+                                , false);
                 if(ret == std::numeric_limits<uint64_t>::max())
                     return -1;
                 if(!new_proxy_added)
@@ -730,7 +756,7 @@ namespace rpc
         return operating_service->__stub_bind_out_param(protocol_version, caller_channel_zone_id, caller_zone_id, iface);
     }
 
-    //do not use directly it is for the interface generator use rpc::create_interface_proxy if you want to get a proxied pointer to a remote implementation
+    //do not use directly it is for the interface generator use rpc::create_shared_interface_proxy if you want to get a proxied pointer to a remote implementation
     template<class T> 
     int proxy_bind_out_param(const std::shared_ptr<rpc::service_proxy>& sp, const rpc::interface_descriptor& encap, caller_zone caller_zone_id, rpc::shared_ptr<T>& val)
     {
@@ -796,7 +822,7 @@ namespace rpc
         {
             //as this is an out parameter the callee will be doing an add ref if the object proxy is already found we can do a release
             RPC_ASSERT(!new_proxy_added);
-            auto ret = service_proxy->sp_release(encap.object_id);
+            auto ret = service_proxy->sp_release(encap.object_id, false);
             if(ret != std::numeric_limits<uint64_t>::max())
             {
                 service_proxy->release_external_ref();            

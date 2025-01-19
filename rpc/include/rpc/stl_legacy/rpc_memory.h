@@ -1921,15 +1921,15 @@ element_type*>::value>> shared_ptr(unique_ptr<_Yp, _Dp>&& __r) : __ptr_(__r.get(
         template<class _Up> friend class shared_ptr;
     };
 
-    template<class _Tp> struct hash;
+    // template<class _Tp> struct hash;
 
-    template<class _Tp> struct hash<shared_ptr<_Tp>>
-    {
-        size_t operator()(const shared_ptr<_Tp>& __ptr) const noexcept
-        {
-            return hash<typename shared_ptr<_Tp>::element_type*>()(__ptr.get());
-        }
-    };
+    // template<class _Tp> struct hash<shared_ptr<_Tp>>
+    // {
+    //     size_t operator()(const shared_ptr<_Tp>& __ptr) const noexcept
+    //     {
+    //         return hash<typename shared_ptr<_Tp>::element_type*>()(__ptr.get());
+    //     }
+    // };
 
     class __sp_mut
     {

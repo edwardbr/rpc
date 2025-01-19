@@ -243,7 +243,8 @@ namespace rpc
         , object object_id
         , caller_channel_zone caller_channel_zone_id
         , caller_zone caller_zone_id
-        , add_ref_options build_out_param_channel)
+        , add_ref_options build_out_param_channel
+        , bool optimistic)
     {
         if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
         {
@@ -301,7 +302,8 @@ namespace rpc
         uint64_t protocol_version
         , destination_zone destination_zone_id
         , object object_id
-        , caller_zone caller_zone_id)
+        , caller_zone caller_zone_id
+        , bool optimistic)
     {
         uint64_t ret = 0;
         sgx_status_t status = ::release_enclave(
