@@ -42,7 +42,7 @@ namespace rpc_generator
             enum param_type
             {
                 BY_VALUE,
-                REFERANCE,
+                REFERENCE,
                 MOVE,
                 POINTER,
                 POINTER_REFERENCE,
@@ -89,14 +89,14 @@ namespace rpc_generator
         };
 
         template<>
-        std::string renderer::render<renderer::REFERANCE>(print_type option, bool from_host, const class_entity& lib,
+        std::string renderer::render<renderer::REFERENCE>(print_type option, bool from_host, const class_entity& lib,
                                                           const std::string& name, bool is_in, bool is_out,
                                                           bool is_const, const std::string& object_type,
                                                           uint64_t& count) const
         {
             if(is_out)
             {
-                throw std::runtime_error("REFERANCE does not support out vals");
+                throw std::runtime_error("REFERENCE does not support out vals");
             }
 
             switch(option)
@@ -328,7 +328,7 @@ namespace rpc_generator
                     }
                     else
                     {
-                        output = renderer().render<renderer::REFERANCE>(option, from_host, lib, name, in, out, is_const,
+                        output = renderer().render<renderer::REFERENCE>(option, from_host, lib, name, in, out, is_const,
                                                                         type_name, count);
                     }
                 }
@@ -593,12 +593,15 @@ namespace rpc_generator
 
             if(has_inparams)
             {
-                uint64_t count = 1;
+                proxy("// no hope of reading anything from an empty buffer");
+                proxy("if (__rpc_buf_size == 0)");
+                proxy("    return rpc::error::PROXY_DESERIALISATION_ERROR();");
                 proxy("try");
                 proxy("{{");
                 proxy("auto __yas_mapping = YAS_OBJECT_NVP(");
                 proxy("  \"out\"");
 
+                uint64_t count = 1;
                 for(auto& parameter : function->get_parameters())
                 {
                     count++;
@@ -651,7 +654,7 @@ namespace rpc_generator
                       interface_name, function->get_name());
                 proxy("LOG_STR(error_message.data(), error_message.length());");
                 proxy("#endif");
-                proxy("return rpc::error::STUB_DESERIALISATION_ERROR();");
+                proxy("return rpc::error::PROXY_DESERIALISATION_ERROR();");
                 proxy("}}");
             }
             proxy("return rpc::error::OK();");
@@ -661,26 +664,29 @@ namespace rpc_generator
             function_count++;
         }
 
-        void write_stub_receive_method(bool from_host, const class_entity& m_ob, writer& proxy,
+        void write_stub_receive_method(bool from_host, const class_entity& m_ob, writer& stub,
                                        const std::string& interface_name,
                                        const std::shared_ptr<function_entity>& function, int& function_count,
                                        bool catch_stub_exceptions, const std::vector<std::string>& rethrow_exceptions)
         {
             bool has_outparams = false;
-            proxy("template<>");
-            proxy("{}", ::rpc_generator::write_stub_receive_declaration(
+            stub("template<>");
+            stub("{}", ::rpc_generator::write_stub_receive_declaration(
                             m_ob, interface_name + "::stub_deserialiser<rpc::serialiser::yas, rpc::encoding>::", function,
                             function_count, has_outparams, ", rpc::encoding __rpc_enc", false));
-            proxy("{{");
+            stub("{{");
 
             if(has_outparams)
             {
-                uint64_t count = 1;
-                proxy("try");
-                proxy("{{");
-                proxy("auto __yas_mapping = YAS_OBJECT_NVP(");
-                proxy("  \"out\"");
+                stub("// no hope of reading anything from an empty buffer");
+                stub("if (__rpc_buf_size == 0)");
+                stub("    return rpc::error::STUB_DESERIALISATION_ERROR();");
+                stub("try");
+                stub("{{");
+                stub("auto __yas_mapping = YAS_OBJECT_NVP(");
+                stub("  \"out\"");
 
+                uint64_t count = 1;
                 for(auto& parameter : function->get_parameters())
                 {
                     count++;
@@ -688,78 +694,78 @@ namespace rpc_generator
                     if(!do_in_param(STUB_MARSHALL_IN, from_host, m_ob, parameter.get_name(), parameter.get_type(),
                                    parameter.get_attributes(), count, output))
                         continue;
-                    proxy(output);
+                    stub(output);
                 }
-                proxy("  );");
+                stub("  );");
 
-                proxy("switch(__rpc_enc)");
-                proxy("{{");
-                proxy("case rpc::encoding::yas_compressed_binary:");
-                proxy("::yas::load<::yas::mem|::yas::binary|::yas::compacted|::yas::no_header>(::yas::intrusive_"
+                stub("switch(__rpc_enc)");
+                stub("{{");
+                stub("case rpc::encoding::yas_compressed_binary:");
+                stub("::yas::load<::yas::mem|::yas::binary|::yas::compacted|::yas::no_header>(::yas::intrusive_"
                       "buffer(__rpc_buf,__rpc_buf_size), "
                       "__yas_mapping);");
-                proxy("break;");
-                // proxy("case rpc::encoding::yas_text:");
-                // proxy("::yas::load<::yas::mem|::yas::text|::yas::no_header>(::yas::intrusive_buffer(__rpc_buf,__"
+                stub("break;");
+                // stub("case rpc::encoding::yas_text:");
+                // stub("::yas::load<::yas::mem|::yas::text|::yas::no_header>(::yas::intrusive_buffer(__rpc_buf,__"
                 //       "rpc_buf_size), __yas_mapping);");
-                // proxy("break;");
-                proxy("case rpc::encoding::yas_json:");
-                proxy("::yas::load<::yas::mem|::yas::json|::yas::no_header>(::yas::intrusive_buffer(__rpc_buf,__"
+                // stub("break;");
+                stub("case rpc::encoding::yas_json:");
+                stub("::yas::load<::yas::mem|::yas::json|::yas::no_header>(::yas::intrusive_buffer(__rpc_buf,__"
                       "rpc_buf_size), __yas_mapping);");
-                proxy("break;");
-                proxy("case rpc::encoding::enc_default:");
-                proxy("case rpc::encoding::yas_binary:");
-                proxy("::yas::load<::yas::mem|::yas::binary|::yas::no_header>(::yas::intrusive_buffer(__rpc_buf,__"
+                stub("break;");
+                stub("case rpc::encoding::enc_default:");
+                stub("case rpc::encoding::yas_binary:");
+                stub("::yas::load<::yas::mem|::yas::binary|::yas::no_header>(::yas::intrusive_buffer(__rpc_buf,__"
                       "rpc_buf_size), __yas_mapping);");
-                proxy("break;");
-                proxy("default:");
-                proxy("return rpc::error::PROXY_DESERIALISATION_ERROR();");
-                proxy("}}");
-                proxy("}}");
-                proxy("#ifdef USE_RPC_LOGGING");
-                proxy("catch(std::exception& ex)");
-                proxy("{{");
-                proxy("auto error_message = std::string(\"A proxy deserialisation error has occurred in an {} "
+                stub("break;");
+                stub("default:");
+                stub("return rpc::error::STUB_DESERIALISATION_ERROR();");
+                stub("}}");
+                stub("}}");
+                stub("#ifdef USE_RPC_LOGGING");
+                stub("catch(std::exception& ex)");
+                stub("{{");
+                stub("auto error_message = std::string(\"A stub deserialisation error has occurred in an {} "
                       "implementation in function {} \") + ex.what();",
                       interface_name, function->get_name());
-                proxy("LOG_STR(error_message.data(), error_message.length());");
-                proxy("return rpc::error::PROXY_DESERIALISATION_ERROR();");
-                proxy("}}");
-                proxy("#endif");
-                proxy("catch(...)");
-                proxy("{{");
-                proxy("#ifdef USE_RPC_LOGGING");
-                proxy("auto error_message = std::string(\"exception has occurred in an {} implementation in "
+                stub("LOG_STR(error_message.data(), error_message.length());");
+                stub("return rpc::error::STUB_DESERIALISATION_ERROR();");
+                stub("}}");
+                stub("#endif");
+                stub("catch(...)");
+                stub("{{");
+                stub("#ifdef USE_RPC_LOGGING");
+                stub("auto error_message = std::string(\"exception has occurred in an {} implementation in "
                       "function {}\");",
                       interface_name, function->get_name());
-                proxy("LOG_STR(error_message.data(), error_message.length());");
-                proxy("#endif");
-                proxy("return rpc::error::STUB_DESERIALISATION_ERROR();");
-                proxy("}}");
+                stub("LOG_STR(error_message.data(), error_message.length());");
+                stub("#endif");
+                stub("return rpc::error::STUB_DESERIALISATION_ERROR();");
+                stub("}}");
             }
-            proxy("return rpc::error::OK();");
-            proxy("}}");
-            proxy("");
+            stub("return rpc::error::OK();");
+            stub("}}");
+            stub("");
 
             function_count++;
         }
 
-        void write_stub_reply_method(bool from_host, const class_entity& m_ob, writer& proxy,
+        void write_stub_reply_method(bool from_host, const class_entity& m_ob, writer& stub,
                                      const std::string& interface_name,
                                      const std::shared_ptr<function_entity>& function, int& function_count,
                                      bool catch_stub_exceptions, const std::vector<std::string>& rethrow_exceptions)
         {
             bool has_outparams = false;
-            proxy("template<>");
-            proxy("{}", ::rpc_generator::write_stub_reply_declaration(
+            stub("template<>");
+            stub("{}", ::rpc_generator::write_stub_reply_declaration(
                             m_ob, interface_name + "::stub_serialiser<rpc::serialiser::yas, rpc::encoding>::", function,
                             function_count, has_outparams, ", rpc::encoding __rpc_enc", false));
-            proxy("{{");
+            stub("{{");
 
             if(has_outparams)
             {
-                proxy("auto __yas_mapping = YAS_OBJECT_NVP(");
-                proxy("  \"out\"");
+                stub("auto __yas_mapping = YAS_OBJECT_NVP(");
+                stub("  \"out\"");
 
                 uint64_t count = 1;
                 for(auto& parameter : function->get_parameters())
@@ -770,44 +776,44 @@ namespace rpc_generator
                                         parameter.get_attributes(), count, output))
                             continue;
 
-                        proxy(output);
+                        stub(output);
                     }
                     count++;
                 }
 
-                proxy("  );");
+                stub("  );");
 
-                proxy("__buffer.clear(); // this does not change the capacity of the vector so this is a low cost reset to the buffer");
-                proxy("switch(__rpc_enc)");
-                proxy("{{");
-                proxy("case rpc::encoding::yas_compressed_binary:");
-                proxy("::yas::save<::yas::mem|::yas::binary|::yas::compacted|::yas::no_header>(::yas::vector_"
+                stub("__buffer.clear(); // this does not change the capacity of the vector so this is a low cost reset to the buffer");
+                stub("switch(__rpc_enc)");
+                stub("{{");
+                stub("case rpc::encoding::yas_compressed_binary:");
+                stub("::yas::save<::yas::mem|::yas::binary|::yas::compacted|::yas::no_header>(::yas::vector_"
                       "ostream(__buffer), "
                       "__yas_mapping);");
-                proxy("break;");
-                // proxy("case rpc::encoding::yas_text:");
-                // proxy("::yas::save<::yas::mem|::yas::text|::yas::no_header>(::yas::vector_ostream(__buffer), "
+                stub("break;");
+                // stub("case rpc::encoding::yas_text:");
+                // stub("::yas::save<::yas::mem|::yas::text|::yas::no_header>(::yas::vector_ostream(__buffer), "
                 //       "__yas_mapping);");
-                // proxy("break;");
-                proxy("case rpc::encoding::yas_json:");
-                proxy("::yas::save<::yas::mem|::yas::json|::yas::no_header>(::yas::vector_ostream(__buffer), "
+                // stub("break;");
+                stub("case rpc::encoding::yas_json:");
+                stub("::yas::save<::yas::mem|::yas::json|::yas::no_header>(::yas::vector_ostream(__buffer), "
                       "__yas_mapping);");
-                proxy("break;");
-                proxy("case rpc::encoding::enc_default:");
-                proxy("case rpc::encoding::yas_binary:");
-                proxy("::yas::save<::yas::mem|::yas::binary|::yas::no_header>(::yas::vector_ostream(__buffer), "
+                stub("break;");
+                stub("case rpc::encoding::enc_default:");
+                stub("case rpc::encoding::yas_binary:");
+                stub("::yas::save<::yas::mem|::yas::binary|::yas::no_header>(::yas::vector_ostream(__buffer), "
                       "__yas_mapping);");
-                proxy("break;");
-                proxy("}}");
+                stub("break;");
+                stub("}}");
             }
             else
             {
-                proxy("if(__rpc_enc == rpc::encoding::yas_json)");
-                proxy("  __buffer = {{'{{','}}'}};");
+                stub("if(__rpc_enc == rpc::encoding::yas_json)");
+                stub("  __buffer = {{'{{','}}'}};");
             }
-            proxy("return rpc::error::OK();");
-            proxy("}}");
-            proxy("");
+            stub("return rpc::error::OK();");
+            stub("}}");
+            stub("");
 
             function_count++;
         }
