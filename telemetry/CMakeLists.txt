@@ -44,7 +44,7 @@ add_library(rpc_telemetry_host STATIC src/host_telemetry_service.cpp src/telemet
 
 target_include_directories(rpc_telemetry_host
                            PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>")
-target_compile_options(rpc_telemetry_host PRIVATE ${HOST_COMPILE_OPTIONS} ${WARN_OK})
+target_compile_options(rpc_telemetry_host PRIVATE ${HOST_COMPILE_OPTIONS} ${WARN_PEDANTIC})
 target_link_options(rpc_telemetry_host PRIVATE ${HOST_LINK_OPTIONS})
 target_link_directories(rpc_telemetry_host PUBLIC ${SGX_LIBRARY_PATH})
 target_compile_definitions(rpc_telemetry_host PRIVATE ${HOST_DEFINES})

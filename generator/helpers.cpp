@@ -39,7 +39,6 @@ bool is_interface_param(const class_entity& lib, const std::string& type)
     if(type == encapsulated_type)
         return false;
 
-    bool is_interface = false;
     std::shared_ptr<class_entity> obj;
     if(lib.find_class(encapsulated_type, obj))
     {

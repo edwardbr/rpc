@@ -36,6 +36,14 @@ namespace rpc_generator
         std::string render(print_type option, const class_entity& lib, const std::string& name, bool is_in, bool is_out,
                            bool is_const, const std::string& object_type, uint64_t& count) const
         {
+            std::ignore = option;
+            std::ignore = lib;
+            std::ignore = name;
+            std::ignore = is_in;
+            std::ignore = is_out;
+            std::ignore = is_const;
+            std::ignore = object_type;
+            std::ignore = count;
             assert(false);
         }
     };
@@ -45,6 +53,12 @@ namespace rpc_generator
                                                      const std::string& name, bool is_in, bool is_out, bool is_const,
                                                      const std::string& object_type, uint64_t& count) const
     {
+        std::ignore = lib;
+        std::ignore = is_in;
+        std::ignore = is_out;
+        std::ignore = is_const;
+        std::ignore = count;
+
         switch(option)
         {
         case PROXY_PARAM_IN:
@@ -67,6 +81,12 @@ namespace rpc_generator
                                                       const std::string& name, bool is_in, bool is_out, bool is_const,
                                                       const std::string& object_type, uint64_t& count) const
     {
+        std::ignore = lib;
+        std::ignore = is_in;
+        std::ignore = is_out;
+        std::ignore = is_const;
+        std::ignore = count;
+
         if(is_out)
         {
             throw std::runtime_error("REFERANCE does not support out vals");
@@ -94,6 +114,10 @@ namespace rpc_generator
                                                  bool is_in, bool is_out, bool is_const, const std::string& object_type,
                                                  uint64_t& count) const
     {
+        std::ignore = lib;
+        std::ignore = is_in;
+        std::ignore = count;
+
         if(is_out)
         {
             throw std::runtime_error("MOVE does not support out vals");
@@ -121,6 +145,13 @@ namespace rpc_generator
                                                     bool is_in, bool is_out, bool is_const,
                                                     const std::string& object_type, uint64_t& count) const
     {
+        std::ignore = lib;
+        std::ignore = is_in;
+        std::ignore = is_out;
+        std::ignore = is_const;
+        std::ignore = object_type;
+        std::ignore = count;
+
         if(is_out)
         {
             throw std::runtime_error("POINTER does not support out vals");
@@ -142,7 +173,14 @@ namespace rpc_generator
                                                               const std::string& name, bool is_in, bool is_out,
                                                               bool is_const, const std::string& object_type,
                                                               uint64_t& count) const
-    {
+    {        
+        std::ignore = lib;
+        std::ignore = option;
+        std::ignore = name;
+        std::ignore = is_in;
+        std::ignore = object_type;
+        std::ignore = count;        
+
         if(is_const && is_out)
         {
             throw std::runtime_error("POINTER_REFERENCE does not support const out vals");
@@ -169,6 +207,13 @@ namespace rpc_generator
                                                             bool is_const, const std::string& object_type,
                                                             uint64_t& count) const
     {
+        std::ignore = lib;
+        std::ignore = is_in;
+        std::ignore = is_out;
+        std::ignore = is_const;
+        std::ignore = object_type;
+        std::ignore = count;        
+
         switch(option)
         {
         case PROXY_PARAM_IN:
@@ -189,6 +234,12 @@ namespace rpc_generator
                                                       const std::string& name, bool is_in, bool is_out, bool is_const,
                                                       const std::string& object_type, uint64_t& count) const
     {
+        std::ignore = lib;
+        std::ignore = is_in;
+        std::ignore = is_const;
+        std::ignore = object_type;
+        std::ignore = count;        
+
         if(is_out)
         {
             throw std::runtime_error("INTERFACE does not support out vals");
@@ -215,6 +266,13 @@ namespace rpc_generator
                                                                 bool is_const, const std::string& object_type,
                                                                 uint64_t& count) const
     {
+        std::ignore = lib;
+        std::ignore = is_in;
+        std::ignore = is_out;
+        std::ignore = is_const;
+        std::ignore = object_type;
+        std::ignore = count;
+
         switch(option)
         {
         case PROXY_PARAM_IN:
@@ -424,7 +482,7 @@ namespace rpc_generator
     }
 
     std::string write_proxy_send_declaration(const class_entity& m_ob, const std::string& scope,
-                                             const std::shared_ptr<function_entity>& function, int function_count,
+                                             const std::shared_ptr<function_entity>& function,
                                              bool& has_inparams, std::string additional_params, bool include_variadics)
     {
         std::stringstream stream;
@@ -464,7 +522,7 @@ namespace rpc_generator
     }
 
     std::string write_proxy_receive_declaration(const class_entity& m_ob, const std::string& scope,
-                                                const std::shared_ptr<function_entity>& function, int& function_count,
+                                                const std::shared_ptr<function_entity>& function,
                                                 bool& has_inparams, std::string additional_params,
                                                 bool include_variadics)
     {
@@ -501,7 +559,7 @@ namespace rpc_generator
     }
 
     std::string write_stub_receive_declaration(const class_entity& m_ob, const std::string& scope,
-                                               const std::shared_ptr<function_entity>& function, int function_count,
+                                               const std::shared_ptr<function_entity>& function,
                                                bool& has_outparams, std::string additional_params,
                                                bool include_variadics)
     {
@@ -539,7 +597,7 @@ namespace rpc_generator
     }
 
     std::string write_stub_reply_declaration(const class_entity& m_ob, const std::string& scope,
-                                             const std::shared_ptr<function_entity>& function, int function_count,
+                                             const std::shared_ptr<function_entity>& function,
                                              bool& has_outparams, std::string additional_params, bool include_variadics)
     {
         std::stringstream stream;
@@ -576,8 +634,7 @@ namespace rpc_generator
         return stream.str();
     }
 
-    std::string client_sender_declaration(const class_entity& m_ob, const std::shared_ptr<function_entity>& function,
-                                          int function_count, bool& is_suitable)
+    std::string client_sender_declaration(const class_entity& m_ob, const std::shared_ptr<function_entity>& function, bool& is_suitable)
     {
         std::stringstream stream;
         writer header(stream);
@@ -626,8 +683,7 @@ namespace rpc_generator
         return stream.str();
     }
 
-    void write_method(const class_entity& m_ob, writer& header, const std::string& interface_name,
-                      const std::shared_ptr<function_entity>& function, int& function_count)
+    void write_method(const class_entity& m_ob, writer& header, const std::shared_ptr<function_entity>& function)
     {
         if(function->get_entity_type() == entity_type::FUNCTION_METHOD)
         {
@@ -738,7 +794,6 @@ namespace rpc_generator
 
         if(has_methods)
         {
-            int function_count = 1;
             for(auto& function : m_ob.get_functions())
             {
                 if(function->get_entity_type() == entity_type::CPPQUOTE)
@@ -773,7 +828,7 @@ namespace rpc_generator
                     continue;
                 }
                 if(function->get_entity_type() == entity_type::FUNCTION_METHOD)
-                    write_method(m_ob, header, interface_name, function, function_count);
+                    write_method(m_ob, header, function);
             }
         }
 
@@ -785,16 +840,13 @@ namespace rpc_generator
         header("struct proxy_serialiser");
         header("{{");
         {
-            int function_count = 0;
             std::unordered_set<std::string> unique_signatures;
-            bool has_inparams = false;
             for(auto& function : m_ob.get_functions())
             {
                 if(function->get_entity_type() == entity_type::FUNCTION_METHOD)
                 {
-                    function_count++;
                     bool has_params = false;
-                    auto key = ::rpc_generator::write_proxy_send_declaration(m_ob, "", function, function_count,
+                    auto key = ::rpc_generator::write_proxy_send_declaration(m_ob, "", function, 
                                                                              has_params, "", true);
                     if(unique_signatures.emplace(key).second)
                     {
@@ -810,16 +862,13 @@ namespace rpc_generator
         header("struct stub_deserialiser");
         header("{{");
         {
-            int function_count = 0;
             std::unordered_set<std::string> unique_signatures;
-            bool has_outparams = false;
             for(auto& function : m_ob.get_functions())
             {
                 if(function->get_entity_type() == entity_type::FUNCTION_METHOD)
                 {
-                    function_count++;
                     bool has_params = false;
-                    auto key = ::rpc_generator::write_stub_receive_declaration(m_ob, "", function, function_count,
+                    auto key = ::rpc_generator::write_stub_receive_declaration(m_ob, "", function,
                                                                                has_params, "", true);
                     if(unique_signatures.emplace(key).second)
                     {
@@ -835,16 +884,13 @@ namespace rpc_generator
         header("struct stub_serialiser");
         header("{{");
         {
-            int function_count = 0;
             std::unordered_set<std::string> unique_signatures;
-            bool has_outparams = false;
             for(auto& function : m_ob.get_functions())
             {
                 if(function->get_entity_type() == entity_type::FUNCTION_METHOD)
                 {
-                    function_count++;
                     bool has_params = false;
-                    auto key = ::rpc_generator::write_stub_reply_declaration(m_ob, "", function, function_count,
+                    auto key = ::rpc_generator::write_stub_reply_declaration(m_ob, "", function,
                                                                              has_params, "", true);
                     if(unique_signatures.emplace(key).second)
                     {
@@ -860,17 +906,13 @@ namespace rpc_generator
         header("struct proxy_deserialiser");
         header("{{");
         {
-            int function_count = 0;
             std::unordered_set<std::string> unique_signatures;
-            bool has_inparams = false;
             for(auto& function : m_ob.get_functions())
             {
                 if(function->get_entity_type() == entity_type::FUNCTION_METHOD)
                 {
-                    function_count++;
-
                     bool has_params = false;
-                    auto key = ::rpc_generator::write_proxy_receive_declaration(m_ob, "", function, function_count,
+                    auto key = ::rpc_generator::write_proxy_receive_declaration(m_ob, "", function,
                                                                                 has_params, "", true);
                     if(unique_signatures.emplace(key).second)
                     {
@@ -906,7 +948,7 @@ namespace rpc_generator
 
                         bool is_suitable = true;
                         auto key
-                            = ::rpc_generator::client_sender_declaration(m_ob, function, function_count, is_suitable);
+                            = ::rpc_generator::client_sender_declaration(m_ob, function, is_suitable);
                         if(!is_suitable)
                             continue;
                             

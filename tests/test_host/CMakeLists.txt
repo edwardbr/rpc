@@ -11,12 +11,16 @@ target_include_directories(
          "$<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/generated/src>"
   PRIVATE ${HOST_INCLUDES})
 
+if(BUILD_ENCLAVE)
+  set(ENCLAVE_DEPENDANCIES marshal_test_edl_host rpc_telemetry_edl_header_host)
+endif()
+  
 target_link_libraries(
   rpc_test
-  PUBLIC marshal_test_edl_host
-         rpc_telemetry_edl_header_host
-         common_host
+  PUBLIC common_host
          example_idl_host
+         example_import_idl_host
+         example_shared_idl_host   
          rpc::rpc_host
          yas_common
          clipp::clipp
@@ -24,9 +28,10 @@ target_link_libraries(
          GTest::gtest_main
          GTest::gmock_main
          spdlog::spdlog
+         ${ENCLAVE_DEPENDANCIES}
          ${HOST_LIBRARIES})
 
-target_compile_options(rpc_test PRIVATE ${HOST_COMPILE_OPTIONS})
+target_compile_options(rpc_test PRIVATE ${HOST_COMPILE_OPTIONS} ${WARN_OK})
 target_link_options(rpc_test PRIVATE ${HOST_LINK_EXE_OPTIONS})
 target_link_directories(rpc_test PUBLIC ${SGX_LIBRARY_PATH})
 set_property(TARGET rpc_test PROPERTY COMPILE_PDB_NAME rpc_test)

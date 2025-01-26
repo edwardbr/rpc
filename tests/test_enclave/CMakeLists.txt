@@ -36,8 +36,8 @@ if(${BUILD_ENCLAVE})
            "$<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/generated/src>" "$<INSTALL_INTERFACE:include/marshalled_tests>"
     PRIVATE ${ENCLAVE_LIBCXX_INCLUDES})
 
-  target_compile_options(marshal_test_enclave PRIVATE ${ENCLAVE_COMPILE_OPTIONS})
-  target_link_options(marshal_test_enclave PRIVATE ${ENCLAVE_LINK_OPTIONS})
+  target_compile_options(marshal_test_enclave PRIVATE ${ENCLAVE_COMPILE_OPTIONS} ${WARN_PEDANTIC})
+  target_link_options(marshal_test_enclave PRIVATE ${ENCLAVE_LINK_OPTIONS} ${WARN_PEDANTIC})
 
   set_property(TARGET marshal_test_enclave PROPERTY COMPILE_PDB_NAME marshal_test_enclave)
   if(ENABLE_CLANG_TIDY)

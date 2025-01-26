@@ -167,7 +167,7 @@ namespace rpc
             return rpc::static_pointer_cast<T>(get_castable_interface(object_id, T::get_id(protocol_version)));
         }
         
-        interface_descriptor prepare_remote_input_interface(uint64_t protocol_version, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, rpc::proxy_base* base, rpc::shared_ptr<service_proxy>& destination_zone);
+        interface_descriptor prepare_remote_input_interface(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, rpc::proxy_base* base, rpc::shared_ptr<service_proxy>& destination_zone);
         
         void clean_up_on_failed_connection(const rpc::shared_ptr<service_proxy>& destination_zone, rpc::shared_ptr<rpc::casting_interface> input_interface);
         
@@ -189,7 +189,7 @@ namespace rpc
             {
                 if(input_interface->query_proxy_base())
                 {
-                    input_descr = prepare_remote_input_interface(rpc::get_version(), {0}, new_service_proxy->get_destination_zone_id().as_caller(), input_interface->query_proxy_base(), destination_zone);   
+                    input_descr = prepare_remote_input_interface({0}, new_service_proxy->get_destination_zone_id().as_caller(), input_interface->query_proxy_base(), destination_zone);   
                 }
                 else
                 {

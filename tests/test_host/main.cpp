@@ -3,16 +3,13 @@
 #include <string_view>
 #include <thread>
 
-#include <sgx_urts.h>
-#include <sgx_quote.h>
-#include <sgx_capable.h>
-#include <sgx_uae_epid.h>
-#include <sgx_eid.h>
+#ifdef BUILD_ENCLAVE
 #include "untrusted/enclave_marshal_test_u.h"
+#include <common/enclave_service_proxy.h>
+#endif
 
 #include <common/foo_impl.h>
 #include <common/tests.h>
-#include <common/enclave_service_proxy.h>
 
 #include <example/example.h>
 
@@ -140,6 +137,7 @@ public:
     }
     error_code create_enclave(rpc::shared_ptr<yyy::i_example>& target) override
     {
+#ifdef BUILD_ENCLAVE
         rpc::shared_ptr<yyy::i_host> host = shared_from_this();
         auto serv = current_host_service.lock();
         auto err_code = serv->connect_to_zone<rpc::enclave_service_proxy>( 
@@ -150,6 +148,8 @@ public:
             , enclave_path);
 
         return err_code;
+#endif
+        return rpc::error::INCOMPATIBLE_SERVICE();
     };
 
     //live app registry, it should have sole responsibility for the long term storage of app shared ptrs
@@ -372,6 +372,7 @@ public:
     }
 };
 
+#ifdef BUILD_ENCLAVE
 template<bool UseHostInChild, bool RunStandardTests, bool CreateNewZoneThenCreateSubordinatedZone>
 class enclave_setup
 {
@@ -462,6 +463,7 @@ public:
         return ptr;
     }
 };
+#endif
 
 template <class T>
 class type_test : 
@@ -489,9 +491,10 @@ using local_implementations = ::testing::Types<
     inproc_setup<true, false, false>, 
     inproc_setup<true, false, true>, 
     inproc_setup<true, true, false>, 
-    inproc_setup<true, true, true>, 
+    inproc_setup<true, true, true> 
 
-
+#ifdef BUILD_ENCLAVE
+    ,
     enclave_setup<false, false, false>, 
     enclave_setup<false, false, true>, 
     enclave_setup<false, true, false>, 
@@ -499,7 +502,9 @@ using local_implementations = ::testing::Types<
     enclave_setup<true, false, false>, 
     enclave_setup<true, false, true>, 
     enclave_setup<true, true, false>, 
-    enclave_setup<true, true, true>>;
+    enclave_setup<true, true, true>
+#endif
+    >;
 TYPED_TEST_SUITE(type_test, local_implementations);
 
 TYPED_TEST(type_test, initialisation_test)
@@ -572,12 +577,16 @@ typedef Types<
     inproc_setup<true, false, false>, 
     inproc_setup<true, false, true>, 
     inproc_setup<true, true, false>, 
-    inproc_setup<true, true, true>, 
+    inproc_setup<true, true, true>
 
+#ifdef BUILD_ENCLAVE
+    ,
     enclave_setup<true, false, false>, 
     enclave_setup<true, false, true>, 
     enclave_setup<true, true, false>, 
-    enclave_setup<true, true, true>> remote_implementations;
+    enclave_setup<true, true, true>
+#endif
+> remote_implementations;
 TYPED_TEST_SUITE(remote_type_test, remote_implementations);
 
 TYPED_TEST(remote_type_test, remote_standard_tests)
@@ -860,6 +869,7 @@ TYPED_TEST(remote_type_test, check_for_set_multiple_inheritance)
     RPC_ASSERT(ret == rpc::error::OK());
 }
 
+#ifdef BUILD_ENCLAVE
 TYPED_TEST(remote_type_test, host_test)
 {    
     auto root_service = this->get_lib().get_root_service();
@@ -899,6 +909,7 @@ TYPED_TEST(remote_type_test, check_for_call_enclave_zone)
     auto ret = this->get_lib().get_example()->call_create_enclave_val(h);
     RPC_ASSERT(ret == rpc::error::OK());
 }
+#endif
 
 TYPED_TEST(remote_type_test, check_sub_subordinate)
 {
@@ -1138,15 +1149,20 @@ typedef Types<
     inproc_setup<true, false, false>, 
     inproc_setup<true, false, true>, 
     inproc_setup<true, true, false>, 
-    inproc_setup<true, true, true>, 
+    inproc_setup<true, true, true>
 
+#ifdef BUILD_ENCLAVE
+    ,
     enclave_setup<true, false, false>, 
     enclave_setup<true, false, true>, 
     enclave_setup<true, true, false>, 
-    enclave_setup<true, true, true>> type_test_with_host_implementations;
+    enclave_setup<true, true, true>
+#endif    
+    > type_test_with_host_implementations;
 TYPED_TEST_SUITE(type_test_with_host, type_test_with_host_implementations);
 
 
+#ifdef BUILD_ENCLAVE
 TYPED_TEST(type_test_with_host, call_host_create_enclave_and_throw_away)
 {  
     bool run_standard_tests = false;
@@ -1161,6 +1177,7 @@ TYPED_TEST(type_test_with_host, call_host_create_enclave)
     ASSERT_EQ(this->get_lib().get_example()->call_host_create_enclave(target, run_standard_tests), rpc::error::OK());
     ASSERT_NE(target, nullptr);
 }
+#endif
 
 TYPED_TEST(type_test_with_host, look_up_app_and_return_with_nothing)
 {  
@@ -1178,6 +1195,7 @@ TYPED_TEST(type_test_with_host, call_host_unload_app_not_there)
 }
 
 
+#ifdef BUILD_ENCLAVE
 TYPED_TEST(type_test_with_host, call_host_look_up_app_unload_app)
 {  
     bool run_standard_tests = false;
@@ -1251,6 +1269,7 @@ TYPED_TEST(type_test_with_host, create_store_delete)
     target = nullptr;
     target2 = nullptr;
 }
+#endif
 
 TYPED_TEST(type_test_with_host, create_subordinate_zone)
 {  

@@ -14,7 +14,7 @@ add_executable(generator
                 fingerprint_generator.cpp)
 
 target_compile_definitions(generator PRIVATE ${HOST_DEFINES})
-target_compile_options(generator PRIVATE ${HOST_COMPILE_OPTIONS})
+target_compile_options(generator PRIVATE ${HOST_COMPILE_OPTIONS} ${WARN_PEDANTIC})
 target_include_directories(generator PRIVATE ${HOST_INCLUDES})
 target_link_libraries(
   generator

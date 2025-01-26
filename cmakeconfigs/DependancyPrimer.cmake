@@ -197,7 +197,12 @@ if(NOT DEPENDANCIES_LOADED)
   else()
     set(USE_RPC_TELEMETRY_RAII_LOGGING_FLAG)
   endif()
-
+  if(BUILD_ENCLAVE)
+    set(BUILD_ENCLAVE_FLAG BUILD_ENCLAVE)
+  else()
+    set(BUILD_ENCLAVE_FLAG)
+  endif()
+  
   if(${ENCLAVE_TARGET} STREQUAL "SGX")
     if(${SGX_HW}) # not simulation
       set(SGX_HW_OR_SIM_DEFINE SGX_HW)
@@ -212,6 +217,7 @@ if(NOT DEPENDANCIES_LOADED)
         NOMINMAX
         _SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS
         ${USE_RPC_LOGGING_FLAG}
+        ${BUILD_ENCLAVE_FLAG}
         ${RPC_HANG_ON_FAILED_ASSERT_FLAG}
         ${USE_RPC_TELEMETRY_FLAG}
         ${USE_RPC_TELEMETRY_RAII_LOGGING_FLAG}
@@ -222,7 +228,9 @@ if(NOT DEPENDANCIES_LOADED)
         RPC_OUT_BUFFER_SIZE=${RPC_OUT_BUFFER_SIZE})
 
     if(WIN32) # Windows
-      find_package(SGX REQUIRED)
+      if(BUILD_ENCLAVE)
+        find_package(SGX REQUIRED)
+      endif()
       
       # we dont want os specific libraries for our enclaves
       set(CMAKE_C_STANDARD_LIBRARIES
@@ -328,7 +336,9 @@ if(NOT DEPENDANCIES_LOADED)
           WIN32
           _WINDOWS
           WIN32_LEAN_AND_MEAN)
-      set(SHARED_ENCLAVE_DEFINES ${SHARED_DEFINES} _IN_ENCLAVE ${ENCLAVE_MEMLEAK_DEFINES})
+      if(BUILD_ENCLAVE)
+                set(SHARED_ENCLAVE_DEFINES ${SHARED_DEFINES} _IN_ENCLAVE ${ENCLAVE_MEMLEAK_DEFINES})
+      endif()
 
       set(SHARED_COMPILE_OPTIONS
           ${WARNING_FLAG}
@@ -398,22 +408,26 @@ if(NOT DEPENDANCIES_LOADED)
             /Oi
             /Ob2)
 
-        if(${SGX_MODE} STREQUAL "release")
-          set(ENCLAVE_DEFINES ${SHARED_ENCLAVE_DEFINES} NDEBUG)
-        else()
-          set(ENCLAVE_DEFINES ${SHARED_ENCLAVE_DEFINES} NDEBUG EDEBUG # sets SGX_DEBUG_FLAG to 1
-          )
+        if(BUILD_ENCLAVE)
+          if(${SGX_MODE} STREQUAL "release")
+            set(ENCLAVE_DEFINES ${SHARED_ENCLAVE_DEFINES} NDEBUG)
+          else()
+            set(ENCLAVE_DEFINES ${SHARED_ENCLAVE_DEFINES} NDEBUG EDEBUG # sets SGX_DEBUG_FLAG to 1
+            )
+          endif()
         endif()
 
-        message("!!!!! /GL needs to be renabled for performance reasons")
-        set(ENCLAVE_COMPILE_OPTIONS
-            ${SHARED_ENCLAVE_COMPILE_OPTIONS}
-            # /GL
-            /MT
-            /O2
-            /Oi
-            /Ob2)
-        set(ENCLAVE_LINK_OPTIONS ${SHARED_ENCLAVE_LINK_OPTIONS} /INCREMENTAL:NO ${ENCLAVE_MEMLEAK_LINK_FLAGS} /DEBUG)
+        if(BUILD_ENCLAVE)
+          message("!!!!! /GL needs to be renabled for performance reasons")
+          set(ENCLAVE_COMPILE_OPTIONS
+              ${SHARED_ENCLAVE_COMPILE_OPTIONS}
+              # /GL
+              /MT
+              /O2
+              /Oi
+              /Ob2)
+          set(ENCLAVE_LINK_OPTIONS ${SHARED_ENCLAVE_LINK_OPTIONS} /INCREMENTAL:NO ${ENCLAVE_MEMLEAK_LINK_FLAGS} /DEBUG)
+        endif()
         set(HOST_LINK_OPTIONS ${SHARED_HOST_LINK_OPTIONS} /INCREMENTAL:NO /DEBUG)
         set(HOST_LINK_DYNAMIC_LIBRARY_OPTIONS ${HOST_LINK_OPTIONS})
         set(HOST_LINK_EXE_OPTIONS ${HOST_LINK_OPTIONS} /IGNORE:4099 /IGNORE:4098)
@@ -427,19 +441,21 @@ if(NOT DEPENDANCIES_LOADED)
             /Ob0
             /RTC1)
 
-        set(ENCLAVE_DEFINES ${SHARED_ENCLAVE_DEFINES} VERBOSE=2 # needed in some projects
-                            _DEBUG ${ENCLAVE_MEMLEAK_DEFINES})
+        if(BUILD_ENCLAVE)
+          set(ENCLAVE_DEFINES ${SHARED_ENCLAVE_DEFINES} VERBOSE=2 # needed in some projects
+                              _DEBUG ${ENCLAVE_MEMLEAK_DEFINES})
 
-        set(ENCLAVE_COMPILE_OPTIONS ${SHARED_ENCLAVE_COMPILE_OPTIONS} /MDd /Od /Ob0)
+          set(ENCLAVE_COMPILE_OPTIONS ${SHARED_ENCLAVE_COMPILE_OPTIONS} /MDd /Od /Ob0)
 
-        set(ENCLAVE_LINK_OPTIONS
-            ${SHARED_ENCLAVE_LINK_OPTIONS}
-            /IGNORE:4099
-            /IGNORE:4204
-            /IGNORE:4217
-            /DEBUG
-            /INCREMENTAL:NO
-            ${ENCLAVE_MEMLEAK_LINK_FLAGS})
+          set(ENCLAVE_LINK_OPTIONS
+              ${SHARED_ENCLAVE_LINK_OPTIONS}
+              /IGNORE:4099
+              /IGNORE:4204
+              /IGNORE:4217
+              /DEBUG
+              /INCREMENTAL:NO
+              ${ENCLAVE_MEMLEAK_LINK_FLAGS})
+        endif()
         set(HOST_LINK_OPTIONS ${SHARED_HOST_LINK_OPTIONS} /DEBUG /INCREMENTAL)
         set(HOST_LINK_DYNAMIC_LIBRARY_OPTIONS ${HOST_LINK_OPTIONS})
         set(HOST_LINK_EXE_OPTIONS
@@ -514,23 +530,27 @@ if(NOT DEPENDANCIES_LOADED)
         set(HOST_DEFINES ${SHARED_DEFINES} _DEBUG)
       endif()
 
-      set(SHARED_ENCLAVE_DEFINES
-          _IN_ENCLAVE
-          ${SHARED_DEFINES}
-          CLEAN_LIBC
-          ENCLAVE_STATUS=sgx_status_t
-          ENCLAVE_OK=SGX_SUCCESS
-          DISALLOW_BAD_JUMPS)
+      if(BUILD_ENCLAVE)
+        set(SHARED_ENCLAVE_DEFINES
+            _IN_ENCLAVE
+            ${SHARED_DEFINES}
+            CLEAN_LIBC
+            ENCLAVE_STATUS=sgx_status_t
+            ENCLAVE_OK=SGX_SUCCESS
+            DISALLOW_BAD_JUMPS)
+      endif()
 
       if(${BUILD_TYPE} STREQUAL "release")
         set(CMAKE_CXX_FLAGS_DEBUG "")
         set(CMAKE_C_FLAGS_DEBUG "")
         set(OPTIMIZER_FLAGS -O3)
 
-        if(${SGX_MODE} STREQUAL "release")
-          set(ENCLAVE_DEFINES ${SHARED_ENCLAVE_DEFINES} NDEBUG ${ENCLAVE_MEMLEAK_DEFINES})
-        else() # Prerelease "possibly"
-          set(ENCLAVE_DEFINES ${SHARED_ENCLAVE_DEFINES} NDEBUG EDEBUG ${ENCLAVE_MEMLEAK_DEFINES}) # sets SGX_DEBUG_FLAG
+        if(BUILD_ENCLAVE)
+          if(${SGX_MODE} STREQUAL "release")
+            set(ENCLAVE_DEFINES ${SHARED_ENCLAVE_DEFINES} NDEBUG ${ENCLAVE_MEMLEAK_DEFINES})
+          else() # Prerelease "possibly"
+            set(ENCLAVE_DEFINES ${SHARED_ENCLAVE_DEFINES} NDEBUG EDEBUG ${ENCLAVE_MEMLEAK_DEFINES}) # sets SGX_DEBUG_FLAG
+          endif()
         endif()
       else() # debug
         set(EXTRA_COMPILE_OPTIONS ${DEBUG_HOST_ENCLAVE_OPTIONS}) # The one actually used by HOST and ENCLAVE instead
@@ -538,7 +558,9 @@ if(NOT DEPENDANCIES_LOADED)
         set(CMAKE_CXX_FLAGS_DEBUG ${DEBUG_COMPILE_FLAGS})
         set(CMAKE_C_FLAGS_DEBUG ${CMAKE_CXX_FLAGS_DEBUG})
         set(OPTIMIZER_FLAGS -O0)
-        set(ENCLAVE_DEFINES ${SHARED_ENCLAVE_DEFINES} _DEBUG ${ENCLAVE_MEMLEAK_DEFINES}) # sets SGX_DEBUG_FLAG to 1
+        if(BUILD_ENCLAVE)
+          set(ENCLAVE_DEFINES ${SHARED_ENCLAVE_DEFINES} _DEBUG ${ENCLAVE_MEMLEAK_DEFINES}) # sets SGX_DEBUG_FLAG to 1
+        endif()
       endif()
       message("CMAKE_CXX_FLAGS_DEBUG [${CMAKE_CXX_FLAGS_DEBUG}]")
       message("OPTIMIZER_FLAGS [${OPTIMIZER_FLAGS}]")
@@ -584,12 +606,14 @@ if(NOT DEPENDANCIES_LOADED)
           -Wno-unused-variable
           -Wno-sign-compare)
 
-      set(ENCLAVE_COMPILE_OPTIONS ${SHARED_COMPILE_OPTIONS} -Wno-c++17-extensions -ffunction-sections -fdata-sections)
-      set(HOST_COMPILE_OPTIONS ${SHARED_COMPILE_OPTIONS} -Wno-trigraphs ${HOST_DEBUG_OPTIONS})
-
-      set(HOST_LINK_OPTIONS -L/opt/intel/sgxsdk/lib64 -lsgx_tcrypto ${HOST_DEBUG_OPTIONS})
+      if(BUILD_ENCLAVE)
+        set(ENCLAVE_COMPILE_OPTIONS ${SHARED_COMPILE_OPTIONS} -Wno-c++17-extensions -ffunction-sections -fdata-sections)
+        set(HOST_LINK_OPTIONS -L/opt/intel/sgxsdk/lib64 -lsgx_tcrypto ${HOST_DEBUG_OPTIONS})
+        set(HOST_LINK_EXE_OPTIONS -lsgx_dcap_quoteverify -lsgx_dcap_ql ${HOST_DEBUG_OPTIONS})
+      endif()
       set(HOST_LINK_DYNAMIC_LIBRARY_OPTIONS ${HOST_LINK_OPTIONS} -fPIC)
-      set(HOST_LINK_EXE_OPTIONS -lsgx_dcap_quoteverify -lsgx_dcap_ql ${HOST_DEBUG_OPTIONS})
+      
+      set(HOST_COMPILE_OPTIONS ${SHARED_COMPILE_OPTIONS} -Wno-trigraphs ${HOST_DEBUG_OPTIONS})
       # this is here as we need to override the rpath we cannot use the ${HOST_LINK_EXE_OPTIONS} as cmake scrambles the
       # $
       set(CMAKE_EXE_LINKER_FLAGS [[-Wl,-rpath,'$ORIGIN']])
@@ -612,21 +636,31 @@ if(NOT DEPENDANCIES_LOADED)
       endif()
     endif()
 
-    find_package(SGX REQUIRED)
+    if(BUILD_ENCLAVE)
+      find_package(SGX REQUIRED)
+    endif()
     # need for SGX_SDK_CONTAINS_DEBUG_INFORMATION has just been determined in FindSGX.cmake
     if(SGX_SDK_CONTAINS_DEBUG_INFORMATION)
       list(APPEND ENCLAVE_DEFINES SGX_SDK_CONTAINS_DEBUG_INFORMATION)
     endif()
 
     set(HOST_INCLUDES ${SGX_INCLUDE_DIR})
-    set(ENCLAVE_LIBC_INCLUDES ${SGX_INCLUDE_DIR} ${SGX_TLIBC_INCLUDE_DIR})
-    set(ENCLAVE_LIBCXX_INCLUDES ${ENCLAVE_LIBC_INCLUDES} ${SGX_LIBCXX_INCLUDE_DIR} ${SGX_LIBSTDCXX_INCLUDE_DIR})
+    if(BUILD_ENCLAVE)
+      set(ENCLAVE_LIBC_INCLUDES ${SGX_INCLUDE_DIR} ${SGX_TLIBC_INCLUDE_DIR})
+      set(ENCLAVE_LIBCXX_INCLUDES ${ENCLAVE_LIBC_INCLUDES} ${SGX_LIBCXX_INCLUDE_DIR} ${SGX_LIBSTDCXX_INCLUDE_DIR})
+    endif()
 
     set(HOST_LIBRARIES
-        ${SHARED_HOST_LIBRARIES}
-        ${SGX_USVC_LIB}
-        sgx_capable
-        ${SGX_URTS_LIB})
+        ${SHARED_HOST_LIBRARIES})
+        
+    if(BUILD_ENCLAVE)        
+      # add some sgx here
+      set(HOST_LIBRARIES
+          ${HOST_LIBRARIES}
+          ${SGX_USVC_LIB}
+          sgx_capable
+          ${SGX_URTS_LIB})
+    endif()
   else()
     message(FATAL_ERROR "Invalid ENCLAVE_TARGET value")
   endif()

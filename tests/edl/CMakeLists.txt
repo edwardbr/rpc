@@ -2,10 +2,10 @@ cmake_minimum_required(VERSION 3.24)
 
 set(telemetry_edl_path "${CMAKE_CURRENT_SOURCE_DIR}")
 
-  add_untrusted_header(
-    rpc_telemetry_edl_header_host
-    EDL ${telemetry_edl_path}/rpc_telemetry.edl
-    EDL_SEARCH_PATHS)
+add_untrusted_header(
+  rpc_telemetry_edl_header_host
+  EDL ${telemetry_edl_path}/rpc_telemetry.edl
+  EDL_SEARCH_PATHS)
 
 if(USE_RPC_TELEMETRY)
     add_trusted_header(

@@ -11,7 +11,7 @@ function(
   # "include_paths" multivalue expects string "defines" multivalue expects string "additional_headers" optional_val mock
 )
   set(options)
-  set(singleValueArgs mock suppress_catch_stub_exceptions)
+  set(singleValueArgs mock suppress_catch_stub_exceptions generated_install_dir)
   set(multiValueArgs
     dependencies
     link_libraries
@@ -64,6 +64,7 @@ function(
     message("sub_directory ${sub_directory}")
     message("namespace ${namespace}")
     message("suppress_catch_stub_exceptions ${suppress_catch_stub_exceptions}")
+    message("generated_install_dir ${generated_install_dir}")
     message("dependencies ${params_dependencies}")
     message("link_libraries ${params_link_libraries}")
     message("additional_headers ${params_additional_headers}")
@@ -128,12 +129,8 @@ function(
         set(PATHS_PARAMS ${PATHS_PARAMS} --path "${dep_base_dir}")
       endif()
 
-      if(BUILD_ENCLAVE)
-        set(GENERATED_DEPENDANCIES ${GENERATED_DEPENDANCIES} ${dep}_generate)
+      set(GENERATED_DEPENDANCIES ${GENERATED_DEPENDANCIES} ${dep}_generate)
       else()
-        set(GENERATED_DEPENDANCIES ${GENERATED_DEPENDANCIES} ${dep} ${dep}_generate)
-      endif()
-    else()
       message("target ${dep}_generate does not exist so skipped")
     endif()
   endforeach()
@@ -154,44 +151,44 @@ function(
     message(
       "
     add_custom_command(OUTPUT ${full_header_path} ${full_proxy_path} ${full_stub_header_path} ${full_stub_path} ${full_yas_path}
-    COMMAND ${ENCLAVE_MARSHALLER}
-    --idl ${idl}
-    --module_name ${name}_idl
-    --output_path ${output_path}
-    --header ${header_path}
-    --proxy ${proxy_path}
-    --stub ${stub_path}
-    --stub_header ${stub_header_path}
-    ${PATHS_PARAMS}
-    ${ADDITIONAL_HEADERS}
-    ${RETHROW_STUB_EXCEPTION}
-    ${ADDITIONAL_STUB_HEADER}
-    MAIN_DEPENDENCY ${idl}
-    IMPLICIT_DEPENDS ${idl}
-    DEPENDS ${GENERATED_DEPENDANCIES}
-    COMMENT \"Running generator ${idl}\"
-  )
+      COMMAND ${ENCLAVE_MARSHALLER}
+      --idl ${idl}
+      --module_name ${name}_idl
+      --output_path ${output_path}
+      --header ${header_path}
+      --proxy ${proxy_path}
+      --stub ${stub_path}
+      --stub_header ${stub_header_path}
+      ${PATHS_PARAMS}
+      ${ADDITIONAL_HEADERS}
+      ${RETHROW_STUB_EXCEPTION}
+      ${ADDITIONAL_STUB_HEADER}
+      MAIN_DEPENDENCY ${idl}
+      IMPLICIT_DEPENDS ${idl}
+      DEPENDS ${GENERATED_DEPENDANCIES}
+      COMMENT \"Running generator ${idl}\"
+    )
 
-  add_custom_target(${name}_idl_generate DEPENDS ${full_header_path} ${full_proxy_path} ${full_stub_header_path} ${full_stub_path} ${full_yas_path})
+    add_custom_target(${name}_idl_generate DEPENDS ${full_header_path} ${full_proxy_path} ${full_stub_header_path} ${full_stub_path} ${full_yas_path})
 
-  set_target_properties(${name}_idl_generate PROPERTIES base_dir ${base_dir})
+    set_target_properties(${name}_idl_generate PROPERTIES base_dir ${base_dir})
 
-  foreach(dep ${params_dependencies})
-    if(TARGET ${dep}_generate)
-      add_dependencies(${name}_idl_generate ${dep}_generate)
-    else()
-      message(\"target ${dep}_generate does not exist so skipped\")
-    endif()
-  endforeach()
+    foreach(dep ${params_dependencies})
+      if(TARGET ${dep}_generate)
+        add_dependencies(${name}_idl_generate ${dep}_generate)
+      else()
+        message(\"target ${dep}_generate does not exist so skipped\")
+      endif()
+    endforeach()
 
-  foreach(dep ${params_link_libraries})
-    if (TARGET ${dep})
-      add_dependencies(${name}_idl_generate ${dep})
-    else()
-      message(\"target ${dep} does not exist so skipped\")
-    endif()
-  endforeach()
-")
+    foreach(dep ${params_link_libraries})
+      if (TARGET ${dep})
+        add_dependencies(${name}_idl_generate ${dep})
+      else()
+        message(\"target ${dep} does not exist so skipped\")
+      endif()
+    endforeach()
+  ")
   endif()
 
   add_custom_command(
@@ -204,24 +201,15 @@ function(
     DEPENDS ${GENERATED_DEPENDANCIES}
     COMMENT "Running generator ${idl}")
 
-  if(${DEBUG_RPC_GEN})
-    message("add_custom_command(
-    OUTPUT ${full_header_path} ${full_proxy_path} ${full_stub_header_path} ${full_stub_path} ${full_yas_path}
-    COMMAND
-      ${ENCLAVE_MARSHALLER} --idl ${idl} --module_name ${name}_idl --output_path ${output_path} --header ${header_path}
-      --proxy ${proxy_path} --stub ${stub_path} --stub_header ${stub_header_path} ${PATHS_PARAMS} ${ADDITIONAL_HEADERS} ${RETHROW_STUB_EXCEPTION} ${ADDITIONAL_STUB_HEADER}
-    MAIN_DEPENDENCY ${idl}
-    IMPLICIT_DEPENDS ${idl}
-    DEPENDS ${GENERATED_DEPENDANCIES}
-    COMMENT Running generator ${idl})")
-  endif()
-
   add_custom_target(${name}_idl_generate DEPENDS ${full_header_path} ${full_proxy_path} ${full_stub_header_path}
     ${full_stub_path} ${full_yas_path})
 
   set_target_properties(${name}_idl_generate PROPERTIES base_dir ${base_dir})
 
   foreach(dep ${params_dependencies})
+  if(${DEBUG_RPC_GEN})
+    message("dep ${dep}")
+  endif()
     if(TARGET ${dep}_generate)
       add_dependencies(${name}_idl_generate ${dep}_generate)
     else()
@@ -237,21 +225,18 @@ function(
     endif()
   endforeach()
 
-  if(BUILD_ENCLAVE)
     if(${DEBUG_RPC_GEN})
       message(
         "
-# #specify a host specific target
-      add_library(${name}_idl_host STATIC
-      ${full_header_path}
-      ${full_stub_header_path}
-      ${full_stub_path}
-      ${full_proxy_path}
-      ${full_yas_path}
-    )
+    # #specify a host specific target
+    add_library(${name}_idl_host STATIC ${full_header_path} ${full_stub_header_path} ${full_stub_path}
+      ${full_proxy_path} ${full_yas_path})
     target_compile_definitions(${name}_idl_host PRIVATE ${HOST_DEFINES})
-    target_include_directories(${name}_idl_host PUBLIC \"$<BUILD_INTERFACE:${output_path}>\" \"$<BUILD_INTERFACE:${output_path}/include>\" PRIVATE ${HOST_INCLUDES} ${params_include_paths})
-    target_compile_options(${name}_idl_host PRIVATE ${HOST_COMPILE_OPTIONS})
+    target_include_directories(
+      ${name}_idl_host
+      PUBLIC \"$<BUILD_INTERFACE:${output_path}>\" \"$<BUILD_INTERFACE:${output_path}/include>\"
+      PRIVATE ${HOST_INCLUDES} ${params_include_paths})
+    target_compile_options(${name}_idl_host PRIVATE ${HOST_COMPILE_OPTIONS} ${WARN_OK})
     target_link_directories(${name}_idl_host PUBLIC ${SGX_LIBRARY_PATH})
     set_property(TARGET ${name}_idl_host PROPERTY COMPILE_PDB_NAME ${name}_idl_host)
 
@@ -265,6 +250,7 @@ function(
       else()
         message(\"target ${dep}_generate does not exist so skipped\")
       endif()
+
       target_link_libraries(${name}_idl_host PUBLIC ${dep}_host)
     endforeach()
 
@@ -276,45 +262,47 @@ function(
       endif()
     endforeach()
 
-    ###############################################################################
-    # #and an enclave specific target
-    add_library(${name}_idl_enclave STATIC
-      ${full_header_path}
-      ${full_stub_header_path}
-      ${full_stub_path}
-      ${full_proxy_path}
-      ${full_yas_path}
-    )
-    target_compile_definitions(${name}_idl_enclave PRIVATE ${ENCLAVE_DEFINES})
-    target_include_directories(${name}_idl_enclave PUBLIC \"$<BUILD_INTERFACE:${output_path}>\" \"$<BUILD_INTERFACE:${output_path}/include>\" PRIVATE \"${output_path}/include\" ${ENCLAVE_LIBCXX_INCLUDES} ${params_include_paths})
+    if(BUILD_ENCLAVE)
+      # ##################################################################################################################
+      # #and an enclave specific target
+      add_library(${name}_idl_enclave STATIC ${full_header_path} ${full_stub_header_path} ${full_stub_path}
+        ${full_proxy_path} ${full_yas_path})
+      target_compile_definitions(${name}_idl_enclave PRIVATE ${ENCLAVE_DEFINES})
+      target_include_directories(
+        ${name}_idl_enclave
+        PUBLIC \"$<BUILD_INTERFACE:${output_path}>\" \"$<BUILD_INTERFACE:${output_path}/include>\"
+        PRIVATE \"${output_path}/include\" ${ENCLAVE_LIBCXX_INCLUDES} ${params_include_paths})
 
-    install(DIRECTORY \"$<BUILD_INTERFACE:${output_path}>\" DESTINATION include/secretarium/idls)
-    install(FILES \"$<BUILD_INTERFACE:${idl}>\" DESTINATION include/secretarium/idls/${idl_relative_dir})
+      target_compile_options(${name}_idl_enclave PRIVATE ${ENCLAVE_COMPILE_OPTIONS} ${WARN_OK})
+      target_link_directories(${name}_idl_enclave PRIVATE ${SGX_LIBRARY_PATH})
+      set_property(TARGET ${name}_idl_enclave PROPERTY COMPILE_PDB_NAME ${name}_idl_enclave)
 
-    target_compile_options(${name}_idl_enclave PRIVATE ${ENCLAVE_COMPILE_OPTIONS})
-    target_link_directories(${name}_idl_enclave PRIVATE ${SGX_LIBRARY_PATH})
-    set_property(TARGET ${name}_idl_enclave PROPERTY COMPILE_PDB_NAME ${name}_idl_enclave)
+      target_link_libraries(${name}_idl_enclave PUBLIC rpc::rpc_enclave yas_common)
 
-    target_link_libraries(${name}_idl_enclave PUBLIC rpc_enclave yas_common)
+      add_dependencies(${name}_idl_enclave ${name}_idl_generate)
 
-    add_dependencies(${name}_idl_enclave ${name}_idl_generate)
+      foreach(dep ${params_dependencies})
+        if(TARGET ${dep}_generate)
+          add_dependencies(${name}_idl_enclave ${dep}_generate)
+        else()
+          message(\"target ${dep}_generate does not exist so skipped\")
+        endif()
 
-    foreach(dep ${params_dependencies})
-      if(TARGET ${dep}_generate)
-        add_dependencies(${name}_idl_enclave ${dep}_generate)
-      else()
-        message(\"target ${dep}_generate does not exist so skipped\")
-      endif()
-      target_link_libraries(${name}_idl_enclave PUBLIC ${dep}_enclave)
-    endforeach()
+        target_link_libraries(${name}_idl_enclave PUBLIC ${dep}_enclave)
+      endforeach()
 
-    foreach(dep ${params_link_libraries})
-      if(TARGET ${dep}_enclave)
-        target_link_libraries(${name}_idl_enclave PRIVATE ${dep}_enclave)
-      else()
-        message(\"target ${dep}_enclave does not exist so skipped\")
-      endif()
-    endforeach()")
+      foreach(dep ${params_link_libraries})
+        if(TARGET ${dep}_enclave)
+          target_link_libraries(${name}_idl_enclave PRIVATE ${dep}_enclave)
+        else()
+          message(\"target ${dep}_enclave does not exist so skipped\")
+        endif()
+      endforeach()
+    endif()
+
+    install(DIRECTORY \"$<BUILD_INTERFACE:${output_path}>\" DESTINATION ${params_generated_install_dir})
+    install(FILES \"$<BUILD_INTERFACE:${idl}>\" DESTINATION ${params_generated_install_dir}/${idl_relative_dir})
+    ")
     endif()
 
     # #specify a host specific target
@@ -324,8 +312,8 @@ function(
     target_include_directories(
       ${name}_idl_host
       PUBLIC "$<BUILD_INTERFACE:${output_path}>" "$<BUILD_INTERFACE:${output_path}/include>"
-      PRIVATE ${HOST_INCLUDES} ${params_include_paths})
-    target_compile_options(${name}_idl_host PRIVATE ${HOST_COMPILE_OPTIONS})
+      PRIVATE "${output_path}/include" ${HOST_INCLUDES} ${params_include_paths})
+    target_compile_options(${name}_idl_host PRIVATE ${HOST_COMPILE_OPTIONS} ${WARN_OK})
     target_link_directories(${name}_idl_host PUBLIC ${SGX_LIBRARY_PATH})
     set_property(TARGET ${name}_idl_host PROPERTY COMPILE_PDB_NAME ${name}_idl_host)
 
@@ -340,7 +328,7 @@ function(
         message("target ${dep}_generate does not exist so skipped")
       endif()
 
-      target_link_libraries(${name}_idl_host PUBLIC ${dep}_host)
+      message("target_link_libraries(${name}_idl_host PUBLIC ${dep}_host)")
     endforeach()
 
     foreach(dep ${params_link_libraries})
@@ -351,43 +339,46 @@ function(
       endif()
     endforeach()
 
-    # ##################################################################################################################
-    # #and an enclave specific target
-    add_library(${name}_idl_enclave STATIC ${full_header_path} ${full_stub_header_path} ${full_stub_path}
-      ${full_proxy_path} ${full_yas_path})
-    target_compile_definitions(${name}_idl_enclave PRIVATE ${ENCLAVE_DEFINES})
-    target_include_directories(
-      ${name}_idl_enclave
-      PUBLIC "$<BUILD_INTERFACE:${output_path}>" "$<BUILD_INTERFACE:${output_path}/include>"
-      PRIVATE "${output_path}/include" ${ENCLAVE_LIBCXX_INCLUDES} ${params_include_paths})
+    if(BUILD_ENCLAVE)
+      # ##################################################################################################################
+      # #and an enclave specific target
+      add_library(${name}_idl_enclave STATIC ${full_header_path} ${full_stub_header_path} ${full_stub_path}
+        ${full_proxy_path} ${full_yas_path})
+      target_compile_definitions(${name}_idl_enclave PRIVATE ${ENCLAVE_DEFINES})
+      target_include_directories(
+        ${name}_idl_enclave
+        PUBLIC "$<BUILD_INTERFACE:${output_path}>" "$<BUILD_INTERFACE:${output_path}/include>"
+        PRIVATE "${output_path}/include" ${ENCLAVE_LIBCXX_INCLUDES} ${params_include_paths})
 
-    install(DIRECTORY "$<BUILD_INTERFACE:${output_path}>" DESTINATION include/secretarium/idls)
-    install(FILES "$<BUILD_INTERFACE:${idl}>" DESTINATION include/secretarium/idls/${idl_relative_dir})
+      target_compile_options(${name}_idl_enclave PRIVATE ${ENCLAVE_COMPILE_OPTIONS} ${WARN_OK})
+      target_link_directories(${name}_idl_enclave PRIVATE ${SGX_LIBRARY_PATH})
+      set_property(TARGET ${name}_idl_enclave PROPERTY COMPILE_PDB_NAME ${name}_idl_enclave)
 
-    target_compile_options(${name}_idl_enclave PRIVATE ${ENCLAVE_COMPILE_OPTIONS})
-    target_link_directories(${name}_idl_enclave PRIVATE ${SGX_LIBRARY_PATH})
-    set_property(TARGET ${name}_idl_enclave PROPERTY COMPILE_PDB_NAME ${name}_idl_enclave)
+      target_link_libraries(${name}_idl_enclave PUBLIC rpc::rpc_enclave yas_common)
 
-    target_link_libraries(${name}_idl_enclave PUBLIC rpc_enclave yas_common)
+      add_dependencies(${name}_idl_enclave ${name}_idl_generate)
 
-    add_dependencies(${name}_idl_enclave ${name}_idl_generate)
+      foreach(dep ${params_dependencies})
+        if(TARGET ${dep}_generate)
+          add_dependencies(${name}_idl_enclave ${dep}_generate)
+        else()
+          message("target ${dep}_generate does not exist so skipped")
+        endif()
 
-    foreach(dep ${params_dependencies})
-      if(TARGET ${dep}_generate)
-        add_dependencies(${name}_idl_enclave ${dep}_generate)
-      else()
-        message("target ${dep}_generate does not exist so skipped")
-      endif()
+        target_link_libraries(${name}_idl_enclave PUBLIC ${dep}_enclave)
+      endforeach()
 
-      target_link_libraries(${name}_idl_enclave PUBLIC ${dep}_enclave)
-    endforeach()
+      foreach(dep ${params_link_libraries})
+        if(TARGET ${dep}_enclave)
+          target_link_libraries(${name}_idl_enclave PRIVATE ${dep}_enclave)
+        else()
+          message("target ${dep}_enclave does not exist so skipped")
+        endif()
+      endforeach()
+    endif()
 
-    foreach(dep ${params_link_libraries})
-      if(TARGET ${dep}_enclave)
-        target_link_libraries(${name}_idl_enclave PRIVATE ${dep}_enclave)
-      else()
-        message("target ${dep}_enclave does not exist so skipped")
-      endif()
-    endforeach()
-  endif()
+    if(params_generated_install_dir)
+      install(DIRECTORY "$<BUILD_INTERFACE:${output_path}>" DESTINATION ${params_generated_install_dir})
+      install(FILES "$<BUILD_INTERFACE:${idl}>" DESTINATION ${params_generated_install_dir}/${idl_relative_dir})
+    endif()
 endfunction()
