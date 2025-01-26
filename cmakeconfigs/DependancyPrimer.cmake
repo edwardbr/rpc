@@ -320,8 +320,8 @@ if(NOT DEPENDANCIES_LOADED)
       set(SHARED_DEFINES ${SHARED_DEFINES} TEMP_DIR="${TEMP_DIR}" RUNTIME_DIR="${RUNTIME_DIR}")
 
       # to fill out later
-      set(WARN_PEDANTIC /DWARN_PEDANTIC)
-      set(WARN_OK /DWARN_OK)
+      set(WARN_PEDANTIC )
+      set(WARN_OK )
       # the are conflicts between winsock.h and winsock2.h, the latter being the preferred one (and sometimes actually
       # required), but the former getting included through windows.h for instance, unless winsock2.h has already been
       # included OR WIN32_LEAN_AND_MEAN is defined, which is therefore a good solution to handle the problem everywhere

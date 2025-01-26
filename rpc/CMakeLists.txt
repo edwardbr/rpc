@@ -5,7 +5,7 @@
 
 cmake_minimum_required(VERSION 3.24)
 
-if(${CMAKE_CXX_COMPILER_ID} STREQUAL "MSVC" OR ${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
+if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC" OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   message("using legacy")
   set(REMOTE_PTR_CPP src/remote_pointer.cpp)
 else()
