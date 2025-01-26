@@ -841,7 +841,7 @@ namespace rpc_generator
                     }
 
                     stub("#ifdef USE_RPC_LOGGING");
-                    stub("catch(std::exception ex)");
+                    stub("catch(const std::exception& ex)");
                     stub("{{");
                     stub("auto error_message = std::string(\"exception has occurred in an {} implementation in "
                          "function {} "

@@ -19,7 +19,7 @@ if(USE_RPC_TELEMETRY)
       rpc_telemetry_enclave
       PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
       PRIVATE ${ENCLAVE_LIBCXX_INCLUDES})
-    target_compile_options(rpc_telemetry_enclave PRIVATE ${ENCLAVE_COMPILE_OPTIONS} ${WARN_PEDANTIC})
+    target_compile_options(rpc_telemetry_enclave PRIVATE ${ENCLAVE_COMPILE_OPTIONS} ${WARN_OK})
     target_link_directories(rpc_telemetry_enclave PUBLIC ${SGX_LIBRARY_PATH})
 
     if(ENABLE_CLANG_TIDY)
@@ -44,7 +44,7 @@ add_library(rpc_telemetry_host STATIC src/host_telemetry_service.cpp src/telemet
 
 target_include_directories(rpc_telemetry_host
                            PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>")
-target_compile_options(rpc_telemetry_host PRIVATE ${HOST_COMPILE_OPTIONS} ${WARN_PEDANTIC})
+target_compile_options(rpc_telemetry_host PRIVATE ${HOST_COMPILE_OPTIONS} ${WARN_OK})
 target_link_options(rpc_telemetry_host PRIVATE ${HOST_LINK_OPTIONS})
 target_link_directories(rpc_telemetry_host PUBLIC ${SGX_LIBRARY_PATH})
 target_compile_definitions(rpc_telemetry_host PRIVATE ${HOST_DEFINES})

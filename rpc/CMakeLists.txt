@@ -5,9 +5,11 @@
 
 cmake_minimum_required(VERSION 3.24)
 
-if(WIN32)
+if(${CMAKE_CXX_COMPILER_ID} STREQUAL "MSVC" OR ${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
+  message("using legacy")
   set(REMOTE_PTR_CPP src/remote_pointer.cpp)
 else()
+  message("using clang12")
   set(REMOTE_PTR_CPP)
 endif()
 
@@ -40,7 +42,7 @@ if(BUILD_ENCLAVE)
     src/version.cpp)
 
   target_compile_definitions(rpc_enclave PRIVATE ${ENCLAVE_DEFINES})
-  target_compile_options(rpc_enclave PRIVATE ${ENCLAVE_COMPILE_OPTIONS} ${WARN_PEDANTIC})
+  target_compile_options(rpc_enclave PRIVATE ${ENCLAVE_COMPILE_OPTIONS} ${WARN_OK})
   target_include_directories(
     rpc_enclave
     PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>" "$<INSTALL_INTERFACE:include/rpc>"
@@ -88,7 +90,7 @@ target_link_libraries(
   PUBLIC ${TELEMETRY_INTERFACE} ${HOST_TELEMETRY_SERVICE}
   PRIVATE yas_common ${HOST_LIBRARIES})
 
-target_compile_options(rpc_host PRIVATE ${HOST_COMPILE_OPTIONS} ${WARN_PEDANTIC})
+target_compile_options(rpc_host PRIVATE ${HOST_COMPILE_OPTIONS} ${WARN_OK})
 target_link_options(rpc_host PRIVATE ${HOST_LINK_EXE_OPTIONS})
 target_link_directories(rpc_host PUBLIC ${SGX_LIBRARY_PATH})
 set_property(TARGET rpc_host PROPERTY COMPILE_PDB_NAME rpc_host)
