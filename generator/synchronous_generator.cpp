@@ -64,6 +64,15 @@ namespace rpc_generator
                                bool is_in, bool is_out, bool is_const, const std::string& object_type,
                                uint64_t& count) const
             {
+                std::ignore = option;
+                std::ignore = from_host;
+                std::ignore = lib;
+                std::ignore = name;
+                std::ignore = is_in;
+                std::ignore = is_out;
+                std::ignore = is_const;
+                std::ignore = object_type;
+                std::ignore = count;
                 assert(false);
             }
         };
@@ -74,6 +83,15 @@ namespace rpc_generator
                                                          bool is_const, const std::string& object_type,
                                                          uint64_t& count) const
         {
+            std::ignore = from_host;
+            std::ignore = lib;
+            std::ignore = name;
+            std::ignore = is_in;
+            std::ignore = is_out;
+            std::ignore = is_const;
+            std::ignore = object_type;
+            std::ignore = count;
+                            
             switch(option)
             {
             case PROXY_MARSHALL_IN:
@@ -98,7 +116,14 @@ namespace rpc_generator
                                                           const std::string& name, bool is_in, bool is_out,
                                                           bool is_const, const std::string& object_type,
                                                           uint64_t& count) const
-        {
+    {
+            std::ignore = from_host;
+            std::ignore = lib;
+            std::ignore = is_in;
+            std::ignore = is_const;
+            std::ignore = object_type;
+            std::ignore = count;
+                            
             if(is_out)
             {
                 throw std::runtime_error("REFERANCE does not support out vals");
@@ -126,6 +151,15 @@ namespace rpc_generator
                                                      const std::string& name, bool is_in, bool is_out, bool is_const,
                                                      const std::string& object_type, uint64_t& count) const
         {
+            
+            std::ignore = from_host;
+            std::ignore = lib;
+            std::ignore = name;
+            std::ignore = is_in;
+            std::ignore = is_const;
+            std::ignore = object_type;      
+            std::ignore = count;
+
             if(is_out)
             {
                 throw std::runtime_error("MOVE does not support out vals");
@@ -159,6 +193,12 @@ namespace rpc_generator
                                                         const std::string& name, bool is_in, bool is_out, bool is_const,
                                                         const std::string& object_type, uint64_t& count) const
         {
+            std::ignore = from_host;
+            std::ignore = lib;
+            std::ignore = is_in;
+            std::ignore = is_const;
+            std::ignore = object_type;
+            std::ignore = count;
             if(is_out)
             {
                 throw std::runtime_error("POINTER does not support out vals");
@@ -187,6 +227,13 @@ namespace rpc_generator
                                                                   bool is_in, bool is_out, bool is_const,
                                                                   const std::string& object_type, uint64_t& count) const
         {
+            std::ignore = from_host;
+            std::ignore = lib;
+            std::ignore = name;
+            std::ignore = is_in;
+            std::ignore = is_const;
+            std::ignore = count;
+
             if(is_const && is_out)
             {
                 throw std::runtime_error("POINTER_REFERENCE does not support const out vals");
@@ -219,6 +266,14 @@ namespace rpc_generator
                                                                 bool is_in, bool is_out, bool is_const,
                                                                 const std::string& object_type, uint64_t& count) const
         {
+            std::ignore = from_host;
+            std::ignore = lib;
+            std::ignore = name;
+            std::ignore = is_in;
+            std::ignore = is_out;
+            std::ignore = is_const;
+            std::ignore = count;
+
             switch(option)
             {
             case PROXY_MARSHALL_IN:
@@ -246,6 +301,13 @@ namespace rpc_generator
                                                           bool is_const, const std::string& object_type,
                                                           uint64_t& count) const
         {
+            std::ignore = from_host;
+            std::ignore = lib;
+            std::ignore = is_in;
+            std::ignore = is_const;
+            std::ignore = object_type;
+            std::ignore = count;
+            
             if(is_out)
             {
                 throw std::runtime_error("INTERFACE does not support out vals");
@@ -319,6 +381,14 @@ namespace rpc_generator
                                                         const std::string& name, bool is_in, bool is_out, bool is_const,
                                                         const std::string& object_type, uint64_t& count) const
         {
+            std::ignore = from_host;
+            std::ignore = lib;
+            std::ignore = name;
+            std::ignore = is_in;
+            std::ignore = is_out;
+            std::ignore = is_const;
+            std::ignore = count;
+            
             switch(option)
             {
             case PROXY_PREPARE_IN:
@@ -939,7 +1009,7 @@ namespace rpc_generator
             }
         }
         
-        void write_interface(bool from_host, const class_entity& m_ob, writer& proxy, writer& stub, size_t id,
+        void write_interface(bool from_host, const class_entity& m_ob, writer& proxy, writer& stub, 
                              bool catch_stub_exceptions, const std::vector<std::string>& rethrow_exceptions)
         {
             if(m_ob.is_in_import())
@@ -1093,7 +1163,7 @@ namespace rpc_generator
             stub("");   
         };
 
-        void write_stub_factory(const class_entity& lib, const class_entity& m_ob, writer& stub,
+        void write_stub_factory(const class_entity& m_ob, writer& stub,
                                 std::set<std::string>& done)
         {
             auto interface_name
@@ -1134,7 +1204,7 @@ namespace rpc_generator
             stub("}}));");
         }
 
-        void write_stub_cast_factory(const class_entity& lib, const class_entity& m_ob, writer& stub)
+        void write_stub_cast_factory(const class_entity& m_ob, writer& stub)
         {
             auto interface_name
                 = std::string(m_ob.get_entity_type() == entity_type::LIBRARY ? "i_" : "") + m_ob.get_name();
@@ -1903,8 +1973,7 @@ namespace rpc_generator
             header("}}");
         };
 
-        void write_encapsulate_outbound_interfaces(const class_entity& lib, const class_entity& obj, writer& header,
-                                                   writer& proxy, writer& stub,
+        void write_encapsulate_outbound_interfaces(const class_entity& obj, writer& header,
                                                    const std::vector<std::string>& namespaces)
         {
             auto interface_name
@@ -2000,8 +2069,7 @@ namespace rpc_generator
             stub("}}");
         }
 
-        void write_marshalling_logic(const class_entity& lib, std::string prefix, writer& header, writer& proxy,
-                                     writer& stub)
+        void write_marshalling_logic(const class_entity& lib, writer& stub)
         {
             {
                 for(auto& cls : lib.get_classes())
@@ -2009,7 +2077,7 @@ namespace rpc_generator
                     if(!cls->get_import_lib().empty())
                         continue;
                     if(cls->get_entity_type() == entity_type::INTERFACE)
-                        write_stub_cast_factory(lib, *cls, stub);
+                        write_stub_cast_factory(*cls, stub);
                 }
 
                 for(auto& cls : lib.get_classes())
@@ -2017,7 +2085,7 @@ namespace rpc_generator
                     if(!cls->get_import_lib().empty())
                         continue;
                     if(cls->get_entity_type() == entity_type::LIBRARY)
-                        write_stub_cast_factory(lib, *cls, stub);
+                        write_stub_cast_factory(*cls, stub);
                 }
             }
         }
@@ -2073,9 +2141,6 @@ namespace rpc_generator
         {
             for(auto& elem : lib.get_elements(entity_type::NAMESPACE_MEMBERS))
             {
-                // this is deprecated and only to be used with rpc v1, delete when no longer needed
-                std::size_t hash = std::hash<std::string> {}(prefix + "::" + elem->get_name());
-
                 if(elem->is_in_import())
                     continue;
                 else if(elem->get_entity_type() == entity_type::ENUM)
@@ -2119,7 +2184,7 @@ namespace rpc_generator
                 {
                     auto& ent = static_cast<const class_entity&>(*elem);
                     ::rpc_generator::write_interface(ent, header);
-                    write_interface(from_host, ent, proxy, stub, hash, catch_stub_exceptions, rethrow_exceptions);
+                    write_interface(from_host, ent, proxy, stub, catch_stub_exceptions, rethrow_exceptions);
                 }
                 else if(elem->get_entity_type() == entity_type::CONSTEXPR)
                 {
@@ -2134,7 +2199,7 @@ namespace rpc_generator
                     }
                 }
             }
-            write_marshalling_logic(lib, prefix, header, proxy, stub);
+            write_marshalling_logic(lib, stub);
         }
 
         void write_epilog(bool from_host, const class_entity& lib, writer& header, writer& proxy, writer& stub,
@@ -2158,7 +2223,7 @@ namespace rpc_generator
                 {
                     if(cls->get_entity_type() == entity_type::LIBRARY
                        || cls->get_entity_type() == entity_type::INTERFACE)
-                        write_encapsulate_outbound_interfaces(lib, *cls, header, proxy, stub, namespaces);
+                        write_encapsulate_outbound_interfaces(*cls, header, namespaces);
 
                     if(cls->get_entity_type() == entity_type::LIBRARY
                        || cls->get_entity_type() == entity_type::INTERFACE)
@@ -2185,7 +2250,7 @@ namespace rpc_generator
                         if(!cls->get_import_lib().empty())
                             continue;
                         if(cls->get_entity_type() == entity_type::INTERFACE)
-                            write_stub_factory(lib, *cls, stub, done);
+                            write_stub_factory(*cls, stub, done);
                     }
 
                     for(auto& cls : lib.get_classes())
@@ -2193,14 +2258,14 @@ namespace rpc_generator
                         if(!cls->get_import_lib().empty())
                             continue;
                         if(cls->get_entity_type() == entity_type::LIBRARY)
-                            write_stub_factory(lib, *cls, stub, done);
+                            write_stub_factory(*cls, stub, done);
                     }
                 }
             }
         }
 
         void write_stub_factory_lookup(const std::string module_name, const class_entity& lib, std::string prefix,
-                                       writer& stub_header, writer& proxy, writer& stub)
+                                       writer& stub_header, writer& stub)
         {
             stub_header("void {}_register_stubs(const rpc::shared_ptr<rpc::service>& srv);", module_name);
             stub("void {}_register_stubs(const rpc::shared_ptr<rpc::service>& srv)", module_name);
@@ -2339,7 +2404,7 @@ namespace rpc_generator
             proxy("}}");
             stub("}}");
 
-            write_stub_factory_lookup(module_name, lib, prefix, stub_header, proxy, stub);
+            write_stub_factory_lookup(module_name, lib, prefix, stub_header, stub);
         }
     }
 }

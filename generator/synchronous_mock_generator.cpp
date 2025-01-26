@@ -20,7 +20,7 @@ namespace rpc_generator
     namespace synchronous_mock_generator
     {
 
-        void write_interface(bool from_host, const class_entity& m_ob, writer& header, int id)
+        void write_interface(const class_entity& m_ob, writer& header)
         {
             auto interface_name
                 = std::string(m_ob.get_entity_type() == entity_type::LIBRARY ? "i_" : "") + m_ob.get_name();
@@ -106,7 +106,7 @@ namespace rpc_generator
             header("");
         };
 
-        void write_struct(bool from_host, const class_entity& m_ob, writer& header, int id)
+        void write_struct(const class_entity& m_ob, writer& header)
         {
             auto interface_name = m_ob.get_name();
 
@@ -207,16 +207,16 @@ namespace rpc_generator
             header("");
         }
 
-        void write_marshalling_logic_nested(bool from_host, const class_entity& cls, int id, writer& header)
+        void write_marshalling_logic_nested(const class_entity& cls, writer& header)
         {
             if(cls.get_entity_type() == entity_type::INTERFACE)
-                write_interface(from_host, cls, header, id);
+                write_interface(cls, header);
 
             if(cls.get_entity_type() == entity_type::LIBRARY)
-                write_interface(from_host, cls, header, id);
+                write_interface(cls, header);
 
             if(cls.get_entity_type() == entity_type::STRUCT)
-                write_struct(from_host, cls, header, id);
+                write_struct(cls, header);
         }
 
         // entry point
@@ -242,15 +242,15 @@ namespace rpc_generator
                 }
                 else
                 {
-                    write_marshalling_logic_nested(from_host, *cls, id++, header);
+                    write_marshalling_logic_nested(*cls, header);
+                    id++;
                 }
             }
         }
 
         // entry point
         void write_files(bool from_host, const class_entity& lib, std::ostream& hos,
-                         const std::vector<std::string>& namespaces, const std::string& header_filename,
-                         const std::list<std::string>& imports)
+                         const std::vector<std::string>& namespaces, const std::string& header_filename)
         {
             writer header(hos);
 

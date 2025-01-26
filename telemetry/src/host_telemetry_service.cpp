@@ -37,7 +37,7 @@ namespace rpc
         std::string fn = file_name.string();
             
 #ifndef _MSC_VER
-        FILE output = ::fopen(fn.c_str(), "w+");
+        FILE* output = ::fopen(fn.c_str(), "w+");
 #else        
         FILE* output;
         auto err = ::fopen_s(&output, fn.c_str(), "w+");
@@ -189,6 +189,12 @@ namespace rpc
 
     void host_telemetry_service::on_service_try_cast(rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::caller_zone caller_zone_id, rpc::object object_id, rpc::interface_ordinal interface_id) const
     {
+        std::ignore = zone_id;
+        std::ignore = destination_zone_id;
+        std::ignore = caller_zone_id;
+        std::ignore = object_id;
+        std::ignore = interface_id;
+        
 #ifdef USE_RPC_TELEMETRY_RAII_LOGGING
         if(zone_id.as_destination() == destination_zone_id)
             fmt::print(output_, "{} -> {} : try_cast {}\n", service_alias(zone_id), object_proxy_alias({zone_id}, destination_zone_id, object_id), interface_id.get_val());
@@ -199,6 +205,14 @@ namespace rpc
 
     void host_telemetry_service::on_service_add_ref(rpc::zone zone_id, rpc::destination_channel_zone destination_channel_zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::caller_channel_zone caller_channel_zone_id, rpc::caller_zone caller_zone_id, rpc::add_ref_options options) const
     {
+        std::ignore = zone_id;
+        std::ignore = destination_channel_zone_id;
+        std::ignore = destination_zone_id;
+        std::ignore = object_id;
+        std::ignore = caller_channel_zone_id;
+        std::ignore = caller_zone_id;
+        std::ignore = options;
+        
 #ifdef USE_RPC_TELEMETRY_RAII_LOGGING
         auto dest = destination_channel_zone_id.get_val() ? rpc::zone(destination_channel_zone_id.id) : destination_zone_id.as_zone();
 
@@ -258,6 +272,12 @@ namespace rpc
 
     void host_telemetry_service::on_service_release(rpc::zone zone_id, rpc::destination_channel_zone destination_channel_zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::caller_zone caller_zone_id) const
     {
+        std::ignore = zone_id;
+        std::ignore = destination_channel_zone_id;
+        std::ignore = destination_zone_id;
+        std::ignore = object_id;
+        std::ignore = caller_zone_id;
+
 #ifdef USE_RPC_TELEMETRY_RAII_LOGGING
         auto dest = destination_channel_zone_id.get_val() ? rpc::zone(destination_channel_zone_id.id) : destination_zone_id.as_zone();
 
@@ -279,6 +299,11 @@ namespace rpc
 
     void host_telemetry_service::on_service_proxy_creation(const char* name, rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::caller_zone caller_zone_id) const
     {   
+        std::ignore = name;
+        std::ignore = zone_id;
+        std::ignore = destination_zone_id;
+        std::ignore = caller_zone_id;
+
 #ifdef USE_RPC_TELEMETRY_RAII_LOGGING
         std::string route_name; 
         std::string destination_name; 
@@ -325,6 +350,10 @@ namespace rpc
 
     void host_telemetry_service::on_service_proxy_deletion(rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::caller_zone caller_zone_id) const
     {
+        std::ignore = zone_id;
+        std::ignore = destination_zone_id;
+        std::ignore = caller_zone_id;
+
 #ifdef USE_RPC_TELEMETRY_RAII_LOGGING
         std::lock_guard g(mux);
         std::string name;
@@ -359,6 +388,13 @@ namespace rpc
 
     void host_telemetry_service::on_service_proxy_try_cast(rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::caller_zone caller_zone_id, rpc::object object_id, rpc::interface_ordinal interface_id) const
     {
+        std::ignore = zone_id;
+        std::ignore = destination_zone_id;
+        std::ignore = object_id;
+        std::ignore = caller_zone_id;
+        std::ignore = object_id;
+        std::ignore = interface_id;
+
 #ifdef USE_RPC_TELEMETRY_RAII_LOGGING
         fmt::print(output_, "{} -> {} : try_cast\n", service_proxy_alias(zone_id, destination_zone_id, caller_zone_id), service_alias(zone_id));    
         fflush(output_);
@@ -367,6 +403,13 @@ namespace rpc
 
     void host_telemetry_service::on_service_proxy_add_ref(rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::destination_channel_zone destination_channel_zone_id, rpc::caller_zone caller_zone_id, rpc::object object_id, rpc::add_ref_options options) const
     {
+        std::ignore = zone_id;
+        std::ignore = destination_channel_zone_id;
+        std::ignore = destination_zone_id;
+        std::ignore = object_id;
+        std::ignore = caller_zone_id;
+        std::ignore = options;
+
 #ifdef USE_RPC_TELEMETRY_RAII_LOGGING
         std::string type;
         if(!!(options & rpc::add_ref_options::build_caller_route) && !!(options & rpc::add_ref_options::build_destination_route))
@@ -412,6 +455,12 @@ namespace rpc
 
     void host_telemetry_service::on_service_proxy_release(rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::destination_channel_zone destination_channel_zone_id, rpc::caller_zone caller_zone_id, rpc::object object_id) const
     {
+        std::ignore = zone_id;
+        std::ignore = destination_channel_zone_id;
+        std::ignore = destination_zone_id;
+        std::ignore = object_id;
+        std::ignore = caller_zone_id;
+
 #ifdef USE_RPC_TELEMETRY_RAII_LOGGING
         auto dest = destination_channel_zone_id.get_val() ? rpc::zone(destination_channel_zone_id.id) : destination_zone_id.as_zone();
 
@@ -429,6 +478,12 @@ namespace rpc
 
     void host_telemetry_service::on_service_proxy_add_external_ref(rpc::zone zone_id, rpc::destination_channel_zone destination_channel_zone_id, rpc::destination_zone destination_zone_id, rpc::caller_zone caller_zone_id, int ref_count) const
     {
+        std::ignore = zone_id;
+        std::ignore = destination_channel_zone_id;
+        std::ignore = destination_zone_id;
+        std::ignore = caller_zone_id;
+        std::ignore = ref_count;
+
 #ifdef USE_RPC_TELEMETRY_RAII_LOGGING
         std::lock_guard g(mux);
         auto found = service_proxies.find(orig_zone{zone_id, destination_zone_id, caller_zone_id});
@@ -468,6 +523,12 @@ namespace rpc
 
     void host_telemetry_service::on_service_proxy_release_external_ref(rpc::zone zone_id, rpc::destination_channel_zone destination_channel_zone_id, rpc::destination_zone destination_zone_id, rpc::caller_zone caller_zone_id, int ref_count) const
     {
+        std::ignore = zone_id;
+        std::ignore = destination_channel_zone_id;
+        std::ignore = destination_zone_id;
+        std::ignore = caller_zone_id;
+        std::ignore = ref_count;
+
 #ifdef USE_RPC_TELEMETRY_RAII_LOGGING
         std::lock_guard g(mux);
         auto found = service_proxies.find(orig_zone{zone_id, destination_zone_id, caller_zone_id});
@@ -528,6 +589,8 @@ namespace rpc
 
     void host_telemetry_service::on_impl_deletion(uint64_t address, rpc::zone zone_id) const
     {
+        std::ignore = zone_id;
+
         std::lock_guard g(mux);
         auto found = impls.find(address);
         if(found == impls.end())
@@ -594,6 +657,11 @@ namespace rpc
 
     void host_telemetry_service::on_stub_send(rpc::zone zone_id, rpc::object object_id, rpc::interface_ordinal interface_id, rpc::method method_id) const
     {
+        std::ignore = zone_id;
+        std::ignore = object_id;
+        std::ignore = interface_id;
+        std::ignore = method_id;
+
 #ifdef USE_RPC_TELEMETRY_RAII_LOGGING
         fmt::print(output_, "note over {} : send\n", object_stub_alias(zone_id, object_id));
         fflush(output_);
@@ -602,6 +670,12 @@ namespace rpc
 
     void host_telemetry_service::on_stub_add_ref(rpc::zone zone, rpc::object object_id, rpc::interface_ordinal interface_id, uint64_t count, rpc::caller_zone caller_zone_id) const
     {
+        std::ignore = zone;
+        std::ignore = interface_id;
+        std::ignore = object_id;
+        std::ignore = count;
+        std::ignore = caller_zone_id;
+
 #ifdef USE_RPC_TELEMETRY_RAII_LOGGING
         std::lock_guard g(mux);
         auto found = stubs.find(zone_object{zone, object_id});
@@ -620,6 +694,12 @@ namespace rpc
 
     void host_telemetry_service::on_stub_release(rpc::zone zone, rpc::object object_id, rpc::interface_ordinal interface_id, uint64_t count, rpc::caller_zone caller_zone_id) const
     {
+        std::ignore = zone;
+        std::ignore = object_id;
+        std::ignore = interface_id;
+        std::ignore = count;
+        std::ignore = caller_zone_id;
+
 #ifdef USE_RPC_TELEMETRY_RAII_LOGGING
         std::lock_guard g(mux);
         auto found = stubs.find(zone_object{zone, object_id});
@@ -644,6 +724,11 @@ namespace rpc
 
     void host_telemetry_service::on_object_proxy_creation(rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, bool add_ref_done) const
     {
+        std::ignore = zone_id;
+        std::ignore = destination_zone_id;
+        std::ignore = object_id;
+        std::ignore = add_ref_done;
+
 #ifdef USE_RPC_TELEMETRY_RAII_LOGGING
 
         std::lock_guard g(mux);
@@ -670,6 +755,9 @@ namespace rpc
 
     void host_telemetry_service::on_object_proxy_deletion(rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id) const
     {
+        std::ignore = zone_id;
+        std::ignore = destination_zone_id;
+        std::ignore = object_id;
 #ifdef USE_RPC_TELEMETRY_RAII_LOGGING
         std::lock_guard g(mux);
         auto found = object_proxies.find(interface_proxy_id{zone_id, destination_zone_id, object_id, {0}});
@@ -698,6 +786,12 @@ namespace rpc
 
     void host_telemetry_service::on_interface_proxy_creation(const char* name, rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::interface_ordinal interface_id) const
     {
+        std::ignore = name;
+        std::ignore = zone_id;
+        std::ignore = destination_zone_id;
+        std::ignore = object_id;
+        std::ignore = interface_id;
+
 #ifdef USE_RPC_TELEMETRY_RAII_LOGGING
         std::lock_guard g(mux);
         interface_proxies.emplace(interface_proxy_id{zone_id, destination_zone_id, object_id, interface_id}, name_count{name, 1});
@@ -708,6 +802,11 @@ namespace rpc
 
     void host_telemetry_service::on_interface_proxy_deletion(rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::interface_ordinal interface_id) const
     {
+        std::ignore = zone_id;
+        std::ignore = destination_zone_id;
+        std::ignore = object_id;
+        std::ignore = interface_id;
+
 #ifdef USE_RPC_TELEMETRY_RAII_LOGGING
         std::lock_guard g(mux);
         auto found = interface_proxies.find(interface_proxy_id{zone_id, destination_zone_id, object_id, interface_id});
@@ -735,6 +834,13 @@ namespace rpc
 
     void host_telemetry_service::on_interface_proxy_send(const char* method_name, rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, rpc::interface_ordinal interface_id, rpc::method method_id) const
     {
+        std::ignore = method_name;
+        std::ignore = zone_id;
+        std::ignore = destination_zone_id;
+        std::ignore = object_id;
+        std::ignore = interface_id;
+        std::ignore = method_id;
+
 #ifdef USE_RPC_TELEMETRY_RAII_LOGGING
         fmt::print(output_, "{} -> {} : {}\n", object_proxy_alias(zone_id, destination_zone_id, object_id), object_stub_alias(destination_zone_id.as_zone(), object_id), method_name);
 #else      

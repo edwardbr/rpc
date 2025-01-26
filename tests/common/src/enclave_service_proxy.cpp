@@ -2,19 +2,18 @@
  *   Copyright (c) 2024 Edward Boggis-Rolfe
  *   All rights reserved.
  */
-#include "common/enclave_service_proxy.h"
 
 #ifndef _IN_ENCLAVE
 #include <thread>
 
+#ifdef BUILD_ENCLAVE
+#include "common/enclave_service_proxy.h"
 #include <sgx_urts.h>
 #include <sgx_capable.h>
 #include <untrusted/enclave_marshal_test_u.h>
-#endif
 
 namespace rpc
 {
-#ifndef _IN_ENCLAVE
     enclave_service_proxy::enclave_service_proxy(
         const char* name
         , destination_zone destination_zone_id
@@ -335,5 +334,6 @@ namespace rpc
         }
         return ret;
     }
-#endif
 }
+#endif
+#endif

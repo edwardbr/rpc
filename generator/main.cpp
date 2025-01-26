@@ -283,8 +283,7 @@ int main(const int argc, char* argv[])
             stub_header_stream << ends;
             if(mockPath.length())
             {
-                rpc_generator::synchronous_mock_generator::write_files(true, *objects, mock_stream, namespaces,
-                                                                       headerPath, imports);
+                rpc_generator::synchronous_mock_generator::write_files(true, *objects, mock_stream, namespaces, headerPath);
                 mock_stream << ends;
             }
 
@@ -350,7 +349,7 @@ int main(const int argc, char* argv[])
             std::stringstream header_stream;
 
             rpc_generator::yas_generator::write_files(
-                module_name, true, *objects, header_stream, namespaces, headerPath, imports, additional_headers,
+                true, *objects, header_stream, namespaces, headerPath, 
                 !suppress_catch_stub_exceptions, rethrow_exceptions, additional_stub_headers);
 
             header_stream << ends;

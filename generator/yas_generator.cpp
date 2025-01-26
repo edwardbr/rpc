@@ -56,6 +56,16 @@ namespace rpc_generator
                                bool is_in, bool is_out, bool is_const, const std::string& object_type,
                                uint64_t& count) const
             {
+                std::ignore = option;
+                std::ignore = from_host;
+                std::ignore = lib;
+                std::ignore = name;
+                std::ignore = is_in;
+                std::ignore = is_out;
+                std::ignore = is_const;
+                std::ignore = object_type;
+                std::ignore = count;
+                
                 assert(false);
             }
         };
@@ -66,6 +76,13 @@ namespace rpc_generator
                                                          bool is_const, const std::string& object_type,
                                                          uint64_t& count) const
         {
+            std::ignore = from_host;
+            std::ignore = lib;
+            std::ignore = is_in;
+            std::ignore = is_out;
+            std::ignore = is_const;
+            std::ignore = count;
+            
             switch(option)
             {
             case PROXY_PARAM_IN:
@@ -94,6 +111,12 @@ namespace rpc_generator
                                                           bool is_const, const std::string& object_type,
                                                           uint64_t& count) const
         {
+            std::ignore = from_host;
+            std::ignore = lib;
+            std::ignore = is_in;
+            std::ignore = is_const;
+            std::ignore = count;
+            
             if(is_out)
             {
                 throw std::runtime_error("REFERANCE does not support out vals");
@@ -125,6 +148,11 @@ namespace rpc_generator
                                                      const std::string& name, bool is_in, bool is_out, bool is_const,
                                                      const std::string& object_type, uint64_t& count) const
         {
+            std::ignore = from_host;
+            std::ignore = lib;
+            std::ignore = is_in;
+            std::ignore = count;
+            
             if(is_out)
             {
                 throw std::runtime_error("MOVE does not support out vals");
@@ -155,6 +183,13 @@ namespace rpc_generator
                                                         const std::string& name, bool is_in, bool is_out, bool is_const,
                                                         const std::string& object_type, uint64_t& count) const
         {
+            std::ignore = from_host;
+            std::ignore = lib;
+            std::ignore = is_in;
+            std::ignore = is_const;
+            std::ignore = object_type;
+            std::ignore = count;
+            
             if(is_out)
             {
                 throw std::runtime_error("POINTER does not support out vals");
@@ -182,6 +217,12 @@ namespace rpc_generator
                                                                   bool is_in, bool is_out, bool is_const,
                                                                   const std::string& object_type, uint64_t& count) const
         {
+            std::ignore = from_host;
+            std::ignore = lib;
+            std::ignore = is_in;
+            std::ignore = object_type;
+            std::ignore = count;
+            
             if(is_const && is_out)
             {
                 throw std::runtime_error("POINTER_REFERENCE does not support const out vals");
@@ -213,6 +254,14 @@ namespace rpc_generator
                                                                 bool is_in, bool is_out, bool is_const,
                                                                 const std::string& object_type, uint64_t& count) const
         {
+            std::ignore = from_host;
+            std::ignore = lib;
+            std::ignore = is_in;
+            std::ignore = is_out;
+            std::ignore = is_const;
+            std::ignore = object_type;
+            std::ignore = count;
+            
             switch(option)
             {
             case PROXY_PARAM_IN:
@@ -239,6 +288,13 @@ namespace rpc_generator
                                                           bool is_const, const std::string& object_type,
                                                           uint64_t& count) const
         {
+            std::ignore = from_host;
+            std::ignore = lib;
+            std::ignore = is_in;
+            std::ignore = is_const;
+            std::ignore = object_type;
+            std::ignore = count;
+            
             if(is_out)
             {
                 throw std::runtime_error("INTERFACE does not support out vals");
@@ -270,6 +326,14 @@ namespace rpc_generator
                                                         const std::string& name, bool is_in, bool is_out, bool is_const,
                                                         const std::string& object_type, uint64_t& count) const
         {
+            std::ignore = from_host;
+            std::ignore = lib;
+            std::ignore = is_in;
+            std::ignore = is_out;
+            std::ignore = is_const;
+            std::ignore = object_type;
+            std::ignore = count;
+            
             switch(option)
             {
             case PROXY_PARAM_IN:
@@ -513,14 +577,13 @@ namespace rpc_generator
 
         void write_proxy_send_method(bool from_host, const class_entity& m_ob, writer& proxy,
                                      const std::string& interface_name,
-                                     const std::shared_ptr<function_entity>& function, int& function_count,
-                                     bool catch_stub_exceptions, const std::vector<std::string>& rethrow_exceptions)
+                                     const std::shared_ptr<function_entity>& function, int& function_count)
         {
             bool has_inparams = false;
             proxy("template<>");
             proxy("{}", ::rpc_generator::write_proxy_send_declaration(
                             m_ob, interface_name + "::proxy_serialiser<rpc::serialiser::yas, rpc::encoding>::", function,
-                            function_count, has_inparams, ", rpc::encoding __rpc_enc", false));
+                            has_inparams, ", rpc::encoding __rpc_enc", false));
             proxy("{{");
 
             if(has_inparams)
@@ -581,14 +644,13 @@ namespace rpc_generator
 
         void write_proxy_receive_method(bool from_host, const class_entity& m_ob, writer& proxy,
                                         const std::string& interface_name,
-                                        const std::shared_ptr<function_entity>& function, int& function_count,
-                                        bool catch_stub_exceptions, const std::vector<std::string>& rethrow_exceptions)
+                                        const std::shared_ptr<function_entity>& function, int& function_count)
         {
             bool has_inparams = false;
             proxy("template<>");
             proxy("{}", ::rpc_generator::write_proxy_receive_declaration(
-                            m_ob, interface_name + "::proxy_deserialiser<rpc::serialiser::yas, rpc::encoding>::", function,
-                            function_count, has_inparams, ", rpc::encoding __rpc_enc", false));
+                            m_ob, interface_name + "::proxy_deserialiser<rpc::serialiser::yas, rpc::encoding>::", function, 
+                            has_inparams, ", rpc::encoding __rpc_enc", false));
             proxy("{{");
 
             if(has_inparams)
@@ -663,14 +725,13 @@ namespace rpc_generator
 
         void write_stub_receive_method(bool from_host, const class_entity& m_ob, writer& proxy,
                                        const std::string& interface_name,
-                                       const std::shared_ptr<function_entity>& function, int& function_count,
-                                       bool catch_stub_exceptions, const std::vector<std::string>& rethrow_exceptions)
+                                       const std::shared_ptr<function_entity>& function, int& function_count)
         {
             bool has_outparams = false;
             proxy("template<>");
             proxy("{}", ::rpc_generator::write_stub_receive_declaration(
                             m_ob, interface_name + "::stub_deserialiser<rpc::serialiser::yas, rpc::encoding>::", function,
-                            function_count, has_outparams, ", rpc::encoding __rpc_enc", false));
+                            has_outparams, ", rpc::encoding __rpc_enc", false));
             proxy("{{");
 
             if(has_outparams)
@@ -746,14 +807,13 @@ namespace rpc_generator
 
         void write_stub_reply_method(bool from_host, const class_entity& m_ob, writer& proxy,
                                      const std::string& interface_name,
-                                     const std::shared_ptr<function_entity>& function, int& function_count,
-                                     bool catch_stub_exceptions, const std::vector<std::string>& rethrow_exceptions)
+                                     const std::shared_ptr<function_entity>& function, int& function_count)
         {
             bool has_outparams = false;
             proxy("template<>");
             proxy("{}", ::rpc_generator::write_stub_reply_declaration(
                             m_ob, interface_name + "::stub_serialiser<rpc::serialiser::yas, rpc::encoding>::", function,
-                            function_count, has_outparams, ", rpc::encoding __rpc_enc", false));
+                            has_outparams, ", rpc::encoding __rpc_enc", false));
             proxy("{{");
 
             if(has_outparams)
@@ -812,8 +872,7 @@ namespace rpc_generator
             function_count++;
         }
 
-        void write_interface(bool from_host, const class_entity& m_ob, writer& proxy, size_t id,
-                             bool catch_stub_exceptions, const std::vector<std::string>& rethrow_exceptions)
+        void write_interface(bool from_host, const class_entity& m_ob, writer& proxy)
         {
             if(m_ob.is_in_import())
                 return;
@@ -858,12 +917,12 @@ namespace rpc_generator
                             bool has_params = false;
                             if(unique_signatures
                                    .emplace(::rpc_generator::write_proxy_send_declaration(
-                                       m_ob, "", function, function_count, has_params, ", rpc::encoding __rpc_enc",
+                                       m_ob, "", function, has_params, ", rpc::encoding __rpc_enc",
                                        false))
                                    .second)
                             {
                                 write_proxy_send_method(from_host, m_ob, proxy, interface_name, function,
-                                                        function_count, catch_stub_exceptions, rethrow_exceptions);
+                                                        function_count);
                             }
                         }
                     }
@@ -891,12 +950,12 @@ namespace rpc_generator
                             bool has_params = false;
                             if(unique_signatures
                                    .emplace(::rpc_generator::write_proxy_receive_declaration(
-                                       m_ob, "", function, function_count, has_params, ", rpc::encoding __rpc_enc",
+                                       m_ob, "", function, has_params, ", rpc::encoding __rpc_enc",
                                        false))
                                    .second)
                             {
                                 write_proxy_receive_method(from_host, m_ob, proxy, interface_name, function,
-                                                           function_count, catch_stub_exceptions, rethrow_exceptions);
+                                                           function_count);
                             }
                         }
                     }
@@ -924,12 +983,12 @@ namespace rpc_generator
                             bool has_params = false;
                             if(unique_signatures
                                    .emplace(::rpc_generator::write_stub_receive_declaration(
-                                       m_ob, "", function, function_count, has_params, ", rpc::encoding __rpc_enc",
+                                       m_ob, "", function, has_params, ", rpc::encoding __rpc_enc",
                                        false))
                                    .second)
                             {
                                 write_stub_receive_method(from_host, m_ob, proxy, interface_name, function,
-                                                          function_count, catch_stub_exceptions, rethrow_exceptions);
+                                                          function_count);
                             }
                         }
                     }
@@ -957,12 +1016,12 @@ namespace rpc_generator
                             bool has_params = false;
                             if(unique_signatures
                                    .emplace(::rpc_generator::write_stub_reply_declaration(
-                                       m_ob, "", function, function_count, has_params, ", rpc::encoding __rpc_enc",
+                                       m_ob, "", function, has_params, ", rpc::encoding __rpc_enc",
                                        false))
                                    .second)
                             {
                                 write_stub_reply_method(from_host, m_ob, proxy, interface_name, function,
-                                                        function_count, catch_stub_exceptions, rethrow_exceptions);
+                                                        function_count);
                             }
                         }
                     }
@@ -976,9 +1035,6 @@ namespace rpc_generator
         {
             for(auto& elem : lib.get_elements(entity_type::NAMESPACE_MEMBERS))
             {
-                // this is deprecated and only to be used with rpc v1, delete when no longer needed
-                std::size_t hash = std::hash<std::string> {}(prefix + "::" + elem->get_name());
-
                 if(elem->is_in_import())
                     continue;
                 else if(elem->get_entity_type() == entity_type::NAMESPACE)
@@ -1003,15 +1059,14 @@ namespace rpc_generator
                         || elem->get_entity_type() == entity_type::LIBRARY)
                 {
                     auto& ent = static_cast<const class_entity&>(*elem);
-                    write_interface(from_host, ent, proxy, hash, catch_stub_exceptions, rethrow_exceptions);
+                    write_interface(from_host, ent, proxy);
                 }
             }
         }
 
         // entry point
-        void write_files(std::string module_name, bool from_host, const class_entity& lib, std::ostream& header_stream,
+        void write_files(bool from_host, const class_entity& lib, std::ostream& header_stream,
                          const std::vector<std::string>& namespaces, const std::string& header_filename,
-                         const std::list<std::string>& imports, const std::vector<std::string>& additional_headers,
                          bool catch_stub_exceptions, const std::vector<std::string>& rethrow_exceptions,
                          const std::vector<std::string>& additional_stub_headers)
         {

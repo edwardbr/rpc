@@ -18,8 +18,8 @@ if(${BUILD_ENCLAVE})
     PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>" "$<INSTALL_INTERFACE:include/marshalled_tests>"
     PRIVATE ${ENCLAVE_LIBCXX_INCLUDES})
 
-  target_compile_options(common_enclave PRIVATE ${ENCLAVE_COMPILE_OPTIONS})
-  target_link_options(common_enclave PRIVATE ${ENCLAVE_LINK_OPTIONS})
+  target_compile_options(common_enclave PRIVATE ${ENCLAVE_COMPILE_OPTIONS} ${WARN_PEDANTIC})
+  target_link_options(common_enclave PRIVATE ${ENCLAVE_LINK_OPTIONS} ${WARN_PEDANTIC})
 
   if(USE_RPC_TELEMETRY)
     set(TELEMETRY_ENCLAVE_EDL rpc_telemetry_edl_header_enclave)
@@ -38,7 +38,7 @@ if(${BUILD_ENCLAVE})
   # ####################################################################################################################
 
 endif()
-# if(${BUILD_HOST})
+if(BUILD_ENCLAVE)
 
 add_library(common_host STATIC src/enclave_service_proxy.cpp)
 
@@ -61,4 +61,11 @@ target_link_libraries(
 
 set_property(TARGET common_host PROPERTY COMPILE_PDB_NAME common_host)
 
-# endif()
+else()
+
+add_library(common_host INTERFACE)
+
+target_include_directories(
+  common_host
+  INTERFACE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>" "$<INSTALL_INTERFACE:include/marshalled_tests>")
+endif()
