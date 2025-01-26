@@ -566,16 +566,36 @@ if(NOT DEPENDANCIES_LOADED)
       message("OPTIMIZER_FLAGS [${OPTIMIZER_FLAGS}]")
 
       set(SHARED_COMPILE_OPTIONS
-          -Wno-implicit-exception-spec-mismatch # thisis a big sgx problem
           -Wno-unknown-pragmas
           # this has a ticket to remove
           -Wno-deprecated-declarations
           ${EXTRA_COMPILE_OPTIONS}
           ${OPTIMIZER_FLAGS})
 
+      message("CMAKE_CXX_COMPILER_ID ${CMAKE_CXX_COMPILER_ID}")
+      if(${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang")
+        set(CLANG_WARNS    
+            -Wc99-extensions
+            -Wzero-length-array
+            -Wflexible-array-extensions
+            -Wpragma-pack-suspicious-include
+            -Wshadow-field-in-constructor
+            -Wno-gnu-zero-variadic-macro-arguments
+            -Wno-implicit-exception-spec-mismatch
+            # some extra checks
+            -Wnon-virtual-dtor
+            -Wdelete-non-virtual-dtor)
+      else()
+        set(CLANG_WARNS   
+          -Wno-variadic-macros
+          -Wno-gnu-zero-variadic-macro-arguments
+          -Wno-c++20-extensions
+        )
+      endif()
+          
       set(WARN_BASELINE
+          ${CLANG_WARNS}
           -Werror # convert warnings into errors
-          -Wc99-extensions
           # -Wdeprecated-dynamic-exception-spec   #sgx is riddled with throws() -Wsuggest-destructor-override #sgx is
           # not using override in its stl -Wdocumentation-unknown-command       #yes this would be nice
           # -Wexit-time-destructors               #not really an error -Wglobal-constructors                 #not really
@@ -584,18 +604,9 @@ if(NOT DEPENDANCIES_LOADED)
           # change -Wconversion                          #this is recommended but causes an explosion in our code
           -Wall
           -Wextra
-          -Wpedantic
           # this is needed by yas
-          -Wno-variadic-macros
-          -Wno-gnu-zero-variadic-macro-arguments
-          # some extra checks
-          -Wzero-length-array
-          -Wflexible-array-extensions
-          -Wpragma-pack-suspicious-include
-          -Wshadow-field-in-constructor
-          -Wnon-virtual-dtor
-          -Wdelete-non-virtual-dtor)
-      set(WARN_PEDANTIC -DWARN_PEDANTIC ${WARN_BASELINE})
+          -Wno-variadic-macros)
+      set(WARN_PEDANTIC -DWARN_PEDANTIC ${WARN_BASELINE} -Wpedantic)
       set(WARN_SIGN_CONVERSION -Wsign-conversion)
       set(WARN_TYPE_SIZES -Wshorten-64-to-32 -Wsign-compare -Wshift-sign-overflow)
 

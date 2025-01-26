@@ -235,6 +235,7 @@ namespace rpc
         }
 
         service_proxy(const service_proxy& other) : 
+                rpc::enable_shared_from_this<rpc::service_proxy>(other),
                 zone_id_(other.zone_id_),
                 destination_zone_id_(other.destination_zone_id_),
                 destination_channel_zone_(other.destination_channel_zone_),
