@@ -1102,14 +1102,16 @@ public:
 
     virtual ~_Ref_count_base() noexcept {} // TRANSITION, should be non-virtual
 
+    __attribute__((no_sanitize("thread")))
     bool _Incref_nz() noexcept { // increment use count if not zero, return true if successful
         auto& _Volatile_uses = reinterpret_cast<volatile long&>(_Uses);
 #ifdef _M_CEE_PURE
         long _Count = *_Atomic_address_as<const long>(&_Volatile_uses);
 #else
         // fix this for arm process not convinced this is available for linux
+        // https://learn.microsoft.com/en-us/cpp/intrinsics/arm64-intrinsics?view=msvc-170#IsoVolatileLoadStore
         // long _Count = __iso_volatile_load32(reinterpret_cast<volatile int*>(&_Volatile_uses));
-        long _Count = _Volatile_uses;
+        long _Count = *(const volatile long*) &_Volatile_uses;
 #endif
         while (_Count != 0) {
 #ifdef WIN32
