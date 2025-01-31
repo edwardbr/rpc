@@ -25,6 +25,7 @@ target_link_libraries(
          example_idl_host
          example_import_idl_host
          example_shared_idl_host   
+         logger_host
          rpc::rpc_host
          yas_common
          clipp::clipp

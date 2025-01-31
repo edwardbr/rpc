@@ -29,6 +29,7 @@ if(${BUILD_ENCLAVE})
       example_import_idl_enclave
       example_idl_enclave
       example_shared_idl_enclave
+      os_sandbox_enclave
       yas_common
       ${SGX_ENCLAVE_LIBS})
 
