@@ -11,6 +11,7 @@
 #include <example_shared/example_shared_stub.h>
 #include <example_import/example_import_stub.h>
 #include <example/example_stub.h>
+#include <enclave_marshal_test_t.h>
 
 void log(const std::string& data)
 {

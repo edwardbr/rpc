@@ -328,7 +328,7 @@ function(
         message("target ${dep}_generate does not exist so skipped")
       endif()
 
-      message("target_link_libraries(${name}_idl_host PUBLIC ${dep}_host)")
+      target_link_libraries(${name}_idl_host PUBLIC ${dep}_host)
     endforeach()
 
     foreach(dep ${params_link_libraries})
