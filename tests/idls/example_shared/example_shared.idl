@@ -2,12 +2,14 @@ typedef int error_code;
 
 namespace xxx
 {
+    [status=example]
     struct something_complicated
     {
         int int_val;
         std::string string_val;
     };
 
+    [status=example]
     struct something_more_complicated
     {
         std::vector<something_complicated> vector_val;
