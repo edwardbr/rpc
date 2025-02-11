@@ -163,6 +163,7 @@ namespace fingerprint
         }
         entity_stack.push_back(&cls);
 
+        std::string status_attr = "status";
         std::string seed;
         for(auto& item : cls.get_attributes())
         {
@@ -178,6 +179,14 @@ namespace fingerprint
             {
                 auto tmp = item.substr(0, strlen(rpc_attribute_types::use_template_param_in_id_attr));
                 if(tmp == rpc_attribute_types::use_template_param_in_id_attr && item[strlen(rpc_attribute_types::use_template_param_in_id_attr)] == '=')
+                {
+                    continue;
+                }
+            }
+
+            {
+                auto tmp = item.substr(0, status_attr.size());
+                if(tmp == status_attr && item[status_attr.size()] == '=')
                 {
                     continue;
                 }

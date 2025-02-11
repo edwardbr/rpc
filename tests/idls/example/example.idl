@@ -3,6 +3,7 @@
 
 namespace yyy
 {
+    [status=example]
     interface i_example
     {
         error_code add(int a, int b, [out, by_value] int& c);
