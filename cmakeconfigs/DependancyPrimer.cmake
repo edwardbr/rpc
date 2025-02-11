@@ -39,6 +39,11 @@ if(NOT DEPENDANCIES_LOADED)
   option(USE_RPC_TELEMETRY "turn on rpc telemetry" OFF)
   option(USE_RPC_TELEMETRY_RAII_LOGGING
          "turn on the logging of the addref release and try cast activity of the services, proxies and stubs" OFF)
+         
+  if(NOT DEFINED RPC_OUT_BUFFER_SIZE)
+    # setting RPC_OUT_BUFFER_SIZE to 4kb which is the default page size for windows and linux
+    set(RPC_OUT_BUFFER_SIZE 0x1000)
+  endif()
 
   message("BUILD_TYPE ${BUILD_TYPE}")
   message("CMAKE_BUILD_TYPE ${CMAKE_BUILD_TYPE}")
@@ -213,7 +218,8 @@ if(NOT DEPENDANCIES_LOADED)
         ${BUILD_TEST_FLAG}
         ${ENCLAVE_MEMLEAK_DEFINES}
         ${ENABLE_EXTERNAL_VERIFICATION_FLAG}
-        ${SGX_HW_OR_SIM_DEFINE})
+        ${SGX_HW_OR_SIM_DEFINE}
+        RPC_OUT_BUFFER_SIZE=${RPC_OUT_BUFFER_SIZE})
 
     if(WIN32) # Windows
       find_package(SGX REQUIRED)

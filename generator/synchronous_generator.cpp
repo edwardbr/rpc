@@ -614,7 +614,7 @@ namespace rpc_generator
 
                 proxy("std::vector<char> __rpc_in_buf;");
                 proxy("auto __rpc_ret = rpc::error::OK();");
-                proxy("std::vector<char> __rpc_out_buf(24); //max size using short string optimisation");
+                proxy("std::vector<char> __rpc_out_buf(RPC_OUT_BUFFER_SIZE); //max size using short string optimisation");
 
                 proxy("//PROXY_PREPARE_IN");
                 uint64_t count = 1;
