@@ -162,6 +162,7 @@ namespace fingerprint
 
         std::string use_legacy_empty_template_struct_id_attr = "use_legacy_empty_template_struct_id";
         std::string use_template_param_in_id_attr = "use_template_param_in_id";
+        std::string status_attr = "status";
 
         std::string seed;
         for(auto& item : cls.get_attributes())
@@ -178,6 +179,14 @@ namespace fingerprint
             {
                 auto tmp = item.substr(0, use_template_param_in_id_attr.size());
                 if(tmp == use_template_param_in_id_attr && item[use_template_param_in_id_attr.size()] == '=')
+                {
+                    continue;
+                }
+            }
+
+            {
+                auto tmp = item.substr(0, status_attr.size());
+                if(tmp == status_attr && item[status_attr.size()] == '=')
                 {
                     continue;
                 }
