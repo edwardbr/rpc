@@ -12,7 +12,6 @@ cmake_minimum_required(VERSION 3.24)
 #   message("using clang12")
 #   set(REMOTE_PTR_CPP)
 # endif()
-
 add_subdirectory(interfaces)
 
 if(USE_RPC_TELEMETRY)

@@ -172,6 +172,11 @@ if(NOT DEPENDENCIES_LOADED)
     set(BUILD_ENCLAVE_FLAG BUILD_ENCLAVE)
   else()
     set(BUILD_ENCLAVE_FLAG)
+  endif()  
+  if(${BUILD_COROUTINE})
+    set(BUILD_COROUTINE_FLAG BUILD_COROUTINE)
+  else()    
+    set(BUILD_COROUTINE_FLAG)
   endif()
 
   if(${BUILD_COROUTINE})
@@ -556,7 +561,6 @@ if(NOT DEPENDENCIES_LOADED)
 
       set(SHARED_COMPILE_OPTIONS
         -Wno-unknown-pragmas
-
         # this has a ticket to remove
         -Wno-deprecated-declarations
         -Wno-gnu-zero-variadic-macro-arguments

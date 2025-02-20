@@ -506,7 +506,6 @@ namespace rpc
             }
             CO_RETURN rpc::error::INCOMPATIBLE_SERVICE();   
         }
-        
         CORO_TASK(void) cleanup_after_object(object object_id, rpc::shared_ptr<service_proxy> keep_alive)
         {
             auto caller_zone_id = get_zone_id().as_caller();
@@ -562,7 +561,6 @@ namespace rpc
         
         void on_object_proxy_released(object object_id)
         {
-
 #ifdef BUILD_COROUTINE
             auto success = get_operating_zone_service()->schedule(cleanup_after_object(object_id, shared_from_this()));
             assert(success);
