@@ -37,9 +37,10 @@ namespace rpc
     const object dummy_object_id = {std::numeric_limits<uint64_t>::max()};
 
     template<class T> 
-    int demarshall_interface_proxy(uint64_t protocol_version, const rpc::shared_ptr<rpc::service_proxy>& sp, const rpc::interface_descriptor& encap, caller_zone caller_zone_id, rpc::shared_ptr<T>& val);    
+    CORO_TASK(int) demarshall_interface_proxy(uint64_t protocol_version, const rpc::shared_ptr<rpc::service_proxy>& sp, const rpc::interface_descriptor& encap, caller_zone caller_zone_id, rpc::shared_ptr<T>& val);    
+    
     template<class T> 
-    rpc::interface_descriptor create_interface_stub(rpc::service& serv, const rpc::shared_ptr<T>& iface);
+    CORO_TASK(rpc::interface_descriptor) create_interface_stub(rpc::service& serv, const rpc::shared_ptr<T>& iface);
     
     class service_logger
     {
@@ -85,8 +86,8 @@ namespace rpc
 
         rpc::shared_ptr<casting_interface> get_castable_interface(object object_id, interface_ordinal interface_id);
                                                         
-        template<class T> interface_descriptor proxy_bind_in_param(uint64_t protocol_version, const shared_ptr<T>& iface, shared_ptr<object_stub>& stub);
-        template<class T> interface_descriptor stub_bind_out_param(uint64_t protocol_version, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, const shared_ptr<T>& iface);
+        template<class T> CORO_TASK(interface_descriptor) proxy_bind_in_param(uint64_t protocol_version, const shared_ptr<T>& iface, shared_ptr<object_stub>& stub);
+        template<class T> CORO_TASK(interface_descriptor) stub_bind_out_param(uint64_t protocol_version, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, const shared_ptr<T>& iface);
 
         void inner_add_zone_proxy(const rpc::shared_ptr<service_proxy>& service_proxy);
 
@@ -116,8 +117,8 @@ namespace rpc
         //passed by value implementing an implicit lock on the life time of ptr
         object get_object_id(shared_ptr<casting_interface> ptr) const;
 
-        interface_descriptor prepare_out_param(uint64_t protocol_version, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, rpc::proxy_base* base);
-        interface_descriptor get_proxy_stub_descriptor(uint64_t protocol_version, 
+        CORO_TASK(interface_descriptor) prepare_out_param(uint64_t protocol_version, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, rpc::proxy_base* base);
+        CORO_TASK(interface_descriptor) get_proxy_stub_descriptor(uint64_t protocol_version, 
                                                         caller_channel_zone caller_channel_zone_id, 
                                                         caller_zone caller_zone_id, 
                                                         rpc::casting_interface* pointer,
@@ -127,7 +128,7 @@ namespace rpc
                                  
         rpc::weak_ptr<object_stub> get_object(object object_id) const;
 
-        int send(
+        CORO_TASK(int) send(
             uint64_t protocol_version 
 			, encoding encoding 
 			, uint64_t tag 
@@ -141,12 +142,12 @@ namespace rpc
             , const char* in_buf_ 
             , std::vector<char>& out_buf_)
             override;
-        int try_cast(            
+        CORO_TASK(int) try_cast(            
             uint64_t protocol_version 
             , destination_zone destination_zone_id 
             , object object_id 
             , interface_ordinal interface_id) override;
-        uint64_t add_ref(
+        CORO_TASK(uint64_t) add_ref(
             uint64_t protocol_version 
             , destination_channel_zone destination_channel_zone_id 
             , destination_zone destination_zone_id 
@@ -154,7 +155,7 @@ namespace rpc
             , caller_channel_zone caller_channel_zone_id 
             , caller_zone caller_zone_id 
             , add_ref_options build_out_param_channel) override;
-        uint64_t release(
+        CORO_TASK(uint64_t) release(
             uint64_t protocol_version 
             , destination_zone destination_zone_id 
             , object object_id 
@@ -171,12 +172,12 @@ namespace rpc
             return rpc::static_pointer_cast<T>(get_castable_interface(object_id, T::get_id(protocol_version)));
         }
         
-        interface_descriptor prepare_remote_input_interface(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, rpc::proxy_base* base, rpc::shared_ptr<service_proxy>& destination_zone);
+        CORO_TASK(interface_descriptor) prepare_remote_input_interface(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, rpc::proxy_base* base, rpc::shared_ptr<service_proxy>& destination_zone);
         
-        void clean_up_on_failed_connection(const rpc::shared_ptr<service_proxy>& destination_zone, rpc::shared_ptr<rpc::casting_interface> input_interface);
+        CORO_TASK(void) clean_up_on_failed_connection(const rpc::shared_ptr<service_proxy>& destination_zone, rpc::shared_ptr<rpc::casting_interface> input_interface);
         
         template<class proxy_class, class in_param_type, class out_param_type, typename... Args>
-        int connect_to_zone(
+        CORO_TASK(int) connect_to_zone(
             const char* name,
             rpc::destination_zone new_zone_id,
             const rpc::shared_ptr<in_param_type>& input_interface, 
@@ -193,7 +194,7 @@ namespace rpc
             {
                 if(input_interface->query_proxy_base())
                 {
-                    input_descr = prepare_remote_input_interface({0}, new_service_proxy->get_destination_zone_id().as_caller(), input_interface->query_proxy_base(), destination_zone);   
+                    input_descr = CO_AWAIT prepare_remote_input_interface({0}, new_service_proxy->get_destination_zone_id().as_caller(), input_interface->query_proxy_base(), destination_zone);   
                 }
                 else
                 {
@@ -202,29 +203,29 @@ namespace rpc
 
                     rpc::shared_ptr<rpc::object_stub> stub;
                     auto factory = create_interface_stub(input_interface);
-                    input_descr = get_proxy_stub_descriptor(rpc::get_version(), empty_caller_channel_zone, caller_zone_id, input_interface.get(), factory, false, stub);        
+                    input_descr = CO_AWAIT get_proxy_stub_descriptor(rpc::get_version(), empty_caller_channel_zone, caller_zone_id, input_interface.get(), factory, false, stub);        
                 }
             }
 
             rpc::interface_descriptor output_descr{{0},{0}};
-            auto err_code = new_service_proxy->connect(input_descr, output_descr);
+            auto err_code = CO_AWAIT new_service_proxy->connect(input_descr, output_descr);
             if(err_code != rpc::error::OK())
             {
                 //clean up
-                clean_up_on_failed_connection(destination_zone, input_interface);                
-                return err_code;
+                CO_AWAIT clean_up_on_failed_connection(destination_zone, input_interface);                
+                CO_RETURN err_code;
             }
             
             if(output_descr.object_id != 0 && output_descr.destination_zone_id != 0)
             {
-                err_code = rpc::demarshall_interface_proxy(rpc::get_version(), new_service_proxy, output_descr, zone_id_.as_caller(), output_interface);
+                err_code = CO_AWAIT rpc::demarshall_interface_proxy(rpc::get_version(), new_service_proxy, output_descr, zone_id_.as_caller(), output_interface);
             }
             else
             {
                 new_service_proxy->release_external_ref();
                 remove_zone_proxy_if_not_used(new_service_proxy->get_destination_zone_id(), new_service_proxy->get_caller_zone_id());
             }
-            return err_code;
+            CO_RETURN err_code;
         }
 
         template<class T> 
@@ -283,13 +284,13 @@ namespace rpc
         destination_zone get_parent_zone_id() const override {return parent_zone_id_;}
         
         template<class SERVICE_PROXY, class PARENT_INTERFACE, class CHILD_INTERFACE, typename... Args>
-        static int create_child_zone(
+        static CORO_TASK(int) create_child_zone(
             const char* name
             , zone zone_id
             , destination_zone parent_zone_id
             , rpc::interface_descriptor input_descr
             , rpc::interface_descriptor& output_descr
-            , std::function<int(const rpc::shared_ptr<PARENT_INTERFACE>&, rpc::shared_ptr<CHILD_INTERFACE>&, const rpc::shared_ptr<rpc::child_service>&)> fn
+            , std::function<CORO_TASK(int)(const rpc::shared_ptr<PARENT_INTERFACE>&, rpc::shared_ptr<CHILD_INTERFACE>&, const rpc::shared_ptr<rpc::child_service>&)> fn
             , rpc::shared_ptr<child_service>& new_child_service
             , Args&&... args)
         {
@@ -298,7 +299,7 @@ namespace rpc
             //link the child to the parent
             auto parent_service_proxy = SERVICE_PROXY::create(name, parent_zone_id, child_svc, args...);            
             if(!parent_service_proxy)
-                return rpc::error::UNABLE_TO_CREATE_SERVICE_PROXY();
+                CO_RETURN rpc::error::UNABLE_TO_CREATE_SERVICE_PROXY();
             child_svc->add_zone_proxy(parent_service_proxy);
             child_svc->set_parent_proxy(parent_service_proxy);
             parent_service_proxy->set_parent_channel(true);        
@@ -306,33 +307,33 @@ namespace rpc
             rpc::shared_ptr<PARENT_INTERFACE> parent_ptr;
             if(input_descr != interface_descriptor())
             {
-                auto err_code = rpc::demarshall_interface_proxy(rpc::get_version(), parent_service_proxy, input_descr, zone_id.as_caller(), parent_ptr);
+                auto err_code = CO_AWAIT rpc::demarshall_interface_proxy(rpc::get_version(), parent_service_proxy, input_descr, zone_id.as_caller(), parent_ptr);
                 if(err_code != rpc::error::OK())
                 { 
-                    return err_code;
+                    CO_RETURN err_code;
                 }
             }   
             rpc::shared_ptr<CHILD_INTERFACE> child_ptr;
             {
                 new_child_service = child_svc;
-                auto err_code = fn(parent_ptr, child_ptr, child_svc);
+                auto err_code = CO_AWAIT fn(parent_ptr, child_ptr, child_svc);
                 if(err_code != rpc::error::OK())
                 {
-                    return err_code;
+                    CO_RETURN err_code;
                 }
             }
             if(child_ptr)
             {
                 RPC_ASSERT(!child_ptr->query_proxy_base() && "we cannot support remote pointers to subordinate zones as it has not been registered yet");
-                output_descr = rpc::create_interface_stub(*child_svc, child_ptr);
+                output_descr = CO_AWAIT rpc::create_interface_stub(*child_svc, child_ptr);
             }
-            return rpc::error::OK();
+            CO_RETURN rpc::error::OK();
         }
     };
 
 
     template<class T> 
-    rpc::interface_descriptor create_interface_stub(rpc::service& serv, const rpc::shared_ptr<T>& iface)
+    CORO_TASK(rpc::interface_descriptor) create_interface_stub(rpc::service& serv, const rpc::shared_ptr<T>& iface)
     {
         caller_channel_zone empty_caller_channel_zone = {};
         caller_zone caller_zone_id = serv.get_zone_id().as_caller();
@@ -340,11 +341,11 @@ namespace rpc
         if(!iface)
         {
             RPC_ASSERT(false);
-            return {{0},{0}};
+            CO_RETURN {{0},{0}};
         }
         rpc::shared_ptr<rpc::object_stub> stub;
         auto factory = serv.create_interface_stub(iface);
-        return serv.get_proxy_stub_descriptor(rpc::get_version(), empty_caller_channel_zone, caller_zone_id, iface.get(), factory, false, stub);
+        CO_RETURN CO_AWAIT serv.get_proxy_stub_descriptor(rpc::get_version(), empty_caller_channel_zone, caller_zone_id, iface.get(), factory, false, stub);
     }
 
 

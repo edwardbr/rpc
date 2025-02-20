@@ -7,6 +7,8 @@
 #include <stdint.h>
 #include <functional>
 
+#include "rpc/coroutine_support.h"
+
 //this class is to ensure type safty of parameters as it gets difficult guaranteeing parameter order
 namespace rpc
 {

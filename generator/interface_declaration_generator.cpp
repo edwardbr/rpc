@@ -696,7 +696,7 @@ namespace rpc_generator
                 if(item == "deprecated" || item == "_deprecated")
                     header.raw("[[deprecated]] ");
             }
-            header.raw("virtual {} {}(", function->get_return_type(), function->get_name());
+            header.raw("virtual CORO_TASK({}) {}(", function->get_return_type(), function->get_name());
             bool has_parameter = false;
             for(auto& parameter : function->get_parameters())
             {

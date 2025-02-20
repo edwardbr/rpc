@@ -22,11 +22,13 @@ namespace rpc
         }
 #endif
 
+#ifndef BUILD_COROUTINE //worry about this later
         service_proxy_->on_object_proxy_released(object_id_);
+#endif        
         service_proxy_ = nullptr;
     }
     
-    int object_proxy::send(
+    CORO_TASK(int) object_proxy::send(
             uint64_t protocol_version 
             , rpc::encoding encoding 
             , uint64_t tag 
@@ -36,7 +38,7 @@ namespace rpc
             , const char* in_buf_ 
             , std::vector<char>& out_buf_)
     {
-        return service_proxy_->send_from_this_zone(
+        CO_RETURN CO_AWAIT service_proxy_->send_from_this_zone(
             protocol_version,
             encoding,
             tag,
@@ -48,10 +50,10 @@ namespace rpc
             out_buf_);
     }
 
-    int object_proxy::send(uint64_t tag, std::function<interface_ordinal (uint64_t)> id_getter, method method_id, size_t in_size_, const char* in_buf_,
+    CORO_TASK(int) object_proxy::send(uint64_t tag, std::function<interface_ordinal (uint64_t)> id_getter, method method_id, size_t in_size_, const char* in_buf_,
                                   std::vector<char>& out_buf_)
     {
-        return service_proxy_->send_from_this_zone(
+        CO_RETURN CO_AWAIT service_proxy_->send_from_this_zone(
             encoding::enc_default,
             tag,
             object_id_, 
@@ -62,9 +64,9 @@ namespace rpc
             out_buf_);
     }
 
-    int object_proxy::try_cast(std::function<interface_ordinal (uint64_t)> id_getter)
+    CORO_TASK(int) object_proxy::try_cast(std::function<interface_ordinal (uint64_t)> id_getter)
     {
-        return service_proxy_->sp_try_cast(service_proxy_->get_destination_zone_id(), object_id_, id_getter);
+        CO_RETURN CO_AWAIT service_proxy_->sp_try_cast(service_proxy_->get_destination_zone_id(), object_id_, id_getter);
     }
 
     destination_zone object_proxy::get_destination_zone_id() const 

@@ -42,7 +42,7 @@ namespace rpc
         return ret;
     }
             
-    int enclave_service_proxy::connect(rpc::interface_descriptor input_descr, rpc::interface_descriptor& output_descr)
+    CORO_TASK(int) enclave_service_proxy::connect(rpc::interface_descriptor input_descr, rpc::interface_descriptor& output_descr)
     {   
         rpc::object output_object_id = {0};
         sgx_launch_token_t token = {0};

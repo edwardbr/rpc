@@ -10,6 +10,8 @@
 #include <rpc/telemetry/telemetry_handler.h>
 #endif
 
+#include "rpc/coroutine_support.h"
+
 using namespace std::chrono_literals;
 
 extern rpc::weak_ptr<rpc::service> current_host_service;
@@ -17,7 +19,7 @@ extern rpc::weak_ptr<rpc::service> current_host_service;
 // an ocall for logging the test
 extern "C"
 {
-    int call_host(
+    CORO_TASK(int) call_host(
         uint64_t protocol_version                          //version of the rpc call protocol
         , uint64_t encoding                                  //format of the serialised data
         , uint64_t tag                                       //info on the type of the call 
@@ -39,27 +41,28 @@ extern "C"
         if (!root_service)
         {
             retry_buf.data.clear();
-            return rpc::error::TRANSPORT_ERROR();
+            CO_RETURN rpc::error::TRANSPORT_ERROR();
         }
         if (retry_buf.data.empty())
         {
             std::vector<char> out_data(sz_out);
-            retry_buf.return_value = root_service->send(protocol_version, rpc::encoding(encoding), tag, {caller_channel_zone_id}, {caller_zone_id}, {destination_zone_id}, {object_id}, {interface_id}, {method_id}, sz_int,
+            retry_buf.return_value = CO_AWAIT root_service->send(protocol_version, rpc::encoding(encoding), tag, {caller_channel_zone_id}, {caller_zone_id}, {destination_zone_id}, {object_id}, {interface_id}, {method_id}, sz_int,
                                          data_in, out_data);
             if (retry_buf.return_value >= rpc::error::MIN() && retry_buf.return_value <= rpc::error::MAX())
             {
-                return retry_buf.return_value;
+                CO_RETURN retry_buf.return_value;
             }
             retry_buf.data.swap(out_data);
         }
         *data_out_sz = retry_buf.data.size();
         if (*data_out_sz > sz_out)
-            return rpc::error::NEED_MORE_MEMORY();
+            CO_RETURN rpc::error::NEED_MORE_MEMORY();
         memcpy(data_out, retry_buf.data.data(), retry_buf.data.size());
         retry_buf.data.clear();
-        return retry_buf.return_value;
+        CO_RETURN retry_buf.return_value;
     }
-    int try_cast_host(
+    
+    CORO_TASK(int) try_cast_host(
         uint64_t protocol_version                          //version of the rpc call protocol
         , uint64_t zone_id
         , uint64_t object_id
@@ -68,12 +71,13 @@ extern "C"
         auto root_service = current_host_service.lock();
         if (!root_service)
         {
-            return rpc::error::TRANSPORT_ERROR();
+            CO_RETURN rpc::error::TRANSPORT_ERROR();
         }
-        int ret = root_service->try_cast(protocol_version, {zone_id}, {object_id}, {interface_id});
-        return ret;
+        int ret = CO_AWAIT root_service->try_cast(protocol_version, {zone_id}, {object_id}, {interface_id});
+        CO_RETURN ret;
     }
-    uint64_t add_ref_host(
+    
+    CORO_TASK(uint64_t) add_ref_host(
         uint64_t protocol_version                          //version of the rpc call protocol
         , uint64_t destination_channel_zone_id
         , uint64_t destination_zone_id
@@ -85,9 +89,9 @@ extern "C"
         auto root_service = current_host_service.lock();
         if (!root_service)
         {
-            return rpc::error::TRANSPORT_ERROR();
+            CO_RETURN rpc::error::TRANSPORT_ERROR();
         }
-        return root_service->add_ref(
+        CO_RETURN CO_AWAIT root_service->add_ref(
             protocol_version, 
             {destination_channel_zone_id}, 
             {destination_zone_id}, 
@@ -96,7 +100,8 @@ extern "C"
             {caller_zone_id}, 
             static_cast<rpc::add_ref_options>(build_out_param_channel));
     }
-    uint64_t release_host(
+    
+    CORO_TASK(uint64_t) release_host(
         uint64_t protocol_version                          //version of the rpc call protocol
         , uint64_t zone_id
         , uint64_t object_id
@@ -105,9 +110,9 @@ extern "C"
         auto root_service = current_host_service.lock();
         if (!root_service)
         {
-            return rpc::error::TRANSPORT_ERROR();
+            CO_RETURN rpc::error::TRANSPORT_ERROR();
         }
-        return root_service->release(protocol_version, {zone_id}, {object_id}, {caller_zone_id});
+        CO_RETURN CO_AWAIT root_service->release(protocol_version, {zone_id}, {object_id}, {caller_zone_id});
     }
 
     void rpc_log(const char* str, size_t sz)

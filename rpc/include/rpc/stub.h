@@ -55,7 +55,7 @@ namespace rpc
 
         service& get_zone() const { return zone_; }
 
-        int call(
+        CORO_TASK(int) call(
             uint64_t protocol_version
             , rpc::encoding enc
             , caller_channel_zone caller_channel_zone_id
@@ -79,11 +79,11 @@ namespace rpc
     protected:
         //here to be able to call private function
         template<class T>
-        interface_descriptor stub_bind_out_param(
+        CORO_TASK(interface_descriptor) stub_bind_out_param(
             rpc::service& zone
             , uint64_t protocol_version, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, const shared_ptr<T>& iface)
         {
-            return zone.stub_bind_out_param(protocol_version
+            CO_RETURN CO_AWAIT zone.stub_bind_out_param(protocol_version
             , caller_channel_zone_id
             , caller_zone_id
             , iface);
@@ -92,7 +92,7 @@ namespace rpc
     public:
         virtual ~i_interface_stub() = default;
         virtual interface_ordinal get_interface_id(uint64_t rpc_version) const = 0;
-        virtual int call(uint64_t protocol_version, rpc::encoding enc, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, method method_id, size_t in_size_, const char* in_buf_, std::vector<char>& out_buf_)
+        virtual CORO_TASK(int) call(uint64_t protocol_version, rpc::encoding enc, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, method method_id, size_t in_size_, const char* in_buf_, std::vector<char>& out_buf_)
             = 0;
         virtual int cast(interface_ordinal interface_id, shared_ptr<i_interface_stub>& new_stub) = 0;
         virtual weak_ptr<object_stub> get_object_stub() const = 0;

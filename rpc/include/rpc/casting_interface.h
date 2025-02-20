@@ -39,14 +39,7 @@ namespace rpc
     template<class T>
     bool match(rpc::interface_ordinal interface_id)
     {
-        return 
-            #ifdef RPC_V2
-                T::get_id(rpc::VERSION_2) == interface_id
-            #endif
-            #if !defined(RPC_V2)
-                false
-            #endif
-            ;
+        return T::get_id(rpc::VERSION_2) == interface_id;
     }
     
     //these will soon be superfluous

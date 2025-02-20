@@ -4,7 +4,13 @@
 ]]
 cmake_minimum_required(VERSION 3.24)
 
-add_executable(rpc_test main.cpp rpc_log.cpp)
+if(BUILD_COROUTINE)
+  set(COROUTINE_LIBS libcoro)
+endif()
+
+add_executable(rpc_test main.cpp 
+# rpc_log.cpp 
+${COROUTINE_TESTS})
 
 target_compile_definitions(rpc_test PRIVATE ${HOST_DEFINES})
 
@@ -18,7 +24,7 @@ target_include_directories(
 if(BUILD_ENCLAVE)
   set(ENCLAVE_DEPENDANCIES marshal_test_edl_host rpc_telemetry_edl_header_host)
 endif()
-  
+
 target_link_libraries(
   rpc_test
   PUBLIC common_host
@@ -32,6 +38,7 @@ target_link_libraries(
          GTest::gtest_main
          GTest::gmock_main
          spdlog::spdlog
+         libcoro
          ${ENCLAVE_DEPENDANCIES}
          ${HOST_LIBRARIES})
 

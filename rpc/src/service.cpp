@@ -188,7 +188,7 @@ namespace rpc
         return success;
     }
 
-    int service::send(
+    CORO_TASK(int) service::send(
         uint64_t protocol_version, 
         encoding encoding, 
         uint64_t tag, 
@@ -218,9 +218,9 @@ namespace rpc
             if(!other_zone)
             {
                 RPC_ASSERT(false);
-                return rpc::error::ZONE_NOT_FOUND();
+                CO_RETURN rpc::error::ZONE_NOT_FOUND();
             }
-            return other_zone->send(
+            CO_RETURN CO_AWAIT other_zone->send(
                 protocol_version, 
                 encoding, 
                 tag,
@@ -236,48 +236,47 @@ namespace rpc
         }
         else
         {
-#ifdef RPC_V2
             if(protocol_version == rpc::VERSION_2)
             ;
             else 
-#endif
             {
-                return rpc::error::INCOMPATIBLE_SERVICE();
+                CO_RETURN rpc::error::INCOMPATIBLE_SERVICE();
             }
             rpc::weak_ptr<object_stub> weak_stub = get_object(object_id);
             auto stub = weak_stub.lock();
             if (stub == nullptr)
             {
-                return rpc::error::INVALID_DATA();
+                CO_RETURN rpc::error::INVALID_DATA();
             }
             std::for_each(service_loggers.begin(), service_loggers.end(), [&](const std::shared_ptr<service_logger>& logger){
                 logger->before_send(caller_zone_id, object_id, interface_id, method_id, in_size_, in_buf_ ? in_buf_ : "");
             });
 
-            auto ret = stub->call(protocol_version, encoding, caller_channel_zone_id, caller_zone_id, interface_id, method_id, in_size_, in_buf_, out_buf_);
+            auto ret = CO_AWAIT stub->call(protocol_version, encoding, caller_channel_zone_id, caller_zone_id, interface_id, method_id, in_size_, in_buf_, out_buf_);
 
             std::for_each(service_loggers.begin(), service_loggers.end(), [&](const std::shared_ptr<service_logger>& logger){
                 logger->after_send(caller_zone_id, object_id, interface_id, method_id, ret, out_buf_);
             });
 
-            return ret;
+            CO_RETURN ret;
         }
     }
     
-    void service::clean_up_on_failed_connection(const rpc::shared_ptr<service_proxy>& destination_zone, rpc::shared_ptr<rpc::casting_interface> input_interface)
+    CORO_TASK(void) service::clean_up_on_failed_connection(const rpc::shared_ptr<service_proxy>& destination_zone, rpc::shared_ptr<rpc::casting_interface> input_interface)
     {
         if(destination_zone && input_interface)
         {
             auto object_id = input_interface->query_proxy_base()->get_object_proxy()->get_object_id();
-            auto ret = destination_zone->sp_release(object_id);                    
+            auto ret = CO_AWAIT destination_zone->sp_release(object_id);                    
             if(ret != std::numeric_limits<uint64_t>::max())
             {
                 destination_zone->release_external_ref();            
             }
         }
+        CO_RETURN;
     }
     
-    interface_descriptor service::prepare_remote_input_interface(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, rpc::proxy_base* base, rpc::shared_ptr<service_proxy>& destination_zone)
+    CORO_TASK(interface_descriptor) service::prepare_remote_input_interface(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, rpc::proxy_base* base, rpc::shared_ptr<service_proxy>& destination_zone)
     {
         auto object_proxy = base->get_object_proxy();
         auto object_service_proxy = object_proxy->get_service_proxy();
@@ -326,7 +325,7 @@ namespace rpc
 
         //the fork is here so we need to add ref the destination normally with caller info
         //note the caller_channel_zone_id is is this zones id as the caller came from a route via this node
-        destination_zone->add_ref(
+        int count = CO_AWAIT destination_zone->add_ref(
             rpc::get_version(),
             destination_channel_zone_id, 
             destination_zone_id, 
@@ -334,11 +333,13 @@ namespace rpc
             zone_id_.as_caller_channel(), 
             caller_zone_id, 
             rpc::add_ref_options::build_destination_route);
+        if(count < 0)
+            std::ignore = count;//do some checks here
 
-        return {object_id, destination_zone_id};         
+        CO_RETURN {object_id, destination_zone_id};         
     }
     
-    interface_descriptor service::prepare_out_param(uint64_t protocol_version, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, rpc::proxy_base* base)
+    CORO_TASK(interface_descriptor) service::prepare_out_param(uint64_t protocol_version, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, rpc::proxy_base* base)
     {
         auto object_proxy = base->get_object_proxy();
         auto object_service_proxy = object_proxy->get_service_proxy();
@@ -373,7 +374,7 @@ namespace rpc
                     , rpc::add_ref_options::build_caller_route | rpc::add_ref_options::build_destination_route);    
             }   
 #endif                             
-            object_service_proxy->add_ref(
+            uint64_t recount = CO_AWAIT object_service_proxy->add_ref(
                 protocol_version,
                 {0}, 
                 destination_zone_id, 
@@ -381,6 +382,7 @@ namespace rpc
                 {0}, 
                 caller_zone_id, 
                 rpc::add_ref_options::build_caller_route | rpc::add_ref_options::build_destination_route);
+            std::ignore = recount;
         }
         else
         {
@@ -413,7 +415,7 @@ namespace rpc
                         if(alternative == other_zones.end() || alternative->first.dest != caller_zone_id.as_destination())
                         {
                             RPC_ASSERT(!!"alternative route to caller zone is not found");
-                            return {};
+                            CO_RETURN {};
                         }
                         
                         auto alternative_caller_service_proxy = alternative->second.lock();
@@ -446,7 +448,7 @@ namespace rpc
 
             //the fork is here so we need to add ref the destination normally with caller info
             //note the caller_channel_zone_id is is this zones id as the caller came from a route via this node
-            destination_zone->add_ref(
+            auto refcount = CO_AWAIT destination_zone->add_ref(
                 protocol_version,
                 {0}, 
                 destination_zone_id, 
@@ -454,6 +456,7 @@ namespace rpc
                 zone_id_.as_caller_channel(), 
                 caller_zone_id, 
                 rpc::add_ref_options::build_destination_route);
+            std::ignore = refcount;
             
             
 #ifdef USE_RPC_TELEMETRY
@@ -470,7 +473,7 @@ namespace rpc
 #endif                    
             
             //note the caller_channel_zone_id is 0 as the caller came from this route 
-            caller->add_ref(
+            auto recount = CO_AWAIT caller->add_ref(
                 protocol_version,
                 zone_id_.as_destination_channel(), 
                 destination_zone_id, 
@@ -478,15 +481,16 @@ namespace rpc
                 {0}, 
                 caller_zone_id, 
                 rpc::add_ref_options::build_caller_route);
+            std::ignore = refcount;
         }
  
-        return {object_id, destination_zone_id};
+        CO_RETURN {object_id, destination_zone_id};
     }    
 
     //this is a key function that returns an interface descriptor
     //for wrapping an implementation to a local object inside a stub where needed
     //or if the interface is a proxy to add ref it
-    interface_descriptor service::get_proxy_stub_descriptor(uint64_t protocol_version, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, rpc::casting_interface* iface,
+    CORO_TASK(interface_descriptor) service::get_proxy_stub_descriptor(uint64_t protocol_version, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, rpc::casting_interface* iface,
                                         std::function<rpc::shared_ptr<i_interface_stub>(rpc::shared_ptr<object_stub>)> fn,
                                         bool outcall,
                                         rpc::shared_ptr<object_stub>& stub)
@@ -500,7 +504,7 @@ namespace rpc
             }
             if(proxy_base)
             {
-                return prepare_out_param(protocol_version, caller_channel_zone_id, caller_zone_id, proxy_base);
+                CO_RETURN CO_AWAIT prepare_out_param(protocol_version, caller_channel_zone_id, caller_zone_id, proxy_base);
             }
         }
         
@@ -567,7 +571,7 @@ namespace rpc
             }      
 #endif                      
                 //note the caller_channel_zone_id is 0 as the caller came from this route 
-            caller->add_ref(
+            auto refcount = CO_AWAIT caller->add_ref(
                 protocol_version,
                 {0}, 
                 zone_id_.as_destination(), 
@@ -575,8 +579,9 @@ namespace rpc
                 {0}, 
                 caller_zone_id, 
                 rpc::add_ref_options::build_caller_route);        
+            std::ignore = refcount;
         }        
-        return {stub->get_id(), zone_id_.as_destination()};
+        CO_RETURN {stub->get_id(), zone_id_.as_destination()};
     }
 
     rpc::weak_ptr<object_stub> service::get_object(object object_id) const
@@ -592,7 +597,7 @@ namespace rpc
 
         return item->second;
     }
-    int service::try_cast(
+    CORO_TASK(int) service::try_cast(
         uint64_t protocol_version, 
         destination_zone destination_zone_id, 
         object object_id, 
@@ -613,7 +618,7 @@ namespace rpc
             if(!other_zone)
             {
                 RPC_ASSERT(false);
-                return rpc::error::ZONE_NOT_FOUND();
+                CO_RETURN rpc::error::ZONE_NOT_FOUND();
             }
 #ifdef USE_RPC_TELEMETRY
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
@@ -621,27 +626,25 @@ namespace rpc
                 telemetry_service->on_service_try_cast(zone_id_, destination_zone_id, {0}, object_id, interface_id);
             }
 #endif            
-            return other_zone->try_cast(protocol_version, destination_zone_id, object_id, interface_id);
+            CO_RETURN CO_AWAIT other_zone->try_cast(protocol_version, destination_zone_id, object_id, interface_id);
         }
         else
         {
-#ifdef RPC_V2
             if(protocol_version == rpc::VERSION_2)
             ;
             else 
-#endif
             {
-                return rpc::error::INCOMPATIBLE_SERVICE();
+                CO_RETURN rpc::error::INCOMPATIBLE_SERVICE();
             }
             rpc::weak_ptr<object_stub> weak_stub = get_object(object_id);
             auto stub = weak_stub.lock();
             if (!stub)
-                return error::INVALID_DATA();
-            return stub->try_cast(interface_id);
+                CO_RETURN error::INVALID_DATA();
+            CO_RETURN stub->try_cast(interface_id);
         }
     }
 
-    uint64_t service::add_ref(
+    CORO_TASK(uint64_t) service::add_ref(
         uint64_t protocol_version, 
         destination_channel_zone destination_channel_zone_id, 
         destination_zone destination_zone_id, 
@@ -717,7 +720,7 @@ namespace rpc
                         , build_out_param_channel);
                 }    
 #endif                
-                return destination->add_ref(
+                CO_RETURN CO_AWAIT destination->add_ref(
                     protocol_version, 
                     {0}, 
                     destination_zone_id, 
@@ -802,7 +805,7 @@ namespace rpc
                                 }  
 #endif                                                                      
 
-                                auto ret = destination->add_ref(
+                                auto ret = CO_AWAIT destination->add_ref(
                                     protocol_version, 
                                     {0}, 
                                     destination_zone_id, 
@@ -813,7 +816,7 @@ namespace rpc
                                 destination->release_external_ref();//perhaps this could be optimised
                                 if(ret == std::numeric_limits<uint64_t>::max())
                                 {
-                                    return ret;
+                                    CO_RETURN ret;
                                 }
                                 break;
                             }
@@ -834,7 +837,7 @@ namespace rpc
                                     , add_ref_options::build_destination_route);
                             }        
 #endif                                                        
-                            destination->add_ref(
+                            auto ret = CO_AWAIT destination->add_ref(
                                 protocol_version, 
                                 {0}, 
                                 destination_zone_id, 
@@ -842,6 +845,7 @@ namespace rpc
                                 zone_id_.as_caller_channel(), 
                                 caller_zone_id, 
                                 add_ref_options::build_destination_route);
+                            std::ignore = ret;
                         }
                         //back fill the ref count to the caller
                         if(!!(build_out_param_channel & add_ref_options::build_caller_route))
@@ -859,7 +863,7 @@ namespace rpc
                             }        
 #endif
                                                         
-                            caller->add_ref(
+                            auto ret = CO_AWAIT caller->add_ref(
                                 protocol_version, 
                                 zone_id_.as_destination_channel(), 
                                 destination_zone_id, 
@@ -867,11 +871,12 @@ namespace rpc
                                 caller_channel_zone_id, 
                                 caller_zone_id, 
                                 add_ref_options::build_caller_route);
+                            std::ignore = ret;
                         }
                     }while(false);
                 }
 
-                return 1;
+                CO_RETURN 1;
             }
             else
             {
@@ -918,7 +923,7 @@ namespace rpc
                 }
 #endif
                 
-                return other_zone->add_ref(
+                CO_RETURN CO_AWAIT other_zone->add_ref(
                     protocol_version, 
                     {0}, 
                     destination_zone_id, 
@@ -930,13 +935,11 @@ namespace rpc
         }
         else
         {
-#ifdef RPC_V2
             if(protocol_version == rpc::VERSION_2)
             ;
             else 
-#endif
             {
-                return std::numeric_limits<uint64_t>::max();
+                CO_RETURN std::numeric_limits<uint64_t>::max();
             }
 
             //find the caller
@@ -971,7 +974,7 @@ namespace rpc
                         , add_ref_options::build_caller_route);
                 }      
 #endif                                  
-                caller->add_ref(
+                auto refcount = CO_AWAIT caller->add_ref(
                     protocol_version, 
                     {0},
                     destination_zone_id, 
@@ -979,10 +982,11 @@ namespace rpc
                     {}, 
                     caller_zone_id, 
                     add_ref_options::build_caller_route);
+                std::ignore = refcount;
             }
             if(object_id == dummy_object_id)
             {
-                return 0;
+                CO_RETURN 0;
             }
 
             rpc::weak_ptr<object_stub> weak_stub = get_object(object_id);
@@ -990,9 +994,9 @@ namespace rpc
             if (!stub)
             {
                 RPC_ASSERT(false);
-                return std::numeric_limits<uint64_t>::max();
+                CO_RETURN std::numeric_limits<uint64_t>::max();
             }
-            return stub->add_ref();
+            CO_RETURN stub->add_ref();
         }
     }
 
@@ -1023,7 +1027,7 @@ namespace rpc
         return count;
     }
 
-    uint64_t service::release(
+    CORO_TASK(uint64_t) service::release(
         uint64_t protocol_version, 
         destination_zone destination_zone_id, 
         object object_id, 
@@ -1046,18 +1050,18 @@ namespace rpc
             if(!other_zone)
             {
                 RPC_ASSERT(false);
-                return std::numeric_limits<uint64_t>::max();
+                CO_RETURN std::numeric_limits<uint64_t>::max();
             }
 #ifdef USE_RPC_TELEMETRY
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
                 telemetry_service->on_service_release(zone_id_, other_zone->get_destination_channel_zone_id(), destination_zone_id, object_id, caller_zone_id);    
 #endif                
-            auto ret = other_zone->sp_release(object_id);
+            auto ret = CO_AWAIT other_zone->sp_release(object_id);
             if(ret != std::numeric_limits<uint64_t>::max())
             {
                 other_zone->release_external_ref();
             }
-            return ret;
+            CO_RETURN ret;
         }
         else
         {
@@ -1066,13 +1070,11 @@ namespace rpc
                 telemetry_service->on_service_release(zone_id_, {0}, destination_zone_id, object_id, caller_zone_id);    
 #endif                
 
-#ifdef RPC_V2
             if(protocol_version == rpc::VERSION_2)
             ;
             else 
-#endif
             {
-                return std::numeric_limits<uint64_t>::max();
+                CO_RETURN std::numeric_limits<uint64_t>::max();
             }
 
             bool reset_stub = false;
@@ -1087,7 +1089,7 @@ namespace rpc
                     if (item == stubs.end())
                     {
                         RPC_ASSERT(false);
-                        return std::numeric_limits<uint64_t>::max();
+                        CO_RETURN std::numeric_limits<uint64_t>::max();
                     }
 
                     stub = item->second.lock();
@@ -1096,7 +1098,7 @@ namespace rpc
                 if (!stub)
                 {
                     RPC_ASSERT(false);
-                    return std::numeric_limits<uint64_t>::max();
+                    CO_RETURN std::numeric_limits<uint64_t>::max();
                 }
                 //this guy needs to live outside of the mutex or deadlocks may happen
                 count = stub->release();
@@ -1118,7 +1120,7 @@ namespace rpc
                             else
                             {
                                 RPC_ASSERT(false);
-                                return std::numeric_limits<uint64_t>::max();
+                                CO_RETURN std::numeric_limits<uint64_t>::max();
                             }
                         }
                     }
@@ -1130,7 +1132,7 @@ namespace rpc
             if(reset_stub)
                 stub->reset();        
 
-            return count;
+                CO_RETURN count;
         }
     }
     
@@ -1252,14 +1254,7 @@ namespace rpc
     int service::create_interface_stub(rpc::interface_ordinal interface_id, std::function<interface_ordinal(uint8_t)> interface_getter, const rpc::shared_ptr<rpc::i_interface_stub>& original, rpc::shared_ptr<rpc::i_interface_stub>& new_stub)
     {
         //an identity check, send back the same pointer
-        if(
-#ifdef RPC_V2
-                interface_getter(rpc::VERSION_2) == interface_id
-#endif
-#if !defined(RPC_V2)
-                false
-#endif
-        )
+        if(interface_getter(rpc::VERSION_2) == interface_id)
         {
             new_stub = rpc::static_pointer_cast<rpc::i_interface_stub>(original);
             return rpc::error::OK();
@@ -1283,7 +1278,6 @@ namespace rpc
     //note this function is not thread safe!  Use it before using the service class for normal operation
     void service::add_interface_stub_factory(std::function<interface_ordinal (uint8_t)> id_getter, std::shared_ptr<std::function<rpc::shared_ptr<rpc::i_interface_stub>(const rpc::shared_ptr<rpc::i_interface_stub>&)>> factory)
     {
-#ifdef RPC_V2
         auto interface_id = id_getter(rpc::VERSION_2);
         auto it = stub_factories.find({interface_id});
         if(it != stub_factories.end())
@@ -1291,7 +1285,6 @@ namespace rpc
             rpc::error::INVALID_DATA();
         }
         stub_factories[{interface_id}] = factory;
-#endif
     }
 
     rpc::shared_ptr<casting_interface> service::get_castable_interface(object object_id, interface_ordinal interface_id)

@@ -1,6 +1,11 @@
 #include <iostream>
 
+#if __cplusplus == 202002L
+#define fmt std
+#include <format>
+#else
 #include <fmt/format.h>
+#endif
 
 #include "helpers.h"
 #include "coreclasses.h"

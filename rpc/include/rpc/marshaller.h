@@ -60,7 +60,7 @@ namespace rpc
     {
     public:
         virtual ~i_marshaller() = default;
-        virtual int send(
+        virtual CORO_TASK(int) send(
             uint64_t protocol_version 
 			, encoding encoding 
 			, uint64_t tag 
@@ -74,12 +74,12 @@ namespace rpc
             , const char* in_buf_ 
             , std::vector<char>& out_buf_)
             = 0;
-        virtual int try_cast(            
+        virtual CORO_TASK(int) try_cast(            
             uint64_t protocol_version 
             , destination_zone destination_zone_id 
             , object object_id 
             , interface_ordinal interface_id) = 0;
-        virtual uint64_t add_ref(
+        virtual CORO_TASK(uint64_t) add_ref(
             uint64_t protocol_version 
             , destination_channel_zone destination_channel_zone_id 
             , destination_zone destination_zone_id 
@@ -87,7 +87,7 @@ namespace rpc
             , caller_channel_zone caller_channel_zone_id 
             , caller_zone caller_zone_id 
             , add_ref_options build_out_param_channel ) = 0;
-        virtual uint64_t release(
+        virtual CORO_TASK(uint64_t) release(
             uint64_t protocol_version 
             , destination_zone destination_zone_id 
             , object object_id 

@@ -37,7 +37,7 @@ namespace rpc
             , const rpc::shared_ptr<service>& svc
             , std::string filename);
         
-        int connect(rpc::interface_descriptor input_descr, rpc::interface_descriptor& output_descr) override;
+        CORO_TASK(int) connect(rpc::interface_descriptor input_descr, rpc::interface_descriptor& output_descr) override;
 
         int send(
             uint64_t protocol_version, 

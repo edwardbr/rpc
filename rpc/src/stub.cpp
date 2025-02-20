@@ -38,9 +38,7 @@ namespace rpc
     //or by an internal call by this class
     void object_stub::add_interface(const rpc::shared_ptr<i_interface_stub>& iface)
     {
-#ifdef RPC_V2
         stub_map[iface->get_interface_id(rpc::VERSION_2)] = iface;
-#endif
     }
 
     rpc::shared_ptr<i_interface_stub> object_stub::get_interface(interface_ordinal interface_id)
@@ -52,7 +50,7 @@ namespace rpc
         return res->second;
     }
 
-    int object_stub::call(
+    CORO_TASK(int) object_stub::call(
         uint64_t protocol_version
         , rpc::encoding enc
         , caller_channel_zone caller_channel_zone_id
@@ -74,9 +72,9 @@ namespace rpc
         }
         if(stub)
         {
-            return stub->call(protocol_version, enc, caller_channel_zone_id, caller_zone_id, method_id, in_size_, in_buf_, out_buf_);
+            CO_RETURN CO_AWAIT stub->call(protocol_version, enc, caller_channel_zone_id, caller_zone_id, method_id, in_size_, in_buf_, out_buf_);
         }        
-        return rpc::error::INVALID_INTERFACE_ID();
+        CO_RETURN rpc::error::INVALID_INTERFACE_ID();
     }
 
     int object_stub::try_cast(interface_ordinal interface_id)
