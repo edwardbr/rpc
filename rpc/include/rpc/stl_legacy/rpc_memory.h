@@ -28,6 +28,8 @@
 
 #include "rpc/logger.h"
 
+#include "rpc/coroutine_support.h"
+
 #ifdef DUMP_REF_COUNT
     #define LOG(str, sz) LOG_STR(str, sz)
 #else
@@ -2021,21 +2023,21 @@ element_type*>::value>> shared_ptr(unique_ptr<_Yp, _Dp>&& __r) : __ptr_(__r.get(
     }
 
     template<class T1, class T2>
-    [[nodiscard]] inline shared_ptr<T1> dynamic_pointer_cast(const shared_ptr<T2>& from) noexcept
+    [[nodiscard]] inline CORO_TASK(shared_ptr<T1>) dynamic_pointer_cast(const shared_ptr<T2>& from) noexcept
     {
         if(!from)
-            return nullptr;
+            CO_RETURN nullptr;
             
         T1* ptr = nullptr;
-#ifdef RPC_V2
+
         ptr = const_cast<T1*>(static_cast<const T1*>(from->query_interface(T1::get_id(rpc::VERSION_2))));
         if (ptr)
-            return shared_ptr<T1>(from, ptr);
-#endif
+            CO_RETURN shared_ptr<T1>(from, ptr);
+
         auto proxy_ = from->query_proxy_base();
         if (!proxy_)
         {
-            return shared_ptr<T1>();
+            CO_RETURN shared_ptr<T1>();
         }
         auto ob = proxy_->get_object_proxy();
         shared_ptr<T1> ret;
@@ -2044,8 +2046,8 @@ element_type*>::value>> shared_ptr(unique_ptr<_Yp, _Dp>&& __r) : __ptr_(__r.get(
         //behaves the same as with normal dynamic_pointer_cast in that you can use this function to
         //cast back to the original.  Hoever static_pointer_cast in this case will not work, for
         //remote interfaces.
-        ob->template query_interface<T1>(ret);
-        return ret;
+        CO_AWAIT ob->template query_interface<T1>(ret);
+        CO_RETURN ret;
     }
 }
 

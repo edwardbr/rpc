@@ -13,7 +13,11 @@ if(NOT DEPENDENCIES_LOADED)
   option(BUILD_ENCLAVE "build enclave code" ON)
   option(BUILD_HOST "build host code" ON)
   option(BUILD_EXE "build exe code" ON)
-  option(BUILD_TEST "build test code" ON)
+  # When building Core, BUILD_TEST is always explicitly defined to ON or OFF, but not necessarily when used in
+  # standalone apps, where we want OFF by default
+  option(BUILD_TEST "build test code, including backdoors in raft idl" OFF)
+  option(BUILD_COROUTINE "Include coroutine support" OFF)
+  # secretarium exe is needed for measurement, so don't default to ON if it is not built
   option(DEBUG_HOST_LEAK "enable leak sanitizer (only use when ptrace is accessible)" OFF)
   option(DEBUG_HOST_ADDRESS "enable address sanitizer" OFF)
   option(DEBUG_HOST_THREAD "enable thread sanitizer (cannot be used with leak sanitizer)" OFF)
@@ -60,7 +64,7 @@ if(NOT DEPENDENCIES_LOADED)
   message("ENABLE_CLANG_TIDY  ${ENABLE_CLANG_TIDY}")
   message("ENABLE_CLANG_TIDY_FIX  ${ENABLE_CLANG_TIDY_FIX}")
 
-  set(CMAKE_CXX_STANDARD 17)
+  set(CMAKE_CXX_STANDARD 20)
   set(CMAKE_CXX_STANDARD_REQUIRED ON)
   set(CMAKE_CXX_EXTENSIONS OFF)
   set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -152,7 +156,16 @@ if(NOT DEPENDENCIES_LOADED)
   else()
     set(USE_RPC_TELEMETRY_RAII_LOGGING_FLAG)
   endif()
-
+  if(BUILD_ENCLAVE)
+    set(BUILD_ENCLAVE_FLAG BUILD_ENCLAVE)
+  else()
+    set(BUILD_ENCLAVE_FLAG)
+  endif()  
+  if(${BUILD_COROUTINE})
+    set(BUILD_COROUTINE_FLAG BUILD_COROUTINE)
+  else()    
+    set(BUILD_COROUTINE_FLAG)
+  endif()
   if(${ENCLAVE_TARGET} STREQUAL "SGX")
     if(${SGX_HW}) # not simulation
       set(SGX_HW_OR_SIM_DEFINE SGX_HW)
@@ -167,6 +180,8 @@ if(NOT DEPENDENCIES_LOADED)
         NOMINMAX
         _SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS
         ${USE_RPC_LOGGING_FLAG}
+        ${BUILD_ENCLAVE_FLAG}
+        ${BUILD_COROUTINE_FLAG}
         ${RPC_HANG_ON_FAILED_ASSERT_FLAG}
         ${USE_RPC_TELEMETRY_FLAG}
         ${USE_RPC_TELEMETRY_RAII_LOGGING_FLAG}
@@ -519,6 +534,12 @@ if(NOT DEPENDENCIES_LOADED)
           -Wno-gnu-zero-variadic-macro-arguments
           ${EXTRA_COMPILE_OPTIONS}
           ${OPTIMIZER_FLAGS})
+          
+      if(BUILD_COROUTINE)
+        list(APPEND SHARED_COMPILE_OPTIONS 
+        # -fcoroutines
+        )
+      endif()
 
       message("CMAKE_CXX_COMPILER_ID ${CMAKE_CXX_COMPILER_ID}")
       if(${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang")

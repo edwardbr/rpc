@@ -29,13 +29,26 @@ if(RPC_STANDALONE)
 
   add_subdirectory(idlparser)
 
-  message("spdlog this is used in tests only and does not need to be installed for other users")
-  set(SPDLOG_FMT_EXTERNAL
-      ON
-      CACHE BOOL "external fmt" FORCE)
-  set(SPDLOG_NO_EXCEPTIONS
-      ON
-      CACHE BOOL "no exceptions" FORCE)
-  set(SPDLOG_INSTALL OFF)
-  add_subdirectory(spdlog)
+  if(BUILD_TEST)
+    message("spdlog this is used in tests only and does not need to be installed for other users")
+    set(SPDLOG_FMT_EXTERNAL
+        ON
+        CACHE BOOL "external fmt" FORCE)
+    set(SPDLOG_NO_EXCEPTIONS
+        ON
+        CACHE BOOL "no exceptions" FORCE)
+    set(SPDLOG_INSTALL OFF)
+    add_subdirectory(spdlog)
+  endif(BUILD_TEST)
+  
+  # if(BUILD_COROUTINE)
+    set(CARES_STATIC    $<NOT:${LIBCORO_BUILD_SHARED_LIBS}> CACHE INTERNAL "")
+    set(CARES_SHARED    ${LIBCORO_BUILD_SHARED_LIBS} CACHE INTERNAL "")
+    set(CARES_INSTALL   OFF CACHE INTERNAL "")
+
+    # set(c-ares_DIR "${CMAKE_SOURCE_DIR}/submodules/c-ares")
+    #   list(APPEND CMAKE_PREFIX_PATH "${CMAKE_SOURCE_DIR}/submodules/c-ares")
+    add_subdirectory(c-ares)
+    add_subdirectory(libcoro)
+  # endif()
 endif()

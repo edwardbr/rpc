@@ -758,7 +758,7 @@ namespace rpc_generator
                     || item == rpc_attribute_types::fingerprint_contaminating_deprecated_function)
                     header.raw("[[deprecated]] ");
             }
-            header.raw("virtual {} {}(", function->get_return_type(), function->get_name());
+            header.raw("virtual CORO_TASK({}) {}(", function->get_return_type(), function->get_name());
             bool has_parameter = false;
             for (auto& parameter : function->get_parameters())
             {

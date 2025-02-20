@@ -5,13 +5,13 @@
 
 cmake_minimum_required(VERSION 3.24)
 
-if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC" OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+# if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC" OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   message("using legacy")
   set(REMOTE_PTR_CPP src/remote_pointer.cpp)
-else()
-  message("using clang12")
-  set(REMOTE_PTR_CPP)
-endif()
+# else()
+#   message("using clang12")
+#   set(REMOTE_PTR_CPP)
+# endif()
 
 if(USE_RPC_TELEMETRY)
   set(ENCLAVE_TELEMETRY_SERVICE rpc::rpc_telemetry_enclave)
@@ -88,6 +88,7 @@ target_include_directories(
 target_link_libraries(
   rpc_host
   PUBLIC ${TELEMETRY_INTERFACE} ${HOST_TELEMETRY_SERVICE}
+  libcoro
   PRIVATE yas_common ${HOST_LIBRARIES})
 
 target_compile_options(rpc_host PRIVATE ${HOST_COMPILE_OPTIONS} ${WARN_OK})

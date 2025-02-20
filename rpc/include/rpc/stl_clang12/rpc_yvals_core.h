@@ -1387,7 +1387,7 @@
 #if _HAS_CXX20
 #define __cpp_lib_shared_ptr_arrays 201707L // P0674R1 make_shared() For Arrays
 #else // _HAS_CXX20
-#define __cpp_lib_shared_ptr_arrays 201611L // P0497R0 Fixing shared_ptr For Arrays
+// #define __cpp_lib_shared_ptr_arrays 201611L // P0497R0 Fixing shared_ptr For Arrays
 #endif // _HAS_CXX20
 
 #if defined(__cpp_impl_coroutine) || defined(_DOWNLEVEL_COROUTINES_SUPPORTED) // TRANSITION, Clang coroutine support

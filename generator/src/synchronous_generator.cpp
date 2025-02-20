@@ -367,7 +367,7 @@ namespace rpc_generator
                 return fmt::format("rpc::shared_ptr<rpc::object_stub> {}_stub_;", name);
             case PROXY_PREPARE_IN_INTERFACE_ID:
                 return fmt::format("RPC_ASSERT(rpc::are_in_same_zone(this, {0}.get()));\n"
-                                   "\t\t\tauto {0}_stub_id_ = proxy_bind_in_param(__rpc_sp->get_remote_rpc_version(), "
+                                   "\t\t\tauto {0}_stub_id_ = CO_AWAIT proxy_bind_in_param(__rpc_sp->get_remote_rpc_version(), "
                                    "{0}, {0}_stub_);",
                     name);
             case PROXY_MARSHALL_IN:
@@ -401,7 +401,7 @@ namespace rpc_generator
                     if (target_stub_strong)
                     {{
                         auto& zone_ = target_stub_strong->get_zone();
-                        __rpc_ret = rpc::stub_bind_in_param(protocol_version, zone_, caller_channel_zone_id, caller_zone_id, {1}_object_, {1});
+                        __rpc_ret = CO_AWAIT rpc::stub_bind_in_param(protocol_version, zone_, caller_channel_zone_id, caller_zone_id, {1}_object_, {1});
                     }}
                     else
                     {{
@@ -449,7 +449,7 @@ namespace rpc_generator
                 return fmt::format("rpc::shared_ptr<rpc::object_stub> {}_stub_;", name);
             case PROXY_PREPARE_IN_INTERFACE_ID:
                 return fmt::format("RPC_ASSERT(rpc::are_in_same_zone(this, {0}.get()));\n"
-                                   "\t\t\tauto {0}_stub_id_ = proxy_bind_in_param(__rpc_sp->get_remote_rpc_version(), "
+                                   "\t\t\tauto {0}_stub_id_ = CO_AWAIT proxy_bind_in_param(__rpc_sp->get_remote_rpc_version(), "
                                    "{0}, {0}_stub_);",
                     name);
             case PROXY_MARSHALL_IN:
@@ -470,14 +470,14 @@ namespace rpc_generator
                 return name;
             case PROXY_VALUE_RETURN:
                 return fmt::format(
-                    "rpc::proxy_bind_out_param(__rpc_sp, {0}_, __rpc_sp->get_zone_id().as_caller(), {0});", name);
+                    "auto {0}_ret = CO_AWAIT rpc::proxy_bind_out_param(__rpc_sp, {0}_, __rpc_sp->get_zone_id().as_caller(), {0}); std::ignore = {0}_ret;", name);
             case PROXY_OUT_DECLARATION:
                 return fmt::format("rpc::interface_descriptor {}_;", name);
             case STUB_ADD_REF_OUT_PREDECLARE:
                 return fmt::format("rpc::interface_descriptor {0}_;", name);
             case STUB_ADD_REF_OUT:
                 return fmt::format(
-                    "{0}_ = stub_bind_out_param(zone_, protocol_version, caller_channel_zone_id, caller_zone_id, {0});",
+                    "{0}_ = CO_AWAIT stub_bind_out_param(zone_, protocol_version, caller_channel_zone_id, caller_zone_id, {0});",
                     name);
             case STUB_MARSHALL_OUT:
                 return fmt::format("{}_, ", name);
@@ -690,7 +690,7 @@ namespace rpc_generator
                 stub("{{");
 
                 proxy.print_tabs();
-                proxy.raw("virtual {} {}(", function->get_return_type(), function->get_name());
+                proxy.raw("virtual CORO_TASK({}) {}(", function->get_return_type(), function->get_name());
                 bool has_parameter = false;
                 for (auto& parameter : function->get_parameters())
                 {
@@ -848,14 +848,14 @@ namespace rpc_generator
 
                     stub.raw("in_buf_, in_size_, enc);\n");
                     stub("if(__rpc_ret != rpc::error::OK())");
-                    stub("  return __rpc_ret;");
+                    stub("  CO_RETURN __rpc_ret;");
                 }
 
                 std::string tag = function->get_attribute_value("tag");
                 if (tag.empty())
                     tag = "0";
 
-                proxy("__rpc_ret = __rpc_op->send((uint64_t){}, {}::get_id, {{{}}}, __rpc_in_buf.size(), "
+                proxy("__rpc_ret = CO_AWAIT __rpc_op->send((uint64_t){}, {}::get_id, {{{}}}, __rpc_in_buf.size(), "
                       "__rpc_in_buf.data(), __rpc_out_buf);",
                     tag,
                     interface_name,
@@ -888,7 +888,7 @@ namespace rpc_generator
                         count++;
                     }
                 }
-                proxy("return __rpc_ret;");
+                proxy("CO_RETURN __rpc_ret;");
                 proxy("}}");
 
                 stub("//STUB_PARAM_WRAP");
@@ -928,7 +928,7 @@ namespace rpc_generator
                 }
 
                 stub.print_tabs();
-                stub.raw("__rpc_ret = __rpc_target_->{}(", function->get_name());
+                stub.raw("__rpc_ret = CO_AWAIT __rpc_target_->{}(", function->get_name());
 
                 {
                     bool has_param = false;
@@ -1136,7 +1136,7 @@ namespace rpc_generator
 
                     stub.raw("__rpc_out_buf, enc);\n");
                 }
-                stub("return __rpc_ret;");
+                stub("CO_RETURN __rpc_ret;");
 
                 proxy("//PROXY_VALUE_RETURN");
                 {
@@ -1190,7 +1190,7 @@ namespace rpc_generator
                     }
                 }
 
-                proxy("return __rpc_ret;");
+                proxy("CO_RETURN __rpc_ret;");
                 proxy("}}");
                 proxy("");
 
@@ -1322,7 +1322,7 @@ namespace rpc_generator
                 interface_name);
             proxy("");
 
-            stub("int {0}_stub::call(uint64_t protocol_version, rpc::encoding enc, rpc::caller_channel_zone "
+            stub("CORO_TASK(int) {0}_stub::call(uint64_t protocol_version, rpc::encoding enc, rpc::caller_channel_zone "
                  "caller_channel_zone_id, rpc::caller_zone caller_zone_id, rpc::method method_id, size_t in_size_, "
                  "const char* in_buf_, std::vector<char>& "
                  "__rpc_out_buf)",
@@ -1358,13 +1358,13 @@ namespace rpc_generator
                 }
 
                 stub("default:");
-                stub("return rpc::error::INVALID_METHOD_ID();");
+                stub("CO_RETURN rpc::error::INVALID_METHOD_ID();");
                 stub("}};");
             }
             proxy("}};");
             proxy("");
 
-            stub("return rpc::error::INVALID_METHOD_ID();");
+            stub("CO_RETURN rpc::error::INVALID_METHOD_ID();");
             stub("}}");
             stub("");
         };
@@ -1391,7 +1391,6 @@ namespace rpc_generator
                 ns);
             stub("{{");
             stub("auto ci = original->get_castable_interface();");
-            stub("#ifdef RPC_V2");
             stub("{{");
             stub("auto* tmp = const_cast<::{0}*>(static_cast<const "
                  "::{0}*>(ci->query_interface(::{0}::get_id(rpc::VERSION_2))));",
@@ -1404,7 +1403,6 @@ namespace rpc_generator
                 ns);
             stub("}}");
             stub("}}");
-            stub("#endif");
             stub("return nullptr;");
             stub("}}));");
         }
@@ -1470,7 +1468,7 @@ namespace rpc_generator
 
             stub("rpc::weak_ptr<rpc::object_stub> get_object_stub() const override {{ return target_stub_;}}");
             stub("void* get_pointer() const override {{ return __rpc_target_.get();}}");
-            stub("int call(uint64_t protocol_version, rpc::encoding enc, rpc::caller_channel_zone "
+            stub("CORO_TASK(int) call(uint64_t protocol_version, rpc::encoding enc, rpc::caller_channel_zone "
                  "caller_channel_zone_id, rpc::caller_zone caller_zone_id, rpc::method method_id, size_t in_size_, "
                  "const char* in_buf_, std::vector<char>& "
                  "__rpc_out_buf) override;");
@@ -1873,12 +1871,11 @@ namespace rpc_generator
                 build_scoped_name(owner, ns);
             }
 
-            header("template<> rpc::interface_descriptor "
+            header("template<> CORO_TASK(rpc::interface_descriptor) "
                    "rpc::service::proxy_bind_in_param(uint64_t protocol_version, const rpc::shared_ptr<::{}{}>& "
                    "iface, rpc::shared_ptr<rpc::object_stub>& stub);",
-                ns,
-                interface_name);
-            header("template<> rpc::interface_descriptor "
+                   ns, interface_name);
+            header("template<> CORO_TASK(rpc::interface_descriptor) "
                    "rpc::service::stub_bind_out_param(uint64_t protocol_version, caller_channel_zone "
                    "caller_channel_zone_id, caller_zone caller_zone_id, const rpc::shared_ptr<::{}{}>& "
                    "iface);",
@@ -1922,22 +1919,22 @@ namespace rpc_generator
             stub("}};");
             stub("}}");
 
-            stub("template<> interface_descriptor service::proxy_bind_in_param(uint64_t protocol_version, const "
+            stub("template<> CORO_TASK(interface_descriptor) service::proxy_bind_in_param(uint64_t protocol_version, const "
                  "shared_ptr<::{}{}>& iface, shared_ptr<object_stub>& stub)",
                 ns,
                 interface_name);
             stub("{{");
             stub("if(!iface)");
             stub("{{");
-            stub("return {{{{0}},{{0}}}};");
+            stub("CO_RETURN {{{{0}},{{0}}}};");
             stub("}}");
 
             stub("auto factory = create_interface_stub(iface);");
             stub(
-                "return get_proxy_stub_descriptor(protocol_version, {{0}}, {{0}}, iface.get(), factory, false, stub);");
+                "CO_RETURN CO_AWAIT get_proxy_stub_descriptor(protocol_version, {{0}}, {{0}}, iface.get(), factory, false, stub);");
             stub("}}");
 
-            stub("template<> interface_descriptor service::stub_bind_out_param(uint64_t protocol_version, "
+            stub("template<> CORO_TASK(interface_descriptor) service::stub_bind_out_param(uint64_t protocol_version, "
                  "caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, const shared_ptr<::{}{}>& "
                  "iface)",
                 ns,
@@ -1945,13 +1942,13 @@ namespace rpc_generator
             stub("{{");
             stub("if(!iface)");
             stub("{{");
-            stub("return {{{{0}},{{0}}}};");
+            stub("CO_RETURN {{{{0}},{{0}}}};");
             stub("}}");
 
             stub("shared_ptr<object_stub> stub;");
 
             stub("auto factory = create_interface_stub(iface);");
-            stub("return get_proxy_stub_descriptor(protocol_version, caller_channel_zone_id, caller_zone_id, "
+            stub("CO_RETURN CO_AWAIT get_proxy_stub_descriptor(protocol_version, caller_channel_zone_id, caller_zone_id, "
                  "iface.get(), factory, true, stub);");
             stub("}}");
         }
