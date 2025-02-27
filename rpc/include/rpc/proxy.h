@@ -507,56 +507,64 @@ namespace rpc
             CO_RETURN rpc::error::INCOMPATIBLE_SERVICE();   
         }
         
-        CORO_TASK(void) on_object_proxy_released(object object_id)
+        void on_object_proxy_released(object object_id)
         {
-            auto caller_zone_id = get_zone_id().as_caller();
-            RPC_ASSERT(caller_zone_id == get_caller_zone_id());
-
+            auto release_task = [this, keep_alive = shared_from_this(), object_id]() -> CORO_TASK(void)
             {
-                std::lock_guard l(insert_control_);
-                auto item = proxies_.find(object_id);
-                RPC_ASSERT(item  != proxies_.end());
-                if(item->second.lock() == nullptr)
+                auto caller_zone_id = get_zone_id().as_caller();
+                RPC_ASSERT(caller_zone_id == get_caller_zone_id());
+
                 {
-                    //the reason for this if statement is between an object weak pointer dying and this attempted entry being removed another object pointer object may have sneaked in and set to a non null value
-                    proxies_.erase(item);  
+                    std::lock_guard l(insert_control_);
+                    auto item = proxies_.find(object_id);
+                    RPC_ASSERT(item  != proxies_.end());
+                    if(item->second.lock() == nullptr)
+                    {
+                        //the reason for this if statement is between an object weak pointer dying and this attempted entry being removed another object pointer object may have sneaked in and set to a non null value
+                        proxies_.erase(item);  
+                    }
                 }
-            }
 
 #ifdef USE_RPC_TELEMETRY
-            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
-            {
-                telemetry_service->on_service_proxy_release(get_zone_id(),
-                                                                destination_zone_id_, destination_channel_zone_,  caller_zone_id, object_id);
-            }
-#endif            
-            
-            auto original_version = version_.load();
-            auto version = original_version;
-            while(version)
-            {
-                auto ret = CO_AWAIT release(
-                    version
-                    , destination_zone_id_ 
-                    , object_id 
-                    , caller_zone_id);
-                if(ret != std::numeric_limits<uint64_t>::max())
+                if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
                 {
-                    inner_release_external_ref();
-                    if(original_version != version)
-                    {
-                        version_.compare_exchange_strong( original_version, version);
-                    }
-                    CO_RETURN;
+                    telemetry_service->on_service_proxy_release(get_zone_id(),
+                                                                    destination_zone_id_, destination_channel_zone_,  caller_zone_id, object_id);
                 }
-                version--;
-            }
-            {
-                std::string message("unable to release on service");
-                LOG_STR(message.c_str(), message.size());
-                RPC_ASSERT(false);
-            }
-            CO_RETURN;   
+#endif            
+                
+                auto original_version = version_.load();
+                auto version = original_version;
+                while(version)
+                {
+                    auto ret = CO_AWAIT release(
+                        version
+                        , destination_zone_id_ 
+                        , object_id 
+                        , caller_zone_id);
+                    if(ret != std::numeric_limits<uint64_t>::max())
+                    {
+                        inner_release_external_ref();
+                        if(original_version != version)
+                        {
+                            version_.compare_exchange_strong( original_version, version);
+                        }
+                        CO_RETURN;
+                    }
+                    version--;
+                }
+                {
+                    std::string message("unable to release on service");
+                    LOG_STR(message.c_str(), message.size());
+                    RPC_ASSERT(false);
+                }
+                CO_RETURN;
+            };  
+#ifdef BUILD_COROUTINE
+            auto success = get_operating_zone_service()->schedule(release_task());
+#else
+            release_task()
+#endif
         }            
 
         std::unordered_map<object, rpc::weak_ptr<object_proxy>> get_proxies(){return proxies_;}
