@@ -46,6 +46,12 @@ namespace rpc
 #endif            
     }
 
+    service::service(const char* name, zone zone_id, const std::shared_ptr<coro::io_scheduler>& io_scheduler) 
+        : service(name, zone_id)
+    {
+        io_scheduler_ = io_scheduler;
+    }
+
     service::~service() 
     {
 #ifdef USE_RPC_TELEMETRY

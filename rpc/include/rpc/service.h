@@ -25,6 +25,10 @@
 #include <rpc/telemetry/i_telemetry_service.h>
 #endif
 
+#ifdef BUILD_COROUTINE
+#include <coro/io_scheduler.hpp>
+#endif
+
 namespace rpc
 {
     class i_interface_stub;
@@ -67,6 +71,10 @@ namespace rpc
         // map wrapped objects pointers to stubs
         std::map<void*, rpc::weak_ptr<object_stub>> wrapped_object_to_stub;
         std::string name_;
+        
+#ifdef BUILD_COROUTINE
+        std::shared_ptr<coro::io_scheduler> io_scheduler_;
+#endif
 
         struct zone_route
         {
@@ -97,9 +105,19 @@ namespace rpc
 
     public:
         explicit service(const char* name, zone zone_id);
+#ifdef BUILD_COROUTINE
+        explicit service(const char* name, zone zone_id, const std::shared_ptr<coro::io_scheduler>& v);
+#endif        
         virtual ~service();
 
         static zone generate_new_zone_id();
+        
+#ifdef BUILD_COROUTINE
+        auto schedule(coro::task<void>&& task) -> bool
+        {
+            return io_scheduler_->schedule(std::move(task));
+        }
+#endif
         
         //we are using a pointer as this is a thread local variable it will not change mid stream, only use this function when servicing an rpc call
         static service* get_current_service();
@@ -275,6 +293,13 @@ namespace rpc
             service(name, zone_id),
             parent_zone_id_(parent_zone_id)
         {}
+        
+#ifdef BUILD_COROUTINE        
+        explicit child_service(const char* name, zone zone_id, destination_zone parent_zone_id, const std::shared_ptr<coro::io_scheduler>& io_scheduler) :
+            service(name, zone_id, io_scheduler),
+            parent_zone_id_(parent_zone_id)
+        {}
+#endif        
 
         virtual ~child_service();
 

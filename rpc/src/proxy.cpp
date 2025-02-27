@@ -22,9 +22,7 @@ namespace rpc
         }
 #endif
 
-#ifndef BUILD_COROUTINE //worry about this later
         service_proxy_->on_object_proxy_released(object_id_);
-#endif        
         service_proxy_ = nullptr;
     }
     

@@ -29,6 +29,10 @@
 
 #include <clipp.h>
 
+#ifdef BUILD_COROUTINE
+#include <coro/io_scheduler.hpp>
+#endif
+
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
@@ -198,6 +202,9 @@ class in_memory_setup
     bool use_host_in_child_ = UseHostInChild;
 
     std::atomic<uint64_t> zone_gen_ = 0;
+
+    std::shared_ptr<coro::io_scheduler> io_scheduler_;
+    bool error_has_occured_ = false;
 public:
     virtual ~in_memory_setup() = default;
 
@@ -208,8 +215,32 @@ public:
     rpc::shared_ptr<yyy::i_host> get_local_host_ptr(){return local_host_ptr_.lock();}
     bool get_use_host_in_child() const {return use_host_in_child_;}
 
+    std::shared_ptr<coro::io_scheduler> get_scheduler()const {return io_scheduler_;}
+    bool error_has_occured()const {return error_has_occured_;}
+    
+        
+    CORO_TASK(void) check_for_error(coro::task<bool> task)
+    {       
+        auto ret = CO_AWAIT task; 
+        if(ret != rpc::error::OK())
+        {
+            error_has_occured_ = true;
+        }
+        CO_RETURN;
+    }
+
     virtual void SetUp()
     {   
+        io_scheduler_ = coro::io_scheduler::make_shared(
+        coro::io_scheduler::options
+        {
+            .thread_strategy = coro::io_scheduler::thread_strategy_t::manual,
+            .pool            = 
+                coro::thread_pool::options
+                {
+                    .thread_count = 1,
+                }
+        });
         zone_gen = &zone_gen_;
         auto test_info = ::testing::UnitTest::GetInstance()->current_test_info();
 #ifdef USE_RPC_TELEMETRY
@@ -276,7 +307,14 @@ class inproc_setup
 
     std::atomic<uint64_t> zone_gen_ = 0;
     
+    std::shared_ptr<coro::io_scheduler> io_scheduler_;
+    bool error_has_occured_ = false;
+    
 public:
+    
+    std::shared_ptr<coro::io_scheduler> get_scheduler()const {return io_scheduler_;}
+    bool error_has_occured()const {return error_has_occured_;}
+    
     virtual ~inproc_setup() = default;
 
     rpc::shared_ptr<rpc::service> get_root_service() const {return root_service_;}
@@ -287,7 +325,17 @@ public:
     rpc::shared_ptr<yyy::i_host> get_local_host_ptr(){return local_host_ptr_.lock();}
     bool get_use_host_in_child() const {return use_host_in_child_;}
     
-    CORO_TASK(int) CoroSetUp()
+    CORO_TASK(void) check_for_error(coro::task<bool> task)
+    {       
+        auto ret = CO_AWAIT task; 
+        if(ret != rpc::error::OK())
+        {
+            error_has_occured_ = true;
+        }
+        CO_RETURN;
+    }
+    
+    CORO_TASK(bool) CoroSetUp()
     {
         zone_gen = &zone_gen_;
         auto test_info = ::testing::UnitTest::GetInstance()->current_test_info();
@@ -296,14 +344,14 @@ public:
             CREATE_TELEMETRY_SERVICE(rpc::host_telemetry_service, test_info->test_suite_name(), test_info->name(), "../../rpc_test_diagram/")
 #endif
 
-        root_service_ = rpc::make_shared<rpc::service>("host", rpc::zone{++zone_gen_});
+        root_service_ = rpc::make_shared<rpc::service>("host", rpc::zone{++zone_gen_}, io_scheduler_);
         root_service_->add_service_logger(std::make_shared<test_service_logger>());
         current_host_service = root_service_;
 
         rpc::shared_ptr<yyy::i_host> hst(new host(root_service_->get_zone_id()));
         local_host_ptr_ = hst;//assign to weak ptr
         
-        CO_RETURN CO_AWAIT root_service_->connect_to_zone<rpc::local_child_service_proxy<yyy::i_example, yyy::i_host>> (
+        auto ret = CO_AWAIT root_service_->connect_to_zone<rpc::local_child_service_proxy<yyy::i_example, yyy::i_host>> (
             "main child"
             , {++zone_gen_}
             , hst
@@ -323,13 +371,32 @@ public:
                     CO_AWAIT new_example->set_host(host);
                 CO_RETURN rpc::error::OK();
             });
+        if(ret != rpc::error::OK())
+        {
+            CO_RETURN false;
+        }
+        CO_RETURN true;
     }
     
     virtual void SetUp()
     {
-        auto err_code = SYNC_WAIT(CoroSetUp());
+        io_scheduler_ = coro::io_scheduler::make_shared(
+        coro::io_scheduler::options
+        {
+            .thread_strategy = coro::io_scheduler::thread_strategy_t::manual,
+            .pool            = 
+                coro::thread_pool::options
+                {
+                    .thread_count = 1,
+                }
+        });
         
-        ASSERT_EQ(err_code, rpc::error::OK());
+        io_scheduler_->schedule(check_for_error(CoroSetUp()));
+        io_scheduler_->process_events();
+
+        //auto err_code = SYNC_WAIT();
+        
+        ASSERT_EQ(error_has_occured_, false);
     }
 
     CORO_TASK(void) CoroTearDown()
@@ -347,7 +414,9 @@ public:
     
     virtual void TearDown()
     {
-        SYNC_WAIT(CoroTearDown());
+        io_scheduler_->schedule(CoroTearDown());
+        io_scheduler_->process_events();
+        // SYNC_WAIT(CoroTearDown());
     }
 
     CORO_TASK(rpc::shared_ptr<yyy::i_example>) create_new_zone()
@@ -531,7 +600,9 @@ TYPED_TEST(type_test, initialisation_test)
 
 TYPED_TEST(type_test, standard_tests)
 {
-    auto root_service = this->get_lib().get_root_service();
+    auto& lib = this->get_lib();
+    auto root_service = lib.get_root_service();
+
     rpc::zone zone_id;
     if(root_service)
         zone_id = root_service->get_zone_id();
@@ -540,7 +611,10 @@ TYPED_TEST(type_test, standard_tests)
 
     foo f(zone_id);
     
-    TEST_SYNC_WAIT(standard_tests(f, this->get_lib().get_has_enclave()));
+    lib.get_scheduler()->schedule(lib.check_for_error(standard_tests(f, lib.get_has_enclave())));
+    lib.get_scheduler()->process_events();
+
+    ASSERT_EQ(lib.error_has_occured(), false);
 }
 
 TEST_RETURN_VAL dyanmic_cast_tests(rpc::shared_ptr<rpc::service> root_service)
@@ -586,8 +660,14 @@ TEST_RETURN_VAL dyanmic_cast_tests(rpc::shared_ptr<rpc::service> root_service)
 
 TYPED_TEST(type_test, dyanmic_cast_tests)
 {
-    auto root_service = this->get_lib().get_root_service();
-    TEST_SYNC_WAIT(dyanmic_cast_tests(root_service));
+    auto& lib = this->get_lib();
+    auto root_service = lib.get_root_service();
+    // TEST_SYNC_WAIT(dyanmic_cast_tests(root_service));
+    
+    lib.get_scheduler()->schedule(lib.check_for_error(dyanmic_cast_tests(root_service)));
+    lib.get_scheduler()->process_events();
+
+    ASSERT_EQ(lib.error_has_occured(), false);
 }
 
 
@@ -615,23 +695,24 @@ TYPED_TEST(type_test, dyanmic_cast_tests)
 
 // TYPED_TEST(remote_type_test, remote_standard_tests)
 // {    
+//     auto& lib = this->get_lib();
 //     rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
-//     ASSERT_EQ(this->get_lib().get_example()->create_foo(i_foo_ptr), 0);
+//     ASSERT_EQ(lib.get_example()->create_foo(i_foo_ptr), 0);
 //     standard_tests(*i_foo_ptr, true);
 // }
 
 // TYPED_TEST(remote_type_test, multithreaded_standard_tests)
 // {
-//     if(!enable_multithreaded_tests || this->get_lib().is_enclave_setup())
+//     if(!enable_multithreaded_tests || lib.is_enclave_setup())
 //     {
 //         GTEST_SKIP() << "multithreaded tests are skipped";
 //         return;
 //     }
 
 //     rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
-//     ASSERT_EQ(this->get_lib().get_example()->create_foo(i_foo_ptr), 0);
+//     ASSERT_EQ(lib.get_example()->create_foo(i_foo_ptr), 0);
     
-//     std::vector<std::thread> threads(this->get_lib().is_enclave_setup() ? 3 : 100);
+//     std::vector<std::thread> threads(lib.is_enclave_setup() ? 3 : 100);
 //     for(auto& thread_target : threads)
 //     {
 //         thread_target = std::thread([&](){
@@ -646,18 +727,18 @@ TYPED_TEST(type_test, dyanmic_cast_tests)
 
 // TYPED_TEST(remote_type_test, multithreaded_standard_tests_with_and_foos)
 // {
-//     if(!enable_multithreaded_tests || this->get_lib().is_enclave_setup())
+//     if(!enable_multithreaded_tests || lib.is_enclave_setup())
 //     {
 //         GTEST_SKIP() << "multithreaded tests are skipped";
 //         return;
 //     }
 
-//     std::vector<std::thread> threads(this->get_lib().is_enclave_setup() ? 3 : 100);
+//     std::vector<std::thread> threads(lib.is_enclave_setup() ? 3 : 100);
 //     for(auto& thread_target : threads)
 //     {
 //         thread_target = std::thread([&](){
 //             rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
-//             ASSERT_EQ(this->get_lib().get_example()->create_foo(i_foo_ptr), 0);
+//             ASSERT_EQ(lib.get_example()->create_foo(i_foo_ptr), 0);
 //             standard_tests(*i_foo_ptr, true);   
 //         });
 //     }
@@ -669,34 +750,34 @@ TYPED_TEST(type_test, dyanmic_cast_tests)
 
 // TYPED_TEST(remote_type_test, remote_tests)
 // {    
-//     auto root_service = this->get_lib().get_root_service();
+//     auto root_service = lib.get_root_service();
 //     rpc::zone zone_id;
 //     if(root_service)
 //         zone_id = root_service->get_zone_id();
 //     else
 //         zone_id = {0};
-//     remote_tests(this->get_lib().get_use_host_in_child(), this->get_lib().get_example(), zone_id);
+//     remote_tests(lib.get_use_host_in_child(), lib.get_example(), zone_id);
 // }
 
 // TYPED_TEST(remote_type_test, multithreaded_remote_tests)
 // {
-//     if(!enable_multithreaded_tests || this->get_lib().is_enclave_setup())
+//     if(!enable_multithreaded_tests || lib.is_enclave_setup())
 //     {
 //         GTEST_SKIP() << "multithreaded tests are skipped";
 //         return;
 //     }
 
-//     auto root_service = this->get_lib().get_root_service();
+//     auto root_service = lib.get_root_service();
 //     rpc::zone zone_id;
 //     if(root_service)
 //         zone_id = root_service->get_zone_id();
 //     else
 //         zone_id = {0};
-//     std::vector<std::thread> threads(this->get_lib().is_enclave_setup() ? 3 : 100);
+//     std::vector<std::thread> threads(lib.is_enclave_setup() ? 3 : 100);
 //     for(auto& thread_target : threads)
 //     {
 //         thread_target = std::thread([&](){
-//             remote_tests(this->get_lib().get_use_host_in_child(), this->get_lib().get_example(), zone_id);
+//             remote_tests(lib.get_use_host_in_child(), lib.get_example(), zone_id);
 //         });
 //     }
 //     for(auto& thread_target : threads)
@@ -707,23 +788,23 @@ TYPED_TEST(type_test, dyanmic_cast_tests)
 
 // TYPED_TEST(remote_type_test, create_new_zone)
 // {
-//     auto example_relay_ptr = this->get_lib().create_new_zone();
+//     auto example_relay_ptr = lib.create_new_zone();
 //     example_relay_ptr->set_host(nullptr);
 // }
 
 // TYPED_TEST(remote_type_test, multithreaded_create_new_zone)
 // {
-//     if(!enable_multithreaded_tests || this->get_lib().is_enclave_setup())
+//     if(!enable_multithreaded_tests || lib.is_enclave_setup())
 //     {
 //         GTEST_SKIP() << "multithreaded tests are skipped";
 //         return;
 //     }
 
-//     std::vector<std::thread> threads(this->get_lib().is_enclave_setup() ? 3 : 100);
+//     std::vector<std::thread> threads(lib.is_enclave_setup() ? 3 : 100);
 //     for(auto& thread_target : threads)
 //     {
 //         thread_target = std::thread([&](){
-//             auto example_relay_ptr = this->get_lib().create_new_zone();
+//             auto example_relay_ptr = lib.create_new_zone();
 //             example_relay_ptr->set_host(nullptr);        
 //         });
 //     }
@@ -736,30 +817,30 @@ TYPED_TEST(type_test, dyanmic_cast_tests)
 // TYPED_TEST(remote_type_test, create_new_zone_releasing_host_then_running_on_other_enclave)
 // {
 //     rpc::shared_ptr<xxx::i_foo> i_foo_relay_ptr;
-//     auto example_relay_ptr = this->get_lib().create_new_zone();
+//     auto example_relay_ptr = lib.create_new_zone();
 //     example_relay_ptr->create_foo(i_foo_relay_ptr);
 //     standard_tests(*i_foo_relay_ptr, true);
 
 //     //rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
-//     //ASSERT_EQ(this->get_lib().get_example()->create_foo(i_foo_ptr), 0);
+//     //ASSERT_EQ(lib.get_example()->create_foo(i_foo_ptr), 0);
 //     example_relay_ptr = nullptr;
 //     //standard_tests(*i_foo_ptr, true);    
 // }
 
 // TYPED_TEST(remote_type_test, multithreaded_create_new_zone_releasing_host_then_running_on_other_enclave)
 // {
-//     if(!enable_multithreaded_tests || this->get_lib().is_enclave_setup())
+//     if(!enable_multithreaded_tests || lib.is_enclave_setup())
 //     {
 //         GTEST_SKIP() << "multithreaded tests are skipped";
 //         return;
 //     }
 
-//     std::vector<std::thread> threads(this->get_lib().is_enclave_setup() ? 3 : 100);
+//     std::vector<std::thread> threads(lib.is_enclave_setup() ? 3 : 100);
 //     for(auto& thread_target : threads)
 //     {
 //         thread_target = std::thread([&](){
 //             rpc::shared_ptr<xxx::i_foo> i_foo_relay_ptr;
-//             auto example_relay_ptr = this->get_lib().create_new_zone();
+//             auto example_relay_ptr = lib.create_new_zone();
 //             example_relay_ptr->create_foo(i_foo_relay_ptr);
 //             standard_tests(*i_foo_relay_ptr, true);
 //         });
@@ -773,7 +854,7 @@ TYPED_TEST(type_test, dyanmic_cast_tests)
 // TYPED_TEST(remote_type_test, dyanmic_cast_tests)
 // {
 //     rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
-//     ASSERT_EQ(this->get_lib().get_example()->create_foo(i_foo_ptr), 0);
+//     ASSERT_EQ(lib.get_example()->create_foo(i_foo_ptr), 0);
 
 //     rpc::shared_ptr<xxx::i_baz> baz;
 //     i_foo_ptr->create_baz_interface(baz);
@@ -792,10 +873,10 @@ TYPED_TEST(type_test, dyanmic_cast_tests)
 // TYPED_TEST(remote_type_test, bounce_baz_between_two_interfaces)
 // {
 //     rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
-//     ASSERT_EQ(this->get_lib().get_example()->create_foo(i_foo_ptr), 0);
+//     ASSERT_EQ(lib.get_example()->create_foo(i_foo_ptr), 0);
 
 //     rpc::shared_ptr<xxx::i_foo> i_foo_relay_ptr;
-//     auto example_relay_ptr = this->get_lib().create_new_zone();
+//     auto example_relay_ptr = lib.create_new_zone();
 //     example_relay_ptr->create_foo(i_foo_relay_ptr);
 
 //     rpc::shared_ptr<xxx::i_baz> baz;
@@ -805,22 +886,22 @@ TYPED_TEST(type_test, dyanmic_cast_tests)
 
 // TYPED_TEST(remote_type_test, multithreaded_bounce_baz_between_two_interfaces)
 // {
-//     if(!enable_multithreaded_tests || this->get_lib().is_enclave_setup())
+//     if(!enable_multithreaded_tests || lib.is_enclave_setup())
 //     {
 //         GTEST_SKIP() << "multithreaded tests are skipped";
 //         return;
 //     }
 
     
-//     std::vector<std::thread> threads(this->get_lib().is_enclave_setup() ? 3 : 100);
+//     std::vector<std::thread> threads(lib.is_enclave_setup() ? 3 : 100);
 //     for(auto& thread_target : threads)
 //     {
 //         thread_target = std::thread([&](){
 //             rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
-//             ASSERT_EQ(this->get_lib().get_example()->create_foo(i_foo_ptr), 0);
+//             ASSERT_EQ(lib.get_example()->create_foo(i_foo_ptr), 0);
 
 //             rpc::shared_ptr<xxx::i_foo> i_foo_relay_ptr;
-//             auto example_relay_ptr = this->get_lib().create_new_zone();
+//             auto example_relay_ptr = lib.create_new_zone();
 //             example_relay_ptr->create_foo(i_foo_relay_ptr);
 
 //             rpc::shared_ptr<xxx::i_baz> baz;
@@ -838,7 +919,7 @@ TYPED_TEST(type_test, dyanmic_cast_tests)
 // TYPED_TEST(remote_type_test, check_for_null_interface)
 // {
 //     rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
-//     ASSERT_EQ(this->get_lib().get_example()->create_foo(i_foo_ptr), 0);
+//     ASSERT_EQ(lib.get_example()->create_foo(i_foo_ptr), 0);
 //     rpc::shared_ptr<xxx::i_baz> c;
 //     i_foo_ptr->get_interface(c);
 //     RPC_ASSERT(c == nullptr);
@@ -846,11 +927,11 @@ TYPED_TEST(type_test, dyanmic_cast_tests)
 
 // TYPED_TEST(remote_type_test, check_for_multiple_sets)
 // {
-//     if(!this->get_lib().get_use_host_in_child())
+//     if(!lib.get_use_host_in_child())
 //         return;
 
 //     rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
-//     ASSERT_EQ(this->get_lib().get_example()->create_foo(i_foo_ptr), 0);
+//     ASSERT_EQ(lib.get_example()->create_foo(i_foo_ptr), 0);
     
 //     auto zone_id = i_foo_ptr->query_proxy_base()->get_object_proxy()->get_service_proxy()->get_zone_id();
 
@@ -867,11 +948,11 @@ TYPED_TEST(type_test, dyanmic_cast_tests)
 
 // TYPED_TEST(remote_type_test, check_for_interface_storage)
 // {
-//     if(!this->get_lib().get_use_host_in_child())
+//     if(!lib.get_use_host_in_child())
 //         return;
         
 //     rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
-//     ASSERT_EQ(this->get_lib().get_example()->create_foo(i_foo_ptr), 0);
+//     ASSERT_EQ(lib.get_example()->create_foo(i_foo_ptr), 0);
 
 //     rpc::shared_ptr<xxx::i_baz> c;
 //     auto zone_id = i_foo_ptr->query_proxy_base()->get_object_proxy()->get_service_proxy()->get_zone_id();
@@ -885,10 +966,10 @@ TYPED_TEST(type_test, dyanmic_cast_tests)
 
 // TYPED_TEST(remote_type_test, check_for_set_multiple_inheritance)
 // {
-//     if(!this->get_lib().get_use_host_in_child())
+//     if(!lib.get_use_host_in_child())
 //         return;
-//     auto proxy = this->get_lib().get_example()->query_proxy_base();        
-//     auto ret = this->get_lib().get_example()->give_interface(
+//     auto proxy = lib.get_example()->query_proxy_base();        
+//     auto ret = lib.get_example()->give_interface(
 //         rpc::shared_ptr<xxx::i_baz>(new multiple_inheritance(proxy->get_object_proxy()->get_service_proxy()->get_zone_id())));
 //     RPC_ASSERT(ret == rpc::error::OK());
 // }
@@ -896,7 +977,7 @@ TYPED_TEST(type_test, dyanmic_cast_tests)
 // #ifdef BUILD_ENCLAVE
 // TYPED_TEST(remote_type_test, host_test)
 // {    
-//     auto root_service = this->get_lib().get_root_service();
+//     auto root_service = lib.get_root_service();
 //     rpc::zone zone_id;
 //     if(root_service)
 //         zone_id = root_service->get_zone_id();
@@ -919,10 +1000,10 @@ TYPED_TEST(type_test, dyanmic_cast_tests)
 
 // TYPED_TEST(remote_type_test, check_for_call_enclave_zone)
 // {
-//     if(!this->get_lib().get_use_host_in_child())
+//     if(!lib.get_use_host_in_child())
 //         return;
 
-//     auto root_service = this->get_lib().get_root_service();
+//     auto root_service = lib.get_root_service();
 //     rpc::zone zone_id;
 //     if(root_service)
 //         zone_id = root_service->get_zone_id();
@@ -930,14 +1011,14 @@ TYPED_TEST(type_test, dyanmic_cast_tests)
 //         zone_id = {0};
         
 //     auto h = rpc::make_shared<host>(zone_id);
-//     auto ret = this->get_lib().get_example()->call_create_enclave_val(h);
+//     auto ret = lib.get_example()->call_create_enclave_val(h);
 //     RPC_ASSERT(ret == rpc::error::OK());
 // }
 // #endif
 
 // TYPED_TEST(remote_type_test, check_sub_subordinate)
 // {
-//     auto& lib = this->get_lib();
+//     auto& lib = lib;
 //     if(!lib.get_use_host_in_child())
 //         return;
 
@@ -950,16 +1031,16 @@ TYPED_TEST(type_test, dyanmic_cast_tests)
 
 // TYPED_TEST(remote_type_test, multithreaded_check_sub_subordinate)
 // {
-//     if(!enable_multithreaded_tests || this->get_lib().is_enclave_setup())
+//     if(!enable_multithreaded_tests || lib.is_enclave_setup())
 //     {
 //         GTEST_SKIP() << "multithreaded tests are skipped";
 //         return;
 //     }
 
-//     auto& lib = this->get_lib();
+//     auto& lib = lib;
 //     if(!lib.get_use_host_in_child())
 //         return;
-//     std::vector<std::thread> threads(this->get_lib().is_enclave_setup() ? 3 : 100);
+//     std::vector<std::thread> threads(lib.is_enclave_setup() ? 3 : 100);
 //     for(auto& thread_target : threads)
 //     {
 //         thread_target = std::thread([&](){
@@ -978,7 +1059,7 @@ TYPED_TEST(type_test, dyanmic_cast_tests)
 
 // TYPED_TEST(remote_type_test, send_interface_back)
 // {
-//     auto& lib = this->get_lib();
+//     auto& lib = lib;
 //     if(!lib.get_use_host_in_child())
 //         return;
 
@@ -997,17 +1078,17 @@ TYPED_TEST(type_test, dyanmic_cast_tests)
 
 // TYPED_TEST(remote_type_test, two_zones_get_one_to_lookup_other)
 // {
-//     auto root_service = this->get_lib().get_root_service();
+//     auto root_service = lib.get_root_service();
 
 //     rpc::zone zone_id;
 //     if(root_service)
 //         zone_id = root_service->get_zone_id();
 //     else
 //         zone_id = {0};
-//     auto h = this->get_lib().get_local_host_ptr();  
-//     auto ex = this->get_lib().get_example();      
+//     auto h = lib.get_local_host_ptr();  
+//     auto ex = lib.get_example();      
     
-//     auto enclaveb = this->get_lib().create_new_zone();
+//     auto enclaveb = lib.create_new_zone();
 //     enclaveb->set_host(h);
 //     ASSERT_EQ(h->set_app("enclaveb", enclaveb), rpc::error::OK());
 
@@ -1017,13 +1098,13 @@ TYPED_TEST(type_test, dyanmic_cast_tests)
 // }
 // TYPED_TEST(remote_type_test, multithreaded_two_zones_get_one_to_lookup_other)
 // {
-//     if(!enable_multithreaded_tests || this->get_lib().is_enclave_setup())
+//     if(!enable_multithreaded_tests || lib.is_enclave_setup())
 //     {
 //         GTEST_SKIP() << "multithreaded tests are skipped";
 //         return;
 //     }
 
-//     auto root_service = this->get_lib().get_root_service();
+//     auto root_service = lib.get_root_service();
 
 //     rpc::zone zone_id;
 //     if(root_service)
@@ -1032,11 +1113,11 @@ TYPED_TEST(type_test, dyanmic_cast_tests)
 //         zone_id = {0};
 //     auto h = rpc::make_shared<host>(zone_id);        
     
-//     auto enclavea = this->get_lib().create_new_zone();
+//     auto enclavea = lib.create_new_zone();
 //     enclavea->set_host(h);
 //     ASSERT_EQ(h->set_app("enclavea", enclavea), rpc::error::OK());
     
-//     auto enclaveb = this->get_lib().create_new_zone();
+//     auto enclaveb = lib.create_new_zone();
 //     enclaveb->set_host(h);
 //     ASSERT_EQ(h->set_app("enclaveb", enclaveb), rpc::error::OK());
     
@@ -1058,7 +1139,7 @@ TYPED_TEST(type_test, dyanmic_cast_tests)
 
 // TYPED_TEST(remote_type_test, check_identity)
 // {
-//     auto& lib = this->get_lib();
+//     auto& lib = lib;
 //     if(!lib.get_use_host_in_child())
 //         return;
 
@@ -1190,7 +1271,7 @@ TYPED_TEST(type_test, dyanmic_cast_tests)
 // TYPED_TEST(type_test_with_host, call_host_create_enclave_and_throw_away)
 // {  
 //     bool run_standard_tests = false;
-//     ASSERT_EQ(this->get_lib().get_example()->call_host_create_enclave_and_throw_away(run_standard_tests), rpc::error::OK());
+//     ASSERT_EQ(lib.get_example()->call_host_create_enclave_and_throw_away(run_standard_tests), rpc::error::OK());
 // }
 
 // TYPED_TEST(type_test_with_host, call_host_create_enclave)
@@ -1198,7 +1279,7 @@ TYPED_TEST(type_test, dyanmic_cast_tests)
 //     bool run_standard_tests = false;
 //     rpc::shared_ptr<yyy::i_example> target;
 
-//     ASSERT_EQ(this->get_lib().get_example()->call_host_create_enclave(target, run_standard_tests), rpc::error::OK());
+//     ASSERT_EQ(lib.get_example()->call_host_create_enclave(target, run_standard_tests), rpc::error::OK());
 //     ASSERT_NE(target, nullptr);
 // }
 // #endif
@@ -1208,14 +1289,14 @@ TYPED_TEST(type_test, dyanmic_cast_tests)
 //     bool run_standard_tests = false;
 //     rpc::shared_ptr<yyy::i_example> target;
 
-//     ASSERT_EQ(this->get_lib().get_example()->call_host_look_up_app("target", target, run_standard_tests), rpc::error::OK());
+//     ASSERT_EQ(lib.get_example()->call_host_look_up_app("target", target, run_standard_tests), rpc::error::OK());
 //     ASSERT_EQ(target, nullptr);
 // }
 
 
 // TYPED_TEST(type_test_with_host, call_host_unload_app_not_there)
 // {  
-//     ASSERT_EQ(this->get_lib().get_example()->call_host_unload_app("target"), rpc::error::OK());
+//     ASSERT_EQ(lib.get_example()->call_host_unload_app("target"), rpc::error::OK());
 // }
 
 
@@ -1225,11 +1306,11 @@ TYPED_TEST(type_test, dyanmic_cast_tests)
 //     bool run_standard_tests = false;
 //     rpc::shared_ptr<yyy::i_example> target;
 
-//     ASSERT_EQ(this->get_lib().get_example()->call_host_create_enclave(target, run_standard_tests), rpc::error::OK());
+//     ASSERT_EQ(lib.get_example()->call_host_create_enclave(target, run_standard_tests), rpc::error::OK());
 //     ASSERT_NE(target, nullptr);
 
-//     ASSERT_EQ(this->get_lib().get_example()->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
-//     ASSERT_EQ(this->get_lib().get_example()->call_host_unload_app("target"), rpc::error::OK());
+//     ASSERT_EQ(lib.get_example()->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
+//     ASSERT_EQ(lib.get_example()->call_host_unload_app("target"), rpc::error::OK());
 //     target = nullptr;
 // }
 
@@ -1239,12 +1320,12 @@ TYPED_TEST(type_test, dyanmic_cast_tests)
 //     bool run_standard_tests = false;
 //     rpc::shared_ptr<yyy::i_example> target;
 
-//     ASSERT_EQ(this->get_lib().get_example()->call_host_create_enclave(target, run_standard_tests), rpc::error::OK());
+//     ASSERT_EQ(lib.get_example()->call_host_create_enclave(target, run_standard_tests), rpc::error::OK());
 //     ASSERT_NE(target, nullptr);
 
-//     ASSERT_EQ(this->get_lib().get_example()->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
-//     ASSERT_EQ(this->get_lib().get_example()->call_host_look_up_app_not_return("target", run_standard_tests), rpc::error::OK());
-//     ASSERT_EQ(this->get_lib().get_example()->call_host_unload_app("target"), rpc::error::OK());
+//     ASSERT_EQ(lib.get_example()->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
+//     ASSERT_EQ(lib.get_example()->call_host_look_up_app_not_return("target", run_standard_tests), rpc::error::OK());
+//     ASSERT_EQ(lib.get_example()->call_host_unload_app("target"), rpc::error::OK());
 //     target = nullptr;
 // }
 
@@ -1254,12 +1335,12 @@ TYPED_TEST(type_test, dyanmic_cast_tests)
 //     rpc::shared_ptr<yyy::i_example> target;
 //     rpc::shared_ptr<yyy::i_example> target2;
 
-//     ASSERT_EQ(this->get_lib().get_example()->call_host_create_enclave(target, run_standard_tests), rpc::error::OK());
+//     ASSERT_EQ(lib.get_example()->call_host_create_enclave(target, run_standard_tests), rpc::error::OK());
 //     ASSERT_NE(target, nullptr);
 
-//     ASSERT_EQ(this->get_lib().get_example()->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
-//     ASSERT_EQ(this->get_lib().get_example()->call_host_look_up_app("target", target2, run_standard_tests), rpc::error::OK());
-//     ASSERT_EQ(this->get_lib().get_example()->call_host_unload_app("target"), rpc::error::OK());
+//     ASSERT_EQ(lib.get_example()->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
+//     ASSERT_EQ(lib.get_example()->call_host_look_up_app("target", target2, run_standard_tests), rpc::error::OK());
+//     ASSERT_EQ(lib.get_example()->call_host_unload_app("target"), rpc::error::OK());
 //     ASSERT_EQ(target, target2);
 //     target = nullptr;
 //     target2 = nullptr;
@@ -1270,11 +1351,11 @@ TYPED_TEST(type_test, dyanmic_cast_tests)
 //     bool run_standard_tests = false;
 //     rpc::shared_ptr<yyy::i_example> target;
 
-//     ASSERT_EQ(this->get_lib().get_example()->call_host_create_enclave(target, run_standard_tests), rpc::error::OK());
+//     ASSERT_EQ(lib.get_example()->call_host_create_enclave(target, run_standard_tests), rpc::error::OK());
 //     ASSERT_NE(target, nullptr);
 
-//     ASSERT_EQ(this->get_lib().get_example()->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
-//     ASSERT_EQ(this->get_lib().get_example()->call_host_look_up_app_not_return_and_delete("target", run_standard_tests), rpc::error::OK());
+//     ASSERT_EQ(lib.get_example()->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
+//     ASSERT_EQ(lib.get_example()->call_host_look_up_app_not_return_and_delete("target", run_standard_tests), rpc::error::OK());
 //     target = nullptr;
 // }
 
@@ -1284,11 +1365,11 @@ TYPED_TEST(type_test, dyanmic_cast_tests)
 //     rpc::shared_ptr<yyy::i_example> target;
 //     rpc::shared_ptr<yyy::i_example> target2;
 
-//     ASSERT_EQ(this->get_lib().get_example()->call_host_create_enclave(target, run_standard_tests), rpc::error::OK());
+//     ASSERT_EQ(lib.get_example()->call_host_create_enclave(target, run_standard_tests), rpc::error::OK());
 //     ASSERT_NE(target, nullptr);
 
-//     ASSERT_EQ(this->get_lib().get_example()->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
-//     ASSERT_EQ(this->get_lib().get_example()->call_host_look_up_app_and_delete("target", target2, run_standard_tests), rpc::error::OK());
+//     ASSERT_EQ(lib.get_example()->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
+//     ASSERT_EQ(lib.get_example()->call_host_look_up_app_and_delete("target", target2, run_standard_tests), rpc::error::OK());
 //     ASSERT_EQ(target, target2);
 //     target = nullptr;
 //     target2 = nullptr;
@@ -1298,16 +1379,16 @@ TYPED_TEST(type_test, dyanmic_cast_tests)
 // TYPED_TEST(type_test_with_host, create_subordinate_zone)
 // {  
 //     rpc::shared_ptr<yyy::i_example> target;
-//     ASSERT_EQ(this->get_lib().get_example()->create_example_in_subordnate_zone(target, this->get_lib().get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+//     ASSERT_EQ(lib.get_example()->create_example_in_subordnate_zone(target, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
 // }
 
 
 // TYPED_TEST(type_test_with_host, create_subordinate_zone_and_set_in_host)
 // {  
-//     ASSERT_EQ(this->get_lib().get_example()->create_example_in_subordnate_zone_and_set_in_host(++(*zone_gen), "foo", this->get_lib().get_local_host_ptr()), rpc::error::OK());
+//     ASSERT_EQ(lib.get_example()->create_example_in_subordnate_zone_and_set_in_host(++(*zone_gen), "foo", lib.get_local_host_ptr()), rpc::error::OK());
 //     rpc::shared_ptr<yyy::i_example> target;
-//     this->get_lib().get_host()->look_up_app("foo", target);
-//     this->get_lib().get_host()->unload_app("foo");
+//     lib.get_host()->look_up_app("foo", target);
+//     lib.get_host()->unload_app("foo");
 //     target->set_host(nullptr);
 // }
 
