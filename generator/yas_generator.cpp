@@ -735,7 +735,7 @@ namespace rpc_generator
             stub("{}", ::rpc_generator::write_stub_receive_declaration(
                             m_ob, interface_name + "::stub_deserialiser<rpc::serialiser::yas, rpc::encoding>::", function,
                             has_outparams, ", rpc::encoding __rpc_enc", false));
-            proxy("{{");
+            stub("{{");
 
             if(has_outparams)
             {
@@ -820,7 +820,7 @@ namespace rpc_generator
             stub("{}", ::rpc_generator::write_stub_reply_declaration(
                             m_ob, interface_name + "::stub_serialiser<rpc::serialiser::yas, rpc::encoding>::", function,
                             has_outparams, ", rpc::encoding __rpc_enc", false));
-            proxy("{{");
+            stub("{{");
 
             if(has_outparams)
             {
