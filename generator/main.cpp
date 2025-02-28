@@ -4,7 +4,16 @@
 #include <filesystem>
 #include <fstream>
 
+#if defined(__clang__)
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
+#endif
+
 #include <clipp.h>
+
+#if defined(__clang__)
+    #pragma GCC diagnostic pop
+#endif
 
 #include "commonfuncs.h"
 #include "macro_parser.h"

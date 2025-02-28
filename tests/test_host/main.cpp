@@ -21,7 +21,16 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+#if defined(__clang__)
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
+#endif
+
 #include <clipp.h>
+
+#if defined(__clang__)
+    #pragma GCC diagnostic pop
+#endif
 
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/basic_file_sink.h>
