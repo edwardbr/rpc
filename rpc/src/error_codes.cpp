@@ -95,7 +95,12 @@ namespace rpc
         [[nodiscard]] int UNABLE_TO_CREATE_SERVICE_PROXY()
         {
             return offset_val + (offset_val_is_negative ? -20 : 20);
-        } // dont forget to update MIN & MAX if new values
+        }
+        [[nodiscard]] int INVALID_CHANNEL()
+        {
+            return offset_val + (offset_val_is_negative ? -21 : 21);
+        }
+        // dont forget to update MIN & MAX if new values
 
         [[nodiscard]] int MIN()
         {
@@ -200,6 +205,10 @@ namespace rpc
             if (err == UNABLE_TO_CREATE_SERVICE_PROXY())
             {
                 return "unable to create service proxy";
+            }
+            if (err == INVALID_CHANNEL())
+            {
+                return "Channel is no longer available";
             }
             return "invalid error code";
         }

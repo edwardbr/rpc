@@ -562,6 +562,7 @@ namespace rpc
             };  
 #ifdef BUILD_COROUTINE
             auto success = get_operating_zone_service()->schedule(release_task());
+            assert(success);
 #else
             release_task()
 #endif

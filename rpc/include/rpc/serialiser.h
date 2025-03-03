@@ -8,23 +8,14 @@
 
 #include <yas/count_streams.hpp>
 #include <yas/serialize.hpp>
+#include <yas/std_types.hpp>
 
 #include <rpc/types.h>
 #include <rpc/error_codes.h>
+#include <rpc/rpc_types.h>
 
 namespace rpc
 {
-    enum class encoding : uint64_t
-    {
-        enc_default = 0, // equivelant to yas_binary
-        yas_binary = 1,
-        yas_compressed_binary = 2,
-        // yas_text = 4,     //not really needed
-        yas_json = 8 // we may have different json parsers that have a better implementation e.g. glaze
-        // protocol_buffers = 16,
-        // flat_buffers = 32,
-        // mpi = 64
-    };
 
     // note a serialiser may support more than one encoding
     namespace serialiser

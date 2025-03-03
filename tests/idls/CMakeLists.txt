@@ -13,7 +13,8 @@ RPCGenerate(
   example_shared
   ""
   mock example_shared/example_shared_mock.h
-  include_paths ${CMAKE_CURRENT_SOURCE_DIR}/.)
+  include_paths ${CMAKE_CURRENT_SOURCE_DIR}/.
+  generated_install_dir ${GENERATED_INSTALL_DIR})
 
 RPCGenerate(
   example_import
@@ -24,7 +25,8 @@ RPCGenerate(
   ""
   mock example_import/example_import_mock.h
   dependencies example_shared_idl
-  include_paths ${CMAKE_CURRENT_SOURCE_DIR}/.)
+  include_paths ${CMAKE_CURRENT_SOURCE_DIR}/.
+  generated_install_dir ${GENERATED_INSTALL_DIR})
 
 RPCGenerate(
   example
@@ -35,4 +37,16 @@ RPCGenerate(
   ""
   mock example/example_mock.h
   dependencies example_import_idl example_shared_idl
-  include_paths ${CMAKE_CURRENT_SOURCE_DIR}/.)
+  include_paths ${CMAKE_CURRENT_SOURCE_DIR}/.
+  generated_install_dir ${GENERATED_INSTALL_DIR})
+
+RPCGenerate(
+  tcp
+  tcp/tcp.idl
+  ${CMAKE_CURRENT_SOURCE_DIR}
+  ${CMAKE_BINARY_DIR}/generated
+  tcp
+  ""
+  include_paths ${CMAKE_CURRENT_SOURCE_DIR}/.
+  dependencies rpc_types_idl
+  generated_install_dir ${GENERATED_INSTALL_DIR})

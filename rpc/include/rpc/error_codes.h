@@ -30,6 +30,7 @@ namespace rpc
         int INCOMPATIBLE_SERIALISATION();     // service proxy does not support this serialisation format try JSON
         int REFERENCE_COUNT_ERROR();          // reference count error
         int UNABLE_TO_CREATE_SERVICE_PROXY(); // unable to create service proxy
+        int INVALID_CHANNEL();                // channel is no longer available
         int MAX();                            // the biggest value
 
         void set_OK_val(int val);

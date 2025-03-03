@@ -38,9 +38,14 @@ if(${BUILD_ENCLAVE})
   # ####################################################################################################################
 
 endif()
-if(BUILD_ENCLAVE)
 
-  add_library(common_host STATIC src/enclave_service_proxy.cpp)
+set(SOURCES src/tcp_service_proxy.cpp)
+if(BUILD_ENCLAVE)
+  list(APPEND SOURCES src/enclave_service_proxy.cpp)
+  set(ADDITIONAL_TARGET marshal_test_edl_host rpc_telemetry_edl_header_host)
+endif()
+
+add_library(common_host STATIC ${SOURCES})
 
   target_compile_definitions(common_host PRIVATE ${HOST_DEFINES})
   target_include_directories(
@@ -51,20 +56,12 @@ if(BUILD_ENCLAVE)
   target_compile_options(common_host PRIVATE ${HOST_COMPILE_OPTIONS})
   target_link_options(common_host PRIVATE ${HOST_LINK_OPTIONS})
 
-  target_link_libraries(
-    common_host
-    PRIVATE rpc::rpc_host
-            marshal_test_edl_host
-            rpc_telemetry_edl_header_host
-            example_idl_host
-            yas_common)
+target_link_libraries(
+  common_host
+  PRIVATE rpc::rpc_host
+          ${ADDITIONAL_TARGET}          
+          example_idl_host
+          tcp_idl_host
+          yas_common)
 
-  set_property(TARGET common_host PROPERTY COMPILE_PDB_NAME common_host)
-
-else()
-
-  add_library(common_host INTERFACE)
-
-  target_include_directories(common_host INTERFACE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-                                                   "$<INSTALL_INTERFACE:include/marshalled_tests>")
-endif()
+set_property(TARGET common_host PROPERTY COMPILE_PDB_NAME common_host)

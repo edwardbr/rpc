@@ -366,9 +366,10 @@ namespace rpc_generator
             case PROXY_PREPARE_IN:
                 return fmt::format("rpc::shared_ptr<rpc::object_stub> {}_stub_;", name);
             case PROXY_PREPARE_IN_INTERFACE_ID:
-                return fmt::format("RPC_ASSERT(rpc::are_in_same_zone(this, {0}.get()));\n"
-                                   "\t\t\tauto {0}_stub_id_ = CO_AWAIT proxy_bind_in_param(__rpc_sp->get_remote_rpc_version(), "
-                                   "{0}, {0}_stub_);",
+                return fmt::format(
+                    "RPC_ASSERT(rpc::are_in_same_zone(this, {0}.get()));\n"
+                    "\t\t\tauto {0}_stub_id_ = CO_AWAIT proxy_bind_in_param(__rpc_sp->get_remote_rpc_version(), "
+                    "{0}, {0}_stub_);",
                     name);
             case PROXY_MARSHALL_IN:
             {
@@ -448,9 +449,10 @@ namespace rpc_generator
             case PROXY_PREPARE_IN:
                 return fmt::format("rpc::shared_ptr<rpc::object_stub> {}_stub_;", name);
             case PROXY_PREPARE_IN_INTERFACE_ID:
-                return fmt::format("RPC_ASSERT(rpc::are_in_same_zone(this, {0}.get()));\n"
-                                   "\t\t\tauto {0}_stub_id_ = CO_AWAIT proxy_bind_in_param(__rpc_sp->get_remote_rpc_version(), "
-                                   "{0}, {0}_stub_);",
+                return fmt::format(
+                    "RPC_ASSERT(rpc::are_in_same_zone(this, {0}.get()));\n"
+                    "\t\t\tauto {0}_stub_id_ = CO_AWAIT proxy_bind_in_param(__rpc_sp->get_remote_rpc_version(), "
+                    "{0}, {0}_stub_);",
                     name);
             case PROXY_MARSHALL_IN:
             {
@@ -469,15 +471,16 @@ namespace rpc_generator
             case STUB_PARAM_CAST:
                 return name;
             case PROXY_VALUE_RETURN:
-                return fmt::format(
-                    "auto {0}_ret = CO_AWAIT rpc::proxy_bind_out_param(__rpc_sp, {0}_, __rpc_sp->get_zone_id().as_caller(), {0}); std::ignore = {0}_ret;", name);
+                return fmt::format("auto {0}_ret = CO_AWAIT rpc::proxy_bind_out_param(__rpc_sp, {0}_, "
+                                   "__rpc_sp->get_zone_id().as_caller(), {0}); std::ignore = {0}_ret;",
+                    name);
             case PROXY_OUT_DECLARATION:
                 return fmt::format("rpc::interface_descriptor {}_;", name);
             case STUB_ADD_REF_OUT_PREDECLARE:
                 return fmt::format("rpc::interface_descriptor {0}_;", name);
             case STUB_ADD_REF_OUT:
-                return fmt::format(
-                    "{0}_ = CO_AWAIT stub_bind_out_param(zone_, protocol_version, caller_channel_zone_id, caller_zone_id, {0});",
+                return fmt::format("{0}_ = CO_AWAIT stub_bind_out_param(zone_, protocol_version, "
+                                   "caller_channel_zone_id, caller_zone_id, {0});",
                     name);
             case STUB_MARSHALL_OUT:
                 return fmt::format("{}_, ", name);
@@ -1874,7 +1877,8 @@ namespace rpc_generator
             header("template<> CORO_TASK(rpc::interface_descriptor) "
                    "rpc::service::proxy_bind_in_param(uint64_t protocol_version, const rpc::shared_ptr<::{}{}>& "
                    "iface, rpc::shared_ptr<rpc::object_stub>& stub);",
-                   ns, interface_name);
+                ns,
+                interface_name);
             header("template<> CORO_TASK(rpc::interface_descriptor) "
                    "rpc::service::stub_bind_out_param(uint64_t protocol_version, caller_channel_zone "
                    "caller_channel_zone_id, caller_zone caller_zone_id, const rpc::shared_ptr<::{}{}>& "
@@ -1919,7 +1923,8 @@ namespace rpc_generator
             stub("}};");
             stub("}}");
 
-            stub("template<> CORO_TASK(interface_descriptor) service::proxy_bind_in_param(uint64_t protocol_version, const "
+            stub("template<> CORO_TASK(interface_descriptor) service::proxy_bind_in_param(uint64_t protocol_version, "
+                 "const "
                  "shared_ptr<::{}{}>& iface, shared_ptr<object_stub>& stub)",
                 ns,
                 interface_name);
@@ -1930,8 +1935,8 @@ namespace rpc_generator
             stub("}}");
 
             stub("auto factory = create_interface_stub(iface);");
-            stub(
-                "CO_RETURN CO_AWAIT get_proxy_stub_descriptor(protocol_version, {{0}}, {{0}}, iface.get(), factory, false, stub);");
+            stub("CO_RETURN CO_AWAIT get_proxy_stub_descriptor(protocol_version, {{0}}, {{0}}, iface.get(), factory, "
+                 "false, stub);");
             stub("}}");
 
             stub("template<> CORO_TASK(interface_descriptor) service::stub_bind_out_param(uint64_t protocol_version, "
@@ -1948,7 +1953,8 @@ namespace rpc_generator
             stub("shared_ptr<object_stub> stub;");
 
             stub("auto factory = create_interface_stub(iface);");
-            stub("CO_RETURN CO_AWAIT get_proxy_stub_descriptor(protocol_version, caller_channel_zone_id, caller_zone_id, "
+            stub("CO_RETURN CO_AWAIT get_proxy_stub_descriptor(protocol_version, caller_channel_zone_id, "
+                 "caller_zone_id, "
                  "iface.get(), factory, true, stub);");
             stub("}}");
         }
@@ -2183,7 +2189,8 @@ namespace rpc_generator
             const std::vector<std::string>& additional_headers,
             bool catch_stub_exceptions,
             const std::vector<std::string>& rethrow_exceptions,
-            const std::vector<std::string>& additional_stub_headers)
+            const std::vector<std::string>& additional_stub_headers,
+            bool include_rpc_headers)
         {
             writer header(hos);
             writer proxy(pos);
@@ -2211,13 +2218,16 @@ namespace rpc_generator
             header("#include <string>");
             header("#include <array>");
 
-            header("#include <rpc/version.h>");
-            header("#include <rpc/marshaller.h>");
-            header("#include <rpc/serialiser.h>");
-            header("#include <rpc/service.h>");
-            header("#include <rpc/error_codes.h>");
-            header("#include <rpc/types.h>");
-            header("#include <rpc/casting_interface.h>");
+            if (include_rpc_headers)
+            {
+                header("#include <rpc/version.h>");
+                header("#include <rpc/marshaller.h>");
+                header("#include <rpc/serialiser.h>");
+                header("#include <rpc/service.h>");
+                header("#include <rpc/error_codes.h>");
+                header("#include <rpc/types.h>");
+                header("#include <rpc/casting_interface.h>");
+            }
 
             for (const auto& import : imports)
             {

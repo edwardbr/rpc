@@ -15,7 +15,7 @@ function(
   # "include_paths" multivalue expects string "defines" multivalue expects string "additional_headers" optional_val mock
 )
   set(options suppress_catch_stub_exceptions)
-  set(singleValueArgs mock install_dir)
+  set(singleValueArgs mock install_dir no_include_rpc_headers)
   set(multiValueArgs
       dependencies
       link_libraries
@@ -87,7 +87,9 @@ function(
     message("full_stub_header_path ${full_stub_header_path}")
     message("yas_path ${yas_path}")
     message("full_yas_path ${full_yas_path}")
+    message("no_include_rpc_headers ${params_no_include_rpc_headers}")
   endif()
+    message("no_include_rpc_headers ${params_no_include_rpc_headers}")
 
   if(EXISTS ENCLAVE_MARSHALLER_EXECUTABLE)
     set(ENCLAVE_MARSHALLER ${ENCLAVE_MARSHALLER_EXECUTABLE})
@@ -153,6 +155,14 @@ function(
 
   if(DEFINED params_mock AND NOT ${params_mock} STREQUAL "")
     set(PATHS_PARAMS ${PATHS_PARAMS} --mock "${params_mock}")
+  endif()
+
+  if(DEFINED params_no_include_rpc_headers AND NOT ${params_no_include_rpc_headers} STREQUAL "")
+    message("no_include_rpc_headers set")
+    set(PATHS_PARAMS ${PATHS_PARAMS} --no_include_rpc_headers)
+  else()
+      message("no_include_rpc_headers not set")
+
   endif()
 
   if(${params_suppress_catch_stub_exceptions})
