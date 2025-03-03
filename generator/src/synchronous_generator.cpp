@@ -2015,7 +2015,6 @@ namespace synchronous_generator
             header("#include <rpc/types.h>");
             header("#include <rpc/casting_interface.h>");
         }
-
         for (const auto& import : imports)
         {
             std::filesystem::path p(import);
