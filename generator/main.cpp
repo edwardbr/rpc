@@ -81,6 +81,7 @@ int main(const int argc, char* argv[])
         std::vector<std::string> additional_headers;
         std::vector<std::string> additional_stub_headers;
         bool dump_preprocessor_output_and_die = false;
+        bool no_include_rpc_headers = false;
 
         auto cli = (clipp::required("-i", "--idl").doc("the idl to be parsed") & clipp::value("idl", rootIdl),
                     clipp::required("-p", "--output_path").doc("base output path")
@@ -117,6 +118,9 @@ int main(const int argc, char* argv[])
                     clipp::repeatable(clipp::option("-A", "--additional_stub_header")
                                       & clipp::value("additional_stub_header", additional_stub_headers))
                         .doc("additional stub header"),
+                    clipp::option("--no_include_rpc_headers")
+                        .set(no_include_rpc_headers)
+                        .doc("include rpc headers"),
                     clipp::any_other(wrong_elements));
 
         clipp::parsing_result res = clipp::parse(argc, argv, cli);
@@ -275,7 +279,7 @@ int main(const int argc, char* argv[])
             rpc_generator::synchronous_generator::write_files(
                 module_name, true, *objects, header_stream, proxy_stream, stub_stream, stub_header_stream, namespaces,
                 headerPath, stubHeaderPath, imports, additional_headers, !suppress_catch_stub_exceptions,
-                rethrow_exceptions, additional_stub_headers);
+                rethrow_exceptions, additional_stub_headers, !no_include_rpc_headers);
 
             header_stream << ends;
             proxy_stream << ends;

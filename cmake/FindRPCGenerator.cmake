@@ -16,7 +16,7 @@ function(
   # "include_paths" multivalue expects string "defines" multivalue expects string "additional_headers" optional_val mock
 )
   set(options)
-  set(singleValueArgs mock suppress_catch_stub_exceptions generated_install_dir)
+  set(singleValueArgs mock suppress_catch_stub_exceptions generated_install_dir no_include_rpc_headers)
   set(multiValueArgs
     dependencies
     link_libraries
@@ -88,7 +88,9 @@ function(
     message("full_stub_header_path ${full_stub_header_path}")
     message("yas_path ${yas_path}")
     message("full_yas_path ${full_yas_path}")
+    message("no_include_rpc_headers ${params_no_include_rpc_headers}")
   endif()
+    message("no_include_rpc_headers ${params_no_include_rpc_headers}")
 
   if(EXISTS ENCLAVE_MARSHALLER_EXECUTABLE)
     set(ENCLAVE_MARSHALLER ${ENCLAVE_MARSHALLER_EXECUTABLE})
@@ -114,13 +116,9 @@ function(
     set(ADDITIONAL_HEADERS ${ADDITIONAL_HEADERS} --additional_headers "${additional_headers}")
   endforeach()
 
-  message("params_rethrow_stub_exception ${params_rethrow_stub_exception}")
-
   foreach(rethrow ${params_rethrow_stub_exception})
     set(RETHROW_STUB_EXCEPTION ${RETHROW_STUB_EXCEPTION} --rethrow_stub_exception "${rethrow}")
   endforeach()
-
-  message("params_additional_stub_header ${params_additional_stub_header}")
 
   foreach(stub_header ${params_additional_stub_header})
     set(ADDITIONAL_STUB_HEADER ${ADDITIONAL_STUB_HEADER} --additional_stub_header "${stub_header}")
@@ -146,6 +144,14 @@ function(
 
   if(DEFINED params_mock AND NOT ${params_mock} STREQUAL "")
     set(PATHS_PARAMS ${PATHS_PARAMS} --mock "${params_mock}")
+  endif()
+
+  if(DEFINED params_no_include_rpc_headers AND NOT ${params_no_include_rpc_headers} STREQUAL "")
+    message("no_include_rpc_headers set")
+    set(PATHS_PARAMS ${PATHS_PARAMS} --no_include_rpc_headers)
+  else()
+      message("no_include_rpc_headers not set")
+
   endif()
 
   if(${params_suppress_catch_stub_exceptions})

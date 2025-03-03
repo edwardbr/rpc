@@ -2283,7 +2283,8 @@ namespace rpc_generator
                          const std::string& stub_header_filename, const std::list<std::string>& imports,
                          const std::vector<std::string>& additional_headers, bool catch_stub_exceptions,
                          const std::vector<std::string>& rethrow_exceptions,
-                         const std::vector<std::string>& additional_stub_headers)
+                         const std::vector<std::string>& additional_stub_headers,
+                         bool include_rpc_headers)
         {
             writer header(hos);
             writer proxy(pos);
@@ -2310,14 +2311,17 @@ namespace rpc_generator
             header("#include <string>");
             header("#include <array>");
 
-            header("#include <rpc/version.h>");
-            header("#include <rpc/marshaller.h>");
-            header("#include <rpc/serialiser.h>");
-            header("#include <rpc/service.h>");
-            header("#include <rpc/error_codes.h>");
-            header("#include <rpc/types.h>");
-            header("#include <rpc/casting_interface.h>");
-
+            if(include_rpc_headers)
+            {
+                header("#include <rpc/version.h>");
+                header("#include <rpc/marshaller.h>");
+                header("#include <rpc/serialiser.h>");
+                header("#include <rpc/service.h>");
+                header("#include <rpc/error_codes.h>");
+                header("#include <rpc/types.h>");
+                header("#include <rpc/casting_interface.h>");
+            }
+            
             for(const auto& import : imports)
             {
                 std::filesystem::path p(import);

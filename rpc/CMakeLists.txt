@@ -13,6 +13,8 @@ cmake_minimum_required(VERSION 3.24)
 #   set(REMOTE_PTR_CPP)
 # endif()
 
+add_subdirectory(interfaces)
+
 if(USE_RPC_TELEMETRY)
   set(ENCLAVE_TELEMETRY_SERVICE rpc::rpc_telemetry_enclave)
   set(HOST_TELEMETRY_SERVICE rpc::rpc_telemetry_host)
@@ -49,7 +51,7 @@ if(BUILD_ENCLAVE)
     PRIVATE ${ENCLAVE_LIBCXX_INCLUDES})
   target_link_libraries(
     rpc_enclave
-    PUBLIC ${TELEMETRY_INTERFACE} ${ENCLAVE_TELEMETRY_SERVICE}
+    PUBLIC ${TELEMETRY_INTERFACE} ${ENCLAVE_TELEMETRY_SERVICE} rpc_types_idl_enclave
     PRIVATE yas_common)
   target_link_options(rpc_enclave PRIVATE ${ENCLAVE_LINK_OPTIONS})
 
@@ -89,6 +91,7 @@ target_link_libraries(
   rpc_host
   PUBLIC ${TELEMETRY_INTERFACE} ${HOST_TELEMETRY_SERVICE}
   libcoro
+  rpc_types_idl_host
   PRIVATE yas_common ${HOST_LIBRARIES})
 
 target_compile_options(rpc_host PRIVATE ${HOST_COMPILE_OPTIONS} ${WARN_OK})
