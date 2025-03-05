@@ -189,8 +189,8 @@ uint64_t release_enclave(uint64_t protocol_version, uint64_t zone_id, uint64_t o
 
 extern "C"
 {
-    void* _Uelf64_valid_object()
+    int _Uelf64_valid_object()
     {
-        return 0;
+        return -1;
     }
 }
