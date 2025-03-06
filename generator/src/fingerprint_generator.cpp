@@ -219,7 +219,7 @@ namespace fingerprint
                     }
                     
                     // to handle some idl parser yuckiness
-                    if(item == attribute_types::tolerate_struct_or_class)
+                    if(item == attribute_types::tolerate_struct_or_enum)
                     {
                         continue;
                     }
