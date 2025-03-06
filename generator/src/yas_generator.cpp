@@ -7,6 +7,9 @@
 #include "coreclasses.h"
 #include "cpp_parser.h"
 #include "helpers.h"
+
+#include "attributes.h"
+
 extern "C"
 {
 #include "sha3.h"
@@ -361,7 +364,7 @@ namespace rpc_generator
             auto in = is_in_param(attributes);
             auto out = is_out_param(attributes);
             auto is_const = is_const_param(attributes);
-            auto by_value = std::find(attributes.begin(), attributes.end(), "by_value") != attributes.end();
+            auto by_value = std::find(attributes.begin(), attributes.end(), attribute_types::by_value_param) != attributes.end();
 
             if(out && !in)
                 return false;

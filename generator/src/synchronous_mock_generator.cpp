@@ -2,10 +2,12 @@
 #include <algorithm>
 #include <tuple>
 #include <type_traits>
-#include "coreclasses.h"
-#include "cpp_parser.h"
 #include <filesystem>
 #include <sstream>
+
+#include "coreclasses.h"
+#include "cpp_parser.h"
+#include "helpers.h"
 
 #include "writer.h"
 
@@ -86,13 +88,7 @@ namespace rpc_generator
                             header.raw(", ");
                         }
                         has_parameter = true;
-                        std::string modifier;
-                        for(auto& item : parameter.get_attributes())
-                        {
-                            if(item == "const")
-                                modifier = "const " + modifier;
-                        }
-                        header.raw("{}{} {}", modifier, parameter.get_type(), parameter.get_name());
+                        render_parameter(header, m_ob, parameter);
                     }
                     header.raw("));\n");
                 }

@@ -5,6 +5,9 @@
 #include "fingerprint_generator.h"
 #include "helpers.h"
 
+#include "attributes.h"
+#include "rpc_attributes.h"
+
 namespace rpc_generator
 {
     enum print_type
@@ -295,7 +298,7 @@ namespace rpc_generator
         auto in = is_in_param(attributes);
         auto out = is_out_param(attributes);
         auto is_const = is_const_param(attributes);
-        auto by_value = std::find(attributes.begin(), attributes.end(), "by_value") != attributes.end();
+        auto by_value = std::find(attributes.begin(), attributes.end(), attribute_types::by_value_param) != attributes.end();
 
         if(out && !in)
             return false;
@@ -666,12 +669,9 @@ namespace rpc_generator
                 }
 
                 if(count > 1)
-                    header.raw(", ");
+                    header.raw(", ");       
                     
-                std::string modifier;
-                if(is_const_param(parameter.get_attributes()))
-                    modifier = "const " + modifier;
-                header.raw("{}{} {}", modifier, parameter.get_type(), parameter.get_name());
+                render_parameter(header, m_ob, parameter);
 
                 count++;
             }
@@ -693,7 +693,7 @@ namespace rpc_generator
             header.print_tabs();
             for(auto& item : function->get_attributes())
             {
-                if(item == "deprecated" || item == "_deprecated")
+                if(item == rpc_attribute_types::deprecated_function || item == rpc_attribute_types::fingerprint_contaminating_deprecated_function)
                     header.raw("[[deprecated]] ");
             }
             header.raw("virtual {} {}(", function->get_return_type(), function->get_name());
@@ -705,13 +705,7 @@ namespace rpc_generator
                     header.raw(", ");
                 }
                 has_parameter = true;
-                std::string modifier;
-                for(auto& item : parameter.get_attributes())
-                {
-                    if(item == "const")
-                        modifier = "const " + modifier;
-                }
-                header.raw("{}{} {}", modifier, parameter.get_type(), parameter.get_name());
+                render_parameter(header, m_ob, parameter);
             }
             bool function_is_const = false;
             for(auto& item : function->get_attributes())

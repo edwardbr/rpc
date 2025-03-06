@@ -3,19 +3,19 @@ cmake_minimum_required(VERSION 3.24)
 enable_testing()
 
 add_executable(generator 
-                synchronous_generator.cpp 
-                synchronous_mock_generator.cpp 
-                interface_declaration_generator.cpp
-                yas_generator.cpp 
-                main.cpp 
-                helpers.cpp
-                sha3.c
-                component_checksum.cpp
-                fingerprint_generator.cpp)
+                src/synchronous_generator.cpp 
+                src/synchronous_mock_generator.cpp 
+                src/interface_declaration_generator.cpp
+                src/yas_generator.cpp 
+                src/main.cpp 
+                src/helpers.cpp
+                src/sha3.c
+                src/component_checksum.cpp
+                src/fingerprint_generator.cpp)
 
 target_compile_definitions(generator PRIVATE ${HOST_DEFINES})
-target_compile_options(generator PRIVATE ${HOST_COMPILE_OPTIONS} ${WARN_PEDANTIC})
-target_include_directories(generator PRIVATE ${HOST_INCLUDES})
+target_compile_options(generator PRIVATE ${HOST_COMPILE_OPTIONS})
+target_include_directories(generator PRIVATE ${HOST_INCLUDES} ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(
   generator
   PRIVATE ast_parser

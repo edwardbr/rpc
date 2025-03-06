@@ -4,6 +4,7 @@
 
 #include "helpers.h"
 #include "coreclasses.h"
+#include "attributes.h"
 
 std::string get_encapsulated_shared_ptr_type(const std::string& type_name)
 {
@@ -53,17 +54,17 @@ bool is_interface_param(const class_entity& lib, const std::string& type)
 
 bool is_in_param(const std::list<std::string>& attributes)
 {
-    return std::find(attributes.begin(), attributes.end(), "in") != attributes.end();
+    return std::find(attributes.begin(), attributes.end(), attribute_types::in_param) != attributes.end();
 }
 
 bool is_out_param(const std::list<std::string>& attributes)
 {
-    return std::find(attributes.begin(), attributes.end(), "out") != attributes.end();
+    return std::find(attributes.begin(), attributes.end(), attribute_types::out_param) != attributes.end();
 }
 
 bool is_const_param(const std::list<std::string>& attributes)
 {
-    return std::find(attributes.begin(), attributes.end(), "const") != attributes.end();
+    return std::find(attributes.begin(), attributes.end(), attribute_types::const_function) != attributes.end();
 }
 
 
@@ -105,4 +106,80 @@ bool is_pointer_to_pointer(std::string type_name)
     strip_reference_modifiers(type_name, reference_modifiers);
 
     return reference_modifiers == "**";
+}
+
+
+bool is_type_and_parameter_the_same(std::string type, std::string name)
+{
+    if(type.empty() || type.size() < name.size())
+        return false;
+    if(*type.rbegin() == '&' || *type.rbegin() == '*')
+    {
+        type = type.substr(0, type.size() - 1);
+    }
+    return type == name;
+}
+
+void render_parameter(writer& wrtr, const class_entity& m_ob, const parameter_entity &parameter)
+{
+    std::string modifier;
+    bool has_struct = false;
+    for(auto& item : parameter.get_attributes())
+    {
+        if(item == "const")
+            modifier = "const " + modifier;
+        if(item == "struct")
+            has_struct = true;
+    }
+    
+    if(has_struct)
+    {
+        modifier = modifier + "struct ";
+    }
+    else if(is_type_and_parameter_the_same(parameter.get_type(), parameter.get_name()))
+    {
+        std::shared_ptr<class_entity> obj;
+        if(!m_ob.get_owner()->find_class(parameter.get_name(), obj))
+        {
+            throw std::runtime_error(std::string("unable to identify type ") + parameter.get_name());
+        }
+        auto type = obj->get_entity_type();
+        if(type == entity_type::STRUCT)
+            modifier = modifier + "struct ";
+        else if(type == entity_type::ENUM)
+            modifier = modifier + "enum ";
+    }
+    
+    wrtr.raw("{}{} {}", modifier, parameter.get_type(), parameter.get_name());
+}
+
+void render_function(writer& wrtr, const class_entity& m_ob, const function_entity& function)
+{
+    std::string modifier;
+    bool has_struct = false;
+    for(auto& item : function.get_attributes())
+    {
+        if(item == "struct")
+            has_struct = true;
+    }
+    
+    if(has_struct)
+    {
+        modifier = modifier + "struct ";
+    }
+    else if(is_type_and_parameter_the_same(function.get_return_type(), function.get_name()))
+    {
+        std::shared_ptr<class_entity> obj;
+        if(!m_ob.get_owner()->find_class(function.get_name(), obj))
+        {
+            throw std::runtime_error(std::string("unable to identify type ") + function.get_name());
+        }
+        auto type = obj->get_entity_type();
+        if(type == entity_type::STRUCT)
+            modifier = modifier + "struct ";
+        else if(type == entity_type::ENUM)
+            modifier = modifier + "enum ";
+    }
+    
+    wrtr.raw("{}{} {}", modifier, function.get_return_type(), function.get_name());
 }

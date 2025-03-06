@@ -5,6 +5,10 @@
 #include "coreclasses.h"
 #include "cpp_parser.h"
 #include "helpers.h"
+
+#include "attributes.h"
+#include "rpc_attributes.h"
+
 extern "C"
 {
 #include "sha3.h"
@@ -437,7 +441,7 @@ namespace rpc_generator
             auto in = is_in_param(attributes);
             auto out = is_out_param(attributes);
             auto is_const = is_const_param(attributes);
-            auto by_value = std::find(attributes.begin(), attributes.end(), "by_value") != attributes.end();
+            auto by_value = std::find(attributes.begin(), attributes.end(), attribute_types::by_value_param) != attributes.end();
 
             if(out && !in)
                 return false;
@@ -629,13 +633,7 @@ namespace rpc_generator
                         proxy.raw(", ");
                     }
                     has_parameter = true;
-                    std::string modifier;
-                    for(auto& item : parameter.get_attributes())
-                    {
-                        if(item == "const")
-                            modifier = "const " + modifier;
-                    }
-                    proxy.raw("{}{} {}", modifier, parameter.get_type(), parameter.get_name());
+                    render_parameter(proxy, m_ob, parameter);
                 }
                 bool function_is_const = false;
                 for(auto& item : function->get_attributes())
@@ -1364,7 +1362,7 @@ namespace rpc_generator
             header("if(rpc_version == rpc::VERSION_2)");
             header("{{");
             header("auto id = {}ull;", fingerprint::generate(m_ob, {}, &header));
-            auto val = m_ob.get_attribute_value("use_template_param_in_id");
+            auto val = m_ob.get_attribute_value(rpc_attribute_types::use_template_param_in_id_attr);
             if(val != "false")
             {
                 for(const auto& param : m_ob.get_template_params())
@@ -1825,7 +1823,7 @@ namespace rpc_generator
                 {
                     auto* function_variable = static_cast<const function_entity*>(field.get());
                     header.print_tabs();
-                    header.raw("{} {}", function_variable->get_return_type(), function_variable->get_name());
+                    render_function(header, m_ob, *function_variable);
                     if(function_variable->get_array_string().size())
                         header.raw("[{}]", function_variable->get_array_string());
                     if(!function_variable->get_default_value().empty())
@@ -1864,6 +1862,7 @@ namespace rpc_generator
             header("template<typename Ar>");
             header("void serialize(Ar &ar)");
             header("{{");
+            header("std::ignore = ar;");
             bool has_fields = false;
             for(auto& field : m_ob.get_functions())
             {
