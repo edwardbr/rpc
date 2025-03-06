@@ -117,6 +117,16 @@ bool is_type_and_parameter_the_same(std::string type, std::string name)
     {
         type = type.substr(0, type.size() - 1);
     }
+    auto template_pos = type.find('<');
+    if(template_pos == 0)
+    {
+        return false;
+    }
+    
+    if(template_pos != std::string::npos)
+    {
+        type = type.substr(0, template_pos);
+    }
     return type == name;
 }
 
