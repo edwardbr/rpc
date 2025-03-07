@@ -128,6 +128,37 @@ namespace rpc
             return to_compressed_yas_binary(obj);
         throw std::runtime_error("invalid encoding type");
     }
+    
+    // serialisation primatives, it will be nice to move yas out of headers and make the library hidden.  Something for the future
+    template<typename T>
+    uint64_t yas_json_saved_size(const T& obj)
+    {
+        return yas::saved_size<::yas::mem|::yas::json|::yas::no_header>(obj);
+    }
+
+    template<typename T>
+    uint64_t yas_binary_saved_size(const T& obj)
+    {
+        return yas::saved_size<::yas::mem|::yas::binary|::yas::no_header>(obj);
+   }
+
+    template<typename T>
+    uint64_t compressed_yas_binary_saved_size(const T& obj)
+    {
+        return yas::saved_size<::yas::mem|::yas::binary|::yas::compacted|::yas::no_header>(obj);
+    }
+
+    template<typename T>
+    uint64_t get_saved_size(const T& obj, encoding enc)
+    {
+        if(enc == encoding::yas_json)
+            return yas_json_saved_size(obj);
+        if(enc == encoding::enc_default || enc == encoding::yas_binary)
+            return yas_binary_saved_size(obj);
+        if(enc == encoding::yas_compressed_binary)
+            return compressed_yas_binary_saved_size(obj);
+        throw std::runtime_error("invalid encoding type");
+    }
 
     // deserialisation primatives
     template<typename T> std::string from_yas_json(const span& data, T& obj)

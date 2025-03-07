@@ -96,7 +96,7 @@ namespace rpc
         {
             return offset_val + (offset_val_is_negative ? -20 : 20);
         }
-        [[nodiscard]] int INVALID_CHANNEL()
+        [[nodiscard]] int SERVICE_PROXY_LOST_CONNECTION()
         {
             return offset_val + (offset_val_is_negative ? -21 : 21);
         }
@@ -206,9 +206,9 @@ namespace rpc
             {
                 return "unable to create service proxy";
             }
-            if (err == INVALID_CHANNEL())
+            if (err == SERVICE_PROXY_LOST_CONNECTION())
             {
-                return "Channel is no longer available";
+                return "Service proxy has lost connection to the remote service";
             }
             return "invalid error code";
         }

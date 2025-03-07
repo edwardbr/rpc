@@ -247,6 +247,46 @@ namespace rpc
             }
             CO_RETURN err_code;
         }
+        
+        template<class SERVICE_PROXY, class PARENT_INTERFACE, class CHILD_INTERFACE, typename Args>
+        CORO_TASK(int) attach_remote_zone(
+            const char* name
+            , rpc::interface_descriptor input_descr
+            , rpc::interface_descriptor& output_descr
+            , std::function<CORO_TASK(int)(const rpc::shared_ptr<PARENT_INTERFACE>&, rpc::shared_ptr<CHILD_INTERFACE>&, const rpc::shared_ptr<rpc::service>&)> fn
+            , Args&& arg1
+            , Args&& arg2)
+        {
+            //link the child to the parent
+            auto parent_service_proxy = CO_AWAIT SERVICE_PROXY::create(name, shared_from_this(), std::move(arg1), std::move(arg2));            
+            if(!parent_service_proxy)
+                CO_RETURN rpc::error::UNABLE_TO_CREATE_SERVICE_PROXY();
+            add_zone_proxy(parent_service_proxy);       
+            
+            rpc::shared_ptr<PARENT_INTERFACE> parent_ptr;
+            if(input_descr != interface_descriptor())
+            {
+                auto err_code = CO_AWAIT rpc::demarshall_interface_proxy(rpc::get_version(), parent_service_proxy, input_descr, get_zone_id().as_caller(), parent_ptr);
+                if(err_code != rpc::error::OK())
+                { 
+                    CO_RETURN err_code;
+                }
+            }   
+            rpc::shared_ptr<CHILD_INTERFACE> child_ptr;
+            {
+                auto err_code = CO_AWAIT fn(parent_ptr, child_ptr, shared_from_this());
+                if(err_code != rpc::error::OK())
+                {
+                    CO_RETURN err_code;
+                }
+            }
+            if(child_ptr)
+            {
+                RPC_ASSERT(!child_ptr->query_proxy_base() && "we cannot support remote pointers to subordinate zones as it has not been registered yet");
+                output_descr = CO_AWAIT rpc::create_interface_stub(*this, child_ptr);
+            }
+            CO_RETURN rpc::error::OK();
+        }
 
         template<class T> 
         std::function<shared_ptr<i_interface_stub>(const shared_ptr<object_stub>& stub)> create_interface_stub(
@@ -355,7 +395,7 @@ namespace rpc
                 output_descr = CO_AWAIT rpc::create_interface_stub(*child_svc, child_ptr);
             }
             CO_RETURN rpc::error::OK();
-        }
+        };
     };
 
 
