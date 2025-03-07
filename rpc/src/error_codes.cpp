@@ -33,7 +33,7 @@ namespace rpc
         [[nodiscard]] int INCOMPATIBLE_SERIALISATION(){return offset_val + (offset_val_is_negative ? - 18 : 18);}
         [[nodiscard]] int REFERENCE_COUNT_ERROR(){return offset_val + (offset_val_is_negative ? - 19 : 19);}
         [[nodiscard]] int UNABLE_TO_CREATE_SERVICE_PROXY(){return offset_val + (offset_val_is_negative ? - 20 : 20);}
-        [[nodiscard]] int INVALID_CHANNEL(){return offset_val + (offset_val_is_negative ? - 21 : 21);}
+        [[nodiscard]] int SERVICE_PROXY_LOST_CONNECTION(){return offset_val + (offset_val_is_negative ? - 21 : 21);}
         //dont forget to update MIN & MAX if new values
 
         [[nodiscard]] int MIN(){return offset_val + (offset_val_is_negative ? -20 : 1);}
@@ -65,7 +65,7 @@ namespace rpc
             if(err == INCOMPATIBLE_SERIALISATION()){return "service proxy does not support this serialisation format try JSON";}
             if(err == REFERENCE_COUNT_ERROR()){return "reference count error";}
             if(err == UNABLE_TO_CREATE_SERVICE_PROXY()){return "unable to create service proxy";}
-            if(err == INVALID_CHANNEL()){return "Channel is no longer available";}
+            if(err == SERVICE_PROXY_LOST_CONNECTION()){return "Service proxy has lost connection to the remote service";}
             return "invalid error code";
         }
     };

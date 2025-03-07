@@ -18,6 +18,7 @@
 
 void log(const std::string& data)
 {
+    std::ignore = data;
 #ifdef USE_RPC_LOGGING
     rpc_log(data.data(), data.size());
 #endif
@@ -247,6 +248,7 @@ namespace marshalled_tests
         do_multi_complicated_val(const xxx::something_more_complicated val1,
                                  const xxx::something_more_complicated val2) override
         {
+            std::ignore = val2;
             log(std::string("got ") + val1.map_val.begin()->first);
             CO_RETURN rpc::error::OK();
         }
@@ -375,7 +377,7 @@ namespace marshalled_tests
     class example : public yyy::i_example
     {
         rpc::shared_ptr<yyy::i_host> host_;
-        rpc::weak_ptr<rpc::child_service> this_service_;
+        rpc::weak_ptr<rpc::service> this_service_;
         rpc::zone zone_id_;
 
         void* get_address() const override { return (void*)this; }
@@ -387,7 +389,7 @@ namespace marshalled_tests
         }
 
     public:
-        example(rpc::shared_ptr<rpc::child_service> this_service, rpc::shared_ptr<yyy::i_host> host)
+        example(rpc::shared_ptr<rpc::service> this_service, rpc::shared_ptr<yyy::i_host> host)
             : host_(host)
             , this_service_(this_service)
             , zone_id_(0)

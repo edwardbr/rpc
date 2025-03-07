@@ -1866,6 +1866,7 @@ namespace rpc_generator
             header("template<typename Ar>");
             header("void serialize(Ar &ar)");
             header("{{");
+            header("std::ignore = ar;");
             bool has_fields = false;
             for(auto& field : m_ob.get_functions())
             {
