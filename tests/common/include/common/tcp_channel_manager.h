@@ -5,6 +5,13 @@
 
 #include <tcp/tcp.h>
 
+class tcp_channel_manager;
+
+struct worker_release
+{
+    std::shared_ptr<tcp_channel_manager> channel_manager;
+};
+
 class tcp_channel_manager
 {
     struct result_listener
@@ -19,12 +26,15 @@ class tcp_channel_manager
     std::unordered_map<uint64_t, result_listener*> pending_transmits_;
     std::mutex pending_transmits_mtx_;
 
-    coro::mutex connection_mtx_;
     coro::net::tcp::client client_;
-    std::chrono::milliseconds timeout_ = std::chrono::milliseconds(10000);
+    std::chrono::milliseconds timeout_;
+    std::weak_ptr<worker_release> worker_release_;
+    coro::mutex connection_mtx_;
     std::atomic<uint64_t> sequence_number_ = 0;
 
     std::queue<std::vector<uint8_t>> send_queue_;
+    
+    rpc::shared_ptr<rpc::service> service_;
 
     // read from the peer and fill the buffer as it has been presized
     CORO_TASK(int) read(std::vector<char>& buf);
@@ -33,13 +43,20 @@ class tcp_channel_manager
     CORO_TASK(int) receive_prefix(tcp::envelope_prefix& prefix);
 
 public:
-    tcp_channel_manager(coro::net::tcp::client&& client, std::chrono::milliseconds timeout)
+    tcp_channel_manager(coro::net::tcp::client client, std::chrono::milliseconds timeout,
+                        std::weak_ptr<worker_release> worker_release, rpc::shared_ptr<rpc::service> service)
         : client_(std::move(client))
         , timeout_(timeout)
+        , worker_release_(worker_release)
+        , service_(service)
     {
+        assert(client_.socket().is_valid());
     }
+    
+    ~tcp_channel_manager(){}
 
-    CORO_TASK(void) launch_send_receive();
+    CORO_TASK(void) pump_send_and_receive();
+    CORO_TASK(void) pump_stub_receive_and_send();
 
     // read a messsage from a peer
     CORO_TASK(int)
@@ -84,6 +101,46 @@ public:
         send_queue_.push(payload);
 
         co_return rpc::error::OK();
+    }
+    
+    template<class SendPayload>
+    CORO_TASK(int)
+    immediate_send_payload(std::uint64_t protocol_version, SendPayload&& sendPayload, uint64_t sequence_number)
+    {
+        auto scoped_lock = co_await connection_mtx_.lock();
+
+        auto payload = rpc::to_yas_binary(
+            tcp::envelope_payload {.payload_fingerprint = rpc::id<SendPayload>::get(protocol_version),
+                                   .payload = rpc::to_compressed_yas_binary(sendPayload)});
+
+        auto prefix = tcp::envelope_prefix {
+            .version = protocol_version, .sequence_number = sequence_number, .payload_size = payload.size()};
+
+        auto status = co_await client_.poll(coro::poll_op::write, timeout_);
+        if(status != coro::poll_status::event)
+        {
+            CO_RETURN rpc::error::TRANSPORT_ERROR();
+        }
+
+        std::vector<uint8_t> buf = rpc::to_yas_binary(prefix);
+        auto marshal_status = client_.send(std::span {(const char*)buf.data(), buf.size()});
+        if(marshal_status.first != coro::net::send_status::ok)
+        {
+            CO_RETURN rpc::error::TRANSPORT_ERROR();
+        }
+        
+        status = co_await client_.poll(coro::poll_op::write, timeout_);
+        if(status != coro::poll_status::event)
+        {
+            CO_RETURN rpc::error::TRANSPORT_ERROR();
+        }
+        
+        marshal_status = client_.send(std::span {(const char*)payload.data(), payload.size()});
+        if(marshal_status.first != coro::net::send_status::ok)
+        {
+            CO_RETURN rpc::error::TRANSPORT_ERROR();
+        }
+        CO_RETURN rpc::error::OK();
     }
 
     // send a message from a peer and wait for a reply
