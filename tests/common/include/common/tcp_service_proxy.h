@@ -6,6 +6,7 @@
 
 #include <rpc/proxy.h>
 #include <coro/coro.hpp>
+#include <coro/net/ip_address.hpp>
 
 #include <tcp/tcp.h>
 
@@ -13,25 +14,26 @@
 
 namespace rpc
 {
-
     // This is for hosts to call services on an enclave
     class tcp_service_proxy : public service_proxy
     {
-        tcp_service_proxy(const char* name, destination_zone destination_zone_id, const rpc::shared_ptr<service>& svc);
         tcp_service_proxy(const char* name, destination_zone destination_zone_id, const rpc::shared_ptr<service>& svc,
-                          const std::shared_ptr<tcp_channel_manager>& channel_manager);
+                          std::shared_ptr<worker_release> proxy_worker_release,
+                          std::shared_ptr<worker_release> stub_worker_release, 
+                          std::chrono::milliseconds timeout,
+                          coro::net::tcp::client::options opts);
 
         tcp_service_proxy(const tcp_service_proxy& other) = default;
 
         rpc::shared_ptr<service_proxy> clone() override;
 
         static rpc::shared_ptr<tcp_service_proxy> create(const char* name, destination_zone destination_zone_id,
-                                                         const rpc::shared_ptr<service>& svc);
+                                                         const rpc::shared_ptr<service>& svc, std::chrono::milliseconds timeout, coro::net::tcp::client::options opts);
 
         static CORO_TASK(rpc::shared_ptr<tcp_service_proxy>)
-            create(const char* name, const rpc::shared_ptr<service>& svc,
-                   const std::shared_ptr<tcp_channel_manager>& initiator_channel_manager,
-                   const std::shared_ptr<tcp_channel_manager>& responding_channel_manager);
+            attach_remote(const char* name, const rpc::shared_ptr<service>& svc, destination_zone destination_zone_id,
+                          std::shared_ptr<worker_release> proxy_worker_release,
+                          std::shared_ptr<worker_release> stub_worker_release);
 
         CORO_TASK(int) connect(rpc::interface_descriptor input_descr, rpc::interface_descriptor& output_descr) override;
 
@@ -51,11 +53,12 @@ namespace rpc
         release(uint64_t protocol_version, destination_zone destination_zone_id, object object_id,
                 caller_zone caller_zone_id) override;
 
-        CORO_TASK(void) init_stub(const std::shared_ptr<tcp_channel_manager>& receive_client);
-
         friend rpc::service;
 
-        std::shared_ptr<tcp_channel_manager> channel_manager_;
+        std::shared_ptr<worker_release> proxy_worker_release_;
+        std::shared_ptr<worker_release> stub_worker_release_;
+        std::chrono::milliseconds timeout_;
+        coro::net::tcp::client::options opts_;
 
     public:
         virtual ~tcp_service_proxy() = default;

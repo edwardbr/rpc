@@ -15,15 +15,15 @@ using namespace std::chrono_literals;
 
 namespace rpc
 {
-    coro::task<void> tcp_listener::run_client(rpc::shared_ptr<rpc::service> service, coro::net::tcp::client&& client)
+    coro::task<void> tcp_listener::run_client(rpc::shared_ptr<rpc::service> service, coro::net::tcp::client client)
     {
-        std::chrono::milliseconds timeout(10000);
-        auto channel_manager = std::make_shared<tcp_channel_manager>(std::move(client), timeout);
-        service->get_scheduler()->schedule(channel_manager->launch_send_receive());
+        assert(client.socket().is_valid());
+        std::shared_ptr<worker_release> worker_release(std::make_shared<worker_release>());
+        worker_release->channel_manager = std::make_shared<tcp_channel_manager>(std::move(client), timeout_, worker_release, service);
 
         tcp::envelope_prefix prefix;
         tcp::envelope_payload payload;
-        int err = CO_AWAIT channel_manager->receive_anonymous_payload(prefix, payload, 0);
+        int err = CO_AWAIT worker_release->channel_manager->receive_anonymous_payload(prefix, payload, 0);
         if(err != rpc::error::OK())
             CO_RETURN;
 
@@ -43,11 +43,14 @@ namespace rpc
                 std::scoped_lock lock(mtx);
                 initialising_clients.try_emplace(request.random_number_id,
                                                  tcp_listener::initialising_client {.payload = std::move(request),
-                                                                                    .channel_manager = channel_manager,
+                                                                                    .worker_release = worker_release,
                                                                                     .rpc_version = prefix.version});
             }
+            
+            err = CO_AWAIT worker_release->channel_manager->immediate_send_payload(prefix.version, tcp::init_client_channel_response{rpc::error::OK()}, prefix.sequence_number);
+            std::ignore = err;
 
-            CO_AWAIT service->get_scheduler()->schedule_after(100ms);
+            CO_AWAIT service->get_scheduler()->schedule_after(100000ms);
 
             {
                 // this is to clean up if the client has failed to send a second connection
@@ -81,6 +84,7 @@ namespace rpc
 
                 auto initialisation_info = std::move(found->second);
                 initialising_clients.erase(found);
+                destination_zone destination_zone_id{0};
 
                 lock.reset();
 
@@ -100,11 +104,15 @@ namespace rpc
                             = rpc::shared_ptr<yyy::i_example>(new marshalled_tests::example(child_service_ptr, host));
                         CO_RETURN rpc::error::OK();
                     },
-                    std::move(initialisation_info.channel_manager), std::move(channel_manager));
+                    destination_zone_id,
+                    initialisation_info.worker_release, worker_release);
                 if(ret != rpc::error::OK())
                 {
                     // report error
                 }
+
+                err = CO_AWAIT worker_release->channel_manager->immediate_send_payload(prefix.version, tcp::init_server_channel_response{rpc::error::OK(), output_interface.destination_zone_id.get_val(), output_interface.object_id.get_val(), 0}, prefix.sequence_number);
+                std::ignore = err;
 
                 CO_RETURN;
             }
@@ -127,13 +135,17 @@ namespace rpc
         auto scheduler = service->get_scheduler();
         co_await scheduler->schedule();
 
-        do
+        while(!stop_)
         {
             // Wait for an incoming connection and accept it.
-            auto poll_status = co_await server.poll();
+            auto poll_status = co_await server.poll(std::chrono::milliseconds{10});
+            if(poll_status == coro::poll_status::timeout)
+            {
+                continue; // Handle error, see poll_status for detailed error states.
+            }
             if(poll_status != coro::poll_status::event)
             {
-                co_return; // Handle error, see poll_status for detailed error states.
+                break; // Handle error, see poll_status for detailed error states.
             }
 
             // Accept the incoming client connection.
@@ -142,11 +154,12 @@ namespace rpc
             // Verify the incoming connection was accepted correctly.
             if(!client.socket().is_valid())
             {
-                co_return; // Handle error.
+                break; // Handle error.
             }
 
             service->schedule(run_client(service, std::move(client)));
-        } while(true);
+        };
+        stop_confirmation_evt_.set();
         CO_RETURN;
     }
 
@@ -154,5 +167,12 @@ namespace rpc
     bool tcp_listener::start_listening(rpc::shared_ptr<rpc::service> service)
     {
         return service->schedule(run_listener(service));
+    }
+
+    // This is to open a listening socket on for incoming tcp connection requests
+    coro::task<void> tcp_listener::stop_listening()
+    {
+        stop_ = true;
+        CO_AWAIT stop_confirmation_evt_;
     }
 }

@@ -12,16 +12,16 @@
 namespace rpc
 {
     tcp_service_proxy::tcp_service_proxy(const char* name, destination_zone destination_zone_id,
-                                         const rpc::shared_ptr<service>& svc)
-        : service_proxy(name, destination_zone_id, svc)
-    {
-    }
-
-    tcp_service_proxy::tcp_service_proxy(const char* name, destination_zone destination_zone_id,
                                          const rpc::shared_ptr<service>& svc,
-                                         const std::shared_ptr<tcp_channel_manager>& channel_manager)
+                                         std::shared_ptr<worker_release> proxy_worker_release,
+                                         std::shared_ptr<worker_release> stub_worker_release, 
+                                         std::chrono::milliseconds timeout,
+                                         coro::net::tcp::client::options opts)
         : service_proxy(name, destination_zone_id, svc)
-        , channel_manager_(channel_manager)
+        , proxy_worker_release_(proxy_worker_release)
+        , stub_worker_release_(stub_worker_release)
+        , timeout_(timeout)
+        , opts_(opts)
     {
     }
 
@@ -31,24 +31,27 @@ namespace rpc
     }
 
     rpc::shared_ptr<tcp_service_proxy> tcp_service_proxy::create(const char* name, destination_zone destination_zone_id,
-                                                                 const rpc::shared_ptr<service>& svc)
+                                                                 const rpc::shared_ptr<service>& svc, std::chrono::milliseconds timeout, coro::net::tcp::client::options opts)
     {
         RPC_ASSERT(svc);
-        auto ret = rpc::shared_ptr<tcp_service_proxy>(new tcp_service_proxy(name, destination_zone_id, svc));
+
+        auto ret = rpc::shared_ptr<tcp_service_proxy>(
+            new tcp_service_proxy(name, destination_zone_id, svc, nullptr, nullptr, timeout, opts));
         return ret;
     }
 
     CORO_TASK(rpc::shared_ptr<tcp_service_proxy>)
-    tcp_service_proxy::create(const char* name, const rpc::shared_ptr<service>& svc,
-                              const std::shared_ptr<tcp_channel_manager>& initiator_channel_manager,
-                              const std::shared_ptr<tcp_channel_manager>& responding_channel_manager)
+    tcp_service_proxy::attach_remote(const char* name, const rpc::shared_ptr<service>& svc,
+                                     destination_zone destination_zone_id,
+                                     std::shared_ptr<worker_release> proxy_worker_release,
+                                     std::shared_ptr<worker_release> stub_worker_release)
     {
         RPC_ASSERT(svc);
-        destination_zone destination_zone_id {0};
+        
         auto ret = rpc::shared_ptr<tcp_service_proxy>(
-            new tcp_service_proxy(name, destination_zone_id, svc, responding_channel_manager));
+            new tcp_service_proxy(name, destination_zone_id, svc, proxy_worker_release, stub_worker_release, std::chrono::milliseconds(0), coro::net::tcp::client::options()));
 
-        if(!svc->schedule(ret->init_stub(initiator_channel_manager)))
+        if(!svc->get_scheduler()->schedule(proxy_worker_release->channel_manager->pump_stub_receive_and_send()))
         {
             co_return nullptr;
         }
@@ -60,17 +63,20 @@ namespace rpc
     tcp_service_proxy::connect(rpc::interface_descriptor input_descr, rpc::interface_descriptor& output_descr)
     {
         auto service = get_operating_zone_service();
-        assert(channel_manager_ == nullptr);
+        assert(proxy_worker_release_ == nullptr);
+        assert(stub_worker_release_ == nullptr);
 
         // auto noop_task = []() ->coro::task<void>{CO_RETURN;};
         //  Immediately schedule onto the scheduler.
         CO_AWAIT service->get_scheduler()->schedule();
 
         auto random_number_id = (uint64_t)std::rand();
+        
+        printf("random no %lu\n", random_number_id);
 
         // create the client channel
 
-        std::shared_ptr<tcp_channel_manager> channel_manager;
+        auto proxy_worker_release = std::make_shared<worker_release>();
 
         {
             // Create the tcp::client with the default settings, see tcp::client for how to set the
@@ -80,19 +86,19 @@ namespace rpc
             // verify the number of bytes sent or received.
 
             // Connect to the server.
-            coro::net::tcp::client init_client(service->get_scheduler());
-            auto connection_status = co_await init_client.connect();
+            coro::net::tcp::client proxy_client(service->get_scheduler(), opts_);
+            auto connection_status = co_await proxy_client.connect();
             if(connection_status != coro::net::connect_status::connected)
             {
                 CO_RETURN rpc::error::SERVICE_PROXY_LOST_CONNECTION();
             }
 
-            channel_manager
-                = std::make_shared<tcp_channel_manager>(std::move(init_client), std::chrono::milliseconds(10000));
-            service->get_scheduler()->schedule(channel_manager->launch_send_receive());
+            proxy_worker_release->channel_manager
+                = std::make_shared<tcp_channel_manager>(std::move(proxy_client), timeout_, proxy_worker_release, get_operating_zone_service());
+            service->get_scheduler()->schedule(proxy_worker_release->channel_manager->pump_send_and_receive());
 
             tcp::init_client_channel_response init_receive;
-            int ret = CO_AWAIT channel_manager->call_peer(
+            int ret = CO_AWAIT proxy_worker_release->channel_manager->call_peer(
                 rpc::get_version(),
                 tcp::init_client_channel_send {.random_number_id = random_number_id,
                                                .caller_zone_id = get_zone_id().get_val(),
@@ -102,9 +108,6 @@ namespace rpc
             if(ret != rpc::error::OK())
                 CO_RETURN ret;
 
-            rpc::object output_object_id = {init_receive.destination_object_id};
-            output_descr = {output_object_id, get_destination_zone_id()};
-
             if(init_receive.err_code != rpc::error::OK())
             {
                 CO_RETURN init_receive.err_code;
@@ -113,30 +116,33 @@ namespace rpc
 
         // create the server channel
         {
+            auto stub_worker_release = std::make_shared<worker_release>();
             std::shared_ptr<tcp_channel_manager> receive_channel_manager;
             {
                 // Create the tcp::client with the default settings, see tcp::client for how to set the
                 // ip address, port, and optionally enabling SSL/TLS.
-                coro::net::tcp::client receive_client(service->get_scheduler());
+                coro::net::tcp::client stub_client(service->get_scheduler(), opts_);
 
                 // Ommitting error checking code for the client, each step should check the status and
                 // verify the number of bytes sent or received.
 
                 // Connect to the server.
-                auto connection_status = co_await receive_client.connect();
+                auto connection_status = co_await stub_client.connect();
                 if(connection_status != coro::net::connect_status::connected)
                 {
                     CO_RETURN rpc::error::SERVICE_PROXY_LOST_CONNECTION();
                 }
 
-                receive_channel_manager = std::make_shared<tcp_channel_manager>(std::move(receive_client),
-                                                                                std::chrono::milliseconds(10000));
-                service->get_scheduler()->schedule(receive_channel_manager->launch_send_receive());
+                stub_worker_release->channel_manager = std::make_shared<tcp_channel_manager>(
+                    std::move(stub_client), timeout_, stub_worker_release, get_operating_zone_service());
             }
 
             tcp::init_server_channel_response init_receive;
-            int ret = CO_AWAIT receive_channel_manager->call_peer(
-                rpc::get_version(), tcp::init_server_channel_send {.random_number_id = random_number_id}, init_receive);
+            int ret = CO_AWAIT stub_worker_release->channel_manager->immediate_send_payload(rpc::get_version(), tcp::init_server_channel_send {.random_number_id = random_number_id}, 0);
+            if(ret != rpc::error::OK())
+                CO_RETURN ret;
+                
+            ret = CO_AWAIT stub_worker_release->channel_manager->receive_payload(init_receive, 0);
             if(ret != rpc::error::OK())
                 CO_RETURN ret;
 
@@ -144,138 +150,21 @@ namespace rpc
             {
                 CO_RETURN init_receive.err_code;
             }
+            
+            rpc::object output_object_id = {init_receive.destination_object_id};
+            output_descr = {output_object_id, get_destination_zone_id()};
 
-            if(!service->schedule(init_stub(std::move(receive_channel_manager))))
+
+            if(!service->schedule(receive_channel_manager->pump_stub_receive_and_send()))
             {
                 CO_RETURN rpc::error::UNABLE_TO_CREATE_SERVICE_PROXY();
             }
 
-            channel_manager_ = channel_manager;
+            stub_worker_release_ = stub_worker_release;
+            proxy_worker_release_ = proxy_worker_release;
         }
 
         CO_RETURN rpc::error::OK();
-    }
-
-    coro::task<void> tcp_service_proxy::init_stub(const std::shared_ptr<tcp_channel_manager>& channel_manager)
-    {
-        do
-        {
-            tcp::envelope_prefix prefix;
-            tcp::envelope_payload payload;
-            int err = CO_AWAIT channel_manager->receive_anonymous_payload(prefix, payload, 0);
-            if(err != rpc::error::OK())
-                CO_RETURN;
-
-            // do a call
-            if(payload.payload_fingerprint == rpc::id<tcp::call_send>::get(prefix.version))
-            {
-                tcp::call_send request;
-                auto str_err = rpc::from_yas_compressed_binary(rpc::span(payload.payload), request);
-                if(!str_err.empty())
-                {
-                    // bad format
-                    CO_RETURN;
-                }
-
-                auto service = get_operating_zone_service();
-                std::vector<char> out_buf;
-                auto ret = co_await service->send(prefix.version, request.encoding, request.tag,
-                                                  {request.caller_channel_zone_id}, {request.caller_zone_id},
-                                                  {request.destination_zone_id}, {request.object_id},
-                                                  {request.interface_id}, {request.method_id}, request.payload.size(),
-                                                  request.payload.data(), out_buf);
-
-                auto err = CO_AWAIT channel_manager->send_payload(
-                    prefix.version, tcp::call_receive {.payload = std::move(out_buf), .err_code = ret},
-                    prefix.sequence_number);
-                if(err != rpc::error::OK())
-                {
-                    // report error
-                    CO_RETURN;
-                }
-            }
-            // do a try cast
-            else if(payload.payload_fingerprint == rpc::id<tcp::try_cast_send>::get(prefix.version))
-            {
-                tcp::try_cast_send request;
-                auto str_err = rpc::from_yas_compressed_binary(rpc::span(payload.payload), request);
-                if(!str_err.empty())
-                {
-                    // bad format
-                    CO_RETURN;
-                }
-
-                auto service = get_operating_zone_service();
-                std::vector<char> out_buf;
-                auto ret = co_await service->try_cast(prefix.version, {request.destination_zone_id},
-                                                      {request.object_id}, {request.interface_id});
-
-                auto err = CO_AWAIT channel_manager->send_payload(
-                    prefix.version, tcp::try_cast_receive {.err_code = ret}, prefix.sequence_number);
-                if(err != rpc::error::OK())
-                {
-                    // report error
-                    CO_RETURN;
-                }
-            }
-            // do an add_ref
-            else if(payload.payload_fingerprint == rpc::id<tcp::addref_send>::get(prefix.version))
-            {
-                tcp::addref_send request;
-                auto str_err = rpc::from_yas_compressed_binary(rpc::span(payload.payload), request);
-                if(!str_err.empty())
-                {
-                    // bad format
-                    CO_RETURN;
-                }
-
-                auto service = get_operating_zone_service();
-                std::vector<char> out_buf;
-                auto ret = co_await service->add_ref(prefix.version, {request.destination_channel_zone_id},
-                                                     {request.destination_zone_id}, {request.object_id},
-                                                     {request.caller_channel_zone_id}, {request.caller_zone_id},
-                                                     (rpc::add_ref_options)request.build_out_param_channel);
-
-                auto err = CO_AWAIT channel_manager->send_payload(
-                    prefix.version, tcp::addref_receive {.ref_count = ret, .err_code = rpc::error::OK()},
-                    prefix.sequence_number);
-                if(err != rpc::error::OK())
-                {
-                    // report error
-                    CO_RETURN;
-                }
-            }
-            // do a release
-            else if(payload.payload_fingerprint == rpc::id<tcp::release_send>::get(prefix.version))
-            {
-                tcp::release_send request;
-                auto str_err = rpc::from_yas_compressed_binary(rpc::span(payload.payload), request);
-                if(!str_err.empty())
-                {
-                    // bad format
-                    CO_RETURN;
-                }
-
-                auto service = get_operating_zone_service();
-                std::vector<char> out_buf;
-                auto ret = co_await service->release(prefix.version, {request.destination_zone_id}, {request.object_id},
-                                                     {request.caller_zone_id});
-
-                auto err = CO_AWAIT channel_manager->send_payload(
-                    prefix.version, tcp::release_receive {.ref_count = ret, .err_code = rpc::error::OK()},
-                    prefix.sequence_number);
-                if(err != rpc::error::OK())
-                {
-                    // report error
-                    CO_RETURN;
-                }
-            }
-            else
-            {
-                // bad message
-                CO_RETURN;
-            }
-        } while(true);
     }
 
     CORO_TASK(int)
@@ -287,11 +176,11 @@ namespace rpc
         if(destination_zone_id != get_destination_zone_id())
             CO_RETURN rpc::error::ZONE_NOT_SUPPORTED();
 
-        if(!channel_manager_)
+        if(!proxy_worker_release_)
             CO_RETURN rpc::error::SERVICE_PROXY_LOST_CONNECTION();
 
         tcp::call_receive call_receive;
-        int ret = CO_AWAIT channel_manager_->call_peer(
+        int ret = CO_AWAIT proxy_worker_release_->channel_manager->call_peer(
             protocol_version,
             tcp::call_send {.encoding = encoding,
                             .tag = tag,
@@ -314,17 +203,17 @@ namespace rpc
     tcp_service_proxy::try_cast(uint64_t protocol_version, destination_zone destination_zone_id, object object_id,
                                 interface_ordinal interface_id)
     {
-        if(!channel_manager_)
+        if(!proxy_worker_release_)
             CO_RETURN rpc::error::SERVICE_PROXY_LOST_CONNECTION();
 
         tcp::try_cast_receive try_cast_receive;
-        int ret = CO_AWAIT channel_manager_->call_peer(protocol_version,
-                                                       tcp::try_cast_send {
-                                                           .destination_zone_id = destination_zone_id.get_val(),
-                                                           .object_id = object_id.get_val(),
-                                                           .interface_id = interface_id.get_val(),
-                                                       },
-                                                       try_cast_receive);
+        int ret = CO_AWAIT proxy_worker_release_->channel_manager->call_peer(protocol_version,
+                                                             tcp::try_cast_send {
+                                                                 .destination_zone_id = destination_zone_id.get_val(),
+                                                                 .object_id = object_id.get_val(),
+                                                                 .interface_id = interface_id.get_val(),
+                                                             },
+                                                             try_cast_receive);
         if(ret != rpc::error::OK())
             CO_RETURN ret;
 
@@ -346,11 +235,11 @@ namespace rpc
 #endif
         constexpr auto add_ref_failed_val = std::numeric_limits<uint64_t>::max();
 
-        if(!channel_manager_)
+        if(!proxy_worker_release_)
             CO_RETURN rpc::error::SERVICE_PROXY_LOST_CONNECTION();
 
         tcp::addref_receive addref_receive;
-        int ret = CO_AWAIT channel_manager_->call_peer(
+        int ret = CO_AWAIT proxy_worker_release_->channel_manager->call_peer(
             protocol_version,
             tcp::addref_send {.destination_channel_zone_id = destination_channel_zone_id.get_val(),
                               .destination_zone_id = destination_zone_id.get_val(),
@@ -383,17 +272,17 @@ namespace rpc
     {
         constexpr auto add_ref_failed_val = std::numeric_limits<uint64_t>::max();
 
-        if(!channel_manager_)
+        if(!proxy_worker_release_)
             CO_RETURN rpc::error::SERVICE_PROXY_LOST_CONNECTION();
 
         tcp::addref_receive release_receive;
-        int ret = CO_AWAIT channel_manager_->call_peer(protocol_version,
-                                                       tcp::release_send {
-                                                           .destination_zone_id = destination_zone_id.get_val(),
-                                                           .object_id = object_id.get_val(),
-                                                           .caller_zone_id = caller_zone_id.get_val(),
-                                                       },
-                                                       release_receive);
+        int ret = CO_AWAIT proxy_worker_release_->channel_manager->call_peer(protocol_version,
+                                                             tcp::release_send {
+                                                                 .destination_zone_id = destination_zone_id.get_val(),
+                                                                 .object_id = object_id.get_val(),
+                                                                 .caller_zone_id = caller_zone_id.get_val(),
+                                                             },
+                                                             release_receive);
         if(ret != rpc::error::OK())
             CO_RETURN ret;
 

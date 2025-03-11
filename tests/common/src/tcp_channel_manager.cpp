@@ -1,15 +1,17 @@
 #include <common/tcp_channel_manager.h>
+#include <common/tcp_service_proxy.h>
 
-CORO_TASK(void) tcp_channel_manager::launch_send_receive()
+// this method sends queued requests to other peers and receives responses notifying the proxy when complete
+CORO_TASK(void) tcp_channel_manager::pump_send_and_receive()
 {
-    static auto envelope_prefix_saved_size = rpc::compressed_yas_binary_saved_size(tcp::envelope_prefix());
+    static auto envelope_prefix_saved_size = rpc::yas_binary_saved_size(tcp::envelope_prefix());
     bool expecting_prefix = true;
     bool read_complete = true;
     tcp::envelope_prefix prefix {};
     std::vector<char> buf;
     std::span remaining_span(buf.begin(), buf.end());
 
-    do
+    while(worker_release_.lock())
     {
         {
             auto scoped_lock = co_await connection_mtx_.lock();
@@ -122,7 +124,134 @@ CORO_TASK(void) tcp_channel_manager::launch_send_receive()
                 }
             }
         }
-    } while(true);
+    }
+
+    {
+        std::scoped_lock lock(pending_transmits_mtx_);
+        for(auto it : pending_transmits_)
+        {
+            it.second->error_code = rpc::error::CALL_CANCELLED();
+            it.second->event.set();
+        }
+    }
+}
+
+coro::task<void> tcp_channel_manager::pump_stub_receive_and_send()
+{
+    while(worker_release_.lock())
+    {
+        tcp::envelope_prefix prefix;
+        tcp::envelope_payload payload;
+        int err = CO_AWAIT receive_anonymous_payload(prefix, payload, 0);
+        if(err != rpc::error::OK())
+            CO_RETURN;
+
+        // do a call
+        if(payload.payload_fingerprint == rpc::id<tcp::call_send>::get(prefix.version))
+        {
+            tcp::call_send request;
+            auto str_err = rpc::from_yas_compressed_binary(rpc::span(payload.payload), request);
+            if(!str_err.empty())
+            {
+                // bad format
+                CO_RETURN;
+            }
+
+            std::vector<char> out_buf;
+            auto ret = co_await service_->send(
+                prefix.version, request.encoding, request.tag, {request.caller_channel_zone_id},
+                {request.caller_zone_id}, {request.destination_zone_id}, {request.object_id}, {request.interface_id},
+                {request.method_id}, request.payload.size(), request.payload.data(), out_buf);
+
+            auto err = CO_AWAIT send_payload(prefix.version,
+                                             tcp::call_receive {.payload = std::move(out_buf), .err_code = ret},
+                                             prefix.sequence_number);
+            if(err != rpc::error::OK())
+            {
+                // report error
+                CO_RETURN;
+            }
+        }
+        // do a try cast
+        else if(payload.payload_fingerprint == rpc::id<tcp::try_cast_send>::get(prefix.version))
+        {
+            tcp::try_cast_send request;
+            auto str_err = rpc::from_yas_compressed_binary(rpc::span(payload.payload), request);
+            if(!str_err.empty())
+            {
+                // bad format
+                CO_RETURN;
+            }
+
+            std::vector<char> out_buf;
+            auto ret = co_await service_->try_cast(prefix.version, {request.destination_zone_id}, {request.object_id},
+                                                   {request.interface_id});
+
+            auto err = CO_AWAIT send_payload(prefix.version, tcp::try_cast_receive {.err_code = ret},
+                                             prefix.sequence_number);
+            if(err != rpc::error::OK())
+            {
+                // report error
+                CO_RETURN;
+            }
+        }
+        // do an add_ref
+        else if(payload.payload_fingerprint == rpc::id<tcp::addref_send>::get(prefix.version))
+        {
+            tcp::addref_send request;
+            auto str_err = rpc::from_yas_compressed_binary(rpc::span(payload.payload), request);
+            if(!str_err.empty())
+            {
+                // bad format
+                CO_RETURN;
+            }
+
+            std::vector<char> out_buf;
+            auto ret = co_await service_->add_ref(prefix.version, {request.destination_channel_zone_id},
+                                                  {request.destination_zone_id}, {request.object_id},
+                                                  {request.caller_channel_zone_id}, {request.caller_zone_id},
+                                                  (rpc::add_ref_options)request.build_out_param_channel);
+
+            auto err = CO_AWAIT send_payload(prefix.version,
+                                             tcp::addref_receive {.ref_count = ret, .err_code = rpc::error::OK()},
+                                             prefix.sequence_number);
+            if(err != rpc::error::OK())
+            {
+                // report error
+                CO_RETURN;
+            }
+        }
+        // do a release
+        else if(payload.payload_fingerprint == rpc::id<tcp::release_send>::get(prefix.version))
+        {
+            tcp::release_send request;
+            auto str_err = rpc::from_yas_compressed_binary(rpc::span(payload.payload), request);
+            if(!str_err.empty())
+            {
+                // bad format
+                CO_RETURN;
+            }
+
+            std::vector<char> out_buf;
+            auto ret = co_await service_->release(prefix.version, {request.destination_zone_id}, {request.object_id},
+                                                  {request.caller_zone_id});
+
+            auto err = CO_AWAIT send_payload(prefix.version,
+                                             tcp::release_receive {.ref_count = ret, .err_code = rpc::error::OK()},
+                                             prefix.sequence_number);
+            if(err != rpc::error::OK())
+            {
+                // report error
+                CO_RETURN;
+            }
+        }
+        else
+        {
+            // bad message
+            CO_RETURN;
+        }
+    }
+    worker_release_.reset();
 }
 
 // read from the connection and fill the buffer as it has been presized
@@ -131,6 +260,11 @@ CORO_TASK(int) tcp_channel_manager::read(std::vector<char>& buf)
     std::span remaining_span(buf.begin(), buf.end());
     do
     {
+        // if(!client_.socket().is_valid())
+        // {
+        //     co_return rpc::error::SERVICE_PROXY_LOST_CONNECTION();
+        // }
+
         auto pstatus = co_await client_.poll(coro::poll_op::read, timeout_);
         if(pstatus == coro::poll_status::timeout)
         {
@@ -145,7 +279,7 @@ CORO_TASK(int) tcp_channel_manager::read(std::vector<char>& buf)
             co_return rpc::error::SERVICE_PROXY_LOST_CONNECTION();
         }
 
-        if(pstatus == coro::poll_status::error)
+        if(pstatus == coro::poll_status::closed)
         {
             // connection closed by peer
             co_return rpc::error::SERVICE_PROXY_LOST_CONNECTION();
@@ -184,7 +318,7 @@ CORO_TASK(int) tcp_channel_manager::read(std::vector<char>& buf)
 CORO_TASK(int)
 tcp_channel_manager::receive_prefix(tcp::envelope_prefix& prefix)
 {
-    static auto envelope_prefix_saved_size = rpc::compressed_yas_binary_saved_size(tcp::envelope_prefix());
+    static auto envelope_prefix_saved_size = rpc::yas_binary_saved_size(tcp::envelope_prefix());
 
     std::vector<char> buf(envelope_prefix_saved_size, '\0');
     int err = CO_AWAIT read(buf);

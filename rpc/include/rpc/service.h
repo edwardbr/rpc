@@ -248,17 +248,16 @@ namespace rpc
             CO_RETURN err_code;
         }
         
-        template<class SERVICE_PROXY, class PARENT_INTERFACE, class CHILD_INTERFACE, typename Args>
+        template<class SERVICE_PROXY, class PARENT_INTERFACE, class CHILD_INTERFACE, typename... Args>
         CORO_TASK(int) attach_remote_zone(
             const char* name
             , rpc::interface_descriptor input_descr
             , rpc::interface_descriptor& output_descr
             , std::function<CORO_TASK(int)(const rpc::shared_ptr<PARENT_INTERFACE>&, rpc::shared_ptr<CHILD_INTERFACE>&, const rpc::shared_ptr<rpc::service>&)> fn
-            , Args&& arg1
-            , Args&& arg2)
+            , Args&&... args)
         {
             //link the child to the parent
-            auto parent_service_proxy = CO_AWAIT SERVICE_PROXY::create(name, shared_from_this(), std::move(arg1), std::move(arg2));            
+            auto parent_service_proxy = CO_AWAIT SERVICE_PROXY::attach_remote(name, shared_from_this(), args...);            
             if(!parent_service_proxy)
                 CO_RETURN rpc::error::UNABLE_TO_CREATE_SERVICE_PROXY();
             add_zone_proxy(parent_service_proxy);       

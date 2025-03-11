@@ -100,6 +100,10 @@ namespace rpc
         {
             return offset_val + (offset_val_is_negative ? -21 : 21);
         }
+        [[nodiscard]] int CALL_CANCELLED()
+        {
+            return offset_val + (offset_val_is_negative ? -22 : 22);
+        }
         // dont forget to update MIN & MAX if new values
 
         [[nodiscard]] int MIN()
@@ -209,6 +213,10 @@ namespace rpc
             if (err == SERVICE_PROXY_LOST_CONNECTION())
             {
                 return "Service proxy has lost connection to the remote service";
+            }
+            if (err == CALL_CANCELLED())
+            {
+                return "Service proxy remote call is cancelled";
             }
             return "invalid error code";
         }

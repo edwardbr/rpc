@@ -50,12 +50,6 @@ namespace tcp
     
     struct init_client_channel_response
     {
-        // the destination zone id derived from the destination
-        uint64_t destination_zone_id;
-        // the destination callable object id generated from the destination
-        uint64_t destination_object_id;
-        // the zone id of the caller derived from the destination
-        uint64_t caller_zone_id;
         int err_code;
     };
     
@@ -69,6 +63,12 @@ namespace tcp
     struct init_server_channel_response
     {
         int err_code;
+        // the destination zone id derived from the destination
+        uint64_t destination_zone_id;
+        // the destination callable object id generated from the destination
+        uint64_t destination_object_id;
+        // the zone id of the caller derived from the destination
+        uint64_t caller_zone_id;
     };
     
     struct call_send
