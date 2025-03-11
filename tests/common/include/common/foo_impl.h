@@ -16,13 +16,7 @@
 #include <example_import/example_import_stub.h>
 #include <example/example_stub.h>
 
-void log(const std::string& data)
-{
-    std::ignore = data;
-#ifdef USE_RPC_LOGGING
-    rpc_log(data.data(), data.size());
-#endif
-}
+void log(const std::string& data);
 
 namespace marshalled_tests
 {

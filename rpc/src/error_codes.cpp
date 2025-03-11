@@ -34,6 +34,7 @@ namespace rpc
         [[nodiscard]] int REFERENCE_COUNT_ERROR(){return offset_val + (offset_val_is_negative ? - 19 : 19);}
         [[nodiscard]] int UNABLE_TO_CREATE_SERVICE_PROXY(){return offset_val + (offset_val_is_negative ? - 20 : 20);}
         [[nodiscard]] int SERVICE_PROXY_LOST_CONNECTION(){return offset_val + (offset_val_is_negative ? - 21 : 21);}
+        [[nodiscard]] int CALL_CANCELLED(){return offset_val + (offset_val_is_negative ? - 22 : 22);}
         //dont forget to update MIN & MAX if new values
 
         [[nodiscard]] int MIN(){return offset_val + (offset_val_is_negative ? -20 : 1);}
@@ -66,6 +67,7 @@ namespace rpc
             if(err == REFERENCE_COUNT_ERROR()){return "reference count error";}
             if(err == UNABLE_TO_CREATE_SERVICE_PROXY()){return "unable to create service proxy";}
             if(err == SERVICE_PROXY_LOST_CONNECTION()){return "Service proxy has lost connection to the remote service";}
+            if(err == CALL_CANCELLED()){return "Service proxy remote call is cancelled";}
             return "invalid error code";
         }
     };
