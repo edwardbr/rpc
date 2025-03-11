@@ -807,9 +807,9 @@ TYPED_TEST(type_test, initialisation_test)
 {
 }
 
-TYPED_TEST(type_test, standard_tests)
+template <class T>
+CORO_TASK(bool) coro_standard_tests(bool& is_ready, T& lib)
 {
-    auto& lib = this->get_lib();
     auto root_service = lib.get_root_service();
 
     rpc::zone zone_id;
@@ -820,9 +820,21 @@ TYPED_TEST(type_test, standard_tests)
 
     foo f(zone_id);
     
-    lib.get_scheduler()->schedule(lib.check_for_error(standard_tests(f, lib.get_has_enclave())));
-    lib.get_scheduler()->process_events();
+    co_await lib.check_for_error(standard_tests(f, lib.get_has_enclave()));
+    is_ready = true;
+    CO_RETURN !lib.error_has_occured();
+}
 
+TYPED_TEST(type_test, standard_tests)
+{
+    bool is_ready = false;
+    auto& lib = this->get_lib();
+    auto root_service = lib.get_root_service();
+    root_service->get_scheduler()->schedule(lib.check_for_error(coro_standard_tests(is_ready, lib)));
+    while(!is_ready)
+    {
+        root_service->get_scheduler()->process_events(std::chrono::milliseconds(1));
+    }  
     ASSERT_EQ(lib.error_has_occured(), false);
 }
 
