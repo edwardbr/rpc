@@ -19,6 +19,7 @@ extern rpc::weak_ptr<rpc::service> current_host_service;
 // an ocall for logging the test
 extern "C"
 {
+#ifdef USE_RPC_TELEMETRY
     CORO_TASK(int) call_host(
         uint64_t protocol_version                          //version of the rpc call protocol
         , uint64_t encoding                                  //format of the serialised data
@@ -114,6 +115,7 @@ extern "C"
         }
         CO_RETURN CO_AWAIT root_service->release(protocol_version, {zone_id}, {object_id}, {caller_zone_id});
     }
+#endif
 
     void rpc_log(const char* str, size_t sz)
     {

@@ -128,6 +128,7 @@ namespace rpc
         std::string get_name() const {return name_;}
 
         virtual bool check_is_empty() const;
+        virtual bool has_service_proxies() const;
         zone get_zone_id() const {return zone_id_;}
         void set_zone_id(zone zone_id){zone_id_ = zone_id;}
         virtual destination_zone get_parent_zone_id() const {return {0};}

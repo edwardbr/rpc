@@ -95,99 +95,111 @@ namespace rpc
         }
         return {};
     }
+    
+    bool service::has_service_proxies() const
+    {
+        std::lock_guard l(zone_control);
+        return !other_zones.empty();        
+    }
 
     bool service::check_is_empty() const
     {
         std::lock_guard l(stub_control);
         bool success = true;
-        for(const auto& item : stubs)
         {
-            auto stub =  item.second.lock();
-            if(!stub)
+            for(const auto& item : stubs)
             {
-#ifdef USE_RPC_LOGGING
-                auto message = std::string("stub zone_id ") + std::to_string(zone_id_)
-                     + std::string(", object stub ") + std::to_string(item.first)
-                     + std::string(" has been released but not deregistered in the service suspected unclean shutdown");
-                LOG_STR(message.c_str(), message.size());
-#endif
-            }
-            else
-            {
-#ifdef USE_RPC_LOGGING
-                auto message = std::string("stub zone_id ") + std::to_string(zone_id_) 
-                    + std::string(", object stub ") + std::to_string(item.first) 
-                    + std::string(" has not been released, there is a strong pointer maintaining a positive reference count suspected unclean shutdown");
-                LOG_STR(message.c_str(), message.size());
-#endif
-            }
-            success = false;
-        }
-        for(auto item : wrapped_object_to_stub)
-        {
-            auto stub =  item.second.lock();
-            if(!stub)
-            {
-#ifdef USE_RPC_LOGGING
-                auto message = std::string("wrapped stub zone_id ") + std::to_string(zone_id_) 
-                    + std::string(", wrapped_object has been released but not deregistered in the service suspected unclean shutdown");
-                LOG_STR(message.c_str(), message.size());
-#endif
-            }
-            else
-            {
-#ifdef USE_RPC_LOGGING
-                auto message = std::string("wrapped stub zone_id ") + std::to_string(zone_id_) 
-                    + std::string(", wrapped_object ") + std::to_string(stub->get_id()) 
-                    + std::string(" has not been deregisted in the service suspected unclean shutdown");
-                LOG_STR(message.c_str(), message.size());
-#endif
-            }
-            success = false;
-        }
-
-        for(auto item : other_zones)
-        {
-            auto svcproxy =  item.second.lock();
-            if(!svcproxy)
-            {
-#ifdef USE_RPC_LOGGING
-                auto message = std::string("service proxy zone_id ") + std::to_string(zone_id_) 
-                    + std::string(", caller_zone_id ") + std::to_string(item.first.source.id) 
-                    + std::string(", destination_zone_id ") + std::to_string(item.first.dest.id) 
-                    + std::string(", has been released but not deregistered in the service");
-                LOG_STR(message.c_str(), message.size());
-#endif
-            }
-            else
-            {
-#ifdef USE_RPC_LOGGING
-                auto message = std::string("service proxy zone_id ") + std::to_string(zone_id_) 
-                    + std::string(", caller_zone_id ") + std::to_string(item.first.source.id) 
-                    + std::string(", destination_zone_id ") + std::to_string(svcproxy->get_destination_zone_id())
-                    + std::string(", destination_channel_zone_id ") + std::to_string(svcproxy->get_destination_channel_zone_id()) 
-                    + std::string(" has not been released in the service suspected unclean shutdown");
-                LOG_STR(message.c_str(), message.size());
-#endif
-
-                for(auto proxy : svcproxy->get_proxies())
+                auto stub =  item.second.lock();
+                if(!stub)
                 {
-                    auto op = proxy.second.lock();
-                    if(op)
-                    {
 #ifdef USE_RPC_LOGGING
-                        auto message = std::string("has object_proxy ") + std::to_string(op->get_object_id());
-                        LOG_STR(message.c_str(), message.size());
+                    auto message = std::string("stub zone_id ") + std::to_string(zone_id_)
+                        + std::string(", object stub ") + std::to_string(item.first)
+                        + std::string(" has been released but not deregistered in the service suspected unclean shutdown");
+                    LOG_STR(message.c_str(), message.size());
 #endif
-                    }
-                    else
-                    {
+                }
+                else
+                {
 #ifdef USE_RPC_LOGGING
-                        auto message = std::string("has null object_proxy");
-                        LOG_STR(message.c_str(), message.size());
+                    auto message = std::string("stub zone_id ") + std::to_string(zone_id_) 
+                        + std::string(", object stub ") + std::to_string(item.first) 
+                        + std::string(" has not been released, there is a strong pointer maintaining a positive reference count suspected unclean shutdown");
+                    LOG_STR(message.c_str(), message.size());
 #endif
+                }
+                success = false;
+            }
+            for(auto item : wrapped_object_to_stub)
+            {
+                auto stub =  item.second.lock();
+                if(!stub)
+                {
+#ifdef USE_RPC_LOGGING
+                    auto message = std::string("wrapped stub zone_id ") + std::to_string(zone_id_) 
+                        + std::string(", wrapped_object has been released but not deregistered in the service suspected unclean shutdown");
+                    LOG_STR(message.c_str(), message.size());
+#endif
+                }
+                else
+                {
+#ifdef USE_RPC_LOGGING
+                    auto message = std::string("wrapped stub zone_id ") + std::to_string(zone_id_) 
+                        + std::string(", wrapped_object ") + std::to_string(stub->get_id()) 
+                        + std::string(" has not been deregisted in the service suspected unclean shutdown");
+                    LOG_STR(message.c_str(), message.size());
+#endif
+                }
+                success = false;
+            }
+        }
+
+
+        {
+            std::lock_guard l(zone_control);
+            for(auto item : other_zones)
+            {
+                auto svcproxy =  item.second.lock();
+                if(!svcproxy)
+                {
+#ifdef USE_RPC_LOGGING
+                    auto message = std::string("service proxy zone_id ") + std::to_string(zone_id_) 
+                        + std::string(", caller_zone_id ") + std::to_string(item.first.source.id) 
+                        + std::string(", destination_zone_id ") + std::to_string(item.first.dest.id) 
+                        + std::string(", has been released but not deregistered in the service");
+                    LOG_STR(message.c_str(), message.size());
+#endif
+                }
+                else
+                {
+#ifdef USE_RPC_LOGGING
+                    auto message = std::string("service proxy zone_id ") + std::to_string(zone_id_) 
+                        + std::string(", caller_zone_id ") + std::to_string(item.first.source.id) 
+                        + std::string(", destination_zone_id ") + std::to_string(svcproxy->get_destination_zone_id())
+                        + std::string(", destination_channel_zone_id ") + std::to_string(svcproxy->get_destination_channel_zone_id()) 
+                        + std::string(" has not been released in the service suspected unclean shutdown");
+                    LOG_STR(message.c_str(), message.size());
+#endif
+
+                    for(auto proxy : svcproxy->get_proxies())
+                    {
+                        auto op = proxy.second.lock();
+                        if(op)
+                        {
+#ifdef USE_RPC_LOGGING
+                            auto message = std::string("has object_proxy ") + std::to_string(op->get_object_id());
+                            LOG_STR(message.c_str(), message.size());
+#endif
+                        }
+                        else
+                        {
+#ifdef USE_RPC_LOGGING
+                            auto message = std::string("has null object_proxy");
+                            LOG_STR(message.c_str(), message.size());
+#endif
+                        }
+                        success = false;
                     }
-                    success = false;
                 }
             }
         }

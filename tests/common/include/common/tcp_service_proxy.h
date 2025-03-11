@@ -24,7 +24,7 @@ namespace rpc
                           coro::net::tcp::client::options opts);
 
         tcp_service_proxy(const tcp_service_proxy& other) = default;
-
+        
         rpc::shared_ptr<service_proxy> clone() override;
 
         static rpc::shared_ptr<tcp_service_proxy> create(const char* name, destination_zone destination_zone_id,
@@ -61,6 +61,6 @@ namespace rpc
         coro::net::tcp::client::options opts_;
 
     public:
-        virtual ~tcp_service_proxy() = default;
+        virtual ~tcp_service_proxy();
     };
 }
