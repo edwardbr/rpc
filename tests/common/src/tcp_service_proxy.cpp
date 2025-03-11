@@ -7,6 +7,8 @@
 #include <thread>
 #include <span>
 
+#include <random>
+
 #include "common/tcp_service_proxy.h"
 
 namespace rpc
@@ -23,6 +25,12 @@ namespace rpc
         , timeout_(timeout)
         , opts_(opts)
     {
+    }
+    
+    tcp_service_proxy::~tcp_service_proxy()
+    {
+        proxy_worker_release_.reset();
+        stub_worker_release_.reset();
     }
 
     rpc::shared_ptr<service_proxy> tcp_service_proxy::clone()
@@ -66,26 +74,17 @@ namespace rpc
         assert(proxy_worker_release_ == nullptr);
         assert(stub_worker_release_ == nullptr);
 
-        // auto noop_task = []() ->coro::task<void>{CO_RETURN;};
         //  Immediately schedule onto the scheduler.
         CO_AWAIT service->get_scheduler()->schedule();
 
-        auto random_number_id = (uint64_t)std::rand();
-        
-        printf("random no %lu\n", random_number_id);
+        std::mt19937 mt(time(nullptr)); 
+        auto random_number_id = mt();
 
-        // create the client channel
-
+        // create the proxy channel
         auto proxy_worker_release = std::make_shared<worker_release>();
 
         {
-            // Create the tcp::client with the default settings, see tcp::client for how to set the
-            // ip address, port, and optionally enabling SSL/TLS.
-
-            // Ommitting error checking code for the client, each step should check the status and
-            // verify the number of bytes sent or received.
-
-            // Connect to the server.
+            // Connect to the server to create a proxy port.
             coro::net::tcp::client proxy_client(service->get_scheduler(), opts_);
             auto connection_status = co_await proxy_client.connect();
             if(connection_status != coro::net::connect_status::connected)
@@ -114,17 +113,12 @@ namespace rpc
             }
         }
 
-        // create the server channel
+        // create the stub channel
         {
             auto stub_worker_release = std::make_shared<worker_release>();
-            std::shared_ptr<tcp_channel_manager> receive_channel_manager;
             {
-                // Create the tcp::client with the default settings, see tcp::client for how to set the
-                // ip address, port, and optionally enabling SSL/TLS.
+                // Connect to the server to create a stub port.
                 coro::net::tcp::client stub_client(service->get_scheduler(), opts_);
-
-                // Ommitting error checking code for the client, each step should check the status and
-                // verify the number of bytes sent or received.
 
                 // Connect to the server.
                 auto connection_status = co_await stub_client.connect();
@@ -153,12 +147,6 @@ namespace rpc
             
             rpc::object output_object_id = {init_receive.destination_object_id};
             output_descr = {output_object_id, get_destination_zone_id()};
-
-
-            if(!service->schedule(receive_channel_manager->pump_stub_receive_and_send()))
-            {
-                CO_RETURN rpc::error::UNABLE_TO_CREATE_SERVICE_PROXY();
-            }
 
             stub_worker_release_ = stub_worker_release;
             proxy_worker_release_ = proxy_worker_release;

@@ -224,7 +224,7 @@ public:
     CORO_TASK(void) check_for_error(coro::task<bool> task)
     {       
         auto ret = CO_AWAIT task; 
-        if(ret != rpc::error::OK())
+        if(!ret)
         {
             error_has_occured_ = true;
         }
@@ -330,7 +330,7 @@ public:
     CORO_TASK(void) check_for_error(coro::task<bool> task)
     {       
         auto ret = CO_AWAIT task; 
-        if(ret != rpc::error::OK())
+        if(!ret)
         {
             error_has_occured_ = true;
         }
@@ -467,8 +467,7 @@ class tcp_setup
     rpc::shared_ptr<rpc::service> root_service_;
     rpc::shared_ptr<rpc::service> peer_service_;
     
-    std::shared_ptr<rpc::tcp_listener> root_listener_;
-    std::shared_ptr<rpc::tcp_listener> peer_listener_;
+    std::shared_ptr<rpc::tcp_listener<yyy::i_host, yyy::i_example>> peer_listener_;
     rpc::shared_ptr<yyy::i_host> i_host_ptr_;
     rpc::weak_ptr<yyy::i_host> local_host_ptr_;
     rpc::shared_ptr<yyy::i_example> i_example_ptr_;
@@ -491,8 +490,7 @@ public:
     virtual ~tcp_setup() = default;
 
     rpc::shared_ptr<rpc::service> get_root_service() const {return root_service_;}
-    std::shared_ptr<rpc::tcp_listener> get_root_listener() const {return root_listener_;}
-    std::shared_ptr<rpc::tcp_listener> get_peer_listener() const {return peer_listener_;};
+    std::shared_ptr<rpc::tcp_listener<yyy::i_host, yyy::i_example>> get_peer_listener() const {return peer_listener_;};
     bool get_has_enclave() const {return has_enclave_;}
     bool is_enclave_setup() const {return false;}
     rpc::shared_ptr<yyy::i_example> get_example() const {return i_example_ptr_;}
@@ -503,14 +501,14 @@ public:
     CORO_TASK(void) check_for_error(coro::task<bool> task)
     {       
         auto ret = CO_AWAIT task; 
-        if(ret != rpc::error::OK())
+        if(!ret)
         {
             error_has_occured_ = true;
         }
         CO_RETURN;
     }
     
-    CORO_TASK(bool) CoroSetUp()
+    CORO_TASK(bool) CoroSetUp(bool& is_ready)
     {
         zone_gen = &zone_gen_;
         auto test_info = ::testing::UnitTest::GetInstance()->current_test_info();
@@ -519,14 +517,25 @@ public:
             CREATE_TELEMETRY_SERVICE(rpc::host_telemetry_service, test_info->test_suite_name(), test_info->name(), "../../rpc_test_diagram/")
 #endif
 
-        root_service_ = rpc::make_shared<rpc::service>("host", rpc::zone{++zone_gen_}, io_scheduler_);
+        auto root_zone_id = rpc::zone{++zone_gen_};
+        auto peer_zone_id = rpc::zone{++zone_gen_};
+        root_service_ = rpc::make_shared<rpc::service>("host", root_zone_id, io_scheduler_);
         root_service_->add_service_logger(std::make_shared<test_service_logger>());
-        root_listener_ = std::make_shared<rpc::tcp_listener>(std::chrono::milliseconds(100000));
-        root_listener_->start_listening(root_service_);
 
-        peer_service_ = rpc::make_shared<rpc::service>("host", rpc::zone{++zone_gen_}, io_scheduler_);
+        peer_service_ = rpc::make_shared<rpc::service>("peer", peer_zone_id, io_scheduler_);
         peer_service_->add_service_logger(std::make_shared<test_service_logger>());
-        peer_listener_ = std::make_shared<rpc::tcp_listener>(std::chrono::milliseconds(100000));
+        
+        peer_listener_ = std::make_shared<rpc::tcp_listener<yyy::i_host, yyy::i_example>>(
+            [](const rpc::shared_ptr<yyy::i_host>& host, rpc::shared_ptr<yyy::i_example>& new_example,
+               const rpc::shared_ptr<rpc::service>& child_service_ptr) -> CORO_TASK(int)
+            {
+                // example_import_idl_register_stubs(child_service_ptr);
+                // example_shared_idl_register_stubs(child_service_ptr);
+                // example_idl_register_stubs(child_service_ptr);
+                new_example = rpc::shared_ptr<yyy::i_example>(new marshalled_tests::example(child_service_ptr, host));
+                CO_RETURN rpc::error::OK();
+            },
+            std::chrono::milliseconds(100000));
         peer_listener_->start_listening(peer_service_);
         
         current_host_service = root_service_;
@@ -538,7 +547,7 @@ public:
         
         auto ret = CO_AWAIT root_service_->connect_to_zone<rpc::tcp_service_proxy> (
             "main child"
-            , {++zone_gen_}
+            , peer_zone_id.as_destination()
             , hst
             , i_example_ptr_
             , std::chrono::milliseconds(100000)
@@ -550,6 +559,7 @@ public:
         {
             CO_RETURN false;
         }
+        is_ready = true;
         CO_RETURN true;
     }
     
@@ -567,11 +577,11 @@ public:
                 }
         });
         
-        io_scheduler_->schedule(check_for_error(CoroSetUp()));
-        for(int i = 0; i < 10; i++)
+        bool is_ready = false;
+        io_scheduler_->schedule(check_for_error(CoroSetUp(is_ready)));
+        while(!is_ready)
         {
-            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-            io_scheduler_->process_events(std::chrono::milliseconds(1000000));
+            io_scheduler_->process_events(std::chrono::milliseconds(1));
         }
 
         //auto err_code = SYNC_WAIT();
@@ -583,10 +593,13 @@ public:
     {
         i_example_ptr_ = nullptr;
         i_host_ptr_ = nullptr;
+        local_host_ptr_.reset();
         CO_AWAIT peer_listener_->stop_listening();
         peer_listener_.reset();
-        CO_AWAIT root_listener_->stop_listening();
-        root_listener_.reset();
+        while(!peer_service_->has_service_proxies())
+            co_await io_scheduler_->schedule();
+        while(!root_service_->has_service_proxies())
+            co_await io_scheduler_->schedule();
         peer_service_.reset();
         root_service_.reset();
         zone_gen = nullptr;

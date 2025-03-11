@@ -9,7 +9,7 @@ if(BUILD_COROUTINE)
 endif()
 
 add_executable(rpc_test main.cpp 
-# rpc_log.cpp 
+rpc_log.cpp 
 ${COROUTINE_TESTS})
 
 target_compile_definitions(rpc_test PRIVATE ${HOST_DEFINES})
