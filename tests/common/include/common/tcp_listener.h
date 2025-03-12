@@ -18,8 +18,7 @@
 
 namespace rpc
 {
-    template<class CallerInterface, class CalleeInterface> 
-    class tcp_listener
+    template<class CallerInterface, class CalleeInterface> class tcp_listener
     {
         struct initialising_client
         {
@@ -48,7 +47,7 @@ namespace rpc
             , connection_handler_(handler)
         {
         }
-        
+
         tcp_listener(const tcp_listener&) = delete;
 
         // This is to open a listening socket on for incoming tcp connection requests
@@ -72,15 +71,23 @@ namespace rpc
             tcp::envelope_payload payload;
             int err = CO_AWAIT worker_release->channel_manager->receive_anonymous_payload(prefix, payload, 0);
             if(err != rpc::error::OK())
+            {
+                LOG_CSTR("failed run_client receive_anonymous_payload");
                 CO_RETURN;
+            }
 
             if(payload.payload_fingerprint == rpc::id<tcp::init_client_channel_send>::get(prefix.version))
             {
+                // std::string msg("run_client init_client_channel_send ");
+                // msg += std::to_string(service->get_zone_id().get_val());
+                // LOG_CSTR(msg.c_str());
+
                 tcp::init_client_channel_send request;
                 auto err = rpc::from_yas_compressed_binary(rpc::span(payload.payload), request);
                 if(!err.empty())
                 {
-                    // bad format
+                    LOG_CSTR("failed run_client init_client_channel_send");
+
                     CO_RETURN;
                 }
 
@@ -92,8 +99,15 @@ namespace rpc
                         request.random_number_id, tcp_listener::initialising_client {.payload = std::move(request),
                                                                                      .worker_release = worker_release,
                                                                                      .rpc_version = prefix.version});
-                    assert(inserted);
+                    if(!inserted)
+                    {
+                        LOG_CSTR("failed run_client not inserted");
+                    }
                 }
+
+                // msg = "run_client init_client_channel_response ";
+                // msg += std::to_string(service->get_zone_id().get_val());
+                // LOG_CSTR(msg.c_str());
 
                 err = CO_AWAIT worker_release->channel_manager->immediate_send_payload(
                     prefix.version, tcp::init_client_channel_response {rpc::error::OK()}, prefix.sequence_number);
@@ -110,11 +124,16 @@ namespace rpc
             }
             else if(payload.payload_fingerprint == rpc::id<tcp::init_server_channel_send>::get(prefix.version))
             {
+            //     std::string msg("run_client init_server_channel_send ");
+            //     msg += std::to_string(service->get_zone_id().get_val());
+            //     LOG_CSTR(msg.c_str());
+
                 tcp::init_server_channel_send request;
                 auto err = rpc::from_yas_compressed_binary(rpc::span(payload.payload), request);
                 if(!err.empty())
                 {
                     // bad format
+                    LOG_CSTR("failed run_client init_server_channel_send from_yas_compressed_binary");
                     CO_RETURN;
                 }
 
@@ -142,13 +161,13 @@ namespace rpc
 
                     rpc::interface_descriptor output_interface;
 
-                    auto ret
-                        = CO_AWAIT service->attach_remote_zone<rpc::tcp_service_proxy, CallerInterface, CalleeInterface>(
-                            "tcp_service_proxy",
-                            {{initialisation_info.payload.caller_object_id},
-                             {initialisation_info.payload.caller_zone_id}},
-                            output_interface, connection_handler_, destination_zone_id,
-                            initialisation_info.worker_release, worker_release);
+                    auto ret = CO_AWAIT service
+                                   ->attach_remote_zone<rpc::tcp_service_proxy, CallerInterface, CalleeInterface>(
+                                       "tcp_service_proxy",
+                                       {{initialisation_info.payload.caller_object_id},
+                                        {initialisation_info.payload.caller_zone_id}},
+                                       output_interface, connection_handler_, destination_zone_id, worker_release,
+                                       initialisation_info.worker_release);
                     if(ret != rpc::error::OK())
                     {
                         // report error
@@ -156,6 +175,10 @@ namespace rpc
                         LOG_STR(randonmumber.c_str(), randonmumber.size());
                         CO_RETURN;
                     }
+
+                    // msg = "run_client init_server_channel_response ";
+                    // msg += std::to_string(service->get_zone_id().get_val());
+                    // LOG_CSTR(msg.c_str());
 
                     err = CO_AWAIT worker_release->channel_manager->immediate_send_payload(
                         prefix.version,
@@ -197,6 +220,7 @@ namespace rpc
                 }
                 if(poll_status != coro::poll_status::event)
                 {
+                    LOG_CSTR("failed run_listener poll_status");
                     break; // Handle error, see poll_status for detailed error states.
                 }
 
@@ -206,6 +230,7 @@ namespace rpc
                 // Verify the incoming connection was accepted correctly.
                 if(!client.socket().is_valid())
                 {
+                    LOG_CSTR("failed run_listener client is_valid");
                     break; // Handle error.
                 }
 

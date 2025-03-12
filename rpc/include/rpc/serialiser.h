@@ -98,27 +98,26 @@ namespace rpc
         }
     };
 
-    // serialisation primatives, it will be nice to move yas out of headers and make the library hidden.  Something for
-    // the future
-    template<typename T, class OutputBlob = std::vector<std::uint8_t>> OutputBlob to_yas_json(const T& obj)
+    // serialisation primatives, it will be nice to move yas out of headers and make the library hidden.  Something for the future
+    template<class OutputBlob = std::vector<std::uint8_t>, typename T> OutputBlob to_yas_json(const T& obj)
     {
         yas::shared_buffer yas_buffer = yas::save<::yas::mem | ::yas::json | ::yas::no_header>(obj);
         return OutputBlob(yas_buffer.data.get(), yas_buffer.data.get() + yas_buffer.size);
     }
 
-    template<typename T, class OutputBlob = std::vector<std::uint8_t>> OutputBlob to_yas_binary(const T& obj)
+    template<class OutputBlob = std::vector<std::uint8_t>, typename T> OutputBlob to_yas_binary(const T& obj)
     {
         yas::shared_buffer yas_buffer = yas::save<::yas::mem | ::yas::binary | ::yas::no_header>(obj);
         return OutputBlob(yas_buffer.data.get(), yas_buffer.data.get() + yas_buffer.size);
     }
 
-    template<typename T, class OutputBlob = std::vector<std::uint8_t>> OutputBlob to_compressed_yas_binary(const T& obj)
+    template<class OutputBlob = std::vector<std::uint8_t>, typename T> OutputBlob to_compressed_yas_binary(const T& obj)
     {
         yas::shared_buffer yas_buffer = yas::save<::yas::mem | ::yas::binary | ::yas::compacted | ::yas::no_header>(obj);
         return OutputBlob(yas_buffer.data.get(), yas_buffer.data.get() + yas_buffer.size);
     }
 
-    template<typename T, class OutputBlob = std::vector<std::uint8_t>> OutputBlob serialise(const T& obj, encoding enc)
+    template<class OutputBlob = std::vector<std::uint8_t>, typename T> OutputBlob serialise(const T& obj, encoding enc)
     {
         if (enc == encoding::yas_json)
             return to_yas_json(obj);
@@ -128,34 +127,30 @@ namespace rpc
             return to_compressed_yas_binary(obj);
         throw std::runtime_error("invalid encoding type");
     }
-    
+
     // serialisation primatives, it will be nice to move yas out of headers and make the library hidden.  Something for the future
-    template<typename T>
-    uint64_t yas_json_saved_size(const T& obj)
+    template<typename T> uint64_t yas_json_saved_size(const T& obj)
     {
-        return yas::saved_size<::yas::mem|::yas::json|::yas::no_header>(obj);
+        return yas::saved_size<::yas::mem | ::yas::json | ::yas::no_header>(obj);
     }
 
-    template<typename T>
-    uint64_t yas_binary_saved_size(const T& obj)
+    template<typename T> uint64_t yas_binary_saved_size(const T& obj)
     {
-        return yas::saved_size<::yas::mem|::yas::binary|::yas::no_header>(obj);
-   }
-
-    template<typename T>
-    uint64_t compressed_yas_binary_saved_size(const T& obj)
-    {
-        return yas::saved_size<::yas::mem|::yas::binary|::yas::compacted|::yas::no_header>(obj);
+        return yas::saved_size<::yas::mem | ::yas::binary | ::yas::no_header>(obj);
     }
 
-    template<typename T>
-    uint64_t get_saved_size(const T& obj, encoding enc)
+    template<typename T> uint64_t compressed_yas_binary_saved_size(const T& obj)
     {
-        if(enc == encoding::yas_json)
+        return yas::saved_size<::yas::mem | ::yas::binary | ::yas::compacted | ::yas::no_header>(obj);
+    }
+
+    template<typename T> uint64_t get_saved_size(const T& obj, encoding enc)
+    {
+        if (enc == encoding::yas_json)
             return yas_json_saved_size(obj);
-        if(enc == encoding::enc_default || enc == encoding::yas_binary)
+        if (enc == encoding::enc_default || enc == encoding::yas_binary)
             return yas_binary_saved_size(obj);
-        if(enc == encoding::yas_compressed_binary)
+        if (enc == encoding::yas_compressed_binary)
             return compressed_yas_binary_saved_size(obj);
         throw std::runtime_error("invalid encoding type");
     }
