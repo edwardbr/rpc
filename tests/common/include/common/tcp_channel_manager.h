@@ -14,6 +14,13 @@ struct worker_release
 
 class tcp_channel_manager
 {
+    enum class mode
+    {
+        not_set,
+        pushing,
+        pulling
+    };
+
     struct result_listener
     {
         coro::event event;
@@ -29,18 +36,32 @@ class tcp_channel_manager
     coro::net::tcp::client client_;
     std::chrono::milliseconds timeout_;
     std::weak_ptr<worker_release> worker_release_;
-    coro::mutex connection_mtx_;
+
     std::atomic<uint64_t> sequence_number_ = 0;
 
     std::queue<std::vector<uint8_t>> send_queue_;
-    
+    coro::mutex send_queue_mtx_;
+
     rpc::shared_ptr<rpc::service> service_;
+
+    mode mode_ = mode::not_set;
 
     // read from the peer and fill the buffer as it has been presized
     CORO_TASK(int) read(std::vector<char>& buf);
 
     // read and deserialise a envelope_prefix from a peer
     CORO_TASK(int) receive_prefix(tcp::envelope_prefix& prefix);
+    
+    CORO_TASK(void) pump_messages(std::function<CORO_TASK(int)(tcp::envelope_prefix, tcp::envelope_payload)> incoming_message_handler);
+    CORO_TASK(int) flush_send_queue();
+
+    CORO_TASK(void) stub_handle_send(tcp::envelope_prefix prefix, tcp::envelope_payload payload);
+    CORO_TASK(void) stub_handle_try_cast(tcp::envelope_prefix prefix, tcp::envelope_payload payload);
+    CORO_TASK(void) stub_handle_add_ref(tcp::envelope_prefix prefix, tcp::envelope_payload payload);
+    CORO_TASK(void) stub_handle_release(tcp::envelope_prefix prefix, tcp::envelope_payload payload);
+    
+    void kill_connection()
+    {}
 
 public:
     tcp_channel_manager(coro::net::tcp::client client, std::chrono::milliseconds timeout,
@@ -52,8 +73,8 @@ public:
     {
         assert(client_.socket().is_valid());
     }
-    
-    ~tcp_channel_manager(){}
+
+    ~tcp_channel_manager() { }
 
     CORO_TASK(void) pump_send_and_receive();
     CORO_TASK(void) pump_stub_receive_and_send();
@@ -62,24 +83,46 @@ public:
     CORO_TASK(int)
     receive_anonymous_payload(tcp::envelope_prefix& prefix, tcp::envelope_payload& payload, uint64_t sequence_number);
 
+    // for register an awaitable coro response
+    std::function<CORO_TASK(int)(tcp::envelope_prefix&, tcp::envelope_payload&)>
+    register_receive_anonymous_payload(uint64_t sequence_number);
+
     // read a messsage from a peer
     template<class ReceivePayload>
     CORO_TASK(int)
     receive_payload(ReceivePayload& receivePayload, uint64_t sequence_number)
     {
+        assert(mode_ == mode::not_set || mode_ == mode::pulling);
+
+        // std::string msg("receive_payload ");
+        // msg += std::to_string(service_->get_zone_id().get_val());
+        // LOG_CSTR(msg.c_str());
+
         tcp::envelope_prefix prefix;
         tcp::envelope_payload payload;
         int err = CO_AWAIT receive_anonymous_payload(prefix, payload, sequence_number);
         if(err != rpc::error::OK())
+        {
+            LOG_CSTR("failed receive_payload receive_anonymous_payload");
             co_return err;
+        }
 
         assert(payload.payload_fingerprint == rpc::id<ReceivePayload>::get(prefix.version));
 
         auto str_err = rpc::from_yas_compressed_binary(rpc::span(payload.payload), receivePayload);
         if(!str_err.empty())
         {
+            LOG_CSTR("failed receive_payload from_yas_compressed_binary");
             co_return rpc::error::TRANSPORT_ERROR();
         }
+
+        // msg = std::string("receive_payload complete ");
+        // msg += std::to_string(service_->get_zone_id().get_val());
+        // msg += std::string("\nprefix = ");
+        // msg += rpc::to_yas_json<std::string>(prefix);
+        // msg += std::string("\npayload = ");
+        // msg += rpc::to_yas_json<std::string>(payload);
+        // LOG_CSTR(msg.c_str());
 
         co_return rpc::error::OK();
     }
@@ -89,25 +132,37 @@ public:
     CORO_TASK(int)
     send_payload(std::uint64_t protocol_version, SendPayload&& sendPayload, uint64_t sequence_number)
     {
-        auto scoped_lock = co_await connection_mtx_.lock();
+        // assert(mode_ == mode::not_set || mode_ == mode::pulling);
 
-        auto payload = rpc::to_yas_binary(
-            tcp::envelope_payload {.payload_fingerprint = rpc::id<SendPayload>::get(protocol_version),
-                                   .payload = rpc::to_compressed_yas_binary(sendPayload)});
+        auto scoped_lock = co_await send_queue_mtx_.lock();
+
+        tcp::envelope_payload payload_envelope = {.payload_fingerprint = rpc::id<SendPayload>::get(protocol_version),
+                                                  .payload = rpc::to_compressed_yas_binary(sendPayload)};
+        auto payload = rpc::to_yas_binary(payload_envelope);
 
         auto prefix = tcp::envelope_prefix {
             .version = protocol_version, .sequence_number = sequence_number, .payload_size = payload.size()};
+
+        // std::string msg("send_payload ");
+        // msg += std::to_string(service_->get_zone_id().get_val());
+        // msg += std::string("\nprefix = ");
+        // msg += rpc::to_yas_json<std::string>(prefix);
+        // msg += std::string("\npayload = ");
+        // msg += rpc::to_yas_json<std::string>(payload_envelope);
+        // LOG_CSTR(msg.c_str());
+
         send_queue_.push(rpc::to_yas_binary(prefix));
         send_queue_.push(payload);
 
         co_return rpc::error::OK();
     }
-    
+
     template<class SendPayload>
     CORO_TASK(int)
     immediate_send_payload(std::uint64_t protocol_version, SendPayload&& sendPayload, uint64_t sequence_number)
     {
-        auto scoped_lock = co_await connection_mtx_.lock();
+        assert(mode_ == mode::not_set || mode_ == mode::pulling);
+        auto scoped_lock = co_await send_queue_mtx_.lock();
 
         auto payload = rpc::to_yas_binary(
             tcp::envelope_payload {.payload_fingerprint = rpc::id<SendPayload>::get(protocol_version),
@@ -116,28 +171,57 @@ public:
         auto prefix = tcp::envelope_prefix {
             .version = protocol_version, .sequence_number = sequence_number, .payload_size = payload.size()};
 
-        auto status = co_await client_.poll(coro::poll_op::write, timeout_);
-        if(status != coro::poll_status::event)
-        {
-            CO_RETURN rpc::error::TRANSPORT_ERROR();
-        }
+        // std::string msg("immediate_send_payload ");
+        // msg += std::to_string(service_->get_zone_id().get_val());
+        // msg = std::string("\nprefix = ");
+        // msg += rpc::to_yas_json<std::string>(prefix);
+        // msg += std::string("\npayload = ");
+        // msg += rpc::to_yas_json<std::string>(payload);
+        // LOG_CSTR(msg.c_str());
 
         std::vector<uint8_t> buf = rpc::to_yas_binary(prefix);
         auto marshal_status = client_.send(std::span {(const char*)buf.data(), buf.size()});
+        if(marshal_status.first == coro::net::send_status::try_again)
+        {
+            auto status = co_await client_.poll(coro::poll_op::write, timeout_);
+            if(status != coro::poll_status::event)
+            {
+                LOG_CSTR("failed immediate_send_payload prefix");
+                CO_RETURN rpc::error::TRANSPORT_ERROR();
+            }
+            marshal_status = client_.send(std::span {(const char*)buf.data(), buf.size()});
+        }
         if(marshal_status.first != coro::net::send_status::ok)
         {
+            LOG_CSTR("failed immediate_send_payload prefix send");
             CO_RETURN rpc::error::TRANSPORT_ERROR();
         }
-        
-        status = co_await client_.poll(coro::poll_op::write, timeout_);
-        if(status != coro::poll_status::event)
-        {
-            CO_RETURN rpc::error::TRANSPORT_ERROR();
-        }
-        
+
         marshal_status = client_.send(std::span {(const char*)payload.data(), payload.size()});
+        if(marshal_status.first == coro::net::send_status::try_again)
+        {
+            auto status = co_await client_.poll(coro::poll_op::write, timeout_);
+            if(status != coro::poll_status::event)
+            {
+                // std::string msg("client_.poll failed ");
+                // msg += std::to_string(service_->get_zone_id().get_val());
+                // msg += " fd = ";
+                // msg += std::to_string(client_.socket().native_handle());
+                // LOG_CSTR(msg.c_str());
+
+                CO_RETURN rpc::error::TRANSPORT_ERROR();
+            }
+
+            marshal_status = client_.send(std::span {(const char*)payload.data(), payload.size()});
+        }
         if(marshal_status.first != coro::net::send_status::ok)
         {
+            // std::string msg("client_.send failed ");
+            // msg += std::to_string(service_->get_zone_id().get_val());
+            // msg += " fd = ";
+            // msg += std::to_string(client_.socket().native_handle());
+            // LOG_CSTR(msg.c_str());
+
             CO_RETURN rpc::error::TRANSPORT_ERROR();
         }
         CO_RETURN rpc::error::OK();
@@ -150,6 +234,8 @@ public:
     CORO_TASK(int)
     call_peer(std::uint64_t protocol_version, SendPayload&& sendPayload, ReceivePayload& receivePayload)
     {
+        // assert(mode_ == mode::not_set || mode_ == mode::pushing);
+
         auto sequence_number = ++sequence_number_;
 
         // we register the receive listener before we do the send
@@ -163,6 +249,7 @@ public:
         auto err = CO_AWAIT send_payload(protocol_version, std::move(sendPayload), sequence_number);
         if(err != rpc::error::OK())
         {
+            LOG_CSTR("failed call_peer send_payload send");
             std::scoped_lock lock(pending_transmits_mtx_);
             pending_transmits_.erase(sequence_number);
             co_return err;
@@ -175,6 +262,7 @@ public:
         auto str_err = rpc::from_yas_compressed_binary(rpc::span(res_payload.payload.payload), receivePayload);
         if(!str_err.empty())
         {
+            LOG_CSTR("failed call_peer send_payload from_yas_compressed_binary");
             co_return rpc::error::TRANSPORT_ERROR();
         }
 

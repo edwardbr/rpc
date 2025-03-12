@@ -167,28 +167,32 @@ public:
     //live app registry, it should have sole responsibility for the long term storage of app shared ptrs
     CORO_TASK(error_code) look_up_app(const std::string& app_name, rpc::shared_ptr<yyy::i_example>& app) override
     {
-        std::scoped_lock lock(cached_apps_mux_);
-        auto it = cached_apps_.find(app_name);
-        if(it == cached_apps_.end())
         {
-            CO_RETURN rpc::error::OK();
+            std::scoped_lock lock(cached_apps_mux_);
+            auto it = cached_apps_.find(app_name);
+            if(it != cached_apps_.end())
+            {
+                app = it->second;
+            }
         }
-        app = it->second;
         CO_RETURN rpc::error::OK();
     }
 
     CORO_TASK(error_code) set_app(const std::string& name, const rpc::shared_ptr<yyy::i_example>& app) override
     {
-        std::scoped_lock lock(cached_apps_mux_);
-        
-        cached_apps_[name] = app;
+        {
+            std::scoped_lock lock(cached_apps_mux_);        
+            cached_apps_[name] = app;
+        }
         CO_RETURN rpc::error::OK();
     }
 
     CORO_TASK(error_code) unload_app(const std::string& name) override
     {
-        std::scoped_lock lock(cached_apps_mux_);
-        cached_apps_.erase(name);
+        {
+            std::scoped_lock lock(cached_apps_mux_);
+            cached_apps_.erase(name);
+        }
         CO_RETURN rpc::error::OK();
     }
 };
@@ -892,35 +896,60 @@ TYPED_TEST(type_test, dyanmic_cast_tests)
 }
 
 
-// template <class T>
-// using remote_type_test = type_test<T>;
+template <class T>
+using remote_type_test = type_test<T>;
 
 
-// typedef Types<
-//     //inproc_setup<false, false, false>, 
+typedef Types<
+    //inproc_setup<false, false, false>, 
 
-//     inproc_setup<true, false, false>, 
-//     inproc_setup<true, false, true>, 
-//     inproc_setup<true, true, false>, 
-//     inproc_setup<true, true, true>
+    inproc_setup<true, false, false>, 
+    inproc_setup<true, false, true>, 
+    inproc_setup<true, true, false>, 
+    inproc_setup<true, true, true>,
+    tcp_setup<true, false, false>, 
+    tcp_setup<true, false, true>, 
+    tcp_setup<true, true, false>, 
+    tcp_setup<true, true, true>
 
-// #ifdef BUILD_ENCLAVE
-//     ,
-//     enclave_setup<true, false, false>, 
-//     enclave_setup<true, false, true>, 
-//     enclave_setup<true, true, false>, 
-//     enclave_setup<true, true, true>
-// #endif
-// > remote_implementations;
-// TYPED_TEST_SUITE(remote_type_test, remote_implementations);
+#ifdef BUILD_ENCLAVE
+    ,
+    enclave_setup<true, false, false>, 
+    enclave_setup<true, false, true>, 
+    enclave_setup<true, true, false>, 
+    enclave_setup<true, true, true>
+#endif
+> remote_implementations;
+TYPED_TEST_SUITE(remote_type_test, remote_implementations);
 
-// TYPED_TEST(remote_type_test, remote_standard_tests)
-// {    
-//     auto& lib = this->get_lib();
-//     rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
-//     ASSERT_EQ(lib.get_example()->create_foo(i_foo_ptr), 0);
-//     standard_tests(*i_foo_ptr, true);
-// }
+
+
+template <class T>
+CORO_TASK(void) coro_remote_standard_tests(bool& is_ready, T& lib)
+{
+    rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
+    auto ret = co_await lib.get_example()->create_foo(i_foo_ptr);
+    if(ret != rpc::error::OK())
+    {
+        LOG_CSTR("failed create_foo");
+        CO_RETURN;
+    }
+    co_await lib.check_for_error(standard_tests(*i_foo_ptr, lib.get_has_enclave()));
+    is_ready = true;
+}
+
+TYPED_TEST(remote_type_test, remote_standard_tests)
+{    
+    bool is_ready = false;
+    auto& lib = this->get_lib();
+    auto root_service = lib.get_root_service();
+    root_service->get_scheduler()->schedule(coro_remote_standard_tests(is_ready, lib));
+    while(!is_ready)
+    {
+        root_service->get_scheduler()->process_events(std::chrono::milliseconds(1));
+    }  
+    ASSERT_EQ(lib.error_has_occured(), false);
+}
 
 // TYPED_TEST(remote_type_test, multithreaded_standard_tests)
 // {
