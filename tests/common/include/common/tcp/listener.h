@@ -11,14 +11,14 @@
 #include <rpc/proxy.h>
 #include <rpc/service.h>
 #include <coro/coro.hpp>
-#include <common/tcp_service_proxy.h>
-#include <common/tcp_channel_manager.h>
+#include <common/tcp/service_proxy.h>
+#include <common/tcp/channel_manager.h>
 
 #include <tcp/tcp.h>
 
-namespace rpc
+namespace rpc::tcp
 {
-    template<class CallerInterface, class CalleeInterface> class tcp_listener
+    template<class CallerInterface, class CalleeInterface> class listener
     {
         struct initialising_client
         {
@@ -42,13 +42,13 @@ namespace rpc
         connection_handler connection_handler_;
 
     public:
-        tcp_listener(connection_handler handler, std::chrono::milliseconds timeout)
+        listener(connection_handler handler, std::chrono::milliseconds timeout)
             : timeout_(timeout)
             , connection_handler_(handler)
         {
         }
 
-        tcp_listener(const tcp_listener&) = delete;
+        listener(const listener&) = delete;
 
         // This is to open a listening socket on for incoming tcp connection requests
         bool start_listening(rpc::shared_ptr<rpc::service> service) { return service->schedule(run_listener(service)); }
@@ -65,10 +65,10 @@ namespace rpc
             assert(client.socket().is_valid());
             std::shared_ptr<worker_release> worker_release(std::make_shared<worker_release>());
             worker_release->channel_manager
-                = std::make_shared<tcp_channel_manager>(std::move(client), timeout_, worker_release, service);
+                = std::make_shared<channel_manager>(std::move(client), timeout_, worker_release, service);
 
-            tcp::envelope_prefix prefix;
-            tcp::envelope_payload payload;
+            envelope_prefix prefix;
+            envelope_payload payload;
             int err = CO_AWAIT worker_release->channel_manager->receive_anonymous_payload(prefix, payload, 0);
             if(err != rpc::error::OK())
             {
@@ -96,7 +96,7 @@ namespace rpc
                 {
                     std::scoped_lock lock(mtx);
                     auto [_, inserted] = initialising_clients.try_emplace(
-                        request.random_number_id, tcp_listener::initialising_client {.payload = std::move(request),
+                        request.random_number_id, listener::initialising_client {.payload = std::move(request),
                                                                                      .worker_release = worker_release,
                                                                                      .rpc_version = prefix.version});
                     if(!inserted)
@@ -162,8 +162,8 @@ namespace rpc
                     rpc::interface_descriptor output_interface;
 
                     auto ret = CO_AWAIT service
-                                   ->attach_remote_zone<rpc::tcp_service_proxy, CallerInterface, CalleeInterface>(
-                                       "tcp_service_proxy",
+                                   ->attach_remote_zone<rpc::tcp::service_proxy, CallerInterface, CalleeInterface>(
+                                       "service_proxy",
                                        {{initialisation_info.payload.caller_object_id},
                                         {initialisation_info.payload.caller_zone_id}},
                                        output_interface, connection_handler_, destination_zone_id, worker_release,

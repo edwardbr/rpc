@@ -5,136 +5,139 @@
  
 #import "rpc/rpc_types.idl"
  
-namespace tcp
+namespace rpc
 {
-    struct envelope_prefix
+    namespace tcp
     {
-        uint64_t version;
-        uint64_t sequence_number;
-        uint64_t payload_size;
-    };
-    
-    struct envelope_payload
-    {
-        uint64_t payload_fingerprint;
-        std::vector<uint8_t> payload;
-    };
-    
-    // When connecting two zones together we need to establish two channel connections one for the 
-    // client to send requests and one for the server.
-    // When it is a peer to peer connection then the client is the initiator of the connection and server is the 
-    // responder to that connection request otherwise they are technically the same.
-    // Once the channels are established the peers initiate rpc calls from their respective channels.
-    // Responses are sent back on the same channel that the request was sent on.
-    
-    // A client may choose to not send an object for the server to add_ref to however the server will have to send 
-    // an object for the client to add_ref to otherwise the channels will auto clean up as there is no positive
-    // reference count in either diretion. 
-    
-    // Note the zone ids for the same zones may be different between the caller and the destination, therefore a mapping
-    // is required to map the zone id that the caller uses to the zone id that the destination uses.
-    // so long as the two servers are the only agents to generate zone ids then the mapping will be consistent.
-    // however if there is a mesh type arrangement then a global mapping service is required.
-    
-    struct init_client_channel_send
-    {
-        // a collision proof random number that is used to identify the client that generated it
-        uint64_t random_number_id;
-        // the zone id of the caller derived from the caller
-        uint64_t caller_zone_id;
-        // the object id of the callback object from the caller
-        uint64_t caller_object_id;
-        // the zone id of the destination derived from the caller
-        uint64_t destination_zone_id;
-    };
-    
-    struct init_client_channel_response
-    {
-        int err_code;
-    };
-    
-    struct init_server_channel_send
-    {
-        // a collision proof random number that is used to identify the client that generated it, and to link 
-        // it to the the client channel as a pair of channels
-        uint64_t random_number_id;
-    };
-    
-    struct init_server_channel_response
-    {
-        int err_code;
-        // the destination zone id derived from the destination
-        uint64_t destination_zone_id;
-        // the destination callable object id generated from the destination
-        uint64_t destination_object_id;
-        // the zone id of the caller derived from the destination
-        uint64_t caller_zone_id;
-    };
-    
-    struct call_send
-    {
-        rpc::encoding encoding;
-        uint64_t tag;
-        uint64_t caller_channel_zone_id; 
-        uint64_t caller_zone_id; 
-        uint64_t destination_zone_id; 
-        uint64_t object_id; 
-        uint64_t interface_id; 
-        uint64_t method_id;
-        std::vector<char> payload;
-    };
+        struct envelope_prefix
+        {
+            uint64_t version;
+            uint64_t sequence_number;
+            uint64_t payload_size;
+        };
         
-    struct call_receive
-    {
-        std::vector<char> payload;
-        int err_code;
-    };
-    
-    struct try_cast_send
-    {
-        uint64_t destination_zone_id;
-        uint64_t object_id;
-        uint64_t interface_id;
-    };
+        struct envelope_payload
+        {
+            uint64_t payload_fingerprint;
+            std::vector<uint8_t> payload;
+        };
         
-    struct try_cast_receive
-    {
-        int err_code;
-    };
-    
-    enum add_ref_options : uint8_t
-    {
-        normal = 1,
-        build_destination_route = 2,    //when unidirectionally addreffing the destination
-        build_caller_route = 4          //when unidirectionally addreffing the caller which prepares refcounts etc in the reverse direction
-    };
-    
-    struct addref_send
-    {
-        uint64_t destination_channel_zone_id;
-        uint64_t destination_zone_id;
-        uint64_t object_id;
-        uint64_t caller_channel_zone_id;
-        uint64_t caller_zone_id;
-        add_ref_options build_out_param_channel;
-    };
+        // When connecting two zones together we need to establish two channel connections one for the 
+        // client to send requests and one for the server.
+        // When it is a peer to peer connection then the client is the initiator of the connection and server is the 
+        // responder to that connection request otherwise they are technically the same.
+        // Once the channels are established the peers initiate rpc calls from their respective channels.
+        // Responses are sent back on the same channel that the request was sent on.
         
-    struct addref_receive
-    {
-        uint64_t ref_count;
-        int err_code;
-    };
-    
-    struct release_send
-    {
-        uint64_t destination_zone_id;
-        uint64_t object_id;
-        uint64_t  caller_zone_id;
-    };
+        // A client may choose to not send an object for the server to add_ref to however the server will have to send 
+        // an object for the client to add_ref to otherwise the channels will auto clean up as there is no positive
+        // reference count in either diretion. 
         
-    struct release_receive
-    {
-        uint64_t ref_count;
-        int err_code;
-    };
+        // Note the zone ids for the same zones may be different between the caller and the destination, therefore a mapping
+        // is required to map the zone id that the caller uses to the zone id that the destination uses.
+        // so long as the two servers are the only agents to generate zone ids then the mapping will be consistent.
+        // however if there is a mesh type arrangement then a global mapping service is required.
+        
+        struct init_client_channel_send
+        {
+            // a collision proof random number that is used to identify the client that generated it
+            uint64_t random_number_id;
+            // the zone id of the caller derived from the caller
+            uint64_t caller_zone_id;
+            // the object id of the callback object from the caller
+            uint64_t caller_object_id;
+            // the zone id of the destination derived from the caller
+            uint64_t destination_zone_id;
+        };
+        
+        struct init_client_channel_response
+        {
+            int err_code;
+        };
+        
+        struct init_server_channel_send
+        {
+            // a collision proof random number that is used to identify the client that generated it, and to link 
+            // it to the the client channel as a pair of channels
+            uint64_t random_number_id;
+        };
+        
+        struct init_server_channel_response
+        {
+            int err_code;
+            // the destination zone id derived from the destination
+            uint64_t destination_zone_id;
+            // the destination callable object id generated from the destination
+            uint64_t destination_object_id;
+            // the zone id of the caller derived from the destination
+            uint64_t caller_zone_id;
+        };
+        
+        struct call_send
+        {
+            rpc::encoding encoding;
+            uint64_t tag;
+            uint64_t caller_channel_zone_id; 
+            uint64_t caller_zone_id; 
+            uint64_t destination_zone_id; 
+            uint64_t object_id; 
+            uint64_t interface_id; 
+            uint64_t method_id;
+            std::vector<char> payload;
+        };
+            
+        struct call_receive
+        {
+            std::vector<char> payload;
+            int err_code;
+        };
+        
+        struct try_cast_send
+        {
+            uint64_t destination_zone_id;
+            uint64_t object_id;
+            uint64_t interface_id;
+        };
+            
+        struct try_cast_receive
+        {
+            int err_code;
+        };
+        
+        enum add_ref_options : uint8_t
+        {
+            normal = 1,
+            build_destination_route = 2,    //when unidirectionally addreffing the destination
+            build_caller_route = 4          //when unidirectionally addreffing the caller which prepares refcounts etc in the reverse direction
+        };
+        
+        struct addref_send
+        {
+            uint64_t destination_channel_zone_id;
+            uint64_t destination_zone_id;
+            uint64_t object_id;
+            uint64_t caller_channel_zone_id;
+            uint64_t caller_zone_id;
+            add_ref_options build_out_param_channel;
+        };
+            
+        struct addref_receive
+        {
+            uint64_t ref_count;
+            int err_code;
+        };
+        
+        struct release_send
+        {
+            uint64_t destination_zone_id;
+            uint64_t object_id;
+            uint64_t  caller_zone_id;
+        };
+            
+        struct release_receive
+        {
+            uint64_t ref_count;
+            int err_code;
+        };
+    }
 }

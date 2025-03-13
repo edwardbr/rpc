@@ -10,27 +10,27 @@
 
 #include <tcp/tcp.h>
 
-#include "common/tcp_channel_manager.h"
+#include "common/tcp/channel_manager.h"
 
-namespace rpc
+namespace rpc::tcp
 {
     // This is for hosts to call services on an enclave
-    class tcp_service_proxy : public service_proxy
+    class service_proxy : public rpc::service_proxy
     {
-        tcp_service_proxy(const char* name, destination_zone destination_zone_id, const rpc::shared_ptr<service>& svc,
+        service_proxy(const char* name, destination_zone destination_zone_id, const rpc::shared_ptr<service>& svc,
                           std::shared_ptr<worker_release> proxy_worker_release,
                           std::shared_ptr<worker_release> stub_worker_release, 
                           std::chrono::milliseconds timeout,
                           coro::net::tcp::client::options opts);
 
-        tcp_service_proxy(const tcp_service_proxy& other) = default;
+        service_proxy(const service_proxy& other) = default;
         
-        rpc::shared_ptr<service_proxy> clone() override;
+        rpc::shared_ptr<rpc::service_proxy> clone() override;
 
-        static rpc::shared_ptr<tcp_service_proxy> create(const char* name, destination_zone destination_zone_id,
+        static rpc::shared_ptr<service_proxy> create(const char* name, destination_zone destination_zone_id,
                                                          const rpc::shared_ptr<service>& svc, std::chrono::milliseconds timeout, coro::net::tcp::client::options opts);
 
-        static CORO_TASK(rpc::shared_ptr<tcp_service_proxy>)
+        static CORO_TASK(rpc::shared_ptr<service_proxy>)
             attach_remote(const char* name, const rpc::shared_ptr<service>& svc, destination_zone destination_zone_id,
                           std::shared_ptr<worker_release> proxy_worker_release,
                           std::shared_ptr<worker_release> stub_worker_release);
@@ -48,7 +48,7 @@ namespace rpc
         CORO_TASK(uint64_t)
         add_ref(uint64_t protocol_version, destination_channel_zone destination_channel_zone_id,
                 destination_zone destination_zone_id, object object_id, caller_channel_zone caller_channel_zone_id,
-                caller_zone caller_zone_id, add_ref_options build_out_param_channel) override;
+                caller_zone caller_zone_id, rpc::add_ref_options build_out_param_channel) override;
         CORO_TASK(uint64_t)
         release(uint64_t protocol_version, destination_zone destination_zone_id, object object_id,
                 caller_zone caller_zone_id) override;
@@ -61,6 +61,6 @@ namespace rpc
         coro::net::tcp::client::options opts_;
 
     public:
-        virtual ~tcp_service_proxy();
+        virtual ~service_proxy();
     };
 }
