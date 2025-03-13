@@ -16,13 +16,6 @@ namespace rpc::tcp
 
     class channel_manager
     {
-        enum class mode
-        {
-            not_set,
-            pushing,
-            pulling
-        };
-
         struct result_listener
         {
             coro::event event;
@@ -46,8 +39,6 @@ namespace rpc::tcp
 
         rpc::shared_ptr<rpc::service> service_;
 
-        mode mode_ = mode::not_set;
-
         // read from the peer and fill the buffer as it has been presized
         CORO_TASK(int) read(std::vector<char>& buf);
 
@@ -55,8 +46,7 @@ namespace rpc::tcp
         CORO_TASK(int) receive_prefix(envelope_prefix& prefix);
 
         CORO_TASK(void)
-        pump_messages(
-            std::function<CORO_TASK(int)(envelope_prefix, envelope_payload)> incoming_message_handler);
+        pump_messages(std::function<CORO_TASK(int)(envelope_prefix, envelope_payload)> incoming_message_handler);
         CORO_TASK(int) flush_send_queue();
 
         CORO_TASK(void) stub_handle_send(envelope_prefix prefix, envelope_payload payload);
@@ -68,7 +58,7 @@ namespace rpc::tcp
 
     public:
         channel_manager(coro::net::tcp::client client, std::chrono::milliseconds timeout,
-                            std::weak_ptr<worker_release> worker_release, rpc::shared_ptr<rpc::service> service)
+                        std::weak_ptr<worker_release> worker_release, rpc::shared_ptr<rpc::service> service)
             : client_(std::move(client))
             , timeout_(timeout)
             , worker_release_(worker_release)
@@ -80,24 +70,16 @@ namespace rpc::tcp
         ~channel_manager() { }
 
         CORO_TASK(void) pump_send_and_receive();
-        CORO_TASK(void) pump_stub_receive_and_send();
 
         // read a messsage from a peer
         CORO_TASK(int)
-        receive_anonymous_payload(envelope_prefix& prefix, envelope_payload& payload,
-                                  uint64_t sequence_number);
-
-        // for register an awaitable coro response
-        std::function<CORO_TASK(int)(envelope_prefix&, envelope_payload&)>
-        register_receive_anonymous_payload(uint64_t sequence_number);
+        receive_anonymous_payload(envelope_prefix& prefix, envelope_payload& payload, uint64_t sequence_number);
 
         // read a messsage from a peer
         template<class ReceivePayload>
         CORO_TASK(int)
         receive_payload(ReceivePayload& receivePayload, uint64_t sequence_number)
         {
-            assert(mode_ == mode::not_set || mode_ == mode::pulling);
-
             // std::string msg("receive_payload ");
             // msg += std::to_string(service_->get_zone_id().get_val());
             // LOG_CSTR(msg.c_str());
@@ -134,19 +116,20 @@ namespace rpc::tcp
         // send a message to a peer
         template<class SendPayload>
         CORO_TASK(int)
-        send_payload(std::uint64_t protocol_version, SendPayload&& sendPayload, uint64_t sequence_number)
+        send_payload(std::uint64_t protocol_version, message_direction direction, SendPayload&& sendPayload,
+                     uint64_t sequence_number)
         {
-            // assert(mode_ == mode::not_set || mode_ == mode::pulling);
-
+            assert(direction);
             auto scoped_lock = co_await send_queue_mtx_.lock();
 
-            envelope_payload payload_envelope
-                = {.payload_fingerprint = rpc::id<SendPayload>::get(protocol_version),
-                   .payload = rpc::to_compressed_yas_binary(sendPayload)};
+            envelope_payload payload_envelope = {.payload_fingerprint = rpc::id<SendPayload>::get(protocol_version),
+                                                 .payload = rpc::to_compressed_yas_binary(sendPayload)};
             auto payload = rpc::to_yas_binary(payload_envelope);
 
-            auto prefix = envelope_prefix {
-                .version = protocol_version, .sequence_number = sequence_number, .payload_size = payload.size()};
+            auto prefix = envelope_prefix {.version = protocol_version,
+                                           .direction = direction,
+                                           .sequence_number = sequence_number,
+                                           .payload_size = payload.size()};
 
             // std::string msg("send_payload ");
             // msg += std::to_string(service_->get_zone_id().get_val());
@@ -164,17 +147,20 @@ namespace rpc::tcp
 
         template<class SendPayload>
         CORO_TASK(int)
-        immediate_send_payload(std::uint64_t protocol_version, SendPayload&& sendPayload, uint64_t sequence_number)
+        immediate_send_payload(std::uint64_t protocol_version, message_direction direction, SendPayload&& sendPayload,
+                               uint64_t sequence_number)
         {
-            assert(mode_ == mode::not_set || mode_ == mode::pulling);
+            assert(direction);
             auto scoped_lock = co_await send_queue_mtx_.lock();
 
             auto payload = rpc::to_yas_binary(
                 envelope_payload {.payload_fingerprint = rpc::id<SendPayload>::get(protocol_version),
-                                       .payload = rpc::to_compressed_yas_binary(sendPayload)});
+                                  .payload = rpc::to_compressed_yas_binary(sendPayload)});
 
-            auto prefix = envelope_prefix {
-                .version = protocol_version, .sequence_number = sequence_number, .payload_size = payload.size()};
+            auto prefix = envelope_prefix {.version = protocol_version,
+                                           .direction = direction,
+                                           .sequence_number = sequence_number,
+                                           .payload_size = payload.size()};
 
             // std::string msg("immediate_send_payload ");
             // msg += std::to_string(service_->get_zone_id().get_val());
@@ -239,8 +225,6 @@ namespace rpc::tcp
         CORO_TASK(int)
         call_peer(std::uint64_t protocol_version, SendPayload&& sendPayload, ReceivePayload& receivePayload)
         {
-            // assert(mode_ == mode::not_set || mode_ == mode::pushing);
-
             auto sequence_number = ++sequence_number_;
 
             // we register the receive listener before we do the send
@@ -251,7 +235,8 @@ namespace rpc::tcp
                 assert(success);
             }
 
-            auto err = CO_AWAIT send_payload(protocol_version, std::move(sendPayload), sequence_number);
+            auto err = CO_AWAIT send_payload(protocol_version, message_direction::send, std::move(sendPayload),
+                                             sequence_number);
             if(err != rpc::error::OK())
             {
                 LOG_CSTR("failed call_peer send_payload send");

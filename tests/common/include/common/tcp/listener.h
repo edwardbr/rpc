@@ -20,19 +20,9 @@ namespace rpc::tcp
 {
     template<class CallerInterface, class CalleeInterface> class listener
     {
-        struct initialising_client
-        {
-            tcp::init_client_channel_send payload;
-            std::shared_ptr<worker_release> worker_release;
-            uint64_t rpc_version;
-        };
-        std::mutex mtx;
-        std::unordered_map<uint64_t, initialising_client> initialising_clients;
-
         coro::event stop_confirmation_evt_;
         bool stop_ = false;
         std::chrono::milliseconds timeout_;
-        std::chrono::milliseconds delayed_connection_timeout_ = std::chrono::milliseconds(100000);
         std::chrono::milliseconds poll_timeout_ = std::chrono::milliseconds(10);
 
         using connection_handler
@@ -63,7 +53,9 @@ namespace rpc::tcp
         coro::task<void> run_client(rpc::shared_ptr<rpc::service> service, coro::net::tcp::client client)
         {
             assert(client.socket().is_valid());
+            
             std::shared_ptr<worker_release> worker_release(std::make_shared<worker_release>());
+            
             worker_release->channel_manager
                 = std::make_shared<channel_manager>(std::move(client), timeout_, worker_release, service);
 
@@ -87,87 +79,18 @@ namespace rpc::tcp
                 if(!err.empty())
                 {
                     LOG_CSTR("failed run_client init_client_channel_send");
-
                     CO_RETURN;
                 }
 
-                auto random_number = request.random_number_id;
-
                 {
-                    std::scoped_lock lock(mtx);
-                    auto [_, inserted] = initialising_clients.try_emplace(
-                        request.random_number_id, listener::initialising_client {.payload = std::move(request),
-                                                                                     .worker_release = worker_release,
-                                                                                     .rpc_version = prefix.version});
-                    if(!inserted)
-                    {
-                        LOG_CSTR("failed run_client not inserted");
-                    }
-                }
-
-                // msg = "run_client init_client_channel_response ";
-                // msg += std::to_string(service->get_zone_id().get_val());
-                // LOG_CSTR(msg.c_str());
-
-                err = CO_AWAIT worker_release->channel_manager->immediate_send_payload(
-                    prefix.version, tcp::init_client_channel_response {rpc::error::OK()}, prefix.sequence_number);
-                std::ignore = err;
-
-                CO_AWAIT service->get_scheduler()->schedule_after(delayed_connection_timeout_);
-
-                {
-                    // this is to clean up if the client has failed to send a second connection
-                    std::scoped_lock lock(mtx);
-                    initialising_clients.erase(random_number);
-                }
-                CO_RETURN;
-            }
-            else if(payload.payload_fingerprint == rpc::id<tcp::init_server_channel_send>::get(prefix.version))
-            {
-            //     std::string msg("run_client init_server_channel_send ");
-            //     msg += std::to_string(service->get_zone_id().get_val());
-            //     LOG_CSTR(msg.c_str());
-
-                tcp::init_server_channel_send request;
-                auto err = rpc::from_yas_compressed_binary(rpc::span(payload.payload), request);
-                if(!err.empty())
-                {
-                    // bad format
-                    LOG_CSTR("failed run_client init_server_channel_send from_yas_compressed_binary");
-                    CO_RETURN;
-                }
-
-                auto random_number = request.random_number_id;
-
-                {
-                    auto lock = std::make_unique<std::scoped_lock<std::mutex>>(mtx);
-                    auto found = initialising_clients.find(random_number);
-                    if(found == initialising_clients.end())
-                    {
-                        // no initialising client found
-                        auto randonmumber
-                            = "random number " + std::to_string(request.random_number_id) + " not found\n";
-                        LOG_STR(randonmumber.c_str(), randonmumber.size());
-                        CO_RETURN;
-                    }
-
-                    // now we have all the info to make a tcp service proxy
-
-                    auto initialisation_info = std::move(found->second);
-                    initialising_clients.erase(found);
-                    destination_zone destination_zone_id {initialisation_info.payload.caller_zone_id};
-
-                    lock.reset();
+                    destination_zone destination_zone_id {request.caller_zone_id};
 
                     rpc::interface_descriptor output_interface;
 
                     auto ret = CO_AWAIT service
                                    ->attach_remote_zone<rpc::tcp::service_proxy, CallerInterface, CalleeInterface>(
-                                       "service_proxy",
-                                       {{initialisation_info.payload.caller_object_id},
-                                        {initialisation_info.payload.caller_zone_id}},
-                                       output_interface, connection_handler_, destination_zone_id, worker_release,
-                                       initialisation_info.worker_release);
+                                       "service_proxy", {{request.caller_object_id}, {request.caller_zone_id}},
+                                       output_interface, connection_handler_, destination_zone_id, worker_release);
                     if(ret != rpc::error::OK())
                     {
                         // report error
@@ -181,8 +104,8 @@ namespace rpc::tcp
                     // LOG_CSTR(msg.c_str());
 
                     err = CO_AWAIT worker_release->channel_manager->immediate_send_payload(
-                        prefix.version,
-                        tcp::init_server_channel_response {rpc::error::OK(),
+                        prefix.version, message_direction::receive,
+                        tcp::init_client_channel_response {rpc::error::OK(),
                                                            output_interface.destination_zone_id.get_val(),
                                                            output_interface.object_id.get_val(), 0},
                         prefix.sequence_number);
@@ -199,6 +122,7 @@ namespace rpc::tcp
                 CO_RETURN;
             }
         }
+        
         coro::task<void> run_listener(rpc::shared_ptr<rpc::service> service)
         {
             // Start by creating a tcp server, we'll do this before putting it into the scheduler so
