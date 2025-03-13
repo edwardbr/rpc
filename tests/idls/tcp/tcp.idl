@@ -9,9 +9,17 @@ namespace rpc
 {
     namespace tcp
     {
+        enum message_direction
+        {
+            send = 1,
+            receive = 2,
+            one_way = 3
+        };
+        
         struct envelope_prefix
         {
             uint64_t version;
+            message_direction direction;
             uint64_t sequence_number;
             uint64_t payload_size;
         };
@@ -40,8 +48,6 @@ namespace rpc
         
         struct init_client_channel_send
         {
-            // a collision proof random number that is used to identify the client that generated it
-            uint64_t random_number_id;
             // the zone id of the caller derived from the caller
             uint64_t caller_zone_id;
             // the object id of the callback object from the caller
@@ -51,18 +57,6 @@ namespace rpc
         };
         
         struct init_client_channel_response
-        {
-            int err_code;
-        };
-        
-        struct init_server_channel_send
-        {
-            // a collision proof random number that is used to identify the client that generated it, and to link 
-            // it to the the client channel as a pair of channels
-            uint64_t random_number_id;
-        };
-        
-        struct init_server_channel_response
         {
             int err_code;
             // the destination zone id derived from the destination

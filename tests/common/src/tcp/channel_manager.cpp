@@ -6,54 +6,9 @@ namespace rpc::tcp
     // this method sends queued requests to other peers and receives responses notifying the proxy when complete
     CORO_TASK(void) channel_manager::pump_send_and_receive()
     {
-        assert(mode_ == mode::not_set);
-        mode_ = mode::pushing;
-
         assert(client_.socket().is_valid());
 
         // std::string msg("pump_send_and_receive ");
-        // msg += std::to_string(service_->get_zone_id().get_val());
-        // msg += " fd = ";
-        // msg += std::to_string(client_.socket().native_handle());
-        // LOG_CSTR(msg.c_str());
-
-        co_await pump_messages(
-            [this](envelope_prefix prefix, envelope_payload payload) -> coro::task<int>
-            {
-                // now find the relevant event handler and set its values before triggering it
-                result_listener* result = nullptr;
-                {
-                    std::scoped_lock lock(pending_transmits_mtx_);
-                    auto it = pending_transmits_.find(prefix.sequence_number);
-                    assert(it != pending_transmits_.end());
-                    result = it->second;
-                    pending_transmits_.erase(it);
-                }
-
-                result->prefix = std::move(prefix);
-                result->payload = std::move(payload);
-
-                // std::string msg("pump_send_and_receive prefix.sequence_number ");
-                // msg += std::to_string(service_->get_zone_id().get_val());
-                // msg += "\n prefix = ";
-                // msg += rpc::to_yas_json<std::string>(prefix);
-                // msg += "\n payload = ";
-                // msg += rpc::to_yas_json<std::string>(result->payload);
-                // LOG_CSTR(msg.c_str());
-
-                result->error_code = rpc::error::OK();
-                result->event.set();
-                co_return rpc::error::OK();
-            });
-    }
-
-    coro::task<void> channel_manager::pump_stub_receive_and_send()
-    {
-        assert(mode_ == mode::not_set);
-        mode_ = mode::pulling;
-        assert(client_.socket().is_valid());
-
-        // std::string msg("pump_stub_receive_and_send ");
         // msg += std::to_string(service_->get_zone_id().get_val());
         // msg += " fd = ";
         // msg += std::to_string(client_.socket().native_handle());
@@ -82,12 +37,9 @@ namespace rpc::tcp
                 {
                     service_->get_scheduler()->schedule(stub_handle_release(std::move(prefix), std::move(payload)));
                 }
-                else if(payload.payload_fingerprint == rpc::id<tcp::init_server_channel_response>::get(prefix.version))
+                else
                 {
-                    // this is complete the handover of initialisation inside the connecting client
-                    // it is needed here as this function now controls this connection
-
-                    // LOG_CSTR("incoming init_server_channel_response");
+                    // now find the relevant event handler and set its values before triggering it
                     result_listener* result = nullptr;
                     {
                         std::scoped_lock lock(pending_transmits_mtx_);
@@ -100,10 +52,10 @@ namespace rpc::tcp
                     result->prefix = std::move(prefix);
                     result->payload = std::move(payload);
 
-                    // std::string msg("pump_stub_receive_and_send prefix.sequence_number ");
+                    // std::string msg("pump_send_and_receive prefix.sequence_number ");
                     // msg += std::to_string(service_->get_zone_id().get_val());
                     // msg += "\n prefix = ";
-                    // msg += rpc::to_yas_json<std::string>(result->prefix);
+                    // msg += rpc::to_yas_json<std::string>(prefix);
                     // msg += "\n payload = ";
                     // msg += rpc::to_yas_json<std::string>(result->payload);
                     // LOG_CSTR(msg.c_str());
@@ -111,14 +63,8 @@ namespace rpc::tcp
                     result->error_code = rpc::error::OK();
                     result->event.set();
                 }
-                else
-                {
-                    LOG_CSTR("incoming message");
-                    co_return rpc::error::INVALID_DATA();
-                }
                 co_return rpc::error::OK();
             });
-        worker_release_.reset();
     }
 
     CORO_TASK(void)
@@ -200,6 +146,7 @@ namespace rpc::tcp
                                 LOG_CSTR("failed invalid prefix");
                                 break;
                             }
+                            assert(prefix.direction);
                         }
                         else
                         {
@@ -244,6 +191,8 @@ namespace rpc::tcp
     {
         // LOG_CSTR("send request");
 
+        assert(prefix.direction == message_direction::send || prefix.direction == message_direction::one_way);
+
         tcp::call_send request;
         auto str_err = rpc::from_yas_compressed_binary(rpc::span(payload.payload), request);
         if(!str_err.empty())
@@ -264,8 +213,12 @@ namespace rpc::tcp
             LOG_CSTR("failed send");
         }
 
-        auto err = CO_AWAIT send_payload(
-            prefix.version, tcp::call_receive {.payload = std::move(out_buf), .err_code = ret}, prefix.sequence_number);
+        if(prefix.direction == message_direction::one_way)
+            CO_RETURN;
+
+        auto err = CO_AWAIT send_payload(prefix.version, message_direction::receive,
+                                         tcp::call_receive {.payload = std::move(out_buf), .err_code = ret},
+                                         prefix.sequence_number);
         if(err != rpc::error::OK())
         {
             LOG_CSTR("failed send_payload");
@@ -299,8 +252,8 @@ namespace rpc::tcp
             LOG_CSTR("failed try_cast");
         }
 
-        auto err
-            = CO_AWAIT send_payload(prefix.version, tcp::try_cast_receive {.err_code = ret}, prefix.sequence_number);
+        auto err = CO_AWAIT send_payload(prefix.version, message_direction::receive,
+                                         tcp::try_cast_receive {.err_code = ret}, prefix.sequence_number);
         if(err != rpc::error::OK())
         {
             LOG_CSTR("failed try_cast_send send_payload");
@@ -336,7 +289,7 @@ namespace rpc::tcp
             LOG_CSTR("failed add_ref");
         }
 
-        auto err = CO_AWAIT send_payload(prefix.version,
+        auto err = CO_AWAIT send_payload(prefix.version, message_direction::receive,
                                          tcp::addref_receive {.ref_count = ret, .err_code = rpc::error::OK()},
                                          prefix.sequence_number);
         if(err != rpc::error::OK())
@@ -371,7 +324,7 @@ namespace rpc::tcp
             LOG_CSTR("failed release");
         }
 
-        auto err = CO_AWAIT send_payload(prefix.version,
+        auto err = CO_AWAIT send_payload(prefix.version, message_direction::receive,
                                          tcp::release_receive {.ref_count = ret, .err_code = rpc::error::OK()},
                                          prefix.sequence_number);
         if(err != rpc::error::OK())
@@ -429,7 +382,6 @@ namespace rpc::tcp
     // read from the connection and fill the buffer as it has been presized
     CORO_TASK(int) channel_manager::read(std::vector<char>& buf)
     {
-        assert(mode_ == mode::not_set || mode_ == mode::pulling);
         assert(client_.socket().is_valid());
 
         std::span remaining_span(buf.begin(), buf.end());
@@ -492,7 +444,6 @@ namespace rpc::tcp
     {
         static auto envelope_prefix_saved_size = rpc::yas_binary_saved_size(envelope_prefix());
 
-        assert(mode_ == mode::not_set || mode_ == mode::pulling);
         std::vector<char> buf(envelope_prefix_saved_size, '\0');
         int err = CO_AWAIT read(buf);
         if(err != rpc::error::OK())
@@ -507,9 +458,9 @@ namespace rpc::tcp
             LOG_CSTR("failed receive_prefix from_yas_binary");
             co_return rpc::error::TRANSPORT_ERROR();
         }
+        assert(prefix.direction);
 
         // std::string msg("received prefix ");
-        // msg += mode_ == mode::not_set ? "not_set " : "pulling \n";
         // msg += "\n prefix = ";
         // msg += rpc::to_yas_json<std::string>(prefix);
         // LOG_CSTR(msg.c_str());
@@ -520,9 +471,8 @@ namespace rpc::tcp
     // read a messsage from a peer
     CORO_TASK(int)
     channel_manager::receive_anonymous_payload(envelope_prefix& prefix, envelope_payload& payload,
-                                                   uint64_t sequence_number)
+                                               uint64_t sequence_number)
     {
-        assert(mode_ == mode::not_set || mode_ == mode::pulling);
         if(sequence_number == 0)
         {
             int err = CO_AWAIT receive_prefix(prefix);
@@ -548,7 +498,6 @@ namespace rpc::tcp
             }
 
             // std::string msg("receive_anonymous_payload seq = 0 ");
-            // msg += mode_ == mode::not_set ? "not_set " : "pulling ";
             // msg += std::to_string(service_->get_zone_id().get_val());
             // msg += "\n payload = ";
             // msg += rpc::to_yas_json<std::string>(payload);
@@ -557,7 +506,6 @@ namespace rpc::tcp
         else
         {
             // std::string msg("receive_anonymous_payload seq != 0 ");
-            // msg += mode_ == mode::not_set ? "not_set " : "pulling ";
             // msg += std::to_string(service_->get_zone_id().get_val());
             // msg += " sequence_number = ";
             // msg += std::to_string(prefix.sequence_number);
@@ -577,31 +525,5 @@ namespace rpc::tcp
             payload = res_payload.payload;
         }
         co_return rpc::error::OK();
-    }
-
-    // read a messsage from a peer
-    std::function<CORO_TASK(int)(envelope_prefix&, envelope_payload&)>
-    channel_manager::register_receive_anonymous_payload(uint64_t sequence_number)
-    {
-        auto res_payload = std::make_shared<result_listener>();
-        {
-            std::scoped_lock lock(pending_transmits_mtx_);
-            auto [it, success] = pending_transmits_.try_emplace(sequence_number, res_payload.get());
-            assert(success);
-        }
-
-        auto receive_notifier
-            = [res_payload](envelope_prefix& prefix, envelope_payload& payload) -> CORO_TASK(int)
-        {
-            // std::string msg("waiting on receive_notifier");
-            // LOG_CSTR(msg.c_str());
-            co_await res_payload->event; // now wait for the reply
-            // msg = "receive_notifier ready";
-            // LOG_CSTR(msg.c_str());
-            prefix = res_payload->prefix;
-            payload = res_payload->payload;
-            co_return rpc::error::OK();
-        };
-        return receive_notifier;
     }
 }
