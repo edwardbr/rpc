@@ -9,16 +9,16 @@
 
 #include <random>
 
-#include "common/tcp_service_proxy.h"
+#include "common/tcp/service_proxy.h"
 
-namespace rpc
+namespace rpc::tcp
 {
-    tcp_service_proxy::tcp_service_proxy(const char* name, destination_zone destination_zone_id,
+    service_proxy::service_proxy(const char* name, destination_zone destination_zone_id,
                                          const rpc::shared_ptr<service>& svc,
                                          std::shared_ptr<worker_release> proxy_worker_release,
                                          std::shared_ptr<worker_release> stub_worker_release,
                                          std::chrono::milliseconds timeout, coro::net::tcp::client::options opts)
-        : service_proxy(name, destination_zone_id, svc)
+        : rpc::service_proxy(name, destination_zone_id, svc)
         , proxy_worker_release_(proxy_worker_release)
         , stub_worker_release_(stub_worker_release)
         , timeout_(timeout)
@@ -26,31 +26,31 @@ namespace rpc
     {
     }
 
-    tcp_service_proxy::~tcp_service_proxy()
+    service_proxy::~service_proxy()
     {
         proxy_worker_release_.reset();
         stub_worker_release_.reset();
     }
 
-    rpc::shared_ptr<service_proxy> tcp_service_proxy::clone()
+    rpc::shared_ptr<rpc::service_proxy> service_proxy::clone()
     {
-        return rpc::shared_ptr<service_proxy>(new tcp_service_proxy(*this));
+        return rpc::shared_ptr<rpc::service_proxy>(new service_proxy(*this));
     }
 
-    rpc::shared_ptr<tcp_service_proxy> tcp_service_proxy::create(const char* name, destination_zone destination_zone_id,
+    rpc::shared_ptr<service_proxy> service_proxy::create(const char* name, destination_zone destination_zone_id,
                                                                  const rpc::shared_ptr<service>& svc,
                                                                  std::chrono::milliseconds timeout,
                                                                  coro::net::tcp::client::options opts)
     {
         RPC_ASSERT(svc);
 
-        auto ret = rpc::shared_ptr<tcp_service_proxy>(
-            new tcp_service_proxy(name, destination_zone_id, svc, nullptr, nullptr, timeout, opts));
+        auto ret = rpc::shared_ptr<service_proxy>(
+            new service_proxy(name, destination_zone_id, svc, nullptr, nullptr, timeout, opts));
         return ret;
     }
 
-    CORO_TASK(rpc::shared_ptr<tcp_service_proxy>)
-    tcp_service_proxy::attach_remote(const char* name, const rpc::shared_ptr<service>& svc,
+    CORO_TASK(rpc::shared_ptr<service_proxy>)
+    service_proxy::attach_remote(const char* name, const rpc::shared_ptr<service>& svc,
                                      destination_zone destination_zone_id,
                                      std::shared_ptr<worker_release> proxy_worker_release,
                                      std::shared_ptr<worker_release> stub_worker_release)
@@ -63,8 +63,8 @@ namespace rpc
         // msg += std::to_string(destination_zone_id.get_val());
         // LOG_CSTR(msg.c_str());
 
-        auto ret = rpc::shared_ptr<tcp_service_proxy>(
-            new tcp_service_proxy(name, destination_zone_id, svc, proxy_worker_release, stub_worker_release,
+        auto ret = rpc::shared_ptr<service_proxy>(
+            new service_proxy(name, destination_zone_id, svc, proxy_worker_release, stub_worker_release,
                                   std::chrono::milliseconds(0), coro::net::tcp::client::options()));
 
         if(!svc->get_scheduler()->schedule(stub_worker_release->channel_manager->pump_stub_receive_and_send()))
@@ -83,7 +83,7 @@ namespace rpc
     }
 
     CORO_TASK(int)
-    tcp_service_proxy::connect(rpc::interface_descriptor input_descr, rpc::interface_descriptor& output_descr)
+    service_proxy::connect(rpc::interface_descriptor input_descr, rpc::interface_descriptor& output_descr)
     {
         // std::string msg("connect ");
         // msg += std::to_string(get_zone_id().get_val());
@@ -112,7 +112,7 @@ namespace rpc
                 CO_RETURN rpc::error::SERVICE_PROXY_LOST_CONNECTION();
             }
 
-            proxy_worker_release->channel_manager = std::make_shared<tcp_channel_manager>(
+            proxy_worker_release->channel_manager = std::make_shared<channel_manager>(
                 std::move(proxy_client), timeout_, proxy_worker_release, get_operating_zone_service());
         }
 
@@ -129,7 +129,7 @@ namespace rpc
                 CO_RETURN rpc::error::SERVICE_PROXY_LOST_CONNECTION();
             }
 
-            stub_worker_release->channel_manager = std::make_shared<tcp_channel_manager>(
+            stub_worker_release->channel_manager = std::make_shared<channel_manager>(
                 std::move(stub_client), timeout_, stub_worker_release, get_operating_zone_service());
         }
 
@@ -187,8 +187,8 @@ namespace rpc
             }
 
             // now wait for the response
-            tcp::envelope_prefix prefix;
-            tcp::envelope_payload payload;
+            envelope_prefix prefix;
+            envelope_payload payload;
             ret = CO_AWAIT receive_awaitable(prefix, payload);
             if(ret != rpc::error::OK())
             {
@@ -220,7 +220,7 @@ namespace rpc
     }
 
     CORO_TASK(int)
-    tcp_service_proxy::send(uint64_t protocol_version, encoding encoding, uint64_t tag,
+    service_proxy::send(uint64_t protocol_version, encoding encoding, uint64_t tag,
                             caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id,
                             destination_zone destination_zone_id, object object_id, interface_ordinal interface_id,
                             method method_id, size_t in_size_, const char* in_buf_, std::vector<char>& out_buf_)
@@ -231,13 +231,13 @@ namespace rpc
 
         if(destination_zone_id != get_destination_zone_id())
         {
-            LOG_CSTR("failed tcp_service_proxy::send ZONE_NOT_SUPPORTED");
+            LOG_CSTR("failed service_proxy::send ZONE_NOT_SUPPORTED");
             CO_RETURN rpc::error::ZONE_NOT_SUPPORTED();
         }
 
         if(!proxy_worker_release_)
         {
-            LOG_CSTR("failed tcp_service_proxy::send SERVICE_PROXY_LOST_CONNECTION");
+            LOG_CSTR("failed service_proxy::send SERVICE_PROXY_LOST_CONNECTION");
             CO_RETURN rpc::error::SERVICE_PROXY_LOST_CONNECTION();
         }
 
@@ -256,7 +256,7 @@ namespace rpc
             call_receive);
         if(ret != rpc::error::OK())
         {
-            LOG_CSTR("failed tcp_service_proxy::send call_send");
+            LOG_CSTR("failed service_proxy::send call_send");
             CO_RETURN ret;
         }
 
@@ -270,7 +270,7 @@ namespace rpc
     }
 
     CORO_TASK(int)
-    tcp_service_proxy::try_cast(uint64_t protocol_version, destination_zone destination_zone_id, object object_id,
+    service_proxy::try_cast(uint64_t protocol_version, destination_zone destination_zone_id, object object_id,
                                 interface_ordinal interface_id)
     {
         // std::string msg("try_cast ");
@@ -306,10 +306,10 @@ namespace rpc
     }
 
     CORO_TASK(uint64_t)
-    tcp_service_proxy::add_ref(uint64_t protocol_version, destination_channel_zone destination_channel_zone_id,
+    service_proxy::add_ref(uint64_t protocol_version, destination_channel_zone destination_channel_zone_id,
                                destination_zone destination_zone_id, object object_id,
                                caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id,
-                               add_ref_options build_out_param_channel)
+                               rpc::add_ref_options build_out_param_channel)
     {
         // auto msg = std::string("add_ref ");
         // msg += std::to_string(get_zone_id().get_val());
@@ -367,7 +367,7 @@ namespace rpc
     }
 
     CORO_TASK(uint64_t)
-    tcp_service_proxy::release(uint64_t protocol_version, destination_zone destination_zone_id, object object_id,
+    service_proxy::release(uint64_t protocol_version, destination_zone destination_zone_id, object object_id,
                                caller_zone caller_zone_id)
     {
         constexpr auto add_ref_failed_val = std::numeric_limits<uint64_t>::max();

@@ -21,8 +21,8 @@
 #ifdef USE_RPC_TELEMETRY
 #include <rpc/telemetry/host_telemetry_service.h>
 #endif
-#include "common/tcp_service_proxy.h"
-#include "common/tcp_listener.h"
+#include "common/tcp/service_proxy.h"
+#include "common/tcp/listener.h"
 
 #include <rpc/coroutine_support.h>
 
@@ -471,7 +471,7 @@ class tcp_setup
     rpc::shared_ptr<rpc::service> root_service_;
     rpc::shared_ptr<rpc::service> peer_service_;
     
-    std::shared_ptr<rpc::tcp_listener<yyy::i_host, yyy::i_example>> peer_listener_;
+    std::shared_ptr<rpc::tcp::listener<yyy::i_host, yyy::i_example>> peer_listener_;
     rpc::shared_ptr<yyy::i_host> i_host_ptr_;
     rpc::weak_ptr<yyy::i_host> local_host_ptr_;
     rpc::shared_ptr<yyy::i_example> i_example_ptr_;
@@ -494,7 +494,7 @@ public:
     virtual ~tcp_setup() = default;
 
     rpc::shared_ptr<rpc::service> get_root_service() const {return root_service_;}
-    std::shared_ptr<rpc::tcp_listener<yyy::i_host, yyy::i_example>> get_peer_listener() const {return peer_listener_;};
+    std::shared_ptr<rpc::tcp::listener<yyy::i_host, yyy::i_example>> get_peer_listener() const {return peer_listener_;};
     bool get_has_enclave() const {return has_enclave_;}
     bool is_enclave_setup() const {return false;}
     rpc::shared_ptr<yyy::i_example> get_example() const {return i_example_ptr_;}
@@ -529,7 +529,7 @@ public:
         peer_service_ = rpc::make_shared<rpc::service>("peer", peer_zone_id, io_scheduler_);
         peer_service_->add_service_logger(std::make_shared<test_service_logger>());
         
-        peer_listener_ = std::make_shared<rpc::tcp_listener<yyy::i_host, yyy::i_example>>(
+        peer_listener_ = std::make_shared<rpc::tcp::listener<yyy::i_host, yyy::i_example>>(
             [](const rpc::shared_ptr<yyy::i_host>& host, rpc::shared_ptr<yyy::i_example>& new_example,
                const rpc::shared_ptr<rpc::service>& child_service_ptr) -> CORO_TASK(int)
             {
@@ -549,7 +549,7 @@ public:
         
         
         
-        auto ret = CO_AWAIT root_service_->connect_to_zone<rpc::tcp_service_proxy> (
+        auto ret = CO_AWAIT root_service_->connect_to_zone<rpc::tcp::service_proxy> (
             "main child"
             , peer_zone_id.as_destination()
             , hst
