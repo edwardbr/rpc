@@ -3,16 +3,27 @@
 
 namespace rpc::tcp
 {
-    // this method sends queued requests to other peers and receives responses notifying the proxy when complete
+    /// Manages sending queued requests to other peers and receiving responses.
+    /// This method is responsible for the bidirectional communication flow between peers.
+    ///
+    /// The method:
+    /// - Sends queued requests to other peers
+    /// - Receives and processes responses
+    /// - Notifies the service proxy when operations complete
+    /// - Handles different message types (calls, try casts, reference counting)
+    ///
+    /// The supported message types are:
+    /// - call_send: For remote procedure calls
+    /// - try_cast_send: For type casting attempts
+    /// - addref_send: For reference counting increments
+    /// - release_send: For reference counting decrements
+    /// - fulfils promises for pending awaits on sent messages to the peer
+    ///
+    /// @note This method runs as a coroutine task and depends on a valid socket connection
+    
     CORO_TASK(void) channel_manager::pump_send_and_receive()
     {
         assert(client_.socket().is_valid());
-
-        // std::string msg("pump_send_and_receive ");
-        // msg += std::to_string(service_->get_zone_id().get_val());
-        // msg += " fd = ";
-        // msg += std::to_string(client_.socket().native_handle());
-        // LOG_CSTR(msg.c_str());
 
         co_await pump_messages(
             [this](envelope_prefix prefix, envelope_payload payload) -> coro::task<int>
@@ -51,21 +62,33 @@ namespace rpc::tcp
 
                     result->prefix = std::move(prefix);
                     result->payload = std::move(payload);
-
-                    // std::string msg("pump_send_and_receive prefix.sequence_number ");
-                    // msg += std::to_string(service_->get_zone_id().get_val());
-                    // msg += "\n prefix = ";
-                    // msg += rpc::to_yas_json<std::string>(prefix);
-                    // msg += "\n payload = ";
-                    // msg += rpc::to_yas_json<std::string>(result->payload);
-                    // LOG_CSTR(msg.c_str());
-
                     result->error_code = rpc::error::OK();
                     result->event.set();
                 }
                 co_return rpc::error::OK();
             });
     }
+
+    /// Continuously pumps messages between peers, handling both sending queued messages and receiving incoming ones.
+    /// This is a core communication loop that manages the bidirectional flow of RPC messages.
+    ///
+    /// @param incoming_message_handler A callback function that processes received messages.
+    ///        It takes an envelope_prefix and envelope_payload as parameters and returns a coroutine task with an int
+    ///        result.
+    ///
+    /// The method performs the following operations:
+    /// - Sends queued messages from send_queue_ when the socket is ready for writing
+    /// - Receives incoming messages in two parts: prefix and payload
+    /// - Handles socket polling and network errors
+    /// - Manages partial reads and writes
+    /// - Processes received messages through the provided handler
+    /// - Cancels pending transmissions if the connection is lost
+    ///
+    /// The message format consists of:
+    /// 1. A fixed-size envelope prefix containing metadata
+    /// 2. A variable-size payload containing the actual message data
+    ///
+    /// @note This method runs until worker_release_ is unlocked or a fatal error occurs
 
     CORO_TASK(void)
     channel_manager::pump_messages(
@@ -81,15 +104,40 @@ namespace rpc::tcp
         std::vector<char> buf;
         std::span remaining_span(buf.begin(), buf.end());
 
-        auto zone = service_->get_zone_id().get_val();
-        std::ignore = zone;
-
         while(worker_release_.lock())
         {
-            auto err = co_await flush_send_queue();
-            if(err != rpc::error::OK())
+            auto scoped_lock = co_await send_queue_mtx_.lock();
+            bool failed = false;
+            while(!send_queue_.empty())
             {
-                LOG_CSTR("failed flush_send_queue");
+                auto& item = send_queue_.front();
+                auto marshal_status = client_.send(std::span {(const char*)item.data(), item.size()});
+                if(marshal_status.first == coro::net::send_status::try_again)
+                {
+                    auto status = co_await client_.poll(coro::poll_op::write, std::chrono::milliseconds(1));
+                    if(status == coro::poll_status::timeout)
+                    {
+                        break;
+                    }
+                    if(status != coro::poll_status::event)
+                    {
+                        failed = true;
+                        break;
+                    }
+
+                    marshal_status = client_.send(std::span {(const char*)item.data(), item.size()});
+                }
+                if(marshal_status.first != coro::net::send_status::ok)
+                {
+                    LOG_CSTR("failed to send data to peer");
+                    failed = true;
+
+                    break;
+                }
+                send_queue_.pop();
+            }
+            if(failed)
+            {
                 break;
             }
 
@@ -335,48 +383,6 @@ namespace rpc::tcp
         }
         // LOG_CSTR("release request complete");
         CO_RETURN;
-    }
-
-    CORO_TASK(int) channel_manager::flush_send_queue()
-    {
-        auto scoped_lock = co_await send_queue_mtx_.lock();
-        while(!send_queue_.empty())
-        {
-            auto& item = send_queue_.front();
-            auto marshal_status = client_.send(std::span {(const char*)item.data(), item.size()});
-            if(marshal_status.first == coro::net::send_status::try_again)
-            {
-                auto status = co_await client_.poll(coro::poll_op::write, std::chrono::milliseconds(1));
-                if(status == coro::poll_status::timeout)
-                {
-                    break;
-                }
-                if(status != coro::poll_status::event)
-                {
-                    // std::string msg("client_.poll failed ");
-                    // msg += std::to_string(service_->get_zone_id().get_val());
-                    // msg += " fd = ";
-                    // msg += std::to_string(client_.socket().native_handle());
-                    // LOG_CSTR(msg.c_str());
-
-                    CO_RETURN rpc::error::SERVICE_PROXY_LOST_CONNECTION();
-                }
-
-                marshal_status = client_.send(std::span {(const char*)item.data(), item.size()});
-            }
-            if(marshal_status.first != coro::net::send_status::ok)
-            {
-                // std::string msg("client_.send failed ");
-                // msg += std::to_string(service_->get_zone_id().get_val());
-                // msg += " fd = ";
-                // msg += std::to_string(client_.socket().native_handle());
-                // LOG_CSTR(msg.c_str());
-
-                CO_RETURN rpc::error::SERVICE_PROXY_LOST_CONNECTION();
-            }
-            send_queue_.pop();
-        }
-        CO_RETURN rpc::error::OK();
     }
 
     // read from the connection and fill the buffer as it has been presized
