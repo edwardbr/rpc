@@ -10,8 +10,8 @@ function(
   # multivalue expects string "dependencies" multivalue expects string "link_libraries" multivalue expects string
   # "include_paths" multivalue expects string "defines" multivalue expects string "additional_headers" optional_val mock
 )
-  set(options)
-  set(singleValueArgs mock suppress_catch_stub_exceptions generated_install_dir)
+  set(options suppress_catch_stub_exceptions)
+  set(singleValueArgs mock install_dir)
   set(multiValueArgs
     dependencies
     link_libraries
@@ -63,8 +63,8 @@ function(
     message("output_path ${output_path}")
     message("sub_directory ${sub_directory}")
     message("namespace ${namespace}")
-    message("suppress_catch_stub_exceptions ${suppress_catch_stub_exceptions}")
-    message("generated_install_dir ${generated_install_dir}")
+    message("suppress_catch_stub_exceptions ${params_suppress_catch_stub_exceptions}")
+    message("install_dir ${params_install_dir}")
     message("dependencies ${params_dependencies}")
     message("link_libraries ${params_link_libraries}")
     message("additional_headers ${params_additional_headers}")
@@ -300,8 +300,8 @@ function(
       endforeach()
     endif()
 
-    install(DIRECTORY \"$<BUILD_INTERFACE:${output_path}>\" DESTINATION ${params_generated_install_dir})
-    install(FILES \"$<BUILD_INTERFACE:${idl}>\" DESTINATION ${params_generated_install_dir}/${idl_relative_dir})
+    install(DIRECTORY \"$<BUILD_INTERFACE:${output_path}>\" DESTINATION ${params_install_dir})
+    install(FILES \"$<BUILD_INTERFACE:${idl}>\" DESTINATION ${params_install_dir}/${idl_relative_dir})
     ")
     endif()
 
@@ -377,8 +377,8 @@ function(
       endforeach()
     endif()
 
-    if(params_generated_install_dir)
-      install(DIRECTORY "$<BUILD_INTERFACE:${output_path}>" DESTINATION ${params_generated_install_dir})
-      install(FILES "$<BUILD_INTERFACE:${idl}>" DESTINATION ${params_generated_install_dir}/${idl_relative_dir})
+    if(params_install_dir)
+      install(DIRECTORY "$<BUILD_INTERFACE:${output_path}>" DESTINATION ${params_install_dir})
+      install(FILES "$<BUILD_INTERFACE:${idl}>" DESTINATION ${params_install_dir}/${idl_relative_dir})
     endif()
 endfunction()
