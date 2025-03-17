@@ -47,7 +47,6 @@ namespace rpc::tcp
 
         CORO_TASK(void)
         pump_messages(std::function<CORO_TASK(int)(envelope_prefix, envelope_payload)> incoming_message_handler);
-        CORO_TASK(int) flush_send_queue();
 
         CORO_TASK(void) stub_handle_send(envelope_prefix prefix, envelope_payload payload);
         CORO_TASK(void) stub_handle_try_cast(envelope_prefix prefix, envelope_payload payload);
