@@ -4,8 +4,18 @@
 
 namespace rpc::spsc
 {
+    std::shared_ptr<channel_manager> channel_manager::create(std::chrono::milliseconds timeout, rpc::shared_ptr<rpc::service> service,
+                queue_type* send_spsc_queue,
+                queue_type* receive_spsc_queue,
+                channel_manager::connection_handler handler)
+    {
+        auto channel = std::shared_ptr<channel_manager>(new channel_manager(timeout, service, send_spsc_queue, receive_spsc_queue, handler));
+        channel->keep_alive_ = channel;
+        return channel;
+    }
+                
     // this method sends queued requests to other peers and receives responses notifying the proxy when complete
-    CORO_TASK(void) channel_manager::pump_send_and_receive()
+    bool channel_manager::pump_send_and_receive()
     {
         // std::string msg("pump_send_and_receive ");
         // msg += std::to_string(service_->get_zone_id().get_val());
@@ -13,63 +23,71 @@ namespace rpc::spsc
         // msg += std::to_string(client_.socket().native_handle());
         // LOG_CSTR(msg.c_str());
 
-        co_await pump_messages(
-            [this](tcp::envelope_prefix prefix, tcp::envelope_payload payload) -> coro::task<int>
+
+        auto foo = [this](tcp::envelope_prefix prefix, tcp::envelope_payload payload) -> coro::task<int>
+        {
+            // do a call
+            if(payload.payload_fingerprint == rpc::id<tcp::call_send>::get(prefix.version))
             {
-                // do a call
-                if(payload.payload_fingerprint == rpc::id<tcp::call_send>::get(prefix.version))
+                service_->get_scheduler()->schedule(stub_handle_send(std::move(prefix), std::move(payload)));
+            }
+            // do a try cast
+            else if(payload.payload_fingerprint == rpc::id<tcp::try_cast_send>::get(prefix.version))
+            {
+                service_->get_scheduler()->schedule(stub_handle_try_cast(std::move(prefix), std::move(payload)));
+            }
+            // do an add_ref
+            else if(payload.payload_fingerprint == rpc::id<tcp::addref_send>::get(prefix.version))
+            {
+                service_->get_scheduler()->schedule(stub_handle_add_ref(std::move(prefix), std::move(payload)));
+            }
+            // do a release
+            else if(payload.payload_fingerprint == rpc::id<tcp::release_send>::get(prefix.version))
+            {
+                service_->get_scheduler()->schedule(stub_handle_release(std::move(prefix), std::move(payload)));
+            }
+            // create the service proxy
+            else if(payload.payload_fingerprint == rpc::id<tcp::init_client_channel_send>::get(prefix.version))
+            {
+                service_->get_scheduler()->schedule(create_stub(std::move(prefix), std::move(payload)));
+            }
+            // do a try cast
+            else
+            {
+                // now find the relevant event handler and set its values before triggering it
+                result_listener* result = nullptr;
                 {
-                    service_->get_scheduler()->schedule(stub_handle_send(std::move(prefix), std::move(payload)));
+                    std::scoped_lock lock(pending_transmits_mtx_);
+                    auto it = pending_transmits_.find(prefix.sequence_number);
+                    assert(it != pending_transmits_.end());
+                    result = it->second;
+                    pending_transmits_.erase(it);
                 }
-                // do a try cast
-                else if(payload.payload_fingerprint == rpc::id<tcp::try_cast_send>::get(prefix.version))
-                {
-                    service_->get_scheduler()->schedule(stub_handle_try_cast(std::move(prefix), std::move(payload)));
-                }
-                // do an add_ref
-                else if(payload.payload_fingerprint == rpc::id<tcp::addref_send>::get(prefix.version))
-                {
-                    service_->get_scheduler()->schedule(stub_handle_add_ref(std::move(prefix), std::move(payload)));
-                }
-                // do a release
-                else if(payload.payload_fingerprint == rpc::id<tcp::release_send>::get(prefix.version))
-                {
-                    service_->get_scheduler()->schedule(stub_handle_release(std::move(prefix), std::move(payload)));
-                }
-                // create the service proxy
-                if(payload.payload_fingerprint == rpc::id<tcp::init_client_channel_send>::get(prefix.version))
-                {
-                    service_->get_scheduler()->schedule(create_stub(std::move(prefix), std::move(payload)));
-                }
-                // do a try cast
-                else
-                {
-                    // now find the relevant event handler and set its values before triggering it
-                    result_listener* result = nullptr;
-                    {
-                        std::scoped_lock lock(pending_transmits_mtx_);
-                        auto it = pending_transmits_.find(prefix.sequence_number);
-                        assert(it != pending_transmits_.end());
-                        result = it->second;
-                        pending_transmits_.erase(it);
-                    }
 
-                    result->prefix = std::move(prefix);
-                    result->payload = std::move(payload);
+                result->prefix = std::move(prefix);
+                result->payload = std::move(payload);
 
-                    // std::string msg("pump_send_and_receive prefix.sequence_number ");
-                    // msg += std::to_string(service_->get_zone_id().get_val());
-                    // msg += "\n prefix = ";
-                    // msg += rpc::to_yas_json<std::string>(prefix);
-                    // msg += "\n payload = ";
-                    // msg += rpc::to_yas_json<std::string>(result->payload);
-                    // LOG_CSTR(msg.c_str());
+                // std::string msg("pump_send_and_receive prefix.sequence_number ");
+                // msg += std::to_string(service_->get_zone_id().get_val());
+                // msg += "\n prefix = ";
+                // msg += rpc::to_yas_json<std::string>(prefix);
+                // msg += "\n payload = ";
+                // msg += rpc::to_yas_json<std::string>(result->payload);
+                // LOG_CSTR(msg.c_str());
 
-                    result->error_code = rpc::error::OK();
-                    result->event.set();
-                }
-                co_return rpc::error::OK();
-            });
+                result->error_code = rpc::error::OK();
+                result->event.set();
+            }
+            co_return rpc::error::OK();
+        };
+
+        return service_->get_scheduler()->schedule(pump_messages(foo));
+    }
+
+    CORO_TASK(void) channel_manager::shutdown()
+    {
+        shutdown_ = true;
+        co_await shutdown_event_;
     }
 
     CORO_TASK(void)
@@ -92,7 +110,7 @@ namespace rpc::spsc
         bool no_pending_send = false;
         bool incoming_queue_empty = false;
 
-        while(worker_release_.lock())
+        while(shutdown_ == false)
         {
             no_pending_send = false;
             if(retry_send_blob)
@@ -235,6 +253,8 @@ namespace rpc::spsc
                 CO_AWAIT service_->get_scheduler()->schedule();
             incoming_queue_empty = false;
         }
+        
+        CO_AWAIT service_->get_scheduler()->schedule_after(std::chrono::milliseconds(100));
 
         {
             std::scoped_lock lock(pending_transmits_mtx_);
@@ -243,12 +263,14 @@ namespace rpc::spsc
                 it.second->error_code = rpc::error::CALL_CANCELLED();
                 it.second->event.set();
             }
-        }
+        }   
+        shutdown_event_.set();
+        keep_alive_ = nullptr;
     }
     // do a try cast
     CORO_TASK(void) channel_manager::stub_handle_send(tcp::envelope_prefix prefix, tcp::envelope_payload payload)
     {
-        // LOG_CSTR("send request");
+        LOG_CSTR("send request");
 
         assert(prefix.direction == tcp::message_direction::send || prefix.direction == tcp::message_direction::one_way);
 
@@ -326,7 +348,7 @@ namespace rpc::spsc
     // do an add_ref
     CORO_TASK(void) channel_manager::stub_handle_add_ref(tcp::envelope_prefix prefix, tcp::envelope_payload payload)
     {
-        // LOG_CSTR("add_ref request");
+        LOG_CSTR("add_ref request");
 
         tcp::addref_send request;
         auto str_err = rpc::from_yas_compressed_binary(rpc::span(payload.payload), request);
@@ -364,7 +386,7 @@ namespace rpc::spsc
     // do a release
     CORO_TASK(void) channel_manager::stub_handle_release(tcp::envelope_prefix prefix, tcp::envelope_payload payload)
     {
-        // LOG_CSTR("release request");
+        LOG_CSTR("release request");
         tcp::release_send request;
         auto str_err = rpc::from_yas_compressed_binary(rpc::span(payload.payload), request);
         if(!str_err.empty())
@@ -398,9 +420,9 @@ namespace rpc::spsc
 
     CORO_TASK(void) channel_manager::create_stub(tcp::envelope_prefix prefix, tcp::envelope_payload payload)
     {
-        // std::string msg("run_client init_client_channel_send ");
-        // msg += std::to_string(service->get_zone_id().get_val());
-        // LOG_CSTR(msg.c_str());
+        std::string msg("run_client init_client_channel_send ");
+        msg += std::to_string(service_->get_zone_id().get_val());
+        LOG_CSTR(msg.c_str());
 
         tcp::init_client_channel_send request;
         auto err = rpc::from_yas_compressed_binary(rpc::span(payload.payload), request);
@@ -410,7 +432,8 @@ namespace rpc::spsc
             CO_RETURN;
         }
         tcp::init_client_channel_response response;
-        int ret = co_await connection_handler_(request, response, service_);
+        int ret = co_await connection_handler_(request, response, service_, keep_alive_);
+        connection_handler_ = nullptr; // handover references etc
         if(ret != rpc::error::OK())
         {
             // report error

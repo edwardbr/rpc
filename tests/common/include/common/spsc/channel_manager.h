@@ -12,11 +12,6 @@ namespace rpc::spsc
 {
     class channel_manager;
 
-    struct worker_release
-    {
-        std::shared_ptr<channel_manager> channel_manager;
-    };
-
     using message_blob = std::array<uint8_t, 1024>;
     using queue_type = ::spsc::queue<message_blob, 1024>;
     
@@ -26,8 +21,23 @@ namespace rpc::spsc
         using connection_handler
             = std::function<CORO_TASK(int)(rpc::tcp::init_client_channel_send request,
                                            rpc::tcp::init_client_channel_response& response,
-                                           const rpc::shared_ptr<rpc::service>& child_service_ptr)>;
+                                           rpc::shared_ptr<rpc::service> child_service_ptr,
+                                           std::shared_ptr<channel_manager>)>;
     private:
+    
+    
+        channel_manager(std::chrono::milliseconds timeout, rpc::shared_ptr<rpc::service> service,
+                        queue_type* send_spsc_queue,
+                        queue_type* receive_spsc_queue,
+                        connection_handler handler
+                    )
+            : send_spsc_queue_(send_spsc_queue)
+            , receive_spsc_queue_(receive_spsc_queue)
+            , timeout_(timeout)
+            , service_(service)
+            , connection_handler_(handler)
+        {}
+    
         struct result_listener
         {
             coro::event event;
@@ -43,7 +53,6 @@ namespace rpc::spsc
         queue_type* send_spsc_queue_;
         queue_type* receive_spsc_queue_;
         std::chrono::milliseconds timeout_;
-        std::weak_ptr<worker_release> worker_release_;
 
         std::atomic<uint64_t> sequence_number_ = 0;
 
@@ -53,6 +62,9 @@ namespace rpc::spsc
         rpc::shared_ptr<rpc::service> service_;
 
         connection_handler connection_handler_;
+        coro::event shutdown_event_;
+        bool shutdown_ = false;
+        std::shared_ptr<channel_manager> keep_alive_;
         
         CORO_TASK(void)
         pump_messages(std::function<CORO_TASK(int)(tcp::envelope_prefix, tcp::envelope_payload)> incoming_message_handler);
@@ -67,24 +79,15 @@ namespace rpc::spsc
         void kill_connection() { }
 
     public:
-    
-        channel_manager(std::chrono::milliseconds timeout,
-                        std::weak_ptr<worker_release> worker_release, rpc::shared_ptr<rpc::service> service,
+        
+        static std::shared_ptr<channel_manager> create(std::chrono::milliseconds timeout, rpc::shared_ptr<rpc::service> service,
                         queue_type* send_spsc_queue,
                         queue_type* receive_spsc_queue,
-                        connection_handler handler
-                    )
-            : send_spsc_queue_(send_spsc_queue)
-            , receive_spsc_queue_(receive_spsc_queue)
-            , timeout_(timeout)
-            , worker_release_(worker_release)
-            , service_(service)
-            , connection_handler_(handler)
-        {}
+                        connection_handler handler);
 
-        ~channel_manager() { }
-
-        CORO_TASK(void) pump_send_and_receive();
+        bool pump_send_and_receive();
+        
+        CORO_TASK(void) shutdown();
 
         // send a message to a peer
         template<class SendPayload>

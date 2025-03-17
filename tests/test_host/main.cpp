@@ -734,14 +734,12 @@ public:
         peer_service_ = rpc::make_shared<rpc::service>("peer", peer_zone_id, io_scheduler_);
         peer_service_->add_service_logger(std::make_shared<test_service_logger>());
 
-        auto worker_release = std::make_shared<rpc::spsc::worker_release>();
-
         // This makes the receiving service proxy for the connection
         rpc::spsc::channel_manager::connection_handler handler
-            = [peer_service = peer_service_, worker_release, send_spsc_queue = &send_spsc_queue_,
+            = [peer_service = peer_service_, send_spsc_queue = &send_spsc_queue_,
                receive_spsc_queue = &receive_spsc_queue_, use_host_in_child = use_host_in_child_](
                   rpc::tcp::init_client_channel_send request, rpc::tcp::init_client_channel_response& init_response,
-                  const rpc::shared_ptr<rpc::service>&) -> CORO_TASK(int)
+                  rpc::shared_ptr<rpc::service>, std::shared_ptr<rpc::spsc::channel_manager> channel) -> CORO_TASK(int)
         {
             rpc::destination_zone destination_zone_id {request.caller_zone_id};
             rpc::interface_descriptor output_interface;
@@ -757,7 +755,7 @@ public:
                         CO_AWAIT new_example->set_host(host);
                     CO_RETURN rpc::error::OK();
                 },
-                destination_zone_id, worker_release, send_spsc_queue, receive_spsc_queue);
+                destination_zone_id, channel, send_spsc_queue, receive_spsc_queue);
             if(ret != rpc::error::OK())
             {
                 // report error
@@ -770,13 +768,12 @@ public:
                                                                     output_interface.object_id.get_val(), 0};
             co_return rpc::error::OK();
         };
-
-        worker_release->channel_manager = std::make_shared<rpc::spsc::channel_manager>(
-            std::chrono::milliseconds(1000), worker_release, peer_service_,
+        auto channel = rpc::spsc::channel_manager::create(
+            std::chrono::milliseconds(1000), peer_service_,
             &receive_spsc_queue_, // these two parameters are reversed for the receiver
             &send_spsc_queue_,    // these two parameters are reversed for the receiver
             handler);
-        io_scheduler_->schedule(worker_release->channel_manager->pump_send_and_receive()); // get the receiver pump going
+        channel->pump_send_and_receive(); // get the receiver pump going
 
         rpc::shared_ptr<yyy::i_host> hst(new host(root_service_->get_zone_id()));
         local_host_ptr_ = hst; // assign to weak ptr
@@ -823,23 +820,24 @@ public:
             co_await io_scheduler_->schedule();
         while(!root_service_->has_service_proxies())
             co_await io_scheduler_->schedule();
-        peer_service_.reset();
-        root_service_.reset();
-        zone_gen = nullptr;
-#ifdef USE_RPC_TELEMETRY
-        RESET_TELEMETRY_SERVICE
-#endif
-        has_stopped_ = true;
+            
+        // has_stopped_ = true;
         CO_RETURN;
     }
 
     virtual void TearDown()
     {
         io_scheduler_->schedule(CoroTearDown());
-        while(has_stopped_ == false)
+        while(!io_scheduler_->empty())
         {
-            io_scheduler_->process_events(std::chrono::milliseconds(1000000));
+            io_scheduler_->process_events(std::chrono::milliseconds(10));
         }
+        peer_service_.reset();
+        root_service_.reset();
+        zone_gen = nullptr;
+#ifdef USE_RPC_TELEMETRY
+        RESET_TELEMETRY_SERVICE
+#endif
         // SYNC_WAIT(CoroTearDown());
     }
 
