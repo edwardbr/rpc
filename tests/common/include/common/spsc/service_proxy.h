@@ -18,7 +18,7 @@ namespace rpc::spsc
     class service_proxy : public rpc::service_proxy
     {
         service_proxy(const char* name, destination_zone destination_zone_id, const rpc::shared_ptr<service>& svc,
-                      std::shared_ptr<rpc::spsc::worker_release> connection, std::chrono::milliseconds timeout,
+                      std::shared_ptr<rpc::spsc::channel_manager> channel_manager, std::chrono::milliseconds timeout,
                       queue_type* send_spsc_queue, queue_type* receive_spsc_queue);
 
         service_proxy(const service_proxy& other) = default;
@@ -32,7 +32,7 @@ namespace rpc::spsc
 
         static CORO_TASK(rpc::shared_ptr<service_proxy>)
             attach_remote(const char* name, const rpc::shared_ptr<service>& svc, destination_zone destination_zone_id,
-                          std::shared_ptr<rpc::spsc::worker_release> connection, queue_type* send_spsc_queue,
+                          std::shared_ptr<rpc::spsc::channel_manager> channel_manager, queue_type* send_spsc_queue,
                                  queue_type* receive_spsc_queue);
 
         CORO_TASK(int) connect(rpc::interface_descriptor input_descr, rpc::interface_descriptor& output_descr) override;
@@ -55,7 +55,7 @@ namespace rpc::spsc
 
         friend rpc::service;
 
-        std::shared_ptr<rpc::spsc::worker_release> connection_;
+        std::shared_ptr<rpc::spsc::channel_manager> channel_manager_;
         std::chrono::milliseconds timeout_;
         queue_type* send_spsc_queue_;
         queue_type* receive_spsc_queue_;
