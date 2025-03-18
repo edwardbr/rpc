@@ -8,7 +8,7 @@
 #include <coro/coro.hpp>
 #include <coro/net/ip_address.hpp>
 
-#include <tcp/tcp.h>
+#include <spsc/spsc.h>
 
 #include "common/spsc/channel_manager.h"
 

@@ -62,6 +62,7 @@ target_link_libraries(
           ${ADDITIONAL_TARGET}          
           example_idl_host
           tcp_idl_host
+          spsc_idl_host
           yas_common)
 
 set_property(TARGET common_host PROPERTY COMPILE_PDB_NAME common_host)
