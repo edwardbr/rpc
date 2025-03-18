@@ -736,15 +736,13 @@ public:
 
         // This makes the receiving service proxy for the connection
         rpc::spsc::channel_manager::connection_handler handler
-            = [peer_service = peer_service_, send_spsc_queue = &send_spsc_queue_,
+            = [send_spsc_queue = &send_spsc_queue_,
                receive_spsc_queue = &receive_spsc_queue_, use_host_in_child = use_host_in_child_](
-                  rpc::tcp::init_client_channel_send request, rpc::tcp::init_client_channel_response& init_response,
-                  rpc::shared_ptr<rpc::service>, std::shared_ptr<rpc::spsc::channel_manager> channel) -> CORO_TASK(int)
+                  const rpc::interface_descriptor& input_interface, rpc::interface_descriptor& output_interface,
+                  rpc::shared_ptr<rpc::service> service, std::shared_ptr<rpc::spsc::channel_manager> channel) -> CORO_TASK(int)
         {
-            rpc::destination_zone destination_zone_id {request.caller_zone_id};
-            rpc::interface_descriptor output_interface;
-            auto ret = CO_AWAIT peer_service->attach_remote_zone<rpc::spsc::service_proxy, yyy::i_host, yyy::i_example>(
-                "service_proxy", {{request.caller_object_id}, {request.caller_zone_id}}, output_interface,
+            auto ret = CO_AWAIT service->attach_remote_zone<rpc::spsc::service_proxy, yyy::i_host, yyy::i_example>(
+                "service_proxy", input_interface, output_interface,
                 [&](const rpc::shared_ptr<yyy::i_host>& host, rpc::shared_ptr<yyy::i_example>& new_example,
                     const rpc::shared_ptr<rpc::service>& child_service_ptr) -> CORO_TASK(int)
                 {
@@ -755,19 +753,10 @@ public:
                         CO_AWAIT new_example->set_host(host);
                     CO_RETURN rpc::error::OK();
                 },
-                destination_zone_id, channel, send_spsc_queue, receive_spsc_queue);
-            if(ret != rpc::error::OK())
-            {
-                // report error
-                auto randonmumber = "failed to connect to zone " + std::to_string(ret) + " \n";
-                LOG_STR(randonmumber.c_str(), randonmumber.size());
-                CO_RETURN ret;
-            }
-            init_response = rpc::tcp::init_client_channel_response {rpc::error::OK(),
-                                                                    output_interface.destination_zone_id.get_val(),
-                                                                    output_interface.object_id.get_val(), 0};
-            co_return rpc::error::OK();
+                input_interface.destination_zone_id, channel, send_spsc_queue, receive_spsc_queue);
+            co_return ret;
         };
+
         auto channel = rpc::spsc::channel_manager::create(
             std::chrono::milliseconds(1000), peer_service_,
             &receive_spsc_queue_, // these two parameters are reversed for the receiver

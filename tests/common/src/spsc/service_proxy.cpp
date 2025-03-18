@@ -97,10 +97,10 @@ namespace rpc::spsc
 
         {
             // register the proxy connection
-            tcp::init_client_channel_response init_receive;
+            init_client_channel_response init_receive;
             int ret = CO_AWAIT channel_manager_->call_peer(
                 rpc::get_version(),
-                tcp::init_client_channel_send {.caller_zone_id = get_zone_id().get_val(),
+                init_client_channel_send {.caller_zone_id = get_zone_id().get_val(),
                                                .caller_object_id = input_descr.object_id.get_val(),
                                                .destination_zone_id = get_destination_zone_id().get_val()},
                 init_receive);
@@ -145,10 +145,10 @@ namespace rpc::spsc
             CO_RETURN rpc::error::SERVICE_PROXY_LOST_CONNECTION();
         }
 
-        tcp::call_receive call_receive;
+        call_receive call_receive;
         int ret = CO_AWAIT channel_manager_->call_peer(
             protocol_version,
-            tcp::call_send {.encoding = encoding,
+            call_send {.encoding = encoding,
                             .tag = tag,
                             .caller_channel_zone_id = caller_channel_zone_id.get_val(),
                             .caller_zone_id = caller_zone_id.get_val(),
@@ -187,9 +187,9 @@ namespace rpc::spsc
             CO_RETURN rpc::error::SERVICE_PROXY_LOST_CONNECTION();
         }
 
-        tcp::try_cast_receive try_cast_receive;
+        try_cast_receive try_cast_receive;
         int ret = CO_AWAIT channel_manager_->call_peer(protocol_version,
-                                                       tcp::try_cast_send {
+                                                       try_cast_send {
                                                            .destination_zone_id = destination_zone_id.get_val(),
                                                            .object_id = object_id.get_val(),
                                                            .interface_id = interface_id.get_val(),
@@ -233,15 +233,15 @@ namespace rpc::spsc
             CO_RETURN rpc::error::SERVICE_PROXY_LOST_CONNECTION();
         }
 
-        tcp::addref_receive addref_receive;
+        addref_receive addref_receive;
         int ret = CO_AWAIT channel_manager_->call_peer(
             protocol_version,
-            tcp::addref_send {.destination_channel_zone_id = destination_channel_zone_id.get_val(),
+            addref_send {.destination_channel_zone_id = destination_channel_zone_id.get_val(),
                               .destination_zone_id = destination_zone_id.get_val(),
                               .object_id = object_id.get_val(),
                               .caller_channel_zone_id = caller_channel_zone_id.get_val(),
                               .caller_zone_id = caller_zone_id.get_val(),
-                              .build_out_param_channel = (tcp::add_ref_options)build_out_param_channel},
+                              .build_out_param_channel = (add_ref_options)build_out_param_channel},
             addref_receive);
         if(ret != rpc::error::OK())
         {
@@ -285,9 +285,9 @@ namespace rpc::spsc
             CO_RETURN rpc::error::SERVICE_PROXY_LOST_CONNECTION();
         }
 
-        tcp::release_receive release_receive;
+        release_receive release_receive;
         int ret = CO_AWAIT channel_manager_->call_peer(protocol_version,
-                                                       tcp::release_send {
+                                                       release_send {
                                                            .destination_zone_id = destination_zone_id.get_val(),
                                                            .object_id = object_id.get_val(),
                                                            .caller_zone_id = caller_zone_id.get_val(),

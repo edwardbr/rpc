@@ -50,3 +50,14 @@ RPCGenerate(
   include_paths ${CMAKE_CURRENT_SOURCE_DIR}/.
   dependencies rpc_types_idl
   generated_install_dir ${GENERATED_INSTALL_DIR})
+
+RPCGenerate(
+  spsc
+  spsc/spsc.idl
+  ${CMAKE_CURRENT_SOURCE_DIR}
+  ${CMAKE_BINARY_DIR}/generated
+  spsc
+  ""
+  include_paths ${CMAKE_CURRENT_SOURCE_DIR}/.
+  dependencies rpc_types_idl
+  generated_install_dir ${GENERATED_INSTALL_DIR})

@@ -1,19 +1,33 @@
 #include <common/spsc/channel_manager.h>
 #include <common/spsc/service_proxy.h>
-#include <tcp/tcp.h>
 
 namespace rpc::spsc
 {
-    std::shared_ptr<channel_manager> channel_manager::create(std::chrono::milliseconds timeout, rpc::shared_ptr<rpc::service> service,
-                queue_type* send_spsc_queue,
-                queue_type* receive_spsc_queue,
-                channel_manager::connection_handler handler)
+    channel_manager::channel_manager(std::chrono::milliseconds timeout, rpc::shared_ptr<rpc::service> service,
+                        queue_type* send_spsc_queue,
+                        queue_type* receive_spsc_queue,
+                        connection_handler handler
+                    )
+            : send_spsc_queue_(send_spsc_queue)
+            , receive_spsc_queue_(receive_spsc_queue)
+            , timeout_(timeout)
+            , service_(service)
+            , connection_handler_(handler)
+        {}
+    
+        
+    std::shared_ptr<channel_manager> channel_manager::create(std::chrono::milliseconds timeout,
+                                                             rpc::shared_ptr<rpc::service> service,
+                                                             queue_type* send_spsc_queue,
+                                                             queue_type* receive_spsc_queue,
+                                                             channel_manager::connection_handler handler)
     {
-        auto channel = std::shared_ptr<channel_manager>(new channel_manager(timeout, service, send_spsc_queue, receive_spsc_queue, handler));
+        auto channel = std::shared_ptr<channel_manager>(
+            new channel_manager(timeout, service, send_spsc_queue, receive_spsc_queue, handler));
         channel->keep_alive_ = channel;
         return channel;
     }
-                
+
     // this method sends queued requests to other peers and receives responses notifying the proxy when complete
     bool channel_manager::pump_send_and_receive()
     {
@@ -23,33 +37,42 @@ namespace rpc::spsc
         // msg += std::to_string(client_.socket().native_handle());
         // LOG_CSTR(msg.c_str());
 
-
-        auto foo = [this](tcp::envelope_prefix prefix, tcp::envelope_payload payload) -> coro::task<int>
+        auto foo = [this](envelope_prefix prefix, envelope_payload payload) -> coro::task<int>
         {
             // do a call
-            if(payload.payload_fingerprint == rpc::id<tcp::call_send>::get(prefix.version))
+            if(payload.payload_fingerprint == rpc::id<call_send>::get(prefix.version))
             {
+                assert(!peer_cancel_received_);
                 service_->get_scheduler()->schedule(stub_handle_send(std::move(prefix), std::move(payload)));
             }
             // do a try cast
-            else if(payload.payload_fingerprint == rpc::id<tcp::try_cast_send>::get(prefix.version))
+            else if(payload.payload_fingerprint == rpc::id<try_cast_send>::get(prefix.version))
             {
+                assert(!peer_cancel_received_);
                 service_->get_scheduler()->schedule(stub_handle_try_cast(std::move(prefix), std::move(payload)));
             }
             // do an add_ref
-            else if(payload.payload_fingerprint == rpc::id<tcp::addref_send>::get(prefix.version))
+            else if(payload.payload_fingerprint == rpc::id<addref_send>::get(prefix.version))
             {
+                assert(!peer_cancel_received_);
                 service_->get_scheduler()->schedule(stub_handle_add_ref(std::move(prefix), std::move(payload)));
             }
             // do a release
-            else if(payload.payload_fingerprint == rpc::id<tcp::release_send>::get(prefix.version))
+            else if(payload.payload_fingerprint == rpc::id<release_send>::get(prefix.version))
             {
                 service_->get_scheduler()->schedule(stub_handle_release(std::move(prefix), std::move(payload)));
             }
             // create the service proxy
-            else if(payload.payload_fingerprint == rpc::id<tcp::init_client_channel_send>::get(prefix.version))
+            else if(payload.payload_fingerprint == rpc::id<init_client_channel_send>::get(prefix.version))
             {
+                assert(!peer_cancel_received_);
                 service_->get_scheduler()->schedule(create_stub(std::move(prefix), std::move(payload)));
+            }
+            // create the service proxy
+            else if(payload.payload_fingerprint == rpc::id<close_connection_send>::get(prefix.version))
+            {
+                std::ignore = CO_AWAIT send_payload(rpc::get_version(), message_direction::receive, close_connection_received{}, prefix.sequence_number);
+                peer_cancel_received_ = true;
             }
             // do a try cast
             else
@@ -59,6 +82,13 @@ namespace rpc::spsc
                 {
                     std::scoped_lock lock(pending_transmits_mtx_);
                     auto it = pending_transmits_.find(prefix.sequence_number);
+                    std::string msg("pending_transmits_ ");
+                    msg += std::to_string(service_->get_zone_id().get_val());
+                    msg += std::string(" sequence_number = ");
+                    msg += std::to_string(prefix.sequence_number);
+                    msg += std::string(" id = ");
+                    msg += std::to_string(payload.payload_fingerprint);
+                    LOG_CSTR(msg.c_str());
                     assert(it != pending_transmits_.end());
                     result = it->second;
                     pending_transmits_.erase(it);
@@ -86,15 +116,23 @@ namespace rpc::spsc
 
     CORO_TASK(void) channel_manager::shutdown()
     {
-        shutdown_ = true;
+        cancel_sent_ = true;
+        close_connection_received received{};
+        auto err = CO_AWAIT call_peer(rpc::get_version(), close_connection_send{}, received);
+        cancel_confirmed_ = true;
+        if(err != rpc::error::OK())
+        {
+            // Something has gone wrong on the other side so pretend that it has succeeded
+            peer_cancel_received_ = true;    
+        }
         co_await shutdown_event_;
     }
 
     CORO_TASK(void)
     channel_manager::pump_messages(
-        std::function<CORO_TASK(int)(tcp::envelope_prefix, tcp::envelope_payload)> incoming_message_handler)
+        std::function<CORO_TASK(int)(envelope_prefix, envelope_payload)> incoming_message_handler)
     {
-        static auto envelope_prefix_saved_size = rpc::yas_binary_saved_size(tcp::envelope_prefix());
+        static auto envelope_prefix_saved_size = rpc::yas_binary_saved_size(envelope_prefix());
 
         std::vector<uint8_t> prefix_buf(envelope_prefix_saved_size);
         std::vector<uint8_t> buf;
@@ -109,8 +147,8 @@ namespace rpc::spsc
         bool retry_send_blob = false;
         bool no_pending_send = false;
         bool incoming_queue_empty = false;
-
-        while(shutdown_ == false)
+        
+        while(peer_cancel_received_ == false || cancel_confirmed_ == false || send_queue_.empty() == false || send_data.empty() == false)
         {
             no_pending_send = false;
             if(retry_send_blob)
@@ -166,7 +204,7 @@ namespace rpc::spsc
             }
 
             {
-                tcp::envelope_prefix prefix {};
+                envelope_prefix prefix {};
 
                 if(receiving_prefix)
                 {
@@ -231,7 +269,7 @@ namespace rpc::spsc
 
                     if(!incoming_queue_empty)
                     {
-                        tcp::envelope_payload payload;
+                        envelope_payload payload;
                         auto str_err = rpc::from_yas_binary(rpc::span(buf), payload);
                         if(!str_err.empty())
                         {
@@ -253,7 +291,7 @@ namespace rpc::spsc
                 CO_AWAIT service_->get_scheduler()->schedule();
             incoming_queue_empty = false;
         }
-        
+
         CO_AWAIT service_->get_scheduler()->schedule_after(std::chrono::milliseconds(100));
 
         {
@@ -263,18 +301,31 @@ namespace rpc::spsc
                 it.second->error_code = rpc::error::CALL_CANCELLED();
                 it.second->event.set();
             }
-        }   
+        }
         shutdown_event_.set();
         keep_alive_ = nullptr;
     }
     // do a try cast
-    CORO_TASK(void) channel_manager::stub_handle_send(tcp::envelope_prefix prefix, tcp::envelope_payload payload)
+    CORO_TASK(void) channel_manager::stub_handle_send(envelope_prefix prefix, envelope_payload payload)
     {
         LOG_CSTR("send request");
 
-        assert(prefix.direction == tcp::message_direction::send || prefix.direction == tcp::message_direction::one_way);
+        assert(prefix.direction == message_direction::send || prefix.direction == message_direction::one_way);
+        
+        if(cancel_sent_ == true)
+        {
+            auto err = CO_AWAIT send_payload(prefix.version, message_direction::receive,
+                                            call_receive {.payload = {}, .err_code = rpc::error::CALL_CANCELLED()},
+                                            prefix.sequence_number);
+            if(err != rpc::error::OK())
+            {
+                LOG_CSTR("failed send_payload");
+                kill_connection();
+                CO_RETURN;
+            }
+        }
 
-        tcp::call_send request;
+        call_send request;
         auto str_err = rpc::from_yas_compressed_binary(rpc::span(payload.payload), request);
         if(!str_err.empty())
         {
@@ -294,11 +345,11 @@ namespace rpc::spsc
             LOG_CSTR("failed send");
         }
 
-        if(prefix.direction == tcp::message_direction::one_way)
+        if(prefix.direction == message_direction::one_way)
             CO_RETURN;
 
-        auto err = CO_AWAIT send_payload(prefix.version, tcp::message_direction::receive,
-                                         tcp::call_receive {.payload = std::move(out_buf), .err_code = ret},
+        auto err = CO_AWAIT send_payload(prefix.version, message_direction::receive,
+                                         call_receive {.payload = std::move(out_buf), .err_code = ret},
                                          prefix.sequence_number);
         if(err != rpc::error::OK())
         {
@@ -312,11 +363,11 @@ namespace rpc::spsc
 
     // do a try cast
     CORO_TASK(void)
-    channel_manager::stub_handle_try_cast(tcp::envelope_prefix prefix, tcp::envelope_payload payload)
+    channel_manager::stub_handle_try_cast(envelope_prefix prefix, envelope_payload payload)
     {
         LOG_CSTR("try_cast request");
 
-        tcp::try_cast_send request;
+        try_cast_send request;
         auto str_err = rpc::from_yas_compressed_binary(rpc::span(payload.payload), request);
         if(!str_err.empty())
         {
@@ -333,8 +384,8 @@ namespace rpc::spsc
             LOG_CSTR("failed try_cast");
         }
 
-        auto err = CO_AWAIT send_payload(prefix.version, tcp::message_direction::receive,
-                                         tcp::try_cast_receive {.err_code = ret}, prefix.sequence_number);
+        auto err = CO_AWAIT send_payload(prefix.version, message_direction::receive,
+                                         try_cast_receive {.err_code = ret}, prefix.sequence_number);
         if(err != rpc::error::OK())
         {
             LOG_CSTR("failed try_cast_send send_payload");
@@ -346,11 +397,11 @@ namespace rpc::spsc
     }
 
     // do an add_ref
-    CORO_TASK(void) channel_manager::stub_handle_add_ref(tcp::envelope_prefix prefix, tcp::envelope_payload payload)
+    CORO_TASK(void) channel_manager::stub_handle_add_ref(envelope_prefix prefix, envelope_payload payload)
     {
         LOG_CSTR("add_ref request");
 
-        tcp::addref_send request;
+        addref_send request;
         auto str_err = rpc::from_yas_compressed_binary(rpc::span(payload.payload), request);
         if(!str_err.empty())
         {
@@ -370,8 +421,8 @@ namespace rpc::spsc
             LOG_CSTR("failed add_ref");
         }
 
-        auto err = CO_AWAIT send_payload(prefix.version, tcp::message_direction::receive,
-                                         tcp::addref_receive {.ref_count = ret, .err_code = rpc::error::OK()},
+        auto err = CO_AWAIT send_payload(prefix.version, message_direction::receive,
+                                         addref_receive {.ref_count = ret, .err_code = rpc::error::OK()},
                                          prefix.sequence_number);
         if(err != rpc::error::OK())
         {
@@ -384,10 +435,10 @@ namespace rpc::spsc
     }
 
     // do a release
-    CORO_TASK(void) channel_manager::stub_handle_release(tcp::envelope_prefix prefix, tcp::envelope_payload payload)
+    CORO_TASK(void) channel_manager::stub_handle_release(envelope_prefix prefix, envelope_payload payload)
     {
         LOG_CSTR("release request");
-        tcp::release_send request;
+        release_send request;
         auto str_err = rpc::from_yas_compressed_binary(rpc::span(payload.payload), request);
         if(!str_err.empty())
         {
@@ -405,8 +456,8 @@ namespace rpc::spsc
             LOG_CSTR("failed release");
         }
 
-        auto err = CO_AWAIT send_payload(prefix.version, tcp::message_direction::receive,
-                                         tcp::release_receive {.ref_count = ret, .err_code = rpc::error::OK()},
+        auto err = CO_AWAIT send_payload(prefix.version, message_direction::receive,
+                                         release_receive {.ref_count = ret, .err_code = rpc::error::OK()},
                                          prefix.sequence_number);
         if(err != rpc::error::OK())
         {
@@ -418,21 +469,23 @@ namespace rpc::spsc
         CO_RETURN;
     }
 
-    CORO_TASK(void) channel_manager::create_stub(tcp::envelope_prefix prefix, tcp::envelope_payload payload)
+    CORO_TASK(void) channel_manager::create_stub(envelope_prefix prefix, envelope_payload payload)
     {
         std::string msg("run_client init_client_channel_send ");
         msg += std::to_string(service_->get_zone_id().get_val());
         LOG_CSTR(msg.c_str());
 
-        tcp::init_client_channel_send request;
+        init_client_channel_send request;
         auto err = rpc::from_yas_compressed_binary(rpc::span(payload.payload), request);
         if(!err.empty())
         {
             LOG_CSTR("failed run_client init_client_channel_send");
             CO_RETURN;
         }
-        tcp::init_client_channel_response response;
-        int ret = co_await connection_handler_(request, response, service_, keep_alive_);
+        rpc::interface_descriptor input_descr {{request.caller_object_id}, {request.caller_zone_id}};
+        rpc::interface_descriptor output_interface;
+
+        int ret = co_await connection_handler_(input_descr, output_interface, service_, keep_alive_);
         connection_handler_ = nullptr; // handover references etc
         if(ret != rpc::error::OK())
         {
@@ -442,8 +495,11 @@ namespace rpc::spsc
             CO_RETURN;
         }
 
-        err = CO_AWAIT send_payload(prefix.version, tcp::message_direction::receive, std::move(response),
-                                    prefix.sequence_number);
+        err = CO_AWAIT send_payload(
+            prefix.version, message_direction::receive,
+            init_client_channel_response {rpc::error::OK(), output_interface.destination_zone_id.get_val(),
+                                                    output_interface.object_id.get_val(), 0},
+            prefix.sequence_number);
         std::ignore = err;
 
         CO_RETURN;
