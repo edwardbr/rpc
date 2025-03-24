@@ -50,13 +50,13 @@ public:
         if(format_str[0] != '#' && tmp < 0)
             print_tabs();
         std::string buffer;
-        fmt::vformat_to(std::back_inserter(buffer), format_str, std::make_format_args(args...));
+        fmt::vformat_to(std::back_inserter(buffer), format_str, fmt::make_format_args(args...));
         strm_ << buffer << "\n";
     }
     template<typename S, typename... Args> void raw(S&& format_str, Args&&... args)
     {
         std::string buffer;
-        fmt::vformat_to(std::back_inserter(buffer), format_str, std::make_format_args(args...));
+        fmt::vformat_to(std::back_inserter(buffer), format_str, fmt::make_format_args(args...));
         strm_ << buffer << "\n";
     }
     void write_buffer(const std::string& str) { strm_ << str; }

@@ -2334,6 +2334,7 @@ namespace rpc_generator
 
             header("");
 
+            proxy("#include <rpc/version.h>");
             proxy("#include <yas/mem_streams.hpp>");
             proxy("#include <yas/binary_iarchive.hpp>");
             proxy("#include <yas/binary_oarchive.hpp>");
@@ -2351,9 +2352,11 @@ namespace rpc_generator
             proxy("");
 
             stub_header("#pragma once");
+            stub_header("#include <rpc/version.h>");
             stub_header("#include <rpc/service.h>");
             stub_header("");
 
+            stub("#include <rpc/version.h>");
             stub("#include <yas/mem_streams.hpp>");
             stub("#include <yas/binary_iarchive.hpp>");
             stub("#include <yas/binary_oarchive.hpp>");

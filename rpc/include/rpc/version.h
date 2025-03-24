@@ -3,6 +3,9 @@
  *   All rights reserved.
  */
 #pragma once
+
+#include <rpc/coroutine_support.h>
+
 #include <cstdint>
 
 namespace rpc

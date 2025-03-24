@@ -4,7 +4,7 @@ enclave {
 
     trusted {
 		/* define ECALLs here. */
-		public int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t host_id, uint64_t child_zone_id, [out]uint64_t* root_object);		
+		public int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t host_id, uint64_t child_zone_id, uint64_t enclave_id, [out]uint64_t* root_object);		
 		public void marshal_test_destroy_enclave();
 
         public int call_enclave(
@@ -45,6 +45,8 @@ enclave {
             uint64_t object_id,                                 //rpc object index
             uint64_t caller_zone_id                             //the original zone where the call came from
         );
+        //used to inject a thread into an enclave triggered by start_thread an ocall call
+        int on_new_thread(uint64_t enclave_id, uint64_t temporary_id);
     };
 
     untrusted {
@@ -94,5 +96,6 @@ enclave {
 
         void rpc_log([in, size=sz] const char* str, size_t sz);
         void hang();
+        int start_thread(uint64_t enclave_id, uint64_t temporary_id);
     };
 };

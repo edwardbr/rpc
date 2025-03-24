@@ -2,16 +2,17 @@
  *   Copyright (c) 2024 Edward Boggis-Rolfe
  *   All rights reserved.
  */
+
+#include <rpc/version.h>
+
 #include <algorithm>
 
 #include <yas/mem_streams.hpp>
 #include <yas/std_types.hpp>
 
-
 #include "rpc/service.h"
 #include "rpc/stub.h"
 #include "rpc/proxy.h"
-#include "rpc/version.h"
 #include "rpc/logger.h"
 
 namespace rpc

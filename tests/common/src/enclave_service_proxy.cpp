@@ -70,6 +70,7 @@ namespace rpc
             , get_zone_id().get_val()
             , input_descr.object_id.get_val()
             , get_destination_zone_id().get_val()
+            , eid_
             , &(output_object_id.get_ref()));
         if (status)
         {
