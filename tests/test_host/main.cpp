@@ -21,17 +21,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-#if defined(__clang__)
-    #pragma GCC diagnostic push
-    #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
-#endif
-
-#include <clipp.h>
-
-#if defined(__clang__)
-    #pragma GCC diagnostic pop
-#endif
-
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
@@ -87,26 +76,23 @@ std::atomic<uint64_t>* zone_gen = nullptr;
 // This line tests that we can define tests in an unnamed namespace.
 namespace {
 
-	extern "C" int main(int argc, char* argv[])
-	{
-        std::string disable_telemetry_server;
-        std::string enable_multithreaded_tests_flag;
-        auto cli = (
-			clipp::option("-t", "--disable_telemetry_server").doc("disable the telemetry_server") & clipp::value("disable_telemetry_server", disable_telemetry_server),
-			clipp::option("-m", "--enable_multithreaded_tests").doc("enable multithreaded tests") & clipp::value("enable_multithreaded_tests", enable_multithreaded_tests_flag)
-        );
+    extern "C" int main(int argc, char* argv[])
+    {
+        for (size_t i = 1; i < argc; ++i)
+        {
+            std::string arg = argv[i];
+            if (arg == "-t" || arg == "--disable_telemetry_server")
+                enable_telemetry_server = false;
+            if (arg == "-m" || arg == "--enable_multithreaded_tests")
+                enable_multithreaded_tests = true;
+        }
 
-        clipp::parsing_result res = clipp::parse(argc, argv, cli);
-        
-        enable_telemetry_server = disable_telemetry_server != "true";
-        enable_multithreaded_tests = enable_multithreaded_tests_flag == "true";
-        
         auto logger = spdlog::stdout_color_mt("console");
-        logger->set_pattern("[%^%l%$] %v");        
+        logger->set_pattern("[%^%l%$] %v");
         spdlog::set_default_logger(logger);
-		::testing::InitGoogleTest(&argc, argv);
-		return RUN_ALL_TESTS();
-	}
+        ::testing::InitGoogleTest(&argc, argv);
+        return RUN_ALL_TESTS();
+    }
 }
 
 class host : 

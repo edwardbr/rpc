@@ -21,7 +21,7 @@ target_link_libraries(
   PRIVATE ast_parser
           macro_parser
           utils
-          clipp::clipp
+          args::args
           fmt::fmt-header-only)
 target_link_options(generator PRIVATE ${HOST_LINK_EXE_OPTIONS})
 

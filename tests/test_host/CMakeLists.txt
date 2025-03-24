@@ -14,16 +14,15 @@ target_include_directories(
 if(BUILD_ENCLAVE)
   set(ENCLAVE_DEPENDANCIES marshal_test_edl_host rpc_telemetry_edl_header_host)
 endif()
-  
+
 target_link_libraries(
   rpc_test
   PUBLIC common_host
          example_idl_host
          example_import_idl_host
-         example_shared_idl_host   
+         example_shared_idl_host
          rpc::rpc_host
          yas_common
-         clipp::clipp
          fmt::fmt
          GTest::gtest_main
          GTest::gmock_main
