@@ -40,13 +40,12 @@ if(NOT DEPENDENCIES_LOADED)
   option(RPC_HANG_ON_FAILED_ASSERT "hang on failed assert" OFF)
   option(USE_RPC_TELEMETRY "turn on rpc telemetry" OFF)
   option(USE_RPC_TELEMETRY_RAII_LOGGING
-    "turn on the logging of the addref release and try cast activity of the services, proxies and stubs" OFF)
+         "turn on the logging of the addref release and try cast activity of the services, proxies and stubs" OFF)
 
   if(NOT DEFINED RPC_OUT_BUFFER_SIZE)
     # setting RPC_OUT_BUFFER_SIZE to 4kb which is the default page size for windows and linux
     set(RPC_OUT_BUFFER_SIZE 0x1000)
   endif()
-
   message("BUILD_TYPE ${BUILD_TYPE}")
   message("CMAKE_BUILD_TYPE ${CMAKE_BUILD_TYPE}")
   message("SGX_MODE ${SGX_MODE}")
@@ -72,6 +71,15 @@ if(NOT DEPENDENCIES_LOADED)
   set(CMAKE_CXX_EXTENSIONS OFF)
   set(CMAKE_POSITION_INDEPENDENT_CODE ON)
   set(ENCLAVE_TARGET "SGX")
+  
+  set(LIBCORO_EXTERNAL_DEPENDENCIES OFF)
+  set(LIBCORO_BUILD_TESTS           OFF)
+  set(LIBCORO_CODE_COVERAGE         OFF)
+  set(LIBCORO_BUILD_EXAMPLES        OFF)
+  set(LIBCORO_FEATURE_NETWORKING    OFF)
+  set(LIBCORO_FEATURE_TLS           OFF)
+
+
 
   list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
@@ -520,13 +528,15 @@ if(NOT DEPENDENCIES_LOADED)
       endif()
 
       if(BUILD_ENCLAVE)
+      
         set(SHARED_ENCLAVE_DEFINES
-          _IN_ENCLAVE
-          ${SHARED_DEFINES}
-          CLEAN_LIBC
-          ENCLAVE_STATUS=sgx_status_t
-          ENCLAVE_OK=SGX_SUCCESS
-          DISALLOW_BAD_JUMPS)
+            _IN_ENCLAVE
+            ${SHARED_DEFINES}
+            CLEAN_LIBC
+            ENCLAVE_STATUS=sgx_status_t
+            ENCLAVE_OK=SGX_SUCCESS
+            _LIBCPP_HAS_NO_VENDOR_AVAILABILITY_ANNOTATIONS
+            DISALLOW_BAD_JUMPS)
       endif()
 
       if(${BUILD_TYPE} STREQUAL "release")
@@ -552,7 +562,7 @@ if(NOT DEPENDENCIES_LOADED)
         set(OPTIMIZER_FLAGS -O0)
 
         if(BUILD_ENCLAVE)
-          set(ENCLAVE_DEFINES ${SHARED_ENCLAVE_DEFINES} _DEBUG ${ENCLAVE_MEMLEAK_DEFINES}) # sets SGX_DEBUG_FLAG to 1
+          set(ENCLAVE_DEFINES ${SHARED_ENCLAVE_DEFINES} _DEBUG ${ENCLAVE_MEMLEAK_DEFINES} _TLIBC_WARN_DEPRECATED_FUNCTIONS_) # sets SGX_DEBUG_FLAG to 1
         endif()
       endif()
 

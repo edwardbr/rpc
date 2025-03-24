@@ -4,6 +4,8 @@
  */
 #pragma once
 
+#include <rpc/version.h>
+
 namespace rpc
 {
     namespace error

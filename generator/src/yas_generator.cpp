@@ -986,6 +986,7 @@ namespace yas_generator
             additional_stub_headers.end(),
             [&](const std::string& additional_stub_header) { header("#include <{}>", additional_stub_header); });
 
+        header("#include <rpc/version.h>");
         header("#include <yas/mem_streams.hpp>");
         header("#include <yas/binary_iarchive.hpp>");
         header("#include <yas/binary_oarchive.hpp>");

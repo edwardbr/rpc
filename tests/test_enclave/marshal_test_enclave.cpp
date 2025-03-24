@@ -2,6 +2,9 @@
  *   Copyright (c) 2024 Edward Boggis-Rolfe
  *   All rights reserved.
  */
+
+#include <rpc/version.h>
+
 #include "stdio.h"
 #include <string>
 #include <cstring>
@@ -31,9 +34,11 @@ TELEMETRY_SERVICE_MANAGER
 #endif
 
 rpc::shared_ptr<rpc::child_service> rpc_server;
+uint64_t enclave_id_ = 0;
 
-int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t host_id, uint64_t child_zone_id, uint64_t* example_object_id)
+int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t host_id, uint64_t child_zone_id, uint64_t enclave_id, uint64_t* example_object_id)
 {
+    enclave_id_ = enclave_id;
     rpc::interface_descriptor input_descr{};
     rpc::interface_descriptor output_descr{};
 

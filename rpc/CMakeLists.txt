@@ -41,7 +41,7 @@ if(BUILD_ENCLAVE)
     src/stub.cpp
     src/error_codes.cpp
     src/version.cpp)
-
+message("ENCLAVE_DEFINES ${ENCLAVE_DEFINES}")
   target_compile_definitions(rpc_enclave PRIVATE ${ENCLAVE_DEFINES})
   target_compile_options(rpc_enclave PRIVATE ${ENCLAVE_COMPILE_OPTIONS} ${WARN_OK})
   target_include_directories(
@@ -51,6 +51,7 @@ if(BUILD_ENCLAVE)
   target_link_libraries(
     rpc_enclave
     PUBLIC ${TELEMETRY_INTERFACE} ${ENCLAVE_TELEMETRY_SERVICE} rpc_types_idl_enclave
+    libcoro_enclave
     PRIVATE yas_common)
   target_link_options(rpc_enclave PRIVATE ${ENCLAVE_LINK_OPTIONS})
 

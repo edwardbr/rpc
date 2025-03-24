@@ -2026,6 +2026,7 @@ namespace synchronous_generator
 
         header("");
 
+        proxy("#include <rpc/version.h>");
         proxy("#include <yas/mem_streams.hpp>");
         proxy("#include <yas/binary_iarchive.hpp>");
         proxy("#include <yas/binary_oarchive.hpp>");
@@ -2043,6 +2044,7 @@ namespace synchronous_generator
         proxy("");
 
         stub_header("#pragma once");
+        stub_header("#include <rpc/version.h>");
         stub_header("#include <rpc/service.h>");
         stub_header("");
 

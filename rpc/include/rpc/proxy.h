@@ -3,13 +3,14 @@
  *   All rights reserved.
  */#pragma once
 
+#include <rpc/version.h>
+
 #include <string>
 #include <memory>
 #include <unordered_map>
 #include <mutex>
 
 #include <rpc/logger.h>
-#include <rpc/version.h>
 #include <rpc/types.h>
 #include <rpc/marshaller.h>
 #include <rpc/service.h>

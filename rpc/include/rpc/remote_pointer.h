@@ -3,6 +3,7 @@
  *   All rights reserved.
  */
 #pragma once
+#include <rpc/version.h>
 
 // #ifndef __llvm__
 #include <rpc/stl_legacy/rpc_memory.h>

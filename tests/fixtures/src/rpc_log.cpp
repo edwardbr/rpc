@@ -10,6 +10,7 @@
 #include <rpc/telemetry/telemetry_handler.h>
 #endif
 
+#include <untrusted/enclave_marshal_test_u.h>
 #include "rpc/coroutine_support.h"
 
 using namespace std::chrono_literals;
@@ -132,5 +133,12 @@ extern "C"
         {
             std::this_thread::sleep_for(1s);
         }
+    }
+    
+    int start_thread(uint64_t enclave_id, uint64_t temporary_id)
+    {
+        sgx_status_t status = on_new_thread(enclave_id, temporary_id);
+        )
+            eid_
     }
 }

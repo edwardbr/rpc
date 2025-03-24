@@ -4,6 +4,8 @@
  */
 #pragma once
 
+#include <rpc/version.h>
+
 #include <string>
 #include <memory>
 #include <map>
@@ -17,7 +19,6 @@
 #include <rpc/error_codes.h>
 #include <rpc/assert.h>
 #include <rpc/types.h>
-#include <rpc/version.h>
 #include <rpc/marshaller.h>
 #include <rpc/remote_pointer.h>
 #include <rpc/casting_interface.h>
