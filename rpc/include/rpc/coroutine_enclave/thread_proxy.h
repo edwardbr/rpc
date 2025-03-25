@@ -7,11 +7,11 @@
 #include <memory>
 #include <assert.h>
 #include <stdint.h>
-
+#include <sgx_error.h>
 
 extern "C"
 {
-    int start_thread(uint64_t enclave_id, uint64_t temporary_id);
+    sgx_status_t start_thread(int* retval, uint64_t enclave_id, uint64_t temporary_id);
 }
 
 extern uint64_t enclave_id_;
@@ -29,8 +29,8 @@ class thread_proxy : std::enable_shared_from_this<thread_proxy>
     std::mutex mtx_;
     uint64_t thread_id_ = 0;
     
-    static std::mutex awaiting_for_thread_mtx_;
-    static std::unordered_map<uint64_t, std::shared_ptr<thread_proxy>> awaiting_for_thread_map_;    
+    inline static std::mutex awaiting_for_thread_mtx_;
+    inline static std::unordered_map<uint64_t, std::shared_ptr<thread_proxy>> awaiting_for_thread_map_;    
     inline static std::atomic<uint64_t> temporary_thread_id_generator_ = 0;
 public:
     void start(std::function<void()> func) 
@@ -40,7 +40,8 @@ public:
         std::unique_lock<std::mutex> lock(awaiting_for_thread_mtx_);
         temp_id = ++temporary_thread_id_generator_;
         awaiting_for_thread_map_.insert({temp_id, shared_from_this()});
-        start_thread(temp_id, enclave_id_);
+        int retval = 0;
+        start_thread(&retval, temp_id, enclave_id_);
     }
 
     void join() { std::unique_lock<std::mutex> lock(mtx_); }

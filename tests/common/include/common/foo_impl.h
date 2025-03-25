@@ -4,6 +4,8 @@
  */
 #pragma once
 
+#include <rpc/coroutine_enclave/enclave_fix.h>
+
 #include <example/example.h>
 #include <rpc/types.h>
 #include <rpc/proxy.h>

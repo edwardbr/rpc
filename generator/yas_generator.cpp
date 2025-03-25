@@ -652,6 +652,9 @@ namespace rpc_generator
                             m_ob, interface_name + "::proxy_deserialiser<rpc::serialiser::yas, rpc::encoding>::", function, 
                             has_inparams, ", rpc::encoding __rpc_enc", false));
             proxy("{{");
+            proxy("std::ignore = __rpc_buf;");
+            proxy("std::ignore = __rpc_buf_size;");
+            proxy("std::ignore = __rpc_enc;");
 
             if(has_inparams)
             {
@@ -733,6 +736,9 @@ namespace rpc_generator
                             m_ob, interface_name + "::stub_deserialiser<rpc::serialiser::yas, rpc::encoding>::", function,
                             has_outparams, ", rpc::encoding __rpc_enc", false));
             proxy("{{");
+            proxy("std::ignore = __rpc_buf;");
+            proxy("std::ignore = __rpc_buf_size;");
+            proxy("std::ignore = __rpc_enc;");
 
             if(has_outparams)
             {

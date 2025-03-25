@@ -335,8 +335,7 @@ namespace rpc_generator
                 return fmt::format("if({0}_stub_) {0}_stub_->release_from_service();", name);
 
             case STUB_DEMARSHALL_DECLARATION:
-                return fmt::format(R"__(rpc::interface_descriptor {0}_object_{{}};
-                    uint64_t {0}_zone_ = 0)__",
+                return fmt::format(R"__(rpc::interface_descriptor {0}_object_{{}})__",
                                    name);
             case STUB_MARSHALL_IN:
             {
@@ -1129,6 +1128,9 @@ namespace rpc_generator
                  "__rpc_out_buf)",
                  interface_name);
             stub("{{");
+            stub("std::ignore = protocol_version;");
+            stub("std::ignore = caller_channel_zone_id;");
+            stub("std::ignore = caller_zone_id;");
 
             bool has_methods = false;
             for(auto& function : m_ob.get_functions())
@@ -2269,6 +2271,7 @@ namespace rpc_generator
             stub_header("void {}_register_stubs(const rpc::shared_ptr<rpc::service>& srv);", module_name);
             stub("void {}_register_stubs(const rpc::shared_ptr<rpc::service>& srv)", module_name);
             stub("{{");
+            stub("std::ignore = srv;");
 
             std::set<std::string> done;
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <rpc/coroutine_enclave/enclave_fix.h>
 #include <array>
 #include <mutex>
 #include <coro/coro.hpp>
@@ -86,7 +87,6 @@ namespace rpc::spsc
         send_payload(std::uint64_t protocol_version, message_direction direction, SendPayload&& sendPayload,
                      uint64_t sequence_number)
         {
-            assert(direction);
             auto scoped_lock = co_await send_queue_mtx_.lock();
 
             envelope_payload payload_envelope = {.payload_fingerprint = rpc::id<SendPayload>::get(protocol_version),

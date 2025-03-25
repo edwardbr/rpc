@@ -3,13 +3,12 @@
  *   All rights reserved.
  */
 
-#ifndef _IN_ENCLAVE
-#include <thread>
+#include "common/spsc/service_proxy.h"
+
 #include <span>
 
 #include <random>
 
-#include "common/spsc/service_proxy.h"
 
 namespace rpc::spsc
 {
@@ -320,4 +319,3 @@ namespace rpc::spsc
         CO_RETURN release_receive.ref_count;
     }
 }
-#endif

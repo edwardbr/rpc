@@ -72,7 +72,7 @@ if(NOT DEPENDANCIES_LOADED)
   set(LIBCORO_BUILD_TESTS           OFF)
   set(LIBCORO_CODE_COVERAGE         OFF)
   set(LIBCORO_BUILD_EXAMPLES        OFF)
-  set(LIBCORO_FEATURE_NETWORKING    OFF)
+  set(LIBCORO_FEATURE_NETWORKING    ON)
   set(LIBCORO_FEATURE_TLS           OFF)
 
 
@@ -645,6 +645,8 @@ if(NOT DEPENDANCIES_LOADED)
           
       set(WARN_BASELINE
           ${CLANG_WARNS}
+          -Wno-nullability-completeness
+          -Wno-unused-parameter
           -Werror # convert warnings into errors
           # -Wdeprecated-dynamic-exception-spec   #sgx is riddled with throws() -Wsuggest-destructor-override #sgx is
           # not using override in its stl -Wdocumentation-unknown-command       #yes this would be nice
@@ -656,16 +658,19 @@ if(NOT DEPENDANCIES_LOADED)
           -Wextra
           # this is needed by yas
           -Wno-variadic-macros)
-      set(WARN_PEDANTIC -DWARN_PEDANTIC ${WARN_BASELINE} -Wpedantic)
+      # set(WARN_PEDANTIC -DWARN_PEDANTIC ${WARN_BASELINE} -Wpedantic)
+      set(WARN_PEDANTIC -Wno-nullability-completeness ${WARN_BASELINE})
       set(WARN_SIGN_CONVERSION -Wsign-conversion)
       set(WARN_TYPE_SIZES -Wshorten-64-to-32 -Wsign-compare -Wshift-sign-overflow)
 
       set(WARN_OK
-          -DWARN_OK
-          ${WARN_BASELINE}
-          -Wno-unused-parameter
-          -Wno-unused-variable
-          -Wno-sign-compare)
+      #     -DWARN_OK
+      #     ${WARN_BASELINE}
+      #     -Wno-unused-parameter
+      #     -Wno-unused-variable
+      #     -Wno-sign-compare)
+      
+      -Wno-nullability-completeness ${WARN_BASELINE})
 
       if(BUILD_ENCLAVE)
         set(ENCLAVE_COMPILE_OPTIONS ${SHARED_COMPILE_OPTIONS} -Wno-c++17-extensions -ffunction-sections -fdata-sections)

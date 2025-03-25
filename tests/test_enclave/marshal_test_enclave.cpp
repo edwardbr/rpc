@@ -16,7 +16,7 @@
 #include <rpc/error_codes.h>
 
 #include <common/foo_impl.h>
-#include <common/host_service_proxy.h>
+// #include <common/host_service_proxy.h>
 
 #include <example/example.h>
 
@@ -27,7 +27,10 @@
 #include <rpc/telemetry/enclave_telemetry_service.h>
 #endif
 
-using namespace marshalled_tests;
+#include <common/spsc/channel_manager.h>
+#include <common/spsc/service_proxy.h>
+
+// using namespace marshalled_tests;
 
 #ifdef USE_RPC_TELEMETRY
 TELEMETRY_SERVICE_MANAGER
@@ -36,8 +39,21 @@ TELEMETRY_SERVICE_MANAGER
 rpc::shared_ptr<rpc::child_service> rpc_server;
 uint64_t enclave_id_ = 0;
 
+int on_new_thread(uint64_t enclave_id, uint64_t temporary_id)
+{
+    std::ignore = enclave_id;
+    std::ignore = temporary_id;
+    return 0;
+}
+
 int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t host_id, uint64_t child_zone_id, uint64_t enclave_id, uint64_t* example_object_id)
 {
+    std::ignore = host_zone_id;
+    std::ignore = host_id;
+    std::ignore = child_zone_id;
+    std::ignore = enclave_id;
+    std::ignore = example_object_id;
+    
     enclave_id_ = enclave_id;
     rpc::interface_descriptor input_descr{};
     rpc::interface_descriptor output_descr{};
@@ -50,8 +66,11 @@ int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t host_id, uint64_t 
 #ifdef USE_RPC_TELEMETRY
     CREATE_TELEMETRY_SERVICE(rpc::enclave_telemetry_service)
 #endif    
-    
-    auto ret = rpc::child_service::create_child_zone<rpc::host_service_proxy, yyy::i_host, yyy::i_example>(
+
+    auto startup_coro = [=]() -> CORO_TASK(void)
+    {
+        rpc::interface_descriptor output_descr{};
+        auto ret = co_await rpc::child_service::create_child_zone<rpc::spsc::service_proxy, yyy::i_host, yyy::i_example>(
         "test_enclave"
         , rpc::zone{child_zone_id}
         , rpc::destination_zone{host_zone_id}
@@ -60,18 +79,74 @@ int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t host_id, uint64_t 
         , [](
             const rpc::shared_ptr<yyy::i_host>& host
             , rpc::shared_ptr<yyy::i_example>& new_example
-            , const rpc::shared_ptr<rpc::child_service>& child_service_ptr) -> int
+            , const rpc::shared_ptr<rpc::child_service>& child_service_ptr) -> CORO_TASK(int)
         {
-            example_import_idl_register_stubs(child_service_ptr);
-            example_shared_idl_register_stubs(child_service_ptr);
-            example_idl_register_stubs(child_service_ptr);
-            new_example = rpc::shared_ptr<yyy::i_example>(new example(child_service_ptr, host));
-            return rpc::error::OK();
+            // example_import_idl_register_stubs(child_service_ptr);
+            // example_shared_idl_register_stubs(child_service_ptr);
+            // example_idl_register_stubs(child_service_ptr);
+            new_example = rpc::shared_ptr<yyy::i_example>(new marshalled_tests::example(child_service_ptr, host));
+            co_return rpc::error::OK();
         }
-        , rpc_server);
+        , rpc_server
+        , std::chrono::milliseconds(10), nullptr,
+                                 nullptr);
+        std::ignore = ret;
+    };
+
+    auto io_scheduler = coro::io_scheduler::make_shared(
+            coro::io_scheduler::options {.thread_strategy = coro::io_scheduler::thread_strategy_t::manual,
+                                         .pool = coro::thread_pool::options {
+                                             .thread_count = 1,
+                                         }});
+
+        bool is_ready = false;
+        io_scheduler->schedule(startup_coro());
+        while(!is_ready)
+        {
+            io_scheduler->process_events(std::chrono::milliseconds(1));
+        }
         
-    if(ret != rpc::error::OK())
-        return ret;
+    // if(ret != rpc::error::OK())
+    //     return ret;
+
+// rpc::spsc::channel_manager::create(std::chrono::milliseconds(1), rpc::shared_ptr<rpc::service> service, rpc::spsc::queue_type *send_spsc_queue, rpc::spsc::queue_type *receive_spsc_queue, rpc::spsc::channel_manager::connection_handler handler)
+
+            // auto ret = CO_AWAIT service->attach_remote_zone<rpc::spsc::service_proxy, yyy::i_host, yyy::i_example>(
+            //     "service_proxy", input_interface, output_interface,
+            //     [&](const rpc::shared_ptr<yyy::i_host>& host, rpc::shared_ptr<yyy::i_example>& new_example,
+            //         const rpc::shared_ptr<rpc::service>& child_service_ptr) -> CORO_TASK(int)
+            //     {
+            //         new_example
+            //             = rpc::shared_ptr<yyy::i_example>(new marshalled_tests::example(child_service_ptr, host));
+
+            //         if(use_host_in_child)
+            //             CO_AWAIT new_example->set_host(host);
+            //         CO_RETURN rpc::error::OK();
+            //     },
+            //     input_interface.destination_zone_id, channel, send_spsc_queue, receive_spsc_queue);
+            // co_return ret;
+    
+    // auto ret = rpc::child_service::create_child_zone<rpc::host_service_proxy, yyy::i_host, yyy::i_example>(
+    //     "test_enclave"
+    //     , rpc::zone{child_zone_id}
+    //     , rpc::destination_zone{host_zone_id}
+    //     , input_descr
+    //     , output_descr
+    //     , [](
+    //         const rpc::shared_ptr<yyy::i_host>& host
+    //         , rpc::shared_ptr<yyy::i_example>& new_example
+    //         , const rpc::shared_ptr<rpc::child_service>& child_service_ptr) -> int
+    //     {
+    //         example_import_idl_register_stubs(child_service_ptr);
+    //         example_shared_idl_register_stubs(child_service_ptr);
+    //         example_idl_register_stubs(child_service_ptr);
+    //         new_example = rpc::shared_ptr<yyy::i_example>(new example(child_service_ptr, host));
+    //         return rpc::error::OK();
+    //     }
+    //     , rpc_server);
+        
+    // if(ret != rpc::error::OK())
+    //     return ret;
         
     *example_object_id = output_descr.object_id.id;
     
@@ -100,98 +175,135 @@ int call_enclave(
     size_t* data_out_sz, 
     void** enclave_retry_buffer)
 {
-    if(protocol_version > rpc::get_version())
-    {
-        return rpc::error::INVALID_VERSION();
-    }
-    //a retry cache using enclave_retry_buffer as thread local storage, leaky if the client does not retry with more memory
-    if(!enclave_retry_buffer)
-    {        
-        return rpc::error::INVALID_DATA();
-    }
-
-    auto*& retry_buf = *reinterpret_cast<rpc::retry_buffer**>(enclave_retry_buffer);
-    if(retry_buf && !sgx_is_within_enclave(retry_buf, sizeof(rpc::retry_buffer*)))
-    {
-        return rpc::error::SECURITY_ERROR();
-    }
-
-
-    if(retry_buf)
-    {
-        *data_out_sz = retry_buf->data.size();
-        if(*data_out_sz > sz_out)
-        {
-            return rpc::error::NEED_MORE_MEMORY();
-        }
     
-        memcpy(data_out, retry_buf->data.data(), retry_buf->data.size());
-        auto ret = retry_buf->return_value;
-        delete retry_buf;
-        retry_buf = nullptr;
-        return ret;
-    }
+    
+    std::ignore = protocol_version;                         //version of the rpc call protocol
+    std::ignore = encoding;                                 //format of the serialised data
+    std::ignore = tag;                                      //info on the type of the call passed from the idl generator 
+    std::ignore = caller_channel_zone_id,
+    std::ignore = caller_zone_id,
+    std::ignore = zone_id;
+    std::ignore = object_id;
+    std::ignore = interface_id;
+    std::ignore = method_id;
+    std::ignore = sz_int;
+    std::ignore = data_in,
+    std::ignore = sz_out;
+    std::ignore = data_out;
+    std::ignore = data_out_sz;
+    std::ignore = enclave_retry_buffer;
+    
+    // if(protocol_version > rpc::get_version())
+    // {
+    //     return rpc::error::INVALID_VERSION();
+    // }
+    // //a retry cache using enclave_retry_buffer as thread local storage, leaky if the client does not retry with more memory
+    // if(!enclave_retry_buffer)
+    // {        
+    //     return rpc::error::INVALID_DATA();
+    // }
 
-    std::vector<char> tmp;
-    tmp.resize(sz_out);
-    int ret = rpc_server->send(
-        protocol_version,                          //version of the rpc call protocol
-        rpc::encoding(encoding),                                  //format of the serialised data
-        tag,
-        {caller_channel_zone_id}, 
-        {caller_zone_id}, 
-        {zone_id}, 
-        {object_id}, 
-        {interface_id}, 
-        {method_id}, 
-        sz_int, 
-        data_in, 
-        tmp);
-    if(ret >= rpc::error::MIN() && ret <= rpc::error::MAX())
-        return ret;
+    // auto*& retry_buf = *reinterpret_cast<rpc::retry_buffer**>(enclave_retry_buffer);
+    // if(retry_buf && !sgx_is_within_enclave(retry_buf, sizeof(rpc::retry_buffer*)))
+    // {
+    //     return rpc::error::SECURITY_ERROR();
+    // }
 
-    *data_out_sz = tmp.size();
-    if(*data_out_sz <= sz_out)
-    {
-        memcpy(data_out, tmp.data(), *data_out_sz);
-        return ret;
-    }
 
-    retry_buf = new rpc::retry_buffer{std::move(tmp), ret};
+    // if(retry_buf)
+    // {
+    //     *data_out_sz = retry_buf->data.size();
+    //     if(*data_out_sz > sz_out)
+    //     {
+    //         return rpc::error::NEED_MORE_MEMORY();
+    //     }
+    
+    //     memcpy(data_out, retry_buf->data.data(), retry_buf->data.size());
+    //     auto ret = retry_buf->return_value;
+    //     delete retry_buf;
+    //     retry_buf = nullptr;
+    //     return ret;
+    // }
+
+    // std::vector<char> tmp;
+    // tmp.resize(sz_out);
+    // int ret = rpc_server->send(
+    //     protocol_version,                          //version of the rpc call protocol
+    //     rpc::encoding(encoding),                                  //format of the serialised data
+    //     tag,
+    //     {caller_channel_zone_id}, 
+    //     {caller_zone_id}, 
+    //     {zone_id}, 
+    //     {object_id}, 
+    //     {interface_id}, 
+    //     {method_id}, 
+    //     sz_int, 
+    //     data_in, 
+    //     tmp);
+    // if(ret >= rpc::error::MIN() && ret <= rpc::error::MAX())
+    //     return ret;
+
+    // *data_out_sz = tmp.size();
+    // if(*data_out_sz <= sz_out)
+    // {
+    //     memcpy(data_out, tmp.data(), *data_out_sz);
+    //     return ret;
+    // }
+
+    // retry_buf = new rpc::retry_buffer{std::move(tmp), ret};
     return rpc::error::NEED_MORE_MEMORY();
 }
 
 int try_cast_enclave(uint64_t protocol_version, uint64_t zone_id, uint64_t object_id, uint64_t interface_id)
 {
-    if(protocol_version > rpc::get_version())
-    {
-        return rpc::error::INVALID_VERSION();
-    }
-    int ret = rpc_server->try_cast(protocol_version, {zone_id}, {object_id}, {interface_id});
-    return ret;
+    std::ignore = protocol_version;
+    std::ignore = zone_id;
+    std::ignore = object_id;
+    std::ignore = interface_id;
+    // if(protocol_version > rpc::get_version())
+    // {
+    //     return rpc::error::INVALID_VERSION();
+    // }
+    // int ret = rpc_server->try_cast(protocol_version, {zone_id}, {object_id}, {interface_id});
+    // return ret;
+    return 0;
 }
 
 uint64_t add_ref_enclave(uint64_t protocol_version, uint64_t destination_channel_zone_id, uint64_t destination_zone_id, uint64_t object_id, uint64_t caller_channel_zone_id, uint64_t caller_zone_id, char build_out_param_channel)
 {
-    if(protocol_version > rpc::get_version())
-    {
-        return std::numeric_limits<uint64_t>::max();
-    }
-    return rpc_server->add_ref(
-        protocol_version, 
-        {destination_channel_zone_id}, 
-        {destination_zone_id}, 
-        {object_id}, 
-        {caller_channel_zone_id}, 
-        {caller_zone_id}, 
-        static_cast<rpc::add_ref_options>(build_out_param_channel));
+    std::ignore = protocol_version;
+    std::ignore = destination_channel_zone_id;
+    std::ignore = destination_zone_id;
+    std::ignore = object_id;
+    std::ignore = caller_channel_zone_id;
+    std::ignore = caller_zone_id;
+    std::ignore = build_out_param_channel;
+    // if(protocol_version > rpc::get_version())
+    // {
+    //     return std::numeric_limits<uint64_t>::max();
+    // }
+    // return rpc_server->add_ref(
+    //     protocol_version, 
+    //     {destination_channel_zone_id}, 
+    //     {destination_zone_id}, 
+    //     {object_id}, 
+    //     {caller_channel_zone_id}, 
+    //     {caller_zone_id}, 
+    //     static_cast<rpc::add_ref_options>(build_out_param_channel));
+    return 0;
 }
 
 uint64_t release_enclave(uint64_t protocol_version, uint64_t zone_id, uint64_t object_id, uint64_t caller_zone_id)
 {
-    if(protocol_version > rpc::get_version())
-    {
-        return std::numeric_limits<uint64_t>::max();
-    }
-    return rpc_server->release(protocol_version, {zone_id}, {object_id}, {caller_zone_id});
+    std::ignore = protocol_version;
+    std::ignore = zone_id;
+    std::ignore = object_id;
+    std::ignore = caller_zone_id;
+    
+    // if(protocol_version > rpc::get_version())
+    // {
+    //     return std::numeric_limits<uint64_t>::max();
+    // }
+    // return rpc_server->release(protocol_version, {zone_id}, {object_id}, {caller_zone_id});
+    return 0;
 }

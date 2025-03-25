@@ -492,7 +492,7 @@ namespace rpc
 #endif                    
             
             //note the caller_channel_zone_id is 0 as the caller came from this route 
-            auto recount = CO_AWAIT caller->add_ref(
+            refcount = CO_AWAIT caller->add_ref(
                 protocol_version,
                 zone_id_.as_destination_channel(), 
                 destination_zone_id, 

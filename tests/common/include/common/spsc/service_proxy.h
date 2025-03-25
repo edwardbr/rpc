@@ -4,9 +4,10 @@
  */
 #pragma once
 
+#include <rpc/coroutine_enclave/enclave_fix.h>
+
 #include <rpc/proxy.h>
 #include <coro/coro.hpp>
-#include <coro/net/ip_address.hpp>
 
 #include <spsc/spsc.h>
 
@@ -54,6 +55,7 @@ namespace rpc::spsc
                 caller_zone caller_zone_id) override;
 
         friend rpc::service;
+        friend rpc::child_service;
 
         std::shared_ptr<rpc::spsc::channel_manager> channel_manager_;
         std::chrono::milliseconds timeout_;
