@@ -76,7 +76,7 @@ if(NOT DEPENDENCIES_LOADED)
   set(LIBCORO_BUILD_TESTS           OFF)
   set(LIBCORO_CODE_COVERAGE         OFF)
   set(LIBCORO_BUILD_EXAMPLES        OFF)
-  set(LIBCORO_FEATURE_NETWORKING    OFF)
+  set(LIBCORO_FEATURE_NETWORKING    ON)
   set(LIBCORO_FEATURE_TLS           OFF)
 
 
@@ -604,21 +604,21 @@ if(NOT DEPENDENCIES_LOADED)
       endif()
 
       set(WARN_BASELINE
-        ${CLANG_WARNS}
-        -Werror # convert warnings into errors
-
-        # -Wdeprecated-dynamic-exception-spec   #sgx is riddled with throws() -Wsuggest-destructor-override #sgx is
-        # not using override in its stl -Wdocumentation-unknown-command       #yes this would be nice
-        # -Wexit-time-destructors               #not really an error -Wglobal-constructors                 #not really
-        # an error -Wshadow-all                          #a nice to have but a big change -Wsuggest-override
-        # #RapidJson is riddled with this problem -Wold-style-cast                      #this would be a massive
-        # change -Wconversion                          #this is recommended but causes an explosion in our code
-        -Wall
-        -Wextra
-
-        # this is needed by yas
-        -Wno-variadic-macros)
-      set(WARN_PEDANTIC -DWARN_PEDANTIC ${WARN_BASELINE} -Wpedantic)
+          ${CLANG_WARNS}
+          -Wno-nullability-completeness
+          -Wno-unused-parameter
+          -Werror # convert warnings into errors
+          # -Wdeprecated-dynamic-exception-spec   #sgx is riddled with throws() -Wsuggest-destructor-override #sgx is
+          # not using override in its stl -Wdocumentation-unknown-command       #yes this would be nice
+          # -Wexit-time-destructors               #not really an error -Wglobal-constructors                 #not really
+          # an error -Wshadow-all                          #a nice to have but a big change -Wsuggest-override
+          # #RapidJson is riddled with this problem -Wold-style-cast                      #this would be a massive
+          # change -Wconversion                          #this is recommended but causes an explosion in our code
+          -Wall
+          -Wextra
+          # this is needed by yas
+          -Wno-variadic-macros)
+      set(WARN_PEDANTIC -Wno-nullability-completeness ${WARN_BASELINE})
       set(WARN_SIGN_CONVERSION -Wsign-conversion)
       set(WARN_TYPE_SIZES -Wshorten-64-to-32 -Wsign-compare -Wshift-sign-overflow)
 

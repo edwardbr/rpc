@@ -16,6 +16,7 @@ namespace rpc
         : id_(id)
         , zone_(zone)
     {
+        std::ignore = target;
 #ifdef USE_RPC_TELEMETRY
         if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             telemetry_service->on_stub_creation(zone_.get_zone_id(), id_, (uint64_t)target);

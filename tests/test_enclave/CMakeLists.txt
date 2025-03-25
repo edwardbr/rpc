@@ -30,6 +30,7 @@ if(${BUILD_ENCLAVE})
       example_idl_enclave
       example_shared_idl_enclave
       yas_common
+      libcoro_enclave
       ${SGX_ENCLAVE_LIBS})
 
   target_compile_definitions(marshal_test_enclave PRIVATE ${ENCLAVE_DEFINES})
@@ -38,7 +39,8 @@ if(${BUILD_ENCLAVE})
     PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
            "$<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/generated/include>"
            "$<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/generated/src>" "$<INSTALL_INTERFACE:include/marshalled_tests>"
-    PRIVATE ${ENCLAVE_LIBCXX_INCLUDES})
+           /home/edward/projects/rpc/tests/common/include
+    PRIVATE ${ENCLAVE_LIBCXX_INCLUDES} )
 
   if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     set(EXTRA_MARSHAL_TEST_ENCLAVE_COMPILE_OPTIONS -Wno-unused-parameter)

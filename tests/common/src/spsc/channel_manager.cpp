@@ -174,7 +174,7 @@ namespace rpc::spsc
                     else
                     {
                         auto& item = send_queue_.front();
-                        send_data = {item.begin(), item.end()};
+                        send_data = std::span<uint8_t>(item.data(), item.size());
                     }
                 }
                 if(!send_data.empty())
@@ -182,7 +182,7 @@ namespace rpc::spsc
                     if(send_data.size() < send_blob.size())
                     {
                         std::copy(send_data.begin(), send_data.end(), send_blob.begin());
-                        send_data = {send_data.end(), send_data.end()};
+                        send_data = std::span<uint8_t>(send_data.data() + send_data.size(), (size_t)0);
                     }
                     else
                     {
@@ -210,7 +210,7 @@ namespace rpc::spsc
                 {
                     if(receive_data.empty())
                     {
-                        receive_data = {prefix_buf.begin(), prefix_buf.end()};
+                        receive_data = {prefix_buf.data(), prefix_buf.size()};
                     }
                     do
                     {
@@ -223,7 +223,7 @@ namespace rpc::spsc
                         std::copy_n(blob.begin(), std::min(receive_data.size(), blob.size()), receive_data.begin());
                         if(receive_data.size() <= blob.size())
                         {
-                            receive_data = {receive_data.end(), receive_data.end()};
+                            receive_data = {receive_data.data() + receive_data.size(), (size_t)(0)};
                             break;
                         }
                         receive_data = receive_data.subspan(blob.size(), receive_data.size() - blob.size());
@@ -237,7 +237,7 @@ namespace rpc::spsc
                             LOG_CSTR("failed invalid prefix");
                             break;
                         }
-                        assert(prefix.direction);
+                        // assert(prefix.direction);
 
                         receiving_prefix = false;
                     }
@@ -248,7 +248,7 @@ namespace rpc::spsc
                     if(receive_data.empty())
                     {
                         buf = std::vector<uint8_t>(prefix.payload_size);
-                        receive_data = {buf.begin(), buf.end()};
+                        receive_data = {buf.data(), buf.size()};
                     }
                     do
                     {
@@ -261,7 +261,7 @@ namespace rpc::spsc
                         std::copy_n(blob.begin(), std::min(receive_data.size(), blob.size()), receive_data.begin());
                         if(receive_data.size() <= blob.size())
                         {
-                            receive_data = {receive_data.end(), receive_data.end()};
+                            receive_data = {receive_data.data() + receive_data.size(), (size_t)0};
                             break;
                         }
                         receive_data = receive_data.subspan(blob.size(), receive_data.size() - blob.size());

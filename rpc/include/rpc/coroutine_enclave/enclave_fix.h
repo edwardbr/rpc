@@ -13,9 +13,12 @@
 #define __wur /* Ignore */
 #define __nonnull(params)
 
-#define NONNULL _Nonnull
-// #define NONNULL
+// #define NONNULL _Nonnull
+#define NONNULL
 
+# define CLOCK_MONOTONIC		1
+typedef unsigned int            uid_t;
+typedef unsigned int            gid_t;
 typedef int clockid_t;
 typedef int __clockid_t;
 // #define __CLOCKID_T_TYPE int
@@ -42,12 +45,12 @@ time_t time(time_t* NONNULL tloc);
 
 typedef uint64_t FILE;
 
-FILE stdout_ = 1;
-FILE stderr_ = 2;
-FILE stdin_ = 3;
-FILE* NONNULL stdout = &stdout_;
-FILE* NONNULL stderr = &stderr_;
-FILE* NONNULL stdin = &stdin_;
+extern FILE stdout_;
+extern FILE stderr_;
+extern FILE stdin_;
+extern FILE* NONNULL stdout;
+extern FILE* NONNULL stderr;
+extern FILE* NONNULL stdin;
 struct fpos_t;
 
 #define FD_SETSIZE 1024

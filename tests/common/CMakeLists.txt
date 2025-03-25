@@ -10,7 +10,8 @@ message("common_enclave")
 # common_enclave
 
 if(${BUILD_ENCLAVE})
-  add_library(common_enclave STATIC src/host_service_proxy.cpp)
+  # add_library(common_enclave STATIC src/host_service_proxy.cpp)
+  add_library(common_enclave STATIC src/spsc/service_proxy.cpp src/spsc/channel_manager.cpp  src/foo_impl.cpp)
 
   target_compile_definitions(common_enclave PRIVATE ${ENCLAVE_DEFINES})
   target_include_directories(

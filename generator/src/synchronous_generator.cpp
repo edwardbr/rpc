@@ -1131,6 +1131,9 @@ namespace synchronous_generator
              "__rpc_out_buf)",
             interface_name);
         stub("{{");
+        stub("std::ignore = protocol_version;");
+        stub("std::ignore = caller_channel_zone_id;");
+        stub("std::ignore = caller_zone_id;");
 
         bool has_methods = false;
         for (auto& function : m_ob.get_functions())
@@ -1953,6 +1956,7 @@ namespace synchronous_generator
         stub_header("void {}_register_stubs(const rpc::shared_ptr<rpc::service>& srv);", module_name);
         stub("void {}_register_stubs(const rpc::shared_ptr<rpc::service>& srv)", module_name);
         stub("{{");
+        stub("std::ignore = srv;");
 
         std::set<std::string> done;
 

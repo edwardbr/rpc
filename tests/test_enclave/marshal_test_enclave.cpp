@@ -16,7 +16,7 @@
 #include <rpc/error_codes.h>
 
 #include <common/foo_impl.h>
-#include <common/host_service_proxy.h>
+// #include <common/host_service_proxy.h>
 
 #include <example/example.h>
 
@@ -27,7 +27,10 @@
 #include <rpc/telemetry/enclave_telemetry_service.h>
 #endif
 
-using namespace marshalled_tests;
+#include <common/spsc/channel_manager.h>
+#include <common/spsc/service_proxy.h>
+
+// using namespace marshalled_tests;
 
 #ifdef USE_RPC_TELEMETRY
 TELEMETRY_SERVICE_MANAGER
@@ -36,8 +39,21 @@ TELEMETRY_SERVICE_MANAGER
 rpc::shared_ptr<rpc::child_service> rpc_server;
 uint64_t enclave_id_ = 0;
 
+int on_new_thread(uint64_t enclave_id, uint64_t temporary_id)
+{
+    std::ignore = enclave_id;
+    std::ignore = temporary_id;
+    return 0;
+}
+
 int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t host_id, uint64_t child_zone_id, uint64_t enclave_id, uint64_t* example_object_id)
 {
+    std::ignore = host_zone_id;
+    std::ignore = host_id;
+    std::ignore = child_zone_id;
+    std::ignore = enclave_id;
+    std::ignore = example_object_id;
+    
     enclave_id_ = enclave_id;
     rpc::interface_descriptor input_descr{};
     rpc::interface_descriptor output_descr{};
@@ -98,6 +114,7 @@ int call_enclave(uint64_t protocol_version, // version of the rpc call protocol
     size_t* data_out_sz,
     void** enclave_retry_buffer)
 {
+<<<<<<< HEAD
     if (protocol_version > rpc::get_version())
     {
         return rpc::error::INVALID_VERSION();

@@ -536,6 +536,9 @@ namespace yas_generator
                 ", rpc::encoding __rpc_enc",
                 false));
         proxy("{{");
+        proxy("std::ignore = __rpc_buf;");
+        proxy("std::ignore = __rpc_buf_size;");
+        proxy("std::ignore = __rpc_enc;");
 
         if (has_inparams)
         {
