@@ -18,10 +18,10 @@
 	url = https://github.com/gabime/spdlog.git
 [submodule "submodules/libcoro"]
 	path = submodules/libcoro
-	url = https://github.com/jbaldwin/libcoro.git
+	url = https://github.com/edwardbr/libcoro.git
 [submodule "submodules/c-ares"]
 	path = submodules/c-ares
 	url = https://github.com/c-ares/c-ares.git
 [submodule "submodules/range-v3"]
 	path = submodules/range-v3
-	url = https://github.com/ericniebler/range-v3.git
+	url = https://github.com/edwardbr/range-v3.git
