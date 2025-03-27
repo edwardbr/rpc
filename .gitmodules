@@ -24,7 +24,7 @@
 	url = https://github.com/c-ares/c-ares.git
 [submodule "submodules/range-v3"]
 	path = submodules/range-v3
-	url = https://github.com/ericniebler/range-v3.git
+	url = https://github.com/edwardbr/range-v3.git
 [submodule "submodules/json"]
 	path = submodules/json
 	url = https://github.com/nlohmann/json.git
