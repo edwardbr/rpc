@@ -296,8 +296,12 @@ function(
       endforeach()
     endif()
 
-    install(DIRECTORY \"$<BUILD_INTERFACE:${output_path}>\" DESTINATION ${params_install_dir})
-    install(FILES \"$<BUILD_INTERFACE:${idl}>\" DESTINATION ${params_install_dir}/${idl_relative_dir})
+    if(params_install_dir)
+      install(DIRECTORY \"$<BUILD_INTERFACE:${output_path}/include/${sub_directory}>\" DESTINATION ${params_install_dir}/interfaces/include)
+      install(DIRECTORY \"$<BUILD_INTERFACE:${output_path}/src/${sub_directory}>\" DESTINATION ${params_install_dir}/interfaces/src)
+      install(DIRECTORY \"$<BUILD_INTERFACE:${output_path}/check_sums/${sub_directory}>\" DESTINATION ${params_install_dir}/interfaces/check_sums)
+      install(FILES \"$<BUILD_INTERFACE:${idl}>\" DESTINATION ${params_install_dir}/${idl_relative_dir})
+    endif()
     ")
     endif()
 
@@ -374,7 +378,9 @@ function(
     endif()
 
     if(params_install_dir)
-      install(DIRECTORY "$<BUILD_INTERFACE:${output_path}>" DESTINATION ${params_install_dir})
+      install(DIRECTORY "$<BUILD_INTERFACE:${output_path}/include/${sub_directory}>" DESTINATION ${params_install_dir}/interfaces/include)
+      install(DIRECTORY "$<BUILD_INTERFACE:${output_path}/src/${sub_directory}>" DESTINATION ${params_install_dir}/interfaces/src)
+      install(DIRECTORY "$<BUILD_INTERFACE:${output_path}/check_sums/${sub_directory}>" DESTINATION ${params_install_dir}/interfaces/check_sums)
       install(FILES "$<BUILD_INTERFACE:${idl}>" DESTINATION ${params_install_dir}/${idl_relative_dir})
     endif()
 endfunction()
