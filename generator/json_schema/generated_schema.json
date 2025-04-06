@@ -6,6 +6,621 @@
   "definitions": 
   {
 
+    "Role": 
+    {
+
+      "type": "integer",
+      "enum": 
+      [
+
+        0,
+        1,
+        2
+      ],
+      "description": "Represents user roles. Possible values: ADMIN = 0; USER = 1; GUEST = 2"
+    },
+    "User": 
+    {
+
+      "type": "object",
+      "properties": 
+      {
+
+        "error": 
+        {
+
+          "description": "User's full name",
+          "type": "integer"
+        },
+        "name": 
+        {
+
+          "description": "User's full name",
+          "type": "string"
+        },
+        "oldSessionId": 
+        {
+
+          "deprecated": true,
+          "type": "integer"
+        },
+        "userId": 
+        {
+
+          "type": "string"
+        }
+      },
+      "required": 
+      [
+
+        "userId"
+      ],
+      "additionalProperties": false
+    },
+    "xxx_i_foo_do_something_in_by_val_ref_receive": 
+    {
+
+      "type": "object",
+      "description": "Parameters for do_something_in_by_val_ref_receive from interface i_foo",
+      "properties": 
+      {
+
+      },
+      "additionalProperties": false
+    },
+    "xxx_i_foo_do_something_in_by_val_ref_send": 
+    {
+
+      "type": "object",
+      "description": "Parameters for do_something_in_by_val_ref_send from interface i_foo",
+      "properties": 
+      {
+
+        "val": 
+        {
+
+          "type": "integer"
+        }
+      },
+      "required": 
+      [
+
+        "val"
+      ],
+      "additionalProperties": false
+    },
+    "xxx_i_foo_do_something_in_move_ref_receive": 
+    {
+
+      "type": "object",
+      "description": "Parameters for do_something_in_move_ref_receive from interface i_foo",
+      "properties": 
+      {
+
+      },
+      "additionalProperties": false
+    },
+    "xxx_i_foo_do_something_in_move_ref_send": 
+    {
+
+      "type": "object",
+      "description": "Parameters for do_something_in_move_ref_send from interface i_foo",
+      "properties": 
+      {
+
+        "val": 
+        {
+
+          "type": "integer"
+        }
+      },
+      "required": 
+      [
+
+        "val"
+      ],
+      "additionalProperties": false
+    },
+    "xxx_i_foo_do_something_in_out_ref_receive": 
+    {
+
+      "type": "object",
+      "description": "Parameters for do_something_in_out_ref_receive from interface i_foo",
+      "properties": 
+      {
+
+        "val": 
+        {
+
+          "type": "integer"
+        }
+      },
+      "required": 
+      [
+
+        "val"
+      ],
+      "additionalProperties": false
+    },
+    "xxx_i_foo_do_something_in_out_ref_send": 
+    {
+
+      "type": "object",
+      "description": "Parameters for do_something_in_out_ref_send from interface i_foo",
+      "properties": 
+      {
+
+        "val": 
+        {
+
+          "type": "integer"
+        }
+      },
+      "required": 
+      [
+
+        "val"
+      ],
+      "additionalProperties": false
+    },
+    "xxx_i_foo_do_something_in_ptr_receive": 
+    {
+
+      "type": "object",
+      "description": "Parameters for do_something_in_ptr_receive from interface i_foo",
+      "properties": 
+      {
+
+      },
+      "additionalProperties": false
+    },
+    "xxx_i_foo_do_something_in_ptr_send": 
+    {
+
+      "type": "object",
+      "description": "Parameters for do_something_in_ptr_send from interface i_foo",
+      "properties": 
+      {
+
+        "val": 
+        {
+
+          "type": "integer"
+        }
+      },
+      "required": 
+      [
+
+        "val"
+      ],
+      "additionalProperties": false
+    },
+    "xxx_i_foo_do_something_in_ref_receive": 
+    {
+
+      "type": "object",
+      "description": "Parameters for do_something_in_ref_receive from interface i_foo",
+      "properties": 
+      {
+
+      },
+      "additionalProperties": false
+    },
+    "xxx_i_foo_do_something_in_ref_send": 
+    {
+
+      "type": "object",
+      "description": "Parameters for do_something_in_ref_send from interface i_foo",
+      "properties": 
+      {
+
+        "val": 
+        {
+
+          "type": "integer"
+        }
+      },
+      "required": 
+      [
+
+        "val"
+      ],
+      "additionalProperties": false
+    },
+    "xxx_i_foo_do_something_in_val_receive": 
+    {
+
+      "type": "object",
+      "description": "Parameters for do_something_in_val_receive from interface i_foo",
+      "properties": 
+      {
+
+      },
+      "additionalProperties": false
+    },
+    "xxx_i_foo_do_something_in_val_send": 
+    {
+
+      "type": "object",
+      "description": "Parameters for do_something_in_val_send from interface i_foo",
+      "properties": 
+      {
+
+        "val": 
+        {
+
+          "type": "integer"
+        }
+      },
+      "required": 
+      [
+
+        "val"
+      ],
+      "additionalProperties": false
+    },
+    "xxx_i_foo_do_something_out_ptr_ptr_receive": 
+    {
+
+      "type": "object",
+      "description": "Parameters for do_something_out_ptr_ptr_receive from interface i_foo",
+      "properties": 
+      {
+
+        "val": 
+        {
+
+          "type": "integer"
+        }
+      },
+      "required": 
+      [
+
+        "val"
+      ],
+      "additionalProperties": false
+    },
+    "xxx_i_foo_do_something_out_ptr_ptr_send": 
+    {
+
+      "type": "object",
+      "description": "Parameters for do_something_out_ptr_ptr_send from interface i_foo",
+      "properties": 
+      {
+
+      },
+      "additionalProperties": false
+    },
+    "xxx_i_foo_do_something_out_ptr_ref_receive": 
+    {
+
+      "type": "object",
+      "description": "Parameters for do_something_out_ptr_ref_receive from interface i_foo",
+      "properties": 
+      {
+
+        "val": 
+        {
+
+          "type": "integer"
+        }
+      },
+      "required": 
+      [
+
+        "val"
+      ],
+      "additionalProperties": false
+    },
+    "xxx_i_foo_do_something_out_ptr_ref_send": 
+    {
+
+      "type": "object",
+      "description": "Parameters for do_something_out_ptr_ref_send from interface i_foo",
+      "properties": 
+      {
+
+      },
+      "additionalProperties": false
+    },
+    "xxx_i_foo_do_something_out_val_receive": 
+    {
+
+      "type": "object",
+      "description": "Parameters for do_something_out_val_receive from interface i_foo",
+      "properties": 
+      {
+
+        "val": 
+        {
+
+          "type": "integer"
+        }
+      },
+      "required": 
+      [
+
+        "val"
+      ],
+      "additionalProperties": false
+    },
+    "xxx_i_foo_do_something_out_val_send": 
+    {
+
+      "type": "object",
+      "description": "Parameters for do_something_out_val_send from interface i_foo",
+      "properties": 
+      {
+
+      },
+      "additionalProperties": false
+    },
+    "xxx_i_foo_give_something_complicated_move_ref_receive": 
+    {
+
+      "type": "object",
+      "description": "Parameters for give_something_complicated_move_ref_receive from interface i_foo",
+      "properties": 
+      {
+
+      },
+      "additionalProperties": false
+    },
+    "xxx_i_foo_give_something_complicated_move_ref_send": 
+    {
+
+      "type": "object",
+      "description": "Parameters for give_something_complicated_move_ref_send from interface i_foo",
+      "properties": 
+      {
+
+        "val": 
+        {
+
+          "$ref": "#/definitions/xxx_something_complicated"
+        }
+      },
+      "required": 
+      [
+
+        "val"
+      ],
+      "additionalProperties": false
+    },
+    "xxx_i_foo_give_something_complicated_ptr_receive": 
+    {
+
+      "type": "object",
+      "description": "Parameters for give_something_complicated_ptr_receive from interface i_foo",
+      "properties": 
+      {
+
+      },
+      "additionalProperties": false
+    },
+    "xxx_i_foo_give_something_complicated_ptr_send": 
+    {
+
+      "type": "object",
+      "description": "Parameters for give_something_complicated_ptr_send from interface i_foo",
+      "properties": 
+      {
+
+        "val": 
+        {
+
+          "$ref": "#/definitions/xxx_something_complicated"
+        }
+      },
+      "required": 
+      [
+
+        "val"
+      ],
+      "additionalProperties": false
+    },
+    "xxx_i_foo_give_something_complicated_ref_receive": 
+    {
+
+      "type": "object",
+      "description": "Parameters for give_something_complicated_ref_receive from interface i_foo",
+      "properties": 
+      {
+
+      },
+      "additionalProperties": false
+    },
+    "xxx_i_foo_give_something_complicated_ref_send": 
+    {
+
+      "type": "object",
+      "description": "Parameters for give_something_complicated_ref_send from interface i_foo",
+      "properties": 
+      {
+
+        "val": 
+        {
+
+          "$ref": "#/definitions/xxx_something_complicated"
+        }
+      },
+      "required": 
+      [
+
+        "val"
+      ],
+      "additionalProperties": false
+    },
+    "xxx_i_foo_give_something_complicated_ref_val_receive": 
+    {
+
+      "type": "object",
+      "description": "Parameters for give_something_complicated_ref_val_receive from interface i_foo",
+      "properties": 
+      {
+
+      },
+      "additionalProperties": false
+    },
+    "xxx_i_foo_give_something_complicated_ref_val_send": 
+    {
+
+      "type": "object",
+      "description": "Parameters for give_something_complicated_ref_val_send from interface i_foo",
+      "properties": 
+      {
+
+        "val": 
+        {
+
+          "$ref": "#/definitions/xxx_something_complicated"
+        }
+      },
+      "required": 
+      [
+
+        "val"
+      ],
+      "additionalProperties": false
+    },
+    "xxx_i_foo_give_something_complicated_val_receive": 
+    {
+
+      "type": "object",
+      "description": "Parameters for give_something_complicated_val_receive from interface i_foo",
+      "properties": 
+      {
+
+      },
+      "additionalProperties": false
+    },
+    "xxx_i_foo_give_something_complicated_val_send": 
+    {
+
+      "type": "object",
+      "description": "Parameters for give_something_complicated_val_send from interface i_foo",
+      "properties": 
+      {
+
+        "val": 
+        {
+
+          "$ref": "#/definitions/xxx_something_complicated"
+        }
+      },
+      "required": 
+      [
+
+        "val"
+      ],
+      "additionalProperties": false
+    },
+    "xxx_i_foo_recieve_something_complicated_in_out_ref_receive": 
+    {
+
+      "type": "object",
+      "description": "Parameters for recieve_something_complicated_in_out_ref_receive from interface i_foo",
+      "properties": 
+      {
+
+        "val": 
+        {
+
+          "$ref": "#/definitions/xxx_something_complicated"
+        }
+      },
+      "required": 
+      [
+
+        "val"
+      ],
+      "additionalProperties": false
+    },
+    "xxx_i_foo_recieve_something_complicated_in_out_ref_send": 
+    {
+
+      "type": "object",
+      "description": "Parameters for recieve_something_complicated_in_out_ref_send from interface i_foo",
+      "properties": 
+      {
+
+        "val": 
+        {
+
+          "$ref": "#/definitions/xxx_something_complicated"
+        }
+      },
+      "required": 
+      [
+
+        "val"
+      ],
+      "additionalProperties": false
+    },
+    "xxx_i_foo_recieve_something_complicated_ptr_receive": 
+    {
+
+      "type": "object",
+      "description": "Parameters for recieve_something_complicated_ptr_receive from interface i_foo",
+      "properties": 
+      {
+
+        "val": 
+        {
+
+          "$ref": "#/definitions/xxx_something_complicated"
+        }
+      },
+      "required": 
+      [
+
+        "val"
+      ],
+      "additionalProperties": false
+    },
+    "xxx_i_foo_recieve_something_complicated_ptr_send": 
+    {
+
+      "type": "object",
+      "description": "Parameters for recieve_something_complicated_ptr_send from interface i_foo",
+      "properties": 
+      {
+
+      },
+      "additionalProperties": false
+    },
+    "xxx_i_foo_recieve_something_complicated_ref_receive": 
+    {
+
+      "type": "object",
+      "description": "Parameters for recieve_something_complicated_ref_receive from interface i_foo",
+      "properties": 
+      {
+
+        "val": 
+        {
+
+          "$ref": "#/definitions/xxx_something_complicated"
+        }
+      },
+      "required": 
+      [
+
+        "val"
+      ],
+      "additionalProperties": false
+    },
+    "xxx_i_foo_recieve_something_complicated_ref_send": 
+    {
+
+      "type": "object",
+      "description": "Parameters for recieve_something_complicated_ref_send from interface i_foo",
+      "properties": 
+      {
+
+      },
+      "additionalProperties": false
+    },
     "xxx_something_complicated": 
     {
 

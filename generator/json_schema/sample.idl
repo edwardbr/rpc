@@ -1,9 +1,29 @@
-/*
- *   Copyright (c) 2024 Edward Boggis-Rolfe
- *   All rights reserved.
- */
- 
+
 typedef int error_code;
+
+struct User {
+    [required]
+    [description="Unique user identifier (UUID format)"]
+    [format="uuid"]
+    string userId;
+
+    [description="User's full name"]
+    string name;
+
+    [deprecated] // Mark the whole field as deprecated
+    long oldSessionId;
+    
+    [description="User's full name"]
+    error_code error;
+};
+
+[description="Represents user roles"]
+enum Role {
+    ADMIN,
+    USER,
+    GUEST
+};
+
 
 namespace xxx
 {
@@ -17,13 +37,6 @@ struct something_more_complicated
 {
     std::vector<something_complicated> vector_val;
     std::map<std::string, something_complicated> map_val;    
-};
-
-
-template<typename T>
-struct typed_payload
-{
-    std::array<uint8_t, sizeof(T)> payload;
 };
 
 interface i_foo
@@ -46,41 +59,5 @@ interface i_foo
     error_code recieve_something_complicated_ref(                  [out, by_value]         something_complicated       &   val); 
     error_code recieve_something_complicated_ptr(                  [out]                   something_complicated       *&  val); 
     error_code recieve_something_complicated_in_out_ref(           [in, out, by_value]     something_complicated       &   val); 
-
-    error_code give_something_more_complicated_val(                [in]                    something_more_complicated      val);
-    error_code give_something_more_complicated_ref(                [in]            const   something_more_complicated  &   val);
-    error_code give_something_more_complicated_move_ref(           [in]                    something_more_complicated  &&  val);
-    error_code give_something_more_complicated_ref_val(            [in, by_value]  const   something_more_complicated  &   val);
-    error_code give_something_more_complicated_ptr(                [in]            const   something_more_complicated  *   val);
-    error_code recieve_something_more_complicated_ref(             [out, by_value]         something_more_complicated  &   val);
-    error_code recieve_something_more_complicated_ptr(             [out]                   something_more_complicated  *&  val);
-    error_code recieve_something_more_complicated_in_out_ref(      [in, out, by_value]     something_more_complicated  &   val);
-
-    error_code do_multi_val(int val1, int val2);
-    error_code do_multi_complicated_val(const something_more_complicated val1, const something_more_complicated val2);
-
-
-
-    error_code recieve_interface([out]rpc::shared_ptr<i_foo>& val);//can be null
-    error_code give_interface([in]rpc::shared_ptr<i_baz> val);//can be null
-    error_code call_baz_interface([in]const rpc::shared_ptr<i_baz>& val);//can be null
-    error_code create_baz_interface([out]rpc::shared_ptr<i_baz>& val);//can be null
-    error_code get_null_interface([out]rpc::shared_ptr<i_baz>& val);//can be null
-    
-    error_code set_interface([in]const rpc::shared_ptr<i_baz>& val);//can be null
-    error_code get_interface([out]rpc::shared_ptr<i_baz>& val);//can be null
-
-    error_code exception_test();
-};
-
-interface i_bar
-{
-    error_code do_something_else(int val);
-};    
-
-interface i_baz
-{
-    error_code callback(int val);
-    error_code blob_test([in] const std::vector<uint8_t>& inval, [out] std::vector<uint8_t>& out_val);
 };
 }

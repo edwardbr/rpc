@@ -9,11 +9,13 @@
 #include <set>
 #include <map>
 #include <sstream>
-#include <algorithm>   // For std::find_if_not, std::reverse
+#include <algorithm>   // For std::find_if_not, std::reverse, std::find_if
 #include <cctype>      // For std::isspace, std::iscntrl
 #include <type_traits> // For underlying_type used with ALL_POSSIBLE_MEMBERS
 #include <typeinfo>    // For dynamic_cast
-#include <stdexcept>   // For std::stoll exceptions
+#include <stdexcept>   // For std::stoll exceptions, std::stoi
+#include <memory>      // For std::shared_ptr
+#include <variant>     // For storing different definition info types
 
 // Declare verboseStream if used globally by the generator/parser
 extern std::stringstream verboseStream;
@@ -21,34 +23,47 @@ extern std::stringstream verboseStream;
 namespace json_schema_generator
 {
 
-    // Forward declarations
-    void
-    map_idl_type_to_json_schema(const class_entity& root,
-                                const class_entity* current_context, // Added context
-                                const std::string& idl_type_name, const attributes& attribs, json_writer& writer,
-                                std::set<std::string>& definitions_needed,
-                                std::set<std::string>& definitions_written,       // Pass written set to avoid re-adding
-                                const std::set<std::string>& currently_processing // Pass processing set for cycle check
-    );
+    // --- Forward Declarations ---
+    struct SyntheticMethodInfo;
+    using DefinitionInfoVariant = std::variant<const class_entity*, SyntheticMethodInfo>;
+    using OrderedDefinitionItem = std::pair<std::string, DefinitionInfoVariant>;
 
+    void map_idl_type_to_json_schema(const class_entity& root, const class_entity* current_context,
+                                     const std::string& idl_type_name, const attributes& attribs, json_writer& writer,
+                                     std::set<std::string>& definitions_needed,
+                                     std::set<std::string>& definitions_written,
+                                     const std::set<std::string>& currently_processing,
+                                     const std::map<std::string, DefinitionInfoVariant>& definition_info_map);
     void write_schema_definition(const class_entity& root, const class_entity& ent, json_writer& writer,
-                                 std::set<std::string>& definitions_needed,
-                                 std::set<std::string>& definitions_written, // Pass needed sets for recursive calls
-                                 const std::set<std::string>& currently_processing);
+                                 std::set<std::string>& definitions_needed, std::set<std::string>& definitions_written,
+                                 const std::set<std::string>& currently_processing,
+                                 const std::map<std::string, DefinitionInfoVariant>& definition_info_map);
+    void
+    write_synthetic_method_struct_definition(const class_entity& root, const SyntheticMethodInfo& info,
+                                             json_writer& writer, std::set<std::string>& definitions_needed,
+                                             std::set<std::string>& definitions_written,
+                                             const std::set<std::string>& currently_processing,
+                                             const std::map<std::string, DefinitionInfoVariant>& definition_info_map);
+    void find_definable_entities(const class_entity& current_entity, std::vector<OrderedDefinitionItem>& ordered_defs);
 
-    // --- Helper functions to check attributes ---
+    // --- Struct to hold info for synthetic method structs ---
+    struct SyntheticMethodInfo
+    {
+        const class_entity* interface_entity = nullptr;
+        const function_entity* method_entity = nullptr;
+        bool is_send_struct = true;
+    };
+
+    // --- Helper functions ---
     bool has_attribute(const attributes& attribs, const std::string& name)
     {
         for(const auto& attr : attribs)
         {
-            if(attr == name)
-                return true;
-            if(attr.rfind(name + "=", 0) == 0)
+            if(attr == name || attr.rfind(name + "=", 0) == 0)
                 return true;
         }
         return false;
     }
-
     std::string find_attribute_value(const attributes& attribs, const std::string& name)
     {
         for(const auto& attr : attribs)
@@ -58,12 +73,10 @@ namespace json_schema_generator
                 if(attr.length() > name.length() + 1)
                 {
                     std::string value = attr.substr(name.length() + 1);
-                    // Handle potential quotes around attribute values
                     if(value.length() >= 2 && value.front() == '"' && value.back() == '"')
                     {
                         value = value.substr(1, value.length() - 2);
                     }
-                    // Handle potential single quotes
                     else if(value.length() >= 2 && value.front() == '\'' && value.back() == '\'')
                     {
                         value = value.substr(1, value.length() - 2);
@@ -72,15 +85,12 @@ namespace json_schema_generator
                 }
                 else
                 {
-                    return ""; // Attribute name found, but no value after '='
+                    return "";
                 }
             }
         }
-        return ""; // Attribute name not found
+        return "";
     }
-    // --- End Attribute Helpers ---
-
-    // Helper to clean type names
     std::string clean_type_name(const std::string& raw_type)
     {
         std::string cleaned = raw_type;
@@ -92,19 +102,19 @@ namespace json_schema_generator
         cleaned.erase(last_good_char.base(), cleaned.end());
         return cleaned;
     }
-
-    // Helper to parse template arguments
     bool parse_template_args(const std::string& type_name, std::string& container_name, std::vector<std::string>& args)
     {
         args.clear();
         size_t open_bracket = type_name.find('<');
         size_t close_bracket = type_name.rfind('>');
-        if(open_bracket == std::string::npos || close_bracket == std::string::npos || close_bracket < open_bracket)
+        if(open_bracket == std::string::npos || close_bracket == std::string::npos || close_bracket <= open_bracket)
             return false;
         container_name = clean_type_name(type_name.substr(0, open_bracket));
         if(container_name.empty())
             return false;
         std::string args_str = type_name.substr(open_bracket + 1, close_bracket - open_bracket - 1);
+        if(args_str.empty())
+            return false;
         int bracket_level = 0;
         size_t current_arg_start = 0;
         for(size_t i = 0; i < args_str.length(); ++i)
@@ -120,19 +130,21 @@ namespace json_schema_generator
             }
             else if(args_str[i] == ',' && bracket_level == 0)
             {
-                args.push_back(clean_type_name(args_str.substr(current_arg_start, i - current_arg_start)));
+                std::string arg = clean_type_name(args_str.substr(current_arg_start, i - current_arg_start));
+                if(arg.empty())
+                    return false;
+                args.push_back(arg);
                 current_arg_start = i + 1;
             }
         }
         if(bracket_level != 0)
             return false;
-        args.push_back(clean_type_name(args_str.substr(current_arg_start)));
-        if(args.empty() || (args.size() == 1 && args[0].empty()))
+        std::string last_arg = clean_type_name(args_str.substr(current_arg_start));
+        if(last_arg.empty())
             return false;
-        return true;
+        args.push_back(last_arg);
+        return !args.empty();
     }
-
-    // Helper to get a qualified name suitable for JSON definitions
     std::string get_qualified_name(const entity& ent)
     {
         std::string qualified_name;
@@ -148,7 +160,8 @@ namespace json_schema_generator
             const class_entity* owner = current_class_ptr->get_owner();
             if(owner == nullptr || owner->get_name().empty() || owner->get_name() == "__global__"
                || (owner->get_entity_type() != entity_type::NAMESPACE && owner->get_entity_type() != entity_type::CLASS
-                   && owner->get_entity_type() != entity_type::STRUCT))
+                   && owner->get_entity_type() != entity_type::STRUCT
+                   && owner->get_entity_type() != entity_type::INTERFACE))
             {
                 break;
             }
@@ -167,10 +180,7 @@ namespace json_schema_generator
         }
         return qualified_name;
     }
-
-    // Helper: Tries to find a definition within a specific scope and its parents
-    bool find_type_upwards(const class_entity* start_scope, const std::string& type_name_cleaned,
-                           std::shared_ptr<class_entity>& found_entity_sp)
+    const class_entity* find_type_entity_upwards(const class_entity* start_scope, const std::string& type_name_cleaned)
     {
         const class_entity* current_scope = start_scope;
         while(current_scope != nullptr)
@@ -186,23 +196,45 @@ namespace json_schema_generator
                     if(et == entity_type::TYPEDEF || et == entity_type::STRUCT || et == entity_type::ENUM
                        || et == entity_type::CLASS || et == entity_type::SEQUENCE)
                     {
-                        found_entity_sp = std::dynamic_pointer_cast<class_entity>(element_ptr);
-                        if(found_entity_sp)
-                            return true;
+                        const class_entity* found_direct_entity = dynamic_cast<const class_entity*>(element_ptr.get());
+                        if(found_direct_entity)
+                            return found_direct_entity;
                     }
                 }
             }
             current_scope = current_scope->get_owner();
         }
+        return nullptr;
+    }
+    bool find_class_in_map(const std::string& type_name_cleaned,
+                           const std::map<std::string, DefinitionInfoVariant>& definition_info_map,
+                           const class_entity*& found_entity)
+    {
+        auto it = definition_info_map.find(type_name_cleaned);
+        if(it != definition_info_map.end() && std::holds_alternative<const class_entity*>(it->second))
+        {
+            found_entity = std::get<const class_entity*>(it->second);
+            return (found_entity != nullptr);
+        }
+        size_t last_sep = type_name_cleaned.rfind('_');
+        if(last_sep != std::string::npos)
+        {
+            std::string base_name = type_name_cleaned.substr(last_sep + 1);
+            it = definition_info_map.find(base_name);
+            if(it != definition_info_map.end() && std::holds_alternative<const class_entity*>(it->second))
+            {
+                found_entity = std::get<const class_entity*>(it->second);
+                return (found_entity != nullptr);
+            }
+        }
         return false;
     }
 
-    // Main function to write the definition for a specific entity
-    void write_schema_definition(const class_entity& root,
-                                 const class_entity& ent, // The entity being defined
-                                 json_writer& writer, std::set<std::string>& definitions_needed,
-                                 std::set<std::string>& definitions_written,
-                                 const std::set<std::string>& currently_processing)
+    // Main function to write the definition for a specific NON-SYNTHETIC entity
+    void write_schema_definition(const class_entity& root, const class_entity& ent, json_writer& writer,
+                                 std::set<std::string>& definitions_needed, std::set<std::string>& definitions_written,
+                                 const std::set<std::string>& currently_processing,
+                                 const std::map<std::string, DefinitionInfoVariant>& definition_info_map)
     {
         if(ent.get_is_template())
         {
@@ -212,48 +244,43 @@ namespace json_schema_generator
             writer.close_object();
             return;
         }
-
         writer.open_object();
         const attributes& definition_attribs = ent.get_attributes();
-        std::string description = find_attribute_value(definition_attribs, "description");
-        if(!description.empty())
-        {
-            writer.write_string_property("description", description);
-        }
+        std::string attr_description = find_attribute_value(definition_attribs, "description");
         if(has_attribute(definition_attribs, "deprecated"))
         {
             writer.write_raw_property("deprecated", "true");
         }
-
         switch(ent.get_entity_type())
         {
         case entity_type::STRUCT:
         case entity_type::CLASS:
         {
+            if(!attr_description.empty())
+            {
+                writer.write_string_property("description", attr_description);
+            }
             writer.write_string_property("type", "object");
             std::vector<std::string> required_fields;
             std::map<std::string, std::pair<std::string, attributes>> properties;
             for(const auto& element_ptr : ent.get_elements(entity_type::FUNCTION_VARIABLE))
             {
-                if(!element_ptr)
+                if(!element_ptr || element_ptr->get_entity_type() != entity_type::FUNCTION_VARIABLE)
                     continue;
-                if(element_ptr->get_entity_type() == entity_type::FUNCTION_VARIABLE)
+                const auto* var = dynamic_cast<const function_entity*>(element_ptr.get());
+                if(!var)
+                    continue;
+                std::string member_name = clean_type_name(var->get_name());
+                std::string raw_member_type = var->get_return_type();
+                if(member_name.empty() || raw_member_type.empty())
+                    continue;
+                std::string cleaned_member_type = clean_type_name(raw_member_type);
+                if(cleaned_member_type.empty())
+                    continue;
+                properties[member_name] = {cleaned_member_type, var->get_attributes()};
+                if(has_attribute(var->get_attributes(), "required"))
                 {
-                    const auto* var = dynamic_cast<const function_entity*>(element_ptr.get());
-                    if(!var)
-                        continue;
-                    std::string member_name = clean_type_name(var->get_name());
-                    std::string raw_member_type = var->get_return_type();
-                    if(member_name.empty() || raw_member_type.empty())
-                        continue;
-                    std::string cleaned_member_type = clean_type_name(raw_member_type);
-                    if(cleaned_member_type.empty())
-                        continue;
-                    properties[member_name] = {cleaned_member_type, var->get_attributes()};
-                    if(has_attribute(var->get_attributes(), "required"))
-                    {
-                        required_fields.push_back(member_name);
-                    }
+                    required_fields.push_back(member_name);
                 }
             }
             if(!properties.empty())
@@ -264,7 +291,8 @@ namespace json_schema_generator
                 {
                     writer.write_key(pair.first);
                     map_idl_type_to_json_schema(root, &ent, pair.second.first, pair.second.second, writer,
-                                                definitions_needed, definitions_written, currently_processing);
+                                                definitions_needed, definitions_written, currently_processing,
+                                                definition_info_map);
                 }
                 writer.close_object();
             }
@@ -289,9 +317,11 @@ namespace json_schema_generator
         }
         case entity_type::ENUM:
         {
-            writer.write_string_property("type", "string");
+            writer.write_string_property("type", "integer");
             writer.write_key("enum");
             writer.open_array();
+            int next_value = 0;
+            std::vector<std::string> value_descriptions;
             using underlying = std::underlying_type<entity_type>::type;
             const entity_type ALL_POSSIBLE_MEMBERS
                 = static_cast<entity_type>(static_cast<underlying>(entity_type::NAMESPACE_MEMBERS)
@@ -303,52 +333,206 @@ namespace json_schema_generator
                 std::string enum_value_name = clean_type_name(element_ptr->get_name());
                 if(!enum_value_name.empty() && enum_value_name.find_first_of("{}[]() \t\n\r") == std::string::npos)
                 {
-                    writer.write_array_string_element(enum_value_name);
+                    int assigned_value = next_value;
+                    bool explicit_value_found = false;
+                    const function_entity* value_entity = dynamic_cast<const function_entity*>(element_ptr.get());
+                    if(value_entity)
+                    {
+                        std::string explicit_value_str = clean_type_name(value_entity->get_return_type());
+                        if(!explicit_value_str.empty())
+                        {
+                            try
+                            {
+                                assigned_value = std::stoi(explicit_value_str);
+                                explicit_value_found = true;
+                            }
+                            catch(const std::exception& e)
+                            { /* Log warning */
+                            }
+                        }
+                    }
+                    writer.write_array_raw_element(std::to_string(assigned_value));
+                    value_descriptions.push_back(enum_value_name + " = " + std::to_string(assigned_value));
+                    next_value = assigned_value + 1;
                 }
             }
             writer.close_array();
+            if(!value_descriptions.empty())
+            {
+                std::string final_description = attr_description;
+                if(!final_description.empty())
+                {
+                    final_description += ". ";
+                }
+                final_description += "Possible values: ";
+                for(size_t i = 0; i < value_descriptions.size(); ++i)
+                {
+                    final_description += value_descriptions[i];
+                    if(i < value_descriptions.size() - 1)
+                    {
+                        final_description += "; ";
+                    }
+                }
+                writer.write_string_property("description", final_description);
+            }
+            else if(!attr_description.empty())
+            {
+                writer.write_string_property("description", attr_description);
+            }
             break;
         }
         case entity_type::SEQUENCE:
         {
+            if(!attr_description.empty())
+            {
+                writer.write_string_property("description", attr_description);
+            }
             writer.write_string_property("type", "array");
             std::string element_type = clean_type_name(ent.get_alias_name());
             if(!element_type.empty())
             {
                 writer.write_key("items");
                 map_idl_type_to_json_schema(root, &ent, element_type, {}, writer, definitions_needed,
-                                            definitions_written, currently_processing);
+                                            definitions_written, currently_processing, definition_info_map);
             }
             else
-            { /* handle missing element type */
+            {
+                writer.write_key("items");
+                writer.open_object();
+                writer.write_string_property("description", "Warning: Sequence element type not determined.");
+                writer.close_object();
             }
             break;
         }
         default:
+        {
+            if(!attr_description.empty())
+            {
+                writer.write_string_property("description", attr_description);
+            }
             writer.write_string_property("type", "null");
             writer.write_string_property("description", "Error: Unexpected entity type in write_schema_definition: "
                                                             + std::to_string(static_cast<int>(ent.get_entity_type())));
             break;
         }
+        }
+        writer.close_object();
+    }
+
+    // Writes definition for synthetic _send or _receive structs
+    // ** RESTORED **
+    void
+    write_synthetic_method_struct_definition(const class_entity& root, const SyntheticMethodInfo& info,
+                                             json_writer& writer, std::set<std::string>& definitions_needed,
+                                             std::set<std::string>& definitions_written,
+                                             const std::set<std::string>& currently_processing,
+                                             const std::map<std::string, DefinitionInfoVariant>& definition_info_map)
+    {
+        if(!info.interface_entity || !info.method_entity)
+        {
+            writer.open_object();
+            writer.write_string_property("type", "null");
+            writer.write_string_property("description", "Error: Invalid info for synthetic struct generation.");
+            writer.close_object();
+            return;
+        }
+        writer.open_object();
+        writer.write_string_property("type", "object");
+        std::string struct_type = info.is_send_struct ? "_send" : "_receive";
+        std::string description = "Parameters for " + info.method_entity->get_name() + struct_type + " from interface "
+                                  + info.interface_entity->get_name();
+        writer.write_string_property("description", description);
+        std::vector<std::string> required_fields;
+        std::map<std::string, std::pair<std::string, attributes>> properties;
+        for(const auto& param : info.method_entity->get_parameters())
+        {
+            bool is_in = has_attribute(param.get_attributes(), "in");
+            bool is_out = has_attribute(param.get_attributes(), "out");
+            bool implicitly_in = !is_in && !is_out;
+            bool include_param = info.is_send_struct ? (is_in || implicitly_in) : is_out;
+            if(include_param)
+            {
+                std::string param_name = clean_type_name(param.get_name());
+                std::string raw_param_type = param.get_type();
+                if(param_name.empty() || raw_param_type.empty())
+                    continue;
+                std::string cleaned_param_type = clean_type_name(raw_param_type);
+                if(cleaned_param_type.empty())
+                    continue;
+                properties[param_name] = {cleaned_param_type, param.get_attributes()};
+                if(!has_attribute(param.get_attributes(), "optional"))
+                {
+                    required_fields.push_back(param_name);
+                }
+            }
+        }
+        if(!properties.empty())
+        {
+            writer.write_key("properties");
+            writer.open_object();
+            for(const auto& pair : properties)
+            {
+                writer.write_key(pair.first);
+                map_idl_type_to_json_schema(root, info.interface_entity, pair.second.first, pair.second.second, writer,
+                                            definitions_needed, definitions_written, currently_processing,
+                                            definition_info_map);
+            }
+            writer.close_object();
+        }
+        else
+        {
+            writer.write_key("properties");
+            writer.open_object();
+            writer.close_object();
+        }
+        if(!required_fields.empty())
+        {
+            writer.write_key("required");
+            writer.open_array();
+            for(const auto& field : required_fields)
+            {
+                writer.write_array_string_element(field);
+            }
+            writer.close_array();
+        }
+        writer.write_raw_property("additionalProperties", "false");
         writer.close_object();
     }
 
     // Maps an IDL type name to its JSON schema representation
-    void map_idl_type_to_json_schema(const class_entity& root,
-                                     const class_entity* current_context, // Context where the type name is used
-                                     const std::string& idl_type_name_in,
-                                     const attributes& attribs, // Attributes from the usage site
+    // ** RESTORED **
+    void map_idl_type_to_json_schema(const class_entity& root, const class_entity* current_context,
+                                     const std::string& idl_type_name_in, const attributes& attribs,
                                      json_writer& writer, std::set<std::string>& definitions_needed,
                                      std::set<std::string>& definitions_written,
-                                     const std::set<std::string>& currently_processing)
+                                     const std::set<std::string>& currently_processing,
+                                     const std::map<std::string, DefinitionInfoVariant>& definition_info_map)
     {
         std::string idl_type_name_cleaned = clean_type_name(idl_type_name_in);
         if(idl_type_name_cleaned.empty())
-        { /* handle error */
+        {
+            writer.open_object();
+            writer.write_string_property("type", "null");
+            writer.write_string_property("description",
+                                         "Error: Invalid or empty type name encountered ('" + idl_type_name_in + "').");
+            writer.close_object();
             return;
         }
-
-        // --- 1. Check for standard containers ---
+        if(is_char_star(idl_type_name_cleaned) || idl_type_name_cleaned == "char*")
+        {
+            writer.open_object();
+            std::string description = find_attribute_value(attribs, "description");
+            if(!description.empty())
+                writer.write_string_property("description", description);
+            if(has_attribute(attribs, "deprecated"))
+                writer.write_raw_property("deprecated", "true");
+            writer.write_string_property("type", "string");
+            writer.close_object();
+            return;
+        }
+        std::string ignored_modifiers;
+        strip_reference_modifiers(idl_type_name_cleaned, ignored_modifiers);
+        idl_type_name_cleaned = unconst(idl_type_name_cleaned);
         std::string container_name;
         std::vector<std::string> template_args;
         if(parse_template_args(idl_type_name_cleaned, container_name, template_args))
@@ -367,7 +551,7 @@ namespace json_schema_generator
                     writer.write_raw_property("deprecated", "true");
                 writer.write_key("items");
                 map_idl_type_to_json_schema(root, current_context, template_args[0], {}, writer, definitions_needed,
-                                            definitions_written, currently_processing);
+                                            definitions_written, currently_processing, definition_info_map);
                 writer.close_object();
                 return;
             }
@@ -398,7 +582,7 @@ namespace json_schema_generator
                 }
                 writer.write_key("items");
                 map_idl_type_to_json_schema(root, current_context, template_args[0], {}, writer, definitions_needed,
-                                            definitions_written, currently_processing);
+                                            definitions_written, currently_processing, definition_info_map);
                 writer.close_object();
                 return;
             }
@@ -419,42 +603,42 @@ namespace json_schema_generator
                 writer.open_object();
                 writer.write_key("k");
                 map_idl_type_to_json_schema(root, current_context, template_args[0], {}, writer, definitions_needed,
-                                            definitions_written, currently_processing);
+                                            definitions_written, currently_processing, definition_info_map);
                 writer.write_key("v");
                 map_idl_type_to_json_schema(root, current_context, template_args[1], {}, writer, definitions_needed,
-                                            definitions_written, currently_processing);
-                writer.close_object(); // properties
+                                            definitions_written, currently_processing, definition_info_map);
+                writer.close_object();
                 writer.write_key("required");
                 writer.open_array();
                 writer.write_array_string_element("k");
                 writer.write_array_string_element("v");
                 writer.close_array();
                 writer.write_raw_property("additionalProperties", "false");
-                writer.close_object(); // items
+                writer.close_object();
                 writer.close_object();
                 return;
             }
         }
-
-        // --- 2. If not a container, try resolving type (upward search + global) ---
-        std::shared_ptr<class_entity> found_entity_sp;
+        const class_entity* found_entity_ptr = nullptr;
         bool found = false;
         if(current_context != nullptr)
         {
-            found = find_type_upwards(current_context, idl_type_name_cleaned, found_entity_sp);
-        }
-        if(!found)
-        {
-            if(root.find_class(idl_type_name_cleaned, found_entity_sp) && found_entity_sp != nullptr)
+            found_entity_ptr = find_type_entity_upwards(current_context, idl_type_name_cleaned);
+            if(found_entity_ptr)
             {
                 found = true;
             }
         }
-
-        // --- 3. Process found entity or fallback to basic types / error ---
-        if(found && found_entity_sp != nullptr)
+        if(!found)
         {
-            const class_entity& found_entity = *found_entity_sp;
+            if(find_class_in_map(idl_type_name_cleaned, definition_info_map, found_entity_ptr))
+            {
+                found = true;
+            }
+        }
+        if(found && found_entity_ptr != nullptr)
+        {
+            const class_entity& found_entity = *found_entity_ptr;
             entity_type et = found_entity.get_entity_type();
             if(et == entity_type::TYPEDEF)
             {
@@ -462,10 +646,11 @@ namespace json_schema_generator
                 if(!underlying_type.empty())
                 {
                     map_idl_type_to_json_schema(root, current_context, underlying_type, attribs, writer,
-                                                definitions_needed, definitions_written, currently_processing);
+                                                definitions_needed, definitions_written, currently_processing,
+                                                definition_info_map);
                 }
                 else
-                { /* Error */
+                {
                     writer.open_object();
                     writer.write_string_property("type", "null");
                     writer.write_string_property("description", "Error: Typedef underlying type invalid.");
@@ -494,7 +679,7 @@ namespace json_schema_generator
                     }
                 }
                 else
-                { /* Error */
+                {
                     writer.open_object();
                     writer.write_string_property("type", "null");
                     writer.write_string_property("description", "Error: Failed get qualified name for $ref.");
@@ -502,26 +687,17 @@ namespace json_schema_generator
                 }
                 return;
             }
-            // If found type isn't one we handle (e.g. INTERFACE), fall through
         }
-
-        // --- 4. If not found or not handled complex, check basic types ---
         std::string idl_type_name = idl_type_name_cleaned;
-        std::string ref_mods;
-        strip_reference_modifiers(idl_type_name, ref_mods); // Modifies idl_type_name
-        idl_type_name = unconst(idl_type_name);             // Returns new string
-
         writer.open_object();
         std::string description = find_attribute_value(attribs, "description");
         if(!description.empty())
             writer.write_string_property("description", description);
         if(has_attribute(attribs, "deprecated"))
             writer.write_raw_property("deprecated", "true");
-
-        // ** RESTORED Explicit Checks **
         if(is_int8(idl_type_name) || is_uint8(idl_type_name) || is_int16(idl_type_name) || is_uint16(idl_type_name)
            || is_int32(idl_type_name) || is_uint32(idl_type_name) || is_int64(idl_type_name) || is_uint64(idl_type_name)
-           || is_long(idl_type_name) || is_ulong(idl_type_name) || idl_type_name == "int") // Restored plain int check
+           || is_long(idl_type_name) || is_ulong(idl_type_name) || idl_type_name == "int" || idl_type_name == "char")
         {
             writer.write_string_property("type", "integer");
         }
@@ -533,7 +709,7 @@ namespace json_schema_generator
         {
             writer.write_string_property("type", "boolean");
         }
-        else if(idl_type_name == "string" || idl_type_name == "std::string" || is_char_star(idl_type_name))
+        else if(idl_type_name == "string" || idl_type_name == "std::string")
         {
             writer.write_string_property("type", "string");
             std::string format = find_attribute_value(attribs, "format");
@@ -542,9 +718,8 @@ namespace json_schema_generator
         }
         else
         {
-            // --- 5. Final fallback: Unknown type ---
             writer.write_string_property("type", "null");
-            std::string error_msg = "Error: Could not resolve IDL type '" + idl_type_name_cleaned + "'";
+            std::string error_msg = "Error: Could not resolve IDL type '" + idl_type_name_in + "'";
             if(current_context != nullptr)
             {
                 std::string context_name = get_qualified_name(*current_context);
@@ -552,45 +727,68 @@ namespace json_schema_generator
                     context_name = current_context->get_name();
                 error_msg += " used within scope '" + context_name + "'";
             }
-            error_msg += " (Searched scope and global definitions).";
+            error_msg += " (Searched scope and global definitions). Stripped type checked: '" + idl_type_name + "'.";
             writer.write_string_property("description", error_msg);
         }
         writer.close_object();
     }
 
-    // ** MODIFIED: Skips template definitions **
-    void find_definable_entities(const class_entity& current_entity,
-                                 std::map<std::string, const class_entity*>& definables)
+    // Finds interfaces and adds synthetic struct info, populates ordered list
+    // ** RESTORED **
+    void find_definable_entities(const class_entity& current_entity, std::vector<OrderedDefinitionItem>& ordered_defs)
     {
         entity_type et = current_entity.get_entity_type();
         if(current_entity.is_in_import())
             return;
         bool is_template_definition = current_entity.get_is_template();
         std::string qualified_name = get_qualified_name(current_entity);
-        if(!qualified_name.empty())
+        if(!qualified_name.empty() && !is_template_definition)
         {
-            if((et == entity_type::STRUCT || et == entity_type::ENUM || et == entity_type::CLASS
-                || et == entity_type::SEQUENCE)
-               && !is_template_definition)
+            if(et == entity_type::STRUCT || et == entity_type::ENUM || et == entity_type::CLASS
+               || et == entity_type::SEQUENCE)
             {
-                if(definables.find(qualified_name) == definables.end())
+                bool found = false;
+                for(const auto& item : ordered_defs)
                 {
-                    definables[qualified_name] = &current_entity;
+                    if(item.first == qualified_name)
+                    {
+                        found = true;
+                        break;
+                    }
+                }
+                if(!found)
+                {
+                    ordered_defs.push_back({qualified_name, &current_entity});
                 }
             }
-            else if(is_template_definition)
-            { /* verboseStream << "Skipping template definition: " << qualified_name << std::endl; */
+            else if(et == entity_type::INTERFACE)
+            {
+                for(const auto& element_ptr : current_entity.get_elements(entity_type::FUNCTION_METHOD))
+                {
+                    if(!element_ptr || element_ptr->get_entity_type() != entity_type::FUNCTION_METHOD)
+                        continue;
+                    const function_entity* method = dynamic_cast<const function_entity*>(element_ptr.get());
+                    if(!method)
+                        continue;
+                    std::string method_name = clean_type_name(method->get_name());
+                    if(method_name.empty())
+                        continue;
+                    std::string send_struct_name = qualified_name + "_" + method_name + "_send";
+                    std::string receive_struct_name = qualified_name + "_" + method_name + "_receive";
+                    ordered_defs.push_back({send_struct_name, SyntheticMethodInfo {&current_entity, method, true}});
+                    ordered_defs.push_back({receive_struct_name, SyntheticMethodInfo {&current_entity, method, false}});
+                }
             }
         }
         entity_type members_to_get = entity_type::TYPE_NULL;
         if(!is_template_definition)
-        { // Don't recurse into template members
+        {
             if(et == entity_type::NAMESPACE || current_entity.get_owner() == nullptr
                || current_entity.get_name() == "__global__")
             {
                 members_to_get = entity_type::NAMESPACE_MEMBERS;
             }
-            else if(et == entity_type::STRUCT || et == entity_type::CLASS)
+            else if(et == entity_type::STRUCT || et == entity_type::CLASS || et == entity_type::INTERFACE)
             {
                 members_to_get = entity_type::STRUCTURE_MEMBERS | entity_type::NAMESPACE_MEMBERS;
             }
@@ -601,44 +799,29 @@ namespace json_schema_generator
             {
                 if(!element_ptr || element_ptr->is_in_import())
                     continue;
-                const entity* element = element_ptr.get();
-                entity_type child_et = element->get_entity_type();
-                const class_entity* child_class = dynamic_cast<const class_entity*>(element);
+                const class_entity* child_class = dynamic_cast<const class_entity*>(element_ptr.get());
                 if(!child_class)
                     continue;
-                bool child_is_template = child_class->get_is_template();
-                if((child_et == entity_type::STRUCT || child_et == entity_type::ENUM || child_et == entity_type::CLASS
-                    || child_et == entity_type::SEQUENCE)
-                   && !child_is_template)
-                {
-                    std::string child_qualified_name = get_qualified_name(*child_class);
-                    if(!child_qualified_name.empty() && definables.find(child_qualified_name) == definables.end())
-                    {
-                        definables[child_qualified_name] = child_class;
-                    }
-                }
-                if((child_et == entity_type::NAMESPACE || child_et == entity_type::STRUCT
-                    || child_et == entity_type::CLASS)
-                   && !child_is_template)
-                {
-                    find_definable_entities(*child_class, definables);
-                }
+                find_definable_entities(*child_class, ordered_defs);
             }
         }
     }
 
     // Entry point function
+    // ** RESTORED **
     void write_json_schema(const class_entity& root_entity, std::ostream& os,
                            const std::string& schema_title = "Generated Schema")
     {
         json_writer writer(os);
         std::set<std::string> definitions_needed;
         std::set<std::string> definitions_written;
-        std::map<std::string, const class_entity*> definable_entities;
-        find_definable_entities(root_entity, definable_entities);
-        for(const auto& pair : definable_entities)
+        std::vector<OrderedDefinitionItem> ordered_defs;
+        std::map<std::string, DefinitionInfoVariant> definition_info_map;
+        find_definable_entities(root_entity, ordered_defs);
+        for(const auto& item : ordered_defs)
         {
-            definitions_needed.insert(pair.first);
+            definition_info_map[item.first] = item.second;
+            definitions_needed.insert(item.first);
         }
         writer.open_object();
         writer.write_string_property("$schema", "http://json-schema.org/draft-07/schema#");
@@ -646,35 +829,66 @@ namespace json_schema_generator
         writer.write_key("definitions");
         writer.open_object();
         int processed_count = 0;
-        const int max_processed = definable_entities.size() * 3 + 20;
+        const int max_processed = (definition_info_map.size()) * 3 + 20;
         std::set<std::string> currently_processing;
         while(!definitions_needed.empty() && processed_count++ < max_processed)
         {
             std::string current_name = *definitions_needed.begin();
             definitions_needed.erase(definitions_needed.begin());
-            if(definitions_written.count(current_name))
+            if(definitions_written.count(current_name) || currently_processing.count(current_name))
                 continue;
-            if(currently_processing.count(current_name))
-                continue;
-            auto it = definable_entities.find(current_name);
-            if(it != definable_entities.end() && it->second != nullptr)
+            auto it_info = definition_info_map.find(current_name);
+            if(it_info != definition_info_map.end())
             {
                 currently_processing.insert(current_name);
                 writer.write_key(current_name);
-                write_schema_definition(root_entity, *(it->second), writer, definitions_needed, definitions_written,
-                                        currently_processing);
+                std::visit(
+                    [&](auto&& arg)
+                    {
+                        using T = std::decay_t<decltype(arg)>;
+                        if constexpr(std::is_same_v<T, const class_entity*>)
+                        {
+                            write_schema_definition(root_entity, *arg, writer, definitions_needed, definitions_written,
+                                                    currently_processing, definition_info_map);
+                        }
+                        else if constexpr(std::is_same_v<T, SyntheticMethodInfo>)
+                        {
+                            write_synthetic_method_struct_definition(root_entity, arg, writer, definitions_needed,
+                                                                     definitions_written, currently_processing,
+                                                                     definition_info_map);
+                        }
+                    },
+                    it_info->second);
                 currently_processing.erase(current_name);
                 definitions_written.insert(current_name);
             }
             else
-            { /* handle definition not found error */
+            {
+                writer.write_key(current_name);
+                writer.open_object();
+                writer.write_string_property("type", "null");
+                writer.write_string_property("description",
+                                             "Error: Definition info not found for '" + current_name + "'.");
+                writer.close_object();
+                definitions_written.insert(current_name);
             }
         }
         if(processed_count >= max_processed && !definitions_needed.empty())
-        { /* handle max processing error */
+        {
+            writer.write_key("__GENERATION_ERROR__");
+            writer.open_object();
+            writer.write_string_property("description", "Max processing limit reached.");
+            writer.write_key("remaining_definitions");
+            writer.open_array();
+            for(const auto& remaining_name : definitions_needed)
+            {
+                writer.write_array_string_element(remaining_name);
+            }
+            writer.close_array();
+            writer.close_object();
         }
-        writer.close_object(); // Close definitions
-        writer.close_object(); // Close main schema object
+        writer.close_object();
+        writer.close_object();
         os << std::endl;
     }
 
