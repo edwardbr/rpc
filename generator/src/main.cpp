@@ -25,6 +25,8 @@
 #include "yas_generator.h"
 #include "component_checksum.h"
 
+#include "json_schema/generator.h"
+
 using namespace std;
 
 std::stringstream verboseStream;
@@ -341,6 +343,40 @@ int main(const int argc, char* argv[])
             {
                 ofstream file(header_fs_path);
                 file << header_stream.str();
+            }
+        }
+
+        {
+            auto pos = header_path.rfind(".h");
+            if(pos == std::string::npos)
+            {
+                std::cerr << "failed looking for a .h suffix " << header_path << '\n';
+                return -1;
+            }
+
+            auto file_path = header_path.substr(0, pos) + ".json";
+
+            auto json_schema_fs_path = std::filesystem::path(output_path) / "json_schema" / file_path;
+
+            std::filesystem::create_directories(json_schema_fs_path.parent_path());
+
+            // read the original data and close the files afterwards
+            string json_schema_data;
+
+            {
+                ifstream hfs(json_schema_fs_path);
+                std::getline(hfs, json_schema_data, '\0');
+            }
+
+            std::stringstream json_schema_stream;
+
+            // Generate the JSON Schema
+            json_schema_generator::write_json_schema(*objects, json_schema_stream, module_name); // Use filename as title
+
+            if(is_different(json_schema_stream, json_schema_data))
+            {
+                ofstream file(json_schema_fs_path);
+                file << json_schema_stream.str();
             }
         }
     }
