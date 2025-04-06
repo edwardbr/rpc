@@ -1,0 +1,81 @@
+
+{
+
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "/home/edward/projects/rpc/generator/json_schema/sample.idl",
+  "definitions": 
+  {
+
+    "xxx_something_complicated": 
+    {
+
+      "type": "object",
+      "properties": 
+      {
+
+        "int_val": 
+        {
+
+          "type": "integer"
+        },
+        "string_val": 
+        {
+
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "xxx_something_more_complicated": 
+    {
+
+      "type": "object",
+      "properties": 
+      {
+
+        "map_val": 
+        {
+
+          "type": "array",
+          "items": 
+          {
+
+            "type": "object",
+            "properties": 
+            {
+
+              "k": 
+              {
+
+                "type": "string"
+              },
+              "v": 
+              {
+
+                "$ref": "#/definitions/xxx_something_complicated"
+              }
+            },
+            "required": 
+            [
+
+              "k",
+              "v"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "vector_val": 
+        {
+
+          "type": "array",
+          "items": 
+          {
+
+            "$ref": "#/definitions/xxx_something_complicated"
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
