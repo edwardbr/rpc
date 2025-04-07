@@ -166,6 +166,10 @@ void render_parameter(writer& wrtr, const class_entity& m_ob, const parameter_en
 void render_function(writer& wrtr, const class_entity& m_ob, const function_entity& function)
 {
     std::string modifier;
+    if(function.is_static())
+    {
+        modifier += "inline static ";
+    }
     bool has_struct = false;
     for(auto& item : function.get_attributes())
     {

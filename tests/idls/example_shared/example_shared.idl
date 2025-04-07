@@ -4,6 +4,8 @@ namespace xxx
 {
     struct something_complicated
     {
+        static std::string foo = "hello";
+
         int int_val;
         std::string string_val;
     };
@@ -22,6 +24,8 @@ namespace xxx
 
     interface i_foo
     {
+        static std::string foo = "hello";
+
         error_code do_something_in_val(                                                        int                             val); //marshal by value - implictly const
         error_code do_something_in_ref(                                [in]            const   int                         &   val); //marshal by reference - implictly const, cannot be enclave memory addresses will be refused
         error_code do_something_in_by_val_ref(                         [in, by_value]  const   int                         &   val); //marshal by value - implictly const

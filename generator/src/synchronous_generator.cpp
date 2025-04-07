@@ -1869,6 +1869,15 @@ namespace rpc_generator
                 auto type = field->get_entity_type();
                 if(type != entity_type::CPPQUOTE && type != entity_type::FUNCTION_PUBLIC && type != entity_type::FUNCTION_PRIVATE && type != entity_type::CONSTEXPR)
                 {
+                    if(field->get_entity_type() == entity_type::FUNCTION_VARIABLE)
+                    {
+                        auto* function_variable = static_cast<const function_entity*>(field.get());
+                        if(function_variable->is_static())
+                        {
+                            continue;
+                        }
+                    }
+                    
                     has_fields = true;
                     break;
                 }
@@ -1881,7 +1890,17 @@ namespace rpc_generator
                 {
                     auto type = field->get_entity_type();
                     if(type != entity_type::CPPQUOTE && type != entity_type::FUNCTION_PUBLIC && type != entity_type::FUNCTION_PRIVATE && type != entity_type::CONSTEXPR)
+                    {
+                        if(field->get_entity_type() == entity_type::FUNCTION_VARIABLE)
+                        {
+                            auto* function_variable = static_cast<const function_entity*>(field.get());
+                            if(function_variable->is_static())
+                            {
+                                continue;
+                            }
+                        }
                         header("  ,(\"{0}\", {0})", field->get_name());
+                    }
                 }
                 header(");");
             }
@@ -1930,7 +1949,17 @@ namespace rpc_generator
                 {
                     auto type = field->get_entity_type();
                     if(type != entity_type::CPPQUOTE && type != entity_type::FUNCTION_PUBLIC && type != entity_type::FUNCTION_PRIVATE && type != entity_type::CONSTEXPR)
+                    {
+                        if(field->get_entity_type() == entity_type::FUNCTION_VARIABLE)
+                        {
+                            auto* function_variable = static_cast<const function_entity*>(field.get());
+                            if(function_variable->is_static())
+                            {
+                                continue;
+                            }
+                        }
                         first_pass = false;
+                    }
                 }
                 has_params = !first_pass;
             }
@@ -1945,6 +1974,15 @@ namespace rpc_generator
                     auto type = field->get_entity_type();
                     if(type != entity_type::CPPQUOTE && type != entity_type::FUNCTION_PUBLIC && type != entity_type::FUNCTION_PRIVATE && type != entity_type::CONSTEXPR)
                     {
+                        if(field->get_entity_type() == entity_type::FUNCTION_VARIABLE)
+                        {
+                            auto* function_variable = static_cast<const function_entity*>(field.get());
+                            if(function_variable->is_static())
+                            {
+                                continue;
+                            }
+                        }
+                                                
                         header.raw("\n");
                         header.print_tabs();
                         header.raw("{1}lhs.{0} != rhs.{0}", field->get_name(), first_pass ? "" : "|| ");
