@@ -109,13 +109,9 @@ function(
     set(ADDITIONAL_HEADERS ${ADDITIONAL_HEADERS} --additional_headers "${additional_headers}")
   endforeach()
 
-  message("params_rethrow_stub_exception ${params_rethrow_stub_exception}")
-
   foreach(rethrow ${params_rethrow_stub_exception})
     set(RETHROW_STUB_EXCEPTION ${RETHROW_STUB_EXCEPTION} --rethrow_stub_exception "${rethrow}")
   endforeach()
-
-  message("params_additional_stub_header ${params_additional_stub_header}")
 
   foreach(stub_header ${params_additional_stub_header})
     set(ADDITIONAL_STUB_HEADER ${ADDITIONAL_STUB_HEADER} --additional_stub_header "${stub_header}")
