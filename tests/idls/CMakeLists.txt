@@ -14,7 +14,7 @@ RPCGenerate(
   ""
   mock example_shared/example_shared_mock.h
   include_paths ${CMAKE_CURRENT_SOURCE_DIR}/.
-  generated_install_dir include/secretarium/idls)
+  params_install_dir include/secretarium/idls)
 
 RPCGenerate(
   example_import
@@ -26,7 +26,7 @@ RPCGenerate(
   mock example_import/example_import_mock.h
   dependencies example_shared_idl
   include_paths ${CMAKE_CURRENT_SOURCE_DIR}/.
-  generated_install_dir include/secretarium/idls)
+  params_install_dir include/secretarium/idls)
 
 RPCGenerate(
   example
@@ -38,4 +38,4 @@ RPCGenerate(
   mock example/example_mock.h
   dependencies example_import_idl example_shared_idl
   include_paths ${CMAKE_CURRENT_SOURCE_DIR}/.
-  generated_install_dir include/secretarium/idls)
+  params_install_dir include/secretarium/idls)

@@ -29,7 +29,6 @@ if(${BUILD_ENCLAVE})
       example_import_idl_enclave
       example_idl_enclave
       example_shared_idl_enclave
-      os_sandbox_enclave
       yas_common
       ${SGX_ENCLAVE_LIBS})
 
@@ -41,7 +40,11 @@ if(${BUILD_ENCLAVE})
            "$<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/generated/src>" "$<INSTALL_INTERFACE:include/marshalled_tests>"
     PRIVATE ${ENCLAVE_LIBCXX_INCLUDES})
 
-  target_compile_options(marshal_test_enclave PRIVATE ${ENCLAVE_COMPILE_OPTIONS} ${WARN_PEDANTIC})
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    set(EXTRA_MARSHAL_TEST_ENCLAVE_COMPILE_OPTIONS -Wno-unused-parameter)
+  endif()
+
+  target_compile_options(marshal_test_enclave PRIVATE ${ENCLAVE_COMPILE_OPTIONS} ${WARN_PEDANTIC} ${EXTRA_MARSHAL_TEST_ENCLAVE_COMPILE_OPTIONS})
   target_link_options(marshal_test_enclave PRIVATE ${ENCLAVE_LINK_OPTIONS} ${WARN_PEDANTIC})
 
   set_property(TARGET marshal_test_enclave PROPERTY COMPILE_PDB_NAME marshal_test_enclave)

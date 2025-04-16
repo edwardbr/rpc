@@ -22,7 +22,8 @@ if(RPC_STANDALONE)
   # fmt CMakeLists.txt defines a PUBLIC_HEADER property which triggers a warning when used as a subproject
   set_property(TARGET fmt PROPERTY PUBLIC_HEADER)
     
-  add_subdirectory(clipp)
+  add_subdirectory(args)
+  add_library(args::args ALIAS args)
 
   if(BUILD_ENCLAVE)
     # this is needed as the linker symbols are different against the global settings
@@ -45,15 +46,13 @@ if(RPC_STANDALONE)
 
   add_subdirectory(idlparser)
 
-  if(BUILD_TEST)
-    message("spdlog this is used in tests only and does not need to be installed for other users")
-    set(SPDLOG_FMT_EXTERNAL
-        ON
-        CACHE BOOL "external fmt" FORCE)
-    set(SPDLOG_NO_EXCEPTIONS
-        ON
-        CACHE BOOL "no exceptions" FORCE)
-    set(SPDLOG_INSTALL OFF)
-    add_subdirectory(spdlog)
-  endif(BUILD_TEST)
+  message("spdlog this is used in tests only and does not need to be installed for other users")
+  set(SPDLOG_FMT_EXTERNAL
+      ON
+      CACHE BOOL "external fmt" FORCE)
+  set(SPDLOG_NO_EXCEPTIONS
+      ON
+      CACHE BOOL "no exceptions" FORCE)
+  set(SPDLOG_INSTALL OFF)
+  add_subdirectory(spdlog)
 endif()

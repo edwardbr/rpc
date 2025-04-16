@@ -22,6 +22,25 @@ namespace rpc
     thread_local service* current_service_ = nullptr;
     service* service::get_current_service() {return current_service_;}
     void service::set_current_service(service* svc) {current_service_ = svc;}
+
+    thread_local caller_zone current_caller_ = {};
+    caller_zone service::get_current_caller() {return current_caller_;}
+    
+    struct current_caller_manager
+    {
+        caller_zone previous_caller_;
+        
+        current_caller_manager(caller_zone new_caller) : 
+            previous_caller_(current_caller_)
+        {
+            current_caller_ = new_caller;
+        }
+        ~current_caller_manager()
+        {
+            current_caller_ = previous_caller_;
+        }
+    };
+    
     
     std::atomic<uint64_t> service::zone_id_generator = 0;
     zone service::generate_new_zone_id() 
@@ -204,6 +223,8 @@ namespace rpc
     )
     {
         current_service_tracker tracker(this);
+        current_caller_manager cc(caller_zone_id);
+        
         if(destination_zone_id != zone_id_.as_destination())
         {
             rpc::shared_ptr<service_proxy> other_zone;
@@ -652,6 +673,8 @@ namespace rpc
     )
     {
         current_service_tracker tracker(this);
+        current_caller_manager cc(caller_zone_id);
+        
 #ifdef USE_RPC_TELEMETRY
         if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
         {
@@ -1031,6 +1054,7 @@ namespace rpc
     )
     {
         current_service_tracker tracker(this);
+        current_caller_manager cc(caller_zone_id);
 
         if(destination_zone_id != zone_id_.as_destination())
         {
