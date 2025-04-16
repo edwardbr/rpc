@@ -22,10 +22,11 @@ namespace rpc
     thread_local caller_zone current_caller_ = {};
     caller_zone service::get_current_caller() {return current_caller_;}
 
-    struct current_caller_manager
+    class current_caller_manager
     {
         caller_zone previous_caller_;
 
+    public:
         current_caller_manager(caller_zone new_caller) :
             previous_caller_(current_caller_)
         {

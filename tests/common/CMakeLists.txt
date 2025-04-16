@@ -14,8 +14,8 @@ if(${BUILD_ENCLAVE})
     PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>" "$<INSTALL_INTERFACE:include/marshalled_tests>"
     PRIVATE ${ENCLAVE_LIBCXX_INCLUDES})
 
-  target_compile_options(common_enclave PRIVATE ${ENCLAVE_COMPILE_OPTIONS} ${WARN_PEDANTIC})
-  target_link_options(common_enclave PRIVATE ${ENCLAVE_LINK_OPTIONS} ${WARN_PEDANTIC})
+  target_compile_options(common_enclave PRIVATE ${ENCLAVE_COMPILE_OPTIONS} ${WARN_BASELINE})
+  target_link_options(common_enclave PRIVATE ${ENCLAVE_LINK_OPTIONS})
 
   if(USE_RPC_TELEMETRY)
     set(TELEMETRY_ENCLAVE_EDL rpc_telemetry_edl_header_enclave)
