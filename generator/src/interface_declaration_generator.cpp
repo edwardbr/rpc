@@ -26,7 +26,7 @@ namespace rpc_generator
         enum param_type
         {
             BY_VALUE,
-            REFERANCE,
+            REFERENCE,
             MOVE,
             POINTER,
             POINTER_REFERENCE,
@@ -80,7 +80,7 @@ namespace rpc_generator
     };
 
     template<>
-    std::string renderer::render<renderer::REFERANCE>(print_type option, const class_entity& lib,
+    std::string renderer::render<renderer::REFERENCE>(print_type option, const class_entity& lib,
                                                       const std::string& name, bool is_in, bool is_out, bool is_const,
                                                       const std::string& object_type, uint64_t& count) const
     {
@@ -92,7 +92,7 @@ namespace rpc_generator
 
         if(is_out)
         {
-            throw std::runtime_error("REFERANCE does not support out vals");
+            throw std::runtime_error("REFERENCE does not support out vals");
         }
 
         switch(option)
@@ -324,7 +324,7 @@ namespace rpc_generator
                 }
                 else
                 {
-                    output = renderer().render<renderer::REFERANCE>(option, lib, name, in, out, is_const, type_name,
+                    output = renderer().render<renderer::REFERENCE>(option, lib, name, in, out, is_const, type_name,
                                                                     count);
                 }
             }
