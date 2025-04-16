@@ -1,5 +1,3 @@
-#pragma once
-
 #include "coreclasses.h" // Your parser API header
 #include "cpp_parser.h"  // Your parser API header
 #include "json_schema/generator.h"
@@ -336,7 +334,6 @@ namespace json_schema_generator
                 if(!enum_value_name.empty() && enum_value_name.find_first_of("{}[]() \t\n\r") == std::string::npos)
                 {
                     int assigned_value = next_value;
-                    bool explicit_value_found = false;
                     const function_entity* value_entity = dynamic_cast<const function_entity*>(element_ptr.get());
                     if(value_entity)
                     {
@@ -346,7 +343,6 @@ namespace json_schema_generator
                             try
                             {
                                 assigned_value = std::stoi(explicit_value_str);
-                                explicit_value_found = true;
                             }
                             catch(const std::exception& e)
                             { 
@@ -832,7 +828,7 @@ namespace json_schema_generator
         writer.write_string_property("title", schema_title);
         writer.write_key("definitions");
         writer.open_object();
-        int processed_count = 0;
+        size_t processed_count = 0;
         const size_t max_processed = (definition_info_map.size()) * 3 + 20;
         std::set<std::string> currently_processing;
         while(!definitions_needed.empty() && processed_count++ < max_processed)
