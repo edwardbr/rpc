@@ -11,9 +11,10 @@ parse:
       pargs:
         nargs: 6+
         flags:
-        - IS_CONTRACT
+        - SUPPRESS_CATCH_STUB_EXCEPTIONS
       spelling: RPCGenerate
       kwargs:
+        INSTALL_DIR: 1
         MOCK: 1
         DEPENDENCIES: +
         LINK_LIBRARIES: +

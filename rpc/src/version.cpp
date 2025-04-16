@@ -12,10 +12,9 @@ namespace rpc
     {
 #ifdef RPC_V2
         return VERSION_2;
-#elif defined(RPC_V1)
-        return VERSION_1;
 #else
-        RPC_ASSERT(false);
+        static_assert(false);
+        return 0;
 #endif
     }
 }

@@ -3,7 +3,9 @@
  *   All rights reserved.
  */
 #include "common/host_service_proxy.h"
+#ifdef USE_RPC_TELEMETRY
 #include "rpc/telemetry/i_telemetry_service.h"
+#endif
 
 
 #ifdef _IN_ENCLAVE
@@ -49,10 +51,12 @@ namespace rpc
 
         if (status)
         {
+#ifdef USE_RPC_TELEMETRY
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             {
                 telemetry_service->message(rpc::i_telemetry_service::err, "call_host failed");
             }
+#endif            
             return rpc::error::TRANSPORT_ERROR();
         }
 
@@ -64,26 +68,13 @@ namespace rpc
             status = ::call_host(&err_code, protocol_version, (uint64_t)encoding, tag, caller_channel_zone_id.get_val(), caller_zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), interface_id.get_val(), method_id.get_val(), in_size_, in_buf_, out_buf_.size(), out_buf_.data(), &data_out_sz);
             if (status)
             {
+#ifdef USE_RPC_TELEMETRY
                 if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
                 {
                     telemetry_service->message(rpc::i_telemetry_service::err, "call_host failed");
                 }
+#endif                
                 return rpc::error::TRANSPORT_ERROR();
-            }
-
-            if(protocol_version == rpc::VERSION_1)
-            {
-                //recover err_code from the out buffer
-                yas::load<
-#ifdef RPC_SERIALISATION_TEXT
-                    yas::mem|yas::text|yas::no_header
-#else
-                    yas::mem|yas::binary|yas::no_header
-#endif
-                >(yas::intrusive_buffer{out_buf_.data(), out_buf_.size()}, YAS_OBJECT_NVP(
-                "out"
-                ,("__return_value", err_code)
-                )); 
             }
         }
         return err_code;
@@ -101,10 +92,12 @@ namespace rpc
         sgx_status_t status = ::try_cast_host(&err_code, protocol_version, destination_zone_id.get_val(), object_id.get_val(), interface_id.get_val());
         if (status)
         {
+#ifdef USE_RPC_TELEMETRY
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             {
                 telemetry_service->message(rpc::i_telemetry_service::err, "try_cast failed");
             }
+#endif            
             return rpc::error::TRANSPORT_ERROR();
         }
         return err_code;
@@ -120,19 +113,23 @@ namespace rpc
         add_ref_options build_out_param_channel
     )
     {
+#ifdef USE_RPC_TELEMETRY
         if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
         {
             telemetry_service->on_service_proxy_add_ref(get_zone_id(),
                                                             destination_zone_id, destination_channel_zone_id, get_caller_zone_id(), object_id, build_out_param_channel);
         }
+#endif        
         uint64_t ret = 0;
         sgx_status_t status = ::add_ref_host(&ret, protocol_version, destination_channel_zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), caller_channel_zone_id.get_val(), caller_zone_id.get_val(), (std::uint8_t)build_out_param_channel);
         if (status)
         {
+#ifdef USE_RPC_TELEMETRY
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             {
                 telemetry_service->message(rpc::i_telemetry_service::err, "add_ref_host failed");
             }
+#endif            
             return std::numeric_limits<uint64_t>::max();
         }  
 
@@ -151,10 +148,12 @@ namespace rpc
         sgx_status_t status = ::release_host(&ret, protocol_version, destination_zone_id.get_val(), object_id.get_val(), caller_zone_id.get_val());
         if (status)
         {
+#ifdef USE_RPC_TELEMETRY
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             {
                 telemetry_service->message(rpc::i_telemetry_service::err, "release_host failed");
             }
+#endif            
             return std::numeric_limits<uint64_t>::max();
         }
         return ret;

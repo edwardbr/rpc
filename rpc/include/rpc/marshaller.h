@@ -9,23 +9,12 @@
 #include <unordered_map>
 #include <mutex>
 
-#include <yas/count_streams.hpp>
-#include <yas/serialize.hpp>
-
 #include <rpc/types.h>
+#include <rpc/serialiser.h>
 #include <rpc/error_codes.h>
 
 namespace rpc
 {
-    enum class encoding : uint64_t
-    {
-        enc_default = 0,    //equivelant to yas_binary
-        yas_binary = 1,
-        yas_compressed_binary = 2,
-        yas_text = 4,
-        yas_json = 8        //we may have different json parsers that have a better implementation e.g. glaze
-    };
-
     enum class add_ref_options : std::uint8_t
     {
         normal = 1,
@@ -207,5 +196,4 @@ namespace rpc
     {
         return !(first == second);
     }
-
 }

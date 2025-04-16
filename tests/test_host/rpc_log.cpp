@@ -5,8 +5,10 @@
 #include <spdlog/spdlog.h>
 
 #include <rpc/service.h>
+#ifdef USE_RPC_TELEMETRY
 #include <rpc/telemetry/host_telemetry_service.h>
 #include <rpc/telemetry/telemetry_handler.h>
+#endif
 
 using namespace std::chrono_literals;
 

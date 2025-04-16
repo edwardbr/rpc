@@ -613,7 +613,7 @@ if(SGX_FOUND)
       if(WIN32)
         set(OUTPUT_NAME "${target}.signed.dll")
       else()
-        set(OUTPUT_NAME "${target}.signed.so")
+        set(OUTPUT_NAME "lib${target}.signed.so")
       endif()
     else()
       set(OUTPUT_NAME ${SGX_OUTPUT})
@@ -656,9 +656,6 @@ if(SGX_FOUND)
         USES_TERMINAL
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 
-    endif()
-    if(STRIP_DEBUG OR GENERATE_DEBUG_INDEX OR STRIP_AND_DELETE_SYMBOLS)
-      post_build_symbol_tasks("${target}" BINARY "$<TARGET_FILE_DIR:${target}>/${OUTPUT_NAME}")
     endif()
 
     set(CLEAN_FILES "$<TARGET_FILE_DIR:${target}>/${OUTPUT_NAME};$<TARGET_FILE_DIR:${target}>/${target}_hash.hex")

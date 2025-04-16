@@ -96,13 +96,19 @@ namespace rpc
             std::string name;
             uint_fast64_t count;
         };
+        
+        struct stub_info
+        {
+            uint64_t address = 0;
+            uint64_t count = 0;
+        };
 
         mutable std::mutex mux;
         mutable std::unordered_map<rpc::zone, name_count> services;
         mutable std::unordered_map<orig_zone, name_count, orig_zone_hash> service_proxies;
         mutable std::unordered_map<uint64_t, rpc::zone> historical_impls;
         mutable std::unordered_map<uint64_t, impl> impls;
-        mutable std::unordered_map<zone_object, uint64_t, zone_object_hash> stubs;
+        mutable std::unordered_map<zone_object, stub_info, zone_object_hash> stubs;
         mutable std::unordered_map<interface_proxy_id, name_count, interface_proxy_id_hash> interface_proxies;
         mutable std::unordered_map<interface_proxy_id, uint64_t, interface_proxy_id_hash> object_proxies;
 
