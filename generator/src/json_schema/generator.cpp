@@ -2,7 +2,8 @@
 
 #include "coreclasses.h" // Your parser API header
 #include "cpp_parser.h"  // Your parser API header
-#include "writer.h"      // The JSON writer helper
+#include "json_schema/generator.h"
+#include "json_schema/writer.h"
 #include <iostream>
 #include <string>
 #include <vector>
@@ -16,6 +17,7 @@
 #include <stdexcept>   // For std::stoll exceptions, std::stoi
 #include <memory>      // For std::shared_ptr
 #include <variant>     // For storing different definition info types
+
 
 // Declare verboseStream if used globally by the generator/parser
 extern std::stringstream verboseStream;
@@ -347,7 +349,8 @@ namespace json_schema_generator
                                 explicit_value_found = true;
                             }
                             catch(const std::exception& e)
-                            { /* Log warning */
+                            { 
+                                std::cerr << "exception has occured explicit_value_str has value " << explicit_value_str << " resulting in this error: " << e.what() << "\n";
                             }
                         }
                     }
@@ -575,6 +578,7 @@ namespace json_schema_generator
                 }
                 catch(const std::exception& e)
                 {
+                    std::cerr << "exception has occured std::stoll(template_args[1]) has value " << template_args[1] << " resulting in this error: " << e.what() << "\n";
                     std::string current_desc = find_attribute_value(attribs, "description");
                     std::string size_note = "[Note: Array size is non-literal: " + template_args[1] + "]";
                     writer.write_string_property("description",
@@ -810,7 +814,7 @@ namespace json_schema_generator
     // Entry point function
     // ** RESTORED **
     void write_json_schema(const class_entity& root_entity, std::ostream& os,
-                           const std::string& schema_title = "Generated Schema")
+                           const std::string& schema_title)
     {
         json_writer writer(os);
         std::set<std::string> definitions_needed;
@@ -829,7 +833,7 @@ namespace json_schema_generator
         writer.write_key("definitions");
         writer.open_object();
         int processed_count = 0;
-        const int max_processed = (definition_info_map.size()) * 3 + 20;
+        const size_t max_processed = (definition_info_map.size()) * 3 + 20;
         std::set<std::string> currently_processing;
         while(!definitions_needed.empty() && processed_count++ < max_processed)
         {
@@ -889,7 +893,7 @@ namespace json_schema_generator
         }
         writer.close_object();
         writer.close_object();
-        os << std::endl;
+        os << "\n";
     }
 
 } // namespace json_schema_generator

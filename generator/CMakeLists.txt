@@ -16,7 +16,8 @@ add_executable(generator
                 src/helpers.cpp
                 src/sha3.c
                 src/component_checksum.cpp
-                src/fingerprint_generator.cpp)
+                src/fingerprint_generator.cpp
+                src/json_schema/generator.cpp)
 
 target_compile_definitions(generator PRIVATE ${HOST_DEFINES})
 target_compile_options(generator PRIVATE ${HOST_COMPILE_OPTIONS} ${WARN_PEDANTIC})
@@ -38,6 +39,3 @@ endif()
 if(STRIP_DEBUG OR GENERATE_DEBUG_INDEX OR STRIP_AND_DELETE_SYMBOLS)
   post_build_symbol_tasks(generator)
 endif()
-
-
-add_subdirectory(json_schema)
