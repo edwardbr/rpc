@@ -7,12 +7,16 @@ typedef int error_code;
 
 namespace xxx
 {
+    [status=example]
     struct something_complicated
     {
+        static std::string foo = "hello";
+
         int int_val;
         std::string string_val;
     };
 
+    [status=example]
     struct something_more_complicated
     {
         std::vector<something_complicated> vector_val;
@@ -27,6 +31,8 @@ namespace xxx
 
     interface i_foo
     {
+        static std::string foo = "hello";
+
         error_code do_something_in_val(                                                        int                             val); //marshal by value - implictly const
         error_code do_something_in_ref(                                [in]            const   int                         &   val); //marshal by reference - implictly const, cannot be enclave memory addresses will be refused
         error_code do_something_in_by_val_ref(                         [in, by_value]  const   int                         &   val); //marshal by value - implictly const
@@ -94,7 +100,7 @@ namespace xxx
     };
     
     //dont include the template parameters when generating the constexpr value
-    [use_template_param_in_id=false]
+    [buggy_template_param_in_id=false]
     template<class T>
     struct test_template_without_params_in_id
     {
@@ -102,7 +108,7 @@ namespace xxx
     };
     
     //maintain a bug for backward compatibility, use an empty seed for template types seed will be 7410425521722818471ull or 0x66D71EBFF8C6FFA7
-    [use_legacy_empty_template_struct_id=true]
+    [buggy_empty_template_struct_id=true]
     template<class T>
     struct test_template_use_legacy_empty_template_struct_id
     {
@@ -110,7 +116,7 @@ namespace xxx
     };
     
     //use both dodgy flags
-    [use_template_param_in_id=false,use_legacy_empty_template_struct_id=true]
+    [buggy_template_param_in_id=false,buggy_empty_template_struct_id=true]
     template<class T>
     struct test_template_use_old
     {

@@ -15,8 +15,8 @@ function(
   # multivalue expects string "dependencies" multivalue expects string "link_libraries" multivalue expects string
   # "include_paths" multivalue expects string "defines" multivalue expects string "additional_headers" optional_val mock
 )
-  set(options)
-  set(singleValueArgs mock suppress_catch_stub_exceptions generated_install_dir)
+  set(options suppress_catch_stub_exceptions)
+  set(singleValueArgs mock install_dir)
   set(multiValueArgs
     dependencies
     link_libraries
@@ -68,8 +68,8 @@ function(
     message("output_path ${output_path}")
     message("sub_directory ${sub_directory}")
     message("namespace ${namespace}")
-    message("suppress_catch_stub_exceptions ${suppress_catch_stub_exceptions}")
-    message("generated_install_dir ${generated_install_dir}")
+    message("suppress_catch_stub_exceptions ${params_suppress_catch_stub_exceptions}")
+    message("install_dir ${params_install_dir}")
     message("dependencies ${params_dependencies}")
     message("link_libraries ${params_link_libraries}")
     message("additional_headers ${params_additional_headers}")
@@ -114,13 +114,9 @@ function(
     set(ADDITIONAL_HEADERS ${ADDITIONAL_HEADERS} --additional_headers "${additional_headers}")
   endforeach()
 
-  message("params_rethrow_stub_exception ${params_rethrow_stub_exception}")
-
   foreach(rethrow ${params_rethrow_stub_exception})
     set(RETHROW_STUB_EXCEPTION ${RETHROW_STUB_EXCEPTION} --rethrow_stub_exception "${rethrow}")
   endforeach()
-
-  message("params_additional_stub_header ${params_additional_stub_header}")
 
   foreach(stub_header ${params_additional_stub_header})
     set(ADDITIONAL_STUB_HEADER ${ADDITIONAL_STUB_HEADER} --additional_stub_header "${stub_header}")
@@ -305,8 +301,12 @@ function(
       endforeach()
     endif()
 
-    install(DIRECTORY \"$<BUILD_INTERFACE:${output_path}>\" DESTINATION ${params_generated_install_dir})
-    install(FILES \"$<BUILD_INTERFACE:${idl}>\" DESTINATION ${params_generated_install_dir}/${idl_relative_dir})
+    if(params_install_dir)
+      install(DIRECTORY \"$<BUILD_INTERFACE:${output_path}/include/${sub_directory}>\" DESTINATION ${params_install_dir}/interfaces/include)
+      install(DIRECTORY \"$<BUILD_INTERFACE:${output_path}/src/${sub_directory}>\" DESTINATION ${params_install_dir}/interfaces/src)
+      install(DIRECTORY \"$<BUILD_INTERFACE:${output_path}/check_sums/${sub_directory}>\" DESTINATION ${params_install_dir}/interfaces/check_sums)
+      install(FILES \"$<BUILD_INTERFACE:${idl}>\" DESTINATION ${params_install_dir}/${idl_relative_dir})
+    endif()
     ")
     endif()
 
@@ -382,8 +382,10 @@ function(
       endforeach()
     endif()
 
-    if(params_generated_install_dir)
-      install(DIRECTORY "$<BUILD_INTERFACE:${output_path}>" DESTINATION ${params_generated_install_dir})
-      install(FILES "$<BUILD_INTERFACE:${idl}>" DESTINATION ${params_generated_install_dir}/${idl_relative_dir})
+    if(params_install_dir)
+      install(DIRECTORY "$<BUILD_INTERFACE:${output_path}/include/${sub_directory}>" DESTINATION ${params_install_dir}/interfaces/include)
+      install(DIRECTORY "$<BUILD_INTERFACE:${output_path}/src/${sub_directory}>" DESTINATION ${params_install_dir}/interfaces/src)
+      install(DIRECTORY "$<BUILD_INTERFACE:${output_path}/check_sums/${sub_directory}>" DESTINATION ${params_install_dir}/interfaces/check_sums)
+      install(FILES "$<BUILD_INTERFACE:${idl}>" DESTINATION ${params_install_dir}/${idl_relative_dir})
     endif()
 endfunction()

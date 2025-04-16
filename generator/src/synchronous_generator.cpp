@@ -9,6 +9,10 @@
 #include "coreclasses.h"
 #include "cpp_parser.h"
 #include "helpers.h"
+
+#include "attributes.h"
+#include "rpc_attributes.h"
+
 extern "C"
 {
 #include "sha3.h"
@@ -50,7 +54,7 @@ namespace rpc_generator
             enum param_type
             {
                 BY_VALUE,
-                REFERANCE,
+                REFERENCE,
                 MOVE,
                 POINTER,
                 POINTER_REFERENCE,
@@ -112,7 +116,7 @@ namespace rpc_generator
         };
 
         template<>
-        std::string renderer::render<renderer::REFERANCE>(print_type option, bool from_host, const class_entity& lib,
+        std::string renderer::render<renderer::REFERENCE>(print_type option, bool from_host, const class_entity& lib,
                                                           const std::string& name, bool is_in, bool is_out,
                                                           bool is_const, const std::string& object_type,
                                                           uint64_t& count) const
@@ -126,7 +130,7 @@ namespace rpc_generator
                             
             if(is_out)
             {
-                throw std::runtime_error("REFERANCE does not support out vals");
+                throw std::runtime_error("REFERENCE does not support out vals");
             }
 
             switch(option)
@@ -441,7 +445,7 @@ namespace rpc_generator
             auto in = is_in_param(attributes);
             auto out = is_out_param(attributes);
             auto is_const = is_const_param(attributes);
-            auto by_value = std::find(attributes.begin(), attributes.end(), "by_value") != attributes.end();
+            auto by_value = std::find(attributes.begin(), attributes.end(), attribute_types::by_value_param) != attributes.end();
 
             if(out && !in)
                 return false;
@@ -472,7 +476,7 @@ namespace rpc_generator
                     }
                     else
                     {
-                        output = renderer().render<renderer::REFERANCE>(option, from_host, lib, name, in, out, is_const,
+                        output = renderer().render<renderer::REFERENCE>(option, from_host, lib, name, in, out, is_const,
                                                                         type_name, count);
                     }
                 }
@@ -633,13 +637,7 @@ namespace rpc_generator
                         proxy.raw(", ");
                     }
                     has_parameter = true;
-                    std::string modifier;
-                    for(auto& item : parameter.get_attributes())
-                    {
-                        if(item == "const")
-                            modifier = "const " + modifier;
-                    }
-                    proxy.raw("{}{} {}", modifier, parameter.get_type(), parameter.get_name());
+                    render_parameter(proxy, m_ob, parameter);
                 }
                 bool function_is_const = false;
                 for(auto& item : function->get_attributes())
@@ -688,7 +686,7 @@ namespace rpc_generator
 
                 proxy("std::vector<char> __rpc_in_buf;");
                 proxy("auto __rpc_ret = rpc::error::OK();");
-                proxy("std::vector<char> __rpc_out_buf(24); //max size using short string optimisation");
+                proxy("std::vector<char> __rpc_out_buf(RPC_OUT_BUFFER_SIZE); //max size using short string optimisation");
 
                 proxy("//PROXY_PREPARE_IN");
                 uint64_t count = 1;
@@ -1368,7 +1366,7 @@ namespace rpc_generator
             header("if(rpc_version == rpc::VERSION_2)");
             header("{{");
             header("auto id = {}ull;", fingerprint::generate(m_ob, {}, &header));
-            auto val = m_ob.get_attribute_value("use_template_param_in_id");
+            auto val = m_ob.get_attribute_value(rpc_attribute_types::use_template_param_in_id_attr);
             if(val != "false")
             {
                 for(const auto& param : m_ob.get_template_params())
@@ -1829,7 +1827,7 @@ namespace rpc_generator
                 {
                     auto* function_variable = static_cast<const function_entity*>(field.get());
                     header.print_tabs();
-                    header.raw("{} {}", function_variable->get_return_type(), function_variable->get_name());
+                    render_function(header, m_ob, *function_variable);
                     if(function_variable->get_array_string().size())
                         header.raw("[{}]", function_variable->get_array_string());
                     if(!function_variable->get_default_value().empty())
@@ -1868,12 +1866,22 @@ namespace rpc_generator
             header("template<typename Ar>");
             header("void serialize(Ar &ar)");
             header("{{");
+            header("std::ignore = ar;");
             bool has_fields = false;
             for(auto& field : m_ob.get_functions())
             {
                 auto type = field->get_entity_type();
                 if(type != entity_type::CPPQUOTE && type != entity_type::FUNCTION_PUBLIC && type != entity_type::FUNCTION_PRIVATE && type != entity_type::CONSTEXPR)
                 {
+                    if(field->get_entity_type() == entity_type::FUNCTION_VARIABLE)
+                    {
+                        auto* function_variable = static_cast<const function_entity*>(field.get());
+                        if(function_variable->is_static())
+                        {
+                            continue;
+                        }
+                    }
+                    
                     has_fields = true;
                     break;
                 }
@@ -1886,7 +1894,17 @@ namespace rpc_generator
                 {
                     auto type = field->get_entity_type();
                     if(type != entity_type::CPPQUOTE && type != entity_type::FUNCTION_PUBLIC && type != entity_type::FUNCTION_PRIVATE && type != entity_type::CONSTEXPR)
+                    {
+                        if(field->get_entity_type() == entity_type::FUNCTION_VARIABLE)
+                        {
+                            auto* function_variable = static_cast<const function_entity*>(field.get());
+                            if(function_variable->is_static())
+                            {
+                                continue;
+                            }
+                        }
                         header("  ,(\"{0}\", {0})", field->get_name());
+                    }
                 }
                 header(");");
             }
@@ -1935,7 +1953,17 @@ namespace rpc_generator
                 {
                     auto type = field->get_entity_type();
                     if(type != entity_type::CPPQUOTE && type != entity_type::FUNCTION_PUBLIC && type != entity_type::FUNCTION_PRIVATE && type != entity_type::CONSTEXPR)
+                    {
+                        if(field->get_entity_type() == entity_type::FUNCTION_VARIABLE)
+                        {
+                            auto* function_variable = static_cast<const function_entity*>(field.get());
+                            if(function_variable->is_static())
+                            {
+                                continue;
+                            }
+                        }
                         first_pass = false;
+                    }
                 }
                 has_params = !first_pass;
             }
@@ -1950,6 +1978,15 @@ namespace rpc_generator
                     auto type = field->get_entity_type();
                     if(type != entity_type::CPPQUOTE && type != entity_type::FUNCTION_PUBLIC && type != entity_type::FUNCTION_PRIVATE && type != entity_type::CONSTEXPR)
                     {
+                        if(field->get_entity_type() == entity_type::FUNCTION_VARIABLE)
+                        {
+                            auto* function_variable = static_cast<const function_entity*>(field.get());
+                            if(function_variable->is_static())
+                            {
+                                continue;
+                            }
+                        }
+                                                
                         header.raw("\n");
                         header.print_tabs();
                         header.raw("{1}lhs.{0} != rhs.{0}", field->get_name(), first_pass ? "" : "|| ");
