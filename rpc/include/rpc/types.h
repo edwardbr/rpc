@@ -142,6 +142,7 @@ namespace rpc
 
     struct function_info
     {
+        std::string full_name;
         std::string name;
         method id;
         uint64_t tag;

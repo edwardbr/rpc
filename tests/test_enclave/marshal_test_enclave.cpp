@@ -15,14 +15,16 @@
 
 #include <rpc/remote_pointer.h>
 
-#include <rpc/telemetry/i_telemetry_service.h>
 #ifdef USE_RPC_TELEMETRY
+#include <rpc/telemetry/i_telemetry_service.h>
 #include <rpc/telemetry/enclave_telemetry_service.h>
 #endif
 
 using namespace marshalled_tests;
 
+#ifdef USE_RPC_TELEMETRY
 TELEMETRY_SERVICE_MANAGER
+#endif
 
 rpc::shared_ptr<rpc::child_service> rpc_server;
 
@@ -36,7 +38,9 @@ int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t host_id, uint64_t 
         input_descr = {{host_id}, {host_zone_id}};
     }
     
+#ifdef USE_RPC_TELEMETRY
     CREATE_TELEMETRY_SERVICE(rpc::enclave_telemetry_service)
+#endif    
     
     auto ret = rpc::child_service::create_child_zone<rpc::host_service_proxy, yyy::i_host, yyy::i_example>(
         "test_enclave"
@@ -181,4 +185,12 @@ uint64_t release_enclave(uint64_t protocol_version, uint64_t zone_id, uint64_t o
         return std::numeric_limits<uint64_t>::max();
     }
     return rpc_server->release(protocol_version, {zone_id}, {object_id}, {caller_zone_id});
+}
+
+extern "C"
+{
+    int _Uelf64_valid_object()
+    {
+        return -1;
+    }
 }

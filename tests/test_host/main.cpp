@@ -3,26 +3,23 @@
 #include <string_view>
 #include <thread>
 
-#include <sgx_urts.h>
-#include <sgx_quote.h>
-#include <sgx_capable.h>
-#include <sgx_uae_epid.h>
-#include <sgx_eid.h>
+#ifdef BUILD_ENCLAVE
 #include "untrusted/enclave_marshal_test_u.h"
+#include <common/enclave_service_proxy.h>
+#endif
 
 #include <common/foo_impl.h>
 #include <common/tests.h>
-#include <common/enclave_service_proxy.h>
 
 #include <example/example.h>
 
 #include <rpc/basic_service_proxies.h>
+#ifdef USE_RPC_TELEMETRY
 #include <rpc/telemetry/host_telemetry_service.h>
+#endif
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-
-#include <clipp.h>
 
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/basic_file_sink.h>
@@ -61,13 +58,13 @@ using namespace marshalled_tests;
 
 #ifdef _WIN32 // windows
 std::string enclave_path = "./marshal_test_enclave.signed.dll";
-std::string enclave_path_v1 = "./marshal_test_enclave_v1.signed.dll";
 #else         // Linux
 std::string enclave_path = "./libmarshal_test_enclave.signed.so";
-std::string enclave_path_v1 = "./libmarshal_test_enclave_v1.signed.so";
 #endif
 
+#ifdef USE_RPC_TELEMETRY
 TELEMETRY_SERVICE_MANAGER
+#endif
 bool enable_telemetry_server = true;
 bool enable_multithreaded_tests = false;
 
@@ -79,33 +76,29 @@ std::atomic<uint64_t>* zone_gen = nullptr;
 // This line tests that we can define tests in an unnamed namespace.
 namespace {
 
-	extern "C" int main(int argc, char* argv[])
-	{
-        std::string disable_telemetry_server;
-        std::string enable_multithreaded_tests_flag;
-        auto cli = (
-			clipp::option("-t", "--disable_telemetry_server").doc("disable the telemetry_server") & clipp::value("disable_telemetry_server", disable_telemetry_server),
-			clipp::option("-m", "--enable_multithreaded_tests").doc("enable multithreaded tests") & clipp::value("enable_multithreaded_tests", enable_multithreaded_tests_flag)
-        );
+    extern "C" int main(int argc, char* argv[])
+    {
+        for (size_t i = 1; i < argc; ++i)
+        {
+            std::string arg = argv[i];
+            if (arg == "-t" || arg == "--disable_telemetry_server")
+                enable_telemetry_server = false;
+            if (arg == "-m" || arg == "--enable_multithreaded_tests")
+                enable_multithreaded_tests = true;
+        }
 
-        clipp::parsing_result res = clipp::parse(argc, argv, cli);
-        
-        enable_telemetry_server = disable_telemetry_server != "true";
-        enable_multithreaded_tests = enable_multithreaded_tests_flag == "true";
-        
         auto logger = spdlog::stdout_color_mt("console");
-        logger->set_pattern("[%^%l%$] %v");        
+        logger->set_pattern("[%^%l%$] %v");
         spdlog::set_default_logger(logger);
-		::testing::InitGoogleTest(&argc, argv);
-		return RUN_ALL_TESTS();
-	}
+        ::testing::InitGoogleTest(&argc, argv);
+        return RUN_ALL_TESTS();
+    }
 }
 
 class host : 
     public yyy::i_host,
     public rpc::enable_shared_from_this<host>
 {
-    bool use_v1_rpc_dll_ = false;
     rpc::zone zone_id_;
 
   	//perhaps this should be an unsorted list but map is easier to debug for now
@@ -122,20 +115,24 @@ class host :
 
 public:
 
-    host(rpc::zone zone_id,  bool use_v1_rpc_dll = false) : 
-        use_v1_rpc_dll_(use_v1_rpc_dll),
+    host(rpc::zone zone_id) : 
         zone_id_(zone_id)
     {
+#ifdef USE_RPC_TELEMETRY
         if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             telemetry_service->on_impl_creation("host", (uint64_t)this, zone_id_);
+#endif            
     }
     virtual ~host()
     {
+#ifdef USE_RPC_TELEMETRY
         if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             telemetry_service->on_impl_deletion((uint64_t)this, zone_id_);
+#endif            
     }
     error_code create_enclave(rpc::shared_ptr<yyy::i_example>& target) override
     {
+#ifdef BUILD_ENCLAVE
         rpc::shared_ptr<yyy::i_host> host = shared_from_this();
         auto serv = current_host_service.lock();
         auto err_code = serv->connect_to_zone<rpc::enclave_service_proxy>( 
@@ -143,9 +140,11 @@ public:
             , {++(*zone_gen)}
             , host
             , target
-            , use_v1_rpc_dll_ ? enclave_path_v1 : enclave_path);
+            , enclave_path);
 
         return err_code;
+#endif
+        return rpc::error::INCOMPATIBLE_SERVICE();
     };
 
     //live app registry, it should have sole responsibility for the long term storage of app shared ptrs
@@ -202,8 +201,10 @@ public:
     {   
         zone_gen = &zone_gen_;
         auto test_info = ::testing::UnitTest::GetInstance()->current_test_info();
+#ifdef USE_RPC_TELEMETRY
         if(enable_telemetry_server)
             CREATE_TELEMETRY_SERVICE(rpc::host_telemetry_service, test_info->test_suite_name(), test_info->name(), "../../rpc_test_diagram/")
+#endif            
         i_host_ptr_ = rpc::shared_ptr<yyy::i_host> (new host({++zone_gen_}));
         local_host_ptr_ = i_host_ptr_;
         i_example_ptr_ = rpc::shared_ptr<yyy::i_example> (new example(nullptr, use_host_in_child_ ? i_host_ptr_ : nullptr));
@@ -214,7 +215,9 @@ public:
         i_host_ptr_ = nullptr;
         i_example_ptr_ = nullptr;
         zone_gen = nullptr;
-        rpc::telemetry_service_manager::reset();
+#ifdef USE_RPC_TELEMETRY
+        RESET_TELEMETRY_SERVICE
+#endif        
     }
 };
 
@@ -277,8 +280,10 @@ public:
     {
         zone_gen = &zone_gen_;
         auto test_info = ::testing::UnitTest::GetInstance()->current_test_info();
+#ifdef USE_RPC_TELEMETRY
         if(enable_telemetry_server)
             CREATE_TELEMETRY_SERVICE(rpc::host_telemetry_service, test_info->test_suite_name(), test_info->name(), "../../rpc_test_diagram/")
+#endif
 
         root_service_ = rpc::make_shared<rpc::service>("host", rpc::zone{++zone_gen_});
         root_service_->add_service_logger(std::make_shared<test_service_logger>());
@@ -317,7 +322,9 @@ public:
         child_service_ = nullptr;
         root_service_ = nullptr;
         zone_gen = nullptr;
-        rpc::telemetry_service_manager::reset();
+#ifdef USE_RPC_TELEMETRY
+        RESET_TELEMETRY_SERVICE
+#endif        
     }
 
     rpc::shared_ptr<yyy::i_example> create_new_zone()
@@ -360,7 +367,8 @@ public:
     }
 };
 
-template<bool UseHostInChild, bool RunStandardTests, bool CreateNewZoneThenCreateSubordinatedZone, bool use_v1_rpc_dll>
+#ifdef BUILD_ENCLAVE
+template<bool UseHostInChild, bool RunStandardTests, bool CreateNewZoneThenCreateSubordinatedZone>
 class enclave_setup
 {
     rpc::shared_ptr<rpc::service> root_service_;
@@ -388,10 +396,12 @@ public:
     {
         zone_gen = &zone_gen_;
         auto test_info = ::testing::UnitTest::GetInstance()->current_test_info();
+#ifdef USE_RPC_TELEMETRY
         if(enable_telemetry_server)
         {
             CREATE_TELEMETRY_SERVICE(rpc::host_telemetry_service, test_info->test_suite_name(), test_info->name(), "../../rpc_test_diagram/")
         }
+#endif        
         root_service_ = rpc::make_shared<rpc::service>("host", rpc::zone{++zone_gen_});
         root_service_->add_service_logger(std::make_shared<test_service_logger>());
         example_import_idl_register_stubs(root_service_);
@@ -399,7 +409,7 @@ public:
         example_idl_register_stubs(root_service_);
         current_host_service = root_service_;
         
-        i_host_ptr_ = rpc::shared_ptr<yyy::i_host> (new host(root_service_->get_zone_id(), use_v1_rpc_dll));
+        i_host_ptr_ = rpc::shared_ptr<yyy::i_host> (new host(root_service_->get_zone_id()));
         local_host_ptr_ = i_host_ptr_;        
 
 
@@ -408,7 +418,7 @@ public:
             , {++(*zone_gen)}
             , use_host_in_child_ ? i_host_ptr_ : nullptr
             , i_example_ptr_
-            , use_v1_rpc_dll ? enclave_path_v1 : enclave_path);
+            , enclave_path);
 
         ASSERT_ERROR_CODE(err_code);
     }
@@ -419,7 +429,9 @@ public:
         i_host_ptr_ = nullptr;
         root_service_ = nullptr;
         zone_gen = nullptr;
-        rpc::telemetry_service_manager::reset();
+#ifdef USE_RPC_TELEMETRY
+        RESET_TELEMETRY_SERVICE
+#endif        
     }
 
     rpc::shared_ptr<yyy::i_example> create_new_zone()
@@ -431,7 +443,7 @@ public:
             , {++zone_gen_}
             , use_host_in_child_ ? i_host_ptr_ : nullptr
             , ptr
-            , use_v1_rpc_dll ? enclave_path_v1 : enclave_path);
+            , enclave_path);
             
         if(err_code != rpc::error::OK())
             return nullptr;
@@ -446,6 +458,7 @@ public:
         return ptr;
     }
 };
+#endif
 
 template <class T>
 class type_test : 
@@ -473,26 +486,20 @@ using local_implementations = ::testing::Types<
     inproc_setup<true, false, false>, 
     inproc_setup<true, false, true>, 
     inproc_setup<true, true, false>, 
-    inproc_setup<true, true, true>, 
+    inproc_setup<true, true, true> 
 
-
-    enclave_setup<false, false, false, false>, 
-    enclave_setup<false, false, true, false>, 
-    enclave_setup<false, true, false, false>, 
-    enclave_setup<false, true, true, false>, 
-    enclave_setup<true, false, false, false>, 
-    enclave_setup<true, false, true, false>, 
-    enclave_setup<true, true, false, false>, 
-    enclave_setup<true, true, true, false>,
-
-    enclave_setup<false, false, false, true>, 
-    enclave_setup<false, false, true, true>, 
-    enclave_setup<false, true, false, true>, 
-    enclave_setup<false, true, true, true>, 
-    enclave_setup<true, false, false, true>, 
-    enclave_setup<true, false, true, true>, 
-    enclave_setup<true, true, false, true>, 
-    enclave_setup<true, true, true, true>>;
+#ifdef BUILD_ENCLAVE
+    ,
+    enclave_setup<false, false, false>, 
+    enclave_setup<false, false, true>, 
+    enclave_setup<false, true, false>, 
+    enclave_setup<false, true, true>, 
+    enclave_setup<true, false, false>, 
+    enclave_setup<true, false, true>, 
+    enclave_setup<true, true, false>, 
+    enclave_setup<true, true, true>
+#endif
+    >;
 TYPED_TEST_SUITE(type_test, local_implementations);
 
 TYPED_TEST(type_test, initialisation_test)
@@ -565,17 +572,16 @@ typedef Types<
     inproc_setup<true, false, false>, 
     inproc_setup<true, false, true>, 
     inproc_setup<true, true, false>, 
-    inproc_setup<true, true, true>, 
+    inproc_setup<true, true, true>
 
-    enclave_setup<true, false, false, false>, 
-    enclave_setup<true, false, true, false>, 
-    enclave_setup<true, true, false, false>, 
-    enclave_setup<true, true, true, false>, 
-
-    enclave_setup<true, false, false, true>, 
-    enclave_setup<true, false, true, true>, 
-    enclave_setup<true, true, false, true>, 
-    enclave_setup<true, true, true, true>> remote_implementations;
+#ifdef BUILD_ENCLAVE
+    ,
+    enclave_setup<true, false, false>, 
+    enclave_setup<true, false, true>, 
+    enclave_setup<true, true, false>, 
+    enclave_setup<true, true, true>
+#endif
+> remote_implementations;
 TYPED_TEST_SUITE(remote_type_test, remote_implementations);
 
 TYPED_TEST(remote_type_test, remote_standard_tests)
@@ -858,6 +864,7 @@ TYPED_TEST(remote_type_test, check_for_set_multiple_inheritance)
     RPC_ASSERT(ret == rpc::error::OK());
 }
 
+#ifdef BUILD_ENCLAVE
 TYPED_TEST(remote_type_test, host_test)
 {    
     auto root_service = this->get_lib().get_root_service();
@@ -897,6 +904,7 @@ TYPED_TEST(remote_type_test, check_for_call_enclave_zone)
     auto ret = this->get_lib().get_example()->call_create_enclave_val(h);
     RPC_ASSERT(ret == rpc::error::OK());
 }
+#endif
 
 TYPED_TEST(remote_type_test, check_sub_subordinate)
 {
@@ -1136,20 +1144,20 @@ typedef Types<
     inproc_setup<true, false, false>, 
     inproc_setup<true, false, true>, 
     inproc_setup<true, true, false>, 
-    inproc_setup<true, true, true>, 
+    inproc_setup<true, true, true>
 
-    enclave_setup<true, false, false, false>, 
-    enclave_setup<true, false, true, false>, 
-    enclave_setup<true, true, false, false>, 
-    enclave_setup<true, true, true, false>, 
-
-    enclave_setup<true, false, false, true>, 
-    enclave_setup<true, false, true, true>, 
-    enclave_setup<true, true, false, true>, 
-    enclave_setup<true, true, true, true>> type_test_with_host_implementations;
+#ifdef BUILD_ENCLAVE
+    ,
+    enclave_setup<true, false, false>, 
+    enclave_setup<true, false, true>, 
+    enclave_setup<true, true, false>, 
+    enclave_setup<true, true, true>
+#endif    
+    > type_test_with_host_implementations;
 TYPED_TEST_SUITE(type_test_with_host, type_test_with_host_implementations);
 
 
+#ifdef BUILD_ENCLAVE
 TYPED_TEST(type_test_with_host, call_host_create_enclave_and_throw_away)
 {  
     bool run_standard_tests = false;
@@ -1164,6 +1172,7 @@ TYPED_TEST(type_test_with_host, call_host_create_enclave)
     ASSERT_EQ(this->get_lib().get_example()->call_host_create_enclave(target, run_standard_tests), rpc::error::OK());
     ASSERT_NE(target, nullptr);
 }
+#endif
 
 TYPED_TEST(type_test_with_host, look_up_app_and_return_with_nothing)
 {  
@@ -1181,6 +1190,7 @@ TYPED_TEST(type_test_with_host, call_host_unload_app_not_there)
 }
 
 
+#ifdef BUILD_ENCLAVE
 TYPED_TEST(type_test_with_host, call_host_look_up_app_unload_app)
 {  
     bool run_standard_tests = false;
@@ -1254,6 +1264,7 @@ TYPED_TEST(type_test_with_host, create_store_delete)
     target = nullptr;
     target2 = nullptr;
 }
+#endif
 
 TYPED_TEST(type_test_with_host, create_subordinate_zone)
 {  
@@ -1270,3 +1281,11 @@ TYPED_TEST(type_test_with_host, create_subordinate_zone_and_set_in_host)
     this->get_lib().get_host()->unload_app("foo");
     target->set_host(nullptr);
 }
+
+
+static_assert(rpc::id<std::string>::get(rpc::VERSION_2) == rpc::STD_STRING_ID);
+
+static_assert(rpc::id<xxx::test_template<std::string>>::get(rpc::VERSION_2) == 0xAFFFFFEB79FBFBFB);
+static_assert(rpc::id<xxx::test_template_without_params_in_id<std::string>>::get(rpc::VERSION_2) == 0x62C84BEB07545E2B);
+static_assert(rpc::id<xxx::test_template_use_legacy_empty_template_struct_id<std::string>>::get(rpc::VERSION_2) == 0x2E7E56276F6E36BE);
+static_assert(rpc::id<xxx::test_template_use_old<std::string>>::get(rpc::VERSION_2) == 0x66D71EBFF8C6FFA7);

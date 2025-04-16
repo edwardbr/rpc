@@ -1102,14 +1102,16 @@ public:
 
     virtual ~_Ref_count_base() noexcept {} // TRANSITION, should be non-virtual
 
+    __attribute__((no_sanitize("thread")))
     bool _Incref_nz() noexcept { // increment use count if not zero, return true if successful
         auto& _Volatile_uses = reinterpret_cast<volatile long&>(_Uses);
 #ifdef _M_CEE_PURE
         long _Count = *_Atomic_address_as<const long>(&_Volatile_uses);
 #else
         // fix this for arm process not convinced this is available for linux
+        // https://learn.microsoft.com/en-us/cpp/intrinsics/arm64-intrinsics?view=msvc-170#IsoVolatileLoadStore
         // long _Count = __iso_volatile_load32(reinterpret_cast<volatile int*>(&_Volatile_uses));
-        long _Count = _Volatile_uses;
+        long _Count = *(const volatile long*) &_Volatile_uses;
 #endif
         while (_Count != 0) {
 #ifdef WIN32
@@ -2004,11 +2006,6 @@ _NODISCARD shared_ptr<_Ty1> dynamic_pointer_cast(const shared_ptr<_Ty2>& _Other)
     if (ptr)
         return shared_ptr<_Ty1>(_Other, ptr);
 #endif
-#ifdef RPC_V1
-    ptr = const_cast<_Ty1*>(static_cast<const _Ty1*>(_Other->query_interface(_Ty1::get_id(rpc::VERSION_1))));
-    if (ptr)
-        return shared_ptr<_Ty1>(_Other, ptr);
-#endif
     auto proxy_ = _Other->query_proxy_base();
     if (!proxy_)
     {
@@ -2040,11 +2037,6 @@ _NODISCARD shared_ptr<_Ty1> dynamic_pointer_cast(shared_ptr<_Ty2>&& _Other) noex
     _Ty1* ptr = nullptr;
 #ifdef RPC_V2
     ptr = const_cast<_Ty1*>(static_cast<const _Ty1*>(_Other->query_interface(_Ty1::get_id(rpc::VERSION_2))));
-    if (ptr)
-        return shared_ptr<_Ty1>(_Other, ptr);
-#endif
-#ifdef RPC_V1
-    ptr = const_cast<_Ty1*>(static_cast<const _Ty1*>(_Other->query_interface(_Ty1::get_id(rpc::VERSION_1))));
     if (ptr)
         return shared_ptr<_Ty1>(_Other, ptr);
 #endif

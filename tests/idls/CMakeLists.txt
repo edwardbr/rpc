@@ -8,8 +8,7 @@ RPCGenerate(
   example_shared
   ""
   mock example_shared/example_shared_mock.h
-  dependencies
-  include_paths ${CMAKE_CURRENT_SOURCE_DIR}/. ${CMAKE_SOURCE_DIR}/submodules/idlparser/defines)
+  include_paths ${CMAKE_CURRENT_SOURCE_DIR}/.)
 
 RPCGenerate(
   example_import
@@ -20,7 +19,7 @@ RPCGenerate(
   ""
   mock example_import/example_import_mock.h
   dependencies example_shared_idl
-  include_paths ${CMAKE_CURRENT_SOURCE_DIR}/. ${CMAKE_SOURCE_DIR}/submodules/idlparser/defines)
+  include_paths ${CMAKE_CURRENT_SOURCE_DIR}/.)
 
 RPCGenerate(
   example
@@ -31,4 +30,4 @@ RPCGenerate(
   ""
   mock example/example_mock.h
   dependencies example_import_idl example_shared_idl
-  include_paths ${CMAKE_CURRENT_SOURCE_DIR}/. ${CMAKE_SOURCE_DIR}/submodules/idlparser/defines)
+  include_paths ${CMAKE_CURRENT_SOURCE_DIR}/.)

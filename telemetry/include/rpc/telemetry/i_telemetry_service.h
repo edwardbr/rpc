@@ -91,7 +91,9 @@ namespace rpc
 #ifdef USE_RPC_TELEMETRY
 #define TELEMETRY_SERVICE_MANAGER rpc::telemetry_service_manager telemetry_service_manager_;
 #define CREATE_TELEMETRY_SERVICE(type, ...) telemetry_service_manager_.create<type>(__VA_ARGS__);
+#define RESET_TELEMETRY_SERVICE rpc::telemetry_service_manager::reset();
 #else
 #define TELEMETRY_SERVICE_MANAGER
 #define CREATE_TELEMETRY_SERVICE(...)
+#define RESET_TELEMETRY_SERVICE
 #endif
