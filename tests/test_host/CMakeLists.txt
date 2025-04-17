@@ -24,7 +24,7 @@ target_link_libraries(
   PUBLIC common_host
          example_idl_host
          example_import_idl_host
-         example_shared_idl_host   
+         example_shared_idl_host
          rpc::rpc_host
          yas_common
          fmt::fmt

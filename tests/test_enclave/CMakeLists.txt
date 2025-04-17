@@ -44,7 +44,8 @@ if(${BUILD_ENCLAVE})
     set(EXTRA_MARSHAL_TEST_ENCLAVE_COMPILE_OPTIONS -Wno-unused-parameter)
   endif()
 
-  target_compile_options(marshal_test_enclave PRIVATE ${ENCLAVE_COMPILE_OPTIONS} ${WARN_BASELINE} ${EXTRA_MARSHAL_TEST_ENCLAVE_COMPILE_OPTIONS})
+  target_compile_options(marshal_test_enclave PRIVATE ${ENCLAVE_COMPILE_OPTIONS} ${WARN_BASELINE}
+                                                      ${EXTRA_MARSHAL_TEST_ENCLAVE_COMPILE_OPTIONS})
   target_link_options(marshal_test_enclave PRIVATE ${ENCLAVE_LINK_OPTIONS})
 
   set_property(TARGET marshal_test_enclave PROPERTY COMPILE_PDB_NAME marshal_test_enclave)

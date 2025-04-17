@@ -24,7 +24,7 @@ if(${BUILD_ENCLAVE})
   if(USE_RPC_TELEMETRY)
     set(TELEMETRY_ENCLAVE_EDL rpc_telemetry_edl_header_enclave)
   endif()
-  
+
   target_link_libraries(
     common_enclave
     PRIVATE rpc_enclave
@@ -40,32 +40,31 @@ if(${BUILD_ENCLAVE})
 endif()
 if(BUILD_ENCLAVE)
 
-add_library(common_host STATIC src/enclave_service_proxy.cpp)
+  add_library(common_host STATIC src/enclave_service_proxy.cpp)
 
-target_compile_definitions(common_host PRIVATE ${HOST_DEFINES})
-target_include_directories(
-  common_host
-  PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>" "$<INSTALL_INTERFACE:include/marshalled_tests>"
-  PRIVATE ${HOST_INCLUDES})
+  target_compile_definitions(common_host PRIVATE ${HOST_DEFINES})
+  target_include_directories(
+    common_host
+    PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>" "$<INSTALL_INTERFACE:include/marshalled_tests>"
+    PRIVATE ${HOST_INCLUDES})
 
-target_compile_options(common_host PRIVATE ${HOST_COMPILE_OPTIONS})
-target_link_options(common_host PRIVATE ${HOST_LINK_OPTIONS})
+  target_compile_options(common_host PRIVATE ${HOST_COMPILE_OPTIONS})
+  target_link_options(common_host PRIVATE ${HOST_LINK_OPTIONS})
 
-target_link_libraries(
-  common_host
-  PRIVATE rpc::rpc_host
-          marshal_test_edl_host
-          rpc_telemetry_edl_header_host
-          example_idl_host
-          yas_common)
+  target_link_libraries(
+    common_host
+    PRIVATE rpc::rpc_host
+            marshal_test_edl_host
+            rpc_telemetry_edl_header_host
+            example_idl_host
+            yas_common)
 
-set_property(TARGET common_host PROPERTY COMPILE_PDB_NAME common_host)
+  set_property(TARGET common_host PROPERTY COMPILE_PDB_NAME common_host)
 
 else()
 
-add_library(common_host INTERFACE)
+  add_library(common_host INTERFACE)
 
-target_include_directories(
-  common_host
-  INTERFACE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>" "$<INSTALL_INTERFACE:include/marshalled_tests>")
+  target_include_directories(common_host INTERFACE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+                                                   "$<INSTALL_INTERFACE:include/marshalled_tests>")
 endif()

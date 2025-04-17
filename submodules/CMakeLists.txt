@@ -21,7 +21,7 @@ if(RPC_STANDALONE)
   add_subdirectory(fmt)
   # fmt CMakeLists.txt defines a PUBLIC_HEADER property which triggers a warning when used as a subproject
   set_property(TARGET fmt PROPERTY PUBLIC_HEADER)
-    
+
   add_subdirectory(args)
   add_library(args::args ALIAS args)
 
