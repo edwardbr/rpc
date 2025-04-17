@@ -15,8 +15,8 @@ function(
   # multivalue expects string "dependencies" multivalue expects string "link_libraries" multivalue expects string
   # "include_paths" multivalue expects string "defines" multivalue expects string "additional_headers" optional_val mock
 )
-  set(options)
-  set(singleValueArgs mock suppress_catch_stub_exceptions generated_install_dir no_include_rpc_headers)
+  set(options suppress_catch_stub_exceptions no_include_rpc_headers)
+  set(singleValueArgs mock install_dir)
   set(multiValueArgs
     dependencies
     link_libraries
@@ -68,8 +68,8 @@ function(
     message("output_path ${output_path}")
     message("sub_directory ${sub_directory}")
     message("namespace ${namespace}")
-    message("suppress_catch_stub_exceptions ${suppress_catch_stub_exceptions}")
-    message("generated_install_dir ${generated_install_dir}")
+    message("suppress_catch_stub_exceptions ${params_suppress_catch_stub_exceptions}")
+    message("install_dir ${params_install_dir}")
     message("dependencies ${params_dependencies}")
     message("link_libraries ${params_link_libraries}")
     message("additional_headers ${params_additional_headers}")
@@ -102,7 +102,7 @@ function(
   set(ADDITIONAL_HEADERS "")
   set(RETHROW_STUB_EXCEPTION "")
   set(ADDITIONAL_STUB_HEADER "")
-  set(GENERATED_DEPENDANCIES generator)
+  set(GENERATED_DEPENDENCIES generator)
 
   foreach(path ${params_include_paths})
     set(PATHS_PARAMS ${PATHS_PARAMS} --path "${path}")
@@ -132,7 +132,7 @@ function(
         set(PATHS_PARAMS ${PATHS_PARAMS} --path "${dep_base_dir}")
       endif()
 
-      set(GENERATED_DEPENDANCIES ${GENERATED_DEPENDANCIES} ${dep}_generate)
+      set(GENERATED_DEPENDENCIES ${GENERATED_DEPENDENCIES} ${dep}_generate)
       else()
       message("target ${dep}_generate does not exist so skipped")
     endif()
@@ -176,7 +176,7 @@ function(
       ${ADDITIONAL_STUB_HEADER}
       MAIN_DEPENDENCY ${idl}
       IMPLICIT_DEPENDS ${idl}
-      DEPENDS ${GENERATED_DEPENDANCIES}
+      DEPENDS ${GENERATED_DEPENDENCIES}
       COMMENT \"Running generator ${idl}\"
     )
 
@@ -209,7 +209,7 @@ function(
     --proxy ${proxy_path} --stub ${stub_path} --stub_header ${stub_header_path} ${PATHS_PARAMS} ${ADDITIONAL_HEADERS} ${RETHROW_STUB_EXCEPTION} ${ADDITIONAL_STUB_HEADER}
     MAIN_DEPENDENCY ${idl}
     IMPLICIT_DEPENDS ${idl}
-    DEPENDS ${GENERATED_DEPENDANCIES}
+    DEPENDS ${GENERATED_DEPENDENCIES}
     COMMENT "Running generator ${idl}")
 
   add_custom_target(${name}_idl_generate DEPENDS ${full_header_path} ${full_proxy_path} ${full_stub_header_path}
@@ -311,8 +311,12 @@ function(
       endforeach()
     endif()
 
-    install(DIRECTORY \"$<BUILD_INTERFACE:${output_path}>\" DESTINATION ${params_generated_install_dir})
-    install(FILES \"$<BUILD_INTERFACE:${idl}>\" DESTINATION ${params_generated_install_dir}/${idl_relative_dir})
+    if(params_install_dir)
+      install(DIRECTORY \"$<BUILD_INTERFACE:${output_path}/include/${sub_directory}>\" DESTINATION ${params_install_dir}/interfaces/include)
+      install(DIRECTORY \"$<BUILD_INTERFACE:${output_path}/src/${sub_directory}>\" DESTINATION ${params_install_dir}/interfaces/src)
+      install(DIRECTORY \"$<BUILD_INTERFACE:${output_path}/check_sums/${sub_directory}>\" DESTINATION ${params_install_dir}/interfaces/check_sums)
+      install(FILES \"$<BUILD_INTERFACE:${idl}>\" DESTINATION ${params_install_dir}/${idl_relative_dir})
+    endif()
     ")
     endif()
 
@@ -339,7 +343,7 @@ function(
         message("target ${dep}_generate does not exist so skipped")
       endif()
 
-      message("target_link_libraries(${name}_idl_host PUBLIC ${dep}_host)")
+      target_link_libraries(${name}_idl_host PUBLIC ${dep}_host)
     endforeach()
 
     foreach(dep ${params_link_libraries})
@@ -388,8 +392,10 @@ function(
       endforeach()
     endif()
 
-    if(params_generated_install_dir)
-      install(DIRECTORY "$<BUILD_INTERFACE:${output_path}>" DESTINATION ${params_generated_install_dir})
-      install(FILES "$<BUILD_INTERFACE:${idl}>" DESTINATION ${params_generated_install_dir}/${idl_relative_dir})
+    if(params_install_dir)
+      install(DIRECTORY "$<BUILD_INTERFACE:${output_path}/include/${sub_directory}>" DESTINATION ${params_install_dir}/interfaces/include)
+      install(DIRECTORY "$<BUILD_INTERFACE:${output_path}/src/${sub_directory}>" DESTINATION ${params_install_dir}/interfaces/src)
+      install(DIRECTORY "$<BUILD_INTERFACE:${output_path}/check_sums/${sub_directory}>" DESTINATION ${params_install_dir}/interfaces/check_sums)
+      install(FILES "$<BUILD_INTERFACE:${idl}>" DESTINATION ${params_install_dir}/${idl_relative_dir})
     endif()
 endfunction()

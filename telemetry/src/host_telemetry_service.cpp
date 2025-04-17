@@ -329,7 +329,7 @@ namespace rpc
             route_name = "channel from "s + caller_name + " to " + destination_name;
         }
         
-        fmt::print(output_, "participant \\n"{} \\nzone {} \\ndestination {} \\ncaller {}\" as {} order {} #cyan"
+        fmt::print(output_, "participant \\n\"{} \\nzone {} \\ndestination {} \\ncaller {}\" as {} order {} #cyan"
             , route_name
             , zone_id.get_val()
             , destination_zone_id.get_val()
@@ -513,7 +513,7 @@ namespace rpc
         if(entry == services.end())
         {
             services.emplace(destination_channel_zone, name_count{"", 1});
-            fmt::print(output_, "participant \\n"zone {}\" as {} order {} #Moccasin", destination_channel_zone.get_val(), service_alias(destination_channel_zone), service_order(destination_channel_zone));
+            fmt::print(output_, "participant \\n\"zone {}\" as {} order {} #Moccasin", destination_channel_zone.get_val(), service_alias(destination_channel_zone), service_order(destination_channel_zone));
             fmt::print(output_, "activate {} #Moccasin\n", service_alias(destination_channel_zone));
         }
         fmt::print(output_, "hnote over {} : add_external_ref {} {}\n", service_proxy_alias(zone_id, destination_zone_id, caller_zone_id), get_thread_id(), ref_count);
@@ -614,7 +614,7 @@ namespace rpc
         add_new_object("unknown", address, zone_id);
         stubs.emplace(zone_object{zone_id, object_id}, stub_info{address, 0});
 #ifdef USE_RPC_TELEMETRY_RAII_LOGGING
-        fmt::print(output_, "participant \\n"object stub\\nzone {}\\nobject {}\" as {} order {} #lime"
+        fmt::print(output_, "participant \\n\"object stub\\nzone {}\\nobject {}\" as {} order {} #lime"
             , zone_id.get_val()
             , object_id.get_val()
             , object_stub_alias(zone_id, object_id)
@@ -733,7 +733,7 @@ namespace rpc
 
         std::lock_guard g(mux);
         object_proxies.emplace(interface_proxy_id{zone_id, destination_zone_id, object_id, {0}}, 1);
-        fmt::print(output_, "participant \\n"object_proxy\\nzone {}\\ndestination {}\\nobject {}\" as {} order {} #pink"
+        fmt::print(output_, "participant \\n\"object_proxy\\nzone {}\\ndestination {}\\nobject {}\" as {} order {} #pink"
             , zone_id.get_val()
             , destination_zone_id.get_val()
             , object_id.get_val()

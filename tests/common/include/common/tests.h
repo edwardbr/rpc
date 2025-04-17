@@ -86,20 +86,20 @@ namespace marshalled_tests
         }
         {
             xxx::something_complicated val;
-            ASSERT_ERROR_CODE(foo.recieve_something_complicated_ref(val));
+            ASSERT_ERROR_CODE(foo.receive_something_complicated_ref(val));
             log(std::string("got ") + val.string_val);
         }
         if (!enclave)
         {
             xxx::something_complicated* val = nullptr;
-            ASSERT_ERROR_CODE(foo.recieve_something_complicated_ptr(val));
+            ASSERT_ERROR_CODE(foo.receive_something_complicated_ptr(val));
             log(std::string("got ") + std::to_string(val->int_val));
             delete val;
         }
         {
             xxx::something_complicated val;
             val.int_val = 32;
-            ASSERT_ERROR_CODE(foo.recieve_something_complicated_in_out_ref(val));
+            ASSERT_ERROR_CODE(foo.receive_something_complicated_in_out_ref(val));
             log(std::string("got ") + std::to_string(val.int_val));
         }
         {
@@ -132,18 +132,18 @@ namespace marshalled_tests
         if (!enclave)
         {
             xxx::something_more_complicated val;
-            ASSERT_ERROR_CODE(foo.recieve_something_more_complicated_ref(val));
+            ASSERT_ERROR_CODE(foo.receive_something_more_complicated_ref(val));
             if(val.map_val.size() == 0)
-                log("error recieve_something_more_complicated_ref returned no data");
+                log("error receive_something_more_complicated_ref returned no data");
             else
                 log(std::string("got ") + val.map_val.begin()->first);
         }
         if (!enclave)
         {
             xxx::something_more_complicated* val = nullptr;
-            ASSERT_ERROR_CODE(foo.recieve_something_more_complicated_ptr(val));
+            ASSERT_ERROR_CODE(foo.receive_something_more_complicated_ptr(val));
             if(val->map_val.size() == 0)
-                log("error recieve_something_more_complicated_ref returned no data");
+                log("error receive_something_more_complicated_ref returned no data");
             else
                 log(std::string("got ") + val->map_val.begin()->first);
             delete val;
@@ -151,9 +151,9 @@ namespace marshalled_tests
         {
             xxx::something_more_complicated val;
             val.map_val["22"] = xxx::something_complicated {33, "22"};
-            ASSERT_ERROR_CODE(foo.recieve_something_more_complicated_in_out_ref(val));
+            ASSERT_ERROR_CODE(foo.receive_something_more_complicated_in_out_ref(val));
             if(val.map_val.size() == 0)
-                log("error recieve_something_more_complicated_in_out_ref returned no data");
+                log("error receive_something_more_complicated_in_out_ref returned no data");
             else
                 log(std::string("got ") + val.map_val.begin()->first);
         }
@@ -192,7 +192,7 @@ namespace marshalled_tests
 
             // test recursive interface passing
             rpc::shared_ptr<xxx::i_foo> other_foo;
-            int err_code = CO_AWAIT foo->recieve_interface(other_foo);
+            int err_code = CO_AWAIT foo->receive_interface(other_foo);
             if (err_code != rpc::error::OK())
             {
                 log(std::string("create_foo failed"));

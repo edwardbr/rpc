@@ -1,11 +1,11 @@
 # formatted using cmake-format
 cmake_minimum_required(VERSION 3.24)
 
-message("DEPENDANCIES_LOADED ${DEPENDANCIES_LOADED}")
-if(NOT DEPENDANCIES_LOADED)
+message("DEPENDENCIES_LOADED ${DEPENDENCIES_LOADED}")
+if(NOT DEPENDENCIES_LOADED)
   message("configuring dependancies")
   # if this is loaded in a parent module then dont do this
-  set(DEPENDANCIES_LOADED ON)
+  set(DEPENDENCIES_LOADED ON)
 
   # ####################################################################################################################
   # settings
@@ -40,6 +40,11 @@ if(NOT DEPENDANCIES_LOADED)
   option(USE_RPC_TELEMETRY "turn on rpc telemetry" OFF)
   option(USE_RPC_TELEMETRY_RAII_LOGGING
          "turn on the logging of the addref release and try cast activity of the services, proxies and stubs" OFF)
+         
+  if(NOT DEFINED RPC_OUT_BUFFER_SIZE)
+    # setting RPC_OUT_BUFFER_SIZE to 4kb which is the default page size for windows and linux
+    set(RPC_OUT_BUFFER_SIZE 0x1000)
+  endif()
 
   message("BUILD_TYPE ${BUILD_TYPE}")
   message("CMAKE_BUILD_TYPE ${CMAKE_BUILD_TYPE}")
@@ -130,45 +135,6 @@ if(NOT DEPENDANCIES_LOADED)
   # reset and apply cmake separate enclave and host compile flags
   if(BUILD_TEST)
     set(BUILD_TEST_FLAG BUILD_TEST)
-    set(HOST_DEBUG_OPTIONS)
-    if(DEBUG_HOST_ALL)
-      set(DEBUG_HOST_LEAK ON)
-      set(DEBUG_HOST_ADDRESS ON)
-      set(DEBUG_HOST_THREAD OFF)
-      set(DEBUG_HOST_UNDEFINED ON)
-    endif()
-    if(DEBUG_HOST_ADDRESS)
-      set(HOST_DEBUG_OPTIONS ${HOST_DEBUG_OPTIONS} -fsanitize=address -fno-omit-frame-pointer)
-    endif()
-    if(DEBUG_HOST_THREAD)
-      set(HOST_DEBUG_OPTIONS ${HOST_DEBUG_OPTIONS} -fsanitize=thread -fno-omit-frame-pointer)
-      set(CMAKE_GTEST_DISCOVER_TESTS_DISCOVERY_MODE PRE_TEST)
-    endif()
-    if(DEBUG_HOST_UNDEFINED)
-      set(HOST_DEBUG_OPTIONS ${HOST_DEBUG_OPTIONS} -fsanitize=undefined)
-    endif()
-    if(DEBUG_HOST_LEAK)
-      if(DEBUG_HOST_ADDRESS)
-        set(HOST_DEBUG_OPTIONS ${HOST_DEBUG_OPTIONS} -fsanitize=leak -fno-omit-frame-pointer)
-      else()
-        set(HOST_DEBUG_OPTIONS ${HOST_DEBUG_OPTIONS} -fsanitize=leak)
-      endif()
-    endif()
-    if(DEBUG_HOST_MEMORY)
-      if(DEBUG_HOST_ADDRESS)
-        set(HOST_DEBUG_OPTIONS ${HOST_DEBUG_OPTIONS} -fsanitize=leak -fno-omit-frame-pointer)
-      else()
-        set(HOST_DEBUG_OPTIONS ${HOST_DEBUG_OPTIONS} -fsanitize=leak)
-      endif()
-    endif()
-    if(DEBUG_HOST_MEMORY)
-      set(DEBUG_HOST_FLAG DEBUG_HOST_LEAK)
-      if(DEBUG_HOST_ADDRESS)
-        set(HOST_DEBUG_OPTIONS ${HOST_DEBUG_OPTIONS} -fsanitize=leak -fno-omit-frame-pointer)
-      else()
-        set(HOST_DEBUG_OPTIONS ${HOST_DEBUG_OPTIONS} -fsanitize=leak)
-      endif()
-    endif()
   else()
     set(BUILD_TEST_FLAG)
   endif()
@@ -226,7 +192,8 @@ if(NOT DEPENDANCIES_LOADED)
         ${BUILD_TEST_FLAG}
         ${ENCLAVE_MEMLEAK_DEFINES}
         ${ENABLE_EXTERNAL_VERIFICATION_FLAG}
-        ${SGX_HW_OR_SIM_DEFINE})
+        ${SGX_HW_OR_SIM_DEFINE}
+        RPC_OUT_BUFFER_SIZE=${RPC_OUT_BUFFER_SIZE})
 
     if(WIN32) # Windows
       if(BUILD_ENCLAVE)
@@ -365,6 +332,8 @@ if(NOT DEPENDANCIES_LOADED)
           /Zi
           /wd4996 # allow deprecated functions
       )
+
+      set(HOST_DEBUG_OPTIONS)
 
       set(SHARED_HOST_COMPILE_OPTIONS ${SHARED_COMPILE_OPTIONS} ${HOST_DEBUG_OPTIONS})
 
@@ -570,6 +539,7 @@ if(NOT DEPENDANCIES_LOADED)
           -Wno-unknown-pragmas
           # this has a ticket to remove
           -Wno-deprecated-declarations
+          -Wno-gnu-zero-variadic-macro-arguments
           ${EXTRA_COMPILE_OPTIONS}
           ${OPTIMIZER_FLAGS})
           
@@ -624,8 +594,53 @@ if(NOT DEPENDANCIES_LOADED)
           -Wno-unused-variable
           -Wno-sign-compare)
 
+      # ####################################################################################################################
+      # reset and apply cmake separate enclave and host compile flags
+      set(HOST_DEBUG_OPTIONS)
+      
+      if(BUILD_TEST)
+        if(DEBUG_HOST_ALL)
+          set(DEBUG_HOST_LEAK ON)
+          set(DEBUG_HOST_ADDRESS ON)
+          set(DEBUG_HOST_THREAD OFF)
+          set(DEBUG_HOST_UNDEFINED ON)
+        endif()
+        if(DEBUG_HOST_ADDRESS)
+          set(HOST_DEBUG_OPTIONS ${HOST_DEBUG_OPTIONS} -fsanitize=address -fno-omit-frame-pointer)
+        endif()
+        if(DEBUG_HOST_THREAD)
+          set(HOST_DEBUG_OPTIONS ${HOST_DEBUG_OPTIONS} -fsanitize=thread -fno-omit-frame-pointer)
+          set(CMAKE_GTEST_DISCOVER_TESTS_DISCOVERY_MODE PRE_TEST)
+        endif()
+        if(DEBUG_HOST_UNDEFINED)
+          set(HOST_DEBUG_OPTIONS ${HOST_DEBUG_OPTIONS} -fsanitize=undefined)
+        endif()
+        if(DEBUG_HOST_LEAK)
+          if(DEBUG_HOST_ADDRESS)
+            set(HOST_DEBUG_OPTIONS ${HOST_DEBUG_OPTIONS} -fsanitize=leak -fno-omit-frame-pointer)
+          else()
+            set(HOST_DEBUG_OPTIONS ${HOST_DEBUG_OPTIONS} -fsanitize=leak)
+          endif()
+        endif()
+        if(DEBUG_HOST_MEMORY)
+          if(DEBUG_HOST_ADDRESS)
+            set(HOST_DEBUG_OPTIONS ${HOST_DEBUG_OPTIONS} -fsanitize=leak -fno-omit-frame-pointer)
+          else()
+            set(HOST_DEBUG_OPTIONS ${HOST_DEBUG_OPTIONS} -fsanitize=leak)
+          endif()
+        endif()
+        if(DEBUG_HOST_MEMORY)
+          set(DEBUG_HOST_FLAG DEBUG_HOST_LEAK)
+          if(DEBUG_HOST_ADDRESS)
+            set(HOST_DEBUG_OPTIONS ${HOST_DEBUG_OPTIONS} -fsanitize=leak -fno-omit-frame-pointer)
+          else()
+            set(HOST_DEBUG_OPTIONS ${HOST_DEBUG_OPTIONS} -fsanitize=leak)
+          endif()
+        endif()
+      endif()
+
       if(BUILD_ENCLAVE)
-        set(ENCLAVE_COMPILE_OPTIONS ${SHARED_COMPILE_OPTIONS} -Wno-c++17-extensions -ffunction-sections -fdata-sections)
+        set(ENCLAVE_COMPILE_OPTIONS ${SHARED_COMPILE_OPTIONS} -Wno-c++17-extensions -ffunction-sections -fdata-sections -Wno-implicit-exception-spec-mismatch)
         set(HOST_LINK_OPTIONS -L/opt/intel/sgxsdk/lib64 -lsgx_tcrypto ${HOST_DEBUG_OPTIONS})
         set(HOST_LINK_EXE_OPTIONS -lsgx_dcap_quoteverify -lsgx_dcap_ql ${HOST_DEBUG_OPTIONS})
       else()      
@@ -711,4 +726,4 @@ if(NOT DEPENDANCIES_LOADED)
   endif()
 
 
-endif(NOT DEPENDANCIES_LOADED)
+endif(NOT DEPENDENCIES_LOADED)

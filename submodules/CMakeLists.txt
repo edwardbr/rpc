@@ -22,30 +22,17 @@ if(RPC_STANDALONE)
   # fmt CMakeLists.txt defines a PUBLIC_HEADER property which triggers a warning when used as a subproject
   set_property(TARGET fmt PROPERTY PUBLIC_HEADER)
     
-  add_subdirectory(clipp)
+  add_subdirectory(args)
+  add_library(args::args ALIAS args)
 
-  if(BUILD_ENCLAVE)
-    # this is needed as the linker symbols are different against the global settings
-    add_subdirectory(googletest_for_enclaves)
+  add_subdirectory(googletest)
+
     add_library(yas_common INTERFACE)
 
-    target_include_directories(yas_common
-      INTERFACE
-      "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/yas_for_enclaves/include>"
-    )  
-  else()
-    add_subdirectory(googletest)
-    add_library(yas_common INTERFACE)
-
-    target_include_directories(yas_common
-      INTERFACE
-      "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/yas/include>"
-    )
-  endif()
+  target_include_directories(yas_common INTERFACE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/yas/include>")
 
   add_subdirectory(idlparser)
 
-  if(BUILD_TEST)
     message("spdlog this is used in tests only and does not need to be installed for other users")
     set(SPDLOG_FMT_EXTERNAL
         ON
@@ -55,7 +42,6 @@ if(RPC_STANDALONE)
         CACHE BOOL "no exceptions" FORCE)
     set(SPDLOG_INSTALL OFF)
     add_subdirectory(spdlog)
-  endif(BUILD_TEST)
   
   # if(BUILD_COROUTINE)
     set(CARES_STATIC    $<NOT:${LIBCORO_BUILD_SHARED_LIBS}> CACHE INTERNAL "")
