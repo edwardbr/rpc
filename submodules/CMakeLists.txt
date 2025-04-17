@@ -25,24 +25,11 @@ if(RPC_STANDALONE)
   add_subdirectory(args)
   add_library(args::args ALIAS args)
 
-  if(BUILD_ENCLAVE)
-    # this is needed as the linker symbols are different against the global settings
-    add_subdirectory(googletest_for_enclaves)
-    add_library(yas_common INTERFACE)
+  add_subdirectory(googletest)
 
-    target_include_directories(yas_common
-      INTERFACE
-      "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/yas_for_enclaves/include>"
-    )  
-  else()
-    add_subdirectory(googletest)
-    add_library(yas_common INTERFACE)
+  add_library(yas_common INTERFACE)
 
-    target_include_directories(yas_common
-      INTERFACE
-      "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/yas/include>"
-    )
-  endif()
+  target_include_directories(yas_common INTERFACE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/yas/include>")
 
   add_subdirectory(idlparser)
 
