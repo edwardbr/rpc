@@ -32,20 +32,23 @@ TELEMETRY_SERVICE_MANAGER
 
 rpc::shared_ptr<rpc::child_service> rpc_server;
 
-int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t host_id, uint64_t child_zone_id, uint64_t* example_object_id)
+// clang-format off
+
+int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t host_id, uint64_t child_zone_id,
+                              uint64_t* example_object_id)
 {
-    rpc::interface_descriptor input_descr{};
-    rpc::interface_descriptor output_descr{};
-    
+    rpc::interface_descriptor input_descr {};
+    rpc::interface_descriptor output_descr {};
+
     if(host_id)
     {
         input_descr = {{host_id}, {host_zone_id}};
     }
-    
+
 #ifdef USE_RPC_TELEMETRY
     CREATE_TELEMETRY_SERVICE(rpc::enclave_telemetry_service)
-#endif    
-    
+#endif
+
     auto ret = rpc::child_service::create_child_zone<rpc::host_service_proxy, yyy::i_host, yyy::i_example>(
         "test_enclave"
         , rpc::zone{child_zone_id}
@@ -62,14 +65,14 @@ int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t host_id, uint64_t 
             example_idl_register_stubs(child_service_ptr);
             new_example = rpc::shared_ptr<yyy::i_example>(new example(child_service_ptr, host));
             return rpc::error::OK();
-        }
-        , rpc_server);
-        
+        },
+        rpc_server);
+
     if(ret != rpc::error::OK())
         return ret;
-        
+
     *example_object_id = output_descr.object_id.id;
-    
+
     return rpc::error::OK();
 }
 
@@ -99,9 +102,10 @@ int call_enclave(
     {
         return rpc::error::INVALID_VERSION();
     }
-    //a retry cache using enclave_retry_buffer as thread local storage, leaky if the client does not retry with more memory
+    // a retry cache using enclave_retry_buffer as thread local storage, leaky if the client does not retry with more
+    // memory
     if(!enclave_retry_buffer)
-    {        
+    {
         return rpc::error::INVALID_DATA();
     }
 
@@ -111,7 +115,6 @@ int call_enclave(
         return rpc::error::SECURITY_ERROR();
     }
 
-
     if(retry_buf)
     {
         *data_out_sz = retry_buf->data.size();
@@ -119,7 +122,7 @@ int call_enclave(
         {
             return rpc::error::NEED_MORE_MEMORY();
         }
-    
+
         memcpy(data_out, retry_buf->data.data(), retry_buf->data.size());
         auto ret = retry_buf->return_value;
         delete retry_buf;
@@ -152,7 +155,7 @@ int call_enclave(
         return ret;
     }
 
-    retry_buf = new rpc::retry_buffer{std::move(tmp), ret};
+    retry_buf = new rpc::retry_buffer {std::move(tmp), ret};
     return rpc::error::NEED_MORE_MEMORY();
 }
 
@@ -166,7 +169,9 @@ int try_cast_enclave(uint64_t protocol_version, uint64_t zone_id, uint64_t objec
     return ret;
 }
 
-uint64_t add_ref_enclave(uint64_t protocol_version, uint64_t destination_channel_zone_id, uint64_t destination_zone_id, uint64_t object_id, uint64_t caller_channel_zone_id, uint64_t caller_zone_id, char build_out_param_channel)
+uint64_t add_ref_enclave(uint64_t protocol_version, uint64_t destination_channel_zone_id, uint64_t destination_zone_id,
+                         uint64_t object_id, uint64_t caller_channel_zone_id, uint64_t caller_zone_id,
+                         char build_out_param_channel)
 {
     if(protocol_version > rpc::get_version())
     {
@@ -198,3 +203,5 @@ extern "C"
         return -1;
     }
 }
+
+// clang-format on

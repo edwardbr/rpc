@@ -5,27 +5,29 @@
 #include "rpc/proxy.h"
 #include "rpc/logger.h"
 
+// clang-format off
 namespace rpc
 {
-    object_proxy::object_proxy( object object_id, 
-                                rpc::shared_ptr<service_proxy> service_proxy)
+    object_proxy::object_proxy(object object_id, rpc::shared_ptr<service_proxy> service_proxy)
         : object_id_(object_id)
         , service_proxy_(service_proxy)
-    {}
+    {
+    }
 
-    object_proxy::~object_proxy() 
-    { 
+    object_proxy::~object_proxy()
+    {
 #ifdef USE_RPC_TELEMETRY
-        if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+        if(auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
         {
-            telemetry_service->on_object_proxy_deletion(service_proxy_->get_zone_id(), service_proxy_->get_destination_zone_id(), object_id_);
+            telemetry_service->on_object_proxy_deletion(service_proxy_->get_zone_id(),
+                                                        service_proxy_->get_destination_zone_id(), object_id_);
         }
 #endif
 
         service_proxy_->on_object_proxy_released(object_id_);
         service_proxy_ = nullptr;
     }
-    
+  
     int object_proxy::send(
             uint64_t protocol_version 
             , rpc::encoding encoding 
@@ -48,8 +50,8 @@ namespace rpc
             out_buf_);
     }
 
-    int object_proxy::send(uint64_t tag, std::function<interface_ordinal (uint64_t)> id_getter, method method_id, size_t in_size_, const char* in_buf_,
-                                  std::vector<char>& out_buf_)
+    int object_proxy::send(uint64_t tag, std::function<interface_ordinal(uint64_t)> id_getter, method method_id,
+                           size_t in_size_, const char* in_buf_, std::vector<char>& out_buf_)
     {
         return service_proxy_->send_from_this_zone(
             encoding::enc_default,
@@ -62,13 +64,15 @@ namespace rpc
             out_buf_);
     }
 
-    int object_proxy::try_cast(std::function<interface_ordinal (uint64_t)> id_getter)
+    int object_proxy::try_cast(std::function<interface_ordinal(uint64_t)> id_getter)
     {
         return service_proxy_->sp_try_cast(service_proxy_->get_destination_zone_id(), object_id_, id_getter);
     }
 
-    destination_zone object_proxy::get_destination_zone_id() const 
+    destination_zone object_proxy::get_destination_zone_id() const
     {
         return service_proxy_->get_destination_zone_id();
     }
 }
+
+// clang-format on

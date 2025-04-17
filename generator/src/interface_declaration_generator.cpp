@@ -17,7 +17,7 @@ namespace rpc_generator
 
         STUB_PARAM_IN,
         STUB_PARAM_OUT,
-        
+
         SEND_PARAM_IN
     };
 
@@ -176,13 +176,13 @@ namespace rpc_generator
                                                               const std::string& name, bool is_in, bool is_out,
                                                               bool is_const, const std::string& object_type,
                                                               uint64_t& count) const
-    {        
+    {
         std::ignore = lib;
         std::ignore = option;
         std::ignore = name;
         std::ignore = is_in;
         std::ignore = object_type;
-        std::ignore = count;        
+        std::ignore = count;
 
         if(is_const && is_out)
         {
@@ -215,7 +215,7 @@ namespace rpc_generator
         std::ignore = is_out;
         std::ignore = is_const;
         std::ignore = object_type;
-        std::ignore = count;        
+        std::ignore = count;
 
         switch(option)
         {
@@ -241,7 +241,7 @@ namespace rpc_generator
         std::ignore = is_in;
         std::ignore = is_const;
         std::ignore = object_type;
-        std::ignore = count;        
+        std::ignore = count;
 
         if(is_out)
         {
@@ -293,12 +293,13 @@ namespace rpc_generator
     };
 
     bool do_in_param(print_type option, const class_entity& lib, const std::string& name, const std::string& type,
-                    const std::list<std::string>& attributes, uint64_t& count, std::string& output)
+                     const std::list<std::string>& attributes, uint64_t& count, std::string& output)
     {
         auto in = is_in_param(attributes);
         auto out = is_out_param(attributes);
         auto is_const = is_const_param(attributes);
-        auto by_value = std::find(attributes.begin(), attributes.end(), attribute_types::by_value_param) != attributes.end();
+        auto by_value
+            = std::find(attributes.begin(), attributes.end(), attribute_types::by_value_param) != attributes.end();
 
         if(out && !in)
             return false;
@@ -377,7 +378,7 @@ namespace rpc_generator
     }
 
     bool do_out_param(print_type option, const class_entity& lib, const std::string& name, const std::string& type,
-                     const std::list<std::string>& attributes, uint64_t& count, std::string& output)
+                      const std::list<std::string>& attributes, uint64_t& count, std::string& output)
     {
         auto in = is_in_param(attributes);
         auto out = is_out_param(attributes);
@@ -485,8 +486,8 @@ namespace rpc_generator
     }
 
     std::string write_proxy_send_declaration(const class_entity& m_ob, const std::string& scope,
-                                             const std::shared_ptr<function_entity>& function,
-                                             bool& has_inparams, std::string additional_params, bool include_variadics)
+                                             const std::shared_ptr<function_entity>& function, bool& has_inparams,
+                                             std::string additional_params, bool include_variadics)
     {
         std::stringstream stream;
         writer header(stream);
@@ -508,7 +509,7 @@ namespace rpc_generator
 
                 std::string output;
                 if(!do_in_param(PROXY_PARAM_IN, m_ob, parameter.get_name(), parameter.get_type(),
-                               parameter.get_attributes(), count, output))
+                                parameter.get_attributes(), count, output))
                     continue;
 
                 header.raw(output);
@@ -525,9 +526,8 @@ namespace rpc_generator
     }
 
     std::string write_proxy_receive_declaration(const class_entity& m_ob, const std::string& scope,
-                                                const std::shared_ptr<function_entity>& function,
-                                                bool& has_inparams, std::string additional_params,
-                                                bool include_variadics)
+                                                const std::shared_ptr<function_entity>& function, bool& has_inparams,
+                                                std::string additional_params, bool include_variadics)
     {
         std::stringstream stream;
         writer header(stream);
@@ -547,7 +547,7 @@ namespace rpc_generator
 
             std::string output;
             if(!do_out_param(PROXY_PARAM_OUT, m_ob, parameter.get_name(), parameter.get_type(),
-                            parameter.get_attributes(), count, output))
+                             parameter.get_attributes(), count, output))
                 continue;
             header.raw(output);
             header.raw(", ");
@@ -562,9 +562,8 @@ namespace rpc_generator
     }
 
     std::string write_stub_receive_declaration(const class_entity& m_ob, const std::string& scope,
-                                               const std::shared_ptr<function_entity>& function,
-                                               bool& has_outparams, std::string additional_params,
-                                               bool include_variadics)
+                                               const std::shared_ptr<function_entity>& function, bool& has_outparams,
+                                               std::string additional_params, bool include_variadics)
     {
         std::stringstream stream;
         writer header(stream);
@@ -584,8 +583,8 @@ namespace rpc_generator
             has_outparams = true;
 
             std::string output;
-            if(!do_in_param(STUB_PARAM_IN, m_ob, parameter.get_name(), parameter.get_type(),
-                           parameter.get_attributes(), count, output))
+            if(!do_in_param(STUB_PARAM_IN, m_ob, parameter.get_name(), parameter.get_type(), parameter.get_attributes(),
+                            count, output))
                 continue;
             header.raw(output);
             header.raw(", ");
@@ -600,8 +599,8 @@ namespace rpc_generator
     }
 
     std::string write_stub_reply_declaration(const class_entity& m_ob, const std::string& scope,
-                                             const std::shared_ptr<function_entity>& function,
-                                             bool& has_outparams, std::string additional_params, bool include_variadics)
+                                             const std::shared_ptr<function_entity>& function, bool& has_outparams,
+                                             std::string additional_params, bool include_variadics)
     {
         std::stringstream stream;
         writer header(stream);
@@ -621,7 +620,7 @@ namespace rpc_generator
                 has_outparams = true;
                 std::string output;
                 if(!do_out_param(STUB_PARAM_OUT, m_ob, parameter.get_name(), parameter.get_type(),
-                                parameter.get_attributes(), count, output))
+                                 parameter.get_attributes(), count, output))
                     continue;
 
                 header.raw(output);
@@ -637,7 +636,8 @@ namespace rpc_generator
         return stream.str();
     }
 
-    std::string client_sender_declaration(const class_entity& m_ob, const std::shared_ptr<function_entity>& function, bool& is_suitable)
+    std::string client_sender_declaration(const class_entity& m_ob, const std::shared_ptr<function_entity>& function,
+                                          bool& is_suitable)
     {
         std::stringstream stream;
         writer header(stream);
@@ -651,33 +651,33 @@ namespace rpc_generator
                 if(is_out_param(parameter.get_attributes()))
                 {
                     is_suitable = false;
-                    //this function is not suitable as it is an out parameter
+                    // this function is not suitable as it is an out parameter
                     break;
                 }
                 if(is_interface_param(m_ob, parameter.get_type()))
                 {
                     is_suitable = false;
-                    //this function is not suitable as it is an interface parameter
+                    // this function is not suitable as it is an interface parameter
                     break;
                 }
-                
+
                 if(is_pointer(parameter.get_type()) || is_pointer_to_pointer(parameter.get_type()))
                 {
                     is_suitable = false;
-                    //this function is not suitable as it is an interface parameter
+                    // this function is not suitable as it is an interface parameter
                     break;
                 }
 
                 if(count > 1)
-                    header.raw(", ");       
-                    
+                    header.raw(", ");
+
                 render_parameter(header, m_ob, parameter);
 
                 count++;
             }
         }
         header.raw(")");
-        
+
         if(is_const_param(function->get_attributes()))
             header.raw(" const");
         return stream.str();
@@ -693,7 +693,8 @@ namespace rpc_generator
             header.print_tabs();
             for(auto& item : function->get_attributes())
             {
-                if(item == rpc_attribute_types::deprecated_function || item == rpc_attribute_types::fingerprint_contaminating_deprecated_function)
+                if(item == rpc_attribute_types::deprecated_function
+                   || item == rpc_attribute_types::fingerprint_contaminating_deprecated_function)
                     header.raw("[[deprecated]] ");
             }
             header.raw("virtual {} {}(", function->get_return_type(), function->get_name());
@@ -840,8 +841,7 @@ namespace rpc_generator
                 if(function->get_entity_type() == entity_type::FUNCTION_METHOD)
                 {
                     bool has_params = false;
-                    auto key = ::rpc_generator::write_proxy_send_declaration(m_ob, "", function, 
-                                                                             has_params, "", true);
+                    auto key = ::rpc_generator::write_proxy_send_declaration(m_ob, "", function, has_params, "", true);
                     if(unique_signatures.emplace(key).second)
                     {
                         header("static {};", key);
@@ -862,8 +862,8 @@ namespace rpc_generator
                 if(function->get_entity_type() == entity_type::FUNCTION_METHOD)
                 {
                     bool has_params = false;
-                    auto key = ::rpc_generator::write_stub_receive_declaration(m_ob, "", function,
-                                                                               has_params, "", true);
+                    auto key
+                        = ::rpc_generator::write_stub_receive_declaration(m_ob, "", function, has_params, "", true);
                     if(unique_signatures.emplace(key).second)
                     {
                         header("static {};", key);
@@ -884,8 +884,7 @@ namespace rpc_generator
                 if(function->get_entity_type() == entity_type::FUNCTION_METHOD)
                 {
                     bool has_params = false;
-                    auto key = ::rpc_generator::write_stub_reply_declaration(m_ob, "", function,
-                                                                             has_params, "", true);
+                    auto key = ::rpc_generator::write_stub_reply_declaration(m_ob, "", function, has_params, "", true);
                     if(unique_signatures.emplace(key).second)
                     {
                         header("static {};", key);
@@ -906,8 +905,8 @@ namespace rpc_generator
                 if(function->get_entity_type() == entity_type::FUNCTION_METHOD)
                 {
                     bool has_params = false;
-                    auto key = ::rpc_generator::write_proxy_receive_declaration(m_ob, "", function,
-                                                                                has_params, "", true);
+                    auto key
+                        = ::rpc_generator::write_proxy_receive_declaration(m_ob, "", function, has_params, "", true);
                     if(unique_signatures.emplace(key).second)
                     {
                         header("static {};", key);
@@ -917,12 +916,12 @@ namespace rpc_generator
         }
         header("}};");
         header("");
-        
+
         {
             std::stringstream stream;
             writer output(stream, header.get_tab_count());
             bool has_usable_functions = false;
-        
+
             output("// proxy class for serialising requests into a buffer for optional dispatch at a future time");
             output("template<class Parent, typename ReturnType>");
             output("class buffered_proxy_serialiser");
@@ -930,7 +929,7 @@ namespace rpc_generator
             output("public:");
             output("using subclass = Parent;");
             {
-                
+
                 auto class_alias = get_full_name(m_ob, true, false, ".");
                 int function_count = 0;
                 std::unordered_set<std::string> unique_signatures;
@@ -941,11 +940,10 @@ namespace rpc_generator
                         function_count++;
 
                         bool is_suitable = true;
-                        auto key
-                            = ::rpc_generator::client_sender_declaration(m_ob, function, is_suitable);
+                        auto key = ::rpc_generator::client_sender_declaration(m_ob, function, is_suitable);
                         if(!is_suitable)
                             continue;
-                            
+
                         has_usable_functions = true;
 
                         if(unique_signatures.emplace(key).second)
@@ -959,13 +957,13 @@ namespace rpc_generator
                                 output("auto __this = static_cast<subclass*>(this);");
                                 output.print_tabs();
                                 output.raw("auto __err = proxy_serialiser<rpc::serialiser::yas, rpc::encoding>::{}(",
-                                        function->get_name());
+                                           function->get_name());
                                 for(auto& parameter : function->get_parameters())
                                 {
                                     std::string mshl_val;
                                     {
-                                        if(!do_in_param(SEND_PARAM_IN, m_ob, parameter.get_name(),
-                                                    parameter.get_type(), parameter.get_attributes(), count, mshl_val))
+                                        if(!do_in_param(SEND_PARAM_IN, m_ob, parameter.get_name(), parameter.get_type(),
+                                                        parameter.get_attributes(), count, mshl_val))
                                             continue;
 
                                         output.raw(mshl_val);
@@ -974,22 +972,24 @@ namespace rpc_generator
                                 }
 
                                 output.raw("__buffer, __this->get_encoding());\n");
-                               
+
                                 std::string tag = function->get_attribute_value("tag");
                                 if(tag.empty())
                                     tag = "0";
-                                
-                                output("return __this->register_call(__err, \"{}.{}\", {{{}}}, {}, __buffer);\n", class_alias, function->get_name(), function_count, tag); // get the method id later
+
+                                output("return __this->register_call(__err, \"{}.{}\", {{{}}}, {}, __buffer);\n",
+                                       class_alias, function->get_name(), function_count,
+                                       tag); // get the method id later
                             }
 
-                            output("}}");                        
+                            output("}}");
                         }
                     }
                 }
             }
             output("}};");
             output("");
-            
+
             if(has_usable_functions)
                 header.write_buffer(stream.str());
             else

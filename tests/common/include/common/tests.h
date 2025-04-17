@@ -8,7 +8,6 @@
 #include <rpc/error_codes.h>
 #include "gtest/gtest.h"
 
-
 #define ASSERT_ERROR_CODE(x) ASSERT_EQ(x, rpc::error::OK())
 
 namespace marshalled_tests
@@ -38,13 +37,13 @@ namespace marshalled_tests
             int val = 0;
             ASSERT_ERROR_CODE(foo.do_something_out_val(val));
         }
-        if (!enclave)
+        if(!enclave)
         {
             int* val = nullptr;
             ASSERT_ERROR_CODE(foo.do_something_out_ptr_ref(val));
             delete val;
         }
-        if (!enclave)
+        if(!enclave)
         {
             int* val = nullptr;
             ASSERT_ERROR_CODE(foo.do_something_out_ptr_ptr(&val));
@@ -79,7 +78,7 @@ namespace marshalled_tests
             ASSERT_ERROR_CODE(foo.receive_something_complicated_ref(val));
             log(std::string("got ") + val.string_val);
         }
-        if (!enclave)
+        if(!enclave)
         {
             xxx::something_complicated* val = nullptr;
             ASSERT_ERROR_CODE(foo.receive_something_complicated_ptr(val));
@@ -97,7 +96,7 @@ namespace marshalled_tests
             val.map_val["22"] = xxx::something_complicated {33, "22"};
             ASSERT_ERROR_CODE(foo.give_something_more_complicated_val(val));
         }
-        if (!enclave)
+        if(!enclave)
         {
             xxx::something_more_complicated val;
             val.map_val["22"] = xxx::something_complicated {33, "22"};
@@ -113,13 +112,13 @@ namespace marshalled_tests
             val.map_val["22"] = xxx::something_complicated {33, "22"};
             ASSERT_ERROR_CODE(foo.give_something_more_complicated_ref_val(val));
         }
-        if (!enclave)
+        if(!enclave)
         {
             xxx::something_more_complicated val;
             val.map_val["22"] = xxx::something_complicated {33, "22"};
             ASSERT_ERROR_CODE(foo.give_something_more_complicated_ptr(&val));
         }
-        if (!enclave)
+        if(!enclave)
         {
             xxx::something_more_complicated val;
             ASSERT_ERROR_CODE(foo.receive_something_more_complicated_ref(val));
@@ -128,7 +127,7 @@ namespace marshalled_tests
             else
                 log(std::string("got ") + val.map_val.begin()->first);
         }
-        if (!enclave)
+        if(!enclave)
         {
             xxx::something_more_complicated* val = nullptr;
             ASSERT_ERROR_CODE(foo.receive_something_more_complicated_ptr(val));
@@ -161,10 +160,7 @@ namespace marshalled_tests
         }
     }
 
-    void remote_tests(
-        bool use_host_in_child
-        , rpc::shared_ptr<yyy::i_example> example_ptr
-        , rpc::zone zone_id)
+    void remote_tests(bool use_host_in_child, rpc::shared_ptr<yyy::i_example> example_ptr, rpc::zone zone_id)
     {
         int val = 0;
         example_ptr->add(1, 2, val);
@@ -182,7 +178,7 @@ namespace marshalled_tests
             // test recursive interface passing
             rpc::shared_ptr<xxx::i_foo> other_foo;
             int err_code = foo->receive_interface(other_foo);
-            if (err_code != rpc::error::OK())
+            if(err_code != rpc::error::OK())
             {
                 log(std::string("create_foo failed"));
             }
@@ -203,8 +199,8 @@ namespace marshalled_tests
         {
             rpc::shared_ptr<xxx::i_baz> i_baz_ptr;
             example_ptr->create_multiple_inheritance(i_baz_ptr);
-            //repeat twice
-            for(int i = 0; i < 2;i++)
+            // repeat twice
+            for(int i = 0; i < 2; i++)
             {
                 auto i_bar_ptr1 = rpc::dynamic_pointer_cast<xxx::i_bar>(i_baz_ptr);
                 RPC_ASSERT(i_bar_ptr1 != nullptr);

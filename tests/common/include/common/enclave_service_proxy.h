@@ -9,36 +9,33 @@
 
 namespace rpc
 {
-    //This is for hosts to call services on an enclave
+    // This is for hosts to call services on an enclave
     class enclave_service_proxy : public service_proxy
     {
         struct enclave_owner
         {
         public:
-            enclave_owner(uint64_t eid) : eid_(eid)
-            {}
+            enclave_owner(uint64_t eid)
+                : eid_(eid)
+            {
+            }
             uint64_t eid_ = 0;
             ~enclave_owner();
         };
 
-        enclave_service_proxy(
-            const char* name
-            , destination_zone destination_zone_id
-            , std::string filename
-            , const rpc::shared_ptr<service>& svc);
-            
+        enclave_service_proxy(const char* name, destination_zone destination_zone_id, std::string filename,
+                              const rpc::shared_ptr<service>& svc);
+
         enclave_service_proxy(const enclave_service_proxy& other) = default;
-       
+
         rpc::shared_ptr<service_proxy> clone() override;
-        
-        static rpc::shared_ptr<enclave_service_proxy> create(
-            const char* name
-            , destination_zone destination_zone_id
-            , const rpc::shared_ptr<service>& svc
-            , std::string filename);
-        
+
+        static rpc::shared_ptr<enclave_service_proxy> create(const char* name, destination_zone destination_zone_id,
+                                                             const rpc::shared_ptr<service>& svc, std::string filename);
+
         int connect(rpc::interface_descriptor input_descr, rpc::interface_descriptor& output_descr) override;
 
+        // clang-format off
         int send(
             uint64_t protocol_version, 
 			encoding encoding, 
@@ -71,14 +68,14 @@ namespace rpc
             destination_zone destination_zone_id, 
             object object_id, 
             caller_zone caller_zone_id) override;
-
+        // clang-format on
         std::shared_ptr<enclave_owner> enclave_owner_;
-        uint64_t eid_ = 0;        
+        uint64_t eid_ = 0;
         std::string filename_;
 
-        friend rpc::service;        
+        friend rpc::service;
+
     public:
-        
         virtual ~enclave_service_proxy() = default;
     };
 }

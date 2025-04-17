@@ -95,7 +95,7 @@ namespace rpc_generator
             std::ignore = is_const;
             std::ignore = object_type;
             std::ignore = count;
-                            
+
             switch(option)
             {
             case PROXY_MARSHALL_IN:
@@ -120,14 +120,14 @@ namespace rpc_generator
                                                           const std::string& name, bool is_in, bool is_out,
                                                           bool is_const, const std::string& object_type,
                                                           uint64_t& count) const
-    {
+        {
             std::ignore = from_host;
             std::ignore = lib;
             std::ignore = is_in;
             std::ignore = is_const;
             std::ignore = object_type;
             std::ignore = count;
-                            
+
             if(is_out)
             {
                 throw std::runtime_error("REFERENCE does not support out vals");
@@ -155,13 +155,13 @@ namespace rpc_generator
                                                      const std::string& name, bool is_in, bool is_out, bool is_const,
                                                      const std::string& object_type, uint64_t& count) const
         {
-            
+
             std::ignore = from_host;
             std::ignore = lib;
             std::ignore = name;
             std::ignore = is_in;
             std::ignore = is_const;
-            std::ignore = object_type;      
+            std::ignore = object_type;
             std::ignore = count;
 
             if(is_out)
@@ -311,7 +311,7 @@ namespace rpc_generator
             std::ignore = is_const;
             std::ignore = object_type;
             std::ignore = count;
-            
+
             if(is_out)
             {
                 throw std::runtime_error("INTERFACE does not support out vals");
@@ -392,7 +392,7 @@ namespace rpc_generator
             std::ignore = is_out;
             std::ignore = is_const;
             std::ignore = count;
-            
+
             switch(option)
             {
             case PROXY_PREPARE_IN:
@@ -436,16 +436,15 @@ namespace rpc_generator
             }
         };
 
-
-
         bool do_in_param(print_type option, bool from_host, const class_entity& lib, const std::string& name,
-                        const std::string& type, const std::list<std::string>& attributes, uint64_t& count,
-                        std::string& output)
+                         const std::string& type, const std::list<std::string>& attributes, uint64_t& count,
+                         std::string& output)
         {
             auto in = is_in_param(attributes);
             auto out = is_out_param(attributes);
             auto is_const = is_const_param(attributes);
-            auto by_value = std::find(attributes.begin(), attributes.end(), attribute_types::by_value_param) != attributes.end();
+            auto by_value
+                = std::find(attributes.begin(), attributes.end(), attribute_types::by_value_param) != attributes.end();
 
             if(out && !in)
                 return false;
@@ -453,7 +452,7 @@ namespace rpc_generator
             std::string type_name = type;
             std::string reference_modifiers;
             strip_reference_modifiers(type_name, reference_modifiers);
-            
+
             bool is_interface = is_interface_param(lib, type);
 
             if(!is_interface)
@@ -533,8 +532,8 @@ namespace rpc_generator
         }
 
         bool do_out_param(print_type option, bool from_host, const class_entity& lib, const std::string& name,
-                         const std::string& type, const std::list<std::string>& attributes, uint64_t& count,
-                         std::string& output)
+                          const std::string& type, const std::list<std::string>& attributes, uint64_t& count,
+                          std::string& output)
         {
             auto in = is_in_param(attributes);
             auto out = is_out_param(attributes);
@@ -675,18 +674,19 @@ namespace rpc_generator
                     {
                         std::string output;
                         if(do_in_param(STUB_DEMARSHALL_DECLARATION, from_host, m_ob, parameter.get_name(),
-                                      parameter.get_type(), parameter.get_attributes(), count, output))
-                                      ;
+                                       parameter.get_type(), parameter.get_attributes(), count, output))
+                            ;
                         else
                             do_out_param(STUB_DEMARSHALL_DECLARATION, from_host, m_ob, parameter.get_name(),
-                                        parameter.get_type(), parameter.get_attributes(), count, output);
+                                         parameter.get_type(), parameter.get_attributes(), count, output);
                         stub("{};", output);
                     }
                 }
 
                 proxy("std::vector<char> __rpc_in_buf;");
                 proxy("auto __rpc_ret = rpc::error::OK();");
-                proxy("std::vector<char> __rpc_out_buf(RPC_OUT_BUFFER_SIZE); //max size using short string optimisation");
+                proxy(
+                    "std::vector<char> __rpc_out_buf(RPC_OUT_BUFFER_SIZE); //max size using short string optimisation");
 
                 proxy("//PROXY_PREPARE_IN");
                 uint64_t count = 1;
@@ -695,12 +695,12 @@ namespace rpc_generator
                     std::string output;
                     {
                         if(!do_in_param(PROXY_PREPARE_IN, from_host, m_ob, parameter.get_name(), parameter.get_type(),
-                                       parameter.get_attributes(), count, output))
+                                        parameter.get_attributes(), count, output))
                             continue;
                         proxy(output);
 
                         if(!do_in_param(PROXY_PREPARE_IN_INTERFACE_ID, from_host, m_ob, parameter.get_name(),
-                                       parameter.get_type(), parameter.get_attributes(), count, output))
+                                        parameter.get_type(), parameter.get_attributes(), count, output))
                             continue;
 
                         proxy(output);
@@ -720,7 +720,7 @@ namespace rpc_generator
                         std::string output;
                         {
                             if(!do_in_param(PROXY_MARSHALL_IN, from_host, m_ob, parameter.get_name(),
-                                           parameter.get_type(), parameter.get_attributes(), count, output))
+                                            parameter.get_type(), parameter.get_attributes(), count, output))
                                 continue;
 
                             proxy.raw(output);
@@ -734,7 +734,7 @@ namespace rpc_generator
                         std::string output;
                         {
                             if(!do_in_param(STUB_MARSHALL_IN, from_host, m_ob, parameter.get_name(),
-                                           parameter.get_type(), parameter.get_attributes(), count, output))
+                                            parameter.get_type(), parameter.get_attributes(), count, output))
                                 continue;
 
                             stub.raw(output);
@@ -769,7 +769,7 @@ namespace rpc_generator
                         std::string output;
                         {
                             if(!do_in_param(PROXY_CLEAN_IN, from_host, m_ob, parameter.get_name(), parameter.get_type(),
-                                           parameter.get_attributes(), count, output))
+                                            parameter.get_attributes(), count, output))
                                 continue;
 
                             proxy(output);
@@ -788,9 +788,9 @@ namespace rpc_generator
                     {
                         std::string output;
                         if(!do_in_param(STUB_PARAM_WRAP, from_host, m_ob, parameter.get_name(), parameter.get_type(),
-                                       parameter.get_attributes(), count, output))
+                                        parameter.get_attributes(), count, output))
                             do_out_param(STUB_PARAM_WRAP, from_host, m_ob, parameter.get_name(), parameter.get_type(),
-                                        parameter.get_attributes(), count, output);
+                                         parameter.get_attributes(), count, output);
                         stub.raw("{}", output);
                     }
                 }
@@ -814,9 +814,9 @@ namespace rpc_generator
                     {
                         std::string output;
                         if(!do_in_param(STUB_PARAM_CAST, from_host, m_ob, parameter.get_name(), parameter.get_type(),
-                                       parameter.get_attributes(), count, output))
+                                        parameter.get_attributes(), count, output))
                             do_out_param(STUB_PARAM_CAST, from_host, m_ob, parameter.get_name(), parameter.get_type(),
-                                        parameter.get_attributes(), count, output);
+                                         parameter.get_attributes(), count, output);
                         if(has_param)
                         {
                             stub.raw(",");
@@ -872,10 +872,10 @@ namespace rpc_generator
                         count++;
                         std::string output;
                         if(do_in_param(PROXY_OUT_DECLARATION, from_host, m_ob, parameter.get_name(),
-                                      parameter.get_type(), parameter.get_attributes(), count, output))
+                                       parameter.get_type(), parameter.get_attributes(), count, output))
                             continue;
                         if(!do_out_param(PROXY_OUT_DECLARATION, from_host, m_ob, parameter.get_name(),
-                                        parameter.get_type(), parameter.get_attributes(), count, output))
+                                         parameter.get_type(), parameter.get_attributes(), count, output))
                             continue;
 
                         proxy(output);
@@ -890,7 +890,7 @@ namespace rpc_generator
                         std::string output;
 
                         if(!do_out_param(STUB_ADD_REF_OUT_PREDECLARE, from_host, m_ob, parameter.get_name(),
-                                        parameter.get_type(), parameter.get_attributes(), count, output))
+                                         parameter.get_type(), parameter.get_attributes(), count, output))
                             continue;
 
                         stub(output);
@@ -904,7 +904,7 @@ namespace rpc_generator
                         std::string output;
 
                         if(!do_out_param(STUB_ADD_REF_OUT, from_host, m_ob, parameter.get_name(), parameter.get_type(),
-                                        parameter.get_attributes(), count, output))
+                                         parameter.get_attributes(), count, output))
                             continue;
 
                         if(!has_preamble && !output.empty())
@@ -944,13 +944,13 @@ namespace rpc_generator
                     {
                         count++;
                         std::string output;
-                        if(!do_out_param(PROXY_MARSHALL_OUT, from_host, m_ob, parameter.get_name(), parameter.get_type(),
-                                        parameter.get_attributes(), count, output))
+                        if(!do_out_param(PROXY_MARSHALL_OUT, from_host, m_ob, parameter.get_name(),
+                                         parameter.get_type(), parameter.get_attributes(), count, output))
                             continue;
                         proxy.raw(output);
 
                         if(!do_out_param(STUB_MARSHALL_OUT, from_host, m_ob, parameter.get_name(), parameter.get_type(),
-                                        parameter.get_attributes(), count, output))
+                                         parameter.get_attributes(), count, output))
                             continue;
 
                         stub.raw(output);
@@ -971,10 +971,10 @@ namespace rpc_generator
                         count++;
                         std::string output;
                         if(do_in_param(PROXY_VALUE_RETURN, from_host, m_ob, parameter.get_name(), parameter.get_type(),
-                                      parameter.get_attributes(), count, output))
+                                       parameter.get_attributes(), count, output))
                             continue;
-                        if(!do_out_param(PROXY_VALUE_RETURN, from_host, m_ob, parameter.get_name(), parameter.get_type(),
-                                        parameter.get_attributes(), count, output))
+                        if(!do_out_param(PROXY_VALUE_RETURN, from_host, m_ob, parameter.get_name(),
+                                         parameter.get_type(), parameter.get_attributes(), count, output))
                             continue;
 
                         proxy(output);
@@ -988,7 +988,7 @@ namespace rpc_generator
                         std::string output;
                         {
                             if(!do_in_param(PROXY_CLEAN_IN, from_host, m_ob, parameter.get_name(), parameter.get_type(),
-                                           parameter.get_attributes(), count, output))
+                                            parameter.get_attributes(), count, output))
                                 continue;
 
                             proxy(output);
@@ -1006,8 +1006,8 @@ namespace rpc_generator
                 stub("break;");
             }
         }
-        
-        void write_interface(bool from_host, const class_entity& m_ob, writer& proxy, writer& stub, 
+
+        void write_interface(bool from_host, const class_entity& m_ob, writer& proxy, writer& stub,
                              bool catch_stub_exceptions, const std::vector<std::string>& rethrow_exceptions)
         {
             if(m_ob.is_in_import())
@@ -1158,11 +1158,10 @@ namespace rpc_generator
 
             stub("return rpc::error::INVALID_METHOD_ID();");
             stub("}}");
-            stub("");   
+            stub("");
         };
 
-        void write_stub_factory(const class_entity& m_ob, writer& stub,
-                                std::set<std::string>& done)
+        void write_stub_factory(const class_entity& m_ob, writer& stub, std::set<std::string>& done)
         {
             auto interface_name
                 = std::string(m_ob.get_entity_type() == entity_type::LIBRARY ? "i_" : "") + m_ob.get_name();
@@ -1412,371 +1411,347 @@ namespace rpc_generator
             header("}}");
             header("}};");
             header("");
-            
-            
-/*
-            ///////////////////////////
-            // to_json
-            
-            int template_param_count = 0;
-            
-            header.print_tabs();
-            header.raw("template<");
-            if(m_ob.get_is_template())
-            {
-                for(const auto& param : m_ob.get_template_params())
-                {
-                    template_param_count++;
-                    
-                    template_deduction deduction;
-                    m_ob.deduct_template_type(param, deduction);
 
-                    if(deduction.type == template_deduction_type::OTHER && deduction.identified_type)
-                    {
-                        auto full_name = get_full_name(*deduction.identified_type, true);
-                        header.raw("{} {},", full_name, param.get_name());
-                    }
-                    else
-                    {
-                        header.raw("{} {},", param.type, param.get_name());
-                    }
-                }
-            }
-            
-            header.raw("class OutputBlob = std::vector<std::uint8_t>>\n");
-            
-            header.print_tabs();
-            header.raw("OutputBlob to_json(const {}", get_full_name(m_ob, true));
-            if(template_param_count > 0 && m_ob.get_is_template())
-            {
-                header.raw("<");
-                bool first_pass = true;
-                for(const auto& param : m_ob.get_template_params())
-                {
-                    template_deduction deduction;
-                    m_ob.deduct_template_type(param, deduction);
-                    
-                    if(!first_pass)
-                    {
-                        header.raw(", ");
-                    }
-                    first_pass = false;
+            /*
+                        ///////////////////////////
+                        // to_json
 
-                    header.raw("{}", param.get_name());
-                }
-                header.raw(">");
-            }
-            header.raw("& obj)\n");
-            header("{{");
-            header("yas::shared_buffer yas_buffer = yas::save<::yas::mem|::yas::json|::yas::no_header>(obj);");
-            header("return OutputBlob(yas_buffer.data.get(), yas_buffer.data.get() + yas_buffer.size);");
-            header("}}");
-            header("");                        
+                        int template_param_count = 0;
 
-            ///////////////////////////
-            // to_yas_binary            
-            header.print_tabs();
-            header.raw("template<");
-            if(m_ob.get_is_template())
-            {
-                for(const auto& param : m_ob.get_template_params())
-                {
-                    template_deduction deduction;
-                    m_ob.deduct_template_type(param, deduction);
+                        header.print_tabs();
+                        header.raw("template<");
+                        if(m_ob.get_is_template())
+                        {
+                            for(const auto& param : m_ob.get_template_params())
+                            {
+                                template_param_count++;
 
-                    if(deduction.type == template_deduction_type::OTHER && deduction.identified_type)
-                    {
-                        auto full_name = get_full_name(*deduction.identified_type, true);
-                        header.raw("{} {},", full_name, param.get_name());
-                    }
-                    else
-                    {
-                        header.raw("{} {},", param.type, param.get_name());
-                    }
-                }
-            }
-            
-            header.raw("class OutputBlob = std::vector<std::uint8_t>>\n");
-            
-            header.print_tabs();
-            header.raw("OutputBlob to_yas_binary(const {}", get_full_name(m_ob, true));
-            if(template_param_count > 0 && m_ob.get_is_template())
-            {
-                header.raw("<");
-                bool first_pass = true;
-                for(const auto& param : m_ob.get_template_params())
-                {
-                    template_deduction deduction;
-                    m_ob.deduct_template_type(param, deduction);
-                    
-                    if(!first_pass)
-                    {
-                        header.raw(", ");
-                    }
-                    first_pass = false;
+                                template_deduction deduction;
+                                m_ob.deduct_template_type(param, deduction);
 
-                    header.raw("{}", param.get_name());
-                }
-                header.raw(">");
-            }
-            header.raw("& obj)\n");
-            header("{{");
-            header("yas::shared_buffer yas_buffer = yas::save<::yas::mem|::yas::binary|::yas::no_header>(obj);");
-            header("return OutputBlob(yas_buffer.data.get(), yas_buffer.data.get() + yas_buffer.size);");
-            header("}}");
-            header("");            
+                                if(deduction.type == template_deduction_type::OTHER && deduction.identified_type)
+                                {
+                                    auto full_name = get_full_name(*deduction.identified_type, true);
+                                    header.raw("{} {},", full_name, param.get_name());
+                                }
+                                else
+                                {
+                                    header.raw("{} {},", param.type, param.get_name());
+                                }
+                            }
+                        }
 
-            ///////////////////////////
-            // to_compressed_yas_binary                                     
-            header.print_tabs();
-            header.raw("template<");
-            if(m_ob.get_is_template())
-            {
-                for(const auto& param : m_ob.get_template_params())
-                {
-                    template_deduction deduction;
-                    m_ob.deduct_template_type(param, deduction);
+                        header.raw("class OutputBlob = std::vector<std::uint8_t>>\n");
 
-                    if(deduction.type == template_deduction_type::OTHER && deduction.identified_type)
-                    {
-                        auto full_name = get_full_name(*deduction.identified_type, true);
-                        header.raw("{} {},", full_name, param.get_name());
-                    }
-                    else
-                    {
-                        header.raw("{} {},", param.type, param.get_name());
-                    }
-                }
-            }
-            
-            header.raw("class OutputBlob = std::vector<std::uint8_t>>\n");
-            
-            header.print_tabs();
-            header.raw("OutputBlob to_compressed_yas_binary(const {}", get_full_name(m_ob, true));
-            if(template_param_count > 0 && m_ob.get_is_template())
-            {
-                header.raw("<");
-                bool first_pass = true;
-                for(const auto& param : m_ob.get_template_params())
-                {
-                    template_deduction deduction;
-                    m_ob.deduct_template_type(param, deduction);
-                    
-                    if(!first_pass)
-                    {
-                        header.raw(", ");
-                    }
-                    first_pass = false;
+                        header.print_tabs();
+                        header.raw("OutputBlob to_json(const {}", get_full_name(m_ob, true));
+                        if(template_param_count > 0 && m_ob.get_is_template())
+                        {
+                            header.raw("<");
+                            bool first_pass = true;
+                            for(const auto& param : m_ob.get_template_params())
+                            {
+                                template_deduction deduction;
+                                m_ob.deduct_template_type(param, deduction);
 
-                    header.raw("{}", param.get_name());
-                }
-                header.raw(">");
-            }
-            header.raw("& obj)\n");
-            header("{{");
-            header("yas::shared_buffer yas_buffer = yas::save<::yas::mem|::yas::binary|::yas::compacted|::yas::no_header>(obj);");
-            header("return OutputBlob(yas_buffer.data.get(), yas_buffer.data.get() + yas_buffer.size);");
-            header("}}");
-            header("");
+                                if(!first_pass)
+                                {
+                                    header.raw(", ");
+                                }
+                                first_pass = false;
 
-            ///////////////////////////
-            // to_compressed_yas_binary               
-            
-            header.print_tabs();
-            header.raw("template<");
-            if(m_ob.get_is_template())
-            {
-                for(const auto& param : m_ob.get_template_params())
-                {
-                    template_deduction deduction;
-                    m_ob.deduct_template_type(param, deduction);
-                    
-                    if(deduction.type == template_deduction_type::OTHER && deduction.identified_type)
-                    {
-                        auto full_name = get_full_name(*deduction.identified_type, true);
-                        header.raw("{} {}, ", full_name, param.get_name());
-                    }
-                    else
-                    {
-                        header.raw("{} {}, ", param.type, param.get_name());
-                    }
-                }
-            }            
-            
-            header.raw("class InputBlob>\n");
-            header.print_tabs();
-            header.raw("std::string from_json(const InputBlob& data, {}", get_full_name(m_ob, true));
-            if(template_param_count > 0 && m_ob.get_is_template())
-            {
-                header.raw("<");
-                bool first_pass = true;
-                for(const auto& param : m_ob.get_template_params())
-                {
-                    template_deduction deduction;
-                    m_ob.deduct_template_type(param, deduction);
-                    
-                    if(!first_pass)
-                    {
-                        header.raw(", ");
-                    }
-                    first_pass = false;
+                                header.raw("{}", param.get_name());
+                            }
+                            header.raw(">");
+                        }
+                        header.raw("& obj)\n");
+                        header("{{");
+                        header("yas::shared_buffer yas_buffer =
+               yas::save<::yas::mem|::yas::json|::yas::no_header>(obj);"); header("return
+               OutputBlob(yas_buffer.data.get(), yas_buffer.data.get() + yas_buffer.size);"); header("}}"); header("");
 
-                    header.raw("{}", param.get_name());
-                }
-                header.raw(">");
-            }
-            header.raw("& obj)\n");
-            header("{{");
-            header("try");
-            header("{{");
-            header("yas::load<yas::mem|yas::json|yas::no_header>(yas::intrusive_buffer{{(const char*)data, data.size()}}, obj);");
-            header("return \"\";");
-            header("}}");
-            header("catch(const std::exception& ex)");
-            header("{{");
-            header("// an error has occurred so do the best one can and set the type_id to 0");
-            header("return std::string(\"An exception has occurred a data blob was incompatible with the type that is deserialising to: \") + ex.what();");
-            header("}}");
-            header("catch(...)");
-            header("{{");
-            header("// an error has occurred so do the best one can and set the type_id to 0");
-            header("return \"An exception has occurred a data blob was incompatible with the type that is deserialising to\";");
-            header("}}");
-            header("}}");
-            header("");
+                        ///////////////////////////
+                        // to_yas_binary
+                        header.print_tabs();
+                        header.raw("template<");
+                        if(m_ob.get_is_template())
+                        {
+                            for(const auto& param : m_ob.get_template_params())
+                            {
+                                template_deduction deduction;
+                                m_ob.deduct_template_type(param, deduction);
 
-            ///////////////////////////
-            // from_yas_binary               
-            
-            header.print_tabs();
-            header.raw("template<");
-            if(m_ob.get_is_template())
-            {
-                for(const auto& param : m_ob.get_template_params())
-                {
-                    template_deduction deduction;
-                    m_ob.deduct_template_type(param, deduction);
-                    
-                    if(deduction.type == template_deduction_type::OTHER && deduction.identified_type)
-                    {
-                        auto full_name = get_full_name(*deduction.identified_type, true);
-                        header.raw("{} {}, ", full_name, param.get_name());
-                    }
-                    else
-                    {
-                        header.raw("{} {}, ", param.type, param.get_name());
-                    }
-                }
-            }            
-            
-            header.raw("class InputBlob>\n");
-            header.print_tabs();
-            header.raw("std::string from_yas_binary(const InputBlob& data, {}", get_full_name(m_ob, true));
-            if(template_param_count > 0 && m_ob.get_is_template())
-            {
-                header.raw("<");
-                bool first_pass = true;
-                for(const auto& param : m_ob.get_template_params())
-                {
-                    template_deduction deduction;
-                    m_ob.deduct_template_type(param, deduction);
-                    
-                    if(!first_pass)
-                    {
-                        header.raw(", ");
-                    }
-                    first_pass = false;
+                                if(deduction.type == template_deduction_type::OTHER && deduction.identified_type)
+                                {
+                                    auto full_name = get_full_name(*deduction.identified_type, true);
+                                    header.raw("{} {},", full_name, param.get_name());
+                                }
+                                else
+                                {
+                                    header.raw("{} {},", param.type, param.get_name());
+                                }
+                            }
+                        }
 
-                    header.raw("{}", param.get_name());
-                }
-                header.raw(">");
-            }
-            header.raw("& obj)\n");
-            header("{{");
-            header("try");
-            header("{{");
-            header("yas::load<yas::mem|::yas::binary|::yas::no_header>(yas::intrusive_buffer{{(const char*)data, data.size()}}, obj);");
-            header("return \"\";");
-            header("}}");
-            header("catch(const std::exception& ex)");
-            header("{{");
-            header("// an error has occurred so do the best one can and set the type_id to 0");
-            header("return std::string(\"An exception has occurred a data blob was incompatible with the type that is deserialising to: \") + ex.what();");
-            header("}}");
-            header("catch(...)");
-            header("{{");
-            header("// an error has occurred so do the best one can and set the type_id to 0");
-            header("return \"An exception has occurred a data blob was incompatible with the type that is deserialising to\";");
-            header("}}");
-            header("}}");
-            header("");
-            
-            ///////////////////////////
-            // from_compressed_yas_binary               
-            
-            header.print_tabs();
-            header.raw("template<");
-            if(m_ob.get_is_template())
-            {
-                for(const auto& param : m_ob.get_template_params())
-                {
-                    template_deduction deduction;
-                    m_ob.deduct_template_type(param, deduction);
-                    
-                    if(deduction.type == template_deduction_type::OTHER && deduction.identified_type)
-                    {
-                        auto full_name = get_full_name(*deduction.identified_type, true);
-                        header.raw("{} {}, ", full_name, param.get_name());
-                    }
-                    else
-                    {
-                        header.raw("{} {}, ", param.type, param.get_name());
-                    }
-                }
-            }            
-            
-            header.raw("class InputBlob>\n");
-            header.print_tabs();
-            header.raw("std::string from_yas_compressed_binary(const InputBlob& data, {}", get_full_name(m_ob, true));
-            if(template_param_count > 0 && m_ob.get_is_template())
-            {
-                header.raw("<");
-                bool first_pass = true;
-                for(const auto& param : m_ob.get_template_params())
-                {
-                    template_deduction deduction;
-                    m_ob.deduct_template_type(param, deduction);
-                    
-                    if(!first_pass)
-                    {
-                        header.raw(", ");
-                    }
-                    first_pass = false;
+                        header.raw("class OutputBlob = std::vector<std::uint8_t>>\n");
 
-                    header.raw("{}", param.get_name());
-                }
-                header.raw(">");
-            }
-            header.raw("& obj)\n");
-            header("{{");
-            header("try");
-            header("{{");
-            header("yas::load<yas::mem|::yas::binary|::yas::compacted|::yas::no_header>(yas::intrusive_buffer{{(const char*)data, data.size()}}, obj);");
-            header("return \"\";");
-            header("}}");
-            header("catch(const std::exception& ex)");
-            header("{{");
-            header("// an error has occurred so do the best one can and set the type_id to 0");
-            header("return std::string(\"An exception has occurred a data blob was incompatible with the type that is deserialising to: \") + ex.what();");
-            header("}}");
-            header("catch(...)");
-            header("{{");
-            header("// an error has occurred so do the best one can and set the type_id to 0");
-            header("return \"An exception has occurred a data blob was incompatible with the type that is deserialising to\";");
-            header("}}");
-            header("}}");
-            header("");
-*/            
+                        header.print_tabs();
+                        header.raw("OutputBlob to_yas_binary(const {}", get_full_name(m_ob, true));
+                        if(template_param_count > 0 && m_ob.get_is_template())
+                        {
+                            header.raw("<");
+                            bool first_pass = true;
+                            for(const auto& param : m_ob.get_template_params())
+                            {
+                                template_deduction deduction;
+                                m_ob.deduct_template_type(param, deduction);
+
+                                if(!first_pass)
+                                {
+                                    header.raw(", ");
+                                }
+                                first_pass = false;
+
+                                header.raw("{}", param.get_name());
+                            }
+                            header.raw(">");
+                        }
+                        header.raw("& obj)\n");
+                        header("{{");
+                        header("yas::shared_buffer yas_buffer =
+               yas::save<::yas::mem|::yas::binary|::yas::no_header>(obj);"); header("return
+               OutputBlob(yas_buffer.data.get(), yas_buffer.data.get() + yas_buffer.size);"); header("}}"); header("");
+
+                        ///////////////////////////
+                        // to_compressed_yas_binary
+                        header.print_tabs();
+                        header.raw("template<");
+                        if(m_ob.get_is_template())
+                        {
+                            for(const auto& param : m_ob.get_template_params())
+                            {
+                                template_deduction deduction;
+                                m_ob.deduct_template_type(param, deduction);
+
+                                if(deduction.type == template_deduction_type::OTHER && deduction.identified_type)
+                                {
+                                    auto full_name = get_full_name(*deduction.identified_type, true);
+                                    header.raw("{} {},", full_name, param.get_name());
+                                }
+                                else
+                                {
+                                    header.raw("{} {},", param.type, param.get_name());
+                                }
+                            }
+                        }
+
+                        header.raw("class OutputBlob = std::vector<std::uint8_t>>\n");
+
+                        header.print_tabs();
+                        header.raw("OutputBlob to_compressed_yas_binary(const {}", get_full_name(m_ob, true));
+                        if(template_param_count > 0 && m_ob.get_is_template())
+                        {
+                            header.raw("<");
+                            bool first_pass = true;
+                            for(const auto& param : m_ob.get_template_params())
+                            {
+                                template_deduction deduction;
+                                m_ob.deduct_template_type(param, deduction);
+
+                                if(!first_pass)
+                                {
+                                    header.raw(", ");
+                                }
+                                first_pass = false;
+
+                                header.raw("{}", param.get_name());
+                            }
+                            header.raw(">");
+                        }
+                        header.raw("& obj)\n");
+                        header("{{");
+                        header("yas::shared_buffer yas_buffer =
+               yas::save<::yas::mem|::yas::binary|::yas::compacted|::yas::no_header>(obj);"); header("return
+               OutputBlob(yas_buffer.data.get(), yas_buffer.data.get() + yas_buffer.size);"); header("}}"); header("");
+
+                        ///////////////////////////
+                        // to_compressed_yas_binary
+
+                        header.print_tabs();
+                        header.raw("template<");
+                        if(m_ob.get_is_template())
+                        {
+                            for(const auto& param : m_ob.get_template_params())
+                            {
+                                template_deduction deduction;
+                                m_ob.deduct_template_type(param, deduction);
+
+                                if(deduction.type == template_deduction_type::OTHER && deduction.identified_type)
+                                {
+                                    auto full_name = get_full_name(*deduction.identified_type, true);
+                                    header.raw("{} {}, ", full_name, param.get_name());
+                                }
+                                else
+                                {
+                                    header.raw("{} {}, ", param.type, param.get_name());
+                                }
+                            }
+                        }
+
+                        header.raw("class InputBlob>\n");
+                        header.print_tabs();
+                        header.raw("std::string from_json(const InputBlob& data, {}", get_full_name(m_ob, true));
+                        if(template_param_count > 0 && m_ob.get_is_template())
+                        {
+                            header.raw("<");
+                            bool first_pass = true;
+                            for(const auto& param : m_ob.get_template_params())
+                            {
+                                template_deduction deduction;
+                                m_ob.deduct_template_type(param, deduction);
+
+                                if(!first_pass)
+                                {
+                                    header.raw(", ");
+                                }
+                                first_pass = false;
+
+                                header.raw("{}", param.get_name());
+                            }
+                            header.raw(">");
+                        }
+                        header.raw("& obj)\n");
+                        header("{{");
+                        header("try");
+                        header("{{");
+                        header("yas::load<yas::mem|yas::json|yas::no_header>(yas::intrusive_buffer{{(const char*)data,
+               data.size()}}, obj);"); header("return \"\";"); header("}}"); header("catch(const std::exception& ex)");
+                        header("{{");
+                        header("// an error has occurred so do the best one can and set the type_id to 0");
+                        header("return std::string(\"An exception has occurred a data blob was incompatible with the
+               type that is deserialising to: \") + ex.what();"); header("}}"); header("catch(...)"); header("{{");
+                        header("// an error has occurred so do the best one can and set the type_id to 0");
+                        header("return \"An exception has occurred a data blob was incompatible with the type that is
+               deserialising to\";"); header("}}"); header("}}"); header("");
+
+                        ///////////////////////////
+                        // from_yas_binary
+
+                        header.print_tabs();
+                        header.raw("template<");
+                        if(m_ob.get_is_template())
+                        {
+                            for(const auto& param : m_ob.get_template_params())
+                            {
+                                template_deduction deduction;
+                                m_ob.deduct_template_type(param, deduction);
+
+                                if(deduction.type == template_deduction_type::OTHER && deduction.identified_type)
+                                {
+                                    auto full_name = get_full_name(*deduction.identified_type, true);
+                                    header.raw("{} {}, ", full_name, param.get_name());
+                                }
+                                else
+                                {
+                                    header.raw("{} {}, ", param.type, param.get_name());
+                                }
+                            }
+                        }
+
+                        header.raw("class InputBlob>\n");
+                        header.print_tabs();
+                        header.raw("std::string from_yas_binary(const InputBlob& data, {}", get_full_name(m_ob, true));
+                        if(template_param_count > 0 && m_ob.get_is_template())
+                        {
+                            header.raw("<");
+                            bool first_pass = true;
+                            for(const auto& param : m_ob.get_template_params())
+                            {
+                                template_deduction deduction;
+                                m_ob.deduct_template_type(param, deduction);
+
+                                if(!first_pass)
+                                {
+                                    header.raw(", ");
+                                }
+                                first_pass = false;
+
+                                header.raw("{}", param.get_name());
+                            }
+                            header.raw(">");
+                        }
+                        header.raw("& obj)\n");
+                        header("{{");
+                        header("try");
+                        header("{{");
+                        header("yas::load<yas::mem|::yas::binary|::yas::no_header>(yas::intrusive_buffer{{(const
+               char*)data, data.size()}}, obj);"); header("return \"\";"); header("}}"); header("catch(const
+               std::exception& ex)"); header("{{"); header("// an error has occurred so do the best one can and set the
+               type_id to 0"); header("return std::string(\"An exception has occurred a data blob was incompatible with
+               the type that is deserialising to: \") + ex.what();"); header("}}"); header("catch(...)"); header("{{");
+                        header("// an error has occurred so do the best one can and set the type_id to 0");
+                        header("return \"An exception has occurred a data blob was incompatible with the type that is
+               deserialising to\";"); header("}}"); header("}}"); header("");
+
+                        ///////////////////////////
+                        // from_compressed_yas_binary
+
+                        header.print_tabs();
+                        header.raw("template<");
+                        if(m_ob.get_is_template())
+                        {
+                            for(const auto& param : m_ob.get_template_params())
+                            {
+                                template_deduction deduction;
+                                m_ob.deduct_template_type(param, deduction);
+
+                                if(deduction.type == template_deduction_type::OTHER && deduction.identified_type)
+                                {
+                                    auto full_name = get_full_name(*deduction.identified_type, true);
+                                    header.raw("{} {}, ", full_name, param.get_name());
+                                }
+                                else
+                                {
+                                    header.raw("{} {}, ", param.type, param.get_name());
+                                }
+                            }
+                        }
+
+                        header.raw("class InputBlob>\n");
+                        header.print_tabs();
+                        header.raw("std::string from_yas_compressed_binary(const InputBlob& data, {}",
+               get_full_name(m_ob, true)); if(template_param_count > 0 && m_ob.get_is_template())
+                        {
+                            header.raw("<");
+                            bool first_pass = true;
+                            for(const auto& param : m_ob.get_template_params())
+                            {
+                                template_deduction deduction;
+                                m_ob.deduct_template_type(param, deduction);
+
+                                if(!first_pass)
+                                {
+                                    header.raw(", ");
+                                }
+                                first_pass = false;
+
+                                header.raw("{}", param.get_name());
+                            }
+                            header.raw(">");
+                        }
+                        header.raw("& obj)\n");
+                        header("{{");
+                        header("try");
+                        header("{{");
+                        header("yas::load<yas::mem|::yas::binary|::yas::compacted|::yas::no_header>(yas::intrusive_buffer{{(const
+               char*)data, data.size()}}, obj);"); header("return \"\";"); header("}}"); header("catch(const
+               std::exception& ex)"); header("{{"); header("// an error has occurred so do the best one can and set the
+               type_id to 0"); header("return std::string(\"An exception has occurred a data blob was incompatible with
+               the type that is deserialising to: \") + ex.what();"); header("}}"); header("catch(...)"); header("{{");
+                        header("// an error has occurred so do the best one can and set the type_id to 0");
+                        header("return \"An exception has occurred a data blob was incompatible with the type that is
+               deserialising to\";"); header("}}"); header("}}"); header("");
+            */
         }
 
         void write_struct(const class_entity& m_ob, writer& header)
@@ -1858,7 +1833,7 @@ namespace rpc_generator
                 else if(field->get_entity_type() == entity_type::CONSTEXPR)
                 {
                     write_constexpr(header, *field);
-                }                
+                }
             }
 
             header("");
@@ -1871,7 +1846,8 @@ namespace rpc_generator
             for(auto& field : m_ob.get_functions())
             {
                 auto type = field->get_entity_type();
-                if(type != entity_type::CPPQUOTE && type != entity_type::FUNCTION_PUBLIC && type != entity_type::FUNCTION_PRIVATE && type != entity_type::CONSTEXPR)
+                if(type != entity_type::CPPQUOTE && type != entity_type::FUNCTION_PUBLIC
+                   && type != entity_type::FUNCTION_PRIVATE && type != entity_type::CONSTEXPR)
                 {
                     if(field->get_entity_type() == entity_type::FUNCTION_VARIABLE)
                     {
@@ -1881,7 +1857,7 @@ namespace rpc_generator
                             continue;
                         }
                     }
-                    
+
                     has_fields = true;
                     break;
                 }
@@ -1893,7 +1869,8 @@ namespace rpc_generator
                 for(auto& field : m_ob.get_functions())
                 {
                     auto type = field->get_entity_type();
-                    if(type != entity_type::CPPQUOTE && type != entity_type::FUNCTION_PUBLIC && type != entity_type::FUNCTION_PRIVATE && type != entity_type::CONSTEXPR)
+                    if(type != entity_type::CPPQUOTE && type != entity_type::FUNCTION_PUBLIC
+                       && type != entity_type::FUNCTION_PRIVATE && type != entity_type::CONSTEXPR)
                     {
                         if(field->get_entity_type() == entity_type::FUNCTION_VARIABLE)
                         {
@@ -1952,7 +1929,8 @@ namespace rpc_generator
                 for(auto& field : m_ob.get_functions())
                 {
                     auto type = field->get_entity_type();
-                    if(type != entity_type::CPPQUOTE && type != entity_type::FUNCTION_PUBLIC && type != entity_type::FUNCTION_PRIVATE && type != entity_type::CONSTEXPR)
+                    if(type != entity_type::CPPQUOTE && type != entity_type::FUNCTION_PUBLIC
+                       && type != entity_type::FUNCTION_PRIVATE && type != entity_type::CONSTEXPR)
                     {
                         if(field->get_entity_type() == entity_type::FUNCTION_VARIABLE)
                         {
@@ -1976,7 +1954,8 @@ namespace rpc_generator
                 for(auto& field : m_ob.get_functions())
                 {
                     auto type = field->get_entity_type();
-                    if(type != entity_type::CPPQUOTE && type != entity_type::FUNCTION_PUBLIC && type != entity_type::FUNCTION_PRIVATE && type != entity_type::CONSTEXPR)
+                    if(type != entity_type::CPPQUOTE && type != entity_type::FUNCTION_PUBLIC
+                       && type != entity_type::FUNCTION_PRIVATE && type != entity_type::CONSTEXPR)
                     {
                         if(field->get_entity_type() == entity_type::FUNCTION_VARIABLE)
                         {
@@ -1986,7 +1965,7 @@ namespace rpc_generator
                                 continue;
                             }
                         }
-                                                
+
                         header.raw("\n");
                         header.print_tabs();
                         header.raw("{1}lhs.{0} != rhs.{0}", field->get_name(), first_pass ? "" : "|| ");

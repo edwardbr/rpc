@@ -14,14 +14,15 @@ class writer
 
 public:
     writer(std::ostream& strm)
-        : strm_(strm) {};    
-        
+        : strm_(strm) {};
+
     writer(std::ostream& strm, int tab_count)
-        : strm_(strm), count_(tab_count) {};
-        
-    int get_tab_count() const {return count_;}
+        : strm_(strm)
+        , count_(tab_count) {};
+
+    int get_tab_count() const { return count_; }
     void set_tab_count(int count) { count_ = count; }
-    
+
     template<typename S, typename... Args> void operator()(const S& format_str, Args&&... args)
     {
         int tmp = 0;

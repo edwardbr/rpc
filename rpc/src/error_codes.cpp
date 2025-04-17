@@ -4,6 +4,7 @@
  */
 #include <rpc/error_codes.h>
 
+// clang-format off
 namespace rpc
 {
     namespace error
@@ -67,3 +68,4 @@ namespace rpc
         }
     };
 }
+// clang-format on

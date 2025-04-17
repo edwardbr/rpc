@@ -183,7 +183,8 @@ namespace fingerprint
 
             {
                 auto tmp = item.substr(0, strlen(rpc_attribute_types::use_template_param_in_id_attr));
-                if(tmp == rpc_attribute_types::use_template_param_in_id_attr && item[strlen(rpc_attribute_types::use_template_param_in_id_attr)] == '=')
+                if(tmp == rpc_attribute_types::use_template_param_in_id_attr
+                   && item[strlen(rpc_attribute_types::use_template_param_in_id_attr)] == '=')
                 {
                     continue;
                 }
@@ -223,15 +224,16 @@ namespace fingerprint
                     // versions before we can rehabilitate this as "deprecated"
                     if(item == rpc_attribute_types::deprecated_function)
                         continue;
-                        
-                    // this is to deal with the issue that a deprecated function attribute contaminated the fingerprint 
-                    // making it impossible to change without changing the interface id which when deprecating a feature should not do
+
+                    // this is to deal with the issue that a deprecated function attribute contaminated the fingerprint
+                    // making it impossible to change without changing the interface id which when deprecating a feature
+                    // should not do
                     if(item == rpc_attribute_types::fingerprint_contaminating_deprecated_function)
                     {
                         seed += "deprecated";
                         continue;
                     }
-                    
+
                     // to handle some idl parser yuckiness
                     if(item == attribute_types::tolerate_struct_or_enum)
                     {
@@ -308,7 +310,8 @@ namespace fingerprint
         }
         else if(cls.get_entity_type() == entity_type::STRUCT)
         {
-            if(cls.get_is_template() && cls.get_attribute_value(rpc_attribute_types::use_legacy_empty_template_struct_id_attr) == "true")
+            if(cls.get_is_template()
+               && cls.get_attribute_value(rpc_attribute_types::use_legacy_empty_template_struct_id_attr) == "true")
             {
                 // this is a bad bug that needs to be preserved for legacy template structures
                 std::ignore = cls;
@@ -316,7 +319,8 @@ namespace fingerprint
             else
             {
                 // template classes cannot know what type they are until the template parameters are specified
-                if(cls.get_is_template() && cls.get_attribute_value(rpc_attribute_types::use_template_param_in_id_attr) != "false")
+                if(cls.get_is_template()
+                   && cls.get_attribute_value(rpc_attribute_types::use_template_param_in_id_attr) != "false")
                 {
                     seed += "template<";
                     bool first_pass = true;

@@ -9,7 +9,7 @@
 #include <rpc/stl_clang12/rpc_yvals.h>
 #if _STL_COMPILER_PREPROCESSOR
 
-//#include <intrin0.h>
+// #include <intrin0.h>
 #include <type_traits>
 
 #if defined(__clang__) || defined(__GNUC__) || defined(__GNUG__)
@@ -23,7 +23,7 @@ _STL_DISABLE_CLANG_WARNINGS
 #undef new
 
 #define _CONCATX(x, y) x##y
-#define _CONCAT(x, y)  _CONCATX(x, y)
+#define _CONCAT(x, y) _CONCATX(x, y)
 
 // Interlocked intrinsic mapping for _nf/_acq/_rel
 #if defined(_M_CEE_PURE) || defined(_M_IX86) || (defined(_M_X64) && !defined(_M_ARM64EC))
@@ -61,7 +61,8 @@ _STL_DISABLE_CLANG_WARNINGS
 _RPC_BEGIN
 
 #if _HAS_CXX20
-enum class memory_order : int {
+enum class memory_order : int
+{
     relaxed,
     consume,
     acquire,
@@ -83,8 +84,9 @@ inline constexpr memory_order memory_order_acquire = memory_order::acquire;
 inline constexpr memory_order memory_order_release = memory_order::release;
 inline constexpr memory_order memory_order_acq_rel = memory_order::acq_rel;
 inline constexpr memory_order memory_order_seq_cst = memory_order::seq_cst;
-#else // _HAS_CXX20
-enum memory_order {
+#else  // _HAS_CXX20
+enum memory_order
+{
     memory_order_relaxed,
     memory_order_consume,
     memory_order_acquire,
@@ -96,15 +98,16 @@ enum memory_order {
 
 using _Atomic_counter_t = unsigned long;
 
-template <class _Integral, class _Ty>
-_NODISCARD volatile _Integral* _Atomic_address_as(_Ty& _Source) noexcept {
+template<class _Integral, class _Ty> _NODISCARD volatile _Integral* _Atomic_address_as(_Ty& _Source) noexcept
+{
     // gets a pointer to the argument as an integral type (to pass to intrinsics)
     static_assert(::std::is_integral_v<_Integral>, "Tried to reinterpret memory as non-integral");
     return &reinterpret_cast<volatile _Integral&>(_Source);
 }
 
-template <class _Integral, class _Ty>
-_NODISCARD const volatile _Integral* _Atomic_address_as(const _Ty& _Source) noexcept {
+template<class _Integral, class _Ty>
+_NODISCARD const volatile _Integral* _Atomic_address_as(const _Ty& _Source) noexcept
+{
     // gets a pointer to the argument as an integral type (to pass to intrinsics)
     static_assert(::std::is_integral_v<_Integral>, "Tried to reinterpret memory as non-integral");
     return &reinterpret_cast<const volatile _Integral&>(_Source);

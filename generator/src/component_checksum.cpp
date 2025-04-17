@@ -52,7 +52,7 @@ namespace component_checksum
         if(status.empty())
             status = "not_specified";
 
-        auto file = output_path / status/ name;
+        auto file = output_path / status / name;
 
         std::filesystem::create_directories(file.parent_path());
 
@@ -66,13 +66,13 @@ namespace component_checksum
             return;
 
         auto name = get_namespace(m_ob.get_owner()) + m_ob.get_name();
-        
+
         auto status = m_ob.get_attribute_value("status");
         if(status.empty())
             status = "not_specified";
 
-        auto file = output_path / status/ name;
-        
+        auto file = output_path / status / name;
+
         std::filesystem::create_directories(file.parent_path());
 
         std::ofstream out(file);

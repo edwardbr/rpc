@@ -12,6 +12,7 @@
 #include <sgx_capable.h>
 #include <untrusted/enclave_marshal_test_u.h>
 
+// clang-format off
 namespace rpc
 {
     enclave_service_proxy::enclave_service_proxy(
@@ -21,7 +22,8 @@ namespace rpc
         , const rpc::shared_ptr<service>& svc)
         : service_proxy(name, destination_zone_id, svc)
         , filename_(filename)
-    {}
+    {
+    }
 
     enclave_service_proxy::enclave_owner::~enclave_owner()
     {
@@ -38,29 +40,30 @@ namespace rpc
         , std::string filename)
     {
         RPC_ASSERT(svc);
-        auto ret = rpc::shared_ptr<enclave_service_proxy>(new enclave_service_proxy(name, destination_zone_id, filename, svc));
+        auto ret = rpc::shared_ptr<enclave_service_proxy>(
+            new enclave_service_proxy(name, destination_zone_id, filename, svc));
         return ret;
     }
-            
+
     int enclave_service_proxy::connect(rpc::interface_descriptor input_descr, rpc::interface_descriptor& output_descr)
-    {   
+    {
         rpc::object output_object_id = {0};
         sgx_launch_token_t token = {0};
         int updated = 0;
-        #ifdef _WIN32
-            auto status = sgx_create_enclavea(filename_.data(), SGX_DEBUG_FLAG, &token, &updated, &eid_, NULL);
-        #else
-            auto status = sgx_create_enclave(filename_.data(), SGX_DEBUG_FLAG, &token, &updated, &eid_, NULL);
-        #endif
-        if (status)
+#ifdef _WIN32
+        auto status = sgx_create_enclavea(filename_.data(), SGX_DEBUG_FLAG, &token, &updated, &eid_, NULL);
+#else
+        auto status = sgx_create_enclave(filename_.data(), SGX_DEBUG_FLAG, &token, &updated, &eid_, NULL);
+#endif
+        if(status)
         {
 #ifdef USE_RPC_TELEMETRY
-            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            if(auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             {
                 auto error_message = std::string("sgx_create_enclave failed ") + std::to_string(status);
                 telemetry_service->message(rpc::i_telemetry_service::err, error_message.c_str());
             }
-#endif            
+#endif
             return rpc::error::TRANSPORT_ERROR();
         }
         int err_code = error::OK();
@@ -74,25 +77,25 @@ namespace rpc
         if (status)
         {
 #ifdef USE_RPC_TELEMETRY
-            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            if(auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             {
                 telemetry_service->message(rpc::i_telemetry_service::err, "marshal_test_init_enclave failed");
             }
-#endif            
+#endif
             sgx_destroy_enclave(eid_);
             return rpc::error::TRANSPORT_ERROR();
         }
-        if (err_code)
-            return err_code;      
-        
-        //class takes ownership of the enclave
-        enclave_owner_ = std::make_shared<enclave_owner>(eid_);
-        if (err_code)
+        if(err_code)
             return err_code;
-            
+
+        // class takes ownership of the enclave
+        enclave_owner_ = std::make_shared<enclave_owner>(eid_);
+        if(err_code)
+            return err_code;
+
         output_descr = {output_object_id, get_destination_zone_id()};
         return err_code;
-    }   
+    }
 
 
     int enclave_service_proxy::send(
@@ -110,8 +113,8 @@ namespace rpc
         std::vector<char>& out_buf_)
     {
         if(destination_zone_id != get_destination_zone_id())
-            return rpc::error::ZONE_NOT_SUPPORTED();   
-                 
+            return rpc::error::ZONE_NOT_SUPPORTED();
+
         int err_code = 0;
         size_t data_out_sz = 0;
         void* tls = nullptr;
@@ -134,23 +137,23 @@ namespace rpc
             , &data_out_sz
             , &tls);
 
-        if (status)
+        if(status)
         {
 #ifdef USE_RPC_TELEMETRY
-            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            if(auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             {
                 auto error_message = std::string("call_enclave failed ") + std::to_string(status);
                 telemetry_service->message(rpc::i_telemetry_service::err, error_message.c_str());
             }
-#endif            
+#endif
             return rpc::error::TRANSPORT_ERROR();
         }
 
-        if (err_code == rpc::error::NEED_MORE_MEMORY())
+        if(err_code == rpc::error::NEED_MORE_MEMORY())
         {
             // data too small reallocate memory and try again
             out_buf_.resize(data_out_sz);
-            
+
             status = ::call_enclave(
                 eid_
                 , &err_code
@@ -172,12 +175,12 @@ namespace rpc
             if (status)
             {
 #ifdef USE_RPC_TELEMETRY
-                if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+                if(auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
                 {
                     auto error_message = std::string("call_enclave failed ") + std::to_string(status);
                     telemetry_service->message(rpc::i_telemetry_service::err, error_message.c_str());
                 }
-#endif                
+#endif
                 return rpc::error::TRANSPORT_ERROR();
             }
         }
@@ -213,15 +216,15 @@ namespace rpc
             });
             task.join();
         }
-        if (status)
+        if(status)
         {
 #ifdef USE_RPC_TELEMETRY
-            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            if(auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             {
                 auto error_message = std::string("try_cast_enclave failed ") + std::to_string(status);
                 telemetry_service->message(rpc::i_telemetry_service::err, error_message.c_str());
             }
-#endif            
+#endif
             RPC_ASSERT(false);
             return rpc::error::TRANSPORT_ERROR();
         }
@@ -238,7 +241,7 @@ namespace rpc
         , add_ref_options build_out_param_channel)
     {
 #ifdef USE_RPC_TELEMETRY
-        if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+        if(auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
         {
             telemetry_service->on_service_proxy_add_ref(
                 get_zone_id()
@@ -248,7 +251,7 @@ namespace rpc
                 , object_id
                 , build_out_param_channel);
         }
-#endif        
+#endif
         uint64_t ret = 0;
         constexpr auto add_ref_failed_val = std::numeric_limits<uint64_t>::max();
         sgx_status_t status = ::add_ref_enclave(
@@ -278,18 +281,18 @@ namespace rpc
             });
             task.join();
         }
-        if (status)
+        if(status)
         {
 #ifdef USE_RPC_TELEMETRY
-            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            if(auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             {
                 auto error_message = std::string("add_ref_enclave failed ") + std::to_string(status);
                 telemetry_service->message(rpc::i_telemetry_service::err, error_message.c_str());
             }
-#endif            
+#endif
             RPC_ASSERT(false);
             return add_ref_failed_val;
-        }    
+        }
         return ret;
     }
 
@@ -321,15 +324,15 @@ namespace rpc
             });
             task.join();
         }
-        if (status)
+        if(status)
         {
 #ifdef USE_RPC_TELEMETRY
-            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            if(auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             {
                 auto error_message = std::string("release_enclave failed ") + std::to_string(status);
                 telemetry_service->message(rpc::i_telemetry_service::err, error_message.c_str());
             }
-#endif            
+#endif
             return std::numeric_limits<uint64_t>::max();
         }
         return ret;
@@ -337,3 +340,4 @@ namespace rpc
 }
 #endif
 #endif
+// clang-format on

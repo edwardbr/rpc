@@ -68,7 +68,7 @@ namespace rpc_generator
                 std::ignore = is_const;
                 std::ignore = object_type;
                 std::ignore = count;
-                
+
                 assert(false);
             }
         };
@@ -85,7 +85,7 @@ namespace rpc_generator
             std::ignore = is_out;
             std::ignore = is_const;
             std::ignore = count;
-            
+
             switch(option)
             {
             case PROXY_PARAM_IN:
@@ -119,7 +119,7 @@ namespace rpc_generator
             std::ignore = is_in;
             std::ignore = is_const;
             std::ignore = count;
-            
+
             if(is_out)
             {
                 throw std::runtime_error("REFERENCE does not support out vals");
@@ -155,7 +155,7 @@ namespace rpc_generator
             std::ignore = lib;
             std::ignore = is_in;
             std::ignore = count;
-            
+
             if(is_out)
             {
                 throw std::runtime_error("MOVE does not support out vals");
@@ -192,7 +192,7 @@ namespace rpc_generator
             std::ignore = is_const;
             std::ignore = object_type;
             std::ignore = count;
-            
+
             if(is_out)
             {
                 throw std::runtime_error("POINTER does not support out vals");
@@ -225,7 +225,7 @@ namespace rpc_generator
             std::ignore = is_in;
             std::ignore = object_type;
             std::ignore = count;
-            
+
             if(is_const && is_out)
             {
                 throw std::runtime_error("POINTER_REFERENCE does not support const out vals");
@@ -264,7 +264,7 @@ namespace rpc_generator
             std::ignore = is_const;
             std::ignore = object_type;
             std::ignore = count;
-            
+
             switch(option)
             {
             case PROXY_PARAM_IN:
@@ -297,7 +297,7 @@ namespace rpc_generator
             std::ignore = is_const;
             std::ignore = object_type;
             std::ignore = count;
-            
+
             if(is_out)
             {
                 throw std::runtime_error("INTERFACE does not support out vals");
@@ -336,7 +336,7 @@ namespace rpc_generator
             std::ignore = is_const;
             std::ignore = object_type;
             std::ignore = count;
-            
+
             switch(option)
             {
             case PROXY_PARAM_IN:
@@ -358,13 +358,14 @@ namespace rpc_generator
         };
 
         bool do_in_param(print_type option, bool from_host, const class_entity& lib, const std::string& name,
-                        const std::string& type, const std::list<std::string>& attributes, uint64_t& count,
-                        std::string& output)
+                         const std::string& type, const std::list<std::string>& attributes, uint64_t& count,
+                         std::string& output)
         {
             auto in = is_in_param(attributes);
             auto out = is_out_param(attributes);
             auto is_const = is_const_param(attributes);
-            auto by_value = std::find(attributes.begin(), attributes.end(), attribute_types::by_value_param) != attributes.end();
+            auto by_value
+                = std::find(attributes.begin(), attributes.end(), attribute_types::by_value_param) != attributes.end();
 
             if(out && !in)
                 return false;
@@ -452,8 +453,8 @@ namespace rpc_generator
         }
 
         bool do_out_param(print_type option, bool from_host, const class_entity& lib, const std::string& name,
-                         const std::string& type, const std::list<std::string>& attributes, uint64_t& count,
-                         std::string& output)
+                          const std::string& type, const std::list<std::string>& attributes, uint64_t& count,
+                          std::string& output)
         {
             auto in = is_in_param(attributes);
             auto out = is_out_param(attributes);
@@ -585,8 +586,8 @@ namespace rpc_generator
             bool has_inparams = false;
             proxy("template<>");
             proxy("{}", ::rpc_generator::write_proxy_send_declaration(
-                            m_ob, interface_name + "::proxy_serialiser<rpc::serialiser::yas, rpc::encoding>::", function,
-                            has_inparams, ", rpc::encoding __rpc_enc", false));
+                            m_ob, interface_name + "::proxy_serialiser<rpc::serialiser::yas, rpc::encoding>::",
+                            function, has_inparams, ", rpc::encoding __rpc_enc", false));
             proxy("{{");
 
             if(has_inparams)
@@ -600,7 +601,7 @@ namespace rpc_generator
                     std::string output;
                     {
                         if(!do_in_param(PROXY_MARSHALL_IN, from_host, m_ob, parameter.get_name(), parameter.get_type(),
-                                       parameter.get_attributes(), count, output))
+                                        parameter.get_attributes(), count, output))
                             continue;
 
                         proxy(output);
@@ -610,7 +611,8 @@ namespace rpc_generator
 
                 proxy("  );");
 
-                proxy("__buffer.clear(); // this does not change the capacity of the vector so this is a low cost reset to the buffer");
+                proxy("__buffer.clear(); // this does not change the capacity of the vector so this is a low cost "
+                      "reset to the buffer");
                 proxy("switch(__rpc_enc)");
                 proxy("{{");
                 proxy("case rpc::encoding::yas_compressed_binary:");
@@ -652,8 +654,8 @@ namespace rpc_generator
             bool has_inparams = false;
             proxy("template<>");
             proxy("{}", ::rpc_generator::write_proxy_receive_declaration(
-                            m_ob, interface_name + "::proxy_deserialiser<rpc::serialiser::yas, rpc::encoding>::", function, 
-                            has_inparams, ", rpc::encoding __rpc_enc", false));
+                            m_ob, interface_name + "::proxy_deserialiser<rpc::serialiser::yas, rpc::encoding>::",
+                            function, has_inparams, ", rpc::encoding __rpc_enc", false));
             proxy("{{");
 
             if(has_inparams)
@@ -672,7 +674,7 @@ namespace rpc_generator
                     count++;
                     std::string output;
                     if(!do_out_param(PROXY_MARSHALL_OUT, from_host, m_ob, parameter.get_name(), parameter.get_type(),
-                                    parameter.get_attributes(), count, output))
+                                     parameter.get_attributes(), count, output))
                         continue;
                     proxy(output);
                 }
@@ -736,8 +738,8 @@ namespace rpc_generator
             bool has_outparams = false;
             stub("template<>");
             stub("{}", ::rpc_generator::write_stub_receive_declaration(
-                            m_ob, interface_name + "::stub_deserialiser<rpc::serialiser::yas, rpc::encoding>::", function,
-                            has_outparams, ", rpc::encoding __rpc_enc", false));
+                           m_ob, interface_name + "::stub_deserialiser<rpc::serialiser::yas, rpc::encoding>::",
+                           function, has_outparams, ", rpc::encoding __rpc_enc", false));
             stub("{{");
 
             if(has_outparams)
@@ -756,7 +758,7 @@ namespace rpc_generator
                     count++;
                     std::string output;
                     if(!do_in_param(STUB_MARSHALL_IN, from_host, m_ob, parameter.get_name(), parameter.get_type(),
-                                   parameter.get_attributes(), count, output))
+                                    parameter.get_attributes(), count, output))
                         continue;
                     stub(output);
                 }
@@ -766,8 +768,8 @@ namespace rpc_generator
                 stub("{{");
                 stub("case rpc::encoding::yas_compressed_binary:");
                 stub("::yas::load<::yas::mem|::yas::binary|::yas::compacted|::yas::no_header>(::yas::intrusive_"
-                      "buffer(__rpc_buf,__rpc_buf_size), "
-                      "__yas_mapping);");
+                     "buffer(__rpc_buf,__rpc_buf_size), "
+                     "__yas_mapping);");
                 stub("break;");
                 // stub("case rpc::encoding::yas_text:");
                 // stub("::yas::load<::yas::mem|::yas::text|::yas::no_header>(::yas::intrusive_buffer(__rpc_buf,__"
@@ -775,12 +777,12 @@ namespace rpc_generator
                 // stub("break;");
                 stub("case rpc::encoding::yas_json:");
                 stub("::yas::load<::yas::mem|::yas::json|::yas::no_header>(::yas::intrusive_buffer(__rpc_buf,__"
-                      "rpc_buf_size), __yas_mapping);");
+                     "rpc_buf_size), __yas_mapping);");
                 stub("break;");
                 stub("case rpc::encoding::enc_default:");
                 stub("case rpc::encoding::yas_binary:");
                 stub("::yas::load<::yas::mem|::yas::binary|::yas::no_header>(::yas::intrusive_buffer(__rpc_buf,__"
-                      "rpc_buf_size), __yas_mapping);");
+                     "rpc_buf_size), __yas_mapping);");
                 stub("break;");
                 stub("default:");
                 stub("return rpc::error::STUB_DESERIALISATION_ERROR();");
@@ -790,8 +792,8 @@ namespace rpc_generator
                 stub("catch(std::exception& ex)");
                 stub("{{");
                 stub("auto error_message = std::string(\"A stub deserialisation error has occurred in an {} "
-                      "implementation in function {} \") + ex.what();",
-                      interface_name, function->get_name());
+                     "implementation in function {} \") + ex.what();",
+                     interface_name, function->get_name());
                 stub("LOG_STR(error_message.data(), error_message.length());");
                 stub("return rpc::error::STUB_DESERIALISATION_ERROR();");
                 stub("}}");
@@ -800,8 +802,8 @@ namespace rpc_generator
                 stub("{{");
                 stub("#ifdef USE_RPC_LOGGING");
                 stub("auto error_message = std::string(\"exception has occurred in an {} implementation in "
-                      "function {}\");",
-                      interface_name, function->get_name());
+                     "function {}\");",
+                     interface_name, function->get_name());
                 stub("LOG_STR(error_message.data(), error_message.length());");
                 stub("#endif");
                 stub("return rpc::error::STUB_DESERIALISATION_ERROR();");
@@ -821,8 +823,8 @@ namespace rpc_generator
             bool has_outparams = false;
             stub("template<>");
             stub("{}", ::rpc_generator::write_stub_reply_declaration(
-                            m_ob, interface_name + "::stub_serialiser<rpc::serialiser::yas, rpc::encoding>::", function,
-                            has_outparams, ", rpc::encoding __rpc_enc", false));
+                           m_ob, interface_name + "::stub_serialiser<rpc::serialiser::yas, rpc::encoding>::", function,
+                           has_outparams, ", rpc::encoding __rpc_enc", false));
             stub("{{");
 
             if(has_outparams)
@@ -836,7 +838,7 @@ namespace rpc_generator
                     std::string output;
                     {
                         if(!do_out_param(STUB_MARSHALL_OUT, from_host, m_ob, parameter.get_name(), parameter.get_type(),
-                                        parameter.get_attributes(), count, output))
+                                         parameter.get_attributes(), count, output))
                             continue;
 
                         stub(output);
@@ -846,13 +848,14 @@ namespace rpc_generator
 
                 stub("  );");
 
-                stub("__buffer.clear(); // this does not change the capacity of the vector so this is a low cost reset to the buffer");
+                stub("__buffer.clear(); // this does not change the capacity of the vector so this is a low cost reset "
+                     "to the buffer");
                 stub("switch(__rpc_enc)");
                 stub("{{");
                 stub("case rpc::encoding::yas_compressed_binary:");
                 stub("::yas::save<::yas::mem|::yas::binary|::yas::compacted|::yas::no_header>(::yas::vector_"
-                      "ostream(__buffer), "
-                      "__yas_mapping);");
+                     "ostream(__buffer), "
+                     "__yas_mapping);");
                 stub("break;");
                 // stub("case rpc::encoding::yas_text:");
                 // stub("::yas::save<::yas::mem|::yas::text|::yas::no_header>(::yas::vector_ostream(__buffer), "
@@ -860,12 +863,12 @@ namespace rpc_generator
                 // stub("break;");
                 stub("case rpc::encoding::yas_json:");
                 stub("::yas::save<::yas::mem|::yas::json|::yas::no_header>(::yas::vector_ostream(__buffer), "
-                      "__yas_mapping);");
+                     "__yas_mapping);");
                 stub("break;");
                 stub("case rpc::encoding::enc_default:");
                 stub("case rpc::encoding::yas_binary:");
                 stub("::yas::save<::yas::mem|::yas::binary|::yas::no_header>(::yas::vector_ostream(__buffer), "
-                      "__yas_mapping);");
+                     "__yas_mapping);");
                 stub("break;");
                 stub("}}");
             }
@@ -926,8 +929,7 @@ namespace rpc_generator
                             bool has_params = false;
                             if(unique_signatures
                                    .emplace(::rpc_generator::write_proxy_send_declaration(
-                                       m_ob, "", function, has_params, ", rpc::encoding __rpc_enc",
-                                       false))
+                                       m_ob, "", function, has_params, ", rpc::encoding __rpc_enc", false))
                                    .second)
                             {
                                 write_proxy_send_method(from_host, m_ob, proxy, interface_name, function,
@@ -959,8 +961,7 @@ namespace rpc_generator
                             bool has_params = false;
                             if(unique_signatures
                                    .emplace(::rpc_generator::write_proxy_receive_declaration(
-                                       m_ob, "", function, has_params, ", rpc::encoding __rpc_enc",
-                                       false))
+                                       m_ob, "", function, has_params, ", rpc::encoding __rpc_enc", false))
                                    .second)
                             {
                                 write_proxy_receive_method(from_host, m_ob, proxy, interface_name, function,
@@ -992,8 +993,7 @@ namespace rpc_generator
                             bool has_params = false;
                             if(unique_signatures
                                    .emplace(::rpc_generator::write_stub_receive_declaration(
-                                       m_ob, "", function, has_params, ", rpc::encoding __rpc_enc",
-                                       false))
+                                       m_ob, "", function, has_params, ", rpc::encoding __rpc_enc", false))
                                    .second)
                             {
                                 write_stub_receive_method(from_host, m_ob, proxy, interface_name, function,
@@ -1025,8 +1025,7 @@ namespace rpc_generator
                             bool has_params = false;
                             if(unique_signatures
                                    .emplace(::rpc_generator::write_stub_reply_declaration(
-                                       m_ob, "", function, has_params, ", rpc::encoding __rpc_enc",
-                                       false))
+                                       m_ob, "", function, has_params, ", rpc::encoding __rpc_enc", false))
                                    .second)
                             {
                                 write_stub_reply_method(from_host, m_ob, proxy, interface_name, function,

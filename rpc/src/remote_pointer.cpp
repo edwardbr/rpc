@@ -2,16 +2,15 @@
  *   Copyright (c) 2024 Edward Boggis-Rolfe
  *   All rights reserved.
  */
-//this is the legacy rpc implementation kept for win32 for now
+// this is the legacy rpc implementation kept for win32 for now
 
 #include <rpc/remote_pointer.h>
 
 namespace rpc
 {
-    bad_weak_ptr::~bad_weak_ptr() noexcept {}
+    bad_weak_ptr::~bad_weak_ptr() noexcept { }
 
-    const char*
-    bad_weak_ptr::what() const noexcept
+    const char* bad_weak_ptr::what() const noexcept
     {
         return "bad_weak_ptr";
     }
@@ -41,27 +40,29 @@ namespace rpc
         // threads, and have them all get copied at once.  The argument
         // also doesn't apply for __release_shared, because an outstanding
         // weak_ptr::lock() could read / modify the shared count.
-        if (__shared_weak_owners_.load(std::memory_order_acquire) == 0)
+        if(__shared_weak_owners_.load(std::memory_order_acquire) == 0)
         {
             // no need to do this store, because we are about
             // to destroy everything.
             //__libcpp_atomic_store(&__shared_weak_owners_, -1, _AO_Release);
             __on_zero_shared_weak();
         }
-        else if (--__shared_weak_owners_ == -1)
+        else if(--__shared_weak_owners_ == -1)
             __on_zero_shared_weak();
     }
     __shared_weak_count* __shared_weak_count::lock() noexcept
     {
         long object_owners = __shared_owners_.load(std::memory_order_seq_cst);
-        while (object_owners != -1)
-        {            
-            if (__shared_owners_.compare_exchange_weak(object_owners, object_owners + 1))
+        while(object_owners != -1)
+        {
+            if(__shared_owners_.compare_exchange_weak(object_owners, object_owners + 1))
                 return this;
         }
         return nullptr;
     }
-    const void* __shared_weak_count::__get_deleter(const std::type_info&) const noexcept { return nullptr; }
-
+    const void* __shared_weak_count::__get_deleter(const std::type_info&) const noexcept
+    {
+        return nullptr;
+    }
 
 }

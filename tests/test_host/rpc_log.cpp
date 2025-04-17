@@ -14,6 +14,8 @@ using namespace std::chrono_literals;
 
 extern rpc::weak_ptr<rpc::service> current_host_service;
 
+// clang-format off
+
 // an ocall for logging the test
 extern "C"
 {
@@ -36,24 +38,25 @@ extern "C"
         thread_local rpc::retry_buffer retry_buf;
 
         auto root_service = current_host_service.lock();
-        if (!root_service)
+        if(!root_service)
         {
             retry_buf.data.clear();
             return rpc::error::TRANSPORT_ERROR();
         }
-        if (retry_buf.data.empty())
+        if(retry_buf.data.empty())
         {
             std::vector<char> out_data(sz_out);
-            retry_buf.return_value = root_service->send(protocol_version, rpc::encoding(encoding), tag, {caller_channel_zone_id}, {caller_zone_id}, {destination_zone_id}, {object_id}, {interface_id}, {method_id}, sz_int,
-                                         data_in, out_data);
-            if (retry_buf.return_value >= rpc::error::MIN() && retry_buf.return_value <= rpc::error::MAX())
+            retry_buf.return_value = root_service->send(
+                protocol_version, rpc::encoding(encoding), tag, {caller_channel_zone_id}, {caller_zone_id},
+                {destination_zone_id}, {object_id}, {interface_id}, {method_id}, sz_int, data_in, out_data);
+            if(retry_buf.return_value >= rpc::error::MIN() && retry_buf.return_value <= rpc::error::MAX())
             {
                 return retry_buf.return_value;
             }
             retry_buf.data.swap(out_data);
         }
         *data_out_sz = retry_buf.data.size();
-        if (*data_out_sz > sz_out)
+        if(*data_out_sz > sz_out)
             return rpc::error::NEED_MORE_MEMORY();
         memcpy(data_out, retry_buf.data.data(), retry_buf.data.size());
         retry_buf.data.clear();
@@ -66,7 +69,7 @@ extern "C"
         , uint64_t interface_id)
     {
         auto root_service = current_host_service.lock();
-        if (!root_service)
+        if(!root_service)
         {
             return rpc::error::TRANSPORT_ERROR();
         }
@@ -83,7 +86,7 @@ extern "C"
         , char build_out_param_channel)
     {
         auto root_service = current_host_service.lock();
-        if (!root_service)
+        if(!root_service)
         {
             return rpc::error::TRANSPORT_ERROR();
         }
@@ -103,7 +106,7 @@ extern "C"
         , uint64_t caller_zone_id)
     {
         auto root_service = current_host_service.lock();
-        if (!root_service)
+        if(!root_service)
         {
             return rpc::error::TRANSPORT_ERROR();
         }
@@ -112,11 +115,11 @@ extern "C"
 
     void rpc_log(const char* str, size_t sz)
     {
-#ifdef USE_RPC_LOGGING        
+#ifdef USE_RPC_LOGGING
         spdlog::info(std::string(str, sz));
 #endif
     }
-    
+
     void hang()
     {
         std::cerr << "hanging for debugger\n";
@@ -127,3 +130,4 @@ extern "C"
         }
     }
 }
+// clang-format on
