@@ -361,7 +361,7 @@ public:
         if(CreateNewZoneThenCreateSubordinatedZone)
         {
             rpc::shared_ptr<yyy::i_example> new_ptr;
-            if(example_relay_ptr->create_example_in_subordnate_zone(new_ptr, use_host_in_child_ ? hst : nullptr, ++zone_gen_) == rpc::error::OK())
+            if(example_relay_ptr->create_example_in_subordinate_zone(new_ptr, use_host_in_child_ ? hst : nullptr, ++zone_gen_) == rpc::error::OK())
             {
                 example_relay_ptr->set_host(nullptr);
                 example_relay_ptr = new_ptr;
@@ -454,7 +454,7 @@ public:
         if(CreateNewZoneThenCreateSubordinatedZone)
         {
             rpc::shared_ptr<yyy::i_example> new_ptr;
-            err_code = ptr->create_example_in_subordnate_zone(new_ptr, use_host_in_child_ ? i_host_ptr_ : nullptr, ++zone_gen_);
+            err_code = ptr->create_example_in_subordinate_zone(new_ptr, use_host_in_child_ ? i_host_ptr_ : nullptr, ++zone_gen_);
             if(err_code != rpc::error::OK())
                 return nullptr;
             ptr = new_ptr;
@@ -917,10 +917,10 @@ TYPED_TEST(remote_type_test, check_sub_subordinate)
         return;
 
     rpc::shared_ptr<yyy::i_example> new_zone;
-    ASSERT_EQ(lib.get_example()->create_example_in_subordnate_zone(new_zone, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK()); //second level
+    ASSERT_EQ(lib.get_example()->create_example_in_subordinate_zone(new_zone, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK()); //second level
 
     rpc::shared_ptr<yyy::i_example> new_new_zone;
-    ASSERT_EQ(new_zone->create_example_in_subordnate_zone(new_new_zone, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK()); //third level
+    ASSERT_EQ(new_zone->create_example_in_subordinate_zone(new_new_zone, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK()); //third level
 }
 
 TYPED_TEST(remote_type_test, multithreaded_check_sub_subordinate)
@@ -939,10 +939,10 @@ TYPED_TEST(remote_type_test, multithreaded_check_sub_subordinate)
     {
         thread_target = std::thread([&](){
             rpc::shared_ptr<yyy::i_example> new_zone;
-            ASSERT_EQ(lib.get_example()->create_example_in_subordnate_zone(new_zone, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK()); //second level
+            ASSERT_EQ(lib.get_example()->create_example_in_subordinate_zone(new_zone, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK()); //second level
 
             rpc::shared_ptr<yyy::i_example> new_new_zone;
-            ASSERT_EQ(new_zone->create_example_in_subordnate_zone(new_new_zone, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK()); //third level
+            ASSERT_EQ(new_zone->create_example_in_subordinate_zone(new_new_zone, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK()); //third level
         });
     }
     for(auto& thread_target : threads)
@@ -961,7 +961,7 @@ TYPED_TEST(remote_type_test, send_interface_back)
 
     rpc::shared_ptr<yyy::i_example> new_zone;
     //lib.i_example_ptr_ //first level
-    ASSERT_EQ(lib.get_example()->create_example_in_subordnate_zone(new_zone, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK()); //second level
+    ASSERT_EQ(lib.get_example()->create_example_in_subordinate_zone(new_zone, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK()); //second level
 
     rpc::shared_ptr<xxx::i_baz> new_baz;
     new_zone->create_baz(new_baz);
@@ -1041,10 +1041,10 @@ TYPED_TEST(remote_type_test, check_identity)
 
     rpc::shared_ptr<yyy::i_example> new_zone;
     //lib.i_example_ptr_ //first level
-    ASSERT_EQ(lib.get_example()->create_example_in_subordnate_zone(new_zone, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK()); //second level
+    ASSERT_EQ(lib.get_example()->create_example_in_subordinate_zone(new_zone, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK()); //second level
 
     rpc::shared_ptr<yyy::i_example> new_new_zone;
-    ASSERT_EQ(new_zone->create_example_in_subordnate_zone(new_new_zone, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK()); //third level
+    ASSERT_EQ(new_zone->create_example_in_subordinate_zone(new_new_zone, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK()); //third level
 
     auto new_zone_fork = lib.create_new_zone();//second level
 
@@ -1273,13 +1273,13 @@ TYPED_TEST(type_test_with_host, create_store_delete)
 TYPED_TEST(type_test_with_host, create_subordinate_zone)
 {  
     rpc::shared_ptr<yyy::i_example> target;
-    ASSERT_EQ(this->get_lib().get_example()->create_example_in_subordnate_zone(target, this->get_lib().get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    ASSERT_EQ(this->get_lib().get_example()->create_example_in_subordinate_zone(target, this->get_lib().get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
 }
 
 
 TYPED_TEST(type_test_with_host, create_subordinate_zone_and_set_in_host)
 {  
-    ASSERT_EQ(this->get_lib().get_example()->create_example_in_subordnate_zone_and_set_in_host(++(*zone_gen), "foo", this->get_lib().get_local_host_ptr()), rpc::error::OK());
+    ASSERT_EQ(this->get_lib().get_example()->create_example_in_subordinate_zone_and_set_in_host(++(*zone_gen), "foo", this->get_lib().get_local_host_ptr()), rpc::error::OK());
     rpc::shared_ptr<yyy::i_example> target;
     this->get_lib().get_host()->look_up_app("foo", target);
     this->get_lib().get_host()->unload_app("foo");

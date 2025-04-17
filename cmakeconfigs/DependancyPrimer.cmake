@@ -1,11 +1,11 @@
 # formatted using cmake-format
 cmake_minimum_required(VERSION 3.24)
 
-message("DEPENDANCIES_LOADED ${DEPENDANCIES_LOADED}")
-if(NOT DEPENDANCIES_LOADED)
+message("DEPENDENCIES_LOADED ${DEPENDENCIES_LOADED}")
+if(NOT DEPENDENCIES_LOADED)
   message("configuring dependancies")
   # if this is loaded in a parent module then dont do this
-  set(DEPENDANCIES_LOADED ON)
+  set(DEPENDENCIES_LOADED ON)
 
   # ####################################################################################################################
   # settings
@@ -704,4 +704,4 @@ if(NOT DEPENDANCIES_LOADED)
   endif()
 
 
-endif(NOT DEPENDANCIES_LOADED)
+endif(NOT DEPENDENCIES_LOADED)

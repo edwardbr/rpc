@@ -16,7 +16,7 @@ target_include_directories(
   PRIVATE ${HOST_INCLUDES})
 
 if(BUILD_ENCLAVE)
-  set(ENCLAVE_DEPENDANCIES marshal_test_edl_host rpc_telemetry_edl_header_host)
+  set(ENCLAVE_DEPENDENCIES marshal_test_edl_host rpc_telemetry_edl_header_host)
 endif()
 
 target_link_libraries(
@@ -31,7 +31,7 @@ target_link_libraries(
          GTest::gtest_main
          GTest::gmock_main
          spdlog::spdlog
-         ${ENCLAVE_DEPENDANCIES}
+         ${ENCLAVE_DEPENDENCIES}
          ${HOST_LIBRARIES})
 
 target_compile_options(rpc_test PRIVATE ${HOST_COMPILE_OPTIONS} ${WARN_OK})
