@@ -35,7 +35,7 @@ namespace rpc
         //static constexpr uint64_t get(uint64_t)
     };
 
-    //this is a nice helper function to match an interface id to a interface in a version independant way
+    //this is a nice helper function to match an interface id to a interface in a version independent way
     template<class T>
     bool match(rpc::interface_ordinal interface_id)
     {

@@ -105,12 +105,12 @@ namespace rpc
         catch(const std::exception& ex)
         {
             // an error has occurred so do the best one can and set the type_id to 0
-            return std::string("An exception has occured a data blob was incompatible with the type that is deserialising to: ") + ex.what();
+            return std::string("An exception has occurred a data blob was incompatible with the type that is deserialising to: ") + ex.what();
         }
         catch(...)
         {
             // an error has occurred so do the best one can and set the type_id to 0
-            return "An exception has occured a data blob was incompatible with the type that is deserialising to";
+            return "An exception has occurred a data blob was incompatible with the type that is deserialising to";
         }
     }
 
@@ -125,12 +125,12 @@ namespace rpc
         catch(const std::exception& ex)
         {
             // an error has occurred so do the best one can and set the type_id to 0
-            return std::string("An exception has occured a data blob was incompatible with the type that is deserialising to: ") + ex.what();
+            return std::string("An exception has occurred a data blob was incompatible with the type that is deserialising to: ") + ex.what();
         }
         catch(...)
         {
             // an error has occurred so do the best one can and set the type_id to 0
-            return "An exception has occured a data blob was incompatible with the type that is deserialising to";
+            return "An exception has occurred a data blob was incompatible with the type that is deserialising to";
         }
     }
 
@@ -145,12 +145,12 @@ namespace rpc
         catch(const std::exception& ex)
         {
             // an error has occurred so do the best one can and set the type_id to 0
-            return std::string("An exception has occured a data blob was incompatible with the type that is deserialising to: ") + ex.what();
+            return std::string("An exception has occurred a data blob was incompatible with the type that is deserialising to: ") + ex.what();
         }
         catch(...)
         {
             // an error has occurred so do the best one can and set the type_id to 0
-            return "An exception has occured a data blob was incompatible with the type that is deserialising to";
+            return "An exception has occurred a data blob was incompatible with the type that is deserialising to";
         }
     }
 

@@ -100,7 +100,7 @@ function(
   set(ADDITIONAL_HEADERS "")
   set(RETHROW_STUB_EXCEPTION "")
   set(ADDITIONAL_STUB_HEADER "")
-  set(GENERATED_DEPENDANCIES generator)
+  set(GENERATED_DEPENDENCIES generator)
 
   foreach(path ${params_include_paths})
     set(PATHS_PARAMS ${PATHS_PARAMS} --path "${path}")
@@ -130,7 +130,7 @@ function(
         set(PATHS_PARAMS ${PATHS_PARAMS} --path "${dep_base_dir}")
       endif()
 
-      set(GENERATED_DEPENDANCIES ${GENERATED_DEPENDANCIES} ${dep}_generate)
+      set(GENERATED_DEPENDENCIES ${GENERATED_DEPENDENCIES} ${dep}_generate)
       else()
       message("target ${dep}_generate does not exist so skipped")
     endif()
@@ -166,7 +166,7 @@ function(
       ${ADDITIONAL_STUB_HEADER}
       MAIN_DEPENDENCY ${idl}
       IMPLICIT_DEPENDS ${idl}
-      DEPENDS ${GENERATED_DEPENDANCIES}
+      DEPENDS ${GENERATED_DEPENDENCIES}
       COMMENT \"Running generator ${idl}\"
     )
 
@@ -199,7 +199,7 @@ function(
     --proxy ${proxy_path} --stub ${stub_path} --stub_header ${stub_header_path} ${PATHS_PARAMS} ${ADDITIONAL_HEADERS} ${RETHROW_STUB_EXCEPTION} ${ADDITIONAL_STUB_HEADER}
     MAIN_DEPENDENCY ${idl}
     IMPLICIT_DEPENDS ${idl}
-    DEPENDS ${GENERATED_DEPENDANCIES}
+    DEPENDS ${GENERATED_DEPENDENCIES}
     COMMENT "Running generator ${idl}")
 
   add_custom_target(${name}_idl_generate DEPENDS ${full_header_path} ${full_proxy_path} ${full_stub_header_path}

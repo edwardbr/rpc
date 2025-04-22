@@ -172,17 +172,17 @@ namespace marshalled_tests
             log(std::string("got ") + std::to_string(val->int_val));
             return rpc::error::OK();
         }
-        error_code recieve_something_complicated_ref(xxx::something_complicated& val) override
+        error_code receive_something_complicated_ref(xxx::something_complicated& val) override
         {
             val = xxx::something_complicated {33, "22"};
             return rpc::error::OK();
         }
-        error_code recieve_something_complicated_ptr(xxx::something_complicated*& val) override
+        error_code receive_something_complicated_ptr(xxx::something_complicated*& val) override
         {
             val = new xxx::something_complicated {33, "22"};
             return rpc::error::OK();
         }
-        error_code recieve_something_complicated_in_out_ref(xxx::something_complicated& val) override
+        error_code receive_something_complicated_in_out_ref(xxx::something_complicated& val) override
         {
             log(std::string("got ") + std::to_string(val.int_val));
             val.int_val = 33;
@@ -213,18 +213,18 @@ namespace marshalled_tests
             log(std::string("got ") + val->map_val.begin()->first);
             return rpc::error::OK();
         }
-        error_code recieve_something_more_complicated_ref(xxx::something_more_complicated& val) override
+        error_code receive_something_more_complicated_ref(xxx::something_more_complicated& val) override
         {
             val.map_val["22"] = xxx::something_complicated {33, "22"};
             return rpc::error::OK();
         }
-        error_code recieve_something_more_complicated_ptr(xxx::something_more_complicated*& val) override
+        error_code receive_something_more_complicated_ptr(xxx::something_more_complicated*& val) override
         {
             val = new xxx::something_more_complicated();
             val->map_val["22"] = xxx::something_complicated {33, "22"};
             return rpc::error::OK();
         }
-        error_code recieve_something_more_complicated_in_out_ref(xxx::something_more_complicated& val) override
+        error_code receive_something_more_complicated_in_out_ref(xxx::something_more_complicated& val) override
         {
             if(val.map_val.size())
                 log(std::string("got ") + val.map_val.begin()->first);
@@ -245,7 +245,7 @@ namespace marshalled_tests
             return rpc::error::OK();
         }
 
-        error_code recieve_interface(rpc::shared_ptr<i_foo>& val) override
+        error_code receive_interface(rpc::shared_ptr<i_foo>& val) override
         {
             val = rpc::shared_ptr<xxx::i_foo>(new foo(zone_id_));
             auto val1 = rpc::dynamic_pointer_cast<xxx::i_bar>(val);
@@ -426,12 +426,12 @@ namespace marshalled_tests
             return rpc::error::OK();            
         }
         
-        error_code inner_create_example_in_subordnate_zone(rpc::shared_ptr<yyy::i_example>& target, uint64_t new_zone_id, const rpc::shared_ptr<yyy::i_host>& host_ptr)
+        error_code inner_create_example_in_subordinate_zone(rpc::shared_ptr<yyy::i_example>& target, uint64_t new_zone_id, const rpc::shared_ptr<yyy::i_host>& host_ptr)
         {
             auto this_service = this_service_.lock();
             
             auto err_code = this_service->connect_to_zone<rpc::local_child_service_proxy<yyy::i_example, yyy::i_host>>(
-                "subordnate_zone"
+                "subordinate_zone"
                 , {new_zone_id}
                 , host_ptr
                 , target
@@ -451,14 +451,14 @@ namespace marshalled_tests
             return err_code;
         }
 
-        error_code create_example_in_subordnate_zone(rpc::shared_ptr<yyy::i_example>& target, const rpc::shared_ptr<yyy::i_host>& host_ptr, uint64_t new_zone_id) override
+        error_code create_example_in_subordinate_zone(rpc::shared_ptr<yyy::i_example>& target, const rpc::shared_ptr<yyy::i_host>& host_ptr, uint64_t new_zone_id) override
         {
-            return inner_create_example_in_subordnate_zone(target, new_zone_id, host_ptr);
+            return inner_create_example_in_subordinate_zone(target, new_zone_id, host_ptr);
         }
-        error_code create_example_in_subordnate_zone_and_set_in_host(uint64_t new_zone_id, const std::string& name, const rpc::shared_ptr<yyy::i_host>& host_ptr) override
+        error_code create_example_in_subordinate_zone_and_set_in_host(uint64_t new_zone_id, const std::string& name, const rpc::shared_ptr<yyy::i_host>& host_ptr) override
         {
             rpc::shared_ptr<yyy::i_example> target;
-            auto ret = inner_create_example_in_subordnate_zone(target, new_zone_id, host_ptr);
+            auto ret = inner_create_example_in_subordinate_zone(target, new_zone_id, host_ptr);
             if(ret != rpc::error::OK())
                 return ret;
             rpc::shared_ptr<yyy::i_host> host;
@@ -708,7 +708,7 @@ namespace marshalled_tests
             return rpc::error::OK();
         }
 
-        error_code recieve_interface(rpc::shared_ptr<xxx::i_foo>& val) override
+        error_code receive_interface(rpc::shared_ptr<xxx::i_foo>& val) override
         {
             val = rpc::shared_ptr<xxx::i_foo>(new foo(zone_id_));
             auto val1 = rpc::dynamic_pointer_cast<xxx::i_bar>(val);

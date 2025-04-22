@@ -346,7 +346,7 @@ namespace json_schema_generator
                             }
                             catch(const std::exception& e)
                             { 
-                                std::cerr << "exception has occured explicit_value_str has value " << explicit_value_str << " resulting in this error: " << e.what() << "\n";
+                                std::cerr << "exception has occurred explicit_value_str has value " << explicit_value_str << " resulting in this error: " << e.what() << "\n";
                             }
                         }
                     }
@@ -574,7 +574,7 @@ namespace json_schema_generator
                 }
                 catch(const std::exception& e)
                 {
-                    std::cerr << "exception has occured std::stoll(template_args[1]) has value " << template_args[1] << " resulting in this error: " << e.what() << "\n";
+                    std::cerr << "exception has occurred std::stoll(template_args[1]) has value " << template_args[1] << " resulting in this error: " << e.what() << "\n";
                     std::string current_desc = find_attribute_value(attribs, "description");
                     std::string size_note = "[Note: Array size is non-literal: " + template_args[1] + "]";
                     writer.write_string_property("description",
