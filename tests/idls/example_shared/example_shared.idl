@@ -2,84 +2,152 @@
  *   Copyright (c) 2024 Edward Boggis-Rolfe
  *   All rights reserved.
  */
- 
+
 typedef int error_code;
 
 namespace xxx
 {
-struct something_complicated
-{
-    int int_val;
-    std::string string_val;
-};
+    [status=example]
+    struct something_complicated
+    {
+        static std::string foo = "hello";
 
-struct something_more_complicated
-{
-    std::vector<something_complicated> vector_val;
-    std::map<std::string, something_complicated> map_val;    
-};
+        int int_val;
+        std::string string_val;
+    };
 
-template<typename T>
-struct typed_payload
-{
-    std::array<uint8_t, sizeof(T)> payload;
-};
+    [status=example]
+    struct something_more_complicated
+    {
+        std::vector<something_complicated> vector_val;
+        std::map<std::string, something_complicated> map_val;    
+    };
 
-interface i_foo
-{
-    error_code do_something_in_val(                                                        int                             val); //marshal by value - implictly const
-    error_code do_something_in_ref(                                [in]            const   int                         &   val); //marshal by reference - implictly const, cannot be enclave memory addresses will be refused
-    error_code do_something_in_by_val_ref(                         [in, by_value]  const   int                         &   val); //marshal by value - implictly const
-    error_code do_something_in_move_ref(                           [in]                    int                         &&  val); //marshal by value
-    error_code do_something_in_ptr(                                [in]            const   int                         *   val); //marshal by pointer - implictly const
-    error_code do_something_out_val(                               [out, by_value]         int                         &   val); //marshal by value
-    error_code do_something_out_ptr_ref(                           [out]                   int                         *&  val); //marshal by ref pointer can be null, cannot be enclave memory addresses if to be readable
-    error_code do_something_out_ptr_ptr(                           [out]                   int                         **  val); //marshal by pointer pointer can be null, cannot be enclave memory addresses if to be readable
-    error_code do_something_in_out_ref(                            [in, out, by_value]     int                         &   val); //marshal by value
+    template<typename T>
+    struct typed_payload
+    {
+        std::array<uint8_t, sizeof(T)> payload;
+    };
 
-    error_code give_something_complicated_val(                     [in]                    something_complicated           val); 
-    error_code give_something_complicated_ref(                     [in]            const   something_complicated       &   val); 
-    error_code give_something_complicated_ref_val(                 [in, by_value]  const   something_complicated       &   val); 
-    error_code give_something_complicated_move_ref(                [in]                    something_complicated       &&  val); 
-    error_code give_something_complicated_ptr(                     [in]            const   something_complicated       *   val); 
-    error_code recieve_something_complicated_ref(                  [out, by_value]         something_complicated       &   val); 
-    error_code recieve_something_complicated_ptr(                  [out]                   something_complicated       *&  val); 
-    error_code recieve_something_complicated_in_out_ref(           [in, out, by_value]     something_complicated       &   val); 
+    interface i_foo
+    {
+        static std::string foo = "hello";
 
-    error_code give_something_more_complicated_val(                [in]                    something_more_complicated      val);
-    error_code give_something_more_complicated_ref(                [in]            const   something_more_complicated  &   val);
-    error_code give_something_more_complicated_move_ref(           [in]                    something_more_complicated  &&  val);
-    error_code give_something_more_complicated_ref_val(            [in, by_value]  const   something_more_complicated  &   val);
-    error_code give_something_more_complicated_ptr(                [in]            const   something_more_complicated  *   val);
-    error_code recieve_something_more_complicated_ref(             [out, by_value]         something_more_complicated  &   val);
-    error_code recieve_something_more_complicated_ptr(             [out]                   something_more_complicated  *&  val);
-    error_code recieve_something_more_complicated_in_out_ref(      [in, out, by_value]     something_more_complicated  &   val);
+        error_code do_something_in_val(                                                        int                             val); //marshal by value - implictly const
+        error_code do_something_in_ref(                                [in]            const   int                         &   val); //marshal by reference - implictly const, cannot be enclave memory addresses will be refused
+        error_code do_something_in_by_val_ref(                         [in, by_value]  const   int                         &   val); //marshal by value - implictly const
+        error_code do_something_in_move_ref(                           [in]                    int                         &&  val); //marshal by value
+        error_code do_something_in_ptr(                                [in]            const   int                         *   val); //marshal by pointer - implictly const
+        error_code do_something_out_val(                               [out, by_value]         int                         &   val); //marshal by value
+        error_code do_something_out_ptr_ref(                           [out]                   int                         *&  val); //marshal by ref pointer can be null, cannot be enclave memory addresses if to be readable
+        error_code do_something_out_ptr_ptr(                           [out]                   int                         **  val); //marshal by pointer pointer can be null, cannot be enclave memory addresses if to be readable
+        error_code do_something_in_out_ref(                            [in, out, by_value]     int                         &   val); //marshal by value
 
-    error_code do_multi_val(int val1, int val2);
-    error_code do_multi_complicated_val(const something_more_complicated val1, const something_more_complicated val2);
+        error_code give_something_complicated_val(                     [in]                    something_complicated           val); 
+        error_code give_something_complicated_ref(                     [in]            const   something_complicated       &   val); 
+        error_code give_something_complicated_ref_val(                 [in, by_value]  const   something_complicated       &   val); 
+        error_code give_something_complicated_move_ref(                [in]                    something_complicated       &&  val); 
+        error_code give_something_complicated_ptr(                     [in]            const   something_complicated       *   val); 
+        error_code recieve_something_complicated_ref(                  [out, by_value]         something_complicated       &   val); 
+        error_code recieve_something_complicated_ptr(                  [out]                   something_complicated       *&  val); 
+        error_code recieve_something_complicated_in_out_ref(           [in, out, by_value]     something_complicated       &   val); 
+
+        error_code give_something_more_complicated_val(                [in]                    something_more_complicated      val);
+        error_code give_something_more_complicated_ref(                [in]            const   something_more_complicated  &   val);
+        error_code give_something_more_complicated_move_ref(           [in]                    something_more_complicated  &&  val);
+        error_code give_something_more_complicated_ref_val(            [in, by_value]  const   something_more_complicated  &   val);
+        error_code give_something_more_complicated_ptr(                [in]            const   something_more_complicated  *   val);
+        error_code recieve_something_more_complicated_ref(             [out, by_value]         something_more_complicated  &   val);
+        error_code recieve_something_more_complicated_ptr(             [out]                   something_more_complicated  *&  val);
+        error_code recieve_something_more_complicated_in_out_ref(      [in, out, by_value]     something_more_complicated  &   val);
+
+        error_code do_multi_val(int val1, int val2);
+        error_code do_multi_complicated_val(const something_more_complicated val1, const something_more_complicated val2);
 
 
 
-    error_code recieve_interface([out]rpc::shared_ptr<i_foo>& val);//can be null
-    error_code give_interface([in]rpc::shared_ptr<i_baz> val);//can be null
-    error_code call_baz_interface([in]const rpc::shared_ptr<i_baz>& val);//can be null
-    error_code create_baz_interface([out]rpc::shared_ptr<i_baz>& val);//can be null
-    error_code get_null_interface([out]rpc::shared_ptr<i_baz>& val);//can be null
+        error_code recieve_interface([out]rpc::shared_ptr<i_foo>& val);//can be null
+        error_code give_interface([in]rpc::shared_ptr<i_baz> val);//can be null
+        error_code call_baz_interface([in]const rpc::shared_ptr<i_baz>& val);//can be null
+        error_code create_baz_interface([out]rpc::shared_ptr<i_baz>& val);//can be null
+        error_code get_null_interface([out]rpc::shared_ptr<i_baz>& val);//can be null
+        
+        error_code set_interface([in]const rpc::shared_ptr<i_baz>& val);//can be null
+        error_code get_interface([out]rpc::shared_ptr<i_baz>& val);//can be null
+
+        error_code exception_test();
+    };
+
+    interface i_bar
+    {
+        error_code do_something_else(int val);
+    };    
+
+    interface i_baz
+    {
+        error_code callback(int val);
+        error_code blob_test([in] const std::vector<uint8_t>& inval, [out] std::vector<uint8_t>& out_val);
+    };
+
+    //some template tests with attributes
     
-    error_code set_interface([in]const rpc::shared_ptr<i_baz>& val);//can be null
-    error_code get_interface([out]rpc::shared_ptr<i_baz>& val);//can be null
-
-    error_code exception_test();
-};
-
-interface i_bar
-{
-    error_code do_something_else(int val);
-};    
-
-interface i_baz
-{
-    error_code callback(int val);
-    error_code blob_test([in] const std::vector<uint8_t>& inval, [out] std::vector<uint8_t>& out_val);
-};
+    //bog standard    
+    template<class T>
+    struct test_template
+    {
+        T type_t;
+        static constexpr int x = 3;
+    };
+    
+    //dont include the template parameters when generating the constexpr value
+    [buggy_template_param_in_id=false]
+    template<class T>
+    struct test_template_without_params_in_id
+    {
+        T type_t;
+    };
+    
+    //maintain a bug for backward compatibility, use an empty seed for template types seed will be 7410425521722818471ull or 0x66D71EBFF8C6FFA7
+    [buggy_empty_template_struct_id=true]
+    template<class T>
+    struct test_template_use_legacy_empty_template_struct_id
+    {
+        T type_t;
+    };
+    
+    //use both dodgy flags
+    [buggy_template_param_in_id=false,buggy_empty_template_struct_id=true]
+    template<class T>
+    struct test_template_use_old
+    {
+        T type_t;
+    };
+    
+    //interfaces use existing logic for now
+    interface i_interface_with_templates
+    {
+        error_code one(test_template<int> val);
+        error_code two(test_template_without_params_in_id<int> val);
+        error_code three(test_template_use_legacy_empty_template_struct_id<int> val);
+        error_code four(test_template_use_old<int> val);
+    };
+    
+    struct type_determinant
+    {
+        static constexpr int x = 3;
+    };
+    
+    template<class T>
+    struct type_determinant_test
+    {
+        std::array<uint8_t, T::x> y;
+    };    
+    
+    template<class T>
+    struct test_template
+    {
+        T type_t;
+        static constexpr int x = 3;
+    };    
+    
 }

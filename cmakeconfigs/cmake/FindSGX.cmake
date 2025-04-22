@@ -61,7 +61,7 @@ else() # Linux
     if(${BUILD_TYPE} STREQUAL "release") # SimulationOptimized aka SimulationPrerelease
       set(SGX_COMMON_CFLAGS "${SGX_COMMON_CFLAGS} -O2 -DNDEBUG -UEDEBUG")
     else() # Debug
-      set(SGX_COMMON_CFLAGS "${SGX_COMMON_CFLAGS} -O0 -g -UNDEBUG -UEDEBUG")
+      set(SGX_COMMON_CFLAGS "${SGX_COMMON_CFLAGS} -O0 -UNDEBUG -UEDEBUG")
     endif()
   elseif(SGX_MODE STREQUAL "prerelease")
     set(SGX_COMMON_CFLAGS "${SGX_COMMON_CFLAGS} -O2 -DNDEBUG -DEDEBUG")
@@ -613,7 +613,7 @@ if(SGX_FOUND)
       if(WIN32)
         set(OUTPUT_NAME "${target}.signed.dll")
       else()
-        set(OUTPUT_NAME "${target}.signed.so")
+        set(OUTPUT_NAME "lib${target}.signed.so")
       endif()
     else()
       set(OUTPUT_NAME ${SGX_OUTPUT})

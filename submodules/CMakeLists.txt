@@ -3,24 +3,16 @@
    All rights reserved.
 ]]
 
-cmake_minimum_required(VERSION 3.0.0)
+cmake_minimum_required(VERSION 3.24)
 
 if(RPC_STANDALONE)
-  if(RPC_BUILD_SGX)
-    if(WIN32)
-      if(${BUILD_TYPE} STREQUAL "release")
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc /MD")
-      else()
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc /MDd")
-      endif()
-    endif()
-  endif()
-
-  message("fmt")
   set(FMT_INSTALL ON)
   add_subdirectory(fmt)
-  add_subdirectory(clipp)
+  # fmt CMakeLists.txt defines a PUBLIC_HEADER property which triggers a warning when used as a subproject
+  set_property(TARGET fmt PROPERTY PUBLIC_HEADER)
 
+  add_subdirectory(args)
+  add_library(args::args ALIAS args)
   add_subdirectory(googletest)
 
   add_library(yas_common INTERFACE)
@@ -29,8 +21,13 @@ if(RPC_STANDALONE)
 
   add_subdirectory(idlparser)
 
-  set(SPDLOG_FMT_EXTERNAL ON CACHE BOOL "external fmt" FORCE)
-  set(SPDLOG_NO_EXCEPTIONS ON CACHE BOOL "no exceptions" FORCE)
-  set(SPDLOG_INSTALL ON)
+  message("spdlog this is used in tests only and does not need to be installed for other users")
+  set(SPDLOG_FMT_EXTERNAL
+      ON
+      CACHE BOOL "external fmt" FORCE)
+  set(SPDLOG_NO_EXCEPTIONS
+      ON
+      CACHE BOOL "no exceptions" FORCE)
+  set(SPDLOG_INSTALL OFF)
   add_subdirectory(spdlog)
 endif()

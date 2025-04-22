@@ -13,7 +13,6 @@ RPCGenerate(
   example_shared
   ""
   mock example_shared/example_shared_mock.h
-  dependencies
   include_paths ${CMAKE_CURRENT_SOURCE_DIR}/.)
 
 RPCGenerate(

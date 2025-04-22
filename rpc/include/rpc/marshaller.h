@@ -9,28 +9,17 @@
 #include <unordered_map>
 #include <mutex>
 
-#include <yas/count_streams.hpp>
-#include <yas/serialize.hpp>
-
 #include <rpc/types.h>
+#include <rpc/serialiser.h>
 #include <rpc/error_codes.h>
 
 namespace rpc
 {
-    enum class encoding : uint64_t
-    {
-        enc_default = 0,    //equivelant to yas_binary
-        yas_binary = 1,
-        yas_compressed_binary = 2,
-        yas_text = 4,
-        yas_json = 8        //we may have different json parsers that have a better implementation e.g. glaze
-    };
-
     enum class add_ref_options : std::uint8_t
     {
         normal = 1,
-        build_destination_route = 2,
-        build_caller_route = 4
+        build_destination_route = 2,    //when unidirectionally addreffing the destination
+        build_caller_route = 4          //when unidirectionally addreffing the caller which prepares refcounts etc in the reverse direction
     };
 
     inline add_ref_options operator|(add_ref_options lhs,add_ref_options rhs)
@@ -70,6 +59,7 @@ namespace rpc
     class i_marshaller
     {
     public:
+        virtual ~i_marshaller() = default;
         virtual int send(
             uint64_t protocol_version 
 			, encoding encoding 
@@ -96,8 +86,7 @@ namespace rpc
             , object object_id 
             , caller_channel_zone caller_channel_zone_id 
             , caller_zone caller_zone_id 
-            , add_ref_options build_out_param_channel 
-            , bool proxy_add_ref) = 0;
+            , add_ref_options build_out_param_channel ) = 0;
         virtual uint64_t release(
             uint64_t protocol_version 
             , destination_zone destination_zone_id 
@@ -198,4 +187,13 @@ namespace rpc
 			);
 		}
     };
+    
+    inline bool operator == (const interface_descriptor& first, const interface_descriptor& second)
+    {
+        return first.destination_zone_id == second.destination_zone_id && first.object_id == second.object_id;
+    }
+    inline bool operator != (const interface_descriptor& first, const interface_descriptor& second)
+    {
+        return !(first == second);
+    }
 }

@@ -1,6 +1,3 @@
-[submodule "submodules/clipp"]
-	path = submodules/clipp
-	url = https://github.com/muellan/clipp.git
 [submodule "submodules/yas"]
 	path = submodules/yas
 	url = https://github.com/edwardbr/yas.git
@@ -15,4 +12,7 @@
 	url = https://github.com/google/googletest.git
 [submodule "submodules/spdlog"]
 	path = submodules/spdlog
-	url = https://github.com/gabime/spdlog
+	url = https://github.com/gabime/spdlog.git
+[submodule "submodules/args"]
+	path = submodules/args
+	url = https://github.com/Taywee/args.git

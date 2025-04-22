@@ -58,11 +58,32 @@ Out of the box without any configuration management this library can be compiled
 
 There are different CMake options specified in the root CMakeLists.txt:
 ```
- option(RPC_STANDALONE "build the rpc on its own and not part of another repo" ON)
- option(RPC_BUILD_SGX "build enclave code" OFF)
- option(RPC_BUILD_TEST "build test code" ON)
- option(RPC_USE_LOGGING "turn on rpc logging" OFF)
- option(FORCE_DEBUG_INFORMATION "force inclusion of debug information" OFF)
+  option(BUILD_ENCLAVE "build enclave code" ON)
+  option(BUILD_HOST "build host code" ON)
+  option(BUILD_EXE "build exe code" ON)
+  # When building Core, BUILD_TEST is always explicitly defined to ON or OFF, but not necessarily when used in
+  # standalone apps, where we want OFF by default
+  option(BUILD_TEST "build test code, including backdoors in raft idl" OFF)
+  # secretarium exe is needed for measurement, so don't default to ON if it is not built
+  option(DEBUG_HOST_LEAK "enable leak sanitizer (only use when ptrace is accessible)" OFF)
+  option(DEBUG_HOST_ADDRESS "enable address sanitizer" OFF)
+  option(DEBUG_HOST_THREAD "enable thread sanitizer (cannot be used with leak sanitizer)" OFF)
+  option(DEBUG_HOST_UNDEFINED "enable undefined behaviour sanitizer" OFF)
+  option(DEBUG_HOST_ALL "enable all sanitizers" OFF)
+  option(DEBUG_ENCLAVE_MEMLEAK "detect memory leaks in enclaves" OFF)
+  option(SECRETARIUM_UNITY_BUILD "enable unity build" OFF)
+  option(ENABLE_CLANG_TIDY "Enable clang-tidy in build" ON)
+  option(ENABLE_CLANG_TIDY_FIX "Turn on auto fix in clang tidy" OFF)
+  option(ENABLE_COVERAGE "Turn on code coverage" OFF)
+  option(CMAKE_VERBOSE_MAKEFILE "verbose build step" OFF)
+  option(CMAKE_RULE_MESSAGES "verbose cmake" OFF)
+  option(FORCE_DEBUG_INFORMATION "force inclusion of debug information" ON)
+  option(RPC_STANDALONE "enable the building of RPC as a standalone library for testing" OFF)
+  option(USE_RPC_LOGGING "turn on rpc logging" OFF)
+  option(RPC_HANG_ON_FAILED_ASSERT "hang on failed assert" OFF)
+  option(USE_RPC_TELEMETRY "turn on rpc telemetry" OFF)
+  option(USE_RPC_TELEMETRY_RAII_LOGGING "turn on the logging of the addref release and try cast activity of the services, proxies and stubs" OFF)
+  option(FORCE_DEBUG_INFORMATION "force inclusion of debug information" OFF)
  ```
 
 From the command line:
@@ -78,7 +99,7 @@ Alternatively you can set them explicitly from the .vscode/settings.json file
 {
     "cmake.configureArgs": [
         "-DRPC_USE_LOGGING=ON",
-        "-DRPC_BUILD_SGX=ON"
+        "-BUILD_ENCLAVE=ON"
     ]
 }
 ```

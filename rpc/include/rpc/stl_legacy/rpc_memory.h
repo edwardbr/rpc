@@ -563,11 +563,13 @@ namespace rpc
     };
     
     #ifdef __linux__
-    #pragma clang diadnostic push
-    #pragma clang diadnostic ignored "-Wc++20-extensions"
+    #ifdef __clang__
+    #pragma clang diagnostic push
+    #pragma clang diagnostic ignored "-Wc++20-extensions"
+    #endif
     #endif // __linux__
 
-    template<class _Ptr> struct __is_deletable<_Ptr, decltype(delete declval<_Ptr>())> : std::true_type
+    template<class _Ptr> struct __is_deletable<_Ptr, decltype(delete std::declval<_Ptr>())> : std::true_type
     {
     };
 
@@ -577,15 +579,17 @@ namespace rpc
     
     
     
-    template<class _Ptr> struct __is_array_deletable<_Ptr, decltype(delete[] declval<_Ptr>())> : std::true_type
+    template<class _Ptr> struct __is_array_deletable<_Ptr, decltype(delete[] std::declval<_Ptr>())> : std::true_type
     {
     };
 
     #ifdef __linux__
-    #pragma clang diadnostic pop
+    #ifdef __clang__
+    #pragma clang diagnostic pop
+    #endif
     #endif // __linux__
 
-    template<class _Dp, class _Pt, class = decltype(declval<_Dp>()(declval<_Pt>()))>
+    template<class _Dp, class _Pt, class = decltype(std::declval<_Dp>()(std::declval<_Pt>()))>
     static std::true_type __well_formed_deleter_test(int);
 
     template<class, class> static std::false_type __well_formed_deleter_test(...);
@@ -955,7 +959,7 @@ namespace rpc
         typedef typename unique_ptr<_T1, _D1>::pointer _P1;
         typedef typename unique_ptr<_T2, _D2>::pointer _P2;
         typedef typename std::common_type<_P1, _P2>::type _Vp;
-        return less<_Vp>()(__x.get(), __y.get());
+        return std::less<_Vp>()(__x.get(), __y.get());
     }
     template<class _T1, class _D1, class _T2, class _D2>
     inline bool operator>(const unique_ptr<_T1, _D1>& __x, const unique_ptr<_T2, _D2>& __y)
@@ -996,13 +1000,13 @@ namespace rpc
     inline bool operator<(const unique_ptr<_T1, _D1>& __x, std::nullptr_t)
     {
         typedef typename unique_ptr<_T1, _D1>::pointer _P1;
-        return less<_P1>()(__x.get(), nullptr);
+        return std::less<_P1>()(__x.get(), nullptr);
     }
     template<class _T1, class _D1>
     inline bool operator<(std::nullptr_t, const unique_ptr<_T1, _D1>& __x)
     {
         typedef typename unique_ptr<_T1, _D1>::pointer _P1;
-        return less<_P1>()(nullptr, __x.get());
+        return std::less<_P1>()(nullptr, __x.get());
     }
     template<class _T1, class _D1>
     inline bool operator>(const unique_ptr<_T1, _D1>& __x, std::nullptr_t)
@@ -2041,14 +2045,12 @@ element_type*>::value>> shared_ptr(unique_ptr<_Yp, _Dp>&& __r) : __ptr_(__r.get(
     template<class T1, class T2>
     [[nodiscard]] inline shared_ptr<T1> dynamic_pointer_cast(const shared_ptr<T2>& from) noexcept
     {
+        if(!from)
+            return nullptr;
+            
         T1* ptr = nullptr;
 #ifdef RPC_V2
         ptr = const_cast<T1*>(static_cast<const T1*>(from->query_interface(T1::get_id(rpc::VERSION_2))));
-        if (ptr)
-            return shared_ptr<T1>(from, ptr);
-#endif
-#ifdef RPC_V1
-        ptr = const_cast<T1*>(static_cast<const T1*>(from->query_interface(T1::get_id(rpc::VERSION_1))));
         if (ptr)
             return shared_ptr<T1>(from, ptr);
 #endif
