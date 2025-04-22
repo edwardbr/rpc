@@ -20,8 +20,7 @@ if(NOT DEPENDENCIES_LOADED)
   option(DEBUG_HOST_UNDEFINED "enable undefined behaviour sanitizer" OFF)
   option(DEBUG_HOST_ALL "enable all sanitizers" OFF)
   option(DEBUG_ENCLAVE_MEMLEAK "detect memory leaks in enclaves" OFF)
-  option(SECRETARIUM_UNITY_BUILD "enable unity build" OFF)
-  option(ENABLE_CLANG_TIDY "Enable clang-tidy in build" ON)
+  option(ENABLE_CLANG_TIDY "Enable clang-tidy in build (needs to build with clang)" OFF)
   option(ENABLE_CLANG_TIDY_FIX "Turn on auto fix in clang tidy" OFF)
   option(ENABLE_COVERAGE "Turn on code coverage" OFF)
 
@@ -54,7 +53,6 @@ if(NOT DEPENDENCIES_LOADED)
 
   message("AWAIT_ATTACH_ON_ENCLAVE_ERRORS  ${AWAIT_ATTACH_ON_ENCLAVE_ERRORS}")
   message("DEBUG_ENCLAVE_MEMLEAK  ${DEBUG_ENCLAVE_MEMLEAK}")
-  message("SECRETARIUM_UNITY_BUILD  ${SECRETARIUM_UNITY_BUILD}")
 
   message("CMAKE_VERBOSE_MAKEFILE  ${CMAKE_VERBOSE_MAKEFILE}")
   message("CMAKE_RULE_MESSAGES  ${CMAKE_RULE_MESSAGES}")

@@ -68,6 +68,7 @@ namespace rpc_generator
                                bool is_in, bool is_out, bool is_const, const std::string& object_type,
                                uint64_t& count) const
             {
+                static_assert(false);
                 std::ignore = option;
                 std::ignore = from_host;
                 std::ignore = lib;
@@ -77,7 +78,7 @@ namespace rpc_generator
                 std::ignore = is_const;
                 std::ignore = object_type;
                 std::ignore = count;
-                assert(false);
+                return {};
             }
         };
 
