@@ -8,7 +8,6 @@
 #include <rpc/error_codes.h>
 #include "gtest/gtest.h"
 
-
 #define ASSERT_ERROR_CODE(x) ASSERT_EQ(x, rpc::error::OK())
 
 namespace marshalled_tests
@@ -55,23 +54,23 @@ namespace marshalled_tests
             ASSERT_ERROR_CODE(foo.do_something_in_out_ref(val));
         }
         {
-            xxx::something_complicated val {33, "22"};
+            xxx::something_complicated val{33, "22"};
             ASSERT_ERROR_CODE(foo.give_something_complicated_val(val));
         }
         {
-            xxx::something_complicated val {33, "22"};
+            xxx::something_complicated val{33, "22"};
             ASSERT_ERROR_CODE(foo.give_something_complicated_ref(val));
         }
         {
-            xxx::something_complicated val {33, "22"};
+            xxx::something_complicated val{33, "22"};
             ASSERT_ERROR_CODE(foo.give_something_complicated_ref_val(val));
         }
         {
-            xxx::something_complicated val {33, "22"};
+            xxx::something_complicated val{33, "22"};
             ASSERT_ERROR_CODE(foo.give_something_complicated_move_ref(std::move(val)));
         }
         {
-            xxx::something_complicated val {33, "22"};
+            xxx::something_complicated val{33, "22"};
             ASSERT_ERROR_CODE(foo.give_something_complicated_ptr(&val));
         }
         {
@@ -94,36 +93,36 @@ namespace marshalled_tests
         }
         {
             xxx::something_more_complicated val;
-            val.map_val["22"] = xxx::something_complicated {33, "22"};
+            val.map_val["22"] = xxx::something_complicated{33, "22"};
             ASSERT_ERROR_CODE(foo.give_something_more_complicated_val(val));
         }
         if (!enclave)
         {
             xxx::something_more_complicated val;
-            val.map_val["22"] = xxx::something_complicated {33, "22"};
+            val.map_val["22"] = xxx::something_complicated{33, "22"};
             ASSERT_ERROR_CODE(foo.give_something_more_complicated_ref(val));
         }
         {
             xxx::something_more_complicated val;
-            val.map_val["22"] = xxx::something_complicated {33, "22"};
+            val.map_val["22"] = xxx::something_complicated{33, "22"};
             ASSERT_ERROR_CODE(foo.give_something_more_complicated_move_ref(std::move(val)));
         }
         {
             xxx::something_more_complicated val;
-            val.map_val["22"] = xxx::something_complicated {33, "22"};
+            val.map_val["22"] = xxx::something_complicated{33, "22"};
             ASSERT_ERROR_CODE(foo.give_something_more_complicated_ref_val(val));
         }
         if (!enclave)
         {
             xxx::something_more_complicated val;
-            val.map_val["22"] = xxx::something_complicated {33, "22"};
+            val.map_val["22"] = xxx::something_complicated{33, "22"};
             ASSERT_ERROR_CODE(foo.give_something_more_complicated_ptr(&val));
         }
         if (!enclave)
         {
             xxx::something_more_complicated val;
             ASSERT_ERROR_CODE(foo.receive_something_more_complicated_ref(val));
-            if(val.map_val.size() == 0)
+            if (val.map_val.size() == 0)
                 log("error receive_something_more_complicated_ref returned no data");
             else
                 log(std::string("got ") + val.map_val.begin()->first);
@@ -132,7 +131,7 @@ namespace marshalled_tests
         {
             xxx::something_more_complicated* val = nullptr;
             ASSERT_ERROR_CODE(foo.receive_something_more_complicated_ptr(val));
-            if(val->map_val.size() == 0)
+            if (val->map_val.size() == 0)
                 log("error receive_something_more_complicated_ref returned no data");
             else
                 log(std::string("got ") + val->map_val.begin()->first);
@@ -140,9 +139,9 @@ namespace marshalled_tests
         }
         {
             xxx::something_more_complicated val;
-            val.map_val["22"] = xxx::something_complicated {33, "22"};
+            val.map_val["22"] = xxx::something_complicated{33, "22"};
             ASSERT_ERROR_CODE(foo.receive_something_more_complicated_in_out_ref(val));
-            if(val.map_val.size() == 0)
+            if (val.map_val.size() == 0)
                 log("error receive_something_more_complicated_in_out_ref returned no data");
             else
                 log(std::string("got ") + val.map_val.begin()->first);
@@ -155,16 +154,13 @@ namespace marshalled_tests
         {
             xxx::something_more_complicated val1;
             xxx::something_more_complicated val2;
-            val1.map_val["22"] = xxx::something_complicated {33, "22"};
-            val2.map_val["22"] = xxx::something_complicated {33, "22"};
+            val1.map_val["22"] = xxx::something_complicated{33, "22"};
+            val2.map_val["22"] = xxx::something_complicated{33, "22"};
             ASSERT_ERROR_CODE(foo.do_multi_complicated_val(val1, val2));
         }
     }
 
-    void remote_tests(
-        bool use_host_in_child
-        , rpc::shared_ptr<yyy::i_example> example_ptr
-        , rpc::zone zone_id)
+    void remote_tests(bool use_host_in_child, rpc::shared_ptr<yyy::i_example> example_ptr, rpc::zone zone_id)
     {
         int val = 0;
         example_ptr->add(1, 2, val);
@@ -191,20 +187,20 @@ namespace marshalled_tests
                 other_foo->do_something_in_val(22);
             }
 
-            if(use_host_in_child)
+            if (use_host_in_child)
             {
                 rpc::shared_ptr<xxx::i_baz> b(new baz(zone_id));
                 err_code = foo->call_baz_interface(b);
             }
 
-            if(foo->exception_test() != rpc::error::EXCEPTION())
+            if (foo->exception_test() != rpc::error::EXCEPTION())
                 log(std::string("exception_test failed"));
         }
         {
             rpc::shared_ptr<xxx::i_baz> i_baz_ptr;
             example_ptr->create_multiple_inheritance(i_baz_ptr);
-            //repeat twice
-            for(int i = 0; i < 2;i++)
+            // repeat twice
+            for (int i = 0; i < 2; i++)
             {
                 auto i_bar_ptr1 = rpc::dynamic_pointer_cast<xxx::i_bar>(i_baz_ptr);
                 RPC_ASSERT(i_bar_ptr1 != nullptr);

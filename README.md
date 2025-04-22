@@ -5,14 +5,14 @@ Copyright (c) 2024 Edward Boggis-Rolfe
 All rights reserved.
 
 ## Intro
-This library implements an RPC solution that reflects modern C++ concepts.  It is intended for developers that want a pure C++ experience and supports C++ types natively, and all other languages communicate with this library using JSON or some other generic protocol.  
+This library implements an RPC solution that reflects modern C++ concepts.  It is intended for developers that want a pure C++ experience and supports C++ types natively, and all other languages communicate with this library using JSON or some other generic protocol.
 
 ## What are Remote Procedure Calls?
-Remote procedure calls allow applications to talk each other without getting snarled up in underlying communication protocols.  The transport and the end user programming API's are treated as separate concerns.  
+Remote procedure calls allow applications to talk each other without getting snarled up in underlying communication protocols.  The transport and the end user programming API's are treated as separate concerns.
 ### In a nutshell
 In other words you can easily make an API that is accessible from another machine, dll, arena or embedded device and not think about serialization.
 ### A bit of history
-RPC has been around for decades targeting mainly the C programming language and was very popular in the 80's and 90's. The technology reached its zenith with the arrival of (D)COM from Microsoft and CORBA from a consortium of other companies.  Unfortunately both organizations hated each other and with their closed source attitudes people fell out of love with them in favour with XMLRPC, SOAP and REST as the new sexy kids on the block.  
+RPC has been around for decades targeting mainly the C programming language and was very popular in the 80's and 90's. The technology reached its zenith with the arrival of (D)COM from Microsoft and CORBA from a consortium of other companies.  Unfortunately both organizations hated each other and with their closed source attitudes people fell out of love with them in favour with XMLRPC, SOAP and REST as the new sexy kids on the block.
 
 RPC though is a valuable solution for all solutions, however historically it did not offer direct answers for working over insecure networks, partly because of the short sighted intransigence and secrecy of various organizations.  People are coming off from some of the other aging fads and are returning to higher performance solutions such as this.
 

@@ -29,14 +29,14 @@ namespace rpc_generator
 
             std::string base_class_declaration;
             auto bc = m_ob.get_base_classes();
-            if(!bc.empty())
+            if (!bc.empty())
             {
 
                 base_class_declaration = " : ";
                 int i = 0;
-                for(auto base_class : bc)
+                for (auto base_class : bc)
                 {
-                    if(i)
+                    if (i)
                         base_class_declaration += ", ";
                     base_class_declaration += base_class->get_name();
                     i++;
@@ -57,37 +57,41 @@ namespace rpc_generator
             header("}}");
 
             bool has_methods = false;
-            for(auto& function : m_ob.get_functions())
+            for (auto& function : m_ob.get_functions())
             {
-                if(function->get_entity_type() != entity_type::FUNCTION_METHOD)
+                if (function->get_entity_type() != entity_type::FUNCTION_METHOD)
                     continue;
                 has_methods = true;
             }
 
-            if(has_methods)
+            if (has_methods)
             {
-                for(auto& function : m_ob.get_functions())
+                for (auto& function : m_ob.get_functions())
                 {
-                    if(function->get_entity_type() != entity_type::FUNCTION_METHOD)
+                    if (function->get_entity_type() != entity_type::FUNCTION_METHOD)
                         continue;
 
                     header.print_tabs();
                     bool is_const_func = false;
-                    for(auto& item : function->get_attributes())
+                    for (auto& item : function->get_attributes())
                     {
-                        if(item == "const")
+                        if (item == "const")
                             is_const_func = true;
                     }
-                    if(is_const_func)
-                        header.raw("MOCK_CONST_METHOD{}({}, {}(", function->get_parameters().size(),
-                                   function->get_name(), function->get_return_type());
+                    if (is_const_func)
+                        header.raw("MOCK_CONST_METHOD{}({}, {}(",
+                            function->get_parameters().size(),
+                            function->get_name(),
+                            function->get_return_type());
                     else
-                        header.raw("MOCK_METHOD{}({}, {}(", function->get_parameters().size(), function->get_name(),
-                                   function->get_return_type());
+                        header.raw("MOCK_METHOD{}({}, {}(",
+                            function->get_parameters().size(),
+                            function->get_name(),
+                            function->get_return_type());
                     bool has_parameter = false;
-                    for(auto& parameter : function->get_parameters())
+                    for (auto& parameter : function->get_parameters())
                     {
-                        if(has_parameter)
+                        if (has_parameter)
                         {
                             header.raw(", ");
                         }
@@ -112,24 +116,24 @@ namespace rpc_generator
             std::string obj_type(interface_name);
             {
                 writer tmpl(sstr, header.get_tab_count());
-                if(m_ob.get_is_template())
+                if (m_ob.get_is_template())
                 {
-                    if(m_ob.get_template_params().empty())
+                    if (m_ob.get_template_params().empty())
                         return; // too complicated for now
                     tmpl.print_tabs();
                     tmpl.raw("template<");
                     obj_type += "<";
                     bool first_pass = true;
-                    for(const auto& param : m_ob.get_template_params())
+                    for (const auto& param : m_ob.get_template_params())
                     {
-                        if(!first_pass)
+                        if (!first_pass)
                         {
                             tmpl.raw(", ");
                             obj_type += ", ";
                         }
                         first_pass = false;
                         tmpl.raw("{} {}", param.type, param.get_name());
-                        if(!param.default_value.empty())
+                        if (!param.default_value.empty())
                             tmpl.raw(" = {}", param.default_value);
                         obj_type += param.get_name();
                     }
@@ -140,7 +144,7 @@ namespace rpc_generator
             header.raw(sstr.str());
             header("class {0}_matcher : public MatcherInterface<{1}>", interface_name, obj_type);
             header("{{");
-            for(auto& function : m_ob.get_functions())
+            for (auto& function : m_ob.get_functions())
             {
                 header("Matcher<{}> {}_matcher_;", function->get_return_type(), function->get_name());
             }
@@ -149,21 +153,21 @@ namespace rpc_generator
             header("{0}_matcher(", interface_name);
             header.set_tab_count(header.get_tab_count() + 1);
             bool is_first = true;
-            for(auto& function : m_ob.get_functions())
+            for (auto& function : m_ob.get_functions())
             {
-                if(!is_first)
+                if (!is_first)
                     header.raw(",\n");
                 is_first = false;
                 header.print_tabs();
                 header.raw("const Matcher<{}> {}_matcher", function->get_return_type(), function->get_name());
             }
-            if(!m_ob.get_functions().empty())
+            if (!m_ob.get_functions().empty())
                 header.raw("\n");
             header(")");
             is_first = true;
-            for(auto& function : m_ob.get_functions())
+            for (auto& function : m_ob.get_functions())
             {
-                if(is_first)
+                if (is_first)
                     header(": {0}_matcher_({0}_matcher)", function->get_name());
                 else
                     header(", {0}_matcher_({0}_matcher)", function->get_name());
@@ -174,7 +178,7 @@ namespace rpc_generator
 
             header("virtual bool MatchAndExplain({} request, MatchResultListener* listener) const", obj_type);
             header("{{");
-            for(auto& function : m_ob.get_functions())
+            for (auto& function : m_ob.get_functions())
             {
                 header("if (!{0}_matcher_.MatchAndExplain(request.{0}, listener))", function->get_name());
                 header("\treturn false;");
@@ -184,7 +188,7 @@ namespace rpc_generator
             header("virtual void DescribeTo(::std::ostream* os) const");
             header("{{");
             header("(*os) << \"is working \";");
-            for(auto& function : m_ob.get_functions())
+            for (auto& function : m_ob.get_functions())
             {
                 header("(*os) << \"{} \";", function->get_name());
                 header("{}_matcher_.DescribeTo(os);", function->get_name());
@@ -193,7 +197,7 @@ namespace rpc_generator
             header("virtual void DescribeNegationTo(::std::ostream* os) const");
             header("{{");
             header("(*os) << \"is not working \";");
-            for(auto& function : m_ob.get_functions())
+            for (auto& function : m_ob.get_functions())
             {
                 header("(*os) << \"{} \";", function->get_name());
                 header("{}_matcher_.DescribeTo(os);", function->get_name());
@@ -205,28 +209,28 @@ namespace rpc_generator
 
         void write_marshalling_logic_nested(const class_entity& cls, writer& header)
         {
-            if(cls.get_entity_type() == entity_type::INTERFACE)
+            if (cls.get_entity_type() == entity_type::INTERFACE)
                 write_interface(cls, header);
 
-            if(cls.get_entity_type() == entity_type::LIBRARY)
+            if (cls.get_entity_type() == entity_type::LIBRARY)
                 write_interface(cls, header);
 
-            if(cls.get_entity_type() == entity_type::STRUCT)
+            if (cls.get_entity_type() == entity_type::STRUCT)
                 write_struct(cls, header);
         }
 
         // entry point
         void write_namespace(bool from_host, const class_entity& lib, int& id, writer& header)
         {
-            for(auto cls : lib.get_classes())
+            for (auto cls : lib.get_classes())
             {
-                if(!cls->get_import_lib().empty())
+                if (!cls->get_import_lib().empty())
                     continue;
-                if(cls->get_entity_type() == entity_type::NAMESPACE)
+                if (cls->get_entity_type() == entity_type::NAMESPACE)
                 {
 
                     bool is_inline = cls->get_attribute("inline") == "inline";
-                    if(is_inline)
+                    if (is_inline)
                         header("inline namespace {}", cls->get_name());
                     else
                         header("namespace {}", cls->get_name());
@@ -245,8 +249,11 @@ namespace rpc_generator
         }
 
         // entry point
-        void write_files(bool from_host, const class_entity& lib, std::ostream& hos,
-                         const std::vector<std::string>& namespaces, const std::string& header_filename)
+        void write_files(bool from_host,
+            const class_entity& lib,
+            std::ostream& hos,
+            const std::vector<std::string>& namespaces,
+            const std::string& header_filename)
         {
             writer header(hos);
 
@@ -312,7 +319,7 @@ namespace rpc_generator
 
             header("");
 
-            for(auto& ns : namespaces)
+            for (auto& ns : namespaces)
             {
                 header("namespace {}", ns);
                 header("{{");
@@ -321,7 +328,7 @@ namespace rpc_generator
             int id = 1;
             write_namespace(from_host, lib, id, header);
 
-            for(auto& ns : namespaces)
+            for (auto& ns : namespaces)
             {
                 (void)ns;
                 header("}}");

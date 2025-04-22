@@ -18,12 +18,19 @@ extern "C"
 }
 #endif
 
-
-#define RPC_ASSERT(x) if(!(x))(hang())
+#define RPC_ASSERT(x)                                                                                                  \
+    if (!(x))                                                                                                          \
+    (hang())
 #else
 #ifdef _DEBUG
-#define RPC_ASSERT(x) if(!(x))assert(!"error failed " #x);
+#define RPC_ASSERT(x)                                                                                                  \
+    if (!(x))                                                                                                          \
+        assert(!"error failed " #x);
 #else
-#define RPC_ASSERT(x) if(!(x)){std::abort();}
+#define RPC_ASSERT(x)                                                                                                  \
+    if (!(x))                                                                                                          \
+    {                                                                                                                  \
+        std::abort();                                                                                                  \
+    }
 #endif
 #endif

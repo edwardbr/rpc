@@ -24,12 +24,12 @@ namespace component_checksum
 {
     std::string get_namespace(const class_entity* entity)
     {
-        if(!entity || entity->get_name().empty())
+        if (!entity || entity->get_name().empty())
             return "";
 
         std::string ns;
         auto* tmp = entity->get_owner();
-        if(tmp)
+        if (tmp)
             ns = get_namespace(tmp);
 
 #ifdef WIN32
@@ -42,17 +42,17 @@ namespace component_checksum
 
     void write_interface(const class_entity& m_ob, std::filesystem::path& output_path)
     {
-        if(m_ob.is_in_import())
+        if (m_ob.is_in_import())
             return;
         auto interface_name = std::string(m_ob.get_entity_type() == entity_type::LIBRARY ? "i_" : "") + m_ob.get_name();
 
         auto name = get_namespace(m_ob.get_owner()) + interface_name;
 
         auto status = m_ob.get_attribute_value("status");
-        if(status.empty())
+        if (status.empty())
             status = "not_specified";
 
-        auto file = output_path / status/ name;
+        auto file = output_path / status / name;
 
         std::filesystem::create_directories(file.parent_path());
 
@@ -62,16 +62,16 @@ namespace component_checksum
 
     void write_struct(const class_entity& m_ob, std::filesystem::path& output_path)
     {
-        if(m_ob.is_in_import())
+        if (m_ob.is_in_import())
             return;
 
         auto name = get_namespace(m_ob.get_owner()) + m_ob.get_name();
 
         auto status = m_ob.get_attribute_value("status");
-        if(status.empty())
+        if (status.empty())
             status = "not_specified";
 
-        auto file = output_path / status/ name;
+        auto file = output_path / status / name;
 
         std::filesystem::create_directories(file.parent_path());
 
@@ -82,22 +82,21 @@ namespace component_checksum
     // entry point
     void write_namespace(const class_entity& lib, std::filesystem::path& output_path)
     {
-        for(auto& elem : lib.get_elements(entity_type::NAMESPACE_MEMBERS))
+        for (auto& elem : lib.get_elements(entity_type::NAMESPACE_MEMBERS))
         {
-            if(elem->is_in_import())
+            if (elem->is_in_import())
                 continue;
-            else if(elem->get_entity_type() == entity_type::NAMESPACE)
+            else if (elem->get_entity_type() == entity_type::NAMESPACE)
             {
                 auto& ent = static_cast<const class_entity&>(*elem);
                 write_namespace(ent, output_path);
             }
-            else if(elem->get_entity_type() == entity_type::STRUCT)
+            else if (elem->get_entity_type() == entity_type::STRUCT)
             {
                 auto& ent = static_cast<const class_entity&>(*elem);
                 write_struct(ent, output_path);
             }
-            else if(elem->get_entity_type() == entity_type::INTERFACE
-                    || elem->get_entity_type() == entity_type::LIBRARY)
+            else if (elem->get_entity_type() == entity_type::INTERFACE || elem->get_entity_type() == entity_type::LIBRARY)
             {
                 auto& ent = static_cast<const class_entity&>(*elem);
                 write_interface(ent, output_path);

@@ -4,16 +4,7 @@
 #include <filesystem>
 #include <fstream>
 
-#if defined(__clang__)
-    #pragma GCC diagnostic push
-    #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
-#endif
-
 #include <args.hxx>
-
-#if defined(__clang__)
-    #pragma GCC diagnostic pop
-#endif
 
 #include "commonfuncs.h"
 #include "macro_parser.h"
@@ -41,11 +32,11 @@ namespace javascript_json
 
 void get_imports(const class_entity& object, std::list<std::string>& imports, std::set<std::string>& imports_cache)
 {
-    for(auto& cls : object.get_classes())
+    for (auto& cls : object.get_classes())
     {
-        if(!cls->get_import_lib().empty())
+        if (!cls->get_import_lib().empty())
         {
-            if(imports_cache.find(cls->get_import_lib()) == imports_cache.end())
+            if (imports_cache.find(cls->get_import_lib()) == imports_cache.end())
             {
                 imports_cache.insert(cls->get_import_lib());
                 imports.push_back(cls->get_import_lib());
@@ -57,9 +48,9 @@ void get_imports(const class_entity& object, std::list<std::string>& imports, st
 bool is_different(const std::stringstream& stream, const std::string& data)
 {
     auto stream_str = stream.str();
-    if(stream_str.empty())
+    if (stream_str.empty())
     {
-        if(data.empty())
+        if (data.empty())
             return true;
         return false;
     }
@@ -74,22 +65,39 @@ int main(const int argc, char* argv[])
         args::ArgumentParser args_parser("Generate C++ headers and source from idl files");
         args::HelpFlag h(args_parser, "help", "help", {"help"});
 
-        args::ValueFlag<std::string> root_idl_arg(args_parser, "path", "the idl to be parsed", {'i', "idl"}, args::Options::Required);
-        args::ValueFlag<std::string> output_path_arg(args_parser, "path", "the base output path", {'p', "output_path"}, args::Options::Required);
-        args::ValueFlag<std::string> header_path_arg(args_parser, "path", "the generated header relative filename", {'h', "header"}, args::Options::Required);
-        args::ValueFlag<std::string> proxy_path_arg(args_parser, "path", "the generated proxy relative filename", {'x', "proxy"}, args::Options::Required);
-        args::ValueFlag<std::string> stub_path_arg(args_parser, "path", "the generated stub relative filename", {'s', "stub"}, args::Options::Required);
-        args::ValueFlag<std::string> stub_header_path_arg(args_parser, "path", "the generated stub header relative filename", {'t', "stub_header"}, args::Options::Required);
-        args::ValueFlag<std::string> mock_path_arg(args_parser, "path", "the generated mock relative filename", {'m', "mock"});
-        args::Flag suppress_catch_stub_exceptions_arg(args_parser, "suppress_catch_stub_exceptions", "catch stub exceptions", {'c', "suppress_catch_stub_exceptions"});
-        args::ValueFlag<std::string> module_name_arg(args_parser, "name", "the name given to the stub_factory", {'M', "module_name"});
-        args::ValueFlagList<std::string> include_paths_arg(args_parser, "name", "locations of include files used by the idl", {'P', "path"});
-        args::ValueFlagList<std::string> namespaces_arg(args_parser, "namespace", "namespace of the generated interface", {'n', "namespace"});
-        args::Flag dump_preprocessor_output_and_die_arg(args_parser, "dump_preprocessor_output_and_die", "dump preprocessor output and die", {'d', "dump_preprocessor_output_and_die"});
+        args::ValueFlag<std::string> root_idl_arg(
+            args_parser, "path", "the idl to be parsed", {'i', "idl"}, args::Options::Required);
+        args::ValueFlag<std::string> output_path_arg(
+            args_parser, "path", "the base output path", {'p', "output_path"}, args::Options::Required);
+        args::ValueFlag<std::string> header_path_arg(
+            args_parser, "path", "the generated header relative filename", {'h', "header"}, args::Options::Required);
+        args::ValueFlag<std::string> proxy_path_arg(
+            args_parser, "path", "the generated proxy relative filename", {'x', "proxy"}, args::Options::Required);
+        args::ValueFlag<std::string> stub_path_arg(
+            args_parser, "path", "the generated stub relative filename", {'s', "stub"}, args::Options::Required);
+        args::ValueFlag<std::string> stub_header_path_arg(
+            args_parser, "path", "the generated stub header relative filename", {'t', "stub_header"}, args::Options::Required);
+        args::ValueFlag<std::string> mock_path_arg(
+            args_parser, "path", "the generated mock relative filename", {'m', "mock"});
+        args::Flag suppress_catch_stub_exceptions_arg(
+            args_parser, "suppress_catch_stub_exceptions", "catch stub exceptions", {'c', "suppress_catch_stub_exceptions"});
+        args::ValueFlag<std::string> module_name_arg(
+            args_parser, "name", "the name given to the stub_factory", {'M', "module_name"});
+        args::ValueFlagList<std::string> include_paths_arg(
+            args_parser, "name", "locations of include files used by the idl", {'P', "path"});
+        args::ValueFlagList<std::string> namespaces_arg(
+            args_parser, "namespace", "namespace of the generated interface", {'n', "namespace"});
+        args::Flag dump_preprocessor_output_and_die_arg(args_parser,
+            "dump_preprocessor_output_and_die",
+            "dump preprocessor output and die",
+            {'d', "dump_preprocessor_output_and_die"});
         args::ValueFlagList<std::string> defines_arg(args_parser, "define", "macro define", {'D'});
-        args::ValueFlagList<std::string> additional_headers_arg(args_parser, "header", "additional header to be added to the idl generated header", {'H', "additional_headers"});
-        args::ValueFlagList<std::string> rethrow_exceptions_arg(args_parser, "exception", "exceptions that should be rethrown", {'r', "rethrow_stub_exception"});
-        args::ValueFlagList<std::string> additional_stub_headers_arg(args_parser, "header", "additional stub headers", {'A', "additional_stub_header"});
+        args::ValueFlagList<std::string> additional_headers_arg(
+            args_parser, "header", "additional header to be added to the idl generated header", {'H', "additional_headers"});
+        args::ValueFlagList<std::string> rethrow_exceptions_arg(
+            args_parser, "exception", "exceptions that should be rethrown", {'r', "rethrow_stub_exception"});
+        args::ValueFlagList<std::string> additional_stub_headers_arg(
+            args_parser, "header", "additional stub headers", {'A', "additional_stub_header"});
 
         try
         {
@@ -131,13 +139,13 @@ int main(const int argc, char* argv[])
 
         std::unique_ptr<macro_parser> parser = std::unique_ptr<macro_parser>(new macro_parser());
 
-        for(auto& define : defines)
+        for (auto& define : defines)
         {
             auto elems = split(define, '=');
             {
                 macro_parser::definition def;
                 std::string defName = elems[0];
-                if(elems.size() > 1)
+                if (elems.size() > 1)
                 {
                     def.m_substitutionString = elems[1];
                 }
@@ -156,14 +164,14 @@ int main(const int argc, char* argv[])
         std::error_code ec;
 
         auto idl = std::filesystem::absolute(root_idl, ec);
-        if(!std::filesystem::exists(idl))
+        if (!std::filesystem::exists(idl))
         {
             cout << "Error file " << idl << " does not exist";
             return -1;
         }
 
         std::vector<std::filesystem::path> parsed_paths;
-        for(auto& path : include_paths)
+        for (auto& path : include_paths)
         {
             parsed_paths.emplace_back(std::filesystem::canonical(path, ec).make_preferred());
         }
@@ -172,13 +180,13 @@ int main(const int argc, char* argv[])
 
         std::stringstream output_stream;
         auto r = parser->load(output_stream, root_idl, parsed_paths, loaded_includes);
-        if(!r)
+        if (!r)
         {
             std::cerr << "unable to load " << root_idl << '\n';
             return -1;
         }
         pre_parsed_data = output_stream.str();
-        if(dump_preprocessor_output_and_die)
+        if (dump_preprocessor_output_and_die)
         {
             std::cout << pre_parsed_data << '\n';
             return 0;
@@ -192,7 +200,7 @@ int main(const int argc, char* argv[])
         std::list<std::string> imports;
         {
             std::set<std::string> imports_cache;
-            if(!objects->get_import_lib().empty())
+            if (!objects->get_import_lib().empty())
             {
                 std::cout << "root object has a non empty import lib\n";
                 return -1;
@@ -204,7 +212,8 @@ int main(const int argc, char* argv[])
         stub_header_path = stub_header_path.size() ? stub_header_path : (stub_path + ".h");
 
         // do the generation of the checksums, in a directory that matches the main header one
-        auto checksums_path = std::filesystem::path(output_path) / "check_sums" / std::filesystem::path(header_path).parent_path();
+        auto checksums_path
+            = std::filesystem::path(output_path) / "check_sums" / std::filesystem::path(header_path).parent_path();
         std::filesystem::create_directories(checksums_path);
         component_checksum::write_namespace(*objects, checksums_path);
 
@@ -220,7 +229,7 @@ int main(const int argc, char* argv[])
             std::filesystem::create_directories(proxy_fs_path.parent_path());
             std::filesystem::create_directories(stub_fs_path.parent_path());
             std::filesystem::create_directories(stub_header_fs_path.parent_path());
-            if(mock_path.length())
+            if (mock_path.length())
                 std::filesystem::create_directories(mock_fs_path.parent_path());
 
             // read the original data and close the files afterwards
@@ -244,7 +253,7 @@ int main(const int argc, char* argv[])
                 ifstream stub_header_fs(stub_header_fs_path);
                 std::getline(stub_header_fs, interfaces_stub_header_data, '\0');
 
-                if(mock_path.length())
+                if (mock_path.length())
                 {
                     ifstream mock_fs(mock_fs_path);
                     std::getline(mock_fs, interfaces_mock_data, '\0');
@@ -257,45 +266,57 @@ int main(const int argc, char* argv[])
             std::stringstream stub_header_stream;
             std::stringstream mock_stream;
 
-            rpc_generator::synchronous_generator::write_files(
-                module_name, true, *objects, header_stream, proxy_stream, stub_stream, stub_header_stream, namespaces,
-                header_path, stub_header_path, imports, additional_headers, !suppress_catch_stub_exceptions,
-                rethrow_exceptions, additional_stub_headers);
+            rpc_generator::synchronous_generator::write_files(module_name,
+                true,
+                *objects,
+                header_stream,
+                proxy_stream,
+                stub_stream,
+                stub_header_stream,
+                namespaces,
+                header_path,
+                stub_header_path,
+                imports,
+                additional_headers,
+                !suppress_catch_stub_exceptions,
+                rethrow_exceptions,
+                additional_stub_headers);
 
             header_stream << ends;
             proxy_stream << ends;
             stub_stream << ends;
             stub_header_stream << ends;
-            if(mock_path.length())
+            if (mock_path.length())
             {
-                rpc_generator::synchronous_mock_generator::write_files(true, *objects, mock_stream, namespaces, header_path);
+                rpc_generator::synchronous_mock_generator::write_files(
+                    true, *objects, mock_stream, namespaces, header_path);
                 mock_stream << ends;
             }
 
             // compare and write if different
-            if(is_different(header_stream, interfaces_h_data))
+            if (is_different(header_stream, interfaces_h_data))
             {
                 ofstream file(header_fs_path);
                 file << header_stream.str();
             }
-            if(is_different(proxy_stream, interfaces_proxy_data))
+            if (is_different(proxy_stream, interfaces_proxy_data))
             {
                 ofstream file(proxy_fs_path);
                 file << proxy_stream.str();
             }
-            if(is_different(stub_stream, interfaces_stub_data))
+            if (is_different(stub_stream, interfaces_stub_data))
             {
                 ofstream file(stub_fs_path);
                 file << stub_stream.str();
             }
-            if(is_different(stub_header_stream, interfaces_stub_header_data))
+            if (is_different(stub_header_stream, interfaces_stub_header_data))
             {
                 ofstream file(stub_header_fs_path);
                 file << stub_header_stream.str();
             }
-            if(mock_path.length())
+            if (mock_path.length())
             {
-                if(interfaces_mock_data != mock_stream.str())
+                if (interfaces_mock_data != mock_stream.str())
                 {
                     ofstream file(mock_fs_path);
                     file << mock_stream.str();
@@ -307,7 +328,7 @@ int main(const int argc, char* argv[])
         {
             // get default paths
             auto pos = header_path.rfind(".h");
-            if(pos == std::string::npos)
+            if (pos == std::string::npos)
             {
                 std::cerr << "failed looking for a .h suffix " << header_path << '\n';
                 return -1;
@@ -332,14 +353,19 @@ int main(const int argc, char* argv[])
 
             std::stringstream header_stream;
 
-            rpc_generator::yas_generator::write_files(
-                true, *objects, header_stream, namespaces, header_path,
-                !suppress_catch_stub_exceptions, rethrow_exceptions, additional_stub_headers);
+            rpc_generator::yas_generator::write_files(true,
+                *objects,
+                header_stream,
+                namespaces,
+                header_path,
+                !suppress_catch_stub_exceptions,
+                rethrow_exceptions,
+                additional_stub_headers);
 
             header_stream << ends;
 
             // compare and write if different
-            if(is_different(header_stream, interfaces_h_data))
+            if (is_different(header_stream, interfaces_h_data))
             {
                 ofstream file(header_fs_path);
                 file << header_stream.str();
@@ -348,7 +374,7 @@ int main(const int argc, char* argv[])
 
         {
             auto pos = header_path.rfind(".h");
-            if(pos == std::string::npos)
+            if (pos == std::string::npos)
             {
                 std::cerr << "failed looking for a .h suffix " << header_path << '\n';
                 return -1;
@@ -371,16 +397,18 @@ int main(const int argc, char* argv[])
             std::stringstream json_schema_stream;
 
             // Generate the JSON Schema
-            json_schema_generator::write_json_schema(*objects, json_schema_stream, module_name); // Use filename as title
+            json_schema_generator::write_json_schema(*objects,
+                json_schema_stream,
+                module_name); // Use filename as title
 
-            if(is_different(json_schema_stream, json_schema_data))
+            if (is_different(json_schema_stream, json_schema_data))
             {
                 ofstream file(json_schema_fs_path);
                 file << json_schema_stream.str();
             }
         }
     }
-    catch(const std::exception& e)
+    catch (const std::exception& e)
     {
         std::cerr << e.what() << std::endl;
         return 1;
