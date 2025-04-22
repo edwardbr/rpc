@@ -5,6 +5,9 @@
 cmake_minimum_required(VERSION 3.24)
 
 if(BUILD_ENCLAVE)
+   set(HOST_DEFINES ${HOST_DEFINES} BUILD_ENCLAVE)
+endif()
+if(BUILD_ENCLAVE)
    add_subdirectory(edl)
 endif()
 add_subdirectory(idls)

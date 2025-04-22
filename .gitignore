@@ -4,6 +4,6 @@ Release
 .vscode
 x64
 test
-build
+/build*
 .vscode/launch.json
 .vscode/settings.json

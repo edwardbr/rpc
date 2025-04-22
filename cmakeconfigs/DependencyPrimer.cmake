@@ -1,11 +1,11 @@
 # formatted using cmake-format
 cmake_minimum_required(VERSION 3.24)
 
-message("DEPENDANCIES_LOADED ${DEPENDANCIES_LOADED}")
-if(NOT DEPENDANCIES_LOADED)
-  message("configuring dependancies")
+message("DEPENDENCIES_LOADED ${DEPENDENCIES_LOADED}")
+if(NOT DEPENDENCIES_LOADED)
+  message("configuring dependencies")
   # if this is loaded in a parent module then dont do this
-  set(DEPENDANCIES_LOADED ON)
+  set(DEPENDENCIES_LOADED ON)
 
   # ####################################################################################################################
   # settings
@@ -13,10 +13,7 @@ if(NOT DEPENDANCIES_LOADED)
   option(BUILD_ENCLAVE "build enclave code" ON)
   option(BUILD_HOST "build host code" ON)
   option(BUILD_EXE "build exe code" ON)
-  # When building Core, BUILD_TEST is always explicitly defined to ON or OFF, but not necessarily when used in
-  # standalone apps, where we want OFF by default
-  option(BUILD_TEST "build test code, including backdoors in raft idl" OFF)
-  # secretarium exe is needed for measurement, so don't default to ON if it is not built
+  option(BUILD_TEST "build test code" ON)
   option(DEBUG_HOST_LEAK "enable leak sanitizer (only use when ptrace is accessible)" OFF)
   option(DEBUG_HOST_ADDRESS "enable address sanitizer" OFF)
   option(DEBUG_HOST_THREAD "enable thread sanitizer (cannot be used with leak sanitizer)" OFF)
@@ -33,7 +30,6 @@ if(NOT DEPENDANCIES_LOADED)
 
   option(FORCE_DEBUG_INFORMATION "force inclusion of debug information" ON)
 
-  option(RPC_STANDALONE "enable the building of RPC as a standalone library for testing" OFF)
   option(USE_RPC_LOGGING "turn on rpc logging" OFF)
   option(RPC_HANG_ON_FAILED_ASSERT "hang on failed assert" OFF)
   option(USE_RPC_TELEMETRY "turn on rpc telemetry" OFF)
@@ -158,11 +154,6 @@ if(NOT DEPENDANCIES_LOADED)
   else()
     set(USE_RPC_TELEMETRY_RAII_LOGGING_FLAG)
   endif()
-  if(BUILD_ENCLAVE)
-    set(BUILD_ENCLAVE_FLAG BUILD_ENCLAVE)
-  else()
-    set(BUILD_ENCLAVE_FLAG)
-  endif()
   
   if(${ENCLAVE_TARGET} STREQUAL "SGX")
     if(${SGX_HW}) # not simulation
@@ -178,7 +169,6 @@ if(NOT DEPENDANCIES_LOADED)
         NOMINMAX
         _SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS
         ${USE_RPC_LOGGING_FLAG}
-        ${BUILD_ENCLAVE_FLAG}
         ${RPC_HANG_ON_FAILED_ASSERT_FLAG}
         ${USE_RPC_TELEMETRY_FLAG}
         ${USE_RPC_TELEMETRY_RAII_LOGGING_FLAG}
@@ -713,4 +703,4 @@ if(NOT DEPENDANCIES_LOADED)
   endif()
 
 
-endif(NOT DEPENDANCIES_LOADED)
+endif(NOT DEPENDENCIES_LOADED)

@@ -61,10 +61,7 @@ There are different CMake options specified in the root CMakeLists.txt:
   option(BUILD_ENCLAVE "build enclave code" ON)
   option(BUILD_HOST "build host code" ON)
   option(BUILD_EXE "build exe code" ON)
-  # When building Core, BUILD_TEST is always explicitly defined to ON or OFF, but not necessarily when used in
-  # standalone apps, where we want OFF by default
-  option(BUILD_TEST "build test code, including backdoors in raft idl" OFF)
-  # secretarium exe is needed for measurement, so don't default to ON if it is not built
+  option(BUILD_TEST "build test code" ON)
   option(DEBUG_HOST_LEAK "enable leak sanitizer (only use when ptrace is accessible)" OFF)
   option(DEBUG_HOST_ADDRESS "enable address sanitizer" OFF)
   option(DEBUG_HOST_THREAD "enable thread sanitizer (cannot be used with leak sanitizer)" OFF)
@@ -78,7 +75,6 @@ There are different CMake options specified in the root CMakeLists.txt:
   option(CMAKE_VERBOSE_MAKEFILE "verbose build step" OFF)
   option(CMAKE_RULE_MESSAGES "verbose cmake" OFF)
   option(FORCE_DEBUG_INFORMATION "force inclusion of debug information" ON)
-  option(RPC_STANDALONE "enable the building of RPC as a standalone library for testing" OFF)
   option(USE_RPC_LOGGING "turn on rpc logging" OFF)
   option(RPC_HANG_ON_FAILED_ASSERT "hang on failed assert" OFF)
   option(USE_RPC_TELEMETRY "turn on rpc telemetry" OFF)
@@ -107,10 +103,10 @@ Alternatively you can set them explicitly from the .vscode/settings.json file
 Also for viewing idl files more easily install the "Microsoft MIDL and Mozilla WebIDL syntax highlighting" extension to get some highlighting support.
 
 Currently tested on Compilers:
- * Clang 10+ 
+ * Clang 10+
  * GCC 9.4
  * Visual Studio 2017
 
 Though strongly suggest upgrading to the latest version of these compilers
 
-SHA2 Credit to: https://github.com/brainhub/SHA3IUF 
+SHA3 Credit to: https://github.com/brainhub/SHA3IUF

@@ -11,6 +11,7 @@
 #include <rpc/telemetry/i_telemetry_service.h>
 #endif
 #include <rpc/basic_service_proxies.h>
+#include <rpc/logger.h>
 
 #include <example_shared/example_shared_stub.h>
 #include <example_import/example_import_stub.h>
@@ -18,7 +19,7 @@
 
 void log(const std::string& data)
 {
-    rpc_log(data.data(), data.size());
+    LOG_STR(data.data(), data.size());
 }
 
 namespace marshalled_tests

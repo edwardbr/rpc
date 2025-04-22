@@ -10,7 +10,7 @@ if(USE_RPC_TELEMETRY)
 
   add_library(rpc::rpc_telemetry_interface ALIAS rpc_telemetry_interface)
 
-  if(${BUILD_ENCLAVE})
+  if(BUILD_ENCLAVE)
     message("rpc_telemetry_enclave")
     add_library(rpc_telemetry_enclave STATIC src/enclave_telemetry_service.cpp)
 

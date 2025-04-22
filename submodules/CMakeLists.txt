@@ -6,6 +6,14 @@
 cmake_minimum_required(VERSION 3.24)
 
 if(RPC_STANDALONE)
+  if(WIN32)
+    if(${BUILD_TYPE} STREQUAL "release")
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc /MD")
+    else()
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc /MDd")
+    endif()
+  endif()
+
   set(FMT_INSTALL ON)
   add_subdirectory(fmt)
   # fmt CMakeLists.txt defines a PUBLIC_HEADER property which triggers a warning when used as a subproject
