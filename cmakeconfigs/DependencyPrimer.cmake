@@ -34,7 +34,7 @@ if(NOT DEPENDENCIES_LOADED)
   option(USE_RPC_TELEMETRY "turn on rpc telemetry" OFF)
   option(USE_RPC_TELEMETRY_RAII_LOGGING
          "turn on the logging of the addref release and try cast activity of the services, proxies and stubs" OFF)
-         
+
   if(NOT DEFINED RPC_OUT_BUFFER_SIZE)
     # setting RPC_OUT_BUFFER_SIZE to 4kb which is the default page size for windows and linux
     set(RPC_OUT_BUFFER_SIZE 0x1000)
@@ -122,7 +122,7 @@ if(NOT DEPENDENCIES_LOADED)
         message(FATAL_ERROR "git submodule update --init failed with ${GIT_SUBMOD_RESULT}, please checkout submodules")
       endif()
     endif()
-  endif()  
+  endif()
 
   # ####################################################################################################################
   # reset and apply cmake separate enclave and host compile flags
@@ -152,7 +152,7 @@ if(NOT DEPENDENCIES_LOADED)
   else()
     set(USE_RPC_TELEMETRY_RAII_LOGGING_FLAG)
   endif()
-  
+
   if(${ENCLAVE_TARGET} STREQUAL "SGX")
     if(${SGX_HW}) # not simulation
       set(SGX_HW_OR_SIM_DEFINE SGX_HW)
@@ -180,20 +180,20 @@ if(NOT DEPENDENCIES_LOADED)
       if(BUILD_ENCLAVE)
         find_package(SGX REQUIRED)
       endif()
-      
+
       # we dont want os specific libraries for our enclaves
       set(CMAKE_C_STANDARD_LIBRARIES
-      ""
-      CACHE STRING "override default windows libraries" FORCE)
+          ""
+          CACHE STRING "override default windows libraries" FORCE)
       set(CMAKE_C_COMPILE_OBJECT
           ""
           CACHE STRING "override default windows libraries" FORCE)
-          set(CMAKE_C_ARCHIVE_FINISH
-              ""
-              CACHE STRING "override default windows libraries" FORCE)
-              set(CMAKE_C_ARCHIVE_CREATE
-                  ""
-                  CACHE STRING "override default windows libraries" FORCE)
+      set(CMAKE_C_ARCHIVE_FINISH
+          ""
+          CACHE STRING "override default windows libraries" FORCE)
+      set(CMAKE_C_ARCHIVE_CREATE
+          ""
+          CACHE STRING "override default windows libraries" FORCE)
       set(CMAKE_CXX_STANDARD_LIBRARIES
           ""
           CACHE STRING "override default windows libraries" FORCE)
@@ -275,18 +275,14 @@ if(NOT DEPENDENCIES_LOADED)
       set(SHARED_DEFINES ${SHARED_DEFINES} TEMP_DIR="${TEMP_DIR}" RUNTIME_DIR="${RUNTIME_DIR}")
 
       # to fill out later
-      set(WARN_PEDANTIC )
-      set(WARN_OK )
+      set(WARN_PEDANTIC)
+      set(WARN_OK)
       # the are conflicts between winsock.h and winsock2.h, the latter being the preferred one (and sometimes actually
       # required), but the former getting included through windows.h for instance, unless winsock2.h has already been
       # included OR WIN32_LEAN_AND_MEAN is defined, which is therefore a good solution to handle the problem everywhere
-      set(SHARED_HOST_DEFINES
-          ${SHARED_DEFINES}
-          WIN32
-          _WINDOWS
-          WIN32_LEAN_AND_MEAN)
+      set(SHARED_HOST_DEFINES ${SHARED_DEFINES} WIN32 _WINDOWS WIN32_LEAN_AND_MEAN)
       if(BUILD_ENCLAVE)
-                set(SHARED_ENCLAVE_DEFINES ${SHARED_DEFINES} _IN_ENCLAVE ${ENCLAVE_MEMLEAK_DEFINES})
+        set(SHARED_ENCLAVE_DEFINES ${SHARED_DEFINES} _IN_ENCLAVE ${ENCLAVE_MEMLEAK_DEFINES})
       endif()
 
       set(SHARED_COMPILE_OPTIONS
@@ -337,9 +333,8 @@ if(NOT DEPENDENCIES_LOADED)
           uuid.lib
           winspool.lib
           Crypt32.lib
-          # ${DCAP_LIBRARY_DIR}/sgx_dcap_quoteverify.lib
-          # ${DCAP_LIBRARY_DIR}/sgx_dcap_ql.lib
-          )
+          # ${DCAP_LIBRARY_DIR}/sgx_dcap_quoteverify.lib ${DCAP_LIBRARY_DIR}/sgx_dcap_ql.lib
+      )
 
       if(${BUILD_TYPE} STREQUAL "release")
         if(${SGX_MODE} STREQUAL "release")
@@ -500,12 +495,13 @@ if(NOT DEPENDENCIES_LOADED)
           if(${SGX_MODE} STREQUAL "release")
             set(ENCLAVE_DEFINES ${SHARED_ENCLAVE_DEFINES} NDEBUG ${ENCLAVE_MEMLEAK_DEFINES})
           else() # Prerelease "possibly"
-            set(ENCLAVE_DEFINES ${SHARED_ENCLAVE_DEFINES} NDEBUG EDEBUG ${ENCLAVE_MEMLEAK_DEFINES}) # sets SGX_DEBUG_FLAG
+            set(ENCLAVE_DEFINES ${SHARED_ENCLAVE_DEFINES} NDEBUG EDEBUG ${ENCLAVE_MEMLEAK_DEFINES}) # sets
+                                                                                                    # SGX_DEBUG_FLAG
           endif()
         endif()
       else() # debug
         set(EXTRA_COMPILE_OPTIONS ${DEBUG_HOST_ENCLAVE_OPTIONS}) # The one actually used by HOST and ENCLAVE instead
-                                                                  # ofq
+        # ofq
         set(CMAKE_CXX_FLAGS_DEBUG ${DEBUG_COMPILE_FLAGS})
         set(CMAKE_C_FLAGS_DEBUG ${CMAKE_CXX_FLAGS_DEBUG})
         set(OPTIMIZER_FLAGS -O0)
@@ -526,7 +522,7 @@ if(NOT DEPENDENCIES_LOADED)
 
       message("CMAKE_CXX_COMPILER_ID ${CMAKE_CXX_COMPILER_ID}")
       if(${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang")
-        set(CLANG_WARNS    
+        set(CLANG_WARNS
             -Wc99-extensions
             -Wzero-length-array
             -Wflexible-array-extensions
@@ -538,13 +534,9 @@ if(NOT DEPENDENCIES_LOADED)
             -Wnon-virtual-dtor
             -Wdelete-non-virtual-dtor)
       else()
-        set(CLANG_WARNS   
-          -Wno-variadic-macros
-          -Wno-gnu-zero-variadic-macro-arguments
-          -Wno-c++20-extensions
-        )
+        set(CLANG_WARNS -Wno-variadic-macros -Wno-gnu-zero-variadic-macro-arguments -Wno-c++20-extensions)
       endif()
-          
+
       set(WARN_BASELINE
           ${CLANG_WARNS}
           -Werror # convert warnings into errors
@@ -569,7 +561,7 @@ if(NOT DEPENDENCIES_LOADED)
           -Wno-unused-variable
           -Wno-sign-compare)
 
-      # ####################################################################################################################
+      # ################################################################################################################
       # reset and apply cmake separate enclave and host compile flags
       set(HOST_DEBUG_OPTIONS)
 
@@ -615,15 +607,20 @@ if(NOT DEPENDENCIES_LOADED)
       endif()
 
       if(BUILD_ENCLAVE)
-        set(ENCLAVE_COMPILE_OPTIONS ${SHARED_COMPILE_OPTIONS} -Wno-c++17-extensions -ffunction-sections -fdata-sections -Wno-implicit-exception-spec-mismatch)
+        set(ENCLAVE_COMPILE_OPTIONS
+            ${SHARED_COMPILE_OPTIONS}
+            -Wno-c++17-extensions
+            -ffunction-sections
+            -fdata-sections
+            -Wno-implicit-exception-spec-mismatch)
         set(HOST_LINK_OPTIONS -L/opt/intel/sgxsdk/lib64 -lsgx_tcrypto ${HOST_DEBUG_OPTIONS})
         set(HOST_LINK_EXE_OPTIONS -lsgx_dcap_quoteverify -lsgx_dcap_ql ${HOST_DEBUG_OPTIONS})
-      else()      
+      else()
         set(HOST_LINK_OPTIONS ${HOST_LINK_OPTIONS} ${HOST_DEBUG_OPTIONS})
         set(HOST_LINK_EXE_OPTIONS ${HOST_DEBUG_OPTIONS})
       endif()
       set(HOST_LINK_DYNAMIC_LIBRARY_OPTIONS ${HOST_LINK_OPTIONS} -fPIC)
-      
+
       set(HOST_COMPILE_OPTIONS ${SHARED_COMPILE_OPTIONS} -Wno-trigraphs ${HOST_DEBUG_OPTIONS})
       # this is here as we need to override the rpath we cannot use the ${HOST_LINK_EXE_OPTIONS} as cmake scrambles the
       # $
@@ -661,16 +658,11 @@ if(NOT DEPENDENCIES_LOADED)
       set(ENCLAVE_LIBCXX_INCLUDES ${ENCLAVE_LIBC_INCLUDES} ${SGX_LIBCXX_INCLUDE_DIR} ${SGX_LIBSTDCXX_INCLUDE_DIR})
     endif()
 
-    set(HOST_LIBRARIES
-        ${SHARED_HOST_LIBRARIES})
-        
-    if(BUILD_ENCLAVE)        
+    set(HOST_LIBRARIES ${SHARED_HOST_LIBRARIES})
+
+    if(BUILD_ENCLAVE)
       # add some sgx here
-      set(HOST_LIBRARIES
-          ${HOST_LIBRARIES}
-          ${SGX_USVC_LIB}
-          sgx_capable
-          ${SGX_URTS_LIB})
+      set(HOST_LIBRARIES ${HOST_LIBRARIES} ${SGX_USVC_LIB} sgx_capable ${SGX_URTS_LIB})
     endif()
   else()
     message(FATAL_ERROR "Invalid ENCLAVE_TARGET value")
@@ -699,6 +691,5 @@ if(NOT DEPENDENCIES_LOADED)
     include(GoogleTest)
     enable_testing()
   endif()
-
 
 endif(NOT DEPENDENCIES_LOADED)
