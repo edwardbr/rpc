@@ -1061,19 +1061,6 @@ namespace rpc
         typedef typename std::remove_extent<_Tp>::type _Up;
         return unique_ptr<_Tp>(new _Up[__n]());
     }
-    /*template<class _Tp, class... _Args>
-    typename __unique_if<_Tp>::__unique_array_known_bound make_unique(_Args&&...) = delete;
-    template<class _Tp> struct hash;
-    template<class _Tp, class _Dp>
-    struct std::hash<__enable_hash_helper<unique_ptr<_Tp, _Dp>, typename unique_ptr<_Tp, _Dp>::pointer>>
-    {
-        
-        size_t operator()(const unique_ptr<_Tp, _Dp>& __ptr) const
-        {
-            typedef typename unique_ptr<_Tp, _Dp>::pointer pointer;
-            return hash<pointer>()(__ptr.get());
-        }
-    };*/
 
     template<class _Tp> class shared_ptr
     {
@@ -1925,15 +1912,6 @@ element_type*>::value>> shared_ptr(unique_ptr<_Yp, _Dp>&& __r) : __ptr_(__r.get(
         template<class _Up> friend class shared_ptr;
     };
 
-    template<class _Tp> struct hash;
-
-    template<class _Tp> struct hash<shared_ptr<_Tp>>
-    {
-        size_t operator()(const shared_ptr<_Tp>& __ptr) const noexcept
-        {
-            return hash<typename shared_ptr<_Tp>::element_type*>()(__ptr.get());
-        }
-    };
 
     class __sp_mut
     {
@@ -2069,4 +2047,28 @@ element_type*>::value>> shared_ptr(unique_ptr<_Yp, _Dp>&& __r) : __ptr_(__r.get(
         ob->template query_interface<T1>(ret);
         return ret;
     }
+}
+
+
+namespace std
+{
+    template<class _Tp, class _Dp>
+    struct hash<rpc::unique_ptr<_Tp, _Dp>>
+    {
+        size_t operator()(const rpc::unique_ptr<_Tp, _Dp>& __ptr) const
+        {
+            typedef typename rpc::unique_ptr<_Tp, _Dp>::pointer pointer;
+            return hash<pointer>()(__ptr.get());
+        }
+    };
+
+    template<class _Tp>
+    struct hash<rpc::shared_ptr<_Tp>>
+    {
+        size_t operator()(const rpc::shared_ptr<_Tp>& __ptr) const noexcept
+        {
+            return hash<typename rpc::shared_ptr<_Tp>::element_type*>()(__ptr.get());
+        }
+    };
+
 }
