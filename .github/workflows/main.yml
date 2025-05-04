@@ -1,0 +1,34 @@
+name: Run CI
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+    branches:
+    - main
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+      - name: Check CMake formatting
+        run: |
+          sudo apt install cmake-format
+          git ls-files -- \*.cmake \*CMakeLists.txt | xargs cmake-format --check
+      - name: Check clang formatting
+        run: |
+          if [ -n "${{github.base_ref}}" ]
+          then
+            if ! git clang-format --quiet --diff "${{github.base_ref}}" HEAD
+            then
+              echo incorrect formatting
+              exit 1
+            fi
+          fi
+      - name: CMake configure
+        run: cmake -DCMAKE_C_COMPILER:FILEPATH=/usr/bin/clang -DCMAKE_CXX_COMPILER:FILEPATH=/usr/bin/clang++ --preset=Debug
+      - name: Build
+        run: cmake --build build
+      - name: Test
+        run: cd build/output/debug && ./rpc_test
