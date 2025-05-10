@@ -2214,13 +2214,7 @@ namespace rpc_generator
             header("#include <string>");
             header("#include <array>");
 
-            header("#include <rpc/version.h>");
-            header("#include <rpc/marshaller.h>");
-            header("#include <rpc/serialiser.h>");
-            header("#include <rpc/service.h>");
-            header("#include <rpc/error_codes.h>");
-            header("#include <rpc/types.h>");
-            header("#include <rpc/casting_interface.h>");
+            header("#include <rpc/rpc.h>");
 
             for (const auto& import : imports)
             {
@@ -2242,24 +2236,19 @@ namespace rpc_generator
             proxy("#include <yas/text_oarchive.hpp>");
             proxy("#include <yas/std_types.hpp>");
             proxy("#include <yas/count_streams.hpp>");
-            proxy("#include <rpc/proxy.h>");
-            proxy("#include <rpc/stub.h>");
-            proxy("#include <rpc/service.h>");
+            proxy("#include <rpc/rpc.h>");
             proxy("#include \"{}\"", header_filename);
 
             proxy("");
 
             stub_header("#pragma once");
-            stub_header("#include <rpc/service.h>");
-            stub_header("");
 
+            stub("#include <rpc/rpc.h>");
             stub("#include <yas/mem_streams.hpp>");
             stub("#include <yas/binary_iarchive.hpp>");
             stub("#include <yas/binary_oarchive.hpp>");
             stub("#include <yas/count_streams.hpp>");
             stub("#include <yas/std_types.hpp>");
-            stub("#include <rpc/stub.h>");
-            stub("#include <rpc/proxy.h>");
             stub("#include \"{}\"", header_filename);
             // stub("#include \"{}\"", yas_header_filename);
             stub("#include \"{}\"", stub_header_filename);

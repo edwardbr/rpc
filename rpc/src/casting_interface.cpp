@@ -1,5 +1,4 @@
-#include <rpc/casting_interface.h>
-#include <rpc/proxy.h>
+#include <rpc/rpc.h>
 
 namespace rpc
 {

@@ -7,23 +7,8 @@
 #include <rpc/assert.h>
 #include <atomic>
 
-#include <rpc/types.h>
-#include <rpc/marshaller.h>
-#include <rpc/remote_pointer.h>
-#include <rpc/casting_interface.h>
-#ifdef USE_RPC_TELEMETRY
-#include <rpc/telemetry/i_telemetry_service.h>
-#endif
-#include <rpc/service.h>
-
 namespace rpc
 {
-
-    class i_interface_stub;
-    class object_stub;
-    class service;
-    class service_proxy;
-
     class object_stub
     {
         object id_ = {0};

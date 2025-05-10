@@ -5,13 +5,7 @@
 #pragma once
 
 #include <example/example.h>
-#include <rpc/types.h>
-#include <rpc/proxy.h>
-#ifdef USE_RPC_TELEMETRY
-#include <rpc/telemetry/i_telemetry_service.h>
-#endif
-#include <rpc/basic_service_proxies.h>
-#include <rpc/logger.h>
+#include <rpc/rpc.h>
 
 #include <example_shared/example_shared_stub.h>
 #include <example_import/example_import_stub.h>

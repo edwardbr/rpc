@@ -4,14 +4,6 @@
  */
 #pragma once
 
-#include <rpc/types.h>
-#include <rpc/proxy.h>
-#include <rpc/error_codes.h>
-#ifdef USE_RPC_TELEMETRY
-#include <rpc/telemetry/i_telemetry_service.h>
-#endif
-#include <rpc/service.h>
-
 namespace rpc
 {
     struct make_shared_local_service_proxy_enabler;
@@ -24,7 +16,7 @@ namespace rpc
 
         local_service_proxy(
             const char* name, const rpc::shared_ptr<child_service>& child_svc, const rpc::shared_ptr<service>& parent_svc)
-            : service_proxy(name, parent_svc->get_zone_id().as_destination(), child_svc)
+            : service_proxy(name, parent_svc->get_zone_id().as_destination(), static_pointer_cast<service>(child_svc))
             , parent_service_(parent_svc)
         {
         }
@@ -32,7 +24,7 @@ namespace rpc
 
         rpc::shared_ptr<service_proxy> clone() override
         {
-            return rpc::shared_ptr<local_service_proxy>(new local_service_proxy(*this));
+            return rpc::make_shared<local_service_proxy>(*this);
         }
 
         // if there is no use of a local_service_proxy in the zone requires_parent_release must be set to true so that

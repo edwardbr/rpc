@@ -30,7 +30,6 @@ if(BUILD_ENCLAVE)
     include/rpc/basic_service_proxies.h
     include/rpc/marshaller.h
     include/rpc/proxy.h
-    include/rpc/remote_pointer.h
     include/rpc/service.h
     include/rpc/stub.h
     src/proxy.cpp
@@ -67,7 +66,6 @@ add_library(
   include/rpc/basic_service_proxies.h
   include/rpc/marshaller.h
   include/rpc/proxy.h
-  include/rpc/remote_pointer.h
   include/rpc/service.h
   include/rpc/stub.h
   src/proxy.cpp

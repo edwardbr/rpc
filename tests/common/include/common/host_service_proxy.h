@@ -4,7 +4,7 @@
  */
 #pragma once
 
-#include <rpc/proxy.h>
+#include <rpc/rpc.h>
 
 namespace rpc
 {

@@ -7,9 +7,8 @@
 #include <spdlog/spdlog.h>
 #include <fmt/os.h>
 
+#include <rpc/rpc.h>
 #include <rpc/telemetry/host_telemetry_service.h>
-#include <rpc/assert.h>
-#include <rpc/service.h>
 
 using namespace std::string_literals;
 

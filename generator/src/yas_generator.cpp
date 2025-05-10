@@ -1208,12 +1208,7 @@ namespace rpc_generator
             header("#include <yas/binary_oarchive.hpp>");
             header("#include <yas/serialize.hpp>");
             header("#include <yas/std_types.hpp>");
-            header("#include <rpc/proxy.h>");
-            header("#include <rpc/stub.h>");
-            header("#include <rpc/error_codes.h>");
-            header("#include <rpc/marshaller.h>");
-            header("#include <rpc/serialiser.h>");
-            header("#include <rpc/service.h>");
+            header("#include <rpc/rpc.h>");
             header("#include \"{}\"", header_filename);
             header("");
 

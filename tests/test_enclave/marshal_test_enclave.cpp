@@ -17,8 +17,6 @@
 
 #include <example/example.h>
 
-#include <rpc/remote_pointer.h>
-
 #ifdef USE_RPC_TELEMETRY
 #include <rpc/telemetry/i_telemetry_service.h>
 #include <rpc/telemetry/enclave_telemetry_service.h>

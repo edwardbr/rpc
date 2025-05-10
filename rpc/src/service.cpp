@@ -7,11 +7,7 @@
 #include <yas/mem_streams.hpp>
 #include <yas/std_types.hpp>
 
-#include "rpc/service.h"
-#include "rpc/stub.h"
-#include "rpc/proxy.h"
-#include "rpc/version.h"
-#include "rpc/logger.h"
+#include "rpc/rpc.h"
 
 namespace rpc
 {

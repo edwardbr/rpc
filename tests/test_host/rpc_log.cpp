@@ -4,7 +4,7 @@
 
 #include <spdlog/spdlog.h>
 
-#include <rpc/service.h>
+#include <rpc/rpc.h>
 #ifdef USE_RPC_TELEMETRY
 #include <rpc/telemetry/host_telemetry_service.h>
 #include <rpc/telemetry/telemetry_handler.h>

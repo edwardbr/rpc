@@ -14,26 +14,9 @@
 #include <limits>
 #include <functional>
 
-#include <rpc/error_codes.h>
-#include <rpc/assert.h>
-#include <rpc/types.h>
-#include <rpc/version.h>
-#include <rpc/marshaller.h>
-#include <rpc/remote_pointer.h>
-#include <rpc/casting_interface.h>
-#ifdef USE_RPC_TELEMETRY
-#include <rpc/telemetry/i_telemetry_service.h>
-#endif
 
 namespace rpc
 {
-    class i_interface_stub;
-    class object_stub;
-    class service;
-    class child_service;
-    class service_proxy;
-    struct current_service_tracker;
-
     const object dummy_object_id = {std::numeric_limits<uint64_t>::max()};
 
     template<class T>
