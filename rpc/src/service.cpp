@@ -7,7 +7,7 @@
 #include <yas/mem_streams.hpp>
 #include <yas/std_types.hpp>
 
-#include "rpc/rpc.h"
+#include <rpc/rpc.h>
 
 namespace rpc
 {
@@ -231,7 +231,7 @@ namespace rpc
 
         if (destination_zone_id != zone_id_.as_destination())
         {
-            rpc::shared_ptr<service_proxy> other_zone;
+            std::shared_ptr<service_proxy> other_zone;
             {
                 std::lock_guard g(zone_control);
                 auto found = other_zones.find({destination_zone_id, caller_zone_id});
@@ -268,7 +268,7 @@ namespace rpc
             {
                 return rpc::error::INCOMPATIBLE_SERVICE();
             }
-            rpc::weak_ptr<object_stub> weak_stub = get_object(object_id);
+            std::weak_ptr<object_stub> weak_stub = get_object(object_id);
             auto stub = weak_stub.lock();
             if (stub == nullptr)
             {
@@ -301,7 +301,7 @@ namespace rpc
     }
 
     void service::clean_up_on_failed_connection(
-        const rpc::shared_ptr<service_proxy>& destination_zone, rpc::shared_ptr<rpc::casting_interface> input_interface)
+        const std::shared_ptr<service_proxy>& destination_zone, rpc::shared_ptr<rpc::casting_interface> input_interface)
     {
         if (destination_zone && input_interface)
         {
@@ -317,7 +317,7 @@ namespace rpc
     interface_descriptor service::prepare_remote_input_interface(caller_channel_zone caller_channel_zone_id,
         caller_zone caller_zone_id,
         rpc::proxy_base* base,
-        rpc::shared_ptr<service_proxy>& destination_zone)
+        std::shared_ptr<service_proxy>& destination_zone)
     {
         auto object_proxy = base->get_object_proxy();
         auto object_service_proxy = object_proxy->get_service_proxy();
@@ -426,8 +426,8 @@ namespace rpc
         }
         else
         {
-            rpc::shared_ptr<service_proxy> destination_zone = object_service_proxy;
-            rpc::shared_ptr<service_proxy> caller;
+            std::shared_ptr<service_proxy> destination_zone = object_service_proxy;
+            std::shared_ptr<service_proxy> caller;
             {
                 std::lock_guard g(zone_control);
                 {
@@ -528,9 +528,9 @@ namespace rpc
         caller_channel_zone caller_channel_zone_id,
         caller_zone caller_zone_id,
         rpc::casting_interface* iface,
-        std::function<rpc::shared_ptr<i_interface_stub>(rpc::shared_ptr<object_stub>)> fn,
+        std::function<std::shared_ptr<i_interface_stub>(std::shared_ptr<object_stub>)> fn,
         bool outcall,
-        rpc::shared_ptr<object_stub>& stub)
+        std::shared_ptr<object_stub>& stub)
     {
         if (outcall)
         {
@@ -546,7 +546,7 @@ namespace rpc
         }
 
         // needed by the out call
-        rpc::shared_ptr<service_proxy> caller;
+        std::shared_ptr<service_proxy> caller;
 
         auto* pointer = iface->get_address();
         {
@@ -563,8 +563,8 @@ namespace rpc
                 {
                     // else create a stub
                     auto id = generate_new_object_id();
-                    stub = rpc::make_shared<object_stub>(id, *this, pointer);
-                    rpc::shared_ptr<i_interface_stub> interface_stub = fn(stub);
+                    stub = std::make_shared<object_stub>(id, *this, pointer);
+                    std::shared_ptr<i_interface_stub> interface_stub = fn(stub);
                     stub->add_interface(interface_stub);
                     wrapped_object_to_stub[pointer] = stub;
                     stubs[id] = stub;
@@ -619,7 +619,7 @@ namespace rpc
         return {stub->get_id(), zone_id_.as_destination()};
     }
 
-    rpc::weak_ptr<object_stub> service::get_object(object object_id) const
+    std::weak_ptr<object_stub> service::get_object(object object_id) const
     {
         std::lock_guard l(stub_control);
         auto item = stubs.find(object_id);
@@ -627,7 +627,7 @@ namespace rpc
         {
             // we need a test if we get here
             RPC_ASSERT(false);
-            return rpc::weak_ptr<object_stub>();
+            return std::weak_ptr<object_stub>();
         }
 
         return item->second;
@@ -638,7 +638,7 @@ namespace rpc
         current_service_tracker tracker(this);
         if (destination_zone_id != zone_id_.as_destination())
         {
-            rpc::shared_ptr<service_proxy> other_zone;
+            std::shared_ptr<service_proxy> other_zone;
             {
                 std::lock_guard g(zone_control);
                 auto found = other_zones.lower_bound({destination_zone_id, {0}});
@@ -670,7 +670,7 @@ namespace rpc
             {
                 return rpc::error::INCOMPATIBLE_SERVICE();
             }
-            rpc::weak_ptr<object_stub> weak_stub = get_object(object_id);
+            std::weak_ptr<object_stub> weak_stub = get_object(object_id);
             auto stub = weak_stub.lock();
             if (!stub)
                 return error::INVALID_DATA();
@@ -715,7 +715,7 @@ namespace rpc
             {
                 // we are here as we are passing the buck to the zone that knows to either splits or terminates this
                 // zone has no refcount issues to deal with
-                rpc::shared_ptr<rpc::service_proxy> destination;
+                std::shared_ptr<rpc::service_proxy> destination;
                 do
                 {
                     std::lock_guard g(zone_control);
@@ -756,8 +756,8 @@ namespace rpc
             else if (build_channel)
             {
                 // we are here as this zone needs to send the destination addref and caller addref to different zones
-                rpc::shared_ptr<rpc::service_proxy> destination;
-                rpc::shared_ptr<rpc::service_proxy> caller;
+                std::shared_ptr<rpc::service_proxy> destination;
+                std::shared_ptr<rpc::service_proxy> caller;
                 {
                     {
                         std::lock_guard g(zone_control);
@@ -898,7 +898,7 @@ namespace rpc
             }
             else
             {
-                rpc::shared_ptr<service_proxy> other_zone;
+                std::shared_ptr<service_proxy> other_zone;
                 { // brackets here as we are using a lock guard
                     std::lock_guard g(zone_control);
                     auto found = other_zones.find({destination_zone_id, caller_zone_id});
@@ -959,7 +959,7 @@ namespace rpc
             // find the caller
             if (zone_id_.as_caller() != caller_zone_id && !!(build_out_param_channel & add_ref_options::build_caller_route))
             {
-                rpc::shared_ptr<service_proxy> caller;
+                std::shared_ptr<service_proxy> caller;
                 {
                     std::lock_guard g(zone_control);
                     // we swap the parameter types as this is from perspective of the caller and not the proxy that
@@ -992,7 +992,7 @@ namespace rpc
                 return 0;
             }
 
-            rpc::weak_ptr<object_stub> weak_stub = get_object(object_id);
+            std::weak_ptr<object_stub> weak_stub = get_object(object_id);
             auto stub = weak_stub.lock();
             if (!stub)
             {
@@ -1003,7 +1003,7 @@ namespace rpc
         }
     }
 
-    uint64_t service::release_local_stub(const rpc::shared_ptr<rpc::object_stub>& stub)
+    uint64_t service::release_local_stub(const std::shared_ptr<rpc::object_stub>& stub)
     {
         std::lock_guard l(stub_control);
         uint64_t count = stub->release();
@@ -1038,7 +1038,7 @@ namespace rpc
 
         if (destination_zone_id != zone_id_.as_destination())
         {
-            rpc::shared_ptr<service_proxy> other_zone;
+            std::shared_ptr<service_proxy> other_zone;
             {
                 std::lock_guard g(zone_control);
                 auto found = other_zones.find({destination_zone_id, caller_zone_id});
@@ -1081,7 +1081,7 @@ namespace rpc
             }
 
             bool reset_stub = false;
-            rpc::shared_ptr<rpc::object_stub> stub;
+            std::shared_ptr<rpc::object_stub> stub;
             uint64_t count = 0;
             // these scope brackets are needed as otherwise there will be a recursive lock on a mutex in rare cases when
             // the stub is reset
@@ -1140,7 +1140,7 @@ namespace rpc
         }
     }
 
-    void service::inner_add_zone_proxy(const rpc::shared_ptr<service_proxy>& service_proxy)
+    void service::inner_add_zone_proxy(const std::shared_ptr<service_proxy>& service_proxy)
     {
         // this is for internal use only has no lock
         service_proxy->add_external_ref();
@@ -1151,14 +1151,14 @@ namespace rpc
         other_zones[{destination_zone_id, caller_zone_id}] = service_proxy;
     }
 
-    void service::add_zone_proxy(const rpc::shared_ptr<service_proxy>& service_proxy)
+    void service::add_zone_proxy(const std::shared_ptr<service_proxy>& service_proxy)
     {
         RPC_ASSERT(service_proxy->get_destination_zone_id() != zone_id_.as_destination());
         std::lock_guard g(zone_control);
         inner_add_zone_proxy(service_proxy);
     }
 
-    rpc::shared_ptr<service_proxy> service::get_zone_proxy(caller_channel_zone caller_channel_zone_id,
+    std::shared_ptr<service_proxy> service::get_zone_proxy(caller_channel_zone caller_channel_zone_id,
         caller_zone caller_zone_id,
         destination_zone destination_zone_id,
         caller_zone new_caller_zone_id,
@@ -1256,8 +1256,8 @@ namespace rpc
 
     int service::create_interface_stub(rpc::interface_ordinal interface_id,
         std::function<interface_ordinal(uint8_t)> interface_getter,
-        const rpc::shared_ptr<rpc::i_interface_stub>& original,
-        rpc::shared_ptr<rpc::i_interface_stub>& new_stub)
+        const std::shared_ptr<rpc::i_interface_stub>& original,
+        std::shared_ptr<rpc::i_interface_stub>& new_stub)
     {
         // an identity check, send back the same pointer
         if (
@@ -1270,7 +1270,7 @@ namespace rpc
 #endif
         )
         {
-            new_stub = rpc::static_pointer_cast<rpc::i_interface_stub>(original);
+            new_stub = original;
             return rpc::error::OK();
         }
 
@@ -1291,7 +1291,7 @@ namespace rpc
 
     // note this function is not thread safe!  Use it before using the service class for normal operation
     void service::add_interface_stub_factory(std::function<interface_ordinal(uint8_t)> id_getter,
-        std::shared_ptr<std::function<rpc::shared_ptr<rpc::i_interface_stub>(const rpc::shared_ptr<rpc::i_interface_stub>&)>> factory)
+        std::shared_ptr<std::function<std::shared_ptr<rpc::i_interface_stub>(const std::shared_ptr<rpc::i_interface_stub>&)>> factory)
     {
 #ifdef RPC_V2
         auto interface_id = id_getter(rpc::VERSION_2);
@@ -1330,7 +1330,7 @@ namespace rpc
         }
     }
 
-    void child_service::set_parent_proxy(const rpc::shared_ptr<rpc::service_proxy>& parent_service_proxy)
+    void child_service::set_parent_proxy(const std::shared_ptr<rpc::service_proxy>& parent_service_proxy)
     {
         if (parent_service_proxy_ && parent_service_proxy_ != parent_service_proxy)
         {

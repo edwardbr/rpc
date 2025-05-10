@@ -2,11 +2,11 @@
  *   Copyright (c) 2024 Edward Boggis-Rolfe
  *   All rights reserved.
  */
-#include "rpc/rpc.h"
+#include <rpc/rpc.h>
 
 namespace rpc
 {
-    object_proxy::object_proxy(object object_id, rpc::shared_ptr<service_proxy> service_proxy)
+    object_proxy::object_proxy(object object_id, std::shared_ptr<service_proxy> service_proxy)
         : object_id_(object_id)
         , service_proxy_(service_proxy)
     {
@@ -60,7 +60,7 @@ namespace rpc
         return service_proxy_->get_destination_zone_id();
     }
 
-    service_proxy::service_proxy(const char* name, destination_zone destination_zone_id, const rpc::shared_ptr<service>& svc)
+    service_proxy::service_proxy(const char* name, destination_zone destination_zone_id, const std::shared_ptr<service>& svc)
         : zone_id_(svc->get_zone_id())
         , destination_zone_id_(destination_zone_id)
         , caller_zone_id_(svc->get_zone_id().as_caller())
@@ -78,7 +78,7 @@ namespace rpc
     }
 
     service_proxy::service_proxy(const service_proxy& other)
-        : rpc::enable_shared_from_this<rpc::service_proxy>(other)
+        : std::enable_shared_from_this<rpc::service_proxy>(other)
         , zone_id_(other.zone_id_)
         , destination_zone_id_(other.destination_zone_id_)
         , destination_channel_zone_(other.destination_channel_zone_)
@@ -92,7 +92,7 @@ namespace rpc
     }
 
     // not thread safe
-    service_proxy::void set_parent_channel(bool val)
+    void service_proxy::set_parent_channel(bool val)
     {
         is_parent_channel_ = val;
 
@@ -118,13 +118,6 @@ namespace rpc
         }
 #endif
     }
-
-    uint64_t service_proxy::set_encoding(encoding enc)
-    {
-        enc_ = enc;
-        return error::OK();
-    }
-
     int service_proxy::connect(interface_descriptor input_descr, interface_descriptor& output_descr)
     {
         std::ignore = input_descr;
@@ -372,7 +365,7 @@ namespace rpc
         return;
     }
 
-    virtual void service_proxy::clone_completed()
+    void service_proxy::clone_completed()
     {
 #ifdef USE_RPC_TELEMETRY
         if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
@@ -382,7 +375,7 @@ namespace rpc
         }
 #endif
     }
-    rpc::shared_ptr<service_proxy> service_proxy::clone_for_zone(
+    std::shared_ptr<service_proxy> service_proxy::clone_for_zone(
         destination_zone destination_zone_id, caller_zone caller_zone_id)
     {
         RPC_ASSERT(!(caller_zone_id_ == caller_zone_id && destination_zone_id_ == destination_zone_id));

@@ -1,8 +1,8 @@
 #pragma once
 
 #include <string>
-#include <rpc/types.h>
-#include <rpc/marshaller.h>
+
+#include <rpc/rpc.h>
 
 // copied from spdlog
 #define I_TELEMETRY_LEVEL_DEBUG 0

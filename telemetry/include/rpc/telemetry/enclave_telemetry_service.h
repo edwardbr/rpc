@@ -1,5 +1,6 @@
 #pragma once
 
+#include <rpc/rpc.h>
 #include <rpc/telemetry/i_telemetry_service.h>
 
 namespace rpc

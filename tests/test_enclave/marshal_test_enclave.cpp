@@ -6,15 +6,13 @@
 #include <string>
 #include <cstring>
 #include <cstdio>
+#include <rpc/rpc.h>
 
 #include <sgx_trts.h>
 #include <trusted/enclave_marshal_test_t.h>
 
-#include <rpc/error_codes.h>
-
 #include <common/foo_impl.h>
 #include <common/host_service_proxy.h>
-
 #include <example/example.h>
 
 #ifdef USE_RPC_TELEMETRY
@@ -28,7 +26,7 @@ using namespace marshalled_tests;
 TELEMETRY_SERVICE_MANAGER
 #endif
 
-rpc::shared_ptr<rpc::child_service> rpc_server;
+std::shared_ptr<rpc::child_service> rpc_server;
 
 int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t host_id, uint64_t child_zone_id, uint64_t* example_object_id)
 {
@@ -52,12 +50,12 @@ int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t host_id, uint64_t 
         output_descr,
         [](const rpc::shared_ptr<yyy::i_host>& host,
             rpc::shared_ptr<yyy::i_example>& new_example,
-            const rpc::shared_ptr<rpc::child_service>& child_service_ptr) -> int
+            const std::shared_ptr<rpc::child_service>& child_service_ptr) -> int
         {
             example_import_idl_register_stubs(child_service_ptr);
             example_shared_idl_register_stubs(child_service_ptr);
             example_idl_register_stubs(child_service_ptr);
-            new_example = rpc::shared_ptr<yyy::i_example>(new example(child_service_ptr, host));
+            new_example = rpc::static_pointer_cast<yyy::i_example>(rpc::make_shared<example>(child_service_ptr, host));
             return rpc::error::OK();
         },
         rpc_server);

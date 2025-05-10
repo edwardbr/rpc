@@ -15,7 +15,7 @@
 namespace rpc
 {
     enclave_service_proxy::enclave_service_proxy(
-        const char* name, destination_zone destination_zone_id, std::string filename, const rpc::shared_ptr<service>& svc)
+        const char* name, destination_zone destination_zone_id, std::string filename, const std::shared_ptr<service>& svc)
         : service_proxy(name, destination_zone_id, svc)
         , filename_(filename)
     {
@@ -27,17 +27,17 @@ namespace rpc
         sgx_destroy_enclave(eid_);
     }
 
-    rpc::shared_ptr<service_proxy> enclave_service_proxy::clone()
+    std::shared_ptr<service_proxy> enclave_service_proxy::clone()
     {
-        return rpc::shared_ptr<service_proxy>(new enclave_service_proxy(*this));
+        return std::shared_ptr<service_proxy>(new enclave_service_proxy(*this));
     }
 
-    rpc::shared_ptr<enclave_service_proxy> enclave_service_proxy::create(
-        const char* name, destination_zone destination_zone_id, const rpc::shared_ptr<service>& svc, std::string filename)
+    std::shared_ptr<enclave_service_proxy> enclave_service_proxy::create(
+        const char* name, destination_zone destination_zone_id, const std::shared_ptr<service>& svc, std::string filename)
     {
         RPC_ASSERT(svc);
         auto ret
-            = rpc::shared_ptr<enclave_service_proxy>(new enclave_service_proxy(name, destination_zone_id, filename, svc));
+            = std::shared_ptr<enclave_service_proxy>(new enclave_service_proxy(name, destination_zone_id, filename, svc));
         return ret;
     }
 

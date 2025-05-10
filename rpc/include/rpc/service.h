@@ -13,7 +13,7 @@
 #include <atomic>
 #include <limits>
 #include <functional>
-
+#include <rpc/smart_pointers.h>    // This is the immersive file rpc_smart_pointers_core_v5.hpp
 
 namespace rpc
 {
@@ -21,7 +21,7 @@ namespace rpc
 
     template<class T>
     int demarshall_interface_proxy(uint64_t protocol_version,
-        const rpc::shared_ptr<rpc::service_proxy>& sp,
+        const std::shared_ptr<rpc::service_proxy>& sp,
         const rpc::interface_descriptor& encap,
         caller_zone caller_zone_id,
         rpc::shared_ptr<T>& val);
@@ -49,7 +49,7 @@ namespace rpc
     };
 
     // responsible for all object lifetimes created within the zone
-    class service : public i_marshaller, public rpc::enable_shared_from_this<service>
+    class service : public i_marshaller, public std::enable_shared_from_this<service>
     {
     protected:
         static std::atomic<uint64_t> zone_id_generator;
@@ -58,12 +58,12 @@ namespace rpc
 
         // map object_id's to stubs
         mutable std::mutex stub_control;
-        std::unordered_map<object, rpc::weak_ptr<object_stub>> stubs;
+        std::unordered_map<object, std::weak_ptr<object_stub>> stubs;
         std::unordered_map<rpc::interface_ordinal,
-            std::shared_ptr<std::function<rpc::shared_ptr<rpc::i_interface_stub>(const rpc::shared_ptr<rpc::i_interface_stub>&)>>>
+            std::shared_ptr<std::function<std::shared_ptr<rpc::i_interface_stub>(const std::shared_ptr<rpc::i_interface_stub>&)>>>
             stub_factories;
         // map wrapped objects pointers to stubs
-        std::map<void*, rpc::weak_ptr<object_stub>> wrapped_object_to_stub;
+        std::map<void*, std::weak_ptr<object_stub>> wrapped_object_to_stub;
         std::string name_;
 
         struct zone_route
@@ -79,21 +79,21 @@ namespace rpc
         };
 
         mutable std::mutex zone_control;
-        std::map<zone_route, rpc::weak_ptr<service_proxy>> other_zones;
+        std::map<zone_route, std::weak_ptr<service_proxy>> other_zones;
         std::list<std::shared_ptr<service_logger>> service_loggers;
 
         rpc::shared_ptr<casting_interface> get_castable_interface(object object_id, interface_ordinal interface_id);
 
         template<class T>
         interface_descriptor proxy_bind_in_param(
-            uint64_t protocol_version, const shared_ptr<T>& iface, shared_ptr<object_stub>& stub);
+            uint64_t protocol_version, const shared_ptr<T>& iface, std::shared_ptr<object_stub>& stub);
         template<class T>
         interface_descriptor stub_bind_out_param(uint64_t protocol_version,
             caller_channel_zone caller_channel_zone_id,
             caller_zone caller_zone_id,
             const shared_ptr<T>& iface);
 
-        void inner_add_zone_proxy(const rpc::shared_ptr<service_proxy>& service_proxy);
+        void inner_add_zone_proxy(const std::shared_ptr<service_proxy>& service_proxy);
 
         friend proxy_base;
         friend i_interface_stub;
@@ -120,8 +120,8 @@ namespace rpc
         zone get_zone_id() const { return zone_id_; }
         void set_zone_id(zone zone_id) { zone_id_ = zone_id; }
         virtual destination_zone get_parent_zone_id() const { return {0}; }
-        virtual rpc::shared_ptr<rpc::service_proxy> get_parent() const { return nullptr; }
-        virtual void set_parent_proxy(const rpc::shared_ptr<rpc::service_proxy>&) { RPC_ASSERT(false); };
+        virtual std::shared_ptr<rpc::service_proxy> get_parent() const { return nullptr; }
+        virtual void set_parent_proxy(const std::shared_ptr<rpc::service_proxy>&) { RPC_ASSERT(false); };
 
         // passed by value implementing an implicit lock on the life time of ptr
         object get_object_id(shared_ptr<casting_interface> ptr) const;
@@ -134,11 +134,11 @@ namespace rpc
             caller_channel_zone caller_channel_zone_id,
             caller_zone caller_zone_id,
             rpc::casting_interface* pointer,
-            std::function<rpc::shared_ptr<i_interface_stub>(rpc::shared_ptr<object_stub>)> fn,
+            std::function<std::shared_ptr<i_interface_stub>(std::shared_ptr<object_stub>)> fn,
             bool outcall,
-            rpc::shared_ptr<object_stub>& stub);
+            std::shared_ptr<object_stub>& stub);
 
-        rpc::weak_ptr<object_stub> get_object(object object_id) const;
+        std::weak_ptr<object_stub> get_object(object object_id) const;
 
         int send(uint64_t protocol_version,
             encoding encoding,
@@ -168,10 +168,10 @@ namespace rpc
             object object_id,
             caller_zone caller_zone_id) override;
 
-        uint64_t release_local_stub(const rpc::shared_ptr<rpc::object_stub>& stub);
+        uint64_t release_local_stub(const std::shared_ptr<rpc::object_stub>& stub);
 
-        virtual void add_zone_proxy(const rpc::shared_ptr<service_proxy>& zone);
-        virtual rpc::shared_ptr<service_proxy> get_zone_proxy(caller_channel_zone caller_channel_zone_id,
+        virtual void add_zone_proxy(const std::shared_ptr<service_proxy>& zone);
+        virtual std::shared_ptr<service_proxy> get_zone_proxy(caller_channel_zone caller_channel_zone_id,
             caller_zone caller_zone_id,
             destination_zone destination_zone_id,
             caller_zone new_caller_zone_id,
@@ -186,9 +186,9 @@ namespace rpc
         interface_descriptor prepare_remote_input_interface(caller_channel_zone caller_channel_zone_id,
             caller_zone caller_zone_id,
             rpc::proxy_base* base,
-            rpc::shared_ptr<service_proxy>& destination_zone);
+            std::shared_ptr<service_proxy>& destination_zone);
 
-        void clean_up_on_failed_connection(const rpc::shared_ptr<service_proxy>& destination_zone,
+        void clean_up_on_failed_connection(const std::shared_ptr<service_proxy>& destination_zone,
             rpc::shared_ptr<rpc::casting_interface> input_interface);
 
         template<class proxy_class, class in_param_type, class out_param_type, typename... Args>
@@ -205,7 +205,7 @@ namespace rpc
             auto new_service_proxy = proxy_class::create(name, new_zone_id, shared_from_this(), args...);
             add_zone_proxy(new_service_proxy);
             rpc::interface_descriptor input_descr{{0}, {0}};
-            rpc::shared_ptr<service_proxy> destination_zone;
+            std::shared_ptr<service_proxy> destination_zone;
             if (input_interface)
             {
                 if (input_interface->query_proxy_base())
@@ -220,7 +220,7 @@ namespace rpc
                     caller_channel_zone empty_caller_channel_zone = {};
                     caller_zone caller_zone_id = zone_id_.as_caller();
 
-                    rpc::shared_ptr<rpc::object_stub> stub;
+                    std::shared_ptr<rpc::object_stub> stub;
                     auto factory = create_interface_stub(input_interface);
                     input_descr = get_proxy_stub_descriptor(rpc::get_version(),
                         empty_caller_channel_zone,
@@ -237,7 +237,7 @@ namespace rpc
             if (err_code != rpc::error::OK())
             {
                 // clean up
-                clean_up_on_failed_connection(destination_zone, input_interface);
+                clean_up_on_failed_connection(destination_zone, rpc::static_pointer_cast<rpc::casting_interface>(input_interface));
                 return err_code;
             }
 
@@ -256,16 +256,16 @@ namespace rpc
         }
 
         template<class T>
-        std::function<shared_ptr<i_interface_stub>(const shared_ptr<object_stub>& stub)> create_interface_stub(
+        std::function<std::shared_ptr<i_interface_stub>(const std::shared_ptr<object_stub>& stub)> create_interface_stub(
             const shared_ptr<T>& iface);
         int create_interface_stub(rpc::interface_ordinal interface_id,
             std::function<interface_ordinal(uint8_t)> original_interface_id,
-            const rpc::shared_ptr<rpc::i_interface_stub>& original,
-            rpc::shared_ptr<rpc::i_interface_stub>& new_stub);
+            const std::shared_ptr<rpc::i_interface_stub>& original,
+            std::shared_ptr<rpc::i_interface_stub>& new_stub);
 
         // note this function is not thread safe!  Use it before using the service class for normal operation
         void add_interface_stub_factory(std::function<interface_ordinal(uint8_t)> id_getter,
-            std::shared_ptr<std::function<rpc::shared_ptr<rpc::i_interface_stub>(const rpc::shared_ptr<rpc::i_interface_stub>&)>>
+            std::shared_ptr<std::function<std::shared_ptr<rpc::i_interface_stub>(const std::shared_ptr<rpc::i_interface_stub>&)>>
                 factory);
 
         // note this is not thread safe and should only be used on setup
@@ -290,7 +290,7 @@ namespace rpc
     {
         // the enclave needs to hold a hard lock to a root object that represents a runtime
         // the enclave service lifetime is managed by the transport functions
-        rpc::shared_ptr<rpc::service_proxy> parent_service_proxy_;
+        std::shared_ptr<rpc::service_proxy> parent_service_proxy_;
         destination_zone parent_zone_id_;
 
     public:
@@ -302,8 +302,8 @@ namespace rpc
 
         virtual ~child_service();
 
-        rpc::shared_ptr<rpc::service_proxy> get_parent() const override { return parent_service_proxy_; }
-        void set_parent_proxy(const rpc::shared_ptr<rpc::service_proxy>& parent_service_proxy) override;
+        std::shared_ptr<rpc::service_proxy> get_parent() const override { return parent_service_proxy_; }
+        void set_parent_proxy(const std::shared_ptr<rpc::service_proxy>& parent_service_proxy) override;
 
         destination_zone get_parent_zone_id() const override { return parent_zone_id_; }
 
@@ -315,11 +315,11 @@ namespace rpc
             rpc::interface_descriptor& output_descr,
             std::function<int(const rpc::shared_ptr<PARENT_INTERFACE>&,
                 rpc::shared_ptr<CHILD_INTERFACE>&,
-                const rpc::shared_ptr<rpc::child_service>&)> fn,
-            rpc::shared_ptr<child_service>& new_child_service,
+                const std::shared_ptr<rpc::child_service>&)> fn,
+            std::shared_ptr<child_service>& new_child_service,
             Args&&... args)
         {
-            auto child_svc = rpc::shared_ptr<rpc::child_service>(new rpc::child_service(name, zone_id, parent_zone_id));
+            auto child_svc = std::shared_ptr<rpc::child_service>(new rpc::child_service(name, zone_id, parent_zone_id));
 
             // link the child to the parent
             auto parent_service_proxy = SERVICE_PROXY::create(name, parent_zone_id, child_svc, args...);
@@ -370,7 +370,7 @@ namespace rpc
             RPC_ASSERT(false);
             return {{0}, {0}};
         }
-        rpc::shared_ptr<rpc::object_stub> stub;
+        std::shared_ptr<rpc::object_stub> stub;
         auto factory = serv.create_interface_stub(iface);
         return serv.get_proxy_stub_descriptor(
             rpc::get_version(), empty_caller_channel_zone, caller_zone_id, iface.get(), factory, false, stub);

@@ -4,8 +4,10 @@
  */
 #pragma once
 
+#include <rpc/rpc.h>
+
 #include <example/example.h>
-#include <rpc/error_codes.h>
+
 #include "gtest/gtest.h"
 
 #define ASSERT_ERROR_CODE(x) ASSERT_EQ(x, rpc::error::OK())
@@ -189,7 +191,7 @@ namespace marshalled_tests
 
             if (use_host_in_child)
             {
-                rpc::shared_ptr<xxx::i_baz> b(new baz(zone_id));
+                auto b = rpc::static_pointer_cast<xxx::i_baz>(rpc::make_shared<baz>(zone_id));
                 err_code = foo->call_baz_interface(b);
             }
 

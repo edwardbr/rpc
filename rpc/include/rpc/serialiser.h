@@ -9,9 +9,6 @@
 #include <yas/count_streams.hpp>
 #include <yas/serialize.hpp>
 
-#include <rpc/types.h>
-#include <rpc/error_codes.h>
-
 namespace rpc
 {
     // note a serialiser may support more than one encoding

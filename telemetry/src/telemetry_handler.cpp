@@ -3,7 +3,7 @@
 #include <chrono>
 #include <thread>
 
-#include <rpc/basic_service_proxies.h>
+#include <rpc/rpc.h>
 
 #include <rpc/telemetry/telemetry_handler.h>
 #include <rpc/telemetry/host_telemetry_service.h>

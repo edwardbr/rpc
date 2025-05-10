@@ -1,8 +1,6 @@
 #pragma once
 
 #include <assert.h>
-#include <rpc/error_codes.h>
-#include <rpc/logger.h>
 
 #ifdef RPC_HANG_ON_FAILED_ASSERT
 #ifdef _IN_ENCLAVE

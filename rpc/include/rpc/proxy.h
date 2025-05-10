@@ -27,7 +27,7 @@ namespace rpc
 
         template<class T>
         interface_descriptor proxy_bind_in_param(
-            uint64_t protocol_version, const rpc::shared_ptr<T>& iface, rpc::shared_ptr<rpc::object_stub>& stub);
+            uint64_t protocol_version, const rpc::shared_ptr<T>& iface, std::shared_ptr<rpc::object_stub>& stub);
         template<class T>
         interface_descriptor stub_bind_out_param(uint64_t protocol_version,
             caller_channel_zone caller_channel_zone_id,
@@ -70,14 +70,14 @@ namespace rpc
         virtual ~proxy_impl() = default;
     };
 
-    class object_proxy : public rpc::enable_shared_from_this<object_proxy>
+    class object_proxy : public std::enable_shared_from_this<object_proxy>
     {
         object object_id_;
-        rpc::shared_ptr<service_proxy> service_proxy_;
+        std::shared_ptr<service_proxy> service_proxy_;
         std::unordered_map<interface_ordinal, rpc::weak_ptr<proxy_base>> proxy_map;
         std::mutex insert_control_;
 
-        object_proxy(object object_id, rpc::shared_ptr<service_proxy> service_proxy);
+        object_proxy(object object_id, std::shared_ptr<service_proxy> service_proxy);
 
         // note the interface pointer may change if there is already an interface inserted successfully
         void register_interface(interface_ordinal interface_id, rpc::weak_ptr<proxy_base>& value);
@@ -89,7 +89,7 @@ namespace rpc
     public:
         virtual ~object_proxy();
 
-        rpc::shared_ptr<service_proxy> get_service_proxy() const { return service_proxy_; }
+        std::shared_ptr<service_proxy> get_service_proxy() const { return service_proxy_; }
         object get_object_id() const { return {object_id_}; }
         destination_zone get_destination_zone_id() const;
 
@@ -114,6 +114,11 @@ namespace rpc
             std::lock_guard guard(insert_control_);
             return proxy_map.size();
         }
+
+        void increment_remote_strong(){}
+        void decrement_remote_strong_and_signal_if_appropriate(){}
+        void increment_remote_weak_callable(){}
+        void decrement_remote_weak_callable_and_signal_if_appropriate(){}
 
         template<class T> void create_interface_proxy(rpc::shared_ptr<T>& inface);
 
@@ -193,17 +198,17 @@ namespace rpc
     // the class that represents another zone from the zone that this is used in
     // only host code can use this class directly other enclaves *may* have access to the i_service_proxy derived
     // interface
-    class service_proxy : public i_marshaller, public rpc::enable_shared_from_this<service_proxy>
+    class service_proxy : public i_marshaller, public std::enable_shared_from_this<service_proxy>
     {
-        std::unordered_map<object, rpc::weak_ptr<object_proxy>> proxies_;
+        std::unordered_map<object, std::weak_ptr<object_proxy>> proxies_;
         std::mutex insert_control_;
 
         const zone zone_id_;
         destination_zone destination_zone_id_ = {0};
         destination_channel_zone destination_channel_zone_ = {0};
         caller_zone caller_zone_id_ = {0};
-        rpc::weak_ptr<service> service_;
-        rpc::shared_ptr<service_proxy> lifetime_lock_;
+        std::weak_ptr<service> service_;
+        std::shared_ptr<service_proxy> lifetime_lock_;
         std::atomic<int> lifetime_lock_count_ = 0;
         std::atomic<uint64_t> version_ = rpc::get_version();
         encoding enc_ = encoding::enc_default;
@@ -213,7 +218,7 @@ namespace rpc
         std::string name_;
 
     protected:
-        service_proxy(const char* name, destination_zone destination_zone_id, const rpc::shared_ptr<service>& svc);
+        service_proxy(const char* name, destination_zone destination_zone_id, const std::shared_ptr<service>& svc);
 
         service_proxy(const service_proxy& other);
 
@@ -275,11 +280,11 @@ namespace rpc
 
         void on_object_proxy_released(object object_id);
 
-        std::unordered_map<object, rpc::weak_ptr<object_proxy>> get_proxies() { return proxies_; }
+        std::unordered_map<object, std::weak_ptr<object_proxy>> get_proxies() { return proxies_; }
 
-        virtual rpc::shared_ptr<service_proxy> clone() = 0;
+        virtual std::shared_ptr<service_proxy> clone() = 0;
         virtual void clone_completed();
-        rpc::shared_ptr<service_proxy> clone_for_zone(destination_zone destination_zone_id, caller_zone caller_zone_id);
+        std::shared_ptr<service_proxy> clone_for_zone(destination_zone destination_zone_id, caller_zone caller_zone_id);
 
         // the zone where this proxy is created
         zone get_zone_id() const { return zone_id_; }
@@ -290,7 +295,7 @@ namespace rpc
         caller_zone get_caller_zone_id() const { return caller_zone_id_; }
 
         // the service that this proxy lives in
-        rpc::shared_ptr<service> get_operating_zone_service() const { return service_.lock(); }
+        std::shared_ptr<service> get_operating_zone_service() const { return service_.lock(); }
 
         std::shared_ptr<object_proxy> get_object_proxy(object object_id, bool& is_new);
 
@@ -301,7 +306,7 @@ namespace rpc
     // declared here as object_proxy and service_proxy is not fully defined in the body of proxy_base
     template<class T>
     interface_descriptor proxy_base::proxy_bind_in_param(
-        uint64_t protocol_version, const rpc::shared_ptr<T>& iface, rpc::shared_ptr<rpc::object_stub>& stub)
+        uint64_t protocol_version, const rpc::shared_ptr<T>& iface, std::shared_ptr<rpc::object_stub>& stub)
     {
         if (!iface)
             return interface_descriptor();
@@ -397,7 +402,7 @@ namespace rpc
     // do not use directly it is for the interface generator use rpc::create_interface_proxy if you want to get a
     // proxied pointer to a remote implementation
     template<class T>
-    int proxy_bind_out_param(const rpc::shared_ptr<rpc::service_proxy>& sp,
+    int proxy_bind_out_param(const std::shared_ptr<rpc::service_proxy>& sp,
         const interface_descriptor& encap,
         caller_zone caller_zone_id,
         rpc::shared_ptr<T>& val)
@@ -472,7 +477,7 @@ namespace rpc
 
     template<class T>
     int demarshall_interface_proxy(uint64_t protocol_version,
-        const rpc::shared_ptr<rpc::service_proxy>& sp,
+        const std::shared_ptr<rpc::service_proxy>& sp,
         const interface_descriptor& encap,
         caller_zone caller_zone_id,
         rpc::shared_ptr<T>& val)

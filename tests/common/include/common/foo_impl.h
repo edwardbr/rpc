@@ -6,6 +6,7 @@
 
 #include <example/example.h>
 #include <rpc/rpc.h>
+#include <rpc/basic_service_proxies.h>
 
 #include <example_shared/example_shared_stub.h>
 #include <example_import/example_import_stub.h>
@@ -239,9 +240,9 @@ namespace marshalled_tests
             return rpc::error::OK();
         }
 
-        error_code receive_interface(rpc::shared_ptr<i_foo>& val) override
+        error_code receive_interface(rpc::shared_ptr<xxx::i_foo>& val) override
         {
-            val = rpc::shared_ptr<xxx::i_foo>(new foo(zone_id_));
+            val = rpc::static_pointer_cast<xxx::i_foo>(rpc::make_shared<foo>(zone_id_));
             auto val1 = rpc::dynamic_pointer_cast<xxx::i_bar>(val);
             return rpc::error::OK();
         }
@@ -280,7 +281,7 @@ namespace marshalled_tests
 
         error_code create_baz_interface(rpc::shared_ptr<xxx::i_baz>& val) override
         {
-            val = rpc::shared_ptr<xxx::i_baz>(new baz(zone_id_));
+            val = rpc::static_pointer_cast<xxx::i_baz>(rpc::make_shared<baz>(zone_id_));
             return rpc::error::OK();
         }
 
@@ -359,7 +360,7 @@ namespace marshalled_tests
     class example : public yyy::i_example
     {
         rpc::shared_ptr<yyy::i_host> host_;
-        rpc::weak_ptr<rpc::child_service> this_service_;
+        std::weak_ptr<rpc::child_service> this_service_;
         rpc::zone zone_id_;
 
         void* get_address() const override { return (void*)this; }
@@ -371,7 +372,7 @@ namespace marshalled_tests
         }
 
     public:
-        example(rpc::shared_ptr<rpc::child_service> this_service, rpc::shared_ptr<yyy::i_host> host)
+        example(std::shared_ptr<rpc::child_service> this_service, rpc::shared_ptr<yyy::i_host> host)
             : host_(host)
             , this_service_(this_service)
             , zone_id_(0)
@@ -404,19 +405,20 @@ namespace marshalled_tests
 
         error_code create_multiple_inheritance(rpc::shared_ptr<xxx::i_baz>& target) override
         {
-            target = rpc::shared_ptr<xxx::i_baz>(new multiple_inheritance(zone_id_));
+            auto x = rpc::make_shared<multiple_inheritance>(zone_id_);
+            target = rpc::static_pointer_cast<xxx::i_baz>(x);
             return rpc::error::OK();
         }
 
         error_code create_foo(rpc::shared_ptr<xxx::i_foo>& target) override
         {
-            target = rpc::shared_ptr<xxx::i_foo>(new foo(zone_id_));
+            target = rpc::static_pointer_cast<xxx::i_foo>(rpc::make_shared<foo>(zone_id_));
             return rpc::error::OK();
         }
 
         error_code create_baz(rpc::shared_ptr<xxx::i_baz>& target) override
         {
-            target = rpc::shared_ptr<xxx::i_baz>(new baz(zone_id_));
+            target = rpc::static_pointer_cast<xxx::i_baz>(rpc::make_shared<baz>(zone_id_));
             return rpc::error::OK();
         }
 
@@ -432,12 +434,12 @@ namespace marshalled_tests
                 target,
                 [](const rpc::shared_ptr<yyy::i_host>& host,
                     rpc::shared_ptr<yyy::i_example>& new_example,
-                    const rpc::shared_ptr<rpc::child_service>& child_service_ptr) -> int
+                    const std::shared_ptr<rpc::child_service>& child_service_ptr) -> int
                 {
                     example_import_idl_register_stubs(child_service_ptr);
                     example_shared_idl_register_stubs(child_service_ptr);
                     example_idl_register_stubs(child_service_ptr);
-                    new_example = rpc::shared_ptr<yyy::i_example>(new example(child_service_ptr, host));
+                    new_example = rpc::static_pointer_cast<yyy::i_example>(rpc::make_shared<example>(child_service_ptr, host));
                     return rpc::error::OK();
                 });
             if (err_code != rpc::error::OK())
@@ -710,7 +712,7 @@ namespace marshalled_tests
 
         error_code receive_interface(rpc::shared_ptr<xxx::i_foo>& val) override
         {
-            val = rpc::shared_ptr<xxx::i_foo>(new foo(zone_id_));
+            val = rpc::static_pointer_cast<xxx::i_foo>(rpc::make_shared<foo>(zone_id_));
             auto val1 = rpc::dynamic_pointer_cast<xxx::i_bar>(val);
             return rpc::error::OK();
         }

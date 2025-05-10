@@ -1,4 +1,4 @@
-#ifndef RPC_SMART_POINTERS_CORE_HPP // Changed guard to reflect potential new filename
+#ifndef RPC_SMART_POINTERS_CORE_HPP
 #define RPC_SMART_POINTERS_CORE_HPP
 
 #include <atomic>
@@ -8,12 +8,6 @@
 #include <type_traits> // For std::is_base_of_v, std::is_convertible_v, std::remove_extent_t, etc.
 #include <functional>  // For std::hash
 #include <cstddef>     // For std::nullptr_t, std::size_t
-#include <vector>      // For interface_ordinal example (if still needed here, or comes from types.h)
-
-// The rest of the smart pointer code (internal namespace, class definitions, free functions)
-// will now use the forward-declared rpc::proxy_base and rpc::object_proxy.
-// Their methods that call members of proxy_base/object_proxy will compile correctly
-// because the full definitions will be available when proxy.h includes this file.
 
 namespace rpc
 {
@@ -27,14 +21,12 @@ namespace rpc
             std::shared_ptr<rpc::object_proxy> this_cb_object_proxy_sp_;
             void* managed_object_ptr_{nullptr};
 
-            // Constructor for objects that might have an object_proxy (e.g., from raw pointer or unique_ptr)
             control_block_base(void* obj_ptr, std::shared_ptr<rpc::object_proxy> obj_proxy_for_this_cb_obj)
                 : managed_object_ptr_(obj_ptr)
                 , this_cb_object_proxy_sp_(std::move(obj_proxy_for_this_cb_obj))
             {
             }
 
-            // Constructor for make_shared (local objects, no initial object_proxy)
             control_block_base(void* obj_ptr)
                 : managed_object_ptr_(obj_ptr)
                 , this_cb_object_proxy_sp_(nullptr)
@@ -79,6 +71,13 @@ namespace rpc
                 , control_block_allocator_(std::move(a))
             {
             }
+            control_block_impl(T* p, Deleter d, Alloc a)
+                : control_block_base(p)
+                , object_deleter_(std::move(d))
+                , control_block_allocator_(std::move(a))
+            {
+            }
+
             void dispose_object_actual() override
             {
                 T* obj_ptr = static_cast<T*>(managed_object_ptr_);
@@ -106,15 +105,14 @@ namespace rpc
             };
 
             template<typename... ConcreteArgs>
-            // obj_proxy parameter removed for make_shared of local objects
-            control_block_make_shared(Alloc alloc_for_t_and_cb, ConcreteArgs&&... args)
+            control_block_make_shared(Alloc alloc_for_t, ConcreteArgs&&... args_for_t)
                 : control_block_base(&object_instance_)
-                , // Calls CB constructor that sets this_cb_object_proxy_sp_ to nullptr
-                allocator_instance_(std::move(alloc_for_t_and_cb))
+                , allocator_instance_(std::move(alloc_for_t))
             {
                 std::allocator_traits<Alloc>::construct(
-                    allocator_instance_, &object_instance_, std::forward<ConcreteArgs>(args)...);
+                    allocator_instance_, &object_instance_, std::forward<ConcreteArgs>(args_for_t)...);
             }
+
             void dispose_object_actual() override
             {
                 if (managed_object_ptr_)
@@ -123,15 +121,18 @@ namespace rpc
                     managed_object_ptr_ = nullptr;
                 }
             }
+
             void destroy_self_actual() override
             {
-                Alloc alloc_copy = allocator_instance_;
                 if (managed_object_ptr_)
                 {
                     std::allocator_traits<Alloc>::destroy(allocator_instance_, &object_instance_);
                     managed_object_ptr_ = nullptr;
                 }
-                std::allocator_traits<Alloc>::deallocate(alloc_copy, this, 1);
+                using ThisCBType = control_block_make_shared<T, Alloc, Args...>;
+                typename std::allocator_traits<Alloc>::template rebind_alloc<ThisCBType> actual_cb_allocator(
+                    allocator_instance_);
+                std::allocator_traits<decltype(actual_cb_allocator)>::deallocate(actual_cb_allocator, this, 1);
             }
             ~control_block_make_shared() { }
         };
@@ -142,13 +143,22 @@ namespace rpc
     {
         if (!ptr)
             return nullptr;
-        if (auto proxy = ptr->query_proxy_base())
+
+        // Attempt to dynamic_cast to proxy_base.
+        // This requires T to be a polymorphic type (which casting_interface ensures).
+        // const_cast is used because ptr might be const T*, but dynamic_cast needs non-const for non-const target.
+        // If T is already proxy_base or derived, this cast should succeed.
+        // If T is an actual object not derived from proxy_base, it will return nullptr.
+        // If T has proxy_base as an ambiguous public base, dynamic_cast to pointer returns nullptr.
+        if (rpc::proxy_base* proxy = dynamic_cast<rpc::proxy_base*>(const_cast<std::remove_cv_t<T>*>(ptr)))
         {
             return proxy->get_object_proxy();
         }
         else if (cb_of_ptr)
         {
-            return cb_of_ptr->this_cb_object_proxy_sp_; // This will be nullptr for objects from make_shared
+            // dynamic_cast failed, so ptr is not a proxy_base (or it's ambiguous in a way dynamic_cast handles).
+            // Assume it's an actual object.
+            return cb_of_ptr->this_cb_object_proxy_sp_;
         }
         return nullptr;
     }
@@ -174,7 +184,6 @@ namespace rpc
                 cb_->decrement_local_shared_and_dispose_if_zero();
         }
 
-        // Private constructor for make_shared, weak_ptr::lock
         shared_ptr(internal::control_block_base* cb, T* p)
             : cb_(cb)
             , ptr_(p)
@@ -182,9 +191,6 @@ namespace rpc
             if (cb_)
             {
                 ultimate_actual_object_proxy_sp_ = get_ultimate_object_proxy_for(ptr_, cb_);
-                // If ultimate_actual_object_proxy_sp_ is not null (e.g. from lock of a proxy-observing weak_ptr,
-                // or if make_shared was for an object that somehow got an object_proxy immediately),
-                // then increment remote strong. For typical make_shared of local obj, this will be null.
                 if (ultimate_actual_object_proxy_sp_)
                 {
                     ultimate_actual_object_proxy_sp_->increment_remote_strong();
@@ -196,6 +202,37 @@ namespace rpc
             }
         }
 
+        enum class for_enable_shared_tag
+        {
+        };
+        shared_ptr(internal::control_block_base* cb, T* p, for_enable_shared_tag)
+            : cb_(cb)
+            , ptr_(p)
+            , ultimate_actual_object_proxy_sp_(nullptr)
+        {
+            if (cb_ && ptr_)
+            {
+                ultimate_actual_object_proxy_sp_ = get_ultimate_object_proxy_for(ptr_, cb_);
+            }
+        }
+
+        template<typename Y, typename Deleter, typename Alloc> void create_cb_local(Y* p, Deleter d, Alloc cb_alloc)
+        {
+            if (!p)
+            {
+                if constexpr (std::is_same_v<Deleter, std::default_delete<Y>>
+                              && std::is_same_v<Alloc, std::allocator<char>>)
+                {
+                    return;
+                }
+            }
+
+            using ActualCB = internal::control_block_impl<Y, Deleter, Alloc>;
+            typename std::allocator_traits<Alloc>::template rebind_alloc<ActualCB> actual_cb_alloc(cb_alloc);
+            cb_ = std::allocator_traits<decltype(actual_cb_alloc)>::allocate(actual_cb_alloc, 1);
+            new (cb_) ActualCB(p, std::move(d), std::move(cb_alloc));
+        }
+
     public:
         using element_type = std::remove_extent_t<T>;
         using weak_type = rpc::weak_ptr<T>;
@@ -203,11 +240,118 @@ namespace rpc
         constexpr shared_ptr() noexcept = default;
         constexpr shared_ptr(std::nullptr_t) noexcept { }
 
-        // Constructor for taking ownership of a raw pointer, WITH an explicit object_proxy
+        template<typename Y, typename = std::enable_if_t<std::is_convertible_v<Y*, T*>>>
+        explicit shared_ptr(Y* p)
+            : ptr_(p)
+            , cb_(nullptr)
+            , ultimate_actual_object_proxy_sp_(nullptr)
+        {
+            if (ptr_)
+            {
+                try
+                {
+                    create_cb_local<Y>(p, std::default_delete<Y>(), std::allocator<char>());
+                }
+                catch (...)
+                {
+                    ptr_ = nullptr;
+                    cb_ = nullptr;
+                    throw;
+                }
+                acquire_this();
+            }
+        }
+
+        template<typename Y, typename Deleter, typename = std::enable_if_t<std::is_convertible_v<Y*, T*>>>
+        shared_ptr(Y* p, Deleter d)
+            : ptr_(p)
+            , cb_(nullptr)
+            , ultimate_actual_object_proxy_sp_(nullptr)
+        {
+            try
+            {
+                create_cb_local<Y>(p, std::move(d), std::allocator<char>());
+            }
+            catch (...)
+            {
+                ptr_ = nullptr;
+                cb_ = nullptr;
+                throw;
+            }
+            if (cb_ || ptr_)
+            {
+                acquire_this();
+            }
+        }
+
+        template<typename Deleter>
+        shared_ptr(std::nullptr_t, Deleter d)
+            : ptr_(nullptr)
+            , cb_(nullptr)
+            , ultimate_actual_object_proxy_sp_(nullptr)
+        {
+            try
+            {
+                create_cb_local<T>(nullptr, std::move(d), std::allocator<char>());
+            }
+            catch (...)
+            {
+                cb_ = nullptr;
+                throw;
+            }
+            if (cb_)
+            {
+                acquire_this();
+            }
+        }
+
+        template<typename Y, typename Deleter, typename Alloc, typename = std::enable_if_t<std::is_convertible_v<Y*, T*>>>
+        shared_ptr(Y* p, Deleter d, Alloc cb_alloc)
+            : ptr_(p)
+            , cb_(nullptr)
+            , ultimate_actual_object_proxy_sp_(nullptr)
+        {
+            try
+            {
+                create_cb_local<Y>(p, std::move(d), std::move(cb_alloc));
+            }
+            catch (...)
+            {
+                ptr_ = nullptr;
+                cb_ = nullptr;
+                throw;
+            }
+            if (cb_ || ptr_)
+            {
+                acquire_this();
+            }
+        }
+
+        template<typename Deleter, typename Alloc>
+        shared_ptr(std::nullptr_t, Deleter d, Alloc cb_alloc)
+            : ptr_(nullptr)
+            , cb_(nullptr)
+            , ultimate_actual_object_proxy_sp_(nullptr)
+        {
+            try
+            {
+                create_cb_local<T>(nullptr, std::move(d), std::move(cb_alloc));
+            }
+            catch (...)
+            {
+                cb_ = nullptr;
+                throw;
+            }
+            if (cb_)
+            {
+                acquire_this();
+            }
+        }
+
         template<typename Y,
             typename Deleter = std::default_delete<Y>,
             typename Alloc = std::allocator<char>,
-            typename = std::enable_if_t<std::is_base_of_v<T, Y> && std::is_base_of_v<casting_interface, Y>>>
+            typename = std::enable_if_t<std::is_base_of<T, Y>::value && std::is_base_of<casting_interface, Y>::value>>
         explicit shared_ptr(
             Y* p, std::shared_ptr<rpc::object_proxy> obj_proxy_for_p_obj, Deleter d = Deleter(), Alloc cb_alloc = Alloc())
             : ptr_(p)
@@ -221,7 +365,6 @@ namespace rpc
                 using ActualCB = internal::control_block_impl<Y, Deleter, Alloc>;
                 typename std::allocator_traits<Alloc>::template rebind_alloc<ActualCB> actual_cb_alloc(cb_alloc);
                 cb_ = std::allocator_traits<decltype(actual_cb_alloc)>::allocate(actual_cb_alloc, 1);
-                // Pass obj_proxy_for_p_obj to the control block constructor
                 new (cb_) ActualCB(p, std::move(obj_proxy_for_p_obj), std::move(d), std::move(cb_alloc));
             }
             catch (...)
@@ -242,12 +385,22 @@ namespace rpc
         }
 
         template<typename Y>
-        shared_ptr(const shared_ptr<Y>& r, T* p_alias) noexcept
+        shared_ptr(const shared_ptr<Y>& r, element_type* p_alias) noexcept
             : cb_(r.internal_get_cb())
             , ptr_(p_alias)
             , ultimate_actual_object_proxy_sp_(r.internal_get_ultimate_object_proxy())
         {
             acquire_this();
+        }
+
+        template<typename Y>
+        shared_ptr(shared_ptr<Y>&& r, element_type* p_alias) noexcept
+            : cb_(r.internal_get_cb())
+            , ptr_(p_alias)
+            , ultimate_actual_object_proxy_sp_(std::move(r.internal_get_ultimate_object_proxy_ref()))
+        {
+            r.cb_ = nullptr;
+            r.ptr_ = nullptr;
         }
 
         shared_ptr(const shared_ptr& r) noexcept
@@ -284,10 +437,50 @@ namespace rpc
             r.ptr_ = nullptr;
         }
 
-        // Constructor from unique_ptr - associates the given object_proxy with the new shared object
+        template<typename Y, typename = std::enable_if_t<std::is_convertible_v<Y*, T*>>>
+        explicit shared_ptr(const rpc::weak_ptr<Y>& r)
+        {
+            rpc::shared_ptr<Y> temp = r.lock();
+            if (!temp)
+            {
+                throw std::bad_weak_ptr();
+            }
+            shared_ptr<T> temp_T(std::move(temp));
+            this->swap(temp_T);
+        }
+
+        template<typename Y, typename Deleter_U, typename = std::enable_if_t<std::is_convertible_v<Y*, T*>>>
+        shared_ptr(rpc::unique_ptr<Y, Deleter_U>&& u)
+            : ptr_(nullptr)
+            , cb_(nullptr)
+            , ultimate_actual_object_proxy_sp_(nullptr)
+        {
+            if (!u)
+                return;
+            Y* raw_p = u.get();
+            Deleter_U deleter = u.get_deleter();
+            try
+            {
+                create_cb_local<Y>(raw_p, std::move(deleter), std::allocator<char>());
+                ptr_ = raw_p;
+                u.release();
+            }
+            catch (...)
+            {
+                cb_ = nullptr;
+                ptr_ = nullptr;
+                throw;
+            }
+            if (cb_ || ptr_)
+            {
+                ultimate_actual_object_proxy_sp_ = get_ultimate_object_proxy_for(ptr_, cb_);
+                acquire_this();
+            }
+        }
+
         template<typename Y,
             typename Deleter_U,
-            typename = std::enable_if_t<std::is_convertible_v<Y*, T*> && std::is_base_of_v<casting_interface, Y>>>
+            typename = std::enable_if_t<std::is_convertible_v<Y*, T*> && std::is_base_of<casting_interface, Y>::value>>
         shared_ptr(rpc::unique_ptr<Y, Deleter_U>&& u, std::shared_ptr<rpc::object_proxy> obj_proxy_for_u_obj)
             : ptr_(nullptr)
             , cb_(nullptr)
@@ -352,7 +545,11 @@ namespace rpc
         }
 
         void reset() noexcept { shared_ptr().swap(*this); }
-        // Reset with a raw pointer, needs an object_proxy
+        template<typename Y, typename Deleter = std::default_delete<Y>, typename Alloc = std::allocator<char>>
+        void reset(Y* p, Deleter d = Deleter(), Alloc cb_alloc = Alloc())
+        {
+            shared_ptr(p, std::move(d), std::move(cb_alloc)).swap(*this);
+        }
         template<typename Y, typename Deleter = std::default_delete<Y>, typename Alloc = std::allocator<char>>
         void reset(
             Y* p, std::shared_ptr<rpc::object_proxy> obj_proxy_for_p_obj, Deleter d = Deleter(), Alloc cb_alloc = Alloc())
@@ -386,10 +583,10 @@ namespace rpc
 
         template<typename U> friend class optimistic_ptr;
         template<typename U> friend class weak_ptr;
-        template<typename U, typename... Args>
-        friend rpc::shared_ptr<U> make_shared(Args&&... args); // Changed signature
+        template<typename U, typename... Args> friend rpc::shared_ptr<U> make_shared(Args&&... args);
         template<class T1_cast, class T2_cast>
         friend shared_ptr<T1_cast> dynamic_pointer_cast(const shared_ptr<T2_cast>& from) noexcept;
+        friend class rpc::enable_shared_from_this<T>;
     };
 
     template<typename T> class optimistic_ptr
@@ -513,12 +710,13 @@ namespace rpc
     public:
         using element_type = std::remove_extent_t<T>;
         constexpr weak_ptr() noexcept = default;
+
         template<typename Y>
         weak_ptr(const shared_ptr<Y>& r) noexcept
             : cb_(r.internal_get_cb())
             , ptr_for_lock_(r.internal_get_ptr())
         {
-            static_assert(std::is_convertible_v<Y*, T*>, "Y* must be convertible to T*");
+            static_assert(std::is_convertible<Y*, T*>::value, "Y* must be convertible to T*");
             if (cb_)
                 cb_->increment_local_weak();
         }
@@ -527,6 +725,7 @@ namespace rpc
             : weak_ptr(o.get_proxy_shared_ptr())
         {
         }
+
         weak_ptr(const weak_ptr& r) noexcept
             : cb_(r.cb_)
             , ptr_for_lock_(r.ptr_for_lock_)
@@ -534,6 +733,16 @@ namespace rpc
             if (cb_)
                 cb_->increment_local_weak();
         }
+        template<typename Y>
+        weak_ptr(const weak_ptr<Y>& r) noexcept
+            : cb_(r.cb_)
+            , ptr_for_lock_(static_cast<T*>(r.ptr_for_lock_))
+        {
+            static_assert(std::is_convertible_v<Y*, T*>, "Y* must be convertible to T*");
+            if (cb_)
+                cb_->increment_local_weak();
+        }
+
         weak_ptr(weak_ptr&& r) noexcept
             : cb_(r.cb_)
             , ptr_for_lock_(r.ptr_for_lock_)
@@ -541,11 +750,53 @@ namespace rpc
             r.cb_ = nullptr;
             r.ptr_for_lock_ = nullptr;
         }
+        template<typename Y>
+        weak_ptr(weak_ptr<Y>&& r) noexcept
+            : cb_(r.cb_)
+            , ptr_for_lock_(static_cast<T*>(r.ptr_for_lock_))
+        {
+            static_assert(std::is_convertible_v<Y*, T*>, "Y* must be convertible to T*");
+            r.cb_ = nullptr;
+            r.ptr_for_lock_ = nullptr;
+        }
+
         ~weak_ptr()
         {
             if (cb_)
                 cb_->decrement_local_weak_and_destroy_if_zero();
         }
+
+        weak_ptr& operator=(const weak_ptr& r) noexcept
+        {
+            weak_ptr(r).swap(*this);
+            return *this;
+        }
+        template<typename Y> weak_ptr& operator=(const weak_ptr<Y>& r) noexcept
+        {
+            weak_ptr(r).swap(*this);
+            return *this;
+        }
+        template<typename Y> weak_ptr& operator=(const shared_ptr<Y>& r) noexcept
+        {
+            weak_ptr(r).swap(*this);
+            return *this;
+        }
+        template<typename Y> weak_ptr& operator=(const optimistic_ptr<Y>& r) noexcept
+        {
+            weak_ptr(r).swap(*this);
+            return *this;
+        }
+        weak_ptr& operator=(weak_ptr&& r) noexcept
+        {
+            weak_ptr(std::move(r)).swap(*this);
+            return *this;
+        }
+        template<typename Y> weak_ptr& operator=(weak_ptr<Y>&& r) noexcept
+        {
+            weak_ptr(std::move(r)).swap(*this);
+            return *this;
+        }
+
         rpc::shared_ptr<T> lock() const
         {
             if (!cb_)
@@ -566,11 +817,6 @@ namespace rpc
                 return true;
             if (use_count() > 0)
                 return false;
-            // This check assumes this_cb_object_proxy_sp_ exists and has get_remote_strong_count.
-            // If object_proxy doesn't expose counts, this logic for expired() needs adjustment.
-            // if (cb_->this_cb_object_proxy_sp_ && cb_->this_cb_object_proxy_sp_->get_remote_strong_count() > 0) {
-            //    return false;
-            // }
             return true;
         }
         void reset() noexcept { weak_ptr().swap(*this); }
@@ -579,6 +825,8 @@ namespace rpc
             std::swap(cb_, r.cb_);
             std::swap(ptr_for_lock_, r.ptr_for_lock_);
         }
+
+        template<typename U> friend class enable_shared_from_this;
     };
 
     template<typename T, typename Deleter> class unique_ptr
@@ -686,7 +934,7 @@ namespace rpc
         if (!from)
             return nullptr;
 
-        if (const T1* ptr_local_casted = static_cast<const T1*>(from->query_interface(T1::get_id(RPC_VERSION_2))))
+        if (const T1* ptr_local_casted = static_cast<const T1*>(from->query_interface(T1::get_id(VERSION_2))))
         {
             return shared_ptr<T1>(from, const_cast<T1*>(ptr_local_casted));
         }
@@ -730,41 +978,54 @@ namespace rpc
         return shared_ptr<T1>(from, p);
     }
 
-    // make_shared for local objects (no initial object_proxy)
+    template<class T1, class T2> bool operator==(const shared_ptr<T1>& a, const shared_ptr<T2>& b) noexcept
+    {
+        return a.get() == b.get();
+    }
+    template<class T> bool operator==(const shared_ptr<T>& a, std::nullptr_t) noexcept
+    {
+        return !a;
+    }
+    template<class T> bool operator==(std::nullptr_t, const shared_ptr<T>& b) noexcept
+    {
+        return !b;
+    }
+    template<class T1, class T2> bool operator!=(const shared_ptr<T1>& a, const shared_ptr<T2>& b) noexcept
+    {
+        return a.get() != b.get();
+    }
+    template<class T> bool operator!=(const shared_ptr<T>& a, std::nullptr_t) noexcept
+    {
+        return static_cast<bool>(a);
+    }
+    template<class T> bool operator!=(std::nullptr_t, const shared_ptr<T>& b) noexcept
+    {
+        return static_cast<bool>(b);
+    }
+
     template<typename T, typename... Args> rpc::shared_ptr<T> make_shared(Args&&... args)
     {
-        // This version of make_shared is for local objects that do not initially have an object_proxy.
-        // Their this_cb_object_proxy_sp_ in the control block will be nullptr.
-        static_assert(std::is_base_of_v<rpc::casting_interface, T>,
+        static_assert(std::is_base_of<rpc::casting_interface, T>::value,
             "T must be a casting_interface for rpc::make_shared, "
             "even if initially local, to support potential RPC interactions later.");
 
-        using Alloc = std::allocator<T>; // Allocator for T object itself
-        // Allocator for the combined control block and T object
+        using Alloc = std::allocator<T>;
         using CBAllocForMakeShared =
             typename std::allocator_traits<Alloc>::template rebind_alloc<internal::control_block_make_shared<T, Alloc, Args...>>;
 
-        CBAllocForMakeShared cb_alloc; // Default construct the allocator for the CB
+        CBAllocForMakeShared cb_alloc;
         auto* cb_ptr = std::allocator_traits<CBAllocForMakeShared>::allocate(cb_alloc, 1);
 
         try
         {
-            // Construct control_block_make_shared.
-            // This version of control_block_make_shared's constructor will pass nullptr
-            // for the object_proxy to the control_block_base constructor.
-            std::allocator_traits<CBAllocForMakeShared>::construct(cb_alloc,
-                cb_ptr,
-                Alloc(),                      // Pass allocator for T to CB ctor
-                std::forward<Args>(args)...); // Args for T's constructor
+            std::allocator_traits<CBAllocForMakeShared>::construct(cb_alloc, cb_ptr, Alloc(), std::forward<Args>(args)...);
         }
         catch (...)
         {
             std::allocator_traits<CBAllocForMakeShared>::deallocate(cb_alloc, cb_ptr, 1);
             throw;
         }
-        // CB's local_shared_owners is implicitly 1 after make_shared's CB construction.
-        // Use private shared_ptr constructor.
-        // The ultimate_actual_object_proxy_sp_ in the new shared_ptr will be nullptr.
+        cb_ptr->increment_local_shared();
         return rpc::shared_ptr<T>(
             static_cast<internal::control_block_base*>(cb_ptr), static_cast<T*>(cb_ptr->get_managed_object_ptr()));
     }
@@ -778,16 +1039,6 @@ namespace rpc
         enable_shared_from_this& operator=(const enable_shared_from_this&) noexcept = default;
         ~enable_shared_from_this() = default;
 
-        struct access_detail_for_est
-        {
-            template<typename U> static internal::control_block_base*& cb(rpc::shared_ptr<U>& sp) { return sp.cb_; }
-            template<typename U> static U*& ptr(rpc::shared_ptr<U>& sp) { return sp.ptr_; }
-            template<typename U> static std::shared_ptr<rpc::object_proxy>& ultimate_proxy(rpc::shared_ptr<U>& sp)
-            {
-                return sp.ultimate_actual_object_proxy_sp_;
-            }
-        };
-
         template<typename ActualPtrType>
         void internal_set_weak_this(internal::control_block_base* cb_for_this_obj, ActualPtrType* ptr_to_this_obj) const
         {
@@ -797,13 +1048,10 @@ namespace rpc
                 {
                     if (cb_for_this_obj && ptr_to_this_obj)
                     {
-                        rpc::shared_ptr<T> temp_sp_for_weak_init;
-                        access_detail_for_est::cb(temp_sp_for_weak_init) = cb_for_this_obj;
-                        access_detail_for_est::ptr(temp_sp_for_weak_init)
-                            = const_cast<T*>(static_cast<const T*>(ptr_to_this_obj));
-                        access_detail_for_est::ultimate_proxy(temp_sp_for_weak_init) = get_ultimate_object_proxy_for(
-                            const_cast<T*>(static_cast<const T*>(ptr_to_this_obj)), cb_for_this_obj);
-                        weak_this_ = temp_sp_for_weak_init;
+                        rpc::shared_ptr<T> temp_sp(cb_for_this_obj,
+                            const_cast<T*>(static_cast<const T*>(ptr_to_this_obj)),
+                            typename rpc::shared_ptr<T>::for_enable_shared_tag{});
+                        weak_this_ = temp_sp;
                     }
                 }
             }
@@ -814,8 +1062,7 @@ namespace rpc
         rpc::shared_ptr<const T> shared_from_this() const { return weak_this_.lock(); }
         rpc::weak_ptr<T> weak_from_this() const noexcept { return weak_this_; }
 
-        template<typename U, typename... Args>
-        friend rpc::shared_ptr<U> make_shared(Args&&...); // Updated make_shared signature
+        template<typename U, typename... Args> friend rpc::shared_ptr<U> make_shared(Args&&...);
         template<typename U> friend class shared_ptr;
     };
 
@@ -824,8 +1071,8 @@ namespace rpc
         const rpc::shared_ptr<InterfaceType>& actual_object_sp_target,
         std::shared_ptr<rpc::object_proxy> obj_proxy_for_local_proxy_instance)
     {
-        static_assert(std::is_base_of_v<InterfaceType, ConcreteLocalProxyType>, "Proxy must implement interface.");
-        static_assert(std::is_base_of_v<rpc::proxy_base, ConcreteLocalProxyType>, "Proxy must be a proxy_base.");
+        static_assert(std::is_base_of<InterfaceType, ConcreteLocalProxyType>::value, "Proxy must implement interface.");
+        static_assert(std::is_base_of<rpc::proxy_base, ConcreteLocalProxyType>::value, "Proxy must be a proxy_base.");
 
         ConcreteLocalProxyType* raw_local_proxy = new ConcreteLocalProxyType(actual_object_sp_target);
 

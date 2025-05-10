@@ -2,7 +2,7 @@
  *   Copyright (c) 2024 Edward Boggis-Rolfe
  *   All rights reserved.
  */
-#include <rpc/error_codes.h>
+#include <rpc/rpc.h>
 
 namespace rpc
 {

@@ -4,7 +4,6 @@
  */
 #pragma once
 
-// 1. Fundamental types and forward declarations
 #include <rpc/version.h>
 #include <rpc/assert.h>
 #include <rpc/error_codes.h>
@@ -24,4 +23,3 @@
 #include <rpc/service.h>
 #include <rpc/stub.h>
 #include <rpc/serialiser.h>
-#include <rpc/basic_service_proxies.h>
