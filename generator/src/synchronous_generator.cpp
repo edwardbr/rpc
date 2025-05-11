@@ -1885,14 +1885,19 @@ namespace rpc_generator
                 build_scoped_name(owner, ns);
             }
 
-            proxy("template<> void object_proxy::create_interface_proxy(shared_ptr<::{}{}>& "
+            proxy("namespace proxy_factory");
+            proxy("{{");
+            
+            proxy("template<> void create(const std::shared_ptr<object_proxy>& ob, shared_ptr<::{}{}>& "
                   "inface)",
                 ns,
                 interface_name);
             proxy("{{");
-            proxy("inface = rpc::static_pointer_cast<{1}{0}>(rpc::make_shared<{1}{0}_proxy>(shared_from_this()));", interface_name, ns);
+            proxy("inface = rpc::static_pointer_cast<{1}{0}>(rpc::make_shared<{1}{0}_proxy>(ob));", interface_name, ns);
             proxy("}}");
             proxy("");
+            
+            proxy("}}");
 
             stub("template<> std::function<std::shared_ptr<i_interface_stub>(const std::shared_ptr<object_stub>& stub)> "
                  "service::create_interface_stub(const shared_ptr<::{}{}>& iface)",

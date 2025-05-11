@@ -10,6 +10,8 @@
 #include <mutex>
 #include <vector>
 
+#include <yas/serialize.hpp>
+
 namespace rpc
 {
     enum class add_ref_options : std::uint8_t

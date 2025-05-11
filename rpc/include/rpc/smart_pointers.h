@@ -19,24 +19,31 @@ namespace rpc
             std::atomic<long> local_shared_owners{0};
             std::atomic<long> local_weak_owners{1};
             std::shared_ptr<rpc::object_proxy> this_cb_object_proxy_sp_;
+
+        protected:
             void* managed_object_ptr_{nullptr};
 
+        public:
             control_block_base(void* obj_ptr, std::shared_ptr<rpc::object_proxy> obj_proxy_for_this_cb_obj)
-                : managed_object_ptr_(obj_ptr)
-                , this_cb_object_proxy_sp_(std::move(obj_proxy_for_this_cb_obj))
+                : this_cb_object_proxy_sp_(std::move(obj_proxy_for_this_cb_obj))
+                , // Initialized in declaration order
+                managed_object_ptr_(obj_ptr)
             {
             }
 
-            control_block_base(void* obj_ptr)
-                : managed_object_ptr_(obj_ptr)
-                , this_cb_object_proxy_sp_(nullptr)
+            control_block_base()
+                : this_cb_object_proxy_sp_(nullptr)
+                , // Initialized in declaration order
+                managed_object_ptr_(nullptr)
             {
             }
 
             virtual ~control_block_base() = default;
             virtual void dispose_object_actual() = 0;
             virtual void destroy_self_actual() = 0;
+
             void* get_managed_object_ptr() const { return managed_object_ptr_; }
+
             void increment_local_shared() { local_shared_owners.fetch_add(1, std::memory_order_relaxed); }
             void increment_local_weak() { local_weak_owners.fetch_add(1, std::memory_order_relaxed); }
 
@@ -106,11 +113,12 @@ namespace rpc
 
             template<typename... ConcreteArgs>
             control_block_make_shared(Alloc alloc_for_t, ConcreteArgs&&... args_for_t)
-                : control_block_base(&object_instance_)
+                : control_block_base()
                 , allocator_instance_(std::move(alloc_for_t))
             {
                 std::allocator_traits<Alloc>::construct(
                     allocator_instance_, &object_instance_, std::forward<ConcreteArgs>(args_for_t)...);
+                this->managed_object_ptr_ = &object_instance_;
             }
 
             void dispose_object_actual() override
@@ -144,20 +152,12 @@ namespace rpc
         if (!ptr)
             return nullptr;
 
-        // Attempt to dynamic_cast to proxy_base.
-        // This requires T to be a polymorphic type (which casting_interface ensures).
-        // const_cast is used because ptr might be const T*, but dynamic_cast needs non-const for non-const target.
-        // If T is already proxy_base or derived, this cast should succeed.
-        // If T is an actual object not derived from proxy_base, it will return nullptr.
-        // If T has proxy_base as an ambiguous public base, dynamic_cast to pointer returns nullptr.
         if (rpc::proxy_base* proxy = dynamic_cast<rpc::proxy_base*>(const_cast<std::remove_cv_t<T>*>(ptr)))
         {
             return proxy->get_object_proxy();
         }
         else if (cb_of_ptr)
         {
-            // dynamic_cast failed, so ptr is not a proxy_base (or it's ambiguous in a way dynamic_cast handles).
-            // Assume it's an actual object.
             return cb_of_ptr->this_cb_object_proxy_sp_;
         }
         return nullptr;
@@ -1066,25 +1066,25 @@ namespace rpc
         template<typename U> friend class shared_ptr;
     };
 
-    template<typename InterfaceType, typename ConcreteLocalProxyType>
-    rpc::shared_ptr<InterfaceType> create_shared_ptr_to_local_proxy(
-        const rpc::shared_ptr<InterfaceType>& actual_object_sp_target,
-        std::shared_ptr<rpc::object_proxy> obj_proxy_for_local_proxy_instance)
-    {
-        static_assert(std::is_base_of<InterfaceType, ConcreteLocalProxyType>::value, "Proxy must implement interface.");
-        static_assert(std::is_base_of<rpc::proxy_base, ConcreteLocalProxyType>::value, "Proxy must be a proxy_base.");
+    // template<typename InterfaceType, typename ConcreteLocalProxyType>
+    // rpc::shared_ptr<InterfaceType> create_shared_ptr_to_local_proxy(
+    //     const rpc::shared_ptr<InterfaceType>& actual_object_sp_target,
+    //     std::shared_ptr<rpc::object_proxy> obj_proxy_for_local_proxy_instance)
+    // {
+    //     static_assert(std::is_base_of<InterfaceType, ConcreteLocalProxyType>::value, "Proxy must implement interface.");
+    //     static_assert(std::is_base_of<rpc::proxy_base, ConcreteLocalProxyType>::value, "Proxy must be a proxy_base.");
 
-        ConcreteLocalProxyType* raw_local_proxy = new ConcreteLocalProxyType(actual_object_sp_target);
+    //     ConcreteLocalProxyType* raw_local_proxy = new ConcreteLocalProxyType(actual_object_sp_target);
 
-        if (auto* proxy_base_ptr = raw_local_proxy->query_proxy_base())
-        {
-            const_cast<rpc::proxy_base*>(proxy_base_ptr)->object_proxy_ = obj_proxy_for_local_proxy_instance;
-        }
+    //     if (auto* proxy_base_ptr = raw_local_proxy->query_proxy_base())
+    //     {
+    //         const_cast<rpc::proxy_base*>(proxy_base_ptr)->object_proxy_ = obj_proxy_for_local_proxy_instance;
+    //     }
 
-        return rpc::shared_ptr<InterfaceType>(static_cast<InterfaceType*>(raw_local_proxy),
-            obj_proxy_for_local_proxy_instance,
-            std::default_delete<ConcreteLocalProxyType>());
-    }
+    //     return rpc::shared_ptr<InterfaceType>(static_cast<InterfaceType*>(raw_local_proxy),
+    //         obj_proxy_for_local_proxy_instance,
+    //         std::default_delete<ConcreteLocalProxyType>());
+    // }
 
 } // namespace rpc
 

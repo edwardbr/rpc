@@ -17,9 +17,14 @@
 #include <rpc/telemetry/i_telemetry_service.h>
 #endif
 
-#include <rpc/smart_pointers.h> // This is the file we've been building (rpc_smart_pointers_v4)
-#include <rpc/proxy.h>          // User's existing proxy.h (defines object_proxy, proxy_base, proxy_impl)
+#include <rpc/proxy_base.h>
+#include <rpc/object_proxy.h>
+#include <rpc/service_proxy.h>
+#include <rpc/proxy_impl.h>
+
+#include <rpc/smart_pointers.h>
 
 #include <rpc/service.h>
 #include <rpc/stub.h>
+#include <rpc/proxy.h>
 #include <rpc/serialiser.h>
