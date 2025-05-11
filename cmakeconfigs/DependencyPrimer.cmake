@@ -336,48 +336,48 @@ if(NOT DEPENDENCIES_LOADED)
           # ${DCAP_LIBRARY_DIR}/sgx_dcap_quoteverify.lib ${DCAP_LIBRARY_DIR}/sgx_dcap_ql.lib
       )
 
-      # if(${BUILD_TYPE} STREQUAL "release")
-      #   if(${SGX_MODE} STREQUAL "release")
-      #     set(HOST_DEFINES ${SHARED_HOST_DEFINES} NDEBUG PREVENT_DEBUG_ENCLAVE # what is this?
-      #     )
-      #   else()
-      #     set(HOST_DEFINES ${SHARED_HOST_DEFINES} NDEBUG PREVENT_DEBUG_ENCLAVE # what is this?
-      #                      EDEBUG # sets SGX_DEBUG_FLAG to 1
-      #     )
-      #   endif()
+      if(${BUILD_TYPE} STREQUAL "release")
+        if(${SGX_MODE} STREQUAL "release")
+          set(HOST_DEFINES ${SHARED_HOST_DEFINES} NDEBUG PREVENT_DEBUG_ENCLAVE # what is this?
+          )
+        else()
+          set(HOST_DEFINES ${SHARED_HOST_DEFINES} NDEBUG PREVENT_DEBUG_ENCLAVE # what is this?
+                           EDEBUG # sets SGX_DEBUG_FLAG to 1
+          )
+        endif()
 
-      #   set(HOST_COMPILE_OPTIONS
-      #       ${SHARED_HOST_COMPILE_OPTIONS}
-      #       /GL
-      #       /MD
-      #       /O2
-      #       /Oi
-      #       /Ob2)
+        set(HOST_COMPILE_OPTIONS
+            ${SHARED_HOST_COMPILE_OPTIONS}
+            /GL
+            /MD
+            /O2
+            /Oi
+            /Ob2)
 
-      #   if(BUILD_ENCLAVE)
-      #     if(${SGX_MODE} STREQUAL "release")
-      #       set(ENCLAVE_DEFINES ${SHARED_ENCLAVE_DEFINES} NDEBUG)
-      #     else()
-      #       set(ENCLAVE_DEFINES ${SHARED_ENCLAVE_DEFINES} NDEBUG EDEBUG # sets SGX_DEBUG_FLAG to 1
-      #       )
-      #     endif()
-      #   endif()
+        if(BUILD_ENCLAVE)
+          if(${SGX_MODE} STREQUAL "release")
+            set(ENCLAVE_DEFINES ${SHARED_ENCLAVE_DEFINES} NDEBUG)
+          else()
+            set(ENCLAVE_DEFINES ${SHARED_ENCLAVE_DEFINES} NDEBUG EDEBUG # sets SGX_DEBUG_FLAG to 1
+            )
+          endif()
+        endif()
 
-      #   if(BUILD_ENCLAVE)
-      #     message("!!!!! /GL needs to be renabled for performance reasons")
-      #     set(ENCLAVE_COMPILE_OPTIONS
-      #         ${SHARED_ENCLAVE_COMPILE_OPTIONS}
-      #         # /GL
-      #         /MT
-      #         /O2
-      #         /Oi
-      #         /Ob2)
-      #     set(ENCLAVE_LINK_OPTIONS ${SHARED_ENCLAVE_LINK_OPTIONS} /INCREMENTAL:NO ${ENCLAVE_MEMLEAK_LINK_FLAGS} /DEBUG)
-      #   endif()
-      #   set(HOST_LINK_OPTIONS ${SHARED_HOST_LINK_OPTIONS} /INCREMENTAL:NO /DEBUG)
-      #   set(HOST_LINK_DYNAMIC_LIBRARY_OPTIONS ${HOST_LINK_OPTIONS})
-      #   set(HOST_LINK_EXE_OPTIONS ${HOST_LINK_OPTIONS} /IGNORE:4099 /IGNORE:4098)
-      # else()
+        if(BUILD_ENCLAVE)
+          message("!!!!! /GL needs to be renabled for performance reasons")
+          set(ENCLAVE_COMPILE_OPTIONS
+              ${SHARED_ENCLAVE_COMPILE_OPTIONS}
+              # /GL
+              /MT
+              /O2
+              /Oi
+              /Ob2)
+          set(ENCLAVE_LINK_OPTIONS ${SHARED_ENCLAVE_LINK_OPTIONS} /INCREMENTAL:NO ${ENCLAVE_MEMLEAK_LINK_FLAGS} /DEBUG)
+        endif()
+        set(HOST_LINK_OPTIONS ${SHARED_HOST_LINK_OPTIONS} /INCREMENTAL:NO /DEBUG)
+        set(HOST_LINK_DYNAMIC_LIBRARY_OPTIONS ${HOST_LINK_OPTIONS})
+        set(HOST_LINK_EXE_OPTIONS ${HOST_LINK_OPTIONS} /IGNORE:4099 /IGNORE:4098)
+      else()
         set(HOST_DEFINES ${SHARED_HOST_DEFINES} _DEBUG)
 
         set(HOST_COMPILE_OPTIONS
@@ -410,7 +410,7 @@ if(NOT DEPENDENCIES_LOADED)
             /IGNORE:4098
             /IGNORE:4204
             /IGNORE:4203)
-      # endif()
+      endif()
       if(${SGX_HW}) # not simulation
         set(HOST_LIBRARIES
             ${SHARED_HOST_LIBRARIES}

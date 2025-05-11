@@ -1,27 +1,58 @@
 {
-    "version": 8,
-    "configurePresets": [
-        {
-            "name": "Visual_studio",
-            "displayName": "Visual Studio Community 2022 Release - amd64",
-            "description": "Using compilers for Visual Studio 17 2022 (x64 architecture)",
-            "generator": "Visual Studio 17 2022",
-            "toolset": "host=x64",
-            "architecture": "x64",
-            "binaryDir": "${sourceDir}/out/build/${presetName}",
-            "cacheVariables": {
-                "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}",
-                "CMAKE_C_COMPILER": "cl.exe",
-                "CMAKE_CXX_COMPILER": "cl.exe"
-            }
-        }
-    ],
-    "buildPresets": [
-        {
-            "name": "Visual_studio-debug",
-            "displayName": "Visual Studio Community 2022 Release - amd64 - Debug",
-            "configurePreset": "Visual_studio",
-            "configuration": "Debug"
-        }
-    ]
+  "version": 5,
+  "configurePresets": [
+    {
+      "name": "Base",
+      "hidden": true,
+      "binaryDir": "build",
+      "generator": "Ninja",
+      "cacheVariables": {
+        "BUILD_ENCLAVE": "OFF",
+        "BUILD_HOST": "ON",
+        "SGX_HW": "OFF",
+        "SGX_MODE": "debug",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    },
+    {
+      "name": "Debug",
+      "inherits": "Base",
+      "cacheVariables": {
+        "BUILD_TYPE": "debug",
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "Debug_SGX",
+      "inherits": "Debug",
+      "cacheVariables": {
+        "BUILD_ENCLAVE": "ON",
+        "SGX_HW": "ON"
+      }
+    },
+    {
+      "name": "Debug_SGX_Sim",
+      "inherits": "Debug",
+      "cacheVariables": {
+        "BUILD_ENCLAVE": "ON"
+      }
+    },
+    {
+      "name": "Release",
+      "inherits": "Base",
+      "cacheVariables": {
+        "BUILD_TYPE": "release",
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "Release_SGX",
+      "inherits": "Release",
+      "cacheVariables": {
+        "BUILD_ENCLAVE": "ON",
+        "SGX_HW": "ON",
+        "SGX_MODE": "release"
+      }
+    }
+  ]
 }

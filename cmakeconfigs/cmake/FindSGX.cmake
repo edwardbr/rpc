@@ -33,12 +33,12 @@ endif()
 if(WIN32)
   set(SGX_BINARIES ${SGX_PATH}/bin/win32/Release)
   # set(SGX_COMMON_CFLAGS -m32)
-  # if((${SGX_MODE} STREQUAL "prerelease") OR (${SGX_MODE} STREQUAL "release")) # not simulation nor debug nor "optimized
-  #                                                                             # debug" nor "optimized simulation"
-  #   set(SGX_LIBRARY_PATH ${SGX_PATH}/bin/x64/Release)
-  # else()
+  if((${SGX_MODE} STREQUAL "prerelease") OR (${SGX_MODE} STREQUAL "release")) # not simulation nor debug nor "optimized
+                                                                              # debug" nor "optimized simulation"
+    set(SGX_LIBRARY_PATH ${SGX_PATH}/bin/x64/Release)
+  else()
     set(SGX_LIBRARY_PATH ${SGX_PATH}/bin/x64/Debug)
-  # endif()
+  endif()
   set(SGX_ENCLAVE_SIGNER ${SGX_BINARIES}/sgx_sign.exe)
   set(SGX_EDGER8R ${SGX_BINARIES}/sgx_edger8r.exe)
 
