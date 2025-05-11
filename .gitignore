@@ -8,3 +8,4 @@ test
 .vscode/launch.json
 .vscode/settings.json
 /out/*
+/CMakeUserPresets.json

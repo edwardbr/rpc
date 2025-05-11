@@ -1,0 +1,64 @@
+{
+  "version": 5,
+  "configurePresets": [
+    {
+      "name": "windows",
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.43.34808/bin/HostX64/x64/cl.exe",
+        "CMAKE_CXX_COMPILER": "C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.43.34808/bin/HostX64/x64/cl.exe",
+        "CMAKE_RC_COMPILER": "C:/Program Files (x86)/Windows Kits/10/bin/10.0.19041.0/x64/rc.exe",
+        "CMAKE_MT": "C:/Program Files (x86)/Windows Kits/10/bin/10.0.19041.0/x64/mt.exe",
+        "CMAKE_POLICY_VERSION_MINIMUM":"3.5"
+      },
+      "environment": {
+        "INCLUDE": "C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.43.34808/include;C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.43.34808/ATLMFC/include;C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Auxiliary/VS/include;C:/Program Files (x86)/Windows Kits/10/include/10.0.19041.0/ucrt;C:/Program Files (x86)/Windows Kits/10/include/10.0.19041.0/um;C:/Program Files (x86)/Windows Kits/10/include/10.0.19041.0/shared;C:/Program Files (x86)/Windows Kits/10/include/10.0.19041.0/winrt;C:/Program Files (x86)/Windows Kits/10/include/10.0.19041.0/cppwinrt;C:/Program Files (x86)/Windows Kits/NETFXSDK/4.8/include/um",
+        "LIB": "C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.43.34808/ATLMFC/lib/x64;C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.43.34808/lib/x64;C:/Program Files (x86)/Windows Kits/NETFXSDK/4.8/lib/um/x64;C:/Program Files (x86)/Windows Kits/10/lib/10.0.19041.0/ucrt/x64;C:/Program Files (x86)/Windows Kits/10/lib/10.0.19041.0/um/x64",
+        "PATH": "$penv{PATH};C:/Program Files (x86)/Windows Kits/10/bin/10.0.19041.0/x64"
+      }
+    },
+    {
+      "name": "linux",
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "/usr/bin/clang",
+        "CMAKE_CXX_COMPILER":"/usr/bin/clang++"
+      }
+    },
+    {
+      "name": "linux-debug",
+      "inherits": ["Debug", "linux"],
+      "cacheVariables": {
+        "DEBUG_RPC_GEN": "OFF"
+      }
+    },
+    {
+      "name": "linux-release",
+      "inherits": ["Release", "linux"],
+      "cacheVariables": {
+        "DEBUG_RPC_GEN": "OFF",        
+        "BUILD_TEST": "OFF"
+      }
+    },
+    {
+      "name": "windows-debug",
+      "inherits": ["Debug", "windows"],
+      "cacheVariables": {
+        "DEBUG_RPC_GEN": "OFF"
+      }
+    },
+    {
+      "name": "windows-debug_sgx",
+      "inherits": ["Debug_SGX", "windows"],
+      "cacheVariables": {
+        "DEBUG_RPC_GEN": "OFF"
+      }
+    },
+    {
+      "name": "windows-release",
+      "inherits": ["Release", "windows"],
+      "cacheVariables": {
+        "DEBUG_RPC_GEN": "OFF",        
+        "BUILD_TEST": "OFF"
+      }
+    }
+  ]
+}

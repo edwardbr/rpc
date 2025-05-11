@@ -1273,7 +1273,8 @@ namespace rpc_generator
                 proxy("}}");
             }
 
-            proxy("class {0}_proxy : public rpc::proxy_impl<{0}>, public rpc::enable_shared_from_this<{0}_proxy>", interface_name);
+            proxy("class {0}_proxy : public rpc::proxy_impl<{0}>, public rpc::enable_shared_from_this<{0}_proxy>",
+                interface_name);
             proxy("{{");
             proxy("public:");
             proxy("{}_proxy(std::shared_ptr<rpc::object_proxy> object_proxy) : ", interface_name);
@@ -1421,7 +1422,8 @@ namespace rpc_generator
             auto interface_name
                 = std::string(m_ob.get_entity_type() == entity_type::LIBRARY ? "i_" : "") + m_ob.get_name();
 
-            stub("class {0}_stub : public rpc::i_interface_stub, public std::enable_shared_from_this<{0}_stub>", interface_name);
+            stub("class {0}_stub : public rpc::i_interface_stub, public std::enable_shared_from_this<{0}_stub>",
+                interface_name);
             stub("{{");
             stub("rpc::shared_ptr<{}> __rpc_target_;", interface_name);
             stub("std::weak_ptr<rpc::object_stub> target_stub_;", interface_name);
@@ -1439,8 +1441,7 @@ namespace rpc_generator
                  "std::weak_ptr<rpc::object_stub> __rpc_target_stub)",
                 interface_name);
             stub("{{");
-            stub("return std::make_shared<{0}_stub>(__rpc_target, __rpc_target_stub);",
-                interface_name);
+            stub("return std::make_shared<{0}_stub>(__rpc_target, __rpc_target_stub);", interface_name);
             stub("}}");
             stub("");
             stub("rpc::interface_ordinal get_interface_id(uint64_t rpc_version) const override");
@@ -1887,7 +1888,7 @@ namespace rpc_generator
 
             proxy("namespace proxy_factory");
             proxy("{{");
-            
+
             proxy("template<> void create(const std::shared_ptr<object_proxy>& ob, shared_ptr<::{}{}>& "
                   "inface)",
                 ns,
@@ -1896,11 +1897,12 @@ namespace rpc_generator
             proxy("inface = rpc::static_pointer_cast<{1}{0}>(rpc::make_shared<{1}{0}_proxy>(ob));", interface_name, ns);
             proxy("}}");
             proxy("");
-            
+
             proxy("}}");
 
-            stub("template<> std::function<std::shared_ptr<i_interface_stub>(const std::shared_ptr<object_stub>& stub)> "
-                 "service::create_interface_stub(const shared_ptr<::{}{}>& iface)",
+            stub(
+                "template<> std::function<std::shared_ptr<i_interface_stub>(const std::shared_ptr<object_stub>& stub)> "
+                "service::create_interface_stub(const shared_ptr<::{}{}>& iface)",
                 ns,
                 interface_name);
             stub("{{");
@@ -2226,11 +2228,10 @@ namespace rpc_generator
             proxy("#include <yas/count_streams.hpp>");
             proxy("#include <rpc/rpc.h>");
             proxy("#include \"{}\"", header_filename);
-            
+
             proxy("#ifdef USE_RPC_TELEMETRY");
             proxy("#include <rpc/telemetry/i_telemetry_service.h>");
             proxy("#endif");
-            
 
             proxy("");
 
@@ -2283,7 +2284,14 @@ namespace rpc_generator
             stub("{{");
             proxy("namespace rpc");
             proxy("{{");
+
+            // header("NAMESPACE_INLINE_BEGIN");
+            stub("NAMESPACE_INLINE_BEGIN");
+            proxy("NAMESPACE_INLINE_BEGIN");
             write_epilog(from_host, lib, header, proxy, stub, namespaces);
+            // header("NAMESPACE_INLINE_END");
+            stub("NAMESPACE_INLINE_END");
+            proxy("NAMESPACE_INLINE_END");
             header("}}");
             proxy("}}");
             stub("}}");

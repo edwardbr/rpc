@@ -80,6 +80,8 @@ There are different CMake options specified in the root CMakeLists.txt:
   option(USE_RPC_TELEMETRY_RAII_LOGGING "turn on the logging of the addref release and try cast activity of the services, proxies and stubs" OFF)
   option(FORCE_DEBUG_INFORMATION "force inclusion of debug information" OFF)
  ```
+ 
+To make this easier copy the CMakeUserPresets.json to the parent directory, these are your local settings that you may fiddle with easier
 
 From the command line:
 mkdir build
