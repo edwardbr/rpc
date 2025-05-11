@@ -5,14 +5,6 @@
 
 cmake_minimum_required(VERSION 3.24)
 
-if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC" OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-  message("using legacy")
-  set(REMOTE_PTR_CPP src/remote_pointer.cpp)
-else()
-  message("using clang12")
-  set(REMOTE_PTR_CPP)
-endif()
-
 if(USE_RPC_TELEMETRY)
   set(ENCLAVE_TELEMETRY_SERVICE rpc::rpc_telemetry_enclave)
   set(HOST_TELEMETRY_SERVICE rpc::rpc_telemetry_host)
@@ -26,14 +18,27 @@ endif()
 if(BUILD_ENCLAVE)
   add_library(
     rpc_enclave
-    include/rpc/marshaller.h
-    include/rpc/basic_service_proxies.h
-    include/rpc/marshaller.h
-    include/rpc/proxy.h
-    include/rpc/service.h
-    include/rpc/stub.h
-    src/proxy.cpp
-    ${REMOTE_PTR_CPP}
+    include/rpc/internal/version.h
+    include/rpc/internal/assert.h
+    include/rpc/internal/error_codes.h
+    include/rpc/internal/types.h
+    include/rpc/internal/logger.h
+    include/rpc/internal/type_id.h
+    include/rpc/internal/marshaller.h
+    include/rpc/internal/forward_declarations.h
+    include/rpc/internal/casting_interface.h
+    include/rpc/internal/proxy_base.h
+    include/rpc/internal/object_proxy.h
+    include/rpc/internal/service_proxy.h
+    include/rpc/internal/proxy_impl.h
+    include/rpc/internal/smart_pointers.h
+    include/rpc/internal/service.h
+    include/rpc/internal/stub.h
+    include/rpc/internal/proxy.h
+    include/rpc/internal/serialiser.h
+    include/rpc/service_proxies/basic_service_proxies.h
+    src/object_proxy.cpp
+    src/service_proxy.cpp
     src/casting_interface.cpp
     src/service.cpp
     src/stub.cpp
@@ -62,14 +67,27 @@ endif()
 # ######################################################################################################################
 add_library(
   rpc_host
-  include/rpc/marshaller.h
-  include/rpc/basic_service_proxies.h
-  include/rpc/marshaller.h
-  include/rpc/proxy.h
-  include/rpc/service.h
-  include/rpc/stub.h
-  src/proxy.cpp
-  ${REMOTE_PTR_CPP}
+  include/rpc/internal/version.h
+  include/rpc/internal/assert.h
+  include/rpc/internal/error_codes.h
+  include/rpc/internal/types.h
+  include/rpc/internal/logger.h
+  include/rpc/internal/type_id.h
+  include/rpc/internal/marshaller.h
+  include/rpc/internal/forward_declarations.h
+  include/rpc/internal/casting_interface.h
+  include/rpc/internal/proxy_base.h
+  include/rpc/internal/object_proxy.h
+  include/rpc/internal/service_proxy.h
+  include/rpc/internal/proxy_impl.h
+  include/rpc/internal/smart_pointers.h
+  include/rpc/internal/service.h
+  include/rpc/internal/stub.h
+  include/rpc/internal/proxy.h
+  include/rpc/internal/serialiser.h
+  include/rpc/service_proxies/basic_service_proxies.h
+  src/object_proxy.cpp
+  src/service_proxy.cpp
   src/casting_interface.cpp
   src/service.cpp
   src/stub.cpp

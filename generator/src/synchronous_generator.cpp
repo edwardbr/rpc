@@ -2226,6 +2226,11 @@ namespace rpc_generator
             proxy("#include <yas/count_streams.hpp>");
             proxy("#include <rpc/rpc.h>");
             proxy("#include \"{}\"", header_filename);
+            
+            proxy("#ifdef USE_RPC_TELEMETRY");
+            proxy("#include <rpc/telemetry/i_telemetry_service.h>");
+            proxy("#endif");
+            
 
             proxy("");
 

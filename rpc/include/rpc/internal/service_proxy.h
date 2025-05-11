@@ -13,6 +13,8 @@
 
 namespace rpc
 {
+    NAMESPACE_INLINE_BEGIN
+    
     // the class that represents another zone from the zone that this is used in
     // only host code can use this class directly other enclaves *may* have access to the i_service_proxy derived
     // interface
@@ -121,4 +123,5 @@ namespace rpc
         friend child_service;
     };
     
+    NAMESPACE_INLINE_END
 }

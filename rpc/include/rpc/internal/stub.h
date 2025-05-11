@@ -8,6 +8,7 @@
 
 namespace rpc
 {
+    NAMESPACE_INLINE_BEGIN
     class object_stub
     {
         object id_ = {0};
@@ -83,4 +84,5 @@ namespace rpc
         virtual shared_ptr<casting_interface> get_castable_interface() const = 0;
     };
 
+    NAMESPACE_INLINE_END
 }

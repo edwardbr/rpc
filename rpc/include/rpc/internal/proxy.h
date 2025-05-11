@@ -12,6 +12,8 @@
 
 namespace rpc
 {
+    NAMESPACE_INLINE_BEGIN
+    
     namespace proxy_factory
 	{
 		template<class T> void create(const std::shared_ptr<object_proxy>& ob, shared_ptr<T>& inface);
@@ -319,4 +321,6 @@ namespace rpc
             return rpc::error::OK();
         }
     }
+    
+    NAMESPACE_INLINE_END
 }

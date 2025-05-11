@@ -12,6 +12,7 @@
 
 namespace rpc
 {
+    NAMESPACE_INLINE_BEGIN
     class object_proxy : public std::enable_shared_from_this<object_proxy>
     {
         object object_id_;
@@ -64,4 +65,6 @@ namespace rpc
 
         template<class T> int query_interface(rpc::shared_ptr<T>& iface, bool do_remote_check = true);
     };
+    
+    NAMESPACE_INLINE_END
 }

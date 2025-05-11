@@ -11,6 +11,8 @@
 
 namespace rpc
 {
+    NAMESPACE_INLINE_BEGIN
+    
     template<class T> class proxy_impl;
 
     // non virtual class to allow for type erasure
@@ -41,4 +43,6 @@ namespace rpc
     public:
         std::shared_ptr<object_proxy> get_object_proxy() const { return object_proxy_; }
     };
+    
+    NAMESPACE_INLINE_END
 }

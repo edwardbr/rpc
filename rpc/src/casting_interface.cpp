@@ -2,6 +2,8 @@
 
 namespace rpc
 {
+    NAMESPACE_INLINE_BEGIN
+
     bool are_in_same_zone(const casting_interface* first, const casting_interface* second)
     {
         if (!first)
@@ -22,4 +24,6 @@ namespace rpc
             return true;
         return false;
     }
+
+    NAMESPACE_INLINE_END
 }

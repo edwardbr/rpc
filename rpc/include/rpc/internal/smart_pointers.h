@@ -1,6 +1,3 @@
-#ifndef RPC_SMART_POINTERS_CORE_HPP
-#define RPC_SMART_POINTERS_CORE_HPP
-
 #include <atomic>
 #include <memory>      // For std::default_delete, std::allocator, std::allocator_traits, std::shared_ptr
 #include <utility>     // For std::swap, std::move, std::forward
@@ -11,7 +8,8 @@
 
 namespace rpc
 {
-
+    NAMESPACE_INLINE_BEGIN
+    
     namespace internal
     {
         struct control_block_base
@@ -1086,6 +1084,8 @@ namespace rpc
     //         std::default_delete<ConcreteLocalProxyType>());
     // }
 
+    NAMESPACE_INLINE_END
+
 } // namespace rpc
 
 namespace std
@@ -1116,6 +1116,5 @@ namespace std
             return 0;
         }
     };
+    
 } // namespace std
-
-#endif // RPC_SMART_POINTERS_CORE_HPP

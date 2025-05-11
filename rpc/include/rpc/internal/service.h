@@ -13,10 +13,11 @@
 #include <atomic>
 #include <limits>
 #include <functional>
-#include <rpc/smart_pointers.h>    // This is the immersive file rpc_smart_pointers_core_v5.hpp
 
 namespace rpc
 {
+    NAMESPACE_INLINE_BEGIN
+    
     const object dummy_object_id = {std::numeric_limits<uint64_t>::max()};
 
     template<class T>
@@ -382,4 +383,5 @@ namespace rpc
         int return_value;
     };
 
+    NAMESPACE_INLINE_END
 }

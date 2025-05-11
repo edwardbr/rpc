@@ -6,6 +6,8 @@
 
 namespace rpc
 {
+    NAMESPACE_INLINE_BEGIN
+    
     template<typename T> class shared_ptr;
     template<typename T> class weak_ptr;
     template<typename T, typename Deleter = std::default_delete<T>> class unique_ptr;
@@ -20,4 +22,6 @@ namespace rpc
     class service;
     class child_service;
     struct current_service_tracker;
+    
+    NAMESPACE_INLINE_END
 }

@@ -18,7 +18,7 @@
 #include <example/example.h>
 
 #include <rpc/rpc.h>
-#include <rpc/basic_service_proxies.h>
+#include <rpc/service_proxies/basic_service_proxies.h>
 #ifdef USE_RPC_TELEMETRY
 #include <rpc/telemetry/host_telemetry_service.h>
 #endif

@@ -3,6 +3,10 @@
  *   All rights reserved.
  */
 
+#ifdef USE_RPC_TELEMETRY
+#include <rpc/telemetry/i_telemetry_service.h>
+#endif
+
 #ifndef _IN_ENCLAVE
 #include <thread>
 

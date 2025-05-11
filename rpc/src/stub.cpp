@@ -4,8 +4,14 @@
  */
 #include <rpc/rpc.h>
 
+#ifdef USE_RPC_TELEMETRY
+#include <rpc/telemetry/i_telemetry_service.h>
+#endif
+
 namespace rpc
 {
+    NAMESPACE_INLINE_BEGIN
+    
     object_stub::object_stub(object id, service& zone, void* target)
         : id_(id)
         , zone_(zone)
@@ -122,4 +128,5 @@ namespace rpc
         zone_.release_local_stub(p_this);
     }
 
+    NAMESPACE_INLINE_END
 }

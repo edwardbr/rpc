@@ -4,27 +4,33 @@
  */
 #pragma once
 
-#include <rpc/version.h>
-#include <rpc/assert.h>
-#include <rpc/error_codes.h>
-#include <rpc/logger.h>
-#include <rpc/types.h>
-#include <rpc/marshaller.h>
-#include <rpc/casting_interface.h>
-#include <rpc/rpc_fwd.h>
+// for future coroutine deliniation
+#define NAMESPACE_INLINE_BEGIN inline namespace synchronous {
+#define NAMESPACE_INLINE_END }
 
-#ifdef USE_RPC_TELEMETRY
-#include <rpc/telemetry/i_telemetry_service.h>
-#endif
+#include <rpc/internal/version.h>
+#include <rpc/internal/assert.h>
+#include <rpc/internal/error_codes.h>
+#include <rpc/internal/types.h>
+#include <rpc/internal/logger.h>
+#include <rpc/internal/type_id.h>
 
-#include <rpc/proxy_base.h>
-#include <rpc/object_proxy.h>
-#include <rpc/service_proxy.h>
-#include <rpc/proxy_impl.h>
+// synchronous/coroutine sensitive headers
 
-#include <rpc/smart_pointers.h>
+// the key interzone communication definiton that all services and service_proxies need to implement
+#include <rpc/internal/marshaller.h>
 
-#include <rpc/service.h>
-#include <rpc/stub.h>
-#include <rpc/proxy.h>
-#include <rpc/serialiser.h>
+#include <rpc/internal/forward_declarations.h>
+
+#include <rpc/internal/casting_interface.h>
+#include <rpc/internal/proxy_base.h>
+#include <rpc/internal/object_proxy.h>
+#include <rpc/internal/service_proxy.h>
+#include <rpc/internal/proxy_impl.h>
+
+#include <rpc/internal/smart_pointers.h>
+
+#include <rpc/internal/service.h>
+#include <rpc/internal/stub.h>
+#include <rpc/internal/proxy.h>
+#include <rpc/internal/serialiser.h>

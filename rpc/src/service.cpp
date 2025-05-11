@@ -9,8 +9,14 @@
 
 #include <rpc/rpc.h>
 
+#ifdef USE_RPC_TELEMETRY
+#include <rpc/telemetry/i_telemetry_service.h>
+#endif
+
 namespace rpc
 {
+    NAMESPACE_INLINE_BEGIN
+    
     ////////////////////////////////////////////////////////////////////////////
     // service
 
@@ -1343,4 +1349,6 @@ namespace rpc
         }
         parent_service_proxy_ = parent_service_proxy;
     }
+
+    NAMESPACE_INLINE_END    
 }

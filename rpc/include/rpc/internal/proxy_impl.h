@@ -12,6 +12,8 @@
 
 namespace rpc
 {
+    NAMESPACE_INLINE_BEGIN
+    
     template<class T> class proxy_impl : public proxy_base, public T
     {
     public:
@@ -39,4 +41,6 @@ namespace rpc
         }
         virtual ~proxy_impl() = default;
     };
+    
+    NAMESPACE_INLINE_END
 }

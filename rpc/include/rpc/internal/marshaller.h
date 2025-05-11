@@ -14,6 +14,8 @@
 
 namespace rpc
 {
+    NAMESPACE_INLINE_BEGIN
+    
     enum class add_ref_options : std::uint8_t
     {
         normal = 1,
@@ -131,4 +133,6 @@ namespace rpc
     {
         return !(first == second);
     }
+    
+    NAMESPACE_INLINE_END
 }
