@@ -18,9 +18,9 @@ jobs:
           git ls-files -- \*.cmake \*CMakeLists.txt | xargs cmake-format --check
       - name: Check clang formatting
         run: |
-          if [ -n "${{github.base_ref}}" ]
+          if [ -n "${{github.event.pull_request.base.sha}}" ]
           then
-            if ! git clang-format --quiet --diff "${{github.base_ref}}" HEAD
+            if ! git clang-format-18 --quiet --diff "${{github.event.pull_request.base.sha}}" HEAD
             then
               echo incorrect formatting
               exit 1
