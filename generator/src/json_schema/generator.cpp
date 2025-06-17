@@ -2,6 +2,7 @@
 #include "cpp_parser.h"  // Your parser API header
 #include "json_schema/generator.h"
 #include "json_schema/writer.h"
+#include <cstdint>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -335,7 +336,7 @@ namespace json_schema_generator
             writer.write_string_property("type", "integer");
             writer.write_key("enum");
             writer.open_array();
-            int next_value = 0;
+            int64_t next_value = 0;
             std::vector<std::string> value_descriptions;
             using underlying = std::underlying_type<entity_type>::type;
             const entity_type ALL_POSSIBLE_MEMBERS
@@ -348,7 +349,7 @@ namespace json_schema_generator
                 std::string enum_value_name = clean_type_name(element_ptr->get_name());
                 if (!enum_value_name.empty() && enum_value_name.find_first_of("{}[]() \t\n\r") == std::string::npos)
                 {
-                    int assigned_value = next_value;
+                    int64_t assigned_value = next_value;
                     const function_entity* value_entity = dynamic_cast<const function_entity*>(element_ptr.get());
                     if (value_entity)
                     {
@@ -357,7 +358,7 @@ namespace json_schema_generator
                         {
                             try
                             {
-                                assigned_value = std::stoi(explicit_value_str);
+                                assigned_value = std::stoll(explicit_value_str);
                             }
                             catch (const std::exception& e)
                             {
