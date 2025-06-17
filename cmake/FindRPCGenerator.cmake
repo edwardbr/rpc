@@ -133,6 +133,18 @@ function(
     else()
       message("target ${dep}_generate does not exist so skipped")
     endif()
+    # when installed (used through a package) idl dependencies can be found through their *_host (or *_enclave) targets:
+    # we know that <package_dir>/${param_install_dir}/interfaces/include is in the target's include directories, and
+    # that the idls themselves are in <package_dir>/${param_install_dir}
+    if(TARGET ${dep}_host)
+      get_target_property(include_dirs ${dep}_host INTERFACE_INCLUDE_DIRECTORIES)
+      foreach(include_dir ${include_dirs})
+        if(${include_dir} MATCHES "/interfaces/include$")
+          string(REPLACE "/interfaces/include" "" idl_dir ${include_dir})
+          set(PATHS_PARAMS ${PATHS_PARAMS} --path ${idl_dir})
+        endif()
+      endforeach()
+    endif()
   endforeach()
 
   if(NOT ${namespace} STREQUAL "")
@@ -402,6 +414,7 @@ function(
   endif()
 
   if(params_install_dir)
+    # install the files when creating a package
     install(DIRECTORY "$<BUILD_INTERFACE:${output_path}/include/${sub_directory}>"
             DESTINATION ${params_install_dir}/interfaces/include)
     install(DIRECTORY "$<BUILD_INTERFACE:${output_path}/src/${sub_directory}>"
@@ -409,5 +422,9 @@ function(
     install(DIRECTORY "$<BUILD_INTERFACE:${output_path}/check_sums/${sub_directory}>"
             DESTINATION ${params_install_dir}/interfaces/check_sums)
     install(FILES "$<BUILD_INTERFACE:${idl}>" DESTINATION ${params_install_dir}/${idl_relative_dir})
+    # make sure the files can be found when used through a package
+    target_include_directories(${name}_idl_host INTERFACE $<INSTALL_INTERFACE:${params_install_dir}/interfaces/include>)
+    target_include_directories(${name}_idl_enclave
+                               INTERFACE $<INSTALL_INTERFACE:${params_install_dir}/interfaces/include>)
   endif()
 endfunction()
