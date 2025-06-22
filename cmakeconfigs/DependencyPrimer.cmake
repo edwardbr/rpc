@@ -1,5 +1,6 @@
 # formatted using cmake-format
 cmake_minimum_required(VERSION 3.24)
+message(STATUS "CMPRIMER: Starting DependencyPrimer.cmake processing.")
 
 message("DEPENDENCIES_LOADED ${DEPENDENCIES_LOADED}")
 if(NOT DEPENDENCIES_LOADED)
@@ -98,31 +99,41 @@ if(NOT DEPENDENCIES_LOADED)
   # ####################################################################################################################
   # load the submodules
 
+  message(STATUS "CMPRIMER: Attempting to find Git...")
   find_package(Git QUIET)
+  message(STATUS "CMPRIMER: Git found: ${GIT_FOUND}")
   message("submodules GIT_FOUND ${GIT_FOUND}")
+  message(STATUS "CMPRIMER: Entering Git repo check for submodules.")
   if(GIT_FOUND AND EXISTS "${CMAKE_SOURCE_DIR}/.git")
     # Update submodules as needed
+    message(STATUS "CMPRIMER: Setting GIT_SUBMODULE option.")
     option(GIT_SUBMODULE "Check submodules during build" ON)
     message("doing GIT_SUBMODULE ${GIT_SUBMODULE}")
+    message(STATUS "CMPRIMER: Checking if GIT_SUBMODULE is enabled for processing.")
     if(GIT_SUBMODULE)
+      message(STATUS "CMPRIMER: Attempting submodule init.")
       message(STATUS "Submodule init")
       execute_process(
         COMMAND ${GIT_EXECUTABLE} submodule init
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
         RESULT_VARIABLE GIT_SUBMOD_INIT_RESULT)
+      message(STATUS "CMPRIMER: Submodule init completed.")
       if(NOT GIT_SUBMOD_INIT_RESULT EQUAL "0")
         message(FATAL_ERROR "submodule init")
       endif()
+      message(STATUS "CMPRIMER: Attempting submodule update.")
       message(STATUS "Submodule update")
       execute_process(
         COMMAND ${GIT_EXECUTABLE} submodule update
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
         RESULT_VARIABLE GIT_SUBMOD_RESULT)
+      message(STATUS "CMPRIMER: Submodule update completed.")
       if(NOT GIT_SUBMOD_RESULT EQUAL "0")
         message(FATAL_ERROR "git submodule update --init failed with ${GIT_SUBMOD_RESULT}, please checkout submodules")
       endif()
     endif()
   endif()
+  message(STATUS "CMPRIMER: Finished Git submodule section.")
 
   # ####################################################################################################################
   # reset and apply cmake separate enclave and host compile flags
@@ -176,6 +187,7 @@ if(NOT DEPENDENCIES_LOADED)
         ${SGX_HW_OR_SIM_DEFINE}
         RPC_OUT_BUFFER_SIZE=${RPC_OUT_BUFFER_SIZE})
 
+    message(STATUS "CMPRIMER: Starting platform-specific (WIN32/Linux) configuration.")
     if(WIN32) # Windows
       if(BUILD_ENCLAVE)
         find_package(SGX REQUIRED)
@@ -428,6 +440,7 @@ if(NOT DEPENDENCIES_LOADED)
       endif()
 
     else() # Linux
+      message(STATUS "CMPRIMER: Configuring for Linux platform.")
       if(ENABLE_CLANG_TIDY)
         find_program(CLANG_TIDY_EXE NAMES "clang-tidy" REQUIRED)
 
@@ -691,5 +704,7 @@ if(NOT DEPENDENCIES_LOADED)
     include(GoogleTest)
     enable_testing()
   endif()
+  message(STATUS "CMPRIMER: Finished main block of DependencyPrimer.cmake.")
 
 endif(NOT DEPENDENCIES_LOADED)
+message(STATUS "CMPRIMER: Fully finished processing DependencyPrimer.cmake.")
