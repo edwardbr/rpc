@@ -68,7 +68,6 @@ There are different CMake options specified in the root CMakeLists.txt:
   option(DEBUG_HOST_UNDEFINED "enable undefined behaviour sanitizer" OFF)
   option(DEBUG_HOST_ALL "enable all sanitizers" OFF)
   option(DEBUG_ENCLAVE_MEMLEAK "detect memory leaks in enclaves" OFF)
-  option(SECRETARIUM_UNITY_BUILD "enable unity build" OFF)
   option(ENABLE_CLANG_TIDY "Enable clang-tidy in build (needs to build with clang)" OFF)
   option(ENABLE_CLANG_TIDY_FIX "Turn on auto fix in clang tidy" OFF)
   option(ENABLE_COVERAGE "Turn on code coverage" OFF)
