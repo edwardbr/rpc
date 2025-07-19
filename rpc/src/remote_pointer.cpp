@@ -2,16 +2,15 @@
  *   Copyright (c) 2024 Edward Boggis-Rolfe
  *   All rights reserved.
  */
-//this is the legacy rpc implementation kept for win32 for now
+// this is the legacy rpc implementation kept for win32 for now
 
 #include <rpc/remote_pointer.h>
 
 namespace rpc
 {
-    bad_weak_ptr::~bad_weak_ptr() noexcept {}
+    bad_weak_ptr::~bad_weak_ptr() noexcept { }
 
-    const char*
-    bad_weak_ptr::what() const noexcept
+    const char* bad_weak_ptr::what() const noexcept
     {
         return "bad_weak_ptr";
     }
@@ -55,13 +54,15 @@ namespace rpc
     {
         long object_owners = __shared_owners_.load(std::memory_order_seq_cst);
         while (object_owners != -1)
-        {            
+        {
             if (__shared_owners_.compare_exchange_weak(object_owners, object_owners + 1))
                 return this;
         }
         return nullptr;
     }
-    const void* __shared_weak_count::__get_deleter(const std::type_info&) const noexcept { return nullptr; }
-
+    const void* __shared_weak_count::__get_deleter(const std::type_info&) const noexcept
+    {
+        return nullptr;
+    }
 
 }

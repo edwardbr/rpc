@@ -6,7 +6,7 @@ ColumnLimit: 120
 # See: https://github.com/isocpp/CppCoreGuidelines/blob/master/CppCoreGuidelines.md#Rl-ptr
 DerivePointerAlignment: false
 
-AlignAfterOpenBracket: true
+AlignAfterOpenBracket: DontAlign
 AlignOperands: true
 AlignTrailingComments: true
 AllowAllParametersOfDeclarationOnNextLine: true
@@ -15,16 +15,19 @@ AllowShortFunctionsOnASingleLine: Inline
 AllowShortIfStatementsOnASingleLine: false
 AllowShortLoopsOnASingleLine: false
 AlwaysBreakAfterReturnType: None
-BinPackArguments: true
-BinPackParameters: true
+BinPackArguments: false
+BinPackParameters: false
 BreakBeforeBraces: Allman
 BreakBeforeTernaryOperators: true
 IndentCaseLabels: false
-SortIncludes:    false
+InsertNewlineAtEOF: true
+SortIncludes: false
 SpaceAfterCStyleCast: false
 SpaceAfterTemplateKeyword: false
 SpaceBeforeAssignmentOperators: true
 SpacesInSquareBrackets: false
 Cpp11BracedListStyle: true
 NamespaceIndentation: All
-SpaceBeforeParens: Never 
+PenaltyExcessCharacter: 5
+PointerAlignment: Left
+SpaceBeforeCpp11BracedList: false

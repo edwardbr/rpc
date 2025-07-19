@@ -5,14 +5,14 @@ Copyright (c) 2024 Edward Boggis-Rolfe
 All rights reserved.
 
 ## Intro
-This library implements an RPC solution that reflects modern C++ concepts.  It is intended for developers that want a pure C++ experience and supports C++ types natively, and all other languages communicate with this library using JSON or some other generic protocol.  
+This library implements an RPC solution that reflects modern C++ concepts.  It is intended for developers that want a pure C++ experience and supports C++ types natively, and all other languages communicate with this library using JSON or some other generic protocol.
 
 ## What are Remote Procedure Calls?
-Remote procedure calls allow applications to talk each other without getting snarled up in underlying communication protocols.  The transport and the end user programming API's are treated as separate concerns.  
+Remote procedure calls allow applications to talk each other without getting snarled up in underlying communication protocols.  The transport and the end user programming API's are treated as separate concerns.
 ### In a nutshell
 In other words you can easily make an API that is accessible from another machine, dll, arena or embedded device and not think about serialization.
 ### A bit of history
-RPC has been around for decades targeting mainly the C programming language and was very popular in the 80's and 90's. The technology reached its zenith with the arrival of (D)COM from Microsoft and CORBA from a consortium of other companies.  Unfortunately both organizations hated each other and with their closed source attitudes people fell out of love with them in favour with XMLRPC, SOAP and REST as the new sexy kids on the block.  
+RPC has been around for decades targeting mainly the C programming language and was very popular in the 80's and 90's. The technology reached its zenith with the arrival of (D)COM from Microsoft and CORBA from a consortium of other companies.  Unfortunately both organizations hated each other and with their closed source attitudes people fell out of love with them in favour with XMLRPC, SOAP and REST as the new sexy kids on the block.
 
 RPC though is a valuable solution for all solutions, however historically it did not offer direct answers for working over insecure networks, partly because of the short sighted intransigence and secrecy of various organizations.  People are coming off from some of the other aging fads and are returning to higher performance solutions such as this.
 
@@ -61,10 +61,7 @@ There are different CMake options specified in the root CMakeLists.txt:
   option(BUILD_ENCLAVE "build enclave code" ON)
   option(BUILD_HOST "build host code" ON)
   option(BUILD_EXE "build exe code" ON)
-  # When building Core, BUILD_TEST is always explicitly defined to ON or OFF, but not necessarily when used in
-  # standalone apps, where we want OFF by default
-  option(BUILD_TEST "build test code, including backdoors in raft idl" OFF)
-  # secretarium exe is needed for measurement, so don't default to ON if it is not built
+  option(BUILD_TEST "build test code" ON)
   option(DEBUG_HOST_LEAK "enable leak sanitizer (only use when ptrace is accessible)" OFF)
   option(DEBUG_HOST_ADDRESS "enable address sanitizer" OFF)
   option(DEBUG_HOST_THREAD "enable thread sanitizer (cannot be used with leak sanitizer)" OFF)
@@ -72,18 +69,16 @@ There are different CMake options specified in the root CMakeLists.txt:
   option(DEBUG_HOST_ALL "enable all sanitizers" OFF)
   option(DEBUG_ENCLAVE_MEMLEAK "detect memory leaks in enclaves" OFF)
   option(SECRETARIUM_UNITY_BUILD "enable unity build" OFF)
-  option(ENABLE_CLANG_TIDY "Enable clang-tidy in build" ON)
+  option(ENABLE_CLANG_TIDY "Enable clang-tidy in build (needs to build with clang)" OFF)
   option(ENABLE_CLANG_TIDY_FIX "Turn on auto fix in clang tidy" OFF)
   option(ENABLE_COVERAGE "Turn on code coverage" OFF)
   option(CMAKE_VERBOSE_MAKEFILE "verbose build step" OFF)
   option(CMAKE_RULE_MESSAGES "verbose cmake" OFF)
   option(FORCE_DEBUG_INFORMATION "force inclusion of debug information" ON)
-  option(RPC_STANDALONE "enable the building of RPC as a standalone library for testing" OFF)
   option(USE_RPC_LOGGING "turn on rpc logging" OFF)
   option(RPC_HANG_ON_FAILED_ASSERT "hang on failed assert" OFF)
   option(USE_RPC_TELEMETRY "turn on rpc telemetry" OFF)
   option(USE_RPC_TELEMETRY_RAII_LOGGING "turn on the logging of the addref release and try cast activity of the services, proxies and stubs" OFF)
-  option(FORCE_DEBUG_INFORMATION "force inclusion of debug information" OFF)
  ```
 
 From the command line:
@@ -107,10 +102,10 @@ Alternatively you can set them explicitly from the .vscode/settings.json file
 Also for viewing idl files more easily install the "Microsoft MIDL and Mozilla WebIDL syntax highlighting" extension to get some highlighting support.
 
 Currently tested on Compilers:
- * Clang 10+ 
+ * Clang 10+
  * GCC 9.4
  * Visual Studio 2017
 
 Though strongly suggest upgrading to the latest version of these compilers
 
-SHA2 Credit to: https://github.com/brainhub/SHA3IUF 
+SHA3 Credit to: https://github.com/brainhub/SHA3IUF
