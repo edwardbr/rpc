@@ -33,7 +33,7 @@ target_link_libraries(
          example_shared_idl_host   
          rpc::rpc_host
          yas_common
-         clipp::clipp
+         args::args
          fmt::fmt
          GTest::gtest_main
          GTest::gmock_main

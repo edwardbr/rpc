@@ -98,6 +98,8 @@ int main(const int argc, char* argv[])
             args_parser, "exception", "exceptions that should be rethrown", {'r', "rethrow_stub_exception"});
         args::ValueFlagList<std::string> additional_stub_headers_arg(
             args_parser, "header", "additional stub headers", {'A', "additional_stub_header"});
+        args::Flag no_include_rpc_headers_arg(
+            args_parser, "include rpc headers", "include rpc headers", {"no_include_rpc_headers"});
 
         try
         {
@@ -280,7 +282,8 @@ int main(const int argc, char* argv[])
                 additional_headers,
                 !suppress_catch_stub_exceptions,
                 rethrow_exceptions,
-                additional_stub_headers);
+                additional_stub_headers,
+                !no_include_rpc_headers_arg);
 
             header_stream << ends;
             proxy_stream << ends;

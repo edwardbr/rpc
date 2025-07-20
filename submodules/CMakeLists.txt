@@ -29,7 +29,7 @@ if(RPC_STANDALONE)
 
   add_subdirectory(idlparser)
 
-  if(BUILD_TEST)
+  # if(BUILD_TEST)
     message("spdlog this is used in tests only and does not need to be installed for other users")
     set(SPDLOG_FMT_EXTERNAL
         ON
@@ -39,7 +39,7 @@ if(RPC_STANDALONE)
         CACHE BOOL "no exceptions" FORCE)
     set(SPDLOG_INSTALL OFF)
     add_subdirectory(spdlog)
-  endif(BUILD_TEST)
+  # endif(BUILD_TEST)
   
   # if(BUILD_COROUTINE)
     set(CARES_STATIC    $<NOT:${LIBCORO_BUILD_SHARED_LIBS}> CACHE INTERNAL "")

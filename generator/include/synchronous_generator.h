@@ -22,6 +22,7 @@ namespace rpc_generator
             const std::vector<std::string>& additional_headers,
             bool catch_stub_exceptions,
             const std::vector<std::string>& rethrow_exceptions,
-            const std::vector<std::string>& additional_stub_headers);
+            const std::vector<std::string>& additional_stub_headers,
+            bool include_rpc_headers);
     }
 }

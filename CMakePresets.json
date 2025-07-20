@@ -9,9 +9,13 @@
       "cacheVariables": {
         "BUILD_ENCLAVE": "OFF",
         "BUILD_HOST": "ON",
+        "BUILD_COROUTINE": "ON",
         "SGX_HW": "OFF",
         "SGX_MODE": "debug",
-        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "LIBCORO_EXTERNAL_DEPENDENCIES": "OFF",
+        "LIBCORO_BUILD_EXAMPLES": "OFF",
+        "LIBCORO_BUILD_TESTS": "OFF"
       }
     },
     {
