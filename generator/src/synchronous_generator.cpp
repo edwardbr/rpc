@@ -25,11 +25,95 @@ extern "C"
 #include "interface_declaration_generator.h"
 #include "fingerprint_generator.h"
 #include "synchronous_generator.h"
+#include "json_schema/generator.h"
+#include "json_schema/writer.h"
+#include <map>
 
 namespace rpc_generator
 {
     namespace synchronous_generator
     {
+        // Generate JSON schema for function input parameters
+        std::string generate_function_parameter_schema(const class_entity& root, const class_entity& interface, const function_entity& function)
+        {
+            std::stringstream schema_stream;
+            json_writer writer(schema_stream);
+            
+            writer.open_object();
+            writer.write_string_property("type", "object");
+            writer.write_string_property("description", "Input parameters for " + function.get_name() + " method");
+            
+            // Collect input parameters
+            std::vector<std::string> required_fields;
+            std::map<std::string, std::pair<std::string, attributes>> properties;
+            
+            for (const auto& param : function.get_parameters())
+            {
+                // Check if this is an input parameter (default to input if no attributes specified)
+                bool is_in = false;
+                bool is_out = false;
+                for (const auto& attr : param.get_attributes())
+                {
+                    if (attr == "in") is_in = true;
+                    if (attr == "out") is_out = true;
+                }
+                bool implicitly_in = !is_in && !is_out;
+                
+                if (is_in || implicitly_in)
+                {
+                    std::string param_name = param.get_name();
+                    std::string param_type = param.get_type();
+                    properties[param_name] = {param_type, param.get_attributes()};
+                    required_fields.push_back(param_name);
+                }
+            }
+            
+            // Write properties
+            if (!properties.empty())
+            {
+                writer.write_key("properties");
+                writer.open_object();
+                
+                std::set<std::string> definitions_needed;
+                std::set<std::string> definitions_written;
+                std::set<std::string> currently_processing;
+                std::map<std::string, json_schema_generator::DefinitionInfoVariant> definition_info_map;
+                
+                for (const auto& prop : properties)
+                {
+                    writer.write_key(prop.first);
+                    json_schema_generator::map_idl_type_to_json_schema(
+                        root, &interface, prop.second.first, prop.second.second,
+                        writer, definitions_needed, definitions_written, 
+                        currently_processing, definition_info_map
+                    );
+                }
+                writer.close_object();
+            }
+            else
+            {
+                writer.write_key("properties");
+                writer.open_object();
+                writer.close_object();
+            }
+            
+            // Write required fields
+            if (!required_fields.empty())
+            {
+                writer.write_key("required");
+                writer.open_array();
+                for (const auto& field : required_fields)
+                {
+                    writer.write_array_string_element(field);
+                }
+                writer.close_array();
+            }
+            
+            writer.write_raw_property("additionalProperties", "false");
+            writer.close_object();
+            
+            return schema_stream.str();
+        }
         enum print_type
         {
             PROXY_PREPARE_IN,
@@ -1260,13 +1344,34 @@ namespace rpc_generator
                         marshalls_interfaces = is_interface_param(library, parameter.get_type());
                     }
 
+                    // Get description attribute
+                    std::string description = function->get_attribute_value("description");
+                    if (!description.empty() && description.front() == '"' && description.back() == '"')
+                    {
+                        description = description.substr(1, description.length() - 2);
+                    }
+                    
+                    // Generate JSON schema for function parameters
+                    std::string json_schema = generate_function_parameter_schema(library, m_ob, *function);
+                    // Escape quotes for C++ string literal
+                    std::string escaped_schema = json_schema;
+                    size_t pos = 0;
+                    while ((pos = escaped_schema.find('"', pos)) != std::string::npos) 
+                    {
+                        escaped_schema.replace(pos, 1, "\\\"");
+                        pos += 2;
+                    }
+                    json_schema = escaped_schema;
+                    
                     proxy("functions.emplace_back(rpc::function_info{{\"{0}.{1}\", \"{1}\", {{{2}}}, (uint64_t){3}, "
-                          "{4}}});",
+                          "{4}, \"{5}\", \"{6}\"}});",
                         full_name,
                         function->get_name(),
                         function_count,
                         tag,
-                        marshalls_interfaces);
+                        marshalls_interfaces,
+                        description,
+                        json_schema);
                     function_count++;
                 }
                 proxy("return functions;");

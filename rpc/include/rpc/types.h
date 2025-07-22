@@ -194,6 +194,8 @@ namespace rpc
         method id;
         uint64_t tag;
         bool marshalls_interfaces;
+        std::string mcp_description;
+        std::string json_schema;
     };
 }
 

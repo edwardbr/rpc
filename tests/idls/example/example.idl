@@ -11,43 +11,43 @@ namespace yyy
     [status=example]
     interface i_example
     {
-        error_code add(int a, int b, [out, by_value] int& c);
-        error_code create_foo([out] rpc::shared_ptr<xxx::i_foo>& target);
-        error_code create_baz([out] rpc::shared_ptr<xxx::i_baz>& val);
+        [description="Adds two integers and returns the result"] error_code add(int a, int b, [out, by_value] int& c);
+        [description="Creates a new foo object instance"] error_code create_foo([out] rpc::shared_ptr<xxx::i_foo>& target);
+        [description="Creates a new baz object instance"] error_code create_baz([out] rpc::shared_ptr<xxx::i_baz>& val);
 
-        error_code create_example_in_subordinate_zone([out] rpc::shared_ptr<yyy::i_example>& target, const rpc::shared_ptr<i_host>& host_ptr, uint64_t new_zone_id);
-        error_code create_example_in_subordinate_zone_and_set_in_host(uint64_t new_zone_id, const std::string& name, const rpc::shared_ptr<i_host>& host_ptr);
-        error_code create_multiple_inheritance([out] rpc::shared_ptr<xxx::i_baz>& target);
+        [description="Creates an example instance in a subordinate zone"] error_code create_example_in_subordinate_zone([out] rpc::shared_ptr<yyy::i_example>& target, const rpc::shared_ptr<i_host>& host_ptr, uint64_t new_zone_id);
+        [description="Creates an example in subordinate zone and sets it in the host"] error_code create_example_in_subordinate_zone_and_set_in_host(uint64_t new_zone_id, const std::string& name, const rpc::shared_ptr<i_host>& host_ptr);
+        [description="Creates an object with multiple inheritance"] error_code create_multiple_inheritance([out] rpc::shared_ptr<xxx::i_baz>& target);
 
-        error_code receive_interface([out] rpc::shared_ptr<xxx::i_foo>& val); // can be null
-        error_code give_interface([in] const rpc::shared_ptr<xxx::i_baz> val); // can be null
-        error_code call_create_enclave_val(rpc::shared_ptr<i_host> host); // can be null
-        error_code call_create_enclave(const rpc::shared_ptr<i_host>& host); // can be null
+        [description="Receives an interface object (can be null)"] error_code receive_interface([out] rpc::shared_ptr<xxx::i_foo>& val); // can be null
+        [description="Gives an interface object to the service (can be null)"] error_code give_interface([in] const rpc::shared_ptr<xxx::i_baz> val); // can be null
+        [description="Creates an enclave using host value parameter (can be null)"] error_code call_create_enclave_val(rpc::shared_ptr<i_host> host); // can be null
+        [description="Creates an enclave using host reference parameter (can be null)"] error_code call_create_enclave(const rpc::shared_ptr<i_host>& host); // can be null
 
-        error_code call_host_create_enclave_and_throw_away(bool run_standard_tests);
-        error_code call_host_create_enclave([out] rpc::shared_ptr<i_example>& target, bool run_standard_tests);
+        [description="Creates an enclave on the host and discards the result"] error_code call_host_create_enclave_and_throw_away(bool run_standard_tests);
+        [description="Creates an enclave on the host and returns the instance"] error_code call_host_create_enclave([out] rpc::shared_ptr<i_example>& target, bool run_standard_tests);
 
         // live app registry, it should have sole responsibility for the long term storage of app shared pointers
-        error_code call_host_look_up_app_not_return(const std::string& name, bool run_standard_tests);
-        error_code call_host_look_up_app(const std::string& name, [out] rpc::shared_ptr<i_example>& app, bool run_standard_tests);
-        error_code call_host_look_up_app_not_return_and_delete(const std::string& name, bool run_standard_tests);
-        error_code call_host_look_up_app_and_delete(const std::string& name, [out] rpc::shared_ptr<i_example>& app, bool run_standard_tests);
-        error_code call_host_set_app(const std::string& name, [in] const rpc::shared_ptr<i_example>& app, bool run_standard_tests);
-        error_code call_host_unload_app(const std::string& name);
+        [description="Looks up an app by name without returning the instance"] error_code call_host_look_up_app_not_return(const std::string& name, bool run_standard_tests);
+        [description="Looks up an app by name and returns the instance"] error_code call_host_look_up_app(const std::string& name, [out] rpc::shared_ptr<i_example>& app, bool run_standard_tests);
+        [description="Looks up an app by name, deletes it, but doesn't return it"] error_code call_host_look_up_app_not_return_and_delete(const std::string& name, bool run_standard_tests);
+        [description="Looks up an app by name, deletes it, and returns the instance"] error_code call_host_look_up_app_and_delete(const std::string& name, [out] rpc::shared_ptr<i_example>& app, bool run_standard_tests);
+        [description="Sets an app instance with the given name in the host registry"] error_code call_host_set_app(const std::string& name, [in] const rpc::shared_ptr<i_example>& app, bool run_standard_tests);
+        [description="Unloads an app by name from the host registry"] error_code call_host_unload_app(const std::string& name);
 
-        error_code send_interface_back([in] const rpc::shared_ptr<xxx::i_baz>& input, [out] rpc::shared_ptr<xxx::i_baz>& output); // can be null
+        [description="Sends an interface object and receives it back (can be null)"] error_code send_interface_back([in] const rpc::shared_ptr<xxx::i_baz>& input, [out] rpc::shared_ptr<xxx::i_baz>& output); // can be null
 
-        error_code get_host([out] rpc::shared_ptr<i_host>& app);
-        error_code set_host([in] const rpc::shared_ptr<i_host>& app);
+        [description="Gets the current host instance"] error_code get_host([out] rpc::shared_ptr<i_host>& app);
+        [description="Sets the current host instance"] error_code set_host([in] const rpc::shared_ptr<i_host>& app);
     };
 
     interface i_host
     {
-        error_code create_enclave([out] rpc::shared_ptr<i_example>& target);
+        [description="Creates a new enclave instance"] error_code create_enclave([out] rpc::shared_ptr<i_example>& target);
 
         // live app registry, it should have sole responsibility for the long term storage of app shared pointers
-        error_code look_up_app(const std::string& name, [out] rpc::shared_ptr<i_example>& app);
-        error_code set_app(const std::string& name, [in] const rpc::shared_ptr<i_example>& app);
-        error_code unload_app(const std::string& name);
+        [description="Looks up an application by name from the registry"] error_code look_up_app(const std::string& name, [out] rpc::shared_ptr<i_example>& app);
+        [description="Sets an application instance in the registry with the given name"] error_code set_app(const std::string& name, [in] const rpc::shared_ptr<i_example>& app);
+        [description="Unloads an application by name from the registry"] error_code unload_app(const std::string& name);
   };
 }
