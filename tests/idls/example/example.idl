@@ -11,11 +11,13 @@ namespace yyy
     [status=example]
     interface i_example
     {
+        [description=R"__(Creates an example instance in a subordinate zone
+        abd we can do funky shit like this)__"] error_code create_example_in_subordinate_zone([out] rpc::shared_ptr<yyy::i_example>& target, const rpc::shared_ptr<i_host>& host_ptr, uint64_t new_zone_id);
+
         [description="Adds two integers and returns the result"] error_code add(int a, int b, [out, by_value] int& c);
         [description="Creates a new foo object instance"] error_code create_foo([out] rpc::shared_ptr<xxx::i_foo>& target);
         [description="Creates a new baz object instance"] error_code create_baz([out] rpc::shared_ptr<xxx::i_baz>& val);
 
-        [description="Creates an example instance in a subordinate zone"] error_code create_example_in_subordinate_zone([out] rpc::shared_ptr<yyy::i_example>& target, const rpc::shared_ptr<i_host>& host_ptr, uint64_t new_zone_id);
         [description="Creates an example in subordinate zone and sets it in the host"] error_code create_example_in_subordinate_zone_and_set_in_host(uint64_t new_zone_id, const std::string& name, const rpc::shared_ptr<i_host>& host_ptr);
         [description="Creates an object with multiple inheritance"] error_code create_multiple_inheritance([out] rpc::shared_ptr<xxx::i_baz>& target);
 

@@ -410,15 +410,14 @@ namespace rpc_generator
             const class_entity& lib,
             const std::string& name,
             const std::string& type,
-            const std::list<std::string>& attributes,
+            const attributes& attribs,
             uint64_t& count,
             std::string& output)
         {
-            auto in = is_in_param(attributes);
-            auto out = is_out_param(attributes);
-            auto is_const = is_const_param(attributes);
-            auto by_value
-                = std::find(attributes.begin(), attributes.end(), attribute_types::by_value_param) != attributes.end();
+            auto in = is_in_param(attribs);
+            auto out = is_out_param(attribs);
+            auto is_const = is_const_param(attribs);
+            auto by_value = attribs.has_value(attribute_types::by_value_param);
 
             if (out && !in)
                 return false;
@@ -509,13 +508,13 @@ namespace rpc_generator
             const class_entity& lib,
             const std::string& name,
             const std::string& type,
-            const std::list<std::string>& attributes,
+            const attributes& attribs,
             uint64_t& count,
             std::string& output)
         {
-            auto in = is_in_param(attributes);
-            auto out = is_out_param(attributes);
-            auto is_const = is_const_param(attributes);
+            auto in = is_in_param(attribs);
+            auto out = is_out_param(attribs);
+            auto is_const = is_const_param(attribs);
 
             if (!out)
                 return false;
@@ -663,14 +662,8 @@ namespace rpc_generator
                 {
                     std::string output;
                     {
-                        if (!do_in_param(PROXY_MARSHALL_IN,
-                                from_host,
-                                m_ob,
-                                parameter.get_name(),
-                                parameter.get_type(),
-                                parameter.get_attributes(),
-                                count,
-                                output))
+                        if (!do_in_param(
+                                PROXY_MARSHALL_IN, from_host, m_ob, parameter.get_name(), parameter.get_type(), parameter, count, output))
                             continue;
 
                         proxy(output);
@@ -749,14 +742,8 @@ namespace rpc_generator
                 {
                     count++;
                     std::string output;
-                    if (!do_out_param(PROXY_MARSHALL_OUT,
-                            from_host,
-                            m_ob,
-                            parameter.get_name(),
-                            parameter.get_type(),
-                            parameter.get_attributes(),
-                            count,
-                            output))
+                    if (!do_out_param(
+                            PROXY_MARSHALL_OUT, from_host, m_ob, parameter.get_name(), parameter.get_type(), parameter, count, output))
                         continue;
                     proxy(output);
                 }
@@ -848,14 +835,8 @@ namespace rpc_generator
                 {
                     count++;
                     std::string output;
-                    if (!do_in_param(STUB_MARSHALL_IN,
-                            from_host,
-                            m_ob,
-                            parameter.get_name(),
-                            parameter.get_type(),
-                            parameter.get_attributes(),
-                            count,
-                            output))
+                    if (!do_in_param(
+                            STUB_MARSHALL_IN, from_host, m_ob, parameter.get_name(), parameter.get_type(), parameter, count, output))
                         continue;
                     stub(output);
                 }
@@ -943,14 +924,8 @@ namespace rpc_generator
                 {
                     std::string output;
                     {
-                        if (!do_out_param(STUB_MARSHALL_OUT,
-                                from_host,
-                                m_ob,
-                                parameter.get_name(),
-                                parameter.get_type(),
-                                parameter.get_attributes(),
-                                count,
-                                output))
+                        if (!do_out_param(
+                                STUB_MARSHALL_OUT, from_host, m_ob, parameter.get_name(), parameter.get_type(), parameter, count, output))
                             continue;
 
                         stub(output);
@@ -1160,7 +1135,7 @@ namespace rpc_generator
                     continue;
                 else if (elem->get_entity_type() == entity_type::NAMESPACE)
                 {
-                    bool is_inline = elem->get_attribute("inline") == "inline";
+                    bool is_inline = elem->has_value("inline");
 
                     if (is_inline)
                     {

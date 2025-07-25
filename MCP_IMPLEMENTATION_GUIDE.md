@@ -12,8 +12,9 @@ This document provides a complete guide to the Model Context Protocol (MCP) inte
      - `std::string json_schema` - JSON schema for input parameters
 
 2. **`/generator/src/synchronous_generator.cpp`**
-   - Added `generate_function_parameter_schema()` function
-   - Integrated JSON schema generation using existing json_schema_generator
+   - Integrated JSON schema generation with comprehensive type support
+   - Enhanced template parameter substitution using first-principles detection
+   - Generic namespace resolution for complex types
    - Extract description attributes from IDL during code generation
    - Generate MCP-compatible metadata in function_info structures
 
@@ -142,8 +143,12 @@ for (const auto& func : functions) {
 
 ### Schema Generation Process
 1. IDL parser extracts `[description="..."]` attributes
-2. Code generator calls `generate_function_parameter_schema()`
-3. JSON schema created for input parameters only
+2. Code generator analyzes function parameters during generation
+3. JSON schema created for input parameters with full type resolution:
+   - Template parameter substitution using first-principles detection
+   - Generic namespace resolution for complex types  
+   - Nested complex types in containers (vectors, maps)
+   - Template instantiations with proper parameter mapping
 4. Schema integrated into generated function_info
 5. Runtime metadata available via `get_function_info()`
 
@@ -155,6 +160,23 @@ for (const auto& func : functions) {
 4. ✅ **Runtime Metadata**: function_info contains MCP fields
 5. ✅ **Test Suite**: All MCP tests pass
 6. ✅ **Integration**: Works with existing CMake build system
+
+## Recent Enhancements (2024)
+
+### JSON Schema Generation Improvements
+- **Generic Template Parameter Detection**: System now analyzes template definitions to extract actual parameter names instead of using hardcoded lists
+- **Universal Namespace Resolution**: Dynamic discovery and resolution of types across all namespaces, not limited to specific namespace names
+- **Enhanced Complex Type Support**: 
+  - Nested complex types in containers (e.g., `std::vector<CustomStruct>`)
+  - Template instantiations with any parameter names (e.g., `MyTemplate<ValueType>`)
+  - Multi-parameter templates with proper argument mapping
+- **Robust Type Substitution**: First-principles approach eliminates "Unknown complex type" errors
+
+### Impact
+- ✅ Eliminated hardcoded assumptions about template parameter names
+- ✅ Removed hardcoded namespace prefixes  
+- ✅ Support for any IDL naming conventions
+- ✅ Future-proof design that adapts to new patterns automatically
 
 ## Future Considerations
 

@@ -1,181 +1,166 @@
+#include <gtest/gtest.h>
 #include <iostream>
 #include <string>
 #include <vector>
+#include <cstdint>
+#include <map>
+#include <algorithm>
+
+// Conditional include for nlohmann/json if available
 #include <nlohmann/json.hpp>
+#include <nlohmann/json-schema.hpp>
 
-// This will be generated from the IDL
-// #include "example.h"
+// Generated IDL headers
+#include <example/example.h>
+#include <rpc/error_codes.h>
 
-struct function_info_test
+// Include test setup classes and required headers
+#include "test_host.h"
+#include "inproc_setup.h"
+#include "test_globals.h"
+#include "test_service_logger.h"
+#include <common/foo_impl.h>
+#include <common/tests.h>
+#include <example/example.h>
+
+// Test using inproc_setup to call standard_tests for schema validation
+TEST(McpSchemaValidationTest, InprocSetupStandardTests)
 {
-    std::string full_name;
-    std::string name;
-    int method_id;
-    uint64_t tag;
-    bool marshalls_interfaces;
-    std::string mcp_description;
-    std::string json_schema;
-};
+    // Serialize a call to call_host_create_enclave_and_throw_away with parameter false
+    std::vector<char> buffer;
+    auto err
+        = yyy::i_example::proxy_serialiser<rpc::serialiser::yas, rpc::encoding>::call_host_create_enclave_and_throw_away(
+            false, buffer, rpc::encoding::yas_json);
 
-// Mock function to simulate what would be generated
-std::vector<function_info_test> get_test_function_info()
-{
-    std::vector<function_info_test> functions;
-    
-    // Simulated generated code for 'add' function
-    functions.emplace_back(function_info_test{
-        "yyy.i_example.add",
-        "add", 
-        1, 
-        0, 
-        false,
-        "Adds two integers and returns the result",
-        R"({"type":"object","description":"Input parameters for add method","properties":{"a":{"type":"integer"},"b":{"type":"integer"}},"required":["a","b"],"additionalProperties":false})"
-    });
-    
-    // Simulated generated code for 'create_foo' function
-    functions.emplace_back(function_info_test{
-        "yyy.i_example.create_foo",
-        "create_foo", 
-        2, 
-        0, 
-        true,
-        "Creates a foo object",
-        R"({"type":"object","description":"Input parameters for create_foo method","properties":{},"additionalProperties":false})"
-    });
-    
-    // Simulated generated code for 'call_host_create_enclave_and_throw_away' function
-    functions.emplace_back(function_info_test{
-        "yyy.i_example.call_host_create_enclave_and_throw_away",
-        "call_host_create_enclave_and_throw_away", 
-        3, 
-        0, 
-        false,
-        "Call host and create enclave then throw away",
-        R"({"type":"object","description":"Input parameters for call_host_create_enclave_and_throw_away method","properties":{"run_standard_tests":{"type":"boolean"}},"required":["run_standard_tests"],"additionalProperties":false})"
-    });
-    
-    return functions;
-}
+    ASSERT_EQ(err, 0) << "Serialization should succeed";
+    ASSERT_FALSE(buffer.empty()) << "Buffer should not be empty after serialization";
 
-void test_metadata_querying()
-{
-    std::cout << "=== Testing Metadata Querying ===" << std::endl;
-    
-    auto functions = get_test_function_info();
-    
-    for (const auto& func : functions)
-    {
-        std::cout << "Function: " << func.name << std::endl;
-        std::cout << "  Full Name: " << func.full_name << std::endl;
-        std::cout << "  Method ID: " << func.method_id << std::endl;
-        std::cout << "  Tag: " << func.tag << std::endl;
-        std::cout << "  Marshalls Interfaces: " << (func.marshalls_interfaces ? "true" : "false") << std::endl;
-        std::cout << "  Description: " << func.mcp_description << std::endl;
-        std::cout << "  JSON Schema: " << func.json_schema << std::endl;
-        std::cout << std::endl;
-    }
-}
+    // Get function info and find the matching function
+    auto fi = yyy::i_example::get_function_info();
+    ASSERT_FALSE(fi.empty()) << "Function info should not be empty";
 
-void test_json_schema_compatibility()
-{
-    std::cout << "=== Testing JSON Schema Compatibility ===" << std::endl;
-    
-    auto functions = get_test_function_info();
-    
-    for (const auto& func : functions)
-    {
-        try
-        {
-            // Parse the JSON schema to validate it's valid JSON
-            auto schema_json = nlohmann::json::parse(func.json_schema);
-            
-            std::cout << "✓ " << func.name << " has valid JSON schema" << std::endl;
-            std::cout << "  Schema type: " << schema_json["type"] << std::endl;
-            std::cout << "  Description: " << schema_json["description"] << std::endl;
-            
-            if (schema_json.contains("properties"))
-            {
-                std::cout << "  Properties: ";
-                for (auto it = schema_json["properties"].begin(); it != schema_json["properties"].end(); ++it)
-                {
-                    std::cout << it.key();
-                    if (std::next(it) != schema_json["properties"].end()) std::cout << ", ";
-                }
-                std::cout << std::endl;
-            }
-            
-            // Test creating example JSON payloads
-            if (func.name == "add")
-            {
-                nlohmann::json payload = {
-                    {"a", 5},
-                    {"b", 3}
-                };
-                std::cout << "  Example payload: " << payload.dump() << std::endl;
-            }
-            else if (func.name == "call_host_create_enclave_and_throw_away")
-            {
-                nlohmann::json payload = {
-                    {"run_standard_tests", true}
-                };
-                std::cout << "  Example payload: " << payload.dump() << std::endl;
-            }
-            else if (func.name == "create_foo")
-            {
-                nlohmann::json payload = nlohmann::json::object();
-                std::cout << "  Example payload: " << payload.dump() << std::endl;
-            }
-            
-        }
-        catch (const std::exception& e)
-        {
-            std::cout << "✗ " << func.name << " has invalid JSON schema: " << e.what() << std::endl;
-        }
-        
-        std::cout << std::endl;
-    }
-}
+    // Find the call_host_create_enclave_and_throw_away function in the real function info
+    auto it = std::find_if(
+        fi.begin(), fi.end(), [](const auto& func) { return func.name == "call_host_create_enclave_and_throw_away"; });
 
-void test_mcp_service_compatibility()
-{
-    std::cout << "=== Testing MCP Service Compatibility ===" << std::endl;
-    
-    auto functions = get_test_function_info();
-    
-    // Simulate what an MCP service would see
-    nlohmann::json mcp_tools = nlohmann::json::array();
-    
-    for (const auto& func : functions)
-    {
-        nlohmann::json tool = {
-            {"name", func.name},
-            {"description", func.mcp_description},
-            {"inputSchema", nlohmann::json::parse(func.json_schema)}
-        };
-        mcp_tools.push_back(tool);
-    }
-    
-    std::cout << "MCP Tools JSON:" << std::endl;
-    std::cout << mcp_tools.dump(2) << std::endl;
-    
-    std::cout << "\n✓ Successfully created MCP-compatible tool definitions" << std::endl;
-}
+    ASSERT_NE(it, fi.end()) << "Should find call_host_create_enclave_and_throw_away function";
 
-int main()
-{
+    // Convert buffer to string and parse as JSON
+    std::string buffer_str(buffer.begin(), buffer.end());
+    EXPECT_FALSE(buffer_str.empty()) << "Serialized buffer should contain data";
+
+    // Parse the serialized data as JSON
+    nlohmann::json payload_json;
+    ASSERT_NO_THROW(payload_json = nlohmann::json::parse(buffer_str)) << "Buffer should contain valid JSON";
+
+    // Parse the schema from the real function info
+    const auto& schema_str = it->in_json_schema;
+    EXPECT_FALSE(schema_str.empty()) << "Schema should not be empty";
+
+    nlohmann::json schema_json;
+    ASSERT_NO_THROW(schema_json = nlohmann::json::parse(schema_str)) << "Schema should be valid JSON";
+
+    // Create validator and set the schema
+    nlohmann::json_schema::json_validator validator;
     try
     {
-        test_metadata_querying();
-        test_json_schema_compatibility(); 
-        test_mcp_service_compatibility();
-        
-        std::cout << "=== All Tests Passed ===" << std::endl;
-        return 0;
+        validator.set_root_schema(schema_json);
     }
     catch (const std::exception& e)
     {
-        std::cerr << "Test failed with exception: " << e.what() << std::endl;
-        return 1;
+        FAIL() << "Failed to set schema: " << e.what();
     }
+
+    // Validate the payload against the schema
+    try
+    {
+        validator.validate(payload_json);
+        SUCCEED() << "Payload successfully validates against schema";
+    }
+    catch (const std::exception& e)
+    {
+        FAIL() << "Schema validation failed: " << e.what() << "\nPayload: " << payload_json.dump(2)
+               << "\nSchema: " << schema_json.dump(2);
+    }
+
+    // Additional checks for the specific function
+    EXPECT_TRUE(payload_json.contains("run_standard_tests")) << "Payload should contain run_standard_tests parameter";
+    EXPECT_TRUE(payload_json["run_standard_tests"].is_boolean()) << "run_standard_tests should be a boolean";
+    EXPECT_EQ(payload_json["run_standard_tests"].get<bool>(), false)
+        << "run_standard_tests should be false as passed to serializer";
+
+    SUCCEED() << "Schema validation test completed successfully";
 }
+
+// Test that input and output schemas are properly separated
+TEST(McpSchemaValidationTest, InputOutputSchemaSeparation)
+{
+    // Get function info
+    auto fi = yyy::i_example::get_function_info();
+    ASSERT_FALSE(fi.empty()) << "Function info should not be empty";
+
+    // Find a function with both input and output parameters
+    auto it = std::find_if(fi.begin(), fi.end(), [](const auto& func) { 
+        return func.name == "call_host_create_enclave"; 
+    });
+
+    ASSERT_NE(it, fi.end()) << "Should find call_host_create_enclave function";
+
+    // Verify input schema exists and is valid
+    EXPECT_FALSE(it->in_json_schema.empty()) << "Input schema should not be empty";
+    
+    nlohmann::json in_schema_json;
+    ASSERT_NO_THROW(in_schema_json = nlohmann::json::parse(it->in_json_schema)) 
+        << "Input schema should be valid JSON";
+    
+    EXPECT_EQ(in_schema_json["type"], "object") << "Input schema should be object type";
+    EXPECT_TRUE(in_schema_json.contains("description")) << "Input schema should have description";
+    EXPECT_TRUE(in_schema_json["description"].get<std::string>().find("Input parameters") != std::string::npos) 
+        << "Input schema description should indicate input parameters";
+
+    // Verify output schema exists and is valid
+    EXPECT_FALSE(it->out_json_schema.empty()) << "Output schema should not be empty";
+    
+    nlohmann::json out_schema_json;
+    ASSERT_NO_THROW(out_schema_json = nlohmann::json::parse(it->out_json_schema)) 
+        << "Output schema should be valid JSON";
+    
+    EXPECT_EQ(out_schema_json["type"], "object") << "Output schema should be object type";
+    EXPECT_TRUE(out_schema_json.contains("description")) << "Output schema should have description";
+    EXPECT_TRUE(out_schema_json["description"].get<std::string>().find("Output parameters") != std::string::npos) 
+        << "Output schema description should indicate output parameters";
+
+    // Test that schemas are different (since this function has both input and output params)
+    EXPECT_NE(it->in_json_schema, it->out_json_schema) << "Input and output schemas should be different";
+}
+
+// Test that functions with only input parameters have empty output schema
+TEST(McpSchemaValidationTest, InputOnlyFunctionSchemas)
+{
+    // Get function info
+    auto fi = yyy::i_example::get_function_info();
+    ASSERT_FALSE(fi.empty()) << "Function info should not be empty";
+
+    // Find a function with only input parameters (no [out] attributes)
+    auto it = std::find_if(fi.begin(), fi.end(), [](const auto& func) { 
+        return func.name == "call_host_create_enclave_and_throw_away"; 
+    });
+
+    ASSERT_NE(it, fi.end()) << "Should find call_host_create_enclave_and_throw_away function";
+
+    // Verify input schema exists
+    EXPECT_FALSE(it->in_json_schema.empty()) << "Input schema should not be empty for input-only function";
+    
+    // Verify output schema indicates no output parameters
+    nlohmann::json out_schema_json;
+    ASSERT_NO_THROW(out_schema_json = nlohmann::json::parse(it->out_json_schema)) 
+        << "Output schema should be valid JSON";
+    
+    // For functions with no output parameters, the schema should still be valid but indicate no properties
+    EXPECT_EQ(out_schema_json["type"], "object") << "Output schema should be object type";
+    EXPECT_FALSE(out_schema_json.contains("properties") && !out_schema_json["properties"].empty()) 
+        << "Output schema should not have properties for input-only function";
+}
+
+// Note: main() function now handled by GTest framework
+// Tests are automatically discovered and run by gtest_main

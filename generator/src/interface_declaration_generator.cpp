@@ -340,15 +340,14 @@ namespace rpc_generator
         const class_entity& lib,
         const std::string& name,
         const std::string& type,
-        const std::list<std::string>& attributes,
+        const attributes& attribs,
         uint64_t& count,
         std::string& output)
     {
-        auto in = is_in_param(attributes);
-        auto out = is_out_param(attributes);
-        auto is_const = is_const_param(attributes);
-        auto by_value
-            = std::find(attributes.begin(), attributes.end(), attribute_types::by_value_param) != attributes.end();
+        auto in = is_in_param(attribs);
+        auto out = is_out_param(attribs);
+        auto is_const = is_const_param(attribs);
+        auto by_value = attribs.has_value(attribute_types::by_value_param);
 
         if (out && !in)
             return false;
@@ -428,13 +427,13 @@ namespace rpc_generator
         const class_entity& lib,
         const std::string& name,
         const std::string& type,
-        const std::list<std::string>& attributes,
+        const attributes& attribs,
         uint64_t& count,
         std::string& output)
     {
-        auto in = is_in_param(attributes);
-        auto out = is_out_param(attributes);
-        auto is_const = is_const_param(attributes);
+        auto in = is_in_param(attribs);
+        auto out = is_out_param(attribs);
+        auto is_const = is_const_param(attribs);
 
         if (!out)
             return false;
@@ -550,9 +549,8 @@ namespace rpc_generator
             uint64_t count = 1;
             for (auto& parameter : function->get_parameters())
             {
-                auto& attributes = parameter.get_attributes();
-                auto in = is_in_param(attributes);
-                auto out = is_out_param(attributes);
+                auto in = is_in_param(parameter);
+                auto out = is_out_param(parameter);
 
                 if (out && !in)
                     continue;
@@ -560,8 +558,7 @@ namespace rpc_generator
                 has_inparams = true;
 
                 std::string output;
-                if (!do_in_param(
-                        PROXY_PARAM_IN, m_ob, parameter.get_name(), parameter.get_type(), parameter.get_attributes(), count, output))
+                if (!do_in_param(PROXY_PARAM_IN, m_ob, parameter.get_name(), parameter.get_type(), parameter, count, output))
                     continue;
 
                 header.raw(output);
@@ -593,16 +590,14 @@ namespace rpc_generator
         uint64_t count = 1;
         for (auto& parameter : function->get_parameters())
         {
-            auto& attributes = parameter.get_attributes();
-            auto out = is_out_param(attributes);
+            auto out = is_out_param(parameter);
 
             if (!out)
                 continue;
             has_inparams = true;
 
             std::string output;
-            if (!do_out_param(
-                    PROXY_PARAM_OUT, m_ob, parameter.get_name(), parameter.get_type(), parameter.get_attributes(), count, output))
+            if (!do_out_param(PROXY_PARAM_OUT, m_ob, parameter.get_name(), parameter.get_type(), parameter, count, output))
                 continue;
             header.raw(output);
             header.raw(", ");
@@ -632,17 +627,15 @@ namespace rpc_generator
         uint64_t count = 1;
         for (auto& parameter : function->get_parameters())
         {
-            auto& attributes = parameter.get_attributes();
-            auto out = is_out_param(attributes);
-            auto in = is_in_param(attributes);
+            auto out = is_out_param(parameter);
+            auto in = is_in_param(parameter);
 
             if (!in && out)
                 continue;
             has_outparams = true;
 
             std::string output;
-            if (!do_in_param(
-                    STUB_PARAM_IN, m_ob, parameter.get_name(), parameter.get_type(), parameter.get_attributes(), count, output))
+            if (!do_in_param(STUB_PARAM_IN, m_ob, parameter.get_name(), parameter.get_type(), parameter, count, output))
                 continue;
             header.raw(output);
             header.raw(", ");
@@ -672,16 +665,14 @@ namespace rpc_generator
             uint64_t count = 1;
             for (auto& parameter : function->get_parameters())
             {
-                auto& attributes = parameter.get_attributes();
-                auto out = is_out_param(attributes);
+                auto out = is_out_param(parameter);
 
                 if (!out)
                     continue;
 
                 has_outparams = true;
                 std::string output;
-                if (!do_out_param(
-                        STUB_PARAM_OUT, m_ob, parameter.get_name(), parameter.get_type(), parameter.get_attributes(), count, output))
+                if (!do_out_param(STUB_PARAM_OUT, m_ob, parameter.get_name(), parameter.get_type(), parameter, count, output))
                     continue;
 
                 header.raw(output);
@@ -709,7 +700,7 @@ namespace rpc_generator
             uint64_t count = 1;
             for (auto& parameter : function->get_parameters())
             {
-                if (is_out_param(parameter.get_attributes()))
+                if (is_out_param(parameter))
                 {
                     is_suitable = false;
                     // this function is not suitable as it is an out parameter
@@ -739,7 +730,7 @@ namespace rpc_generator
         }
         header.raw(")");
 
-        if (is_const_param(function->get_attributes()))
+        if (is_const_param(*function))
             header.raw(" const");
         return stream.str();
     }
@@ -752,12 +743,9 @@ namespace rpc_generator
             build_scoped_name(&m_ob, scoped_namespace);
 
             header.print_tabs();
-            for (auto& item : function->get_attributes())
-            {
-                if (item == rpc_attribute_types::deprecated_function
-                    || item == rpc_attribute_types::fingerprint_contaminating_deprecated_function)
-                    header.raw("[[deprecated]] ");
-            }
+            if (function->has_value(rpc_attribute_types::deprecated_function)
+                || function->has_value(rpc_attribute_types::fingerprint_contaminating_deprecated_function))
+                header.raw("[[deprecated]] ");
             header.raw("virtual {} {}(", function->get_return_type(), function->get_name());
             bool has_parameter = false;
             for (auto& parameter : function->get_parameters())
@@ -770,11 +758,8 @@ namespace rpc_generator
                 render_parameter(header, m_ob, parameter);
             }
             bool function_is_const = false;
-            for (auto& item : function->get_attributes())
-            {
-                if (item == "const")
-                    function_is_const = true;
-            }
+            if (function->has_value("const"))
+                function_is_const = true;
             if (function_is_const)
             {
                 header.raw(") const = 0;\n");
@@ -1025,7 +1010,7 @@ namespace rpc_generator
                                                 m_ob,
                                                 parameter.get_name(),
                                                 parameter.get_type(),
-                                                parameter.get_attributes(),
+                                                parameter,
                                                 count,
                                                 mshl_val))
                                             continue;
@@ -1037,7 +1022,7 @@ namespace rpc_generator
 
                                 output.raw("__buffer, __this->get_encoding());\n");
 
-                                std::string tag = function->get_attribute_value("tag");
+                                std::string tag = function->get_value("tag");
                                 if (tag.empty())
                                     tag = "0";
 

@@ -14,6 +14,7 @@ endif()
 
 add_subdirectory(idls)
 add_subdirectory(common)
+add_subdirectory(fixtures)
 add_subdirectory(test_host)
 add_subdirectory(mcp_test)
 

@@ -61,43 +61,6 @@ namespace json_schema_generator
         bool is_send_struct = true;
     };
 
-    // --- Helper functions ---
-    bool has_attribute(const attributes& attribs, const std::string& name)
-    {
-        for (const auto& attr : attribs)
-        {
-            if (attr == name || attr.rfind(name + "=", 0) == 0)
-                return true;
-        }
-        return false;
-    }
-    std::string find_attribute_value(const attributes& attribs, const std::string& name)
-    {
-        for (const auto& attr : attribs)
-        {
-            if (attr.rfind(name + "=", 0) == 0)
-            {
-                if (attr.length() > name.length() + 1)
-                {
-                    std::string value = attr.substr(name.length() + 1);
-                    if (value.length() >= 2 && value.front() == '"' && value.back() == '"')
-                    {
-                        value = value.substr(1, value.length() - 2);
-                    }
-                    else if (value.length() >= 2 && value.front() == '\'' && value.back() == '\'')
-                    {
-                        value = value.substr(1, value.length() - 2);
-                    }
-                    return value;
-                }
-                else
-                {
-                    return "";
-                }
-            }
-        }
-        return "";
-    }
     std::string clean_type_name(const std::string& raw_type)
     {
         std::string cleaned = raw_type;
@@ -255,9 +218,8 @@ namespace json_schema_generator
             return;
         }
         writer.open_object();
-        const attributes& definition_attribs = ent.get_attributes();
-        std::string attr_description = find_attribute_value(definition_attribs, "description");
-        if (has_attribute(definition_attribs, "deprecated"))
+        std::string attr_description = ent.get_value("description");
+        if (ent.has_value("deprecated"))
         {
             writer.write_raw_property("deprecated", "true");
         }
@@ -287,8 +249,8 @@ namespace json_schema_generator
                 std::string cleaned_member_type = clean_type_name(raw_member_type);
                 if (cleaned_member_type.empty())
                     continue;
-                properties[member_name] = {cleaned_member_type, var->get_attributes()};
-                if (has_attribute(var->get_attributes(), "required"))
+                properties[member_name] = {cleaned_member_type, *var};
+                if (var->has_value("required"))
                 {
                     required_fields.push_back(member_name);
                 }
@@ -471,8 +433,8 @@ namespace json_schema_generator
         std::map<std::string, std::pair<std::string, attributes>> properties;
         for (const auto& param : info.method_entity->get_parameters())
         {
-            bool is_in = has_attribute(param.get_attributes(), "in");
-            bool is_out = has_attribute(param.get_attributes(), "out");
+            bool is_in = param.has_value("in");
+            bool is_out = param.has_value("out");
             bool implicitly_in = !is_in && !is_out;
             bool include_param = info.is_send_struct ? (is_in || implicitly_in) : is_out;
             if (include_param)
@@ -484,8 +446,8 @@ namespace json_schema_generator
                 std::string cleaned_param_type = clean_type_name(raw_param_type);
                 if (cleaned_param_type.empty())
                     continue;
-                properties[param_name] = {cleaned_param_type, param.get_attributes()};
-                if (!has_attribute(param.get_attributes(), "optional"))
+                properties[param_name] = {cleaned_param_type, param};
+                if (!param.has_value("optional"))
                 {
                     required_fields.push_back(param_name);
                 }
@@ -555,10 +517,11 @@ namespace json_schema_generator
         if (is_char_star(idl_type_name_cleaned) || idl_type_name_cleaned == "char*")
         {
             writer.open_object();
-            std::string description = find_attribute_value(attribs, "description");
+            std::string description = attribs.get_value("description");
             if (!description.empty())
                 writer.write_string_property("description", description);
-            if (has_attribute(attribs, "deprecated"))
+
+            if (attribs.has_value("deprecated"))
                 writer.write_raw_property("deprecated", "true");
             writer.write_string_property("type", "string");
             writer.close_object();
@@ -578,10 +541,10 @@ namespace json_schema_generator
             {
                 writer.open_object();
                 writer.write_string_property("type", "array");
-                std::string description = find_attribute_value(attribs, "description");
+                std::string description = attribs.get_value("description");
                 if (!description.empty())
                     writer.write_string_property("description", description);
-                if (has_attribute(attribs, "deprecated"))
+                if (attribs.has_value("deprecated"))
                     writer.write_raw_property("deprecated", "true");
                 writer.write_key("items");
                 map_idl_type_to_json_schema(root,
@@ -600,10 +563,10 @@ namespace json_schema_generator
             {
                 writer.open_object();
                 writer.write_string_property("type", "array");
-                std::string description = find_attribute_value(attribs, "description");
+                std::string description = attribs.get_value("description");
                 if (!description.empty())
                     writer.write_string_property("description", description);
-                if (has_attribute(attribs, "deprecated"))
+                if (attribs.has_value("deprecated"))
                     writer.write_raw_property("deprecated", "true");
                 try
                 {
@@ -618,7 +581,7 @@ namespace json_schema_generator
                 {
                     std::cerr << "exception has occurred std::stoll(template_args[1]) has value " << template_args[1]
                               << " resulting in this error: " << e.what() << "\n";
-                    std::string current_desc = find_attribute_value(attribs, "description");
+                    std::string current_desc = attribs.get_value("description");
                     std::string size_note = "[Note: Array size is non-literal: " + template_args[1] + "]";
                     writer.write_string_property(
                         "description", current_desc.empty() ? size_note : (current_desc + " " + size_note));
@@ -640,10 +603,10 @@ namespace json_schema_generator
             {
                 writer.open_object();
                 writer.write_string_property("type", "array");
-                std::string description = find_attribute_value(attribs, "description");
+                std::string description = attribs.get_value("description");
                 if (!description.empty())
                     writer.write_string_property("description", description);
-                if (has_attribute(attribs, "deprecated"))
+                if (attribs.has_value("deprecated"))
                     writer.write_raw_property("deprecated", "true");
                 writer.write_key("items");
                 writer.open_object();
@@ -734,10 +697,10 @@ namespace json_schema_generator
                 if (!qualified_name.empty())
                 {
                     writer.open_object();
-                    std::string description = find_attribute_value(attribs, "description");
+                    std::string description = attribs.get_value("description");
                     if (!description.empty())
                         writer.write_string_property("description", description);
-                    if (has_attribute(attribs, "deprecated"))
+                    if (attribs.has_value("deprecated"))
                         writer.write_raw_property("deprecated", "true");
                     writer.write_string_property("$ref", "#/definitions/" + qualified_name);
                     writer.close_object();
@@ -759,10 +722,10 @@ namespace json_schema_generator
         }
         std::string idl_type_name = idl_type_name_cleaned;
         writer.open_object();
-        std::string description = find_attribute_value(attribs, "description");
+        std::string description = attribs.get_value("description");
         if (!description.empty())
             writer.write_string_property("description", description);
-        if (has_attribute(attribs, "deprecated"))
+        if (attribs.has_value("deprecated"))
             writer.write_raw_property("deprecated", "true");
         if (is_int8(idl_type_name) || is_uint8(idl_type_name) || is_int16(idl_type_name) || is_uint16(idl_type_name)
             || is_int32(idl_type_name) || is_uint32(idl_type_name) || is_int64(idl_type_name) || is_uint64(idl_type_name)
@@ -781,7 +744,7 @@ namespace json_schema_generator
         else if (idl_type_name == "string" || idl_type_name == "std::string")
         {
             writer.write_string_property("type", "string");
-            std::string format = find_attribute_value(attribs, "format");
+            std::string format = attribs.get_value("format");
             if (!format.empty())
                 writer.write_string_property("format", format);
         }

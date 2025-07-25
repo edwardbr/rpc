@@ -25,95 +25,17 @@ extern "C"
 #include "interface_declaration_generator.h"
 #include "fingerprint_generator.h"
 #include "synchronous_generator.h"
-#include "json_schema/generator.h"
 #include "json_schema/writer.h"
+#include "json_schema_generator.h"
 #include <map>
 
 namespace rpc_generator
 {
     namespace synchronous_generator
     {
-        // Generate JSON schema for function input parameters
-        std::string generate_function_parameter_schema(const class_entity& root, const class_entity& interface, const function_entity& function)
-        {
-            std::stringstream schema_stream;
-            json_writer writer(schema_stream);
-            
-            writer.open_object();
-            writer.write_string_property("type", "object");
-            writer.write_string_property("description", "Input parameters for " + function.get_name() + " method");
-            
-            // Collect input parameters
-            std::vector<std::string> required_fields;
-            std::map<std::string, std::pair<std::string, attributes>> properties;
-            
-            for (const auto& param : function.get_parameters())
-            {
-                // Check if this is an input parameter (default to input if no attributes specified)
-                bool is_in = false;
-                bool is_out = false;
-                for (const auto& attr : param.get_attributes())
-                {
-                    if (attr == "in") is_in = true;
-                    if (attr == "out") is_out = true;
-                }
-                bool implicitly_in = !is_in && !is_out;
-                
-                if (is_in || implicitly_in)
-                {
-                    std::string param_name = param.get_name();
-                    std::string param_type = param.get_type();
-                    properties[param_name] = {param_type, param.get_attributes()};
-                    required_fields.push_back(param_name);
-                }
-            }
-            
-            // Write properties
-            if (!properties.empty())
-            {
-                writer.write_key("properties");
-                writer.open_object();
-                
-                std::set<std::string> definitions_needed;
-                std::set<std::string> definitions_written;
-                std::set<std::string> currently_processing;
-                std::map<std::string, json_schema_generator::DefinitionInfoVariant> definition_info_map;
-                
-                for (const auto& prop : properties)
-                {
-                    writer.write_key(prop.first);
-                    json_schema_generator::map_idl_type_to_json_schema(
-                        root, &interface, prop.second.first, prop.second.second,
-                        writer, definitions_needed, definitions_written, 
-                        currently_processing, definition_info_map
-                    );
-                }
-                writer.close_object();
-            }
-            else
-            {
-                writer.write_key("properties");
-                writer.open_object();
-                writer.close_object();
-            }
-            
-            // Write required fields
-            if (!required_fields.empty())
-            {
-                writer.write_key("required");
-                writer.open_array();
-                for (const auto& field : required_fields)
-                {
-                    writer.write_array_string_element(field);
-                }
-                writer.close_array();
-            }
-            
-            writer.write_raw_property("additionalProperties", "false");
-            writer.close_object();
-            
-            return schema_stream.str();
-        }
+
+
+
         enum print_type
         {
             PROXY_PREPARE_IN,
@@ -575,15 +497,14 @@ namespace rpc_generator
             const class_entity& lib,
             const std::string& name,
             const std::string& type,
-            const std::list<std::string>& attributes,
+            const attributes& attribs,
             uint64_t& count,
             std::string& output)
         {
-            auto in = is_in_param(attributes);
-            auto out = is_out_param(attributes);
-            auto is_const = is_const_param(attributes);
-            auto by_value
-                = std::find(attributes.begin(), attributes.end(), attribute_types::by_value_param) != attributes.end();
+            auto in = is_in_param(attribs);
+            auto out = is_out_param(attribs);
+            auto is_const = is_const_param(attribs);
+            auto by_value = attribs.has_value(attribute_types::by_value_param);
 
             if (out && !in)
                 return false;
@@ -674,13 +595,13 @@ namespace rpc_generator
             const class_entity& lib,
             const std::string& name,
             const std::string& type,
-            const std::list<std::string>& attributes,
+            const attributes& attribs,
             uint64_t& count,
             std::string& output)
         {
-            auto in = is_in_param(attributes);
-            auto out = is_out_param(attributes);
-            auto is_const = is_const_param(attributes);
+            auto in = is_in_param(attribs);
+            auto out = is_out_param(attribs);
+            auto is_const = is_const_param(attribs);
 
             if (!out)
                 return false;
@@ -785,12 +706,7 @@ namespace rpc_generator
                     has_parameter = true;
                     render_parameter(proxy, m_ob, parameter);
                 }
-                bool function_is_const = false;
-                for (auto& item : function->get_attributes())
-                {
-                    if (item == "const")
-                        function_is_const = true;
-                }
+                bool function_is_const = function->has_value("const");
                 if (function_is_const)
                 {
                     proxy.raw(") const override\n");
@@ -827,7 +743,7 @@ namespace rpc_generator
                                 m_ob,
                                 parameter.get_name(),
                                 parameter.get_type(),
-                                parameter.get_attributes(),
+                                parameter,
                                 count,
                                 output))
                             ;
@@ -837,7 +753,7 @@ namespace rpc_generator
                                 m_ob,
                                 parameter.get_name(),
                                 parameter.get_type(),
-                                parameter.get_attributes(),
+                                parameter,
                                 count,
                                 output);
                         stub("{};", output);
@@ -855,14 +771,8 @@ namespace rpc_generator
                 {
                     std::string output;
                     {
-                        if (!do_in_param(PROXY_PREPARE_IN,
-                                from_host,
-                                m_ob,
-                                parameter.get_name(),
-                                parameter.get_type(),
-                                parameter.get_attributes(),
-                                count,
-                                output))
+                        if (!do_in_param(
+                                PROXY_PREPARE_IN, from_host, m_ob, parameter.get_name(), parameter.get_type(), parameter, count, output))
                             continue;
                         proxy(output);
 
@@ -871,7 +781,7 @@ namespace rpc_generator
                                 m_ob,
                                 parameter.get_name(),
                                 parameter.get_type(),
-                                parameter.get_attributes(),
+                                parameter,
                                 count,
                                 output))
                             continue;
@@ -899,7 +809,7 @@ namespace rpc_generator
                                     m_ob,
                                     parameter.get_name(),
                                     parameter.get_type(),
-                                    parameter.get_attributes(),
+                                    parameter,
                                     count,
                                     output))
                                 continue;
@@ -919,7 +829,7 @@ namespace rpc_generator
                                     m_ob,
                                     parameter.get_name(),
                                     parameter.get_type(),
-                                    parameter.get_attributes(),
+                                    parameter,
                                     count,
                                     output))
                                 continue;
@@ -935,7 +845,7 @@ namespace rpc_generator
                     stub("  return __rpc_ret;");
                 }
 
-                std::string tag = function->get_attribute_value("tag");
+                std::string tag = function->get_value("tag");
                 if (tag.empty())
                     tag = "0";
 
@@ -962,7 +872,7 @@ namespace rpc_generator
                                     m_ob,
                                     parameter.get_name(),
                                     parameter.get_type(),
-                                    parameter.get_attributes(),
+                                    parameter,
                                     count,
                                     output))
                                 continue;
@@ -982,20 +892,14 @@ namespace rpc_generator
                     for (auto& parameter : function->get_parameters())
                     {
                         std::string output;
-                        if (!do_in_param(STUB_PARAM_WRAP,
-                                from_host,
-                                m_ob,
-                                parameter.get_name(),
-                                parameter.get_type(),
-                                parameter.get_attributes(),
-                                count,
-                                output))
+                        if (!do_in_param(
+                                STUB_PARAM_WRAP, from_host, m_ob, parameter.get_name(), parameter.get_type(), parameter, count, output))
                             do_out_param(STUB_PARAM_WRAP,
                                 from_host,
                                 m_ob,
                                 parameter.get_name(),
                                 parameter.get_type(),
-                                parameter.get_attributes(),
+                                parameter,
                                 count,
                                 output);
                         stub.raw("{}", output);
@@ -1020,20 +924,14 @@ namespace rpc_generator
                     for (auto& parameter : function->get_parameters())
                     {
                         std::string output;
-                        if (!do_in_param(STUB_PARAM_CAST,
-                                from_host,
-                                m_ob,
-                                parameter.get_name(),
-                                parameter.get_type(),
-                                parameter.get_attributes(),
-                                count,
-                                output))
+                        if (!do_in_param(
+                                STUB_PARAM_CAST, from_host, m_ob, parameter.get_name(), parameter.get_type(), parameter, count, output))
                             do_out_param(STUB_PARAM_CAST,
                                 from_host,
                                 m_ob,
                                 parameter.get_name(),
                                 parameter.get_type(),
-                                parameter.get_attributes(),
+                                parameter,
                                 count,
                                 output);
                         if (has_param)
@@ -1097,7 +995,7 @@ namespace rpc_generator
                                 m_ob,
                                 parameter.get_name(),
                                 parameter.get_type(),
-                                parameter.get_attributes(),
+                                parameter,
                                 count,
                                 output))
                             continue;
@@ -1106,7 +1004,7 @@ namespace rpc_generator
                                 m_ob,
                                 parameter.get_name(),
                                 parameter.get_type(),
-                                parameter.get_attributes(),
+                                parameter,
                                 count,
                                 output))
                             continue;
@@ -1127,7 +1025,7 @@ namespace rpc_generator
                                 m_ob,
                                 parameter.get_name(),
                                 parameter.get_type(),
-                                parameter.get_attributes(),
+                                parameter,
                                 count,
                                 output))
                             continue;
@@ -1142,14 +1040,8 @@ namespace rpc_generator
                         count++;
                         std::string output;
 
-                        if (!do_out_param(STUB_ADD_REF_OUT,
-                                from_host,
-                                m_ob,
-                                parameter.get_name(),
-                                parameter.get_type(),
-                                parameter.get_attributes(),
-                                count,
-                                output))
+                        if (!do_out_param(
+                                STUB_ADD_REF_OUT, from_host, m_ob, parameter.get_name(), parameter.get_type(), parameter, count, output))
                             continue;
 
                         if (!has_preamble && !output.empty())
@@ -1196,20 +1088,14 @@ namespace rpc_generator
                                 m_ob,
                                 parameter.get_name(),
                                 parameter.get_type(),
-                                parameter.get_attributes(),
+                                parameter,
                                 count,
                                 output))
                             continue;
                         proxy.raw(output);
 
-                        if (!do_out_param(STUB_MARSHALL_OUT,
-                                from_host,
-                                m_ob,
-                                parameter.get_name(),
-                                parameter.get_type(),
-                                parameter.get_attributes(),
-                                count,
-                                output))
+                        if (!do_out_param(
+                                STUB_MARSHALL_OUT, from_host, m_ob, parameter.get_name(), parameter.get_type(), parameter, count, output))
                             continue;
 
                         stub.raw(output);
@@ -1234,7 +1120,7 @@ namespace rpc_generator
                                 m_ob,
                                 parameter.get_name(),
                                 parameter.get_type(),
-                                parameter.get_attributes(),
+                                parameter,
                                 count,
                                 output))
                             continue;
@@ -1243,7 +1129,7 @@ namespace rpc_generator
                                 m_ob,
                                 parameter.get_name(),
                                 parameter.get_type(),
-                                parameter.get_attributes(),
+                                parameter,
                                 count,
                                 output))
                             continue;
@@ -1263,7 +1149,7 @@ namespace rpc_generator
                                     m_ob,
                                     parameter.get_name(),
                                     parameter.get_type(),
-                                    parameter.get_attributes(),
+                                    parameter,
                                     count,
                                     output))
                                 continue;
@@ -1329,7 +1215,7 @@ namespace rpc_generator
                     if (function->get_entity_type() != entity_type::FUNCTION_METHOD)
                         continue;
 
-                    std::string tag = function->get_attribute_value("tag");
+                    std::string tag = function->get_value("tag");
                     if (tag.empty())
                         tag = "0";
 
@@ -1345,33 +1231,31 @@ namespace rpc_generator
                     }
 
                     // Get description attribute
-                    std::string description = function->get_attribute_value("description");
+                    std::string description = function->get_value("description");
                     if (!description.empty() && description.front() == '"' && description.back() == '"')
                     {
                         description = description.substr(1, description.length() - 2);
                     }
-                    
-                    // Generate JSON schema for function parameters
-                    std::string json_schema = generate_function_parameter_schema(library, m_ob, *function);
-                    // Escape quotes for C++ string literal
-                    std::string escaped_schema = json_schema;
-                    size_t pos = 0;
-                    while ((pos = escaped_schema.find('"', pos)) != std::string::npos) 
+
+                    // Generate JSON schemas for function parameters
+                    std::string in_json_schema;
+                    std::string out_json_schema;
+                    if (!marshalls_interfaces)
                     {
-                        escaped_schema.replace(pos, 1, "\\\"");
-                        pos += 2;
+                        in_json_schema = json_schema_generator::generate_function_input_parameter_schema_with_recursion(library, m_ob, *function);
+                        out_json_schema = json_schema_generator::generate_function_output_parameter_schema_with_recursion(library, m_ob, *function);
                     }
-                    json_schema = escaped_schema;
-                    
+
                     proxy("functions.emplace_back(rpc::function_info{{\"{0}.{1}\", \"{1}\", {{{2}}}, (uint64_t){3}, "
-                          "{4}, \"{5}\", \"{6}\"}});",
+                          "{4}, R\"__({5})__\", R\"__({6})__\", R\"__({7})__\"}});",
                         full_name,
                         function->get_name(),
                         function_count,
                         tag,
                         marshalls_interfaces,
                         description,
-                        json_schema);
+                        in_json_schema,
+                        out_json_schema);
                     function_count++;
                 }
                 proxy("return functions;");
@@ -1678,7 +1562,7 @@ namespace rpc_generator
             header("if(rpc_version == rpc::VERSION_2)");
             header("{{");
             header("auto id = {}ull;", fingerprint::generate(m_ob, {}, &header));
-            auto val = m_ob.get_attribute_value(rpc_attribute_types::use_template_param_in_id_attr);
+            auto val = m_ob.get_value(rpc_attribute_types::use_template_param_in_id_attr);
             if (val != "false")
             {
                 for (const auto& param : m_ob.get_template_params())
@@ -2099,7 +1983,7 @@ namespace rpc_generator
                     continue;
                 if (cls->get_entity_type() == entity_type::NAMESPACE)
                 {
-                    bool is_inline = cls->get_attribute("inline") == "inline";
+                    bool is_inline = cls->has_value("inline");
                     if (is_inline)
                     {
                         header("inline namespace {}", cls->get_name());
@@ -2146,7 +2030,7 @@ namespace rpc_generator
                     write_typedef_forward_declaration(*elem, header);
                 else if (elem->get_entity_type() == entity_type::NAMESPACE)
                 {
-                    bool is_inline = elem->get_attribute("inline") == "inline";
+                    bool is_inline = elem->has_value("inline");
 
                     if (is_inline)
                     {

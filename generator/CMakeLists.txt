@@ -18,6 +18,7 @@ add_executable(
   src/sha3.c
   src/component_checksum.cpp
   src/fingerprint_generator.cpp
+  src/json_schema_generator.cpp
   src/json_schema/generator.cpp)
 
 target_compile_definitions(generator PRIVATE ${HOST_DEFINES})

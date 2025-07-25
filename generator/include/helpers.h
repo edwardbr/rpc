@@ -7,9 +7,9 @@
 #include "coreclasses.h"
 #include "writer.h"
 
-bool is_in_param(const std::list<std::string>& attributes);
-bool is_out_param(const std::list<std::string>& attributes);
-bool is_const_param(const std::list<std::string>& attributes);
+bool is_in_param(const attributes& attribs);
+bool is_out_param(const attributes& attribs);
+bool is_const_param(const attributes& attribs);
 
 bool is_reference(std::string type_name);
 bool is_rvalue(std::string type_name);

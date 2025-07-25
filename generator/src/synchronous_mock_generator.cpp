@@ -73,11 +73,8 @@ namespace rpc_generator
 
                     header.print_tabs();
                     bool is_const_func = false;
-                    for (auto& item : function->get_attributes())
-                    {
-                        if (item == "const")
-                            is_const_func = true;
-                    }
+                    if (function->has_value("const"))
+                        is_const_func = true;
                     if (is_const_func)
                         header.raw("MOCK_CONST_METHOD{}({}, {}(",
                             function->get_parameters().size(),
@@ -229,7 +226,7 @@ namespace rpc_generator
                 if (cls->get_entity_type() == entity_type::NAMESPACE)
                 {
 
-                    bool is_inline = cls->get_attribute("inline") == "inline";
+                    bool is_inline = cls->has_value("inline");
                     if (is_inline)
                         header("inline namespace {}", cls->get_name());
                     else
