@@ -3,8 +3,8 @@
 #include <string>
 #include <set>
 #include <vector>
-#include "../../submodules/idlparser/parsers/ast_parser/coreclasses.h"
 #include "json_schema/writer.h"
+#include "coreclasses.h"
 
 namespace rpc_generator
 {
@@ -33,8 +33,10 @@ namespace rpc_generator
             std::set<std::string>& visited_types);
 
         // Recursively generate schema for any type
-        void generate_type_schema_recursive(
-            const std::string& type_name, const class_entity& root, json_writer& writer, std::set<std::string>& visited_types);
+        void generate_type_schema_recursive(const std::string& type_name,
+            const class_entity& root,
+            json_writer& writer,
+            std::set<std::string>& visited_types);
 
         // Enhanced JSON schema generation for input parameters with recursive complex type support
         std::string generate_function_input_parameter_schema_with_recursion(

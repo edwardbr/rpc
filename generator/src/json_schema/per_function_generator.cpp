@@ -1,4 +1,4 @@
-#include "json_schema_generator.h"
+#include "json_schema/per_function_generator.h"
 #include "json_schema/writer.h"
 #include <map>
 #include <algorithm>

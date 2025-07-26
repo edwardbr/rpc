@@ -26,15 +26,13 @@ extern "C"
 #include "fingerprint_generator.h"
 #include "synchronous_generator.h"
 #include "json_schema/writer.h"
-#include "json_schema_generator.h"
+#include "json_schema/per_function_generator.h"
 #include <map>
 
 namespace rpc_generator
 {
     namespace synchronous_generator
     {
-
-
 
         enum print_type
         {
@@ -1242,8 +1240,10 @@ namespace rpc_generator
                     std::string out_json_schema;
                     if (!marshalls_interfaces)
                     {
-                        in_json_schema = json_schema_generator::generate_function_input_parameter_schema_with_recursion(library, m_ob, *function);
-                        out_json_schema = json_schema_generator::generate_function_output_parameter_schema_with_recursion(library, m_ob, *function);
+                        in_json_schema = json_schema_generator::generate_function_input_parameter_schema_with_recursion(
+                            library, m_ob, *function);
+                        out_json_schema = json_schema_generator::generate_function_output_parameter_schema_with_recursion(
+                            library, m_ob, *function);
                     }
 
                     proxy("functions.emplace_back(rpc::function_info{{\"{0}.{1}\", \"{1}\", {{{2}}}, (uint64_t){3}, "
