@@ -4,6 +4,7 @@
 #include "interface_declaration_generator.h"
 #include "fingerprint_generator.h"
 #include "helpers.h"
+#include "type_utils.h"
 
 #include "attributes.h"
 #include "rpc_attributes.h"
@@ -354,7 +355,7 @@ namespace rpc_generator
 
         std::string type_name = type;
         std::string reference_modifiers;
-        strip_reference_modifiers(type_name, reference_modifiers);
+        rpc_generator::strip_reference_modifiers(type_name, reference_modifiers);
 
         bool is_interface = is_interface_param(lib, type);
 
@@ -446,14 +447,14 @@ namespace rpc_generator
 
         std::string type_name = type;
         std::string reference_modifiers;
-        strip_reference_modifiers(type_name, reference_modifiers);
+        rpc_generator::strip_reference_modifiers(type_name, reference_modifiers);
 
         bool is_interface = is_interface_param(lib, type);
 
         if (reference_modifiers.empty())
         {
             std::cerr << fmt::format("out parameters require data to be sent by pointer or reference {} {} ", type, name);
-            throw fmt::format("out parameters require data to be sent by pointeror reference {} {} ", type, name);
+            throw fmt::format("out parameters require data to be sent by pointer or reference {} {} ", type, name);
         }
 
         if (!is_interface)

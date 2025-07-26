@@ -95,17 +95,21 @@ namespace rpc_generator
             size_t last = type.find_last_not_of(" \t\n\r");
             type = type.substr(first, last - first + 1);
 
-            // Strip reference modifiers from end
-            while (!type.empty() && (type.back() == '&' || type.back() == ' ' || type.back() == '\t'))
+            // Strip reference and pointer modifiers from end
+            while (!type.empty() && (type.back() == '&' || type.back() == '*' || type.back() == ' ' || type.back() == '\t'))
             {
                 if (type.back() == '&')
                 {
                     modifiers = "&" + modifiers;
                 }
+                else if (type.back() == '*')
+                {
+                    modifiers = "*" + modifiers;
+                }
                 type.pop_back();
             }
 
-            // Remove trailing whitespace after stripping references
+            // Remove trailing whitespace after stripping references and pointers
             last = type.find_last_not_of(" \t\n\r");
             if (last != std::string::npos)
             {
