@@ -3,12 +3,13 @@
 #include <string>
 #include <set>
 #include <vector>
+#include <map>
 #include "json_schema/writer.h"
 #include "coreclasses.h"
 
 namespace rpc_generator
 {
-    namespace json_schema_generator
+    namespace json_schema
     {
         // Simple type mapping for basic JSON schema generation
         std::string map_basic_type_to_json(const std::string& idl_type);
@@ -45,5 +46,13 @@ namespace rpc_generator
         // Enhanced JSON schema generation for output parameters with recursive complex type support
         std::string generate_function_output_parameter_schema_with_recursion(
             const class_entity& root, const class_entity& interface, const function_entity& function);
+
+        // Enhanced type mapping with attribute support (from comprehensive system)
+        void map_idl_type_to_json_schema_enhanced(const class_entity& root,
+            const class_entity* current_context,
+            const std::string& idl_type_name,
+            const attributes& attribs,
+            json_writer& writer,
+            std::set<std::string>& visited_types);
     }
 }

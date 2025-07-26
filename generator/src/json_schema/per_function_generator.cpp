@@ -1,5 +1,6 @@
 #include "json_schema/per_function_generator.h"
 #include "json_schema/writer.h"
+#include "json_schema/type_utils.h"
 #include <map>
 #include <algorithm>
 #include <cctype>
@@ -7,7 +8,7 @@
 
 namespace rpc_generator
 {
-    namespace json_schema_generator
+    namespace json_schema
     {
         // Simple type mapping for basic JSON schema generation
         std::string map_basic_type_to_json(const std::string& idl_type)
@@ -342,22 +343,6 @@ namespace rpc_generator
             return result;
         }
 
-        // Helper function to trim whitespace from strings
-        void trim_string(std::string& str)
-        {
-            // Trim leading whitespace
-            size_t first = str.find_first_not_of(" \t\n\r");
-            if (first == std::string::npos)
-            {
-                str.clear();
-                return;
-            }
-
-            // Trim trailing whitespace
-            size_t last = str.find_last_not_of(" \t\n\r");
-            str = str.substr(first, last - first + 1);
-        }
-
         // Generate detailed schema for complex types (structs/classes)
         void generate_complex_type_schema(const std::string& clean_type_name,
             const class_entity& root,
@@ -685,16 +670,7 @@ namespace rpc_generator
                 if (clean_type.find("::") != std::string::npos
                     || clean_type.find("std::") == std::string::npos) // Not a std:: container
                 {
-                    // Try multiple variations of the type name
-                    std::string lookup_type = clean_type;
-
-                    // If it doesn't have namespace, try adding xxx:: prefix for our test structs
-                    if (clean_type.find("::") == std::string::npos && (clean_type.find("something_") != std::string::npos))
-                    {
-                        lookup_type = "xxx::" + clean_type;
-                    }
-
-                    generate_complex_type_schema(lookup_type, root, writer, visited_types);
+                    generate_complex_type_schema(clean_type, root, writer, visited_types);
                 }
                 else
                 {
@@ -865,6 +841,196 @@ namespace rpc_generator
             writer.close_object();
 
             return schema_stream.str();
+        }
+
+        // Enhanced type mapping with attribute support (from comprehensive system)
+        void map_idl_type_to_json_schema_enhanced(const class_entity& root,
+            const class_entity* current_context,
+            const std::string& idl_type_name,
+            const attributes& attribs,
+            json_writer& writer,
+            std::set<std::string>& visited_types)
+        {
+            std::string idl_type_name_cleaned = clean_type_name(idl_type_name);
+            if (idl_type_name_cleaned.empty())
+            {
+                writer.open_object();
+                writer.write_string_property("type", "null");
+                writer.write_string_property(
+                    "description", "Error: Invalid or empty type name encountered ('" + idl_type_name + "').");
+                writer.close_object();
+                return;
+            }
+
+            // Handle char* specially
+            if (is_char_star(idl_type_name_cleaned) || idl_type_name_cleaned == "char*")
+            {
+                writer.open_object();
+                std::string description = attribs.get_value("description");
+                if (!description.empty())
+                    writer.write_string_property("description", description);
+                if (attribs.has_value("deprecated"))
+                    writer.write_raw_property("deprecated", "true");
+                writer.write_string_property("type", "string");
+                writer.close_object();
+                return;
+            }
+
+            // Strip modifiers
+            std::string ignored_modifiers;
+            strip_reference_modifiers(idl_type_name_cleaned, ignored_modifiers);
+            idl_type_name_cleaned = unconst(idl_type_name_cleaned);
+
+            // Check for template types (containers)
+            std::vector<std::string> template_args = parse_template_arguments(idl_type_name_cleaned);
+            if (!template_args.empty())
+            {
+                // Extract container name
+                size_t template_start = idl_type_name_cleaned.find('<');
+                std::string container_name = idl_type_name_cleaned.substr(0, template_start);
+                trim_string(container_name);
+
+                // Handle common STL containers
+                if ((container_name == "std::vector" || container_name == "std::list" || container_name == "std::set"
+                        || container_name == "std::unordered_set" || container_name == "std::deque"
+                        || container_name == "std::queue" || container_name == "std::stack")
+                    && template_args.size() >= 1)
+                {
+                    writer.open_object();
+                    writer.write_string_property("type", "array");
+                    std::string description = attribs.get_value("description");
+                    if (!description.empty())
+                        writer.write_string_property("description", description);
+                    if (attribs.has_value("deprecated"))
+                        writer.write_raw_property("deprecated", "true");
+
+                    writer.write_key("items");
+                    map_idl_type_to_json_schema_enhanced(
+                        root, current_context, template_args[0], {}, writer, visited_types);
+                    writer.close_object();
+                    return;
+                }
+                else if ((container_name == "std::map" || container_name == "std::unordered_map")
+                         && template_args.size() == 2)
+                {
+                    writer.open_object();
+                    writer.write_string_property("type", "array");
+                    std::string description = attribs.get_value("description");
+                    if (!description.empty())
+                        writer.write_string_property("description", description);
+                    if (attribs.has_value("deprecated"))
+                        writer.write_raw_property("deprecated", "true");
+
+                    writer.write_key("items");
+                    writer.open_object();
+                    writer.write_string_property("type", "object");
+                    writer.write_key("properties");
+                    writer.open_object();
+
+                    writer.write_key("k");
+                    map_idl_type_to_json_schema_enhanced(
+                        root, current_context, template_args[0], {}, writer, visited_types);
+
+                    writer.write_key("v");
+                    map_idl_type_to_json_schema_enhanced(
+                        root, current_context, template_args[1], {}, writer, visited_types);
+
+                    writer.close_object(); // properties
+                    writer.write_key("required");
+                    writer.open_array();
+                    writer.write_array_string_element("k");
+                    writer.write_array_string_element("v");
+                    writer.close_array();
+                    writer.write_raw_property("additionalProperties", "false");
+                    writer.close_object(); // items object
+                    writer.close_object(); // main object
+                    return;
+                }
+            }
+
+            // Try to find complex types using the enhanced namespace resolution
+            std::shared_ptr<class_entity> struct_def;
+            bool found = false;
+
+            // First try to find the type as-is
+            if (root.find_class(idl_type_name_cleaned, struct_def))
+            {
+                found = true;
+            }
+
+            // If not found, try with namespace prefixes by exploring available namespaces
+            if (!found && idl_type_name_cleaned.find("::") == std::string::npos)
+            {
+                // Get all namespace children from root and try each one
+                auto namespaces = root.get_elements(entity_type::NAMESPACE_MEMBERS);
+                for (const auto& ns_element : namespaces)
+                {
+                    if (ns_element && ns_element->get_entity_type() == entity_type::NAMESPACE)
+                    {
+                        std::string ns_name = ns_element->get_name();
+                        if (!ns_name.empty() && ns_name != "__global__")
+                        {
+                            std::string namespaced_type = ns_name + "::" + idl_type_name_cleaned;
+                            if (root.find_class(namespaced_type, struct_def))
+                            {
+                                found = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // If found a complex type, generate reference-style schema
+            if (found && struct_def)
+            {
+                // For per-function schemas, we inline the complex type rather than using $ref
+                generate_complex_type_schema(idl_type_name_cleaned, root, writer, visited_types);
+                return;
+            }
+
+            // Handle basic types with attribute support
+            writer.open_object();
+            std::string description = attribs.get_value("description");
+            if (!description.empty())
+                writer.write_string_property("description", description);
+            if (attribs.has_value("deprecated"))
+                writer.write_raw_property("deprecated", "true");
+
+            // Use enhanced type checking
+            if (is_int8(idl_type_name_cleaned) || is_uint8(idl_type_name_cleaned) || is_int16(idl_type_name_cleaned)
+                || is_uint16(idl_type_name_cleaned) || is_int32(idl_type_name_cleaned) || is_uint32(idl_type_name_cleaned)
+                || is_int64(idl_type_name_cleaned) || is_uint64(idl_type_name_cleaned) || is_long(idl_type_name_cleaned)
+                || is_ulong(idl_type_name_cleaned) || idl_type_name_cleaned == "int" || idl_type_name_cleaned == "char")
+            {
+                writer.write_string_property("type", "integer");
+            }
+            else if (is_float(idl_type_name_cleaned) || is_double(idl_type_name_cleaned))
+            {
+                writer.write_string_property("type", "number");
+            }
+            else if (is_bool(idl_type_name_cleaned))
+            {
+                writer.write_string_property("type", "boolean");
+            }
+            else if (idl_type_name_cleaned == "string" || idl_type_name_cleaned == "std::string")
+            {
+                writer.write_string_property("type", "string");
+                std::string format = attribs.get_value("format");
+                if (!format.empty())
+                    writer.write_string_property("format", format);
+            }
+            else
+            {
+                // Fallback to object for unknown types
+                writer.write_string_property("type", "object");
+                if (description.empty())
+                {
+                    writer.write_string_property("description", "Complex type: " + idl_type_name_cleaned);
+                }
+            }
+
+            writer.close_object();
         }
     }
 }

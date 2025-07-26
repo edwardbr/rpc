@@ -19,7 +19,8 @@ add_executable(
   src/component_checksum.cpp
   src/fingerprint_generator.cpp
   src/json_schema/per_function_generator.cpp
-  src/json_schema/generator.cpp)
+  src/json_schema/generator.cpp
+  src/json_schema/type_utils.cpp)
 
 target_compile_definitions(generator PRIVATE ${HOST_DEFINES})
 target_compile_options(generator PRIVATE ${HOST_COMPILE_OPTIONS} ${WARN_PEDANTIC})

@@ -1240,9 +1240,9 @@ namespace rpc_generator
                     std::string out_json_schema;
                     if (!marshalls_interfaces)
                     {
-                        in_json_schema = json_schema_generator::generate_function_input_parameter_schema_with_recursion(
+                        in_json_schema = json_schema::generate_function_input_parameter_schema_with_recursion(
                             library, m_ob, *function);
-                        out_json_schema = json_schema_generator::generate_function_output_parameter_schema_with_recursion(
+                        out_json_schema = json_schema::generate_function_output_parameter_schema_with_recursion(
                             library, m_ob, *function);
                     }
 

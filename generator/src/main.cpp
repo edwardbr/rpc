@@ -397,7 +397,7 @@ int main(const int argc, char* argv[])
             std::stringstream json_schema_stream;
 
             // Generate the JSON Schema
-            json_schema_generator::write_json_schema(*objects,
+            rpc_generator::json_schema::write_json_schema(*objects,
                 json_schema_stream,
                 module_name); // Use filename as title
 
