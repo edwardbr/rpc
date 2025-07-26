@@ -1,11 +1,9 @@
-#include "json_schema/type_utils.h"
+#include "type_utils.h"
 #include <algorithm>
 #include <cctype>
 
 namespace rpc_generator
 {
-    namespace json_schema
-    {
 
         // Type checking utilities for basic types
         bool is_char_star(const std::string& type)
@@ -196,5 +194,4 @@ namespace rpc_generator
             return cleaned;
         }
 
-    } // namespace json_schema
 } // namespace rpc_generator

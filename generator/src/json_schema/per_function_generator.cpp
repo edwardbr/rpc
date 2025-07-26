@@ -1,6 +1,6 @@
 #include "json_schema/per_function_generator.h"
 #include "json_schema/writer.h"
-#include "json_schema/type_utils.h"
+#include "type_utils.h"
 #include <map>
 #include <algorithm>
 #include <cctype>
@@ -183,7 +183,7 @@ namespace rpc_generator
                 else if (args_str[i] == ',' && depth == 0)
                 {
                     std::string arg = args_str.substr(arg_start, i - arg_start);
-                    trim_string(arg);
+                    rpc_generator::trim_string(arg);
                     if (!arg.empty())
                     {
                         args.push_back(arg);
@@ -194,7 +194,7 @@ namespace rpc_generator
 
             // Add the last argument
             std::string last_arg = args_str.substr(arg_start);
-            trim_string(last_arg);
+            rpc_generator::trim_string(last_arg);
             if (!last_arg.empty())
             {
                 args.push_back(last_arg);
@@ -237,7 +237,7 @@ namespace rpc_generator
                         if (func_entity)
                         {
                             std::string member_type = func_entity->get_return_type();
-                            trim_string(member_type);
+                            rpc_generator::trim_string(member_type);
 
                             // Look for simple identifiers that could be template parameters
                             // Template parameters are typically single words without :: or special chars
@@ -255,13 +255,13 @@ namespace rpc_generator
                                 if (pos != std::string::npos)
                                 {
                                     clean_type.erase(pos, 5);
-                                    trim_string(clean_type);
+                                    rpc_generator::trim_string(clean_type);
                                 }
                                 pos = clean_type.find("volatile");
                                 if (pos != std::string::npos)
                                 {
                                     clean_type.erase(pos, 8);
-                                    trim_string(clean_type);
+                                    rpc_generator::trim_string(clean_type);
                                 }
 
                                 // Check if it looks like a template parameter (single identifier)
@@ -397,7 +397,7 @@ namespace rpc_generator
                 // Parse template name and arguments
                 size_t template_start = clean_type_name.find('<');
                 std::string template_name = clean_type_name.substr(0, template_start);
-                trim_string(template_name);
+                rpc_generator::trim_string(template_name);
 
                 // Try to find the template definition
                 if (root.find_class(template_name, struct_def))
@@ -517,7 +517,7 @@ namespace rpc_generator
                                     if (start < end)
                                     {
                                         std::string inner_type = raw_type_name.substr(start, end - start);
-                                        trim_string(inner_type);
+                                        rpc_generator::trim_string(inner_type);
 
                                         writer.write_key("items");
                                         writer.open_object();
@@ -551,7 +551,7 @@ namespace rpc_generator
                                     if (comma != std::string::npos && comma < end)
                                     {
                                         std::string value_type = raw_type_name.substr(comma + 1, end - comma - 1);
-                                        trim_string(value_type);
+                                        rpc_generator::trim_string(value_type);
 
                                         writer.write_key("items");
                                         writer.open_object();
@@ -851,7 +851,7 @@ namespace rpc_generator
             json_writer& writer,
             std::set<std::string>& visited_types)
         {
-            std::string idl_type_name_cleaned = clean_type_name(idl_type_name);
+            std::string idl_type_name_cleaned = rpc_generator::clean_type_name(idl_type_name);
             if (idl_type_name_cleaned.empty())
             {
                 writer.open_object();
@@ -878,8 +878,8 @@ namespace rpc_generator
 
             // Strip modifiers
             std::string ignored_modifiers;
-            strip_reference_modifiers(idl_type_name_cleaned, ignored_modifiers);
-            idl_type_name_cleaned = unconst(idl_type_name_cleaned);
+            rpc_generator::strip_reference_modifiers(idl_type_name_cleaned, ignored_modifiers);
+            idl_type_name_cleaned = rpc_generator::unconst(idl_type_name_cleaned);
 
             // Check for template types (containers)
             std::vector<std::string> template_args = parse_template_arguments(idl_type_name_cleaned);
@@ -888,7 +888,7 @@ namespace rpc_generator
                 // Extract container name
                 size_t template_start = idl_type_name_cleaned.find('<');
                 std::string container_name = idl_type_name_cleaned.substr(0, template_start);
-                trim_string(container_name);
+                rpc_generator::trim_string(container_name);
 
                 // Handle common STL containers
                 if ((container_name == "std::vector" || container_name == "std::list" || container_name == "std::set"

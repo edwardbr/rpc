@@ -22,6 +22,7 @@ extern "C"
 #include "interface_declaration_generator.h"
 #include "fingerprint_generator.h"
 #include "yas_generator.h"
+#include "type_utils.h"
 
 namespace rpc_generator
 {
@@ -424,7 +425,7 @@ namespace rpc_generator
 
             std::string type_name = type;
             std::string reference_modifiers;
-            strip_reference_modifiers(type_name, reference_modifiers);
+            rpc_generator::strip_reference_modifiers(type_name, reference_modifiers);
 
             bool is_interface = is_interface_param(lib, type);
 
@@ -527,7 +528,7 @@ namespace rpc_generator
 
             std::string type_name = type;
             std::string reference_modifiers;
-            strip_reference_modifiers(type_name, reference_modifiers);
+            rpc_generator::strip_reference_modifiers(type_name, reference_modifiers);
 
             bool is_interface = is_interface_param(lib, type);
 
@@ -604,7 +605,7 @@ namespace rpc_generator
             auto ret = type_name;
             std::string reference_modifiers;
             std::string template_modifier;
-            strip_reference_modifiers(ret, reference_modifiers);
+            rpc_generator::strip_reference_modifiers(ret, reference_modifiers);
 
             auto template_start = ret.find('<');
             if (template_start != std::string::npos)

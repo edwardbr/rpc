@@ -27,6 +27,7 @@ extern "C"
 #include "synchronous_generator.h"
 #include "json_schema/writer.h"
 #include "json_schema/per_function_generator.h"
+#include "type_utils.h"
 #include <map>
 
 namespace rpc_generator
@@ -509,7 +510,7 @@ namespace rpc_generator
 
             std::string type_name = type;
             std::string reference_modifiers;
-            strip_reference_modifiers(type_name, reference_modifiers);
+            rpc_generator::strip_reference_modifiers(type_name, reference_modifiers);
 
             bool is_interface = is_interface_param(lib, type);
 
@@ -612,7 +613,7 @@ namespace rpc_generator
 
             std::string type_name = type;
             std::string reference_modifiers;
-            strip_reference_modifiers(type_name, reference_modifiers);
+            rpc_generator::strip_reference_modifiers(type_name, reference_modifiers);
 
             bool is_interface = is_interface_param(lib, type);
 
@@ -1223,7 +1224,7 @@ namespace rpc_generator
                     {
                         std::string type_name = parameter.get_type();
                         std::string reference_modifiers;
-                        strip_reference_modifiers(type_name, reference_modifiers);
+                        rpc_generator::strip_reference_modifiers(type_name, reference_modifiers);
 
                         marshalls_interfaces = is_interface_param(library, parameter.get_type());
                     }
