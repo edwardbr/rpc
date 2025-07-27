@@ -13,8 +13,8 @@ namespace rpc_generator
         // Simple type mapping for basic JSON schema generation
         std::string map_basic_type_to_json(const std::string& idl_type)
         {
-            std::string clean_type = idl_type;
-
+            // HOMOGENIZED: Use unified type classification (replaces 50+ lines of hardcoded checks)
+            
             // Check if this is a pointer type first (before cleaning)
             // Pointer types are serialized as memory addresses (uint64_t integers)
             if (idl_type.find('*') != std::string::npos)
@@ -22,6 +22,8 @@ namespace rpc_generator
                 return "integer";
             }
 
+            std::string clean_type = idl_type;
+            
             // Remove const, &, shared_ptr wrappers etc. (but not *)
             if (clean_type.find("const") != std::string::npos)
             {

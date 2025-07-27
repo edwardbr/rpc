@@ -22,320 +22,257 @@ namespace rpc_generator
         SEND_PARAM_IN
     };
 
-    struct renderer
+    
+    // Polymorphic renderer adapter that implements base_renderer interface
+    class polymorphic_renderer : public rpc_generator::base_renderer
     {
-        enum param_type
+    public:
+        polymorphic_renderer() = default;
+        
+        // Implement pure virtual functions from base_renderer
+        std::string render_by_value(int option, bool from_host, const class_entity& lib, const std::string& name, 
+                                   bool is_in, bool is_out, bool is_const, 
+                                   const std::string& type_name, uint64_t& count) override
         {
-            BY_VALUE,
-            REFERENCE,
-            MOVE,
-            POINTER,
-            POINTER_REFERENCE,
-            POINTER_POINTER,
-            INTERFACE,
-            INTERFACE_REFERENCE
-        };
-
-        template<param_type type>
-        std::string render(print_type option,
-            const class_entity& lib,
-            const std::string& name,
-            bool is_in,
-            bool is_out,
-            bool is_const,
-            const std::string& object_type,
-            uint64_t& count) const
-        {
-            static_assert(false);
-            std::ignore = option;
+            std::ignore = from_host;
             std::ignore = lib;
-            std::ignore = name;
             std::ignore = is_in;
             std::ignore = is_out;
             std::ignore = is_const;
-            std::ignore = object_type;
             std::ignore = count;
-            return {};
+
+            print_type pt = static_cast<print_type>(option);
+            switch (pt)
+            {
+            case PROXY_PARAM_IN:
+                return fmt::format("const {}& {}", type_name, name);
+            case STUB_PARAM_IN:
+                return fmt::format("{}& {}", type_name, name);
+            case STUB_PARAM_OUT:
+                return fmt::format("const {}& {}", type_name, name);
+            case PROXY_PARAM_OUT:
+                return fmt::format("{}& {}", type_name, name);
+            case SEND_PARAM_IN:
+                return fmt::format("{0}, ", name);
+            default:
+                return "";
+            }
         }
+        
+        std::string render_reference(int option, bool from_host, const class_entity& lib, const std::string& name, 
+                                    bool is_in, bool is_out, bool is_const, 
+                                    const std::string& type_name, uint64_t& count) override
+        {
+            std::ignore = from_host;
+            std::ignore = lib;
+            std::ignore = is_in;
+            std::ignore = is_out;
+            std::ignore = is_const;
+            std::ignore = count;
+
+            if (is_out)
+            {
+                throw std::runtime_error("REFERENCE does not support out vals");
+            }
+
+            print_type pt = static_cast<print_type>(option);
+            switch (pt)
+            {
+            case PROXY_PARAM_IN:
+                return fmt::format("const {}& {}", type_name, name);
+            case STUB_PARAM_IN:
+                return fmt::format("{}& {}", type_name, name);
+            case STUB_PARAM_OUT:
+                return fmt::format("const {}& {}", type_name, name);
+            case PROXY_PARAM_OUT:
+                return fmt::format("{}& {}", type_name, name);
+            case SEND_PARAM_IN:
+                return fmt::format("{0}, ", name);
+            default:
+                return "";
+            }
+        }
+        
+        std::string render_move(int option, bool from_host, const class_entity& lib, const std::string& name, 
+                               bool is_in, bool is_out, bool is_const, 
+                               const std::string& type_name, uint64_t& count) override
+        {
+            std::ignore = from_host;
+            std::ignore = lib;
+            std::ignore = is_in;
+            std::ignore = count;
+
+            if (is_out)
+            {
+                throw std::runtime_error("MOVE does not support out vals");
+            }
+            if (is_const)
+            {
+                throw std::runtime_error("MOVE does not support const vals");
+            }
+
+            print_type pt = static_cast<print_type>(option);
+            switch (pt)
+            {
+            case PROXY_PARAM_IN:
+                return fmt::format("{}&& {}", type_name, name);
+            case STUB_PARAM_IN:
+                return fmt::format("{}& {}", type_name, name);
+            case SEND_PARAM_IN:
+                return fmt::format("std::move({0}), ", name);
+            default:
+                return "";
+            }
+        }
+        
+        std::string render_pointer(int option, bool from_host, const class_entity& lib, const std::string& name, 
+                                  bool is_in, bool is_out, bool is_const, 
+                                  const std::string& type_name, uint64_t& count) override
+        {
+            std::ignore = from_host;
+            std::ignore = lib;
+            std::ignore = is_in;
+            std::ignore = is_out;
+            std::ignore = is_const;
+            std::ignore = type_name;
+            std::ignore = count;
+
+            if (is_out)
+            {
+                throw std::runtime_error("POINTER does not support out vals");
+            }
+
+            print_type pt = static_cast<print_type>(option);
+            switch (pt)
+            {
+            case PROXY_PARAM_IN:
+                return fmt::format("uint64_t {}", name);
+            case STUB_PARAM_IN:
+                return fmt::format("uint64_t& {}", name);
+            default:
+                return "";
+            }
+        }
+        
+        std::string render_pointer_reference(int option, bool from_host, const class_entity& lib, const std::string& name, 
+                                            bool is_in, bool is_out, bool is_const, 
+                                            const std::string& type_name, uint64_t& count) override
+        {
+            std::ignore = from_host;
+            std::ignore = lib;
+            std::ignore = is_in;
+            std::ignore = type_name;
+            std::ignore = count;
+
+            if (is_const && is_out)
+            {
+                throw std::runtime_error("POINTER_REFERENCE does not support const out vals");
+            }
+            print_type pt = static_cast<print_type>(option);
+            switch (pt)
+            {
+            case PROXY_PARAM_IN:
+                return fmt::format("uint64_t& {}", name);
+            case STUB_PARAM_IN:
+                return fmt::format("uint64_t& {}", name);
+            case STUB_PARAM_OUT:
+                return fmt::format("uint64_t {}", name);
+            case PROXY_PARAM_OUT:
+                return fmt::format("uint64_t& {}", name);
+            default:
+                return "";
+            }
+        }
+        
+        std::string render_pointer_pointer(int option, bool from_host, const class_entity& lib, const std::string& name, 
+                                          bool is_in, bool is_out, bool is_const, 
+                                          const std::string& type_name, uint64_t& count) override
+        {
+            std::ignore = from_host;
+            std::ignore = lib;
+            std::ignore = is_in;
+            std::ignore = is_out;
+            std::ignore = is_const;
+            std::ignore = count;
+
+            print_type pt = static_cast<print_type>(option);
+            switch (pt)
+            {
+            case PROXY_PARAM_IN:
+                return fmt::format("{}** {}", type_name, name);
+            case STUB_PARAM_IN:
+                return fmt::format("{}** {}", type_name, name);
+            case STUB_PARAM_OUT:
+                return fmt::format("uint64_t {}", name);
+            case PROXY_PARAM_OUT:
+                return fmt::format("uint64_t& {}", name);
+            default:
+                return "";
+            }
+        }
+        
+        std::string render_interface(int option, bool from_host, const class_entity& lib, const std::string& name, 
+                                    bool is_in, bool is_out, bool is_const, 
+                                    const std::string& type_name, uint64_t& count) override
+        {
+            std::ignore = from_host;
+            std::ignore = lib;
+            std::ignore = is_in;
+            std::ignore = is_const;
+            std::ignore = type_name;
+            std::ignore = count;
+
+            if (is_out)
+            {
+                throw std::runtime_error("INTERFACE does not support out vals");
+            }
+
+            print_type pt = static_cast<print_type>(option);
+            switch (pt)
+            {
+            case PROXY_PARAM_IN:
+                return fmt::format("const rpc::interface_descriptor& {}", name);
+            case STUB_PARAM_IN:
+                return fmt::format("rpc::interface_descriptor& {}", name);
+            case PROXY_PARAM_OUT:
+                return fmt::format("rpc::interface_descriptor& {}", name);
+            case STUB_PARAM_OUT:
+                return fmt::format("rpc::interface_descriptor& {}", name);
+            default:
+                return "";
+            }
+        }
+        
+        std::string render_interface_reference(int option, bool from_host, const class_entity& lib, const std::string& name, 
+                                              bool is_in, bool is_out, bool is_const, 
+                                              const std::string& type_name, uint64_t& count) override
+        {
+            std::ignore = from_host;
+            std::ignore = lib;
+            std::ignore = is_in;
+            std::ignore = is_out;
+            std::ignore = is_const;
+            std::ignore = type_name;
+            std::ignore = count;
+
+            print_type pt = static_cast<print_type>(option);
+            switch (pt)
+            {
+            case PROXY_PARAM_IN:
+                return fmt::format("rpc::interface_descriptor& {}", name);
+            case STUB_PARAM_IN:
+                return fmt::format("rpc::interface_descriptor& {}", name);
+            case PROXY_PARAM_OUT:
+                return fmt::format("rpc::interface_descriptor& {}", name);
+            case STUB_PARAM_OUT:
+                return fmt::format("rpc::interface_descriptor& {}", name);
+            default:
+                return "";
+            }
+        }
+
     };
 
-    template<>
-    std::string renderer::render<renderer::BY_VALUE>(print_type option,
-        const class_entity& lib,
-        const std::string& name,
-        bool is_in,
-        bool is_out,
-        bool is_const,
-        const std::string& object_type,
-        uint64_t& count) const
-    {
-        std::ignore = lib;
-        std::ignore = is_in;
-        std::ignore = is_out;
-        std::ignore = is_const;
-        std::ignore = count;
-
-        switch (option)
-        {
-        case PROXY_PARAM_IN:
-            return fmt::format("const {}& {}", object_type, name);
-        case STUB_PARAM_IN:
-            return fmt::format("{}& {}", object_type, name);
-        case STUB_PARAM_OUT:
-            return fmt::format("const {}& {}", object_type, name);
-        case PROXY_PARAM_OUT:
-            return fmt::format("{}& {}", object_type, name);
-        case SEND_PARAM_IN:
-            return fmt::format("{0}, ", name);
-        default:
-            return "";
-        }
-    };
-
-    template<>
-    std::string renderer::render<renderer::REFERENCE>(print_type option,
-        const class_entity& lib,
-        const std::string& name,
-        bool is_in,
-        bool is_out,
-        bool is_const,
-        const std::string& object_type,
-        uint64_t& count) const
-    {
-        std::ignore = lib;
-        std::ignore = is_in;
-        std::ignore = is_out;
-        std::ignore = is_const;
-        std::ignore = count;
-
-        if (is_out)
-        {
-            throw std::runtime_error("REFERENCE does not support out vals");
-        }
-
-        switch (option)
-        {
-        case PROXY_PARAM_IN:
-            return fmt::format("const {}& {}", object_type, name);
-        case STUB_PARAM_IN:
-            return fmt::format("{}& {}", object_type, name);
-        case STUB_PARAM_OUT:
-            return fmt::format("const {}& {}", object_type, name);
-        case PROXY_PARAM_OUT:
-            return fmt::format("{}& {}", object_type, name);
-        case SEND_PARAM_IN:
-            return fmt::format("{0}, ", name);
-        default:
-            return "";
-        }
-    };
-
-    template<>
-    std::string renderer::render<renderer::MOVE>(print_type option,
-        const class_entity& lib,
-        const std::string& name,
-        bool is_in,
-        bool is_out,
-        bool is_const,
-        const std::string& object_type,
-        uint64_t& count) const
-    {
-        std::ignore = lib;
-        std::ignore = is_in;
-        std::ignore = count;
-
-        if (is_out)
-        {
-            throw std::runtime_error("MOVE does not support out vals");
-        }
-        if (is_const)
-        {
-            throw std::runtime_error("MOVE does not support const vals");
-        }
-
-        switch (option)
-        {
-        case PROXY_PARAM_IN:
-            return fmt::format("{}&& {}", object_type, name);
-        case STUB_PARAM_IN:
-            return fmt::format("{}& {}", object_type, name);
-        case SEND_PARAM_IN:
-            return fmt::format("std::move({0}), ", name);
-        default:
-            return "";
-        }
-    };
-
-    template<>
-    std::string renderer::render<renderer::POINTER>(print_type option,
-        const class_entity& lib,
-        const std::string& name,
-        bool is_in,
-        bool is_out,
-        bool is_const,
-        const std::string& object_type,
-        uint64_t& count) const
-    {
-        std::ignore = lib;
-        std::ignore = is_in;
-        std::ignore = is_out;
-        std::ignore = is_const;
-        std::ignore = object_type;
-        std::ignore = count;
-
-        if (is_out)
-        {
-            throw std::runtime_error("POINTER does not support out vals");
-        }
-
-        switch (option)
-        {
-        case PROXY_PARAM_IN:
-            return fmt::format("uint64_t {}", name);
-        case STUB_PARAM_IN:
-            return fmt::format("uint64_t& {}", name);
-        default:
-            return "";
-        }
-    };
-
-    template<>
-    std::string renderer::render<renderer::POINTER_REFERENCE>(print_type option,
-        const class_entity& lib,
-        const std::string& name,
-        bool is_in,
-        bool is_out,
-        bool is_const,
-        const std::string& object_type,
-        uint64_t& count) const
-    {
-        std::ignore = lib;
-        std::ignore = option;
-        std::ignore = name;
-        std::ignore = is_in;
-        std::ignore = object_type;
-        std::ignore = count;
-
-        if (is_const && is_out)
-        {
-            throw std::runtime_error("POINTER_REFERENCE does not support const out vals");
-        }
-        switch (option)
-        {
-        case PROXY_PARAM_IN:
-            return fmt::format("uint64_t& {}", name);
-        case STUB_PARAM_IN:
-            return fmt::format("uint64_t& {}", name);
-        case STUB_PARAM_OUT:
-            return fmt::format("uint64_t {}", name);
-        case PROXY_PARAM_OUT:
-            return fmt::format("uint64_t& {}", name);
-
-        default:
-            return "";
-        }
-    };
-
-    template<>
-    std::string renderer::render<renderer::POINTER_POINTER>(print_type option,
-        const class_entity& lib,
-        const std::string& name,
-        bool is_in,
-        bool is_out,
-        bool is_const,
-        const std::string& object_type,
-        uint64_t& count) const
-    {
-        std::ignore = lib;
-        std::ignore = is_in;
-        std::ignore = is_out;
-        std::ignore = is_const;
-        std::ignore = object_type;
-        std::ignore = count;
-
-        switch (option)
-        {
-        case PROXY_PARAM_IN:
-            return fmt::format("{}** {}", object_type, name);
-        case STUB_PARAM_IN:
-            return fmt::format("{}** {}", object_type, name);
-        case STUB_PARAM_OUT:
-            return fmt::format("uint64_t {}", name);
-        case PROXY_PARAM_OUT:
-            return fmt::format("uint64_t& {}", name);
-        default:
-            return "";
-        }
-    };
-
-    template<>
-    std::string renderer::render<renderer::INTERFACE>(print_type option,
-        const class_entity& lib,
-        const std::string& name,
-        bool is_in,
-        bool is_out,
-        bool is_const,
-        const std::string& object_type,
-        uint64_t& count) const
-    {
-        std::ignore = lib;
-        std::ignore = is_in;
-        std::ignore = is_const;
-        std::ignore = object_type;
-        std::ignore = count;
-
-        if (is_out)
-        {
-            throw std::runtime_error("INTERFACE does not support out vals");
-        }
-
-        switch (option)
-        {
-        case PROXY_PARAM_IN:
-            return fmt::format("const rpc::interface_descriptor& {}", name);
-        case STUB_PARAM_IN:
-            return fmt::format("rpc::interface_descriptor& {}", name);
-        case PROXY_PARAM_OUT:
-            return fmt::format("rpc::interface_descriptor& {}", name);
-        case STUB_PARAM_OUT:
-            return fmt::format("rpc::interface_descriptor& {}", name);
-        default:
-            return "";
-        }
-    };
-
-    template<>
-    std::string renderer::render<renderer::INTERFACE_REFERENCE>(print_type option,
-        const class_entity& lib,
-        const std::string& name,
-        bool is_in,
-        bool is_out,
-        bool is_const,
-        const std::string& object_type,
-        uint64_t& count) const
-    {
-        std::ignore = lib;
-        std::ignore = is_in;
-        std::ignore = is_out;
-        std::ignore = is_const;
-        std::ignore = object_type;
-        std::ignore = count;
-
-        switch (option)
-        {
-        case PROXY_PARAM_IN:
-            return fmt::format("rpc::interface_descriptor& {}", name);
-        case STUB_PARAM_IN:
-            return fmt::format("rpc::interface_descriptor& {}", name);
-
-        case PROXY_PARAM_OUT:
-            return fmt::format("rpc::interface_descriptor& {}", name);
-        case STUB_PARAM_OUT:
-            return fmt::format("rpc::interface_descriptor& {}", name);
-        default:
-            return "";
-        }
-    };
 
     bool do_in_param(print_type option,
         const class_entity& lib,
@@ -345,83 +282,9 @@ namespace rpc_generator
         uint64_t& count,
         std::string& output)
     {
-        auto in = is_in_param(attribs);
-        auto out = is_out_param(attribs);
-        auto is_const = is_const_param(attribs);
-        auto by_value = attribs.has_value(attribute_types::by_value_param);
-
-        if (out && !in)
-            return false;
-
-        std::string type_name = type;
-        std::string reference_modifiers;
-        rpc_generator::strip_reference_modifiers(type_name, reference_modifiers);
-
-        bool is_interface = is_interface_param(lib, type);
-
-        if (!is_interface)
-        {
-            if (reference_modifiers.empty())
-            {
-                output = renderer().render<renderer::BY_VALUE>(option, lib, name, in, out, is_const, type_name, count);
-            }
-            else if (reference_modifiers == "&")
-            {
-                if (by_value)
-                {
-                    output = renderer().render<renderer::BY_VALUE>(option, lib, name, in, out, is_const, type_name, count);
-                }
-                else
-                {
-                    output
-                        = renderer().render<renderer::REFERENCE>(option, lib, name, in, out, is_const, type_name, count);
-                }
-            }
-            else if (reference_modifiers == "&&")
-            {
-                output = renderer().render<renderer::MOVE>(option, lib, name, in, out, is_const, type_name, count);
-            }
-            else if (reference_modifiers == "*")
-            {
-                output = renderer().render<renderer::POINTER>(option, lib, name, in, out, is_const, type_name, count);
-            }
-            else if (reference_modifiers == "*&")
-            {
-                output = renderer().render<renderer::POINTER_REFERENCE>(
-                    option, lib, name, in, out, is_const, type_name, count);
-            }
-            else if (reference_modifiers == "**")
-            {
-                output = renderer().render<renderer::POINTER_POINTER>(
-                    option, lib, name, in, out, is_const, type_name, count);
-            }
-            else
-            {
-
-                std::cerr << fmt::format(
-                    "passing data by {} as in {} {} is not supported", reference_modifiers, type, name);
-                throw fmt::format("passing data by {} as in {} {} is not supported", reference_modifiers, type, name);
-            }
-        }
-        else
-        {
-            if (reference_modifiers.empty() || (reference_modifiers == "&" && (is_const || !out)))
-            {
-                output = renderer().render<renderer::INTERFACE>(option, lib, name, in, out, is_const, type_name, count);
-            }
-            else if (reference_modifiers == "&")
-            {
-                output = renderer().render<renderer::INTERFACE_REFERENCE>(
-                    option, lib, name, in, out, is_const, type_name, count);
-            }
-            else
-            {
-                std::cerr << fmt::format(
-                    "passing interface by {} as in {} {} is not supported", reference_modifiers, type, name);
-                throw fmt::format("passing interface by {} as in {} {} is not supported", reference_modifiers, type, name);
-            }
-        }
-        return true;
+        // UNIFIED: Use polymorphic renderer with print_type option  
+        polymorphic_renderer r;
+        return rpc_generator::do_in_param_unified(r, static_cast<int>(option), false, lib, name, type, attribs, count, output);
     }
 
     bool do_out_param(print_type option,
@@ -432,78 +295,9 @@ namespace rpc_generator
         uint64_t& count,
         std::string& output)
     {
-        auto in = is_in_param(attribs);
-        auto out = is_out_param(attribs);
-        auto is_const = is_const_param(attribs);
-
-        if (!out)
-            return false;
-
-        if (is_const)
-        {
-            std::cerr << fmt::format("out parameters cannot be null");
-            throw fmt::format("out parameters cannot be null");
-        }
-
-        std::string type_name = type;
-        std::string reference_modifiers;
-        rpc_generator::strip_reference_modifiers(type_name, reference_modifiers);
-
-        bool is_interface = is_interface_param(lib, type);
-
-        if (reference_modifiers.empty())
-        {
-            std::cerr << fmt::format("out parameters require data to be sent by pointer or reference {} {} ", type, name);
-            throw fmt::format("out parameters require data to be sent by pointer or reference {} {} ", type, name);
-        }
-
-        if (!is_interface)
-        {
-            if (reference_modifiers == "&")
-            {
-                output = renderer().render<renderer::BY_VALUE>(option, lib, name, in, out, is_const, type_name, count);
-            }
-            else if (reference_modifiers == "&&")
-            {
-                throw std::runtime_error("out call rvalue references is not possible");
-            }
-            else if (reference_modifiers == "*")
-            {
-                throw std::runtime_error("passing [out] by_pointer data by * will not work use a ** or *&");
-            }
-            else if (reference_modifiers == "*&")
-            {
-                output = renderer().render<renderer::POINTER_REFERENCE>(
-                    option, lib, name, in, out, is_const, type_name, count);
-            }
-            else if (reference_modifiers == "**")
-            {
-                output = renderer().render<renderer::POINTER_POINTER>(
-                    option, lib, name, in, out, is_const, type_name, count);
-            }
-            else
-            {
-
-                std::cerr << fmt::format(
-                    "passing data by {} as in {} {} is not supported", reference_modifiers, type, name);
-                throw fmt::format("passing data by {} as in {} {} is not supported", reference_modifiers, type, name);
-            }
-        }
-        else
-        {
-            if (reference_modifiers == "&")
-            {
-                output = renderer().render<renderer::INTERFACE_REFERENCE>(
-                    option, lib, name, in, out, is_const, type_name, count);
-            }
-            else
-            {
-                std::cerr << fmt::format(
-                    "passing interface by {} as in {} {} is not supported", reference_modifiers, type, name);
-                throw fmt::format("passing interface by {} as in {} {} is not supported", reference_modifiers, type, name);
-            }
-        }
-        return true;
+        // UNIFIED: Use polymorphic renderer with print_type option  
+        polymorphic_renderer r;
+        return rpc_generator::do_out_param_unified(r, static_cast<int>(option), false, lib, name, type, attribs, count, output);
     }
 
     void build_scoped_name(const class_entity* entity, std::string& name)
