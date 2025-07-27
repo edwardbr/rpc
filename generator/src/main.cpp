@@ -266,7 +266,7 @@ int main(const int argc, char* argv[])
             std::stringstream stub_header_stream;
             std::stringstream mock_stream;
 
-            rpc_generator::synchronous_generator::write_files(module_name,
+            synchronous_generator::write_files(module_name,
                 true,
                 *objects,
                 header_stream,
@@ -288,8 +288,7 @@ int main(const int argc, char* argv[])
             stub_header_stream << ends;
             if (mock_path.length())
             {
-                rpc_generator::synchronous_mock_generator::write_files(
-                    true, *objects, mock_stream, namespaces, header_path);
+                synchronous_mock_generator::write_files(true, *objects, mock_stream, namespaces, header_path);
                 mock_stream << ends;
             }
 
@@ -353,7 +352,7 @@ int main(const int argc, char* argv[])
 
             std::stringstream header_stream;
 
-            rpc_generator::yas_generator::write_files(true,
+            yas_generator::write_files(true,
                 *objects,
                 header_stream,
                 namespaces,
@@ -397,8 +396,7 @@ int main(const int argc, char* argv[])
             std::stringstream json_schema_stream;
 
             // Generate the JSON Schema
-            json_schema_generator::write_json_schema(*objects,
-                json_schema_stream,
+            json_schema::write_json_schema(*objects, json_schema_stream,
                 module_name); // Use filename as title
 
             if (is_different(json_schema_stream, json_schema_data))

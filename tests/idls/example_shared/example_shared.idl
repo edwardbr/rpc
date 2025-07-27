@@ -7,7 +7,8 @@ typedef int error_code;
 
 namespace xxx
 {
-    [status=example]
+    [status=example,description=R"__(Creates an example instance in a subordinate zone
+        abd we can do funky shit like this)__"]
     struct something_complicated
     {
         static std::string foo = "hello";

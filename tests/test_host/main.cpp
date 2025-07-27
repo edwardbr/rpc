@@ -7,20 +7,8 @@
 #include <string_view>
 #include <thread>
 
-#ifdef BUILD_ENCLAVE
-#include "untrusted/enclave_marshal_test_u.h"
-#include <common/enclave_service_proxy.h>
-#endif
-
 #include <common/foo_impl.h>
 #include <common/tests.h>
-
-#include <example/example.h>
-
-#include <rpc/basic_service_proxies.h>
-#ifdef USE_RPC_TELEMETRY
-#include <rpc/telemetry/host_telemetry_service.h>
-#endif
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -29,6 +17,13 @@
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <rpc/error_codes.h>
+
+// Include extracted setup classes
+#include "test_host.h"
+#include "test_service_logger.h"
+#include "in_memory_setup.h"
+#include "inproc_setup.h"
+#include "enclave_setup.h"
 
 // This list should be kept sorted.
 using testing::_;
@@ -59,6 +54,7 @@ using testing::Types;
 
 using namespace marshalled_tests;
 
+// Global variables (defined here and declared in headers)
 #ifdef _WIN32 // windows
 std::string enclave_path = "./marshal_test_enclave.signed.dll";
 #else // Linux
@@ -72,7 +68,6 @@ bool enable_telemetry_server = true;
 bool enable_multithreaded_tests = false;
 
 rpc::weak_ptr<rpc::service> current_host_service;
-
 std::atomic<uint64_t>* zone_gen = nullptr;
 
 // This line tests that we can define tests in an unnamed namespace.
@@ -97,373 +92,6 @@ namespace
         return RUN_ALL_TESTS();
     }
 }
-
-class host : public yyy::i_host, public rpc::enable_shared_from_this<host>
-{
-    rpc::zone zone_id_;
-
-    // perhaps this should be an unsorted list but map is easier to debug for now
-    std::map<std::string, rpc::shared_ptr<yyy::i_example>> cached_apps_;
-    std::mutex cached_apps_mux_;
-
-    void* get_address() const override { return (void*)this; }
-    const rpc::casting_interface* query_interface(rpc::interface_ordinal interface_id) const override
-    {
-        if (rpc::match<yyy::i_host>(interface_id))
-            return static_cast<const yyy::i_host*>(this);
-        return nullptr;
-    }
-
-public:
-    host(rpc::zone zone_id)
-        : zone_id_(zone_id)
-    {
-#ifdef USE_RPC_TELEMETRY
-        if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
-            telemetry_service->on_impl_creation("host", (uint64_t)this, zone_id_);
-#endif
-    }
-    virtual ~host()
-    {
-#ifdef USE_RPC_TELEMETRY
-        if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
-            telemetry_service->on_impl_deletion((uint64_t)this, zone_id_);
-#endif
-    }
-    error_code create_enclave(rpc::shared_ptr<yyy::i_example>& target) override
-    {
-#ifdef BUILD_ENCLAVE
-        rpc::shared_ptr<yyy::i_host> host = shared_from_this();
-        auto serv = current_host_service.lock();
-        auto err_code = serv->connect_to_zone<rpc::enclave_service_proxy>(
-            "an enclave", {++(*zone_gen)}, host, target, enclave_path);
-
-        return err_code;
-#endif
-        return rpc::error::INCOMPATIBLE_SERVICE();
-    };
-
-    // live app registry, it should have sole responsibility for the long term storage of app shared ptrs
-    error_code look_up_app(const std::string& app_name, rpc::shared_ptr<yyy::i_example>& app) override
-    {
-        std::scoped_lock lock(cached_apps_mux_);
-        auto it = cached_apps_.find(app_name);
-        if (it == cached_apps_.end())
-        {
-            return rpc::error::OK();
-        }
-        app = it->second;
-        return rpc::error::OK();
-    }
-
-    error_code set_app(const std::string& name, const rpc::shared_ptr<yyy::i_example>& app) override
-    {
-        std::scoped_lock lock(cached_apps_mux_);
-
-        cached_apps_[name] = app;
-        return rpc::error::OK();
-    }
-
-    error_code unload_app(const std::string& name) override
-    {
-        std::scoped_lock lock(cached_apps_mux_);
-        cached_apps_.erase(name);
-        return rpc::error::OK();
-    }
-};
-
-template<bool UseHostInChild> class in_memory_setup
-{
-    rpc::shared_ptr<yyy::i_host> i_host_ptr_;
-    rpc::weak_ptr<yyy::i_host> local_host_ptr_;
-    rpc::shared_ptr<yyy::i_example> i_example_ptr_;
-
-    const bool has_enclave_ = false;
-    bool use_host_in_child_ = UseHostInChild;
-
-    std::atomic<uint64_t> zone_gen_ = 0;
-
-public:
-    virtual ~in_memory_setup() = default;
-
-    rpc::shared_ptr<rpc::service> get_root_service() const { return nullptr; }
-    bool get_has_enclave() const { return has_enclave_; }
-    rpc::shared_ptr<yyy::i_example> get_example() const { return i_example_ptr_; }
-    rpc::shared_ptr<yyy::i_host> get_host() const { return i_host_ptr_; }
-    rpc::shared_ptr<yyy::i_host> get_local_host_ptr() { return local_host_ptr_.lock(); }
-    bool get_use_host_in_child() const { return use_host_in_child_; }
-
-    virtual void SetUp()
-    {
-        zone_gen = &zone_gen_;
-        auto test_info = ::testing::UnitTest::GetInstance()->current_test_info();
-#ifdef USE_RPC_TELEMETRY
-        if (enable_telemetry_server)
-            CREATE_TELEMETRY_SERVICE(
-                rpc::host_telemetry_service, test_info->test_suite_name(), test_info->name(), "../../rpc_test_diagram/")
-#endif
-        i_host_ptr_ = rpc::shared_ptr<yyy::i_host>(new host({++zone_gen_}));
-        local_host_ptr_ = i_host_ptr_;
-        i_example_ptr_ = rpc::shared_ptr<yyy::i_example>(new example(nullptr, use_host_in_child_ ? i_host_ptr_ : nullptr));
-    }
-
-    virtual void TearDown()
-    {
-        i_host_ptr_ = nullptr;
-        i_example_ptr_ = nullptr;
-        zone_gen = nullptr;
-#ifdef USE_RPC_TELEMETRY
-        RESET_TELEMETRY_SERVICE
-#endif
-    }
-};
-
-class test_service_logger : public rpc::service_logger
-{
-    inline static std::shared_ptr<spdlog::logger> logr
-        = spdlog::basic_logger_mt("basic_logger", "./conversation.txt", true);
-
-public:
-    test_service_logger()
-    {
-        logr->info("************************************");
-        logr->info("test {}", ::testing::UnitTest::GetInstance()->current_test_info()->name());
-    }
-    virtual ~test_service_logger() { }
-
-    void before_send(rpc::caller_zone caller_zone_id,
-        rpc::object object_id,
-        rpc::interface_ordinal interface_id,
-        rpc::method method_id,
-        size_t in_size_,
-        const char* in_buf_)
-    {
-        logr->info("caller_zone_id {} object_id {} interface_ordinal {} method {} data {}",
-            caller_zone_id.id,
-            object_id.id,
-            interface_id.id,
-            method_id.id,
-            std::string_view(in_buf_, in_size_));
-    }
-
-    void after_send(rpc::caller_zone caller_zone_id,
-        rpc::object object_id,
-        rpc::interface_ordinal interface_id,
-        rpc::method method_id,
-        int ret,
-        const std::vector<char>& out_buf_)
-    {
-        logr->info("caller_zone_id {} object_id {} interface_ordinal {} method {} ret {} data {}",
-            caller_zone_id.id,
-            object_id.id,
-            interface_id.id,
-            method_id.id,
-            ret,
-            std::string_view(out_buf_.data(), out_buf_.size()));
-    }
-};
-
-template<bool UseHostInChild, bool RunStandardTests, bool CreateNewZoneThenCreateSubordinatedZone> class inproc_setup
-{
-    rpc::shared_ptr<rpc::service> root_service_;
-    rpc::shared_ptr<rpc::child_service> child_service_;
-    rpc::shared_ptr<yyy::i_host> i_host_ptr_;
-    rpc::weak_ptr<yyy::i_host> local_host_ptr_;
-    rpc::shared_ptr<yyy::i_example> i_example_ptr_;
-
-    const bool has_enclave_ = true;
-    bool use_host_in_child_ = UseHostInChild;
-    bool run_standard_tests_ = RunStandardTests;
-
-    std::atomic<uint64_t> zone_gen_ = 0;
-
-public:
-    virtual ~inproc_setup() = default;
-
-    rpc::shared_ptr<rpc::service> get_root_service() const { return root_service_; }
-    bool get_has_enclave() const { return has_enclave_; }
-    bool is_enclave_setup() const { return false; }
-    rpc::shared_ptr<yyy::i_example> get_example() const { return i_example_ptr_; }
-    rpc::shared_ptr<yyy::i_host> get_host() const { return i_host_ptr_; }
-    rpc::shared_ptr<yyy::i_host> get_local_host_ptr() { return local_host_ptr_.lock(); }
-    bool get_use_host_in_child() const { return use_host_in_child_; }
-
-    virtual void SetUp()
-    {
-        zone_gen = &zone_gen_;
-        auto test_info = ::testing::UnitTest::GetInstance()->current_test_info();
-#ifdef USE_RPC_TELEMETRY
-        if (enable_telemetry_server)
-            CREATE_TELEMETRY_SERVICE(
-                rpc::host_telemetry_service, test_info->test_suite_name(), test_info->name(), "../../rpc_test_diagram/")
-#endif
-
-        root_service_ = rpc::make_shared<rpc::service>("host", rpc::zone{++zone_gen_});
-        root_service_->add_service_logger(std::make_shared<test_service_logger>());
-        current_host_service = root_service_;
-
-        rpc::shared_ptr<yyy::i_host> hst(new host(root_service_->get_zone_id()));
-        local_host_ptr_ = hst; // assign to weak ptr
-
-        auto err_code
-            = root_service_->connect_to_zone<rpc::local_child_service_proxy<yyy::i_example, yyy::i_host>>("main child",
-                {++zone_gen_},
-                hst,
-                i_example_ptr_,
-                [&](const rpc::shared_ptr<yyy::i_host>& host,
-                    rpc::shared_ptr<yyy::i_example>& new_example,
-                    const rpc::shared_ptr<rpc::child_service>& child_service_ptr) -> int
-                {
-                    i_host_ptr_ = host;
-                    child_service_ = child_service_ptr;
-                    example_import_idl_register_stubs(child_service_ptr);
-                    example_shared_idl_register_stubs(child_service_ptr);
-                    example_idl_register_stubs(child_service_ptr);
-                    new_example = rpc::shared_ptr<yyy::i_example>(new example(child_service_ptr, nullptr));
-                    if (use_host_in_child_)
-                        new_example->set_host(host);
-                    return rpc::error::OK();
-                });
-        ASSERT_ERROR_CODE(err_code);
-    }
-
-    virtual void TearDown()
-    {
-        i_example_ptr_ = nullptr;
-        i_host_ptr_ = nullptr;
-        child_service_ = nullptr;
-        root_service_ = nullptr;
-        zone_gen = nullptr;
-#ifdef USE_RPC_TELEMETRY
-        RESET_TELEMETRY_SERVICE
-#endif
-    }
-
-    rpc::shared_ptr<yyy::i_example> create_new_zone()
-    {
-        rpc::shared_ptr<yyy::i_host> hst;
-        if (use_host_in_child_)
-            hst = local_host_ptr_.lock();
-
-        rpc::shared_ptr<yyy::i_example> example_relay_ptr;
-
-        auto err_code
-            = root_service_->connect_to_zone<rpc::local_child_service_proxy<yyy::i_example, yyy::i_host>>("main child",
-                {++zone_gen_},
-                hst,
-                example_relay_ptr,
-                [&](const rpc::shared_ptr<yyy::i_host>& host,
-                    rpc::shared_ptr<yyy::i_example>& new_example,
-                    const rpc::shared_ptr<rpc::child_service>& child_service_ptr) -> int
-                {
-                    example_import_idl_register_stubs(child_service_ptr);
-                    example_shared_idl_register_stubs(child_service_ptr);
-                    example_idl_register_stubs(child_service_ptr);
-                    new_example = rpc::shared_ptr<yyy::i_example>(new example(child_service_ptr, nullptr));
-                    if (use_host_in_child_)
-                        new_example->set_host(host);
-                    return rpc::error::OK();
-                });
-
-        if (CreateNewZoneThenCreateSubordinatedZone)
-        {
-            rpc::shared_ptr<yyy::i_example> new_ptr;
-            if (example_relay_ptr->create_example_in_subordinate_zone(new_ptr, use_host_in_child_ ? hst : nullptr, ++zone_gen_)
-                == rpc::error::OK())
-            {
-                example_relay_ptr->set_host(nullptr);
-                example_relay_ptr = new_ptr;
-            }
-        }
-        return example_relay_ptr;
-    }
-};
-
-#ifdef BUILD_ENCLAVE
-template<bool UseHostInChild, bool RunStandardTests, bool CreateNewZoneThenCreateSubordinatedZone> class enclave_setup
-{
-    rpc::shared_ptr<rpc::service> root_service_;
-    rpc::shared_ptr<yyy::i_host> i_host_ptr_;
-    rpc::weak_ptr<yyy::i_host> local_host_ptr_;
-    rpc::shared_ptr<yyy::i_example> i_example_ptr_;
-
-    const bool has_enclave_ = true;
-    bool use_host_in_child_ = UseHostInChild;
-    bool run_standard_tests_ = RunStandardTests;
-
-    std::atomic<uint64_t> zone_gen_ = 0;
-
-public:
-    virtual ~enclave_setup() = default;
-
-    rpc::shared_ptr<rpc::service> get_root_service() const { return root_service_; }
-    bool get_has_enclave() const { return has_enclave_; }
-    bool is_enclave_setup() const { return true; }
-    rpc::shared_ptr<yyy::i_host> get_local_host_ptr() { return local_host_ptr_.lock(); }
-    rpc::shared_ptr<yyy::i_example> get_example() const { return i_example_ptr_; }
-    rpc::shared_ptr<yyy::i_host> get_host() const { return i_host_ptr_; }
-    bool get_use_host_in_child() const { return use_host_in_child_; }
-
-    virtual void SetUp()
-    {
-        zone_gen = &zone_gen_;
-        auto test_info = ::testing::UnitTest::GetInstance()->current_test_info();
-#ifdef USE_RPC_TELEMETRY
-        if (enable_telemetry_server)
-        {
-            CREATE_TELEMETRY_SERVICE(
-                rpc::host_telemetry_service, test_info->test_suite_name(), test_info->name(), "../../rpc_test_diagram/")
-        }
-#endif
-        root_service_ = rpc::make_shared<rpc::service>("host", rpc::zone{++zone_gen_});
-        root_service_->add_service_logger(std::make_shared<test_service_logger>());
-        example_import_idl_register_stubs(root_service_);
-        example_shared_idl_register_stubs(root_service_);
-        example_idl_register_stubs(root_service_);
-        current_host_service = root_service_;
-
-        i_host_ptr_ = rpc::shared_ptr<yyy::i_host>(new host(root_service_->get_zone_id()));
-        local_host_ptr_ = i_host_ptr_;
-
-        auto err_code = root_service_->connect_to_zone<rpc::enclave_service_proxy>(
-            "main child", {++(*zone_gen)}, use_host_in_child_ ? i_host_ptr_ : nullptr, i_example_ptr_, enclave_path);
-
-        ASSERT_ERROR_CODE(err_code);
-    }
-
-    virtual void TearDown()
-    {
-        i_example_ptr_ = nullptr;
-        i_host_ptr_ = nullptr;
-        root_service_ = nullptr;
-        zone_gen = nullptr;
-#ifdef USE_RPC_TELEMETRY
-        RESET_TELEMETRY_SERVICE
-#endif
-    }
-
-    rpc::shared_ptr<yyy::i_example> create_new_zone()
-    {
-        rpc::shared_ptr<yyy::i_example> ptr;
-
-        auto err_code = root_service_->connect_to_zone<rpc::enclave_service_proxy>(
-            "main child", {++zone_gen_}, use_host_in_child_ ? i_host_ptr_ : nullptr, ptr, enclave_path);
-
-        if (err_code != rpc::error::OK())
-            return nullptr;
-        if (CreateNewZoneThenCreateSubordinatedZone)
-        {
-            rpc::shared_ptr<yyy::i_example> new_ptr;
-            err_code = ptr->create_example_in_subordinate_zone(
-                new_ptr, use_host_in_child_ ? i_host_ptr_ : nullptr, ++zone_gen_);
-            if (err_code != rpc::error::OK())
-                return nullptr;
-            ptr = new_ptr;
-        }
-        return ptr;
-    }
-};
-#endif
 
 template<class T> class type_test : public testing::Test
 {
