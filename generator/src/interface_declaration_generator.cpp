@@ -9,7 +9,7 @@
 #include "attributes.h"
 #include "rpc_attributes.h"
 
-namespace rpc_generator
+namespace interface_declaration_generator
 {
     enum print_type
     {
@@ -682,7 +682,7 @@ namespace rpc_generator
                 if (function->get_entity_type() == entity_type::FUNCTION_METHOD)
                 {
                     bool has_params = false;
-                    auto key = ::rpc_generator::write_proxy_send_declaration(m_ob, "", function, has_params, "", true);
+                    auto key = write_proxy_send_declaration(m_ob, "", function, has_params, "", true);
                     if (unique_signatures.emplace(key).second)
                     {
                         header("static {};", key);
@@ -703,7 +703,7 @@ namespace rpc_generator
                 if (function->get_entity_type() == entity_type::FUNCTION_METHOD)
                 {
                     bool has_params = false;
-                    auto key = ::rpc_generator::write_stub_receive_declaration(m_ob, "", function, has_params, "", true);
+                    auto key = write_stub_receive_declaration(m_ob, "", function, has_params, "", true);
                     if (unique_signatures.emplace(key).second)
                     {
                         header("static {};", key);
@@ -724,7 +724,7 @@ namespace rpc_generator
                 if (function->get_entity_type() == entity_type::FUNCTION_METHOD)
                 {
                     bool has_params = false;
-                    auto key = ::rpc_generator::write_stub_reply_declaration(m_ob, "", function, has_params, "", true);
+                    auto key = write_stub_reply_declaration(m_ob, "", function, has_params, "", true);
                     if (unique_signatures.emplace(key).second)
                     {
                         header("static {};", key);
@@ -745,7 +745,7 @@ namespace rpc_generator
                 if (function->get_entity_type() == entity_type::FUNCTION_METHOD)
                 {
                     bool has_params = false;
-                    auto key = ::rpc_generator::write_proxy_receive_declaration(m_ob, "", function, has_params, "", true);
+                    auto key = write_proxy_receive_declaration(m_ob, "", function, has_params, "", true);
                     if (unique_signatures.emplace(key).second)
                     {
                         header("static {};", key);
@@ -779,7 +779,7 @@ namespace rpc_generator
                         function_count++;
 
                         bool is_suitable = true;
-                        auto key = ::rpc_generator::client_sender_declaration(m_ob, function, is_suitable);
+                        auto key = client_sender_declaration(m_ob, function, is_suitable);
                         if (!is_suitable)
                             continue;
 
