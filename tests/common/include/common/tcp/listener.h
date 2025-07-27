@@ -25,10 +25,9 @@ namespace rpc::tcp
         std::chrono::milliseconds timeout_;
         std::chrono::milliseconds poll_timeout_ = std::chrono::milliseconds(10);
 
-        using connection_handler
-            = std::function<CORO_TASK(int)(const rpc::shared_ptr<CallerInterface>& caller_interface,
-                                           rpc::shared_ptr<CalleeInterface>& callee_interface,
-                                           const rpc::shared_ptr<rpc::service>& child_service_ptr)>;
+        using connection_handler = std::function<CORO_TASK(int)(const rpc::shared_ptr<CallerInterface>& caller_interface,
+            rpc::shared_ptr<CalleeInterface>& callee_interface,
+            const rpc::shared_ptr<rpc::service>& child_service_ptr)>;
         connection_handler connection_handler_;
 
     public:
@@ -53,22 +52,22 @@ namespace rpc::tcp
         coro::task<void> run_client(rpc::shared_ptr<rpc::service> service, coro::net::tcp::client client)
         {
             assert(client.socket().is_valid());
-            
+
             std::shared_ptr<worker_release> worker_release(std::make_shared<worker_release>());
-            
-            worker_release->channel_manager
+
+            worker_release->channel_manager_
                 = std::make_shared<channel_manager>(std::move(client), timeout_, worker_release, service);
 
             envelope_prefix prefix;
             envelope_payload payload;
-            int err = CO_AWAIT worker_release->channel_manager->receive_anonymous_payload(prefix, payload, 0);
-            if(err != rpc::error::OK())
+            int err = CO_AWAIT worker_release->channel_manager_->receive_anonymous_payload(prefix, payload, 0);
+            if (err != rpc::error::OK())
             {
                 LOG_CSTR("failed run_client receive_anonymous_payload");
                 CO_RETURN;
             }
 
-            if(payload.payload_fingerprint == rpc::id<tcp::init_client_channel_send>::get(prefix.version))
+            if (payload.payload_fingerprint == rpc::id<tcp::init_client_channel_send>::get(prefix.version))
             {
                 // std::string msg("run_client init_client_channel_send ");
                 // msg += std::to_string(service->get_zone_id().get_val());
@@ -76,22 +75,26 @@ namespace rpc::tcp
 
                 tcp::init_client_channel_send request;
                 auto err = rpc::from_yas_compressed_binary(rpc::span(payload.payload), request);
-                if(!err.empty())
+                if (!err.empty())
                 {
                     LOG_CSTR("failed run_client init_client_channel_send");
                     CO_RETURN;
                 }
 
                 {
-                    destination_zone destination_zone_id {request.caller_zone_id};
+                    destination_zone destination_zone_id{request.caller_zone_id};
 
                     rpc::interface_descriptor output_interface;
 
-                    auto ret = CO_AWAIT service
-                                   ->attach_remote_zone<rpc::tcp::service_proxy, CallerInterface, CalleeInterface>(
-                                       "service_proxy", {{request.caller_object_id}, {request.caller_zone_id}},
-                                       output_interface, connection_handler_, destination_zone_id, worker_release);
-                    if(ret != rpc::error::OK())
+                    auto ret
+                        = CO_AWAIT service->attach_remote_zone<rpc::tcp::service_proxy, CallerInterface, CalleeInterface>(
+                            "service_proxy",
+                            {{request.caller_object_id}, {request.caller_zone_id}},
+                            output_interface,
+                            connection_handler_,
+                            destination_zone_id,
+                            worker_release);
+                    if (ret != rpc::error::OK())
                     {
                         // report error
                         auto randonmumber = "failed to connect to zone " + std::to_string(ret) + " \n";
@@ -103,11 +106,12 @@ namespace rpc::tcp
                     // msg += std::to_string(service->get_zone_id().get_val());
                     // LOG_CSTR(msg.c_str());
 
-                    err = CO_AWAIT worker_release->channel_manager->immediate_send_payload(
-                        prefix.version, message_direction::receive,
-                        tcp::init_client_channel_response {rpc::error::OK(),
-                                                           output_interface.destination_zone_id.get_val(),
-                                                           output_interface.object_id.get_val(), 0},
+                    err = CO_AWAIT worker_release->channel_manager_->immediate_send_payload(prefix.version,
+                        message_direction::receive,
+                        tcp::init_client_channel_response{rpc::error::OK(),
+                            output_interface.destination_zone_id.get_val(),
+                            output_interface.object_id.get_val(),
+                            0},
                         prefix.sequence_number);
                     std::ignore = err;
 
@@ -122,27 +126,27 @@ namespace rpc::tcp
                 CO_RETURN;
             }
         }
-        
+
         coro::task<void> run_listener(rpc::shared_ptr<rpc::service> service)
         {
             // Start by creating a tcp server, we'll do this before putting it into the scheduler so
             // it is immediately available for the client to connect since this will create a socket,
             // bind the socket and start listening on that socket.  See tcp::server for more details on
             // how to specify the local address and port to bind to as well as enabling SSL/TLS.
-            coro::net::tcp::server server {service->get_scheduler()};
+            coro::net::tcp::server server{service->get_scheduler()};
 
             auto scheduler = service->get_scheduler();
             co_await scheduler->schedule();
 
-            while(!stop_)
+            while (!stop_)
             {
                 // Wait for an incoming connection and accept it.
                 auto poll_status = co_await server.poll(poll_timeout_);
-                if(poll_status == coro::poll_status::timeout)
+                if (poll_status == coro::poll_status::timeout)
                 {
                     continue; // Handle error, see poll_status for detailed error states.
                 }
-                if(poll_status != coro::poll_status::event)
+                if (poll_status != coro::poll_status::event)
                 {
                     LOG_CSTR("failed run_listener poll_status");
                     break; // Handle error, see poll_status for detailed error states.
@@ -152,7 +156,7 @@ namespace rpc::tcp
                 auto client = server.accept();
 
                 // Verify the incoming connection was accepted correctly.
-                if(!client.socket().is_valid())
+                if (!client.socket().is_valid())
                 {
                     LOG_CSTR("failed run_listener client is_valid");
                     break; // Handle error.

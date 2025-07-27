@@ -49,19 +49,19 @@ bool is_interface_param(const class_entity& lib, const std::string& type)
     return false;
 }
 
-bool is_in_param(const std::list<std::string>& attributes)
+bool is_in_param(const attributes& attribs)
 {
-    return std::find(attributes.begin(), attributes.end(), attribute_types::in_param) != attributes.end();
+    return attribs.has_value(attribute_types::in_param);
 }
 
-bool is_out_param(const std::list<std::string>& attributes)
+bool is_out_param(const attributes& attribs)
 {
-    return std::find(attributes.begin(), attributes.end(), attribute_types::out_param) != attributes.end();
+    return attribs.has_value(attribute_types::out_param);
 }
 
-bool is_const_param(const std::list<std::string>& attributes)
+bool is_const_param(const attributes& attribs)
 {
-    return std::find(attributes.begin(), attributes.end(), attribute_types::const_function) != attributes.end();
+    return attribs.has_value(attribute_types::const_function);
 }
 
 bool is_reference(std::string type_name)
@@ -129,13 +129,10 @@ void render_parameter(writer& wrtr, const class_entity& m_ob, const parameter_en
 {
     std::string modifier;
     bool has_struct = false;
-    for (auto& item : parameter.get_attributes())
-    {
-        if (item == "const")
-            modifier = "const " + modifier;
-        if (item == "struct")
-            has_struct = true;
-    }
+    if (parameter.has_value("const"))
+        modifier = "const " + modifier;
+    if (parameter.has_value("struct"))
+        has_struct = true;
 
     if (has_struct)
     {
@@ -165,13 +162,7 @@ void render_function(writer& wrtr, const class_entity& m_ob, const function_enti
     {
         modifier += "inline static ";
     }
-    bool has_struct = false;
-    for (auto& item : function.get_attributes())
-    {
-        if (item == "struct")
-            has_struct = true;
-    }
-
+    bool has_struct = function.has_value("struct");
     if (has_struct)
     {
         modifier = modifier + "struct ";

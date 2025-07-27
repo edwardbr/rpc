@@ -8,17 +8,14 @@ if(BUILD_COROUTINE)
   set(COROUTINE_LIBS libcoro)
 endif()
 
-add_executable(rpc_test main.cpp 
-rpc_log.cpp 
-${COROUTINE_TESTS})
+add_executable(rpc_test main.cpp ${COROUTINE_TESTS})
 
 target_compile_definitions(rpc_test PRIVATE ${HOST_DEFINES})
 
 target_include_directories(
   rpc_test
-  PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-         "$<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/generated/include>"
-         "$<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/generated/src>"
+  PUBLIC "$<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/generated/include>"
+  "$<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/generated/src>"
   PRIVATE ${HOST_INCLUDES})
 
 if(BUILD_ENCLAVE)
@@ -28,19 +25,20 @@ endif()
 target_link_libraries(
   rpc_test
   PUBLIC common_host
-         example_idl_host
-         example_import_idl_host
-         example_shared_idl_host   
-         rpc::rpc_host
-         yas_common
-         args::args
-         fmt::fmt
-         GTest::gtest_main
-         GTest::gmock_main
-         spdlog::spdlog
-         libcoro
-         ${ENCLAVE_DEPENDANCIES}
-         ${HOST_LIBRARIES})
+  example_idl_host
+  example_import_idl_host
+  example_shared_idl_host
+  test_fixtures
+  yas_common
+  rpc::rpc_host
+  args::args
+  fmt::fmt
+  GTest::gtest_main
+  GTest::gmock_main
+  spdlog::spdlog
+  libcoro
+  ${ENCLAVE_DEPENDANCIES}
+  ${HOST_LIBRARIES})
 
 target_compile_options(rpc_test PRIVATE ${HOST_COMPILE_OPTIONS} ${WARN_OK})
 target_link_options(rpc_test PRIVATE ${HOST_LINK_EXE_OPTIONS})

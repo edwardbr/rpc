@@ -48,7 +48,7 @@ namespace component_checksum
 
         auto name = get_namespace(m_ob.get_owner()) + interface_name;
 
-        auto status = m_ob.get_attribute_value("status");
+        auto status = m_ob.get_value("status");
         if (status.empty())
             status = "not_specified";
 
@@ -67,7 +67,7 @@ namespace component_checksum
 
         auto name = get_namespace(m_ob.get_owner()) + m_ob.get_name();
 
-        auto status = m_ob.get_attribute_value("status");
+        auto status = m_ob.get_value("status");
         if (status.empty())
             status = "not_specified";
 

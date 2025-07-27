@@ -22,3 +22,9 @@
 [submodule "submodules/c-ares"]
 	path = submodules/c-ares
 	url = https://github.com/c-ares/c-ares.git
+[submodule "submodules/json"]
+	path = submodules/json
+	url = https://github.com/nlohmann/json.git
+[submodule "submodules/json-schema-validator"]
+	path = submodules/json-schema-validator
+	url = https://github.com/pboettch/json-schema-validator.git

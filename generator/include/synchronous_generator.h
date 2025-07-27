@@ -3,9 +3,7 @@
  *   All rights reserved.
  */
 
-namespace rpc_generator
-{
-    namespace synchronous_generator
+namespace synchronous_generator
     {
         // entry point
         void write_files(std::string module_name,
@@ -25,4 +23,3 @@ namespace rpc_generator
             const std::vector<std::string>& additional_stub_headers,
             bool include_rpc_headers);
     }
-}

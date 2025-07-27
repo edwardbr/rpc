@@ -10,15 +10,15 @@
 #include "gtest/gtest.h"
 
 #ifdef BUILD_COROUTINE
-    #define ASSERT_ERROR_CODE(x) CORO_ASSERT_EQ(CO_AWAIT x, rpc::error::OK())
-    #define TEST_RETURN_VAL CORO_TASK(bool)
-    #define TEST_RETURN_SUCCESFUL CO_RETURN true
-    #define TEST_SYNC_WAIT(x) ASSERT_EQ(SYNC_WAIT(x), true)
+#define ASSERT_ERROR_CODE(x) CORO_ASSERT_EQ(CO_AWAIT x, rpc::error::OK())
+#define TEST_RETURN_VAL CORO_TASK(bool)
+#define TEST_RETURN_SUCCESFUL CO_RETURN true
+#define TEST_SYNC_WAIT(x) ASSERT_EQ(SYNC_WAIT(x), true)
 #else
-    #define ASSERT_ERROR_CODE(x) ASSERT_EQ(x, rpc::error::OK())
-    #define TEST_RETURN_VAL void
-    #define TEST_RETURN_SUCCESFUL
-    #define TEST_SYNC_WAIT(x) SYNC_WAIT(x)
+#define ASSERT_ERROR_CODE(x) ASSERT_EQ(x, rpc::error::OK())
+#define TEST_RETURN_VAL void
+#define TEST_RETURN_SUCCESFUL
+#define TEST_SYNC_WAIT(x) SYNC_WAIT(x)
 #endif
 
 namespace marshalled_tests
@@ -65,95 +65,95 @@ namespace marshalled_tests
             ASSERT_ERROR_CODE(foo.do_something_in_out_ref(val));
         }
         {
-            xxx::something_complicated val {33, "22"};
+            xxx::something_complicated val{33, "22"};
             ASSERT_ERROR_CODE(foo.give_something_complicated_val(val));
         }
         {
-            xxx::something_complicated val {33, "22"};
+            xxx::something_complicated val{33, "22"};
             ASSERT_ERROR_CODE(foo.give_something_complicated_ref(val));
         }
         {
-            xxx::something_complicated val {33, "22"};
+            xxx::something_complicated val{33, "22"};
             ASSERT_ERROR_CODE(foo.give_something_complicated_ref_val(val));
         }
         {
-            xxx::something_complicated val {33, "22"};
+            xxx::something_complicated val{33, "22"};
             ASSERT_ERROR_CODE(foo.give_something_complicated_move_ref(std::move(val)));
         }
         {
-            xxx::something_complicated val {33, "22"};
+            xxx::something_complicated val{33, "22"};
             ASSERT_ERROR_CODE(foo.give_something_complicated_ptr(&val));
         }
         {
             xxx::something_complicated val;
-            ASSERT_ERROR_CODE(foo.recieve_something_complicated_ref(val));
+            ASSERT_ERROR_CODE(foo.receive_something_complicated_ref(val));
             log(std::string("got ") + val.string_val);
         }
         if (!enclave)
         {
             xxx::something_complicated* val = nullptr;
-            ASSERT_ERROR_CODE(foo.recieve_something_complicated_ptr(val));
+            ASSERT_ERROR_CODE(foo.receive_something_complicated_ptr(val));
             log(std::string("got ") + std::to_string(val->int_val));
             delete val;
         }
         {
             xxx::something_complicated val;
             val.int_val = 32;
-            ASSERT_ERROR_CODE(foo.recieve_something_complicated_in_out_ref(val));
+            ASSERT_ERROR_CODE(foo.receive_something_complicated_in_out_ref(val));
             log(std::string("got ") + std::to_string(val.int_val));
         }
         {
             xxx::something_more_complicated val;
-            val.map_val["22"] = xxx::something_complicated {33, "22"};
+            val.map_val["22"] = xxx::something_complicated{33, "22"};
             ASSERT_ERROR_CODE(foo.give_something_more_complicated_val(val));
         }
         if (!enclave)
         {
             xxx::something_more_complicated val;
-            val.map_val["22"] = xxx::something_complicated {33, "22"};
+            val.map_val["22"] = xxx::something_complicated{33, "22"};
             ASSERT_ERROR_CODE(foo.give_something_more_complicated_ref(val));
         }
         {
             xxx::something_more_complicated val;
-            val.map_val["22"] = xxx::something_complicated {33, "22"};
+            val.map_val["22"] = xxx::something_complicated{33, "22"};
             ASSERT_ERROR_CODE(foo.give_something_more_complicated_move_ref(std::move(val)));
         }
         {
             xxx::something_more_complicated val;
-            val.map_val["22"] = xxx::something_complicated {33, "22"};
+            val.map_val["22"] = xxx::something_complicated{33, "22"};
             ASSERT_ERROR_CODE(foo.give_something_more_complicated_ref_val(val));
         }
         if (!enclave)
         {
             xxx::something_more_complicated val;
-            val.map_val["22"] = xxx::something_complicated {33, "22"};
+            val.map_val["22"] = xxx::something_complicated{33, "22"};
             ASSERT_ERROR_CODE(foo.give_something_more_complicated_ptr(&val));
         }
         if (!enclave)
         {
             xxx::something_more_complicated val;
-            ASSERT_ERROR_CODE(foo.recieve_something_more_complicated_ref(val));
-            if(val.map_val.size() == 0)
-                log("error recieve_something_more_complicated_ref returned no data");
+            ASSERT_ERROR_CODE(foo.receive_something_more_complicated_ref(val));
+            if (val.map_val.size() == 0)
+                log("error receive_something_more_complicated_ref returned no data");
             else
                 log(std::string("got ") + val.map_val.begin()->first);
         }
         if (!enclave)
         {
             xxx::something_more_complicated* val = nullptr;
-            ASSERT_ERROR_CODE(foo.recieve_something_more_complicated_ptr(val));
-            if(val->map_val.size() == 0)
-                log("error recieve_something_more_complicated_ref returned no data");
+            ASSERT_ERROR_CODE(foo.receive_something_more_complicated_ptr(val));
+            if (val->map_val.size() == 0)
+                log("error receive_something_more_complicated_ref returned no data");
             else
                 log(std::string("got ") + val->map_val.begin()->first);
             delete val;
         }
         {
             xxx::something_more_complicated val;
-            val.map_val["22"] = xxx::something_complicated {33, "22"};
-            ASSERT_ERROR_CODE(foo.recieve_something_more_complicated_in_out_ref(val));
-            if(val.map_val.size() == 0)
-                log("error recieve_something_more_complicated_in_out_ref returned no data");
+            val.map_val["22"] = xxx::something_complicated{33, "22"};
+            ASSERT_ERROR_CODE(foo.receive_something_more_complicated_in_out_ref(val));
+            if (val.map_val.size() == 0)
+                log("error receive_something_more_complicated_in_out_ref returned no data");
             else
                 log(std::string("got ") + val.map_val.begin()->first);
         }
@@ -165,17 +165,14 @@ namespace marshalled_tests
         {
             xxx::something_more_complicated val1;
             xxx::something_more_complicated val2;
-            val1.map_val["22"] = xxx::something_complicated {33, "22"};
-            val2.map_val["22"] = xxx::something_complicated {33, "22"};
+            val1.map_val["22"] = xxx::something_complicated{33, "22"};
+            val2.map_val["22"] = xxx::something_complicated{33, "22"};
             ASSERT_ERROR_CODE(foo.do_multi_complicated_val(val1, val2));
         }
         TEST_RETURN_SUCCESFUL;
     }
 
-    CORO_TASK(void) remote_tests(
-        bool use_host_in_child
-        , rpc::shared_ptr<yyy::i_example> example_ptr
-        , rpc::zone zone_id)
+    CORO_TASK(void) remote_tests(bool use_host_in_child, rpc::shared_ptr<yyy::i_example> example_ptr, rpc::zone zone_id)
     {
         int val = 0;
         CO_AWAIT example_ptr->add(1, 2, val);
@@ -192,7 +189,7 @@ namespace marshalled_tests
 
             // test recursive interface passing
             rpc::shared_ptr<xxx::i_foo> other_foo;
-            int err_code = CO_AWAIT foo->recieve_interface(other_foo);
+            int err_code = CO_AWAIT foo->receive_interface(other_foo);
             if (err_code != rpc::error::OK())
             {
                 log(std::string("create_foo failed"));
@@ -202,20 +199,20 @@ namespace marshalled_tests
                 CO_AWAIT other_foo->do_something_in_val(22);
             }
 
-            if(use_host_in_child)
+            if (use_host_in_child)
             {
                 rpc::shared_ptr<xxx::i_baz> b(new baz(zone_id));
                 err_code = CO_AWAIT foo->call_baz_interface(b);
             }
 
-            if(CO_AWAIT foo->exception_test() != rpc::error::EXCEPTION())
+            if (CO_AWAIT foo->exception_test() != rpc::error::EXCEPTION())
                 log(std::string("exception_test failed"));
         }
         {
             rpc::shared_ptr<xxx::i_baz> i_baz_ptr;
             CO_AWAIT example_ptr->create_multiple_inheritance(i_baz_ptr);
-            //repeat twice
-            for(int i = 0; i < 2;i++)
+            // repeat twice
+            for (int i = 0; i < 2; i++)
             {
                 auto i_bar_ptr1 = CO_AWAIT rpc::dynamic_pointer_cast<xxx::i_bar>(i_baz_ptr);
                 RPC_ASSERT(i_bar_ptr1 != nullptr);

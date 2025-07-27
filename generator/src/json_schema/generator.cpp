@@ -2,6 +2,7 @@
 #include "cpp_parser.h"  // Your parser API header
 #include "json_schema/generator.h"
 #include "json_schema/writer.h"
+#include "type_utils.h"
 #include <cstdint>
 #include <iostream>
 #include <string>
@@ -20,7 +21,7 @@
 // Declare verboseStream if used globally by the generator/parser
 extern std::stringstream verboseStream;
 
-namespace json_schema_generator
+namespace json_schema
 {
 
     // --- Forward Declarations ---
@@ -61,54 +62,6 @@ namespace json_schema_generator
         bool is_send_struct = true;
     };
 
-    // --- Helper functions ---
-    bool has_attribute(const attributes& attribs, const std::string& name)
-    {
-        for (const auto& attr : attribs)
-        {
-            if (attr == name || attr.rfind(name + "=", 0) == 0)
-                return true;
-        }
-        return false;
-    }
-    std::string find_attribute_value(const attributes& attribs, const std::string& name)
-    {
-        for (const auto& attr : attribs)
-        {
-            if (attr.rfind(name + "=", 0) == 0)
-            {
-                if (attr.length() > name.length() + 1)
-                {
-                    std::string value = attr.substr(name.length() + 1);
-                    if (value.length() >= 2 && value.front() == '"' && value.back() == '"')
-                    {
-                        value = value.substr(1, value.length() - 2);
-                    }
-                    else if (value.length() >= 2 && value.front() == '\'' && value.back() == '\'')
-                    {
-                        value = value.substr(1, value.length() - 2);
-                    }
-                    return value;
-                }
-                else
-                {
-                    return "";
-                }
-            }
-        }
-        return "";
-    }
-    std::string clean_type_name(const std::string& raw_type)
-    {
-        std::string cleaned = raw_type;
-        auto first_good_char = std::find_if_not(
-            cleaned.begin(), cleaned.end(), [](unsigned char c) { return std::isspace(c) || std::iscntrl(c); });
-        cleaned.erase(cleaned.begin(), first_good_char);
-        auto last_good_char = std::find_if_not(
-            cleaned.rbegin(), cleaned.rend(), [](unsigned char c) { return std::isspace(c) || std::iscntrl(c); });
-        cleaned.erase(last_good_char.base(), cleaned.end());
-        return cleaned;
-    }
     bool parse_template_args(const std::string& type_name, std::string& container_name, std::vector<std::string>& args)
     {
         args.clear();
@@ -116,7 +69,7 @@ namespace json_schema_generator
         size_t close_bracket = type_name.rfind('>');
         if (open_bracket == std::string::npos || close_bracket == std::string::npos || close_bracket <= open_bracket)
             return false;
-        container_name = clean_type_name(type_name.substr(0, open_bracket));
+        container_name = rpc_generator::clean_type_name(type_name.substr(0, open_bracket));
         if (container_name.empty())
             return false;
         std::string args_str = type_name.substr(open_bracket + 1, close_bracket - open_bracket - 1);
@@ -137,7 +90,8 @@ namespace json_schema_generator
             }
             else if (args_str[i] == ',' && bracket_level == 0)
             {
-                std::string arg = clean_type_name(args_str.substr(current_arg_start, i - current_arg_start));
+                std::string arg
+                    = rpc_generator::clean_type_name(args_str.substr(current_arg_start, i - current_arg_start));
                 if (arg.empty())
                     return false;
                 args.push_back(arg);
@@ -146,7 +100,7 @@ namespace json_schema_generator
         }
         if (bracket_level != 0)
             return false;
-        std::string last_arg = clean_type_name(args_str.substr(current_arg_start));
+        std::string last_arg = rpc_generator::clean_type_name(args_str.substr(current_arg_start));
         if (last_arg.empty())
             return false;
         args.push_back(last_arg);
@@ -197,7 +151,7 @@ namespace json_schema_generator
             {
                 if (!element_ptr)
                     continue;
-                if (clean_type_name(element_ptr->get_name()) == type_name_cleaned)
+                if (rpc_generator::clean_type_name(element_ptr->get_name()) == type_name_cleaned)
                 {
                     entity_type et = element_ptr->get_entity_type();
                     if (et == entity_type::TYPEDEF || et == entity_type::STRUCT || et == entity_type::ENUM
@@ -255,9 +209,8 @@ namespace json_schema_generator
             return;
         }
         writer.open_object();
-        const attributes& definition_attribs = ent.get_attributes();
-        std::string attr_description = find_attribute_value(definition_attribs, "description");
-        if (has_attribute(definition_attribs, "deprecated"))
+        std::string attr_description = ent.get_value("description");
+        if (ent.has_value("deprecated"))
         {
             writer.write_raw_property("deprecated", "true");
         }
@@ -280,15 +233,15 @@ namespace json_schema_generator
                 const auto* var = dynamic_cast<const function_entity*>(element_ptr.get());
                 if (!var)
                     continue;
-                std::string member_name = clean_type_name(var->get_name());
+                std::string member_name = rpc_generator::clean_type_name(var->get_name());
                 std::string raw_member_type = var->get_return_type();
                 if (member_name.empty() || raw_member_type.empty())
                     continue;
-                std::string cleaned_member_type = clean_type_name(raw_member_type);
+                std::string cleaned_member_type = rpc_generator::clean_type_name(raw_member_type);
                 if (cleaned_member_type.empty())
                     continue;
-                properties[member_name] = {cleaned_member_type, var->get_attributes()};
-                if (has_attribute(var->get_attributes(), "required"))
+                properties[member_name] = {cleaned_member_type, *var};
+                if (var->has_value("required"))
                 {
                     required_fields.push_back(member_name);
                 }
@@ -346,14 +299,14 @@ namespace json_schema_generator
             {
                 if (!element_ptr)
                     continue;
-                std::string enum_value_name = clean_type_name(element_ptr->get_name());
+                std::string enum_value_name = rpc_generator::clean_type_name(element_ptr->get_name());
                 if (!enum_value_name.empty() && enum_value_name.find_first_of("{}[]() \t\n\r") == std::string::npos)
                 {
                     int64_t assigned_value = next_value;
                     const function_entity* value_entity = dynamic_cast<const function_entity*>(element_ptr.get());
                     if (value_entity)
                     {
-                        std::string explicit_value_str = clean_type_name(value_entity->get_return_type());
+                        std::string explicit_value_str = rpc_generator::clean_type_name(value_entity->get_return_type());
                         if (!explicit_value_str.empty())
                         {
                             try
@@ -404,7 +357,7 @@ namespace json_schema_generator
                 writer.write_string_property("description", attr_description);
             }
             writer.write_string_property("type", "array");
-            std::string element_type = clean_type_name(ent.get_alias_name());
+            std::string element_type = rpc_generator::clean_type_name(ent.get_alias_name());
             if (!element_type.empty())
             {
                 writer.write_key("items");
@@ -471,21 +424,21 @@ namespace json_schema_generator
         std::map<std::string, std::pair<std::string, attributes>> properties;
         for (const auto& param : info.method_entity->get_parameters())
         {
-            bool is_in = has_attribute(param.get_attributes(), "in");
-            bool is_out = has_attribute(param.get_attributes(), "out");
+            bool is_in = param.has_value("in");
+            bool is_out = param.has_value("out");
             bool implicitly_in = !is_in && !is_out;
             bool include_param = info.is_send_struct ? (is_in || implicitly_in) : is_out;
             if (include_param)
             {
-                std::string param_name = clean_type_name(param.get_name());
+                std::string param_name = rpc_generator::clean_type_name(param.get_name());
                 std::string raw_param_type = param.get_type();
                 if (param_name.empty() || raw_param_type.empty())
                     continue;
-                std::string cleaned_param_type = clean_type_name(raw_param_type);
+                std::string cleaned_param_type = rpc_generator::clean_type_name(raw_param_type);
                 if (cleaned_param_type.empty())
                     continue;
-                properties[param_name] = {cleaned_param_type, param.get_attributes()};
-                if (!has_attribute(param.get_attributes(), "optional"))
+                properties[param_name] = {cleaned_param_type, param};
+                if (!param.has_value("optional"))
                 {
                     required_fields.push_back(param_name);
                 }
@@ -542,7 +495,7 @@ namespace json_schema_generator
         const std::set<std::string>& currently_processing,
         const std::map<std::string, DefinitionInfoVariant>& definition_info_map)
     {
-        std::string idl_type_name_cleaned = clean_type_name(idl_type_name_in);
+        std::string idl_type_name_cleaned = rpc_generator::clean_type_name(idl_type_name_in);
         if (idl_type_name_cleaned.empty())
         {
             writer.open_object();
@@ -555,18 +508,19 @@ namespace json_schema_generator
         if (is_char_star(idl_type_name_cleaned) || idl_type_name_cleaned == "char*")
         {
             writer.open_object();
-            std::string description = find_attribute_value(attribs, "description");
+            std::string description = attribs.get_value("description");
             if (!description.empty())
                 writer.write_string_property("description", description);
-            if (has_attribute(attribs, "deprecated"))
+
+            if (attribs.has_value("deprecated"))
                 writer.write_raw_property("deprecated", "true");
             writer.write_string_property("type", "string");
             writer.close_object();
             return;
         }
         std::string ignored_modifiers;
-        strip_reference_modifiers(idl_type_name_cleaned, ignored_modifiers);
-        idl_type_name_cleaned = unconst(idl_type_name_cleaned);
+        rpc_generator::strip_reference_modifiers(idl_type_name_cleaned, ignored_modifiers);
+        idl_type_name_cleaned = rpc_generator::unconst(idl_type_name_cleaned);
         std::string container_name;
         std::vector<std::string> template_args;
         if (parse_template_args(idl_type_name_cleaned, container_name, template_args))
@@ -578,10 +532,10 @@ namespace json_schema_generator
             {
                 writer.open_object();
                 writer.write_string_property("type", "array");
-                std::string description = find_attribute_value(attribs, "description");
+                std::string description = attribs.get_value("description");
                 if (!description.empty())
                     writer.write_string_property("description", description);
-                if (has_attribute(attribs, "deprecated"))
+                if (attribs.has_value("deprecated"))
                     writer.write_raw_property("deprecated", "true");
                 writer.write_key("items");
                 map_idl_type_to_json_schema(root,
@@ -600,10 +554,10 @@ namespace json_schema_generator
             {
                 writer.open_object();
                 writer.write_string_property("type", "array");
-                std::string description = find_attribute_value(attribs, "description");
+                std::string description = attribs.get_value("description");
                 if (!description.empty())
                     writer.write_string_property("description", description);
-                if (has_attribute(attribs, "deprecated"))
+                if (attribs.has_value("deprecated"))
                     writer.write_raw_property("deprecated", "true");
                 try
                 {
@@ -618,7 +572,7 @@ namespace json_schema_generator
                 {
                     std::cerr << "exception has occurred std::stoll(template_args[1]) has value " << template_args[1]
                               << " resulting in this error: " << e.what() << "\n";
-                    std::string current_desc = find_attribute_value(attribs, "description");
+                    std::string current_desc = attribs.get_value("description");
                     std::string size_note = "[Note: Array size is non-literal: " + template_args[1] + "]";
                     writer.write_string_property(
                         "description", current_desc.empty() ? size_note : (current_desc + " " + size_note));
@@ -640,10 +594,10 @@ namespace json_schema_generator
             {
                 writer.open_object();
                 writer.write_string_property("type", "array");
-                std::string description = find_attribute_value(attribs, "description");
+                std::string description = attribs.get_value("description");
                 if (!description.empty())
                     writer.write_string_property("description", description);
-                if (has_attribute(attribs, "deprecated"))
+                if (attribs.has_value("deprecated"))
                     writer.write_raw_property("deprecated", "true");
                 writer.write_key("items");
                 writer.open_object();
@@ -705,7 +659,7 @@ namespace json_schema_generator
             entity_type et = found_entity.get_entity_type();
             if (et == entity_type::TYPEDEF)
             {
-                std::string underlying_type = clean_type_name(found_entity.get_alias_name());
+                std::string underlying_type = rpc_generator::clean_type_name(found_entity.get_alias_name());
                 if (!underlying_type.empty())
                 {
                     map_idl_type_to_json_schema(root,
@@ -734,10 +688,10 @@ namespace json_schema_generator
                 if (!qualified_name.empty())
                 {
                     writer.open_object();
-                    std::string description = find_attribute_value(attribs, "description");
+                    std::string description = attribs.get_value("description");
                     if (!description.empty())
                         writer.write_string_property("description", description);
-                    if (has_attribute(attribs, "deprecated"))
+                    if (attribs.has_value("deprecated"))
                         writer.write_raw_property("deprecated", "true");
                     writer.write_string_property("$ref", "#/definitions/" + qualified_name);
                     writer.close_object();
@@ -759,10 +713,10 @@ namespace json_schema_generator
         }
         std::string idl_type_name = idl_type_name_cleaned;
         writer.open_object();
-        std::string description = find_attribute_value(attribs, "description");
+        std::string description = attribs.get_value("description");
         if (!description.empty())
             writer.write_string_property("description", description);
-        if (has_attribute(attribs, "deprecated"))
+        if (attribs.has_value("deprecated"))
             writer.write_raw_property("deprecated", "true");
         if (is_int8(idl_type_name) || is_uint8(idl_type_name) || is_int16(idl_type_name) || is_uint16(idl_type_name)
             || is_int32(idl_type_name) || is_uint32(idl_type_name) || is_int64(idl_type_name) || is_uint64(idl_type_name)
@@ -781,7 +735,7 @@ namespace json_schema_generator
         else if (idl_type_name == "string" || idl_type_name == "std::string")
         {
             writer.write_string_property("type", "string");
-            std::string format = find_attribute_value(attribs, "format");
+            std::string format = attribs.get_value("format");
             if (!format.empty())
                 writer.write_string_property("format", format);
         }
@@ -839,7 +793,7 @@ namespace json_schema_generator
                     const function_entity* method = dynamic_cast<const function_entity*>(element_ptr.get());
                     if (!method)
                         continue;
-                    std::string method_name = clean_type_name(method->get_name());
+                    std::string method_name = rpc_generator::clean_type_name(method->get_name());
                     if (method_name.empty())
                         continue;
                     std::string send_struct_name = qualified_name + "_" + method_name + "_send";
@@ -968,4 +922,4 @@ namespace json_schema_generator
         os << "\n";
     }
 
-} // namespace json_schema_generator
+} // namespace json_schema
