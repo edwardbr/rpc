@@ -30,7 +30,11 @@ namespace rpc::spsc
 
     service_proxy::~service_proxy()
     {
+#ifdef BUILD_COROUTINE
         get_operating_zone_service()->get_scheduler()->schedule(channel_manager_->shutdown());
+#else
+        channel_manager_->shutdown();
+#endif
     }
 
     rpc::shared_ptr<rpc::service_proxy> service_proxy::clone()
@@ -71,7 +75,7 @@ namespace rpc::spsc
         auto ret = rpc::shared_ptr<service_proxy>(new service_proxy(
             name, destination_zone_id, svc, channel, std::chrono::milliseconds(0), send_spsc_queue, receive_spsc_queue));
 
-        co_return ret;
+        CO_RETURN ret;
     }
 
     CORO_TASK(int)

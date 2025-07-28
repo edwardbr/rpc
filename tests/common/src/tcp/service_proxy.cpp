@@ -69,10 +69,10 @@ namespace rpc::tcp
         if (!svc->get_scheduler()->schedule(connection->channel_manager_->pump_send_and_receive()))
         {
             LOG_CSTR("unable to attach_remote->pump_send_and_receive");
-            co_return nullptr;
+            CO_RETURN nullptr;
         }
 
-        co_return ret;
+        CO_RETURN ret;
     }
 
     CORO_TASK(int)

@@ -34,6 +34,9 @@ template<bool UseHostInChild, bool RunStandardTests, bool CreateNewZoneThenCreat
     std::shared_ptr<coro::io_scheduler> io_scheduler_;
     bool error_has_occured_ = false;
 
+    bool startup_complete_ = false;
+    bool shutdown_complete_ = false;
+
 public:
     std::shared_ptr<coro::io_scheduler> get_scheduler() const { return io_scheduler_; }
     bool error_has_occured() const { return error_has_occured_; }
@@ -94,6 +97,7 @@ public:
                     CO_AWAIT new_example->set_host(host);
                 CO_RETURN rpc::error::OK();
             });
+        startup_complete_ = true;
         if (ret != rpc::error::OK())
         {
             CO_RETURN false;
@@ -110,7 +114,9 @@ public:
                 }});
 
         io_scheduler_->schedule(check_for_error(CoroSetUp()));
-        io_scheduler_->process_events();
+        while (startup_complete_ == false || io_scheduler_->process_events())
+        {
+        }
 
         // auto err_code = SYNC_WAIT();
 
@@ -122,18 +128,21 @@ public:
         i_example_ptr_ = nullptr;
         i_host_ptr_ = nullptr;
         child_service_ = nullptr;
-        root_service_ = nullptr;
-        zone_gen = nullptr;
-#ifdef USE_RPC_TELEMETRY
-        RESET_TELEMETRY_SERVICE
-#endif
+        shutdown_complete_ = true;
         CO_RETURN;
     }
 
     virtual void TearDown()
     {
         io_scheduler_->schedule(CoroTearDown());
-        io_scheduler_->process_events();
+        while (shutdown_complete_ == false || io_scheduler_->process_events())
+        {
+        }
+        root_service_ = nullptr;
+        zone_gen = nullptr;
+#ifdef USE_RPC_TELEMETRY
+        RESET_TELEMETRY_SERVICE
+#endif
         // SYNC_WAIT(CoroTearDown());
     }
 

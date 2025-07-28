@@ -41,6 +41,14 @@ namespace rpc
         return {count};
     }
 
+#ifdef BUILD_COROUTINE
+    service::service(const char* name, zone zone_id, const std::shared_ptr<coro::io_scheduler>& io_scheduler)
+        : zone_id_(zone_id)
+        , name_(name)
+        , io_scheduler_(io_scheduler)
+    {
+    }
+#else
     service::service(const char* name, zone zone_id)
         : zone_id_(zone_id)
         , name_(name)
@@ -50,12 +58,7 @@ namespace rpc
             telemetry_service->on_service_creation(name, zone_id);
 #endif
     }
-
-    service::service(const char* name, zone zone_id, const std::shared_ptr<coro::io_scheduler>& io_scheduler)
-        : service(name, zone_id)
-    {
-        io_scheduler_ = io_scheduler;
-    }
+#endif
 
     service::~service()
     {

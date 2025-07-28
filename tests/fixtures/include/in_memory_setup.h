@@ -18,6 +18,7 @@
 
 template<bool UseHostInChild> class in_memory_setup
 {
+    rpc::shared_ptr<rpc::service> root_service_;
     rpc::shared_ptr<yyy::i_host> i_host_ptr_;
     rpc::weak_ptr<yyy::i_host> local_host_ptr_;
     rpc::shared_ptr<yyy::i_example> i_example_ptr_;
@@ -33,7 +34,7 @@ template<bool UseHostInChild> class in_memory_setup
 public:
     virtual ~in_memory_setup() = default;
 
-    rpc::shared_ptr<rpc::service> get_root_service() const { return nullptr; }
+    rpc::shared_ptr<rpc::service> get_root_service() const { return root_service_; }
     bool get_has_enclave() const { return has_enclave_; }
     rpc::shared_ptr<yyy::i_example> get_example() const { return i_example_ptr_; }
     rpc::shared_ptr<yyy::i_host> get_host() const { return i_host_ptr_; }
@@ -67,6 +68,9 @@ public:
             CREATE_TELEMETRY_SERVICE(
                 rpc::host_telemetry_service, test_info->test_suite_name(), test_info->name(), "../../rpc_test_diagram/")
 #endif
+        root_service_ = rpc::make_shared<rpc::service>("host", rpc::zone{++zone_gen_}, io_scheduler_);
+        root_service_->add_service_logger(std::make_shared<test_service_logger>());
+
         i_host_ptr_ = rpc::shared_ptr<yyy::i_host>(new host({++zone_gen_}));
         local_host_ptr_ = i_host_ptr_;
         i_example_ptr_ = rpc::shared_ptr<yyy::i_example>(

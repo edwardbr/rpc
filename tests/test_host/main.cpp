@@ -194,7 +194,7 @@ TYPED_TEST(type_test, standard_tests)
     ASSERT_EQ(lib.error_has_occured(), false);
 }
 
-TEST_RETURN_VAL dyanmic_cast_tests(rpc::shared_ptr<rpc::service> root_service)
+TEST_RETURN_VAL dyanmic_cast_tests(bool& is_ready, rpc::shared_ptr<rpc::service> root_service)
 {
     rpc::zone zone_id;
     if (root_service)
@@ -232,6 +232,7 @@ TEST_RETURN_VAL dyanmic_cast_tests(rpc::shared_ptr<rpc::service> root_service)
         auto z = CO_AWAIT rpc::dynamic_pointer_cast<xxx::i_foo>(baz);
         CORO_ASSERT_EQ(z, nullptr);
     }
+    is_ready = true;
     TEST_RETURN_SUCCESFUL;
 }
 
@@ -241,8 +242,13 @@ TYPED_TEST(type_test, dyanmic_cast_tests)
     auto root_service = lib.get_root_service();
     // TEST_SYNC_WAIT(dyanmic_cast_tests(root_service));
 
-    lib.get_scheduler()->schedule(lib.check_for_error(dyanmic_cast_tests(root_service)));
-    lib.get_scheduler()->process_events();
+    bool is_ready = false;
+
+    lib.get_scheduler()->schedule(lib.check_for_error(dyanmic_cast_tests(is_ready, root_service)));
+    while (!is_ready)
+    {
+        root_service->get_scheduler()->process_events(std::chrono::milliseconds(1));
+    };
 
     ASSERT_EQ(lib.error_has_occured(), false);
 }
