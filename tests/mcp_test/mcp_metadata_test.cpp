@@ -18,7 +18,6 @@
 #include "test_host.h"
 #include "inproc_setup.h"
 #include "test_globals.h"
-#include "test_service_logger.h"
 #include <common/foo_impl.h>
 #include <common/tests.h>
 #include <example/example.h>

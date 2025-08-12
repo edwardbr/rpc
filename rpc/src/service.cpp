@@ -295,13 +295,6 @@ namespace rpc
             {
                 CO_RETURN rpc::error::INVALID_DATA();
             }
-            std::for_each(service_loggers.begin(),
-                service_loggers.end(),
-                [&](const std::shared_ptr<service_logger>& logger)
-                {
-                    logger->before_send(
-                        caller_zone_id, object_id, interface_id, method_id, in_size_, in_buf_ ? in_buf_ : "");
-                });
 
             auto ret = CO_AWAIT stub->call(protocol_version,
                 encoding,
@@ -312,11 +305,6 @@ namespace rpc
                 in_size_,
                 in_buf_,
                 out_buf_);
-
-            std::for_each(service_loggers.begin(),
-                service_loggers.end(),
-                [&](const std::shared_ptr<service_logger>& logger)
-                { logger->after_send(caller_zone_id, object_id, interface_id, method_id, ret, out_buf_); });
 
             CO_RETURN ret;
         }

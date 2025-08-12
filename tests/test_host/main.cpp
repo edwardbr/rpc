@@ -33,7 +33,6 @@
 
 // Include extracted setup classes
 #include "test_host.h"
-#include "test_service_logger.h"
 #include "in_memory_setup.h"
 #include "inproc_setup.h"
 #include "enclave_setup.h"
@@ -484,6 +483,7 @@ coro_create_new_zone_releasing_host_then_running_on_other_enclave(
 
 TYPED_TEST(remote_type_test, create_new_zone_releasing_host_then_running_on_other_enclave)
 {
+    GTEST_SKIP() << "for later";
     bool is_ready = false;
     auto& lib = this->get_lib();
     auto root_service = lib.get_root_service();

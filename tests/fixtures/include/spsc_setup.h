@@ -59,13 +59,11 @@ public:
         auto root_zone_id = rpc::zone{++zone_gen_};
         auto peer_zone_id = rpc::zone{++zone_gen_};
         root_service_ = rpc::make_shared<rpc::service>("host", root_zone_id, io_scheduler_);
-        root_service_->add_service_logger(std::make_shared<test_service_logger>());
         example_import_idl_register_stubs(root_service_);
         example_shared_idl_register_stubs(root_service_);
         example_idl_register_stubs(root_service_);
 
         peer_service_ = rpc::make_shared<rpc::service>("peer", peer_zone_id, io_scheduler_);
-        peer_service_->add_service_logger(std::make_shared<test_service_logger>());
         example_import_idl_register_stubs(peer_service_);
         example_shared_idl_register_stubs(peer_service_);
         example_idl_register_stubs(peer_service_);

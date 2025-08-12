@@ -7,7 +7,6 @@
 
 #include <atomic>
 #include "test_host.h"
-#include "test_service_logger.h"
 #include "test_globals.h"
 #include <gtest/gtest.h>
 #include <common/foo_impl.h>
@@ -68,7 +67,6 @@ public:
             telemetry_service_manager_.create(test_info->test_suite_name(), test_info->name(), "../../rpc_test_diagram/");
 #endif
         root_service_ = rpc::make_shared<rpc::service>("host", rpc::zone{++zone_gen_}, io_scheduler_);
-        root_service_->add_service_logger(std::make_shared<test_service_logger>());
         example_import_idl_register_stubs(root_service_);
         example_shared_idl_register_stubs(root_service_);
         example_idl_register_stubs(root_service_);
