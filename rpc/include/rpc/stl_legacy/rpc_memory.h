@@ -29,11 +29,12 @@
 #include "rpc/logger.h"
 
 #include "rpc/coroutine_support.h"
+#include "rpc/casting_interface.h"
 
 #ifdef DUMP_REF_COUNT
-    #define LOG(str, sz) LOG_STR(str, sz)
+#define LOG(str, sz) LOG_STR(str, sz)
 #else
-    #define LOG(str, sz)
+#define LOG(str, sz)
 #endif
 
 namespace rpc
@@ -110,7 +111,9 @@ namespace rpc
         _Pointer __ptr_;
     };
 
-    struct __value_init_tag {};
+    struct __value_init_tag
+    {
+    };
 
     template<class _Tp, int _Idx, bool _CanBeEmptyBase = std::is_empty<_Tp>::value && !__libcpp_is_final<_Tp>::value>
     struct __compressed_pair_elem
@@ -125,8 +128,8 @@ namespace rpc
         {
         }
 
-        template<class _Up, class = typename std::enable_if<
-                                !std::is_same<__compressed_pair_elem, typename std::decay<_Up>::type>::value>::type>
+        template<class _Up,
+            class = typename std::enable_if<!std::is_same<__compressed_pair_elem, typename std::decay<_Up>::type>::value>::type>
 
         constexpr explicit __compressed_pair_elem(_Up&& __u)
             : __value_(std::forward<_Up>(__u))
@@ -169,8 +172,8 @@ namespace rpc
 #ifndef _LIBCPP_CXX03_LANG
         constexpr __compressed_pair_elem() = default;
 
-        template<class _Up, class = typename std::enable_if<
-                                !std::is_same<__compressed_pair_elem, typename std::decay<_Up>::type>::value>::type>
+        template<class _Up,
+            class = typename std::enable_if<!std::is_same<__compressed_pair_elem, typename std::decay<_Up>::type>::value>::type>
 
         constexpr explicit __compressed_pair_elem(_Up&& __u)
             : __value_type(std::forward<_Up>(__u))
@@ -216,23 +219,22 @@ namespace rpc
         // (The exception is std::function where it is possible that the function
         //  object and the allocator have the same type).
         static_assert((!std::is_same<_T1, _T2>::value),
-                      "__compressed_pair cannot be instantated when T1 and T2 are the same type; "
-                      "The current implementation is NOT ABI-compatible with the previous "
-                      "implementation for this configuration");
+            "__compressed_pair cannot be instantated when T1 and T2 are the same type; "
+            "The current implementation is NOT ABI-compatible with the previous "
+            "implementation for this configuration");
 
     public:
 #ifndef _LIBCPP_CXX03_LANG
-        template<bool _Dummy = true, class = typename std::enable_if<
-                                         __dependent_type<std::is_default_constructible<_T1>, _Dummy>::value
-                                         && __dependent_type<std::is_default_constructible<_T2>, _Dummy>::value>::type>
+        template<bool _Dummy = true,
+            class = typename std::enable_if<__dependent_type<std::is_default_constructible<_T1>, _Dummy>::value
+                                            && __dependent_type<std::is_default_constructible<_T2>, _Dummy>::value>::type>
 
         constexpr __compressed_pair()
         {
         }
 
-        template<class _Tp, typename std::enable_if<
-                                !std::is_same<typename std::decay<_Tp>::type, __compressed_pair>::value, bool>::type
-                            = true>
+        template<class _Tp,
+            typename std::enable_if<!std::is_same<typename std::decay<_Tp>::type, __compressed_pair>::value, bool>::type = true>
         constexpr explicit __compressed_pair(_Tp&& __t)
             : _Base1(std::forward<_Tp>(__t))
             , _Base2()
@@ -255,8 +257,8 @@ namespace rpc
 
 #ifdef _IN_ENCLAVE
         template<class... _Args1, class... _Args2>
-        constexpr __compressed_pair(std::piecewise_construct_t __pc, std::tuple<_Args1...> __first_args,
-                                    std::tuple<_Args2...> __second_args)
+        constexpr __compressed_pair(
+            std::piecewise_construct_t __pc, std::tuple<_Args1...> __first_args, std::tuple<_Args2...> __second_args)
             : _Base1(__pc, std::move(__first_args), typename std::__make_tuple_indices<sizeof...(_Args1)>::type())
             , _Base2(__pc, std::move(__second_args), typename std::__make_tuple_indices<sizeof...(_Args2)>::type())
         {
@@ -293,8 +295,8 @@ namespace rpc
 
         typename _Base2::const_reference second() const noexcept { return static_cast<_Base2 const&>(*this).__get(); }
 
-        void
-        swap(__compressed_pair& __x) noexcept(std::__is_nothrow_swappable<_T1>::value&& std::__is_nothrow_swappable<_T2>::value)
+        void swap(__compressed_pair& __x) noexcept(
+            std::__is_nothrow_swappable<_T1>::value && std::__is_nothrow_swappable<_T2>::value)
         {
             using std::swap;
             swap(first(), __x.first());
@@ -304,7 +306,7 @@ namespace rpc
 
     template<class _T1, class _T2>
     inline void swap(__compressed_pair<_T1, _T2>& __x, __compressed_pair<_T1, _T2>& __y) noexcept(
-        std::__is_nothrow_swappable<_T1>::value&& std::__is_nothrow_swappable<_T2>::value)
+        std::__is_nothrow_swappable<_T1>::value && std::__is_nothrow_swappable<_T2>::value)
     {
         __x.swap(__y);
     }
@@ -368,13 +370,11 @@ namespace rpc
         {
         }
 
-
-
         void __add_shared() noexcept { __shared_owners_++; }
 
         bool __release_shared() noexcept
         {
-            LOG((std::string("__release_shared()") + std::to_string(__shared_owners_.load())).data(),100);
+            LOG((std::string("__release_shared()") + std::to_string(__shared_owners_.load())).data(), 100);
             if (--__shared_owners_ == -1)
             {
                 __on_zero_shared();
@@ -401,7 +401,6 @@ namespace rpc
         virtual ~__shared_weak_count();
 
     public:
-
         void __add_shared() noexcept { __shared_count::__add_shared(); }
 
         void __add_weak() noexcept { __shared_weak_owners_++; }
@@ -449,7 +448,7 @@ namespace rpc
     template<class _Tp, class _Dp, class _Alloc>
     void __shared_ptr_pointer<_Tp, _Dp, _Alloc>::__on_zero_shared() noexcept
     {
-        LOG(std::to_string((uint64_t)&__data_.first().second()).data(),100);
+        LOG(std::to_string((uint64_t)&__data_.first().second()).data(), 100);
         __data_.first().second()(__data_.first().first());
         __data_.first().second().~_Dp();
     }
@@ -563,13 +562,13 @@ namespace rpc
     template<class _Ptr, class = void> struct __is_deletable : std::false_type
     {
     };
-    
-    #ifdef __linux__
-    #ifdef __clang__
-    #pragma clang diagnostic push
-    #pragma clang diagnostic ignored "-Wc++20-extensions"
-    #endif
-    #endif // __linux__
+
+#ifdef __linux__
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wc++20-extensions"
+#endif
+#endif // __linux__
 
     template<class _Ptr> struct __is_deletable<_Ptr, decltype(delete std::declval<_Ptr>())> : std::true_type
     {
@@ -578,18 +577,16 @@ namespace rpc
     template<class _Ptr, class = void> struct __is_array_deletable : std::false_type
     {
     };
-    
-    
-    
+
     template<class _Ptr> struct __is_array_deletable<_Ptr, decltype(delete[] std::declval<_Ptr>())> : std::true_type
     {
     };
 
-    #ifdef __linux__
-    #ifdef __clang__
-    #pragma clang diagnostic pop
-    #endif
-    #endif // __linux__
+#ifdef __linux__
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
+#endif // __linux__
 
     template<class _Dp, class _Pt, class = decltype(std::declval<_Dp>()(std::declval<_Pt>()))>
     static std::true_type __well_formed_deleter_test(int);
@@ -621,8 +618,7 @@ namespace rpc
     // __pointer
     _LIBCPP_ALLOCATOR_TRAITS_HAS_XXX(__has_pointer, pointer);
 
-    template<class _Tp, class _Alloc, class _RawAlloc = typename std::remove_reference<_Alloc>::type,
-             bool = __has_pointer<_RawAlloc>::value>
+    template<class _Tp, class _Alloc, class _RawAlloc = typename std::remove_reference<_Alloc>::type, bool = __has_pointer<_RawAlloc>::value>
     struct __pointer
     {
         using type = typename _RawAlloc::pointer;
@@ -652,8 +648,10 @@ namespace rpc
         typedef std::false_type __enable_rval_overload;
     };
 
-    template <class _Tp>
-    struct __type_identity { typedef _Tp type; };
+    template<class _Tp> struct __type_identity
+    {
+        typedef _Tp type;
+    };
 
     // DECLARATIONS
     template<class _Tp, class _Dp = std::default_delete<_Tp>> class unique_ptr
@@ -662,8 +660,8 @@ namespace rpc
         typedef _Tp element_type;
         typedef _Dp deleter_type;
         typedef typename __pointer<_Tp, deleter_type>::type pointer;
-        static_assert(!std::is_rvalue_reference<deleter_type>::value,
-                      "the specified deleter type cannot be an rvalue reference");
+        static_assert(
+            !std::is_rvalue_reference<deleter_type>::value, "the specified deleter type cannot be an rvalue reference");
 
     private:
         __compressed_pair<pointer, deleter_type> __ptr_;
@@ -681,14 +679,15 @@ namespace rpc
         using _EnableIfDeleterDefaultConstructible =
             typename std::enable_if<std::is_default_constructible<_Deleter>::value && !std::is_pointer<_Deleter>::value>::type;
         template<class _ArgType>
-        using _EnableIfDeleterConstructible = typename std::enable_if<std::is_constructible<deleter_type, _ArgType>::value>::type;
+        using _EnableIfDeleterConstructible =
+            typename std::enable_if<std::is_constructible<deleter_type, _ArgType>::value>::type;
         template<class _UPtr, class _Up>
         using _EnableIfMoveConvertible =
             typename std::enable_if<std::is_convertible<typename _UPtr::pointer, pointer>::value && !std::is_array<_Up>::value>::type;
         template<class _UDel>
         using _EnableIfDeleterConvertible =
             typename std::enable_if<(std::is_reference<_Dp>::value && std::is_same<_Dp, _UDel>::value)
-                               || (!std::is_reference<_Dp>::value && std::is_convertible<_UDel, _Dp>::value)>::type;
+                                    || (!std::is_reference<_Dp>::value && std::is_convertible<_UDel, _Dp>::value)>::type;
         template<class _UDel>
         using _EnableIfDeleterAssignable = typename std::enable_if<std::is_assignable<_Dp&, _UDel&&>::value>::type;
 
@@ -704,11 +703,13 @@ namespace rpc
         {
         }
         template<bool _Dummy = true, class = _EnableIfDeleterDefaultConstructible<_Dummy>>
-        explicit unique_ptr(pointer __p) noexcept : __ptr_(__p, __value_init_tag())
+        explicit unique_ptr(pointer __p) noexcept
+            : __ptr_(__p, __value_init_tag())
         {
         }
         template<bool _Dummy = true, class = _EnableIfDeleterConstructible<_LValRefType<_Dummy>>>
-        unique_ptr(pointer __p, _LValRefType<_Dummy> __d) noexcept : __ptr_(__p, __d)
+        unique_ptr(pointer __p, _LValRefType<_Dummy> __d) noexcept
+            : __ptr_(__p, __d)
         {
         }
         template<bool _Dummy = true, class = _EnableIfDeleterConstructible<_GoodRValRefType<_Dummy>>>
@@ -719,59 +720,58 @@ namespace rpc
         }
         template<bool _Dummy = true, class = _EnableIfDeleterConstructible<_BadRValRefType<_Dummy>>>
         unique_ptr(pointer __p, _BadRValRefType<_Dummy> __d) = delete;
-        
-        unique_ptr(unique_ptr&& __u) noexcept : __ptr_(__u.release(), std::forward<deleter_type>(__u.get_deleter()))
+
+        unique_ptr(unique_ptr&& __u) noexcept
+            : __ptr_(__u.release(), std::forward<deleter_type>(__u.get_deleter()))
         {
         }
-        template<class _Up, class _Ep, class = _EnableIfMoveConvertible<unique_ptr<_Up, _Ep>, _Up>,
-                 class = _EnableIfDeleterConvertible<_Ep>>
+        template<class _Up, class _Ep, class = _EnableIfMoveConvertible<unique_ptr<_Up, _Ep>, _Up>, class = _EnableIfDeleterConvertible<_Ep>>
         unique_ptr(unique_ptr<_Up, _Ep>&& __u) noexcept
             : __ptr_(__u.release(), std::forward<_Ep>(__u.get_deleter()))
         {
         }
-        
+
         unique_ptr& operator=(unique_ptr&& __u) noexcept
         {
             reset(__u.release());
             __ptr_.second() = std::forward<deleter_type>(__u.get_deleter());
             return *this;
         }
-        template<class _Up, class _Ep, class = _EnableIfMoveConvertible<unique_ptr<_Up, _Ep>, _Up>,
-                 class = _EnableIfDeleterAssignable<_Ep>>
+        template<class _Up, class _Ep, class = _EnableIfMoveConvertible<unique_ptr<_Up, _Ep>, _Up>, class = _EnableIfDeleterAssignable<_Ep>>
         unique_ptr& operator=(unique_ptr<_Up, _Ep>&& __u) noexcept
         {
             reset(__u.release());
             __ptr_.second() = std::forward<_Ep>(__u.get_deleter());
             return *this;
         }
-        
+
         ~unique_ptr() { reset(); }
-        
+
         unique_ptr& operator=(std::nullptr_t) noexcept
         {
             reset();
             return *this;
         }
-        
+
         typename std::add_lvalue_reference<_Tp>::type operator*() const { return *__ptr_.first(); }
-        
+
         pointer operator->() const noexcept { return __ptr_.first(); }
-        
+
         pointer get() const noexcept { return __ptr_.first(); }
-        
+
         deleter_type& get_deleter() noexcept { return __ptr_.second(); }
-        
+
         const deleter_type& get_deleter() const noexcept { return __ptr_.second(); }
-        
+
         explicit operator bool() const noexcept { return __ptr_.first() != nullptr; }
-        
+
         pointer release() noexcept
         {
             pointer __t = __ptr_.first();
             __ptr_.first() = pointer();
             return __t;
         }
-        
+
         void reset(pointer __p = pointer()) noexcept
         {
             pointer __tmp = __ptr_.first();
@@ -779,7 +779,7 @@ namespace rpc
             if (__tmp)
                 __ptr_.second()(__tmp);
         }
-        
+
         void swap(unique_ptr& __u) noexcept { __ptr_.swap(__u.__ptr_); }
     };
     template<class _Tp, class _Dp> class unique_ptr<_Tp[], _Dp>
@@ -796,9 +796,10 @@ namespace rpc
         };
         template<class _FromElem>
         struct _CheckArrayPointerConversion<_FromElem*>
-            : std::integral_constant<bool, std::is_same<_FromElem*, pointer>::value
-                                          || (std::is_same<pointer, element_type*>::value
-                                              && std::is_convertible<_FromElem (*)[], element_type (*)[]>::value)>
+            : std::integral_constant<bool,
+                  std::is_same<_FromElem*, pointer>::value
+                      || (std::is_same<pointer, element_type*>::value
+                          && std::is_convertible<_FromElem (*)[], element_type (*)[]>::value)>
         {
         };
         typedef __unique_ptr_deleter_sfinae<_Dp> _DeleterSFINAE;
@@ -811,18 +812,19 @@ namespace rpc
         using _EnableIfDeleterDefaultConstructible =
             typename std::enable_if<std::is_default_constructible<_Deleter>::value && !std::is_pointer<_Deleter>::value>::type;
         template<class _ArgType>
-        using _EnableIfDeleterConstructible = typename std::enable_if<std::is_constructible<deleter_type, _ArgType>::value>::type;
+        using _EnableIfDeleterConstructible =
+            typename std::enable_if<std::is_constructible<deleter_type, _ArgType>::value>::type;
         template<class _Pp>
         using _EnableIfPointerConvertible = typename std::enable_if<_CheckArrayPointerConversion<_Pp>::value>::type;
         template<class _UPtr, class _Up, class _ElemT = typename _UPtr::element_type>
         using _EnableIfMoveConvertible =
             typename std::enable_if<std::is_array<_Up>::value && std::is_same<pointer, element_type*>::value
-                               && std::is_same<typename _UPtr::pointer, _ElemT*>::value
-                               && std::is_convertible<_ElemT (*)[], element_type (*)[]>::value>::type;
+                                    && std::is_same<typename _UPtr::pointer, _ElemT*>::value
+                                    && std::is_convertible<_ElemT (*)[], element_type (*)[]>::value>::type;
         template<class _UDel>
         using _EnableIfDeleterConvertible =
             typename std::enable_if<(std::is_reference<_Dp>::value && std::is_same<_Dp, _UDel>::value)
-                               || (!std::is_reference<_Dp>::value && std::is_convertible<_UDel, _Dp>::value)>::type;
+                                    || (!std::is_reference<_Dp>::value && std::is_convertible<_UDel, _Dp>::value)>::type;
         template<class _UDel>
         using _EnableIfDeleterAssignable = typename std::enable_if<std::is_assignable<_Dp&, _UDel&&>::value>::type;
 
@@ -837,22 +839,22 @@ namespace rpc
             : __ptr_(__value_init_tag(), __value_init_tag())
         {
         }
-        template<class _Pp, bool _Dummy = true, class = _EnableIfDeleterDefaultConstructible<_Dummy>,
-                 class = _EnableIfPointerConvertible<_Pp>>
-        explicit unique_ptr(_Pp __p) noexcept : __ptr_(__p, __value_init_tag())
+        template<class _Pp, bool _Dummy = true, class = _EnableIfDeleterDefaultConstructible<_Dummy>, class = _EnableIfPointerConvertible<_Pp>>
+        explicit unique_ptr(_Pp __p) noexcept
+            : __ptr_(__p, __value_init_tag())
         {
         }
-        template<class _Pp, bool _Dummy = true, class = _EnableIfDeleterConstructible<_LValRefType<_Dummy>>,
-                 class = _EnableIfPointerConvertible<_Pp>>
-        unique_ptr(_Pp __p, _LValRefType<_Dummy> __d) noexcept : __ptr_(__p, __d)
+        template<class _Pp, bool _Dummy = true, class = _EnableIfDeleterConstructible<_LValRefType<_Dummy>>, class = _EnableIfPointerConvertible<_Pp>>
+        unique_ptr(_Pp __p, _LValRefType<_Dummy> __d) noexcept
+            : __ptr_(__p, __d)
         {
         }
         template<bool _Dummy = true, class = _EnableIfDeleterConstructible<_LValRefType<_Dummy>>>
-        unique_ptr(std::nullptr_t, _LValRefType<_Dummy> __d) noexcept : __ptr_(nullptr, __d)
+        unique_ptr(std::nullptr_t, _LValRefType<_Dummy> __d) noexcept
+            : __ptr_(nullptr, __d)
         {
         }
-        template<class _Pp, bool _Dummy = true, class = _EnableIfDeleterConstructible<_GoodRValRefType<_Dummy>>,
-                 class = _EnableIfPointerConvertible<_Pp>>
+        template<class _Pp, bool _Dummy = true, class = _EnableIfDeleterConstructible<_GoodRValRefType<_Dummy>>, class = _EnableIfPointerConvertible<_Pp>>
         unique_ptr(_Pp __p, _GoodRValRefType<_Dummy> __d) noexcept
             : __ptr_(__p, std::move(__d))
         {
@@ -864,28 +866,26 @@ namespace rpc
         {
             static_assert(!std::is_reference<deleter_type>::value, "rvalue deleter bound to reference");
         }
-        template<class _Pp, bool _Dummy = true, class = _EnableIfDeleterConstructible<_BadRValRefType<_Dummy>>,
-                 class = _EnableIfPointerConvertible<_Pp>>
+        template<class _Pp, bool _Dummy = true, class = _EnableIfDeleterConstructible<_BadRValRefType<_Dummy>>, class = _EnableIfPointerConvertible<_Pp>>
         unique_ptr(_Pp __p, _BadRValRefType<_Dummy> __d) = delete;
-        
-        unique_ptr(unique_ptr&& __u) noexcept : __ptr_(__u.release(), std::forward<deleter_type>(__u.get_deleter()))
+
+        unique_ptr(unique_ptr&& __u) noexcept
+            : __ptr_(__u.release(), std::forward<deleter_type>(__u.get_deleter()))
         {
         }
-        
+
         unique_ptr& operator=(unique_ptr&& __u) noexcept
         {
             reset(__u.release());
             __ptr_.second() = std::forward<deleter_type>(__u.get_deleter());
             return *this;
         }
-        template<class _Up, class _Ep, class = _EnableIfMoveConvertible<unique_ptr<_Up, _Ep>, _Up>,
-                 class = _EnableIfDeleterConvertible<_Ep>>
+        template<class _Up, class _Ep, class = _EnableIfMoveConvertible<unique_ptr<_Up, _Ep>, _Up>, class = _EnableIfDeleterConvertible<_Ep>>
         unique_ptr(unique_ptr<_Up, _Ep>&& __u) noexcept
             : __ptr_(__u.release(), std::forward<_Ep>(__u.get_deleter()))
         {
         }
-        template<class _Up, class _Ep, class = _EnableIfMoveConvertible<unique_ptr<_Up, _Ep>, _Up>,
-                 class = _EnableIfDeleterAssignable<_Ep>>
+        template<class _Up, class _Ep, class = _EnableIfMoveConvertible<unique_ptr<_Up, _Ep>, _Up>, class = _EnableIfDeleterAssignable<_Ep>>
         unique_ptr& operator=(unique_ptr<_Up, _Ep>&& __u) noexcept
         {
             reset(__u.release());
@@ -894,25 +894,24 @@ namespace rpc
         }
 
     public:
-        
         ~unique_ptr() { reset(); }
-        
+
         unique_ptr& operator=(std::nullptr_t) noexcept
         {
             reset();
             return *this;
         }
-        
+
         typename std::add_lvalue_reference<_Tp>::type operator[](size_t __i) const { return __ptr_.first()[__i]; }
-        
+
         pointer get() const noexcept { return __ptr_.first(); }
-        
+
         deleter_type& get_deleter() noexcept { return __ptr_.second(); }
-        
+
         const deleter_type& get_deleter() const noexcept { return __ptr_.second(); }
-        
+
         explicit operator bool() const noexcept { return __ptr_.first() != nullptr; }
-        
+
         pointer release() noexcept
         {
             pointer __t = __ptr_.first();
@@ -920,15 +919,14 @@ namespace rpc
             return __t;
         }
         template<class _Pp>
-        typename std::enable_if<_CheckArrayPointerConversion<_Pp>::value>::type
-        reset(_Pp __p) noexcept
+        typename std::enable_if<_CheckArrayPointerConversion<_Pp>::value>::type reset(_Pp __p) noexcept
         {
             pointer __tmp = __ptr_.first();
             __ptr_.first() = __p;
             if (__tmp)
                 __ptr_.second()(__tmp);
         }
-        
+
         void reset(std::nullptr_t = nullptr) noexcept
         {
             pointer __tmp = __ptr_.first();
@@ -936,7 +934,7 @@ namespace rpc
             if (__tmp)
                 __ptr_.second()(__tmp);
         }
-        
+
         void swap(unique_ptr& __u) noexcept { __ptr_.swap(__u.__ptr_); }
     };
     /*template<class _Tp, class _Dp>
@@ -978,65 +976,53 @@ namespace rpc
     {
         return !(__x < __y);
     }
-    template<class _T1, class _D1>
-    inline bool operator==(const unique_ptr<_T1, _D1>& __x, std::nullptr_t) noexcept
+    template<class _T1, class _D1> inline bool operator==(const unique_ptr<_T1, _D1>& __x, std::nullptr_t) noexcept
     {
         return !__x;
     }
-    template<class _T1, class _D1>
-    inline bool operator==(std::nullptr_t, const unique_ptr<_T1, _D1>& __x) noexcept
+    template<class _T1, class _D1> inline bool operator==(std::nullptr_t, const unique_ptr<_T1, _D1>& __x) noexcept
     {
         return !__x;
     }
-    template<class _T1, class _D1>
-    inline bool operator!=(const unique_ptr<_T1, _D1>& __x, std::nullptr_t) noexcept
+    template<class _T1, class _D1> inline bool operator!=(const unique_ptr<_T1, _D1>& __x, std::nullptr_t) noexcept
     {
         return static_cast<bool>(__x);
     }
-    template<class _T1, class _D1>
-    inline bool operator!=(std::nullptr_t, const unique_ptr<_T1, _D1>& __x) noexcept
+    template<class _T1, class _D1> inline bool operator!=(std::nullptr_t, const unique_ptr<_T1, _D1>& __x) noexcept
     {
         return static_cast<bool>(__x);
     }
-    template<class _T1, class _D1>
-    inline bool operator<(const unique_ptr<_T1, _D1>& __x, std::nullptr_t)
+    template<class _T1, class _D1> inline bool operator<(const unique_ptr<_T1, _D1>& __x, std::nullptr_t)
     {
         typedef typename unique_ptr<_T1, _D1>::pointer _P1;
         return std::less<_P1>()(__x.get(), nullptr);
     }
-    template<class _T1, class _D1>
-    inline bool operator<(std::nullptr_t, const unique_ptr<_T1, _D1>& __x)
+    template<class _T1, class _D1> inline bool operator<(std::nullptr_t, const unique_ptr<_T1, _D1>& __x)
     {
         typedef typename unique_ptr<_T1, _D1>::pointer _P1;
         return std::less<_P1>()(nullptr, __x.get());
     }
-    template<class _T1, class _D1>
-    inline bool operator>(const unique_ptr<_T1, _D1>& __x, std::nullptr_t)
+    template<class _T1, class _D1> inline bool operator>(const unique_ptr<_T1, _D1>& __x, std::nullptr_t)
     {
         return nullptr < __x;
     }
-    template<class _T1, class _D1>
-    inline bool operator>(std::nullptr_t, const unique_ptr<_T1, _D1>& __x)
+    template<class _T1, class _D1> inline bool operator>(std::nullptr_t, const unique_ptr<_T1, _D1>& __x)
     {
         return __x < nullptr;
     }
-    template<class _T1, class _D1>
-    inline bool operator<=(const unique_ptr<_T1, _D1>& __x, std::nullptr_t)
+    template<class _T1, class _D1> inline bool operator<=(const unique_ptr<_T1, _D1>& __x, std::nullptr_t)
     {
         return !(nullptr < __x);
     }
-    template<class _T1, class _D1>
-    inline bool operator<=(std::nullptr_t, const unique_ptr<_T1, _D1>& __x)
+    template<class _T1, class _D1> inline bool operator<=(std::nullptr_t, const unique_ptr<_T1, _D1>& __x)
     {
         return !(__x < nullptr);
     }
-    template<class _T1, class _D1>
-    inline bool operator>=(const unique_ptr<_T1, _D1>& __x, std::nullptr_t)
+    template<class _T1, class _D1> inline bool operator>=(const unique_ptr<_T1, _D1>& __x, std::nullptr_t)
     {
         return !(__x < nullptr);
     }
-    template<class _T1, class _D1>
-    inline bool operator>=(std::nullptr_t, const unique_ptr<_T1, _D1>& __x)
+    template<class _T1, class _D1> inline bool operator>=(std::nullptr_t, const unique_ptr<_T1, _D1>& __x)
     {
         return !(nullptr < __x);
     }
@@ -1052,13 +1038,11 @@ namespace rpc
     {
         typedef void __unique_array_known_bound;
     };
-    template<class _Tp, class... _Args>
-    inline typename __unique_if<_Tp>::__unique_single make_unique(_Args&&... __args)
+    template<class _Tp, class... _Args> inline typename __unique_if<_Tp>::__unique_single make_unique(_Args&&... __args)
     {
         return unique_ptr<_Tp>(new _Tp(std::forward<_Args>(__args)...));
     }
-    template<class _Tp>
-    inline typename __unique_if<_Tp>::__unique_array_unknown_bound make_unique(size_t __n)
+    template<class _Tp> inline typename __unique_if<_Tp>::__unique_array_unknown_bound make_unique(size_t __n)
     {
         typedef typename std::remove_extent<_Tp>::type _Up;
         return unique_ptr<_Tp>(new _Up[__n]());
@@ -1086,7 +1070,7 @@ namespace rpc
             , __cntrl_(nullptr)
         {
         }
-        
+
         template<class _Yp
         /*,         class = __std::enable_if_t<_And<__compatible_with<_Yp, _Tp>
         // In C++03 we get errors when trying to do SFINAE with the
@@ -1108,8 +1092,7 @@ namespace rpc
             __enable_weak_this(__p, __p);
         }
 
-        template<class _Yp, class _Dp,
-                 class = typename std::enable_if<__shared_ptr_deleter_ctor_reqs<_Dp, _Yp, element_type>::value>::type>
+        template<class _Yp, class _Dp, class = typename std::enable_if<__shared_ptr_deleter_ctor_reqs<_Dp, _Yp, element_type>::value>::type>
         shared_ptr(_Yp* __p, _Dp __d)
             : __ptr_(__p)
         {
@@ -1135,8 +1118,10 @@ namespace rpc
 #endif // _LIBCPP_NO_EXCEPTIONS
         }
 #ifdef _IN_ENCLAVE
-        template<class _Yp, class _Dp, class _Alloc,
-                 class = typename std::enable_if<__shared_ptr_deleter_ctor_reqs<_Dp, _Yp, element_type>::value>::type>
+        template<class _Yp,
+            class _Dp,
+            class _Alloc,
+            class = typename std::enable_if<__shared_ptr_deleter_ctor_reqs<_Dp, _Yp, element_type>::value>::type>
         shared_ptr(_Yp* __p, _Dp __d, _Alloc __a)
             : __ptr_(__p)
         {
@@ -1322,7 +1307,7 @@ element_type*>::value>> shared_ptr(unique_ptr<_Yp, _Dp>&& __r) : __ptr_(__r.get(
         {
             if (__cntrl_)
             {
-                LOG(typeid(*this).raw_name(),100);
+                LOG(typeid(*this).raw_name(), 100);
                 __cntrl_->__release_shared();
             }
         }
@@ -1369,7 +1354,8 @@ element_type*>::value>> shared_ptr(unique_ptr<_Yp, _Dp>&& __r) : __ptr_(__r.get(
 
         void reset() noexcept { shared_ptr().swap(*this); }
 
-        template<class _Yp, class = typename std::enable_if<__compatible_with<_Yp, _Tp>::value>::type> void reset(_Yp* __p)
+        template<class _Yp, class = typename std::enable_if<__compatible_with<_Yp, _Tp>::value>::type>
+        void reset(_Yp* __p)
         {
             shared_ptr(__p).swap(*this);
         }
@@ -1393,7 +1379,7 @@ element_type*>::value>> shared_ptr(unique_ptr<_Yp, _Dp>&& __r) : __ptr_(__r.get(
         element_type* operator->() const noexcept
         {
             static_assert(!std::is_array<_Tp>::value,
-                          "std::shared_ptr<T>::operator-> is only valid when T is not an array type.");
+                "std::shared_ptr<T>::operator-> is only valid when T is not an array type.");
             return __ptr_;
         }
 
@@ -1417,8 +1403,8 @@ element_type*>::value>> shared_ptr(unique_ptr<_Yp, _Dp>&& __r) : __ptr_(__r.get(
 
         typename std::add_lvalue_reference<element_type>::type operator[](ptrdiff_t __i) const
         {
-            static_assert(std::is_array<_Tp>::value,
-                          "std::shared_ptr<T>::operator[] is only valid when T is an array type.");
+            static_assert(
+                std::is_array<_Tp>::value, "std::shared_ptr<T>::operator[] is only valid when T is an array type.");
             return __ptr_[__i];
         }
 
@@ -1448,16 +1434,15 @@ element_type*>::value>> shared_ptr(unique_ptr<_Yp, _Dp>&& __r) : __ptr_(__r.get(
             typedef std::allocator<__shared_ptr_dummy_rebind_allocator_type> type;
         };
 
-        template<
-            class _Yp, class _OrigPtr,
+        template<class _Yp,
+            class _OrigPtr,
             class = typename std::enable_if<std::is_convertible<_OrigPtr*, const enable_shared_from_this<_Yp>*>::value>::type>
         void __enable_weak_this(const enable_shared_from_this<_Yp>* __e, _OrigPtr* __ptr) noexcept
         {
             typedef typename std::remove_cv<_Yp>::type _RawYp;
             if (__e && __e->__weak_this_.expired())
             {
-                __e->__weak_this_
-                    = shared_ptr<_RawYp>(*this, const_cast<_RawYp*>(static_cast<const _Yp*>(__ptr)));
+                __e->__weak_this_ = shared_ptr<_RawYp>(*this, const_cast<_RawYp*>(static_cast<const _Yp*>(__ptr)));
             }
         }
 
@@ -1494,16 +1479,16 @@ element_type*>::value>> shared_ptr(unique_ptr<_Yp, _Dp>&& __r) : __ptr_(__r.get(
         __allocation_guard<_ControlBlockAllocator> __guard(__a, 1);
         ::new ((void*)std::addressof(*__guard.__get())) _ControlBlock(__a, std::forward<_Args>(__args)...);
         auto __control_block = __guard.__release_ptr();
-        return shared_ptr<_Tp>::__create_with_control_block((*__control_block).__get_elem(),
-                                                                   std::addressof(*__control_block));
+        return shared_ptr<_Tp>::__create_with_control_block(
+            (*__control_block).__get_elem(), std::addressof(*__control_block));
     }
 
     template<class _Tp, class... _Args> shared_ptr<_Tp> make_shared(_Args&&... __args)
     {
         auto tmp = rpc::allocate_shared<_Tp>(std::allocator<_Tp>(), std::forward<_Args>(__args)...);
-        LOG(typeid(tmp).raw_name(),100);
-        LOG("make_shared",100);
-        LOG(std::to_string((uint64_t)tmp.get()).data(),100);
+        LOG(typeid(tmp).raw_name(), 100);
+        LOG("make_shared", 100);
+        LOG(std::to_string((uint64_t)tmp.get()).data(), 100);
         return tmp;
     }
 
@@ -1522,7 +1507,7 @@ element_type*>::value>> shared_ptr(unique_ptr<_Yp, _Dp>&& __r) : __ptr_(__r.get(
     template<class _Tp, class _Up>
     inline bool operator<(const shared_ptr<_Tp>& __x, const shared_ptr<_Up>& __y) noexcept
     {
-        return __x.get( ) < __y.get();
+        return __x.get() < __y.get();
     }
 
     template<class _Tp, class _Up>
@@ -1608,10 +1593,9 @@ element_type*>::value>> shared_ptr(unique_ptr<_Yp, _Dp>&& __r) : __ptr_(__r.get(
         __x.swap(__y);
     }
 
-    template<class _Tp, class _Up>
-    inline shared_ptr<_Tp> static_pointer_cast(const shared_ptr<_Up>& __r) noexcept
+    template<class _Tp, class _Up> inline shared_ptr<_Tp> static_pointer_cast(const shared_ptr<_Up>& __r) noexcept
     {
-        //only work with local polymorphic types
+        // only work with local polymorphic types
         return shared_ptr<_Tp>(__r, static_cast<typename shared_ptr<_Tp>::element_type*>(__r.get()));
     }
 
@@ -1621,10 +1605,9 @@ element_type*>::value>> shared_ptr(unique_ptr<_Yp, _Dp>&& __r) : __ptr_(__r.get(
         return shared_ptr<_Tp>(__r, const_cast<_RTp*>(__r.get()));
     }
 
-    template<class _Tp, class _Up> shared_ptr<_Tp> reinterpret_pointer_cast(const shared_ptr<_Up>& __r)
-    noexcept
+    template<class _Tp, class _Up> shared_ptr<_Tp> reinterpret_pointer_cast(const shared_ptr<_Up>& __r) noexcept
     {
-        //only work with local polymorphic types
+        // only work with local polymorphic types
         return shared_ptr<_Tp>(__r, reinterpret_cast<typename shared_ptr<_Tp>::element_type*>(__r.get()));
     }
 
@@ -1646,32 +1629,30 @@ element_type*>::value>> shared_ptr(unique_ptr<_Yp, _Dp>&& __r) : __ptr_(__r.get(
         constexpr weak_ptr() noexcept;
         template<class _Yp>
         weak_ptr(shared_ptr<_Yp> const& __r,
-                        typename std::enable_if<__compatible_with<_Yp, _Tp>::value, int>::type = 0) noexcept;
+            typename std::enable_if<__compatible_with<_Yp, _Tp>::value, int>::type = 0) noexcept;
 
         weak_ptr(weak_ptr const& __r) noexcept;
         template<class _Yp>
         weak_ptr(weak_ptr<_Yp> const& __r,
-                        typename std::enable_if<__compatible_with<_Yp, _Tp>::value, int>::type = 0) noexcept;
+            typename std::enable_if<__compatible_with<_Yp, _Tp>::value, int>::type = 0) noexcept;
 
         weak_ptr(weak_ptr&& __r) noexcept;
         template<class _Yp>
-        weak_ptr(weak_ptr<_Yp>&& __r,
-                        typename std::enable_if<__compatible_with<_Yp, _Tp>::value, int>::type = 0) noexcept;
+        weak_ptr(weak_ptr<_Yp>&& __r, typename std::enable_if<__compatible_with<_Yp, _Tp>::value, int>::type = 0) noexcept;
         ~weak_ptr();
 
         weak_ptr& operator=(weak_ptr const& __r) noexcept;
         template<class _Yp>
-        typename std::enable_if<__compatible_with<_Yp, _Tp>::value, weak_ptr&>::type
-        operator=(weak_ptr<_Yp> const& __r) noexcept;
+        typename std::enable_if<__compatible_with<_Yp, _Tp>::value, weak_ptr&>::type operator=(
+            weak_ptr<_Yp> const& __r) noexcept;
 
         weak_ptr& operator=(weak_ptr&& __r) noexcept;
         template<class _Yp>
-        typename std::enable_if<__compatible_with<_Yp, _Tp>::value, weak_ptr&>::type
-        operator=(weak_ptr<_Yp>&& __r) noexcept;
+        typename std::enable_if<__compatible_with<_Yp, _Tp>::value, weak_ptr&>::type operator=(weak_ptr<_Yp>&& __r) noexcept;
 
         template<class _Yp>
-        typename std::enable_if<__compatible_with<_Yp, _Tp>::value, weak_ptr&>::type
-        operator=(shared_ptr<_Yp> const& __r) noexcept;
+        typename std::enable_if<__compatible_with<_Yp, _Tp>::value, weak_ptr&>::type operator=(
+            shared_ptr<_Yp> const& __r) noexcept;
 
         void swap(weak_ptr& __r) noexcept;
 
@@ -1715,8 +1696,7 @@ element_type*>::value>> shared_ptr(unique_ptr<_Yp, _Dp>&& __r) : __ptr_(__r.get(
     template<class _Tp>
     template<class _Yp>
     inline weak_ptr<_Tp>::weak_ptr(
-        shared_ptr<_Yp> const& __r,
-        typename std::enable_if<__compatible_with<_Yp, _Tp>::value, int>::type) noexcept
+        shared_ptr<_Yp> const& __r, typename std::enable_if<__compatible_with<_Yp, _Tp>::value, int>::type) noexcept
         : __ptr_(__r.__ptr_)
         , __cntrl_(__r.__cntrl_)
     {
@@ -1727,8 +1707,7 @@ element_type*>::value>> shared_ptr(unique_ptr<_Yp, _Dp>&& __r) : __ptr_(__r.get(
     template<class _Tp>
     template<class _Yp>
     inline weak_ptr<_Tp>::weak_ptr(
-        weak_ptr<_Yp> const& __r,
-        typename std::enable_if<__compatible_with<_Yp, _Tp>::value, int>::type) noexcept
+        weak_ptr<_Yp> const& __r, typename std::enable_if<__compatible_with<_Yp, _Tp>::value, int>::type) noexcept
         : __ptr_(__r.__ptr_)
         , __cntrl_(__r.__cntrl_)
     {
@@ -1762,8 +1741,7 @@ element_type*>::value>> shared_ptr(unique_ptr<_Yp, _Dp>&& __r) : __ptr_(__r.get(
             __cntrl_->__release_weak();
     }
 
-    template<class _Tp>
-    inline weak_ptr<_Tp>& weak_ptr<_Tp>::operator=(weak_ptr const& __r) noexcept
+    template<class _Tp> inline weak_ptr<_Tp>& weak_ptr<_Tp>::operator=(weak_ptr const& __r) noexcept
     {
         weak_ptr(__r).swap(*this);
         return *this;
@@ -1771,8 +1749,8 @@ element_type*>::value>> shared_ptr(unique_ptr<_Yp, _Dp>&& __r) : __ptr_(__r.get(
 
     template<class _Tp>
     template<class _Yp>
-    inline typename std::enable_if<__compatible_with<_Yp, _Tp>::value, weak_ptr<_Tp>&>::type
-    weak_ptr<_Tp>::operator=(weak_ptr<_Yp> const& __r) noexcept
+    inline typename std::enable_if<__compatible_with<_Yp, _Tp>::value, weak_ptr<_Tp>&>::type weak_ptr<_Tp>::operator=(
+        weak_ptr<_Yp> const& __r) noexcept
     {
         weak_ptr(__r).swap(*this);
         return *this;
@@ -1786,8 +1764,8 @@ element_type*>::value>> shared_ptr(unique_ptr<_Yp, _Dp>&& __r) : __ptr_(__r.get(
 
     template<class _Tp>
     template<class _Yp>
-    inline typename std::enable_if<__compatible_with<_Yp, _Tp>::value, weak_ptr<_Tp>&>::type
-    weak_ptr<_Tp>::operator=(weak_ptr<_Yp>&& __r) noexcept
+    inline typename std::enable_if<__compatible_with<_Yp, _Tp>::value, weak_ptr<_Tp>&>::type weak_ptr<_Tp>::operator=(
+        weak_ptr<_Yp>&& __r) noexcept
     {
         weak_ptr(std::move(__r)).swap(*this);
         return *this;
@@ -1795,8 +1773,8 @@ element_type*>::value>> shared_ptr(unique_ptr<_Yp, _Dp>&& __r) : __ptr_(__r.get(
 
     template<class _Tp>
     template<class _Yp>
-    inline typename std::enable_if<__compatible_with<_Yp, _Tp>::value, weak_ptr<_Tp>&>::type
-    weak_ptr<_Tp>::operator=(shared_ptr<_Yp> const& __r) noexcept
+    inline typename std::enable_if<__compatible_with<_Yp, _Tp>::value, weak_ptr<_Tp>&>::type weak_ptr<_Tp>::operator=(
+        shared_ptr<_Yp> const& __r) noexcept
     {
         weak_ptr(__r).swap(*this);
         return *this;
@@ -1813,7 +1791,10 @@ element_type*>::value>> shared_ptr(unique_ptr<_Yp, _Dp>&& __r) : __ptr_(__r.get(
         __x.swap(__y);
     }
 
-    template<class _Tp> inline void weak_ptr<_Tp>::reset() noexcept { weak_ptr().swap(*this); }
+    template<class _Tp> inline void weak_ptr<_Tp>::reset() noexcept
+    {
+        weak_ptr().swap(*this);
+    }
 
     template<class _Tp> shared_ptr<_Tp> weak_ptr<_Tp>::lock() const noexcept
     {
@@ -1914,7 +1895,6 @@ element_type*>::value>> shared_ptr(unique_ptr<_Yp, _Dp>&& __r) : __ptr_(__r.get(
         template<class _Up> friend class shared_ptr;
     };
 
-
     class __sp_mut
     {
         void* __lx;
@@ -1933,7 +1913,10 @@ element_type*>::value>> shared_ptr(unique_ptr<_Yp, _Dp>&& __r) : __ptr_(__r.get(
 
     __sp_mut& __get_sp_mut(const void*);
 
-    template<class _Tp> inline bool atomic_is_lock_free(const shared_ptr<_Tp>*) { return false; }
+    template<class _Tp> inline bool atomic_is_lock_free(const shared_ptr<_Tp>*)
+    {
+        return false;
+    }
 
     template<class _Tp> shared_ptr<_Tp> atomic_load(const shared_ptr<_Tp>* __p)
     {
@@ -1944,8 +1927,7 @@ element_type*>::value>> shared_ptr(unique_ptr<_Yp, _Dp>&& __r) : __ptr_(__r.get(
         return __q;
     }
 
-    template<class _Tp>
-    inline shared_ptr<_Tp> atomic_load_explicit(const shared_ptr<_Tp>* __p, std::memory_order)
+    template<class _Tp> inline shared_ptr<_Tp> atomic_load_explicit(const shared_ptr<_Tp>* __p, std::memory_order)
     {
         return atomic_load(__p);
     }
@@ -1958,8 +1940,7 @@ element_type*>::value>> shared_ptr(unique_ptr<_Yp, _Dp>&& __r) : __ptr_(__r.get(
         __m.unlock();
     }
 
-    template<class _Tp>
-    inline void atomic_store_explicit(shared_ptr<_Tp>* __p, shared_ptr<_Tp> __r, std::memory_order)
+    template<class _Tp> inline void atomic_store_explicit(shared_ptr<_Tp>* __p, shared_ptr<_Tp> __r, std::memory_order)
     {
         atomic_store(__p, __r);
     }
@@ -1974,15 +1955,13 @@ element_type*>::value>> shared_ptr(unique_ptr<_Yp, _Dp>&& __r) : __ptr_(__r.get(
     }
 
     template<class _Tp>
-    inline shared_ptr<_Tp> atomic_exchange_explicit(shared_ptr<_Tp>* __p, shared_ptr<_Tp> __r,
-                                                           std::memory_order)
+    inline shared_ptr<_Tp> atomic_exchange_explicit(shared_ptr<_Tp>* __p, shared_ptr<_Tp> __r, std::memory_order)
     {
         return atomic_exchange(__p, __r);
     }
 
     template<class _Tp>
-    bool atomic_compare_exchange_strong(shared_ptr<_Tp>* __p, shared_ptr<_Tp>* __v,
-                                        shared_ptr<_Tp> __w)
+    bool atomic_compare_exchange_strong(shared_ptr<_Tp>* __p, shared_ptr<_Tp>* __v, shared_ptr<_Tp> __w)
     {
         shared_ptr<_Tp> __temp;
         __sp_mut& __m = __get_sp_mut(__p);
@@ -2001,23 +1980,21 @@ element_type*>::value>> shared_ptr(unique_ptr<_Yp, _Dp>&& __r) : __ptr_(__r.get(
     }
 
     template<class _Tp>
-    inline bool atomic_compare_exchange_weak(shared_ptr<_Tp>* __p, shared_ptr<_Tp>* __v,
-                                             shared_ptr<_Tp> __w)
+    inline bool atomic_compare_exchange_weak(shared_ptr<_Tp>* __p, shared_ptr<_Tp>* __v, shared_ptr<_Tp> __w)
     {
         return atomic_compare_exchange_strong(__p, __v, __w);
     }
 
     template<class _Tp>
-    inline bool atomic_compare_exchange_strong_explicit(shared_ptr<_Tp>* __p, shared_ptr<_Tp>* __v,
-                                                        shared_ptr<_Tp> __w, std::memory_order,
-                                                        std::memory_order)
+    inline bool atomic_compare_exchange_strong_explicit(
+        shared_ptr<_Tp>* __p, shared_ptr<_Tp>* __v, shared_ptr<_Tp> __w, std::memory_order, std::memory_order)
     {
         return atomic_compare_exchange_strong(__p, __v, __w);
     }
 
     template<class _Tp>
-    inline bool atomic_compare_exchange_weak_explicit(shared_ptr<_Tp>* __p, shared_ptr<_Tp>* __v,
-                                                      shared_ptr<_Tp> __w, std::memory_order, std::memory_order)
+    inline bool atomic_compare_exchange_weak_explicit(
+        shared_ptr<_Tp>* __p, shared_ptr<_Tp>* __v, shared_ptr<_Tp> __w, std::memory_order, std::memory_order)
     {
         return atomic_compare_exchange_weak(__p, __v, __w);
     }
@@ -2025,37 +2002,34 @@ element_type*>::value>> shared_ptr(unique_ptr<_Yp, _Dp>&& __r) : __ptr_(__r.get(
     template<class T1, class T2>
     [[nodiscard]] inline CORO_TASK(shared_ptr<T1>) dynamic_pointer_cast(const shared_ptr<T2>& from) noexcept
     {
-        if(!from)
+        if (!from)
             CO_RETURN nullptr;
-            
+
         T1* ptr = nullptr;
 
         ptr = const_cast<T1*>(static_cast<const T1*>(from->query_interface(T1::get_id(rpc::VERSION_2))));
         if (ptr)
             CO_RETURN shared_ptr<T1>(from, ptr);
 
-        auto proxy_ = from->query_proxy_base();
-        if (!proxy_)
+        auto ob = casting_interface::get_object_proxy(*from);
+        if (!ob)
         {
             CO_RETURN shared_ptr<T1>();
         }
-        auto ob = proxy_->get_object_proxy();
         shared_ptr<T1> ret;
-        //note this magic function will return a shared pointer to a new interface proxy
-        //its refernce count will not be the same as the "from" pointers value, symanticlly it 
-        //behaves the same as with normal dynamic_pointer_cast in that you can use this function to
-        //cast back to the original.  Hoever static_pointer_cast in this case will not work, for
-        //remote interfaces.
+        // note this magic function will return a shared pointer to a new interface proxy
+        // its refernce count will not be the same as the "from" pointers value, symanticlly it
+        // behaves the same as with normal dynamic_pointer_cast in that you can use this function to
+        // cast back to the original.  Hoever static_pointer_cast in this case will not work, for
+        // remote interfaces.
         CO_AWAIT ob->template query_interface<T1>(ret);
         CO_RETURN ret;
     }
 }
 
-
 namespace std
 {
-    template<class _Tp, class _Dp>
-    struct hash<rpc::unique_ptr<_Tp, _Dp>>
+    template<class _Tp, class _Dp> struct hash<rpc::unique_ptr<_Tp, _Dp>>
     {
         size_t operator()(const rpc::unique_ptr<_Tp, _Dp>& __ptr) const
         {
@@ -2064,8 +2038,7 @@ namespace std
         }
     };
 
-    template<class _Tp>
-    struct hash<rpc::shared_ptr<_Tp>>
+    template<class _Tp> struct hash<rpc::shared_ptr<_Tp>>
     {
         size_t operator()(const rpc::shared_ptr<_Tp>& __ptr) const noexcept
         {

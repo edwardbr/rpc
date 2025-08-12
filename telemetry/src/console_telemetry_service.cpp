@@ -1,8 +1,47 @@
 #include <iostream>
+#include <thread>
+#include <chrono>
 #include <rpc/telemetry/console_telemetry_service.h>
 
 namespace rpc
 {
+    console_telemetry_service::console_telemetry_service() = default;
+
+    console_telemetry_service::~console_telemetry_service()
+    {
+        if (logger_) {
+            // Flush any pending async messages - this blocks until complete
+            logger_->flush();
+            
+            // Get reference to the thread pool before dropping logger
+            auto tp = spdlog::thread_pool();
+            
+            // Remove logger from spdlog registry to prevent conflicts
+            std::string logger_name = logger_->name();
+            spdlog::drop(logger_name);
+            
+            // Drop the logger reference to allow proper cleanup
+            logger_.reset();
+            
+            // Wait for thread pool to finish processing if it exists and has work
+            if (tp) {
+                // Wait for the queue to be empty - this is more deterministic than arbitrary sleep
+                constexpr int max_wait_ms = 100;
+                constexpr int check_interval_ms = 1;
+                
+                for (int waited = 0; waited < max_wait_ms; waited += check_interval_ms) {
+                    if (tp->queue_size() == 0) {
+                        break;
+                    }
+                    std::this_thread::sleep_for(std::chrono::milliseconds(check_interval_ms));
+                }
+                
+                // Small additional delay to ensure worker thread processes the empty queue check
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+        }
+    }
+
     void capitalise(std::string& name)
     {
         // Capitalize the entire name
@@ -70,8 +109,15 @@ namespace rpc
         {
             try
             {
-                // Create async logger using spdlog's async factory
-                logger_ = spdlog::stdout_color_mt<spdlog::async_factory>("console_telemetry");
+                // Use unique logger name based on instance address to avoid conflicts
+                std::string logger_name = "console_telemetry_" + std::to_string(reinterpret_cast<uintptr_t>(this));
+                
+                // Try to get existing logger first
+                logger_ = spdlog::get(logger_name);
+                if (!logger_) {
+                    // Create async logger using spdlog's async factory
+                    logger_ = spdlog::stdout_color_mt<spdlog::async_factory>(logger_name);
+                }
 
                 // Use raw pattern to preserve our custom ANSI formatting
                 logger_->set_pattern("%v");
@@ -79,9 +125,18 @@ namespace rpc
             }
             catch (...)
             {
-                // Fallback to synchronous logging if async fails
-                logger_ = spdlog::stdout_color_mt("console_telemetry_fallback");
-                logger_->set_pattern("%v");
+                try {
+                    // Fallback to synchronous logging if async fails
+                    std::string fallback_name = "console_telemetry_sync_" + std::to_string(reinterpret_cast<uintptr_t>(this));
+                    logger_ = spdlog::get(fallback_name);
+                    if (!logger_) {
+                        logger_ = spdlog::stdout_color_mt(fallback_name);
+                    }
+                    logger_->set_pattern("%v");
+                } catch (...) {
+                    // Last resort - use default logger
+                    logger_ = spdlog::default_logger();
+                }
             }
         }
     }

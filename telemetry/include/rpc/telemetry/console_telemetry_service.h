@@ -31,7 +31,10 @@ namespace rpc
             const std::string& name,
             const std::filesystem::path& directory);
 
-        virtual ~console_telemetry_service() = default;
+        virtual ~console_telemetry_service();
+        console_telemetry_service();
+        console_telemetry_service(const console_telemetry_service&) = delete;
+        console_telemetry_service& operator=(const console_telemetry_service&) = delete;
 
         void on_service_creation(const char* name, rpc::zone zone_id) const override;
         void on_service_deletion(rpc::zone zone_id) const override;

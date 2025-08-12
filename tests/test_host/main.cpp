@@ -29,6 +29,7 @@
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <rpc/error_codes.h>
+#include <rpc/casting_interface.h>
 
 // Include extracted setup classes
 #include "test_host.h"
@@ -459,6 +460,13 @@ coro_create_new_zone_releasing_host_then_running_on_other_enclave(
     co_await example_relay_ptr->create_foo(i_foo_relay_ptr);
     co_await standard_tests(*i_foo_relay_ptr, true);
 
+    {
+        auto example_o = rpc::casting_interface::get_object_id(*example_relay_ptr);
+        auto foo_o = rpc::casting_interface::get_object_id(*i_foo_relay_ptr);
+        foo_o = foo_o;
+        example_o = example_o;
+    }
+
     // rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
     // ASSERT_EQ(lib.get_example()->create_foo(i_foo_ptr), 0);
     example_relay_ptr = nullptr;
@@ -596,7 +604,7 @@ TYPED_TEST(remote_type_test, create_new_zone_releasing_host_then_running_on_othe
 //     rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
 //     ASSERT_EQ(lib.get_example()->create_foo(i_foo_ptr), 0);
 
-//     auto zone_id = i_foo_ptr->query_proxy_base()->get_object_proxy()->get_service_proxy()->get_zone_id();
+//     auto zone_id = casting_interface::get_zone_id(*i_foo_ptr);
 
 //     auto b = rpc::make_shared<marshalled_tests::baz>(zone_id);
 //     // set
@@ -618,7 +626,7 @@ TYPED_TEST(remote_type_test, create_new_zone_releasing_host_then_running_on_othe
 //     ASSERT_EQ(lib.get_example()->create_foo(i_foo_ptr), 0);
 
 //     rpc::shared_ptr<xxx::i_baz> c;
-//     auto zone_id = i_foo_ptr->query_proxy_base()->get_object_proxy()->get_service_proxy()->get_zone_id();
+//     auto zone_id = casting_interface::get_zone_id(i_foo_ptr);
 
 //     auto b = rpc::make_shared<marshalled_tests::baz>(zone_id);
 //     i_foo_ptr->set_interface(b);
@@ -633,7 +641,7 @@ TYPED_TEST(remote_type_test, create_new_zone_releasing_host_then_running_on_othe
 //         return;
 //     auto proxy = lib.get_example()->query_proxy_base();
 //     auto ret = lib.get_example()->give_interface(
-//         rpc::shared_ptr<xxx::i_baz>(new multiple_inheritance(proxy->get_object_proxy()->get_service_proxy()->get_zone_id())));
+//         rpc::shared_ptr<xxx::i_baz>(new multiple_inheritance(casting_interface::get_zone_id(proxy->get_object_proxy())));
 //     RPC_ASSERT(ret == rpc::error::OK());
 // }
 
@@ -839,7 +847,7 @@ TYPED_TEST(remote_type_test, create_new_zone_releasing_host_then_running_on_othe
 
 //     auto proxy = lib.get_example()->query_proxy_base();
 //     auto base_baz = rpc::shared_ptr<xxx::i_baz>(new
-//     baz(proxy->get_object_proxy()->get_service_proxy()->get_zone_id())); auto input = base_baz;
+//     baz(casting_interface::get_zone_id(*proxy)); auto input = base_baz;
 
 //     ASSERT_EQ(lib.get_example()->send_interface_back(input, output), rpc::error::OK());
 //     ASSERT_EQ(input, output);

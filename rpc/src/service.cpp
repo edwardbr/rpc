@@ -85,7 +85,7 @@ namespace rpc
         other_zones.clear();
     }
 
-    object service::get_object_id(shared_ptr<casting_interface> ptr) const
+    object service::get_object_id(const shared_ptr<casting_interface>& ptr) const
     {
         if (ptr == nullptr)
             return {};
@@ -103,7 +103,7 @@ namespace rpc
         }
         else
         {
-            return ptr->query_proxy_base()->get_object_proxy()->get_object_id();
+            return casting_interface::get_object_id(*ptr);
         }
         return {};
     }
@@ -328,7 +328,7 @@ namespace rpc
     {
         if (destination_zone && input_interface)
         {
-            auto object_id = input_interface->query_proxy_base()->get_object_proxy()->get_object_id();
+            auto object_id = casting_interface::get_object_id(*input_interface);
             auto ret = CO_AWAIT destination_zone->sp_release(object_id);
             if (ret != std::numeric_limits<uint64_t>::max())
             {
@@ -344,7 +344,7 @@ namespace rpc
         rpc::proxy_base* base,
         rpc::shared_ptr<service_proxy>& destination_zone)
     {
-        auto object_proxy = base->get_object_proxy();
+        auto object_proxy = base->object_proxy_;
         auto object_service_proxy = object_proxy->get_service_proxy();
         RPC_ASSERT(object_service_proxy->zone_id_ == zone_id_);
         auto destination_zone_id = object_service_proxy->get_destination_zone_id();
@@ -410,7 +410,7 @@ namespace rpc
         caller_zone caller_zone_id,
         rpc::proxy_base* base)
     {
-        auto object_proxy = base->get_object_proxy();
+        auto object_proxy = base->object_proxy_;
         auto object_service_proxy = object_proxy->get_service_proxy();
         RPC_ASSERT(object_service_proxy->zone_id_ == zone_id_);
         auto destination_zone_id = object_service_proxy->get_destination_zone_id();

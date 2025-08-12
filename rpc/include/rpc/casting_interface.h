@@ -14,6 +14,11 @@
 namespace rpc
 {
     class proxy_base;
+    class object_proxy;
+    class service_proxy;
+    class service;
+    class object;
+    template<class T> class shared_ptr;
 
     // this do nothing class is for static pointer casting
     class casting_interface
@@ -24,6 +29,14 @@ namespace rpc
         virtual const rpc::casting_interface* query_interface(rpc::interface_ordinal interface_id) const = 0;
         // this is only implemented by proxy_base
         virtual proxy_base* query_proxy_base() const { return nullptr; }
+
+        static shared_ptr<object_proxy> get_object_proxy(const casting_interface& iface);
+        static object get_object_id(const casting_interface& iface);
+        static shared_ptr<service_proxy> get_service_proxy(const casting_interface& iface);
+        static shared_ptr<service> get_service(const casting_interface& iface);
+        static zone get_zone(const casting_interface& iface);
+        static destination_zone get_destination_zone(const casting_interface& iface);
+        static destination_channel_zone get_channel_zone(const casting_interface& iface);
     };
     bool are_in_same_zone(const casting_interface* first, const casting_interface* second);
 

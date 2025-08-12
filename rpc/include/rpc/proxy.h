@@ -32,6 +32,8 @@ namespace rpc
     // non virtual class to allow for type erasure
     class proxy_base
     {
+    protected:
+        friend casting_interface;
         rpc::shared_ptr<object_proxy> object_proxy_;
 
     protected:
@@ -48,8 +50,6 @@ namespace rpc
         template<class T1, class T2>
         friend CORO_TASK(rpc::shared_ptr<T1>) dynamic_pointer_cast(const shared_ptr<T2>& from) noexcept;
         friend service;
-    public:
-        rpc::shared_ptr<object_proxy> get_object_proxy() const { return object_proxy_; }
     };
 
     template<class T> class proxy_impl : public proxy_base, public T
@@ -63,7 +63,7 @@ namespace rpc
         virtual void* get_address() const override
         {
             RPC_ASSERT(false);
-            return (T*)get_object_proxy().get();
+            return (T*)object_proxy_.get();
         }   
         rpc::proxy_base* query_proxy_base() const override 
         { 
@@ -651,9 +651,9 @@ namespace rpc
 
         //this is to check that an interface is belonging to another zone and not the operating zone
         auto proxy = iface->query_proxy_base();
-        if(proxy && proxy->get_object_proxy()->get_destination_zone_id() != operating_service->get_zone_id().as_destination())
+        if(proxy && casting_interface::get_destination_zone(*iface) != operating_service->get_zone_id().as_destination())
         {
-            CO_RETURN {proxy->get_object_proxy()->get_object_id(), proxy->get_object_proxy()->get_destination_zone_id()};
+            CO_RETURN {casting_interface::get_object_id(*iface), casting_interface::get_destination_zone(*iface)};
         }
 
         //else encapsulate away
@@ -719,9 +719,9 @@ namespace rpc
 
         //this is to check that an interface is belonging to another zone and not the operating zone
         auto proxy = iface->query_proxy_base();
-        if(proxy && proxy->get_object_proxy()->get_zone_id() != operating_service->get_zone_id())
+        if(proxy && casting_interface::get_zone(*proxy) != operating_service->get_zone_id())
         {
-            CO_RETURN {proxy->get_object_proxy()->get_object_id(), proxy->get_object_proxy()->get_zone_id()};
+            CO_RETURN {proxy->get_object_proxy()->get_object_id(), casting_interface::get_zone(*proxy)};
         }
 
         //else encapsulate away

@@ -163,7 +163,7 @@ namespace rpc
         virtual void set_parent_proxy(const rpc::shared_ptr<rpc::service_proxy>&) { RPC_ASSERT(false); };
 
         // passed by value implementing an implicit lock on the life time of ptr
-        object get_object_id(shared_ptr<casting_interface> ptr) const;
+        object get_object_id(const shared_ptr<casting_interface>& ptr) const;
 
         CORO_TASK(interface_descriptor)
         prepare_out_param(uint64_t protocol_version,
@@ -247,8 +247,7 @@ namespace rpc
             Args&&... args)
         {
             RPC_ASSERT(input_interface == nullptr || !input_interface->query_proxy_base()
-                       || input_interface->query_proxy_base()->get_object_proxy()->get_service_proxy()->get_zone_id()
-                              == zone_id_);
+                       || casting_interface::get_zone(*input_interface) == zone_id_);
 
             auto new_service_proxy = proxy_class::create(name, new_zone_id, shared_from_this(), args...);
             add_zone_proxy(new_service_proxy);
