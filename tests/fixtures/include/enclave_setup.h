@@ -50,8 +50,7 @@ public:
 #ifdef USE_RPC_TELEMETRY
         if (enable_telemetry_server)
         {
-            CREATE_TELEMETRY_SERVICE(
-                rpc::host_telemetry_service, test_info->test_suite_name(), test_info->name(), "../../rpc_test_diagram/")
+            telemetry_service_manager_.create(test_info->test_suite_name(), test_info->name(), "../../rpc_test_diagram/");
         }
 #endif
         root_service_ = rpc::make_shared<rpc::service>("host", rpc::zone{++zone_gen_});

@@ -4,6 +4,10 @@
 #include <rpc/types.h>
 #include <rpc/marshaller.h>
 
+#ifndef _IN_ENCLAVE
+#include <filesystem>
+#endif
+
 // copied from spdlog
 #define I_TELEMETRY_LEVEL_DEBUG 0
 #define I_TELEMETRY_LEVEL_TRACE 1
@@ -54,8 +58,17 @@ namespace rpc
             caller_zone caller_zone_id) const
             = 0;
 
-        virtual void on_service_proxy_creation(
-            const char* name, zone zone_id, destination_zone destination_zone_id, caller_zone caller_zone_id) const
+        virtual void on_service_proxy_creation(const char* service_name,
+            const char* service_proxy_name,
+            zone zone_id,
+            destination_zone destination_zone_id,
+            caller_zone caller_zone_id) const
+            = 0;
+        virtual void on_cloned_service_proxy_creation(const char* service_name,
+            const char* service_proxy_name,
+            rpc::zone zone_id,
+            rpc::destination_zone destination_zone_id,
+            rpc::caller_zone caller_zone_id) const
             = 0;
         virtual void on_service_proxy_deletion(
             zone zone_id, destination_zone destination_zone_id, caller_zone caller_zone_id) const
@@ -144,12 +157,16 @@ namespace rpc
         static inline std::shared_ptr<i_telemetry_service> telemetry_service_ = nullptr;
 
     public:
-        template<class TELEMETRY_SERVICE, typename... Args> bool create(Args&&... args)
+#ifdef _IN_ENCLAVE
+        bool create()
         {
             if (telemetry_service_)
                 return false;
-            return TELEMETRY_SERVICE::create(telemetry_service_, std::forward<Args>(args)...);
+            return rpc::enclave_telemetry_service::create(telemetry_service_);
         }
+#else
+        bool create(const std::string& test_suite_name, const std::string& name, const std::filesystem::path& directory);
+#endif
 
         static std::shared_ptr<i_telemetry_service> get() { return telemetry_service_; }
 
@@ -158,13 +175,10 @@ namespace rpc
         static void reset() { telemetry_service_.reset(); }
     };
 }
-
 #ifdef USE_RPC_TELEMETRY
 #define TELEMETRY_SERVICE_MANAGER rpc::telemetry_service_manager telemetry_service_manager_;
-#define CREATE_TELEMETRY_SERVICE(type, ...) telemetry_service_manager_.create<type>(__VA_ARGS__);
 #define RESET_TELEMETRY_SERVICE rpc::telemetry_service_manager::reset();
 #else
 #define TELEMETRY_SERVICE_MANAGER
-#define CREATE_TELEMETRY_SERVICE(...)
 #define RESET_TELEMETRY_SERVICE
 #endif

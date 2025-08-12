@@ -143,7 +143,13 @@ namespace rpc
             rpc::object object_id,
             rpc::caller_zone caller_zone_id) const override;
 
-        void on_service_proxy_creation(const char* name,
+        void on_service_proxy_creation(const char* service_name,
+            const char* service_proxy_name,
+            rpc::zone zone_id,
+            rpc::destination_zone destination_zone_id,
+            rpc::caller_zone caller_zone_id) const override;
+        void on_cloned_service_proxy_creation(const char* service_name,
+            const char* service_proxy_name,
             rpc::zone zone_id,
             rpc::destination_zone destination_zone_id,
             rpc::caller_zone caller_zone_id) const override;

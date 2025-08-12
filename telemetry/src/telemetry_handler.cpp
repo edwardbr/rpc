@@ -58,11 +58,26 @@ extern "C"
                 {zone_id}, {destination_channel_zone_id}, {destination_zone_id}, {object_id}, {caller_zone_id});
     }
 
-    void on_service_proxy_creation_host(
-        const char* name, uint64_t zone_id, uint64_t destination_zone_id, uint64_t caller_zone_id)
+    void on_service_proxy_creation_host(const char* service_name,
+        const char* service_proxy_name,
+        uint64_t zone_id,
+        uint64_t destination_zone_id,
+        uint64_t caller_zone_id)
     {
         if (auto telemetry_service = rpc::telemetry_service_manager::get())
-            telemetry_service->on_service_proxy_creation(name, {zone_id}, {destination_zone_id}, {caller_zone_id});
+            telemetry_service->on_service_proxy_creation(
+                service_name, service_proxy_name, {zone_id}, {destination_zone_id}, {caller_zone_id});
+    }
+
+    void on_cloned_service_proxy_creation_host(const char* service_name,
+        const char* service_proxy_name,
+        uint64_t zone_id,
+        uint64_t destination_zone_id,
+        uint64_t caller_zone_id)
+    {
+        if (auto telemetry_service = rpc::telemetry_service_manager::get())
+            telemetry_service->on_cloned_service_proxy_creation(
+                service_name, service_proxy_name, {zone_id}, {destination_zone_id}, {caller_zone_id});
     }
     void on_service_proxy_deletion_host(uint64_t zone_id, uint64_t destination_zone_id, uint64_t caller_zone_id)
     {

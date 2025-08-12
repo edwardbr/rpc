@@ -223,7 +223,7 @@ namespace rpc
 #ifdef USE_RPC_TELEMETRY
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             {
-                telemetry_service->on_service_proxy_creation(name, get_zone_id(), get_destination_zone_id(), svc->get_zone_id().as_caller());
+                telemetry_service->on_service_proxy_creation(svc->get_name().c_str(), name, get_zone_id(), get_destination_zone_id(), svc->get_zone_id().as_caller());
             }
 #endif            
             RPC_ASSERT(svc != nullptr);
@@ -579,7 +579,7 @@ namespace rpc
 #ifdef USE_RPC_TELEMETRY            
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             {
-                telemetry_service->on_service_proxy_creation(name_.c_str(), get_zone_id(), get_destination_zone_id(), get_caller_zone_id());
+                telemetry_service->on_cloned_service_proxy_creation(service_.lock()->get_name().c_str(), name_.c_str(), get_zone_id(), get_destination_zone_id(), get_caller_zone_id());
             }
 #endif            
         }

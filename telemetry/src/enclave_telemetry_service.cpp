@@ -54,10 +54,23 @@ namespace rpc
             object_id.get_val(),
             caller_zone_id.get_val());
     }
-    void enclave_telemetry_service::on_service_proxy_creation(
-        const char* name, rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::caller_zone caller_zone_id) const
+    void enclave_telemetry_service::on_service_proxy_creation(const char* service_name,
+        const char* service_proxy_name,
+        rpc::zone zone_id,
+        rpc::destination_zone destination_zone_id,
+        rpc::caller_zone caller_zone_id) const
     {
-        on_service_proxy_creation_host(name, zone_id.get_val(), destination_zone_id.get_val(), caller_zone_id.get_val());
+        on_service_proxy_creation_host(
+            service_name, service_proxy_name, zone_id.get_val(), destination_zone_id.get_val(), caller_zone_id.get_val());
+    }
+    void enclave_telemetry_service::on_cloned_service_proxy_creation(const char* service_name,
+        const char* service_proxy_name,
+        rpc::zone zone_id,
+        rpc::destination_zone destination_zone_id,
+        rpc::caller_zone caller_zone_id) const
+    {
+        on_cloned_service_proxy_creation(
+            service_name, service_proxy_name, zone_id.get_val(), destination_zone_id.get_val(), caller_zone_id.get_val());
     }
     void enclave_telemetry_service::on_service_proxy_deletion(
         rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::caller_zone caller_zone_id) const

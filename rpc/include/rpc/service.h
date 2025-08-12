@@ -140,7 +140,11 @@ namespace rpc
         static zone generate_new_zone_id();
 
 #ifdef BUILD_COROUTINE
-        auto schedule(coro::task<void>&& task) -> bool { return io_scheduler_->schedule(std::move(task)); }
+        template<typename Callable> auto schedule(Callable&& callable)
+        {
+            // Forwards the lambda (or any other callable) to the real scheduler
+            return io_scheduler_->schedule(std::forward<Callable>(callable));
+        }
         auto get_scheduler() const { return io_scheduler_; }
 #endif
 
@@ -310,7 +314,7 @@ namespace rpc
             Args&&... args)
         {
             // link the child to the parent
-            auto parent_service_proxy = CO_AWAIT SERVICE_PROXY::attach_remote(name, shared_from_this(), args...);
+            auto parent_service_proxy = CO_AWAIT SERVICE_PROXY::attach_remote("remote", shared_from_this(), args...);
             if (!parent_service_proxy)
                 CO_RETURN rpc::error::UNABLE_TO_CREATE_SERVICE_PROXY();
             add_zone_proxy(parent_service_proxy);
@@ -425,7 +429,7 @@ namespace rpc
                 new rpc::child_service(name, zone_id, parent_zone_id, io_scheduler));
 
             // link the child to the parent
-            auto parent_service_proxy = SERVICE_PROXY::create(name, parent_zone_id, child_svc, args...);
+            auto parent_service_proxy = SERVICE_PROXY::create("parent", parent_zone_id, child_svc, args...);
             if (!parent_service_proxy)
                 CO_RETURN rpc::error::UNABLE_TO_CREATE_SERVICE_PROXY();
             child_svc->add_zone_proxy(parent_service_proxy);

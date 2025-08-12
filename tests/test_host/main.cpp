@@ -355,16 +355,29 @@ TYPED_TEST(remote_type_test, remote_standard_tests)
 //     }
 // }
 
-// TYPED_TEST(remote_type_test, remote_tests)
-// {
-//     auto root_service = lib.get_root_service();
-//     rpc::zone zone_id;
-//     if(root_service)
-//         zone_id = root_service->get_zone_id();
-//     else
-//         zone_id = {0};
-//     remote_tests(lib.get_use_host_in_child(), lib.get_example(), zone_id);
-// }
+template<class T> CORO_TASK(void) coro_remote_tests(bool& is_ready, T& lib, rpc::zone zone_id)
+{
+    co_await remote_tests(lib.get_use_host_in_child(), lib.get_example(), zone_id);
+    is_ready = true;
+}
+
+TYPED_TEST(remote_type_test, remote_tests)
+{
+    bool is_ready = false;
+    auto& lib = this->get_lib();
+    auto root_service = lib.get_root_service();
+    rpc::zone zone_id;
+    if (root_service)
+        zone_id = root_service->get_zone_id();
+    else
+        zone_id = {0};
+    root_service->get_scheduler()->schedule(coro_remote_tests(is_ready, lib, zone_id));
+    while (!is_ready)
+    {
+        root_service->get_scheduler()->process_events(std::chrono::milliseconds(1));
+    }
+    ASSERT_EQ(lib.error_has_occured(), false);
+}
 
 // TYPED_TEST(remote_type_test, multithreaded_remote_tests)
 // {
@@ -393,11 +406,26 @@ TYPED_TEST(remote_type_test, remote_standard_tests)
 //     }
 // }
 
-// TYPED_TEST(remote_type_test, create_new_zone)
-// {
-//     auto example_relay_ptr = lib.create_new_zone();
-//     example_relay_ptr->set_host(nullptr);
-// }
+template<class T> CORO_TASK(void) coro_create_new_zone(bool& is_ready, T& lib, const rpc::shared_ptr<yyy::i_host>& host)
+{
+    auto example_relay_ptr = co_await lib.create_new_zone();
+    co_await example_relay_ptr->set_host(host);
+    is_ready = true;
+}
+
+TYPED_TEST(remote_type_test, create_new_zone)
+{
+    bool is_ready = false;
+    auto& lib = this->get_lib();
+    auto root_service = lib.get_root_service();
+    rpc::shared_ptr<yyy::i_host> host;
+    root_service->get_scheduler()->schedule(coro_create_new_zone(is_ready, lib, host));
+    while (!is_ready)
+    {
+        root_service->get_scheduler()->process_events(std::chrono::milliseconds(1));
+    }
+    ASSERT_EQ(lib.error_has_occured(), false);
+}
 
 // TYPED_TEST(remote_type_test, multithreaded_create_new_zone)
 // {
@@ -421,18 +449,47 @@ TYPED_TEST(remote_type_test, remote_standard_tests)
 //     }
 // }
 
-// TYPED_TEST(remote_type_test, create_new_zone_releasing_host_then_running_on_other_enclave)
-// {
-//     rpc::shared_ptr<xxx::i_foo> i_foo_relay_ptr;
-//     auto example_relay_ptr = lib.create_new_zone();
-//     example_relay_ptr->create_foo(i_foo_relay_ptr);
-//     standard_tests(*i_foo_relay_ptr, true);
+template<class T>
+CORO_TASK(void)
+coro_create_new_zone_releasing_host_then_running_on_other_enclave(
+    bool& is_ready, T& lib, const rpc::shared_ptr<yyy::i_host>& host)
+{
+    auto example_relay_ptr = co_await lib.create_new_zone();
+    rpc::shared_ptr<xxx::i_foo> i_foo_relay_ptr;
+    co_await example_relay_ptr->create_foo(i_foo_relay_ptr);
+    co_await standard_tests(*i_foo_relay_ptr, true);
 
-//     //rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
-//     //ASSERT_EQ(lib.get_example()->create_foo(i_foo_ptr), 0);
-//     example_relay_ptr = nullptr;
-//     //standard_tests(*i_foo_ptr, true);
-// }
+    // rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
+    // ASSERT_EQ(lib.get_example()->create_foo(i_foo_ptr), 0);
+    example_relay_ptr = nullptr;
+    i_foo_relay_ptr = nullptr;
+
+    // standard_tests(*i_foo_ptr, true);
+
+    auto success = lib.get_root_service()->schedule(
+        [&is_ready]() -> CORO_TASK(void)
+        {
+            is_ready = true;
+            CO_RETURN;
+        }());
+}
+
+TYPED_TEST(remote_type_test, create_new_zone_releasing_host_then_running_on_other_enclave)
+{
+    bool is_ready = false;
+    auto& lib = this->get_lib();
+    auto root_service = lib.get_root_service();
+    rpc::shared_ptr<yyy::i_host> host;
+    root_service->get_scheduler()->schedule(
+        coro_create_new_zone_releasing_host_then_running_on_other_enclave(is_ready, lib, host));
+    while (!is_ready)
+    {
+        root_service->get_scheduler()->process_events(std::chrono::milliseconds(1));
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    root_service->get_scheduler()->process_events(std::chrono::milliseconds(1));
+    ASSERT_EQ(lib.error_has_occured(), false);
+}
 
 // TYPED_TEST(remote_type_test, multithreaded_create_new_zone_releasing_host_then_running_on_other_enclave)
 // {

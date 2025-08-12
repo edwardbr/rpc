@@ -47,6 +47,10 @@ namespace rpc
         , name_(name)
         , io_scheduler_(io_scheduler)
     {
+#ifdef USE_RPC_TELEMETRY
+        if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            telemetry_service->on_service_creation(name, zone_id);
+#endif
     }
 #else
     service::service(const char* name, zone zone_id)
@@ -117,51 +121,56 @@ namespace rpc
         {
             for (const auto& item : stubs)
             {
-                auto stub = item.second.lock();
-                if (!stub)
+#ifdef USE_RPC_TELEMETRY
+                if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
                 {
-#ifdef USE_RPC_LOGGING
-                    auto message
-                        = std::string("stub zone_id ") + std::to_string(zone_id_) + std::string(", object stub ")
-                          + std::to_string(item.first)
-                          + std::string(
-                              " has been released but not deregistered in the service suspected unclean shutdown");
-                    LOG_STR(message.c_str(), message.size());
-#endif
+                    auto stub = item.second.lock();
+                    if (!stub)
+                    {
+                        auto message
+                            = std::string("stub in zone_id ") + std::to_string(zone_id_) + std::string(", object stub ")
+                              + std::to_string(item.first)
+                              + std::string(
+                                  " has been released but not deregistered in the service suspected unclean shutdown");
+
+                        telemetry_service->message(rpc::i_telemetry_service::level_enum::err, message.c_str());
+                    }
+                    else
+                    {
+                        auto message = std::string("stub in zone_id ") + std::to_string(zone_id_)
+                                       + std::string(", object stub ") + std::to_string(item.first)
+                                       + std::string(" has not been released, there is a strong pointer maintaining a "
+                                                     "positive reference count suspected unclean shutdown");
+
+                        telemetry_service->message(rpc::i_telemetry_service::level_enum::err, message.c_str());
+                    }
                 }
-                else
-                {
-#ifdef USE_RPC_LOGGING
-                    auto message = std::string("stub zone_id ") + std::to_string(zone_id_)
-                                   + std::string(", object stub ") + std::to_string(item.first)
-                                   + std::string(" has not been released, there is a strong pointer maintaining a "
-                                                 "positive reference count suspected unclean shutdown");
-                    LOG_STR(message.c_str(), message.size());
 #endif
-                }
                 success = false;
             }
             for (auto item : wrapped_object_to_stub)
             {
-                auto stub = item.second.lock();
-                if (!stub)
+#ifdef USE_RPC_TELEMETRY
+                if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
                 {
-#ifdef USE_RPC_LOGGING
-                    auto message
-                        = std::string("wrapped stub zone_id ")
-                          + std::to_string(zone_id_) + std::string(", wrapped_object has been released but not deregistered in the service suspected unclean shutdown");
-                    LOG_STR(message.c_str(), message.size());
-#endif
+                    auto stub = item.second.lock();
+                    if (!stub)
+                    {
+                        auto message
+                            = std::string("wrapped stub in zone_id ")
+                              + std::to_string(zone_id_) + std::string(", wrapped_object has been released but not deregistered in the service suspected unclean shutdown");
+                        telemetry_service->message(rpc::i_telemetry_service::level_enum::err, message.c_str());
+                    }
+                    else
+                    {
+                        auto message
+                            = std::string("wrapped stub in zone_id ") + std::to_string(zone_id_)
+                              + std::string(", wrapped_object ") + std::to_string(stub->get_id())
+                              + std::string(" has not been deregisted in the service suspected unclean shutdown");
+                        telemetry_service->message(rpc::i_telemetry_service::level_enum::err, message.c_str());
+                    }
                 }
-                else
-                {
-#ifdef USE_RPC_LOGGING
-                    auto message = std::string("wrapped stub zone_id ") + std::to_string(zone_id_)
-                                   + std::string(", wrapped_object ") + std::to_string(stub->get_id())
-                                   + std::string(" has not been deregisted in the service suspected unclean shutdown");
-                    LOG_STR(message.c_str(), message.size());
 #endif
-                }
                 success = false;
             }
         }
@@ -173,44 +182,53 @@ namespace rpc
                 auto svcproxy = item.second.lock();
                 if (!svcproxy)
                 {
-#ifdef USE_RPC_LOGGING
-                    auto message = std::string("service proxy zone_id ") + std::to_string(zone_id_)
-                                   + std::string(", caller_zone_id ") + std::to_string(item.first.source.id)
-                                   + std::string(", destination_zone_id ") + std::to_string(item.first.dest.id)
-                                   + std::string(", has been released but not deregistered in the service");
-                    LOG_STR(message.c_str(), message.size());
+#ifdef USE_RPC_TELEMETRY
+                    if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+                    {
+                        auto message = std::string("service proxy zone_id ") + std::to_string(zone_id_)
+                                       + std::string(", caller_zone_id ") + std::to_string(item.first.source.id)
+                                       + std::string(", destination_zone_id ") + std::to_string(item.first.dest.id)
+                                       + std::string(", has been released but not deregistered in the service");
+                        telemetry_service->message(rpc::i_telemetry_service::level_enum::err, message.c_str());
+                    }
 #endif
                 }
                 else
                 {
-#ifdef USE_RPC_LOGGING
-                    auto message = std::string("service proxy zone_id ") + std::to_string(zone_id_)
-                                   + std::string(", caller_zone_id ") + std::to_string(item.first.source.id)
-                                   + std::string(", destination_zone_id ")
-                                   + std::to_string(svcproxy->get_destination_zone_id())
-                                   + std::string(", destination_channel_zone_id ")
-                                   + std::to_string(svcproxy->get_destination_channel_zone_id())
-                                   + std::string(" has not been released in the service suspected unclean shutdown");
-                    LOG_STR(message.c_str(), message.size());
+#ifdef USE_RPC_TELEMETRY
+                    if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+                    {
+                        auto message
+                            = std::string("service proxy zone_id ") + std::to_string(zone_id_)
+                              + std::string(", caller_zone_id ") + std::to_string(item.first.source.id)
+                              + std::string(", destination_zone_id ") + std::to_string(svcproxy->get_destination_zone_id())
+                              + std::string(", destination_channel_zone_id ")
+                              + std::to_string(svcproxy->get_destination_channel_zone_id())
+                              + std::string(" has not been released in the service suspected unclean shutdown");
+                        telemetry_service->message(rpc::i_telemetry_service::level_enum::err, message.c_str());
+                    }
 #endif
 
                     for (auto proxy : svcproxy->get_proxies())
                     {
-                        auto op = proxy.second.lock();
-                        if (op)
+#ifdef USE_RPC_TELEMETRY
+                        if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
                         {
-#ifdef USE_RPC_LOGGING
-                            auto message = std::string("has object_proxy ") + std::to_string(op->get_object_id());
-                            LOG_STR(message.c_str(), message.size());
-#endif
+                            auto op = proxy.second.lock();
+                            if (op)
+                            {
+                                auto message = std::string("service zone_id ") + std::to_string(zone_id_)
+                                               + std::string(" has object_proxy ") + std::to_string(op->get_object_id());
+                                telemetry_service->message(rpc::i_telemetry_service::level_enum::err, message.c_str());
+                            }
+                            else
+                            {
+                                auto message = std::string("service zone_id ") + std::to_string(zone_id_)
+                                               + std::string(" has null object_proxy");
+                                telemetry_service->message(rpc::i_telemetry_service::level_enum::err, message.c_str());
+                            }
                         }
-                        else
-                        {
-#ifdef USE_RPC_LOGGING
-                            auto message = std::string("has null object_proxy");
-                            LOG_STR(message.c_str(), message.size());
 #endif
-                        }
                         success = false;
                     }
                 }

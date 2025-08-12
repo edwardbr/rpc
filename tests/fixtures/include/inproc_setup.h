@@ -67,12 +67,14 @@ public:
         auto test_info = ::testing::UnitTest::GetInstance()->current_test_info();
 #ifdef USE_RPC_TELEMETRY
         if (enable_telemetry_server)
-            CREATE_TELEMETRY_SERVICE(
-                rpc::host_telemetry_service, test_info->test_suite_name(), test_info->name(), "../../rpc_test_diagram/")
+            telemetry_service_manager_.create(test_info->test_suite_name(), test_info->name(), "../../rpc_test_diagram/");
 #endif
 
         root_service_ = rpc::make_shared<rpc::service>("host", rpc::zone{++zone_gen_}, io_scheduler_);
         root_service_->add_service_logger(std::make_shared<test_service_logger>());
+        example_import_idl_register_stubs(root_service_);
+        example_shared_idl_register_stubs(root_service_);
+        example_idl_register_stubs(root_service_);
         current_host_service = root_service_;
 
         rpc::shared_ptr<yyy::i_host> hst(new host(root_service_->get_zone_id()));

@@ -1,3 +1,5 @@
+#include <common/foo_impl.h>
+
 template<bool UseHostInChild, bool RunStandardTests, bool CreateNewZoneThenCreateSubordinatedZone> class tcp_setup
 {
     rpc::shared_ptr<rpc::service> root_service_;
@@ -52,17 +54,21 @@ public:
         auto test_info = ::testing::UnitTest::GetInstance()->current_test_info();
 #ifdef USE_RPC_TELEMETRY
         if (enable_telemetry_server)
-            CREATE_TELEMETRY_SERVICE(
-                rpc::host_telemetry_service, test_info->test_suite_name(), test_info->name(), "../../rpc_test_diagram/")
+            telemetry_service_manager_.create(test_info->test_suite_name(), test_info->name(), "../../rpc_test_diagram/");
 #endif
 
         auto root_zone_id = rpc::zone{++zone_gen_};
         auto peer_zone_id = rpc::zone{++zone_gen_};
         root_service_ = rpc::make_shared<rpc::service>("host", root_zone_id, io_scheduler_);
         root_service_->add_service_logger(std::make_shared<test_service_logger>());
-
+        example_import_idl_register_stubs(root_service_);
+        example_shared_idl_register_stubs(root_service_);
+        example_idl_register_stubs(root_service_);
         peer_service_ = rpc::make_shared<rpc::service>("peer", peer_zone_id, io_scheduler_);
         peer_service_->add_service_logger(std::make_shared<test_service_logger>());
+        example_import_idl_register_stubs(peer_service_);
+        example_shared_idl_register_stubs(peer_service_);
+        example_idl_register_stubs(peer_service_);
 
         peer_listener_ = std::make_shared<rpc::tcp::listener<yyy::i_host, yyy::i_example>>(
             [](const rpc::shared_ptr<yyy::i_host>& host,
@@ -149,42 +155,44 @@ public:
         // SYNC_WAIT(CoroTearDown());
     }
 
-    /*CORO_TASK(rpc::shared_ptr<yyy::i_example>) create_new_zone()
+    CORO_TASK(rpc::shared_ptr<yyy::i_example>) create_new_zone()
     {
         rpc::shared_ptr<yyy::i_host> hst;
-        if(use_host_in_child_)
+        if (use_host_in_child_)
             hst = local_host_ptr_.lock();
 
         rpc::shared_ptr<yyy::i_example> example_relay_ptr;
 
-        auto err_code = CO_AWAIT root_service_->connect_to_zone<rpc::local_child_service_proxy<yyy::i_example, yyy::i_host>>(
-            "main child"
-            , {++zone_gen_}
-            , hst
-            , example_relay_ptr
-            , [&](
-                const rpc::shared_ptr<yyy::i_host>& host
-                , rpc::shared_ptr<yyy::i_example>& new_example
-                , const rpc::shared_ptr<rpc::child_service>& child_service_ptr) -> CORO_TASK(int)
-            {
-                example_import_idl_register_stubs(child_service_ptr);
-                example_shared_idl_register_stubs(child_service_ptr);
-                example_idl_register_stubs(child_service_ptr);
-                new_example = rpc::shared_ptr<yyy::i_example>(new example(child_service_ptr, nullptr));
-                if(use_host_in_child_)
-                    CO_AWAIT new_example->set_host(host);
-                CO_RETURN rpc::error::OK();
-            });
+        auto err_code
+            = CO_AWAIT root_service_->connect_to_zone<rpc::local_child_service_proxy<yyy::i_example, yyy::i_host>>(
+                "main child",
+                {++zone_gen_},
+                hst,
+                example_relay_ptr,
+                [&](const rpc::shared_ptr<yyy::i_host>& host,
+                    rpc::shared_ptr<yyy::i_example>& new_example,
+                    const rpc::shared_ptr<rpc::child_service>& child_service_ptr) -> CORO_TASK(int)
+                {
+                    example_import_idl_register_stubs(child_service_ptr);
+                    example_shared_idl_register_stubs(child_service_ptr);
+                    example_idl_register_stubs(child_service_ptr);
+                    new_example = rpc::make_shared<marshalled_tests::example>(child_service_ptr, nullptr);
+                    if (use_host_in_child_)
+                        CO_AWAIT new_example->set_host(host);
+                    CO_RETURN rpc::error::OK();
+                });
 
-        if(CreateNewZoneThenCreateSubordinatedZone)
+        if (CreateNewZoneThenCreateSubordinatedZone)
         {
             rpc::shared_ptr<yyy::i_example> new_ptr;
-            if(CO_AWAIT example_relay_ptr->create_example_in_subordinate_zone(new_ptr, use_host_in_child_ ? hst : nullptr, ++zone_gen_) == rpc::error::OK())
+            if (CO_AWAIT example_relay_ptr->create_example_in_subordinate_zone(
+                    new_ptr, use_host_in_child_ ? hst : nullptr, ++zone_gen_)
+                == rpc::error::OK())
             {
                 CO_AWAIT example_relay_ptr->set_host(nullptr);
                 example_relay_ptr = new_ptr;
             }
         }
         CO_RETURN example_relay_ptr;
-    }*/
+    }
 };
