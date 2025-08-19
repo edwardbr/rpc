@@ -28,8 +28,9 @@ CORO_TASK(error_code) host::create_enclave(rpc::shared_ptr<yyy::i_example>& targ
 #ifdef BUILD_ENCLAVE
     rpc::shared_ptr<yyy::i_host> host = shared_from_this();
     auto serv = current_host_service.lock();
+    auto new_zone_id = ++(*zone_gen);
     auto err_code
-        = serv->connect_to_zone<rpc::enclave_service_proxy>("an enclave", {++(*zone_gen)}, host, target, enclave_path);
+        = serv->connect_to_zone<rpc::enclave_service_proxy>("an enclave", {new_zone_id}, host, target, enclave_path);
 
     CO_RETURN err_code;
 #endif

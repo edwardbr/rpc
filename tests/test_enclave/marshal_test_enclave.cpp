@@ -43,7 +43,7 @@ int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t host_id, uint64_t 
     }
 
 #ifdef USE_RPC_TELEMETRY
-    telemetry_service_manager_.create(telemetry_service_manager_);
+    telemetry_service_manager::create(telemetry_service_manager_);
 #endif
 
     auto ret = rpc::child_service::create_child_zone<rpc::host_service_proxy, yyy::i_host, yyy::i_example>(

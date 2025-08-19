@@ -30,14 +30,18 @@ template<bool UseHostInChild, bool RunStandardTests, bool CreateNewZoneThenCreat
 
     std::atomic<uint64_t> zone_gen_ = 0;
 
+#ifdef BUILD_COROUTINE
     std::shared_ptr<coro::io_scheduler> io_scheduler_;
+#endif    
     bool error_has_occured_ = false;
 
     bool startup_complete_ = false;
     bool shutdown_complete_ = false;
 
 public:
+#ifdef BUILD_COROUTINE
     std::shared_ptr<coro::io_scheduler> get_scheduler() const { return io_scheduler_; }
+#endif    
     bool error_has_occured() const { return error_has_occured_; }
 
     virtual ~inproc_setup() = default;
@@ -50,7 +54,7 @@ public:
     rpc::shared_ptr<yyy::i_host> get_local_host_ptr() { return local_host_ptr_.lock(); }
     bool get_use_host_in_child() const { return use_host_in_child_; }
 
-    CORO_TASK(void) check_for_error(coro::task<bool> task)
+    CORO_TASK(void) check_for_error(CORO_TASK(bool) task)
     {
         auto ret = CO_AWAIT task;
         if (!ret)
@@ -69,7 +73,11 @@ public:
             telemetry_service_manager_.create(test_info->test_suite_name(), test_info->name(), "../../rpc_test_diagram/");
 #endif
 
-        root_service_ = rpc::make_shared<rpc::service>("host", rpc::zone{++zone_gen_}, io_scheduler_);
+        root_service_ = rpc::make_shared<rpc::service>("host", rpc::zone{++zone_gen_}
+#ifdef BUILD_COROUTINE
+        , io_scheduler_
+#endif
+        );
         example_import_idl_register_stubs(root_service_);
         example_shared_idl_register_stubs(root_service_);
         example_idl_register_stubs(root_service_);
@@ -78,9 +86,10 @@ public:
         rpc::shared_ptr<yyy::i_host> hst(new host(root_service_->get_zone_id()));
         local_host_ptr_ = hst; // assign to weak ptr
 
+        auto new_zone_id = ++(zone_gen_);
         auto ret = CO_AWAIT root_service_->connect_to_zone<rpc::local_child_service_proxy<yyy::i_example, yyy::i_host>>(
             "main child",
-            {++zone_gen_},
+            {new_zone_id},
             hst,
             i_example_ptr_,
             [&](const rpc::shared_ptr<yyy::i_host>& host,
@@ -107,6 +116,7 @@ public:
 
     virtual void SetUp()
     {
+#ifdef BUILD_COROUTINE
         io_scheduler_ = coro::io_scheduler::make_shared(
             coro::io_scheduler::options{.thread_strategy = coro::io_scheduler::thread_strategy_t::manual,
                 .pool = coro::thread_pool::options{
@@ -117,6 +127,10 @@ public:
         while (startup_complete_ == false || io_scheduler_->process_events())
         {
         }
+#else      
+        check_for_error(CoroSetUp());
+        ASSERT_EQ(startup_complete_, true);
+#endif        
 
         // auto err_code = SYNC_WAIT();
 
@@ -134,10 +148,14 @@ public:
 
     virtual void TearDown()
     {
+#ifdef BUILD_COROUTINE        
         io_scheduler_->schedule(CoroTearDown());
         while (shutdown_complete_ == false || io_scheduler_->process_events())
         {
         }
+#else
+        CoroTearDown();        
+#endif        
         root_service_ = nullptr;
         zone_gen = nullptr;
 #ifdef USE_RPC_TELEMETRY
@@ -154,10 +172,11 @@ public:
 
         rpc::shared_ptr<yyy::i_example> example_relay_ptr;
 
+        auto new_zone_id = ++(zone_gen_);
         auto err_code
             = CO_AWAIT root_service_->connect_to_zone<rpc::local_child_service_proxy<yyy::i_example, yyy::i_host>>(
                 "main child",
-                {++zone_gen_},
+                {new_zone_id},
                 hst,
                 example_relay_ptr,
                 [&](const rpc::shared_ptr<yyy::i_host>& host,

@@ -442,7 +442,7 @@ namespace rpc
         }
         else
         {
-            rpc::shared_ptr<service_proxy> destination_zone = object_service_proxy;
+            rpc::shared_ptr<service_proxy> destination_service_proxy = object_service_proxy;
             rpc::shared_ptr<service_proxy> caller;
             {
                 std::lock_guard g(zone_control);
@@ -451,13 +451,14 @@ namespace rpc
                         {destination_zone_id, caller_zone_id}); // we dont need to get caller id for this
                     if (found != other_zones.end())
                     {
-                        destination_zone = found->second.lock();
-                        destination_zone->add_external_ref();
+                        destination_service_proxy = found->second.lock();
+                        destination_service_proxy->add_external_ref();
                     }
                     else
                     {
-                        destination_zone = object_service_proxy->clone_for_zone(destination_zone_id, caller_zone_id);
-                        inner_add_zone_proxy(destination_zone);
+                        destination_service_proxy
+                            = object_service_proxy->clone_for_zone(destination_zone_id, caller_zone_id);
+                        inner_add_zone_proxy(destination_service_proxy);
                     }
                 }
                 // and the caller with destination info
@@ -503,7 +504,7 @@ namespace rpc
 
             // the fork is here so we need to add ref the destination normally with caller info
             // note the caller_channel_zone_id is is this zones id as the caller came from a route via this node
-            auto refcount = CO_AWAIT destination_zone->add_ref(protocol_version,
+            auto refcount = CO_AWAIT destination_service_proxy->add_ref(protocol_version,
                 {0},
                 destination_zone_id,
                 object_id,
@@ -813,9 +814,24 @@ namespace rpc
                             }
                             else
                             {
-                                // untested path
-                                RPC_ASSERT(false);
-                                // caller = get_parent();
+                                // UNTESTED PATH!!!
+                                // It has been worked out that this happens when a reference to an zone is passed to a
+                                // zone that does not know of its existence.
+                                // SOLUTION:
+                                // Create a temporary "snail trail" of service proxies if not present from the caller to
+                                // the called this would result in the i_marshaller::send method having an additional
+                                // list of zones that are referred to in any parameter that is passing an interface.
+                                // This list needs to be not encrypted along the chain of services in a function call so
+                                // that they can maintain that snail trail. All service proxies whether already present
+                                // or ephemeral will need to be protected with a shared pointer for the lifetime of the
+                                // call. This will require a change to the code generator to populate the list of zones
+                                // in the send method for the receiving service to process.
+                                // TEMPORARY FIX:
+                                // This fix below assumes that the bottom most parent knows about the zone in question.
+                                // However one branch may have a zone with a child that the bottom most node does not
+                                // know about so this will break.  With the proposed snail trail fix this logic branch
+                                // should assert false as it should then be impossible to get to this position.
+                                caller = get_parent();
                             }
 
                             RPC_ASSERT(caller);

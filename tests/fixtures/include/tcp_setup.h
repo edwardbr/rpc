@@ -161,10 +161,11 @@ public:
 
         rpc::shared_ptr<yyy::i_example> example_relay_ptr;
 
+        auto new_zone_id = ++(zone_gen_);
         auto err_code
             = CO_AWAIT root_service_->connect_to_zone<rpc::local_child_service_proxy<yyy::i_example, yyy::i_host>>(
                 "main child",
-                {++zone_gen_},
+                {new_zone_id},
                 hst,
                 example_relay_ptr,
                 [&](const rpc::shared_ptr<yyy::i_host>& host,

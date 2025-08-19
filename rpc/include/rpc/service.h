@@ -423,7 +423,11 @@ namespace rpc
             Args&&... args)
         {
             auto child_svc = rpc::shared_ptr<rpc::child_service>(
-                new rpc::child_service(name, zone_id, parent_zone_id, io_scheduler));
+                new rpc::child_service(name, zone_id, parent_zone_id
+#ifdef BUILD_COROUTINE
+                , io_scheduler
+#endif                
+                ));
 
             // link the child to the parent
             auto parent_service_proxy = SERVICE_PROXY::create("parent", parent_zone_id, child_svc, args...);

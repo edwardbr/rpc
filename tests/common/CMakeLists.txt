@@ -6,6 +6,15 @@ cmake_minimum_required(VERSION 3.24)
 
 message("common_enclave")
 
+if(BUILD_COROUTINE)
+set(COROUTINE_SERVICE_PROXIES
+    src/tcp/service_proxy.cpp 
+  src/tcp/channel_manager.cpp 
+  src/spsc/service_proxy.cpp 
+  src/spsc/channel_manager.cpp  
+)
+endif()
+
 # ######################################################################################################################
 # common_enclave
 
@@ -39,7 +48,9 @@ if(${BUILD_ENCLAVE})
 
 endif()
 
-set(SOURCES src/tcp/service_proxy.cpp src/tcp/channel_manager.cpp src/spsc/service_proxy.cpp src/spsc/channel_manager.cpp  src/foo_impl.cpp)
+set(SOURCES 
+  ${COROUTINE_SERVICE_PROXIES}
+  src/foo_impl.cpp)
 if(BUILD_ENCLAVE)
   list(APPEND SOURCES src/enclave_service_proxy.cpp)
   set(ADDITIONAL_TARGET marshal_test_edl_host rpc_telemetry_edl_header_host)

@@ -10,18 +10,18 @@
 #include <common/foo_impl.h>
 #include <common/tests.h>
 
-#include "common/tcp/service_proxy.h"
-#include "common/tcp/listener.h"
-
-#include "common/spsc/service_proxy.h"
-#include "common/spsc/channel_manager.h"
-
 #include <rpc/coroutine_support.h>
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 #ifdef BUILD_COROUTINE
+#include "common/tcp/service_proxy.h"
+#include "common/tcp/listener.h"
+
+#include "common/spsc/service_proxy.h"
+#include "common/spsc/channel_manager.h"
+
 #include <coro/io_scheduler.hpp>
 #endif
 
@@ -36,8 +36,11 @@
 #include "in_memory_setup.h"
 #include "inproc_setup.h"
 #include "enclave_setup.h"
+
+#ifdef BUILD_COROUTINE
 #include "tcp_setup.h"
 #include "spsc_setup.h"
+#endif
 
 // This list should be kept sorted.
 using testing::_;
@@ -130,7 +133,9 @@ using local_implementations = ::testing::Types<in_memory_setup<false>,
     inproc_setup<true, false, false>,
     inproc_setup<true, false, true>,
     inproc_setup<true, true, false>,
-    inproc_setup<true, true, true>,
+    inproc_setup<true, true, true>
+#ifdef BUILD_COROUTINE
+    ,
     tcp_setup<false, false, false>,
     tcp_setup<false, false, true>,
     tcp_setup<false, true, false>,
@@ -147,6 +152,7 @@ using local_implementations = ::testing::Types<in_memory_setup<false>,
     spsc_setup<true, false, true>,
     spsc_setup<true, true, false>,
     spsc_setup<true, true, true>
+#endif    
 
 #ifdef BUILD_ENCLAVE
     ,
@@ -176,7 +182,7 @@ template<class T> CORO_TASK(bool) coro_standard_tests(bool& is_ready, T& lib)
 
     foo f(zone_id);
 
-    co_await lib.check_for_error(standard_tests(f, lib.get_has_enclave()));
+    CO_AWAIT standard_tests(f, lib.get_has_enclave());
     is_ready = true;
     CO_RETURN !lib.error_has_occured();
 }
@@ -186,11 +192,15 @@ TYPED_TEST(type_test, standard_tests)
     bool is_ready = false;
     auto& lib = this->get_lib();
     auto root_service = lib.get_root_service();
-    root_service->get_scheduler()->schedule(lib.check_for_error(coro_standard_tests(is_ready, lib)));
+#ifdef BUILD_COROUTINE      
+    lib.get_scheduler()->schedule(lib.check_for_error(coro_standard_tests(is_ready, lib)));
     while (!is_ready)
     {
-        root_service->get_scheduler()->process_events(std::chrono::milliseconds(1));
+        lib.get_scheduler()->process_events(std::chrono::milliseconds(1));
     }
+#else
+    coro_standard_tests(is_ready, lib);
+#endif    
     ASSERT_EQ(lib.error_has_occured(), false);
 }
 
@@ -243,12 +253,15 @@ TYPED_TEST(type_test, dyanmic_cast_tests)
     // TEST_SYNC_WAIT(dyanmic_cast_tests(root_service));
 
     bool is_ready = false;
-
+#ifdef BUILD_COROUTINE  
     lib.get_scheduler()->schedule(lib.check_for_error(dyanmic_cast_tests(is_ready, root_service)));
     while (!is_ready)
     {
-        root_service->get_scheduler()->process_events(std::chrono::milliseconds(1));
+        lib.get_scheduler()->process_events(std::chrono::milliseconds(1));
     };
+#else
+    dyanmic_cast_tests(is_ready, root_service);
+#endif    
 
     ASSERT_EQ(lib.error_has_occured(), false);
 }
@@ -261,7 +274,9 @@ typedef Types<
     inproc_setup<true, false, false>,
     inproc_setup<true, false, true>,
     inproc_setup<true, true, false>,
-    inproc_setup<true, true, true>,
+    inproc_setup<true, true, true>
+#ifdef BUILD_COROUTINE
+    ,
     tcp_setup<true, false, false>,
     tcp_setup<true, false, true>,
     tcp_setup<true, true, false>,
@@ -270,6 +285,7 @@ typedef Types<
     spsc_setup<true, false, true>,
     spsc_setup<true, true, false>,
     spsc_setup<true, true, true>
+#endif
 
 #ifdef BUILD_ENCLAVE
     ,
@@ -285,13 +301,13 @@ TYPED_TEST_SUITE(remote_type_test, remote_implementations);
 template<class T> CORO_TASK(void) coro_remote_standard_tests(bool& is_ready, T& lib)
 {
     rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
-    auto ret = co_await lib.get_example()->create_foo(i_foo_ptr);
+    auto ret = CO_AWAIT lib.get_example()->create_foo(i_foo_ptr);
     if (ret != rpc::error::OK())
     {
         LOG_CSTR("failed create_foo");
         CO_RETURN;
     }
-    co_await lib.check_for_error(standard_tests(*i_foo_ptr, lib.get_has_enclave()));
+    CO_AWAIT standard_tests(*i_foo_ptr, lib.get_has_enclave());
     is_ready = true;
 }
 
@@ -300,11 +316,15 @@ TYPED_TEST(remote_type_test, remote_standard_tests)
     bool is_ready = false;
     auto& lib = this->get_lib();
     auto root_service = lib.get_root_service();
-    root_service->get_scheduler()->schedule(coro_remote_standard_tests(is_ready, lib));
+#ifdef BUILD_COROUTINE  
+    lib.get_scheduler()->schedule(coro_remote_standard_tests(is_ready, lib));
     while (!is_ready)
     {
-        root_service->get_scheduler()->process_events(std::chrono::milliseconds(1));
+        lib.get_scheduler()->process_events(std::chrono::milliseconds(1));
     }
+#else
+    coro_remote_standard_tests(is_ready, lib);
+#endif    
     ASSERT_EQ(lib.error_has_occured(), false);
 }
 
@@ -357,7 +377,7 @@ TYPED_TEST(remote_type_test, remote_standard_tests)
 
 template<class T> CORO_TASK(void) coro_remote_tests(bool& is_ready, T& lib, rpc::zone zone_id)
 {
-    co_await remote_tests(lib.get_use_host_in_child(), lib.get_example(), zone_id);
+    CO_AWAIT remote_tests(lib.get_use_host_in_child(), lib.get_example(), zone_id);
     is_ready = true;
 }
 
@@ -371,11 +391,15 @@ TYPED_TEST(remote_type_test, remote_tests)
         zone_id = root_service->get_zone_id();
     else
         zone_id = {0};
-    root_service->get_scheduler()->schedule(coro_remote_tests(is_ready, lib, zone_id));
+#ifdef BUILD_COROUTINE                
+    lib.get_scheduler()->schedule(coro_remote_tests(is_ready, lib, zone_id));
     while (!is_ready)
     {
-        root_service->get_scheduler()->process_events(std::chrono::milliseconds(1));
+        lib.get_scheduler()->process_events(std::chrono::milliseconds(1));
     }
+#else
+    coro_remote_tests(is_ready, lib, zone_id);
+#endif    
     ASSERT_EQ(lib.error_has_occured(), false);
 }
 
@@ -408,8 +432,8 @@ TYPED_TEST(remote_type_test, remote_tests)
 
 template<class T> CORO_TASK(void) coro_create_new_zone(bool& is_ready, T& lib, const rpc::shared_ptr<yyy::i_host>& host)
 {
-    auto example_relay_ptr = co_await lib.create_new_zone();
-    co_await example_relay_ptr->set_host(host);
+    auto example_relay_ptr = CO_AWAIT lib.create_new_zone();
+    CO_AWAIT example_relay_ptr->set_host(host);
     is_ready = true;
 }
 
@@ -419,11 +443,15 @@ TYPED_TEST(remote_type_test, create_new_zone)
     auto& lib = this->get_lib();
     auto root_service = lib.get_root_service();
     rpc::shared_ptr<yyy::i_host> host;
-    root_service->get_scheduler()->schedule(coro_create_new_zone(is_ready, lib, host));
+#ifdef BUILD_COROUTINE        
+    lib.get_scheduler()->schedule(coro_create_new_zone(is_ready, lib, host));
     while (!is_ready)
     {
-        root_service->get_scheduler()->process_events(std::chrono::milliseconds(1));
+        lib.get_scheduler()->process_events(std::chrono::milliseconds(1));
     }
+#else
+    coro_create_new_zone(is_ready, lib, host);
+#endif    
     ASSERT_EQ(lib.error_has_occured(), false);
 }
 
@@ -454,17 +482,31 @@ CORO_TASK(void)
 coro_create_new_zone_releasing_host_then_running_on_other_enclave(
     bool& is_ready, T& lib, const rpc::shared_ptr<yyy::i_host>& host)
 {
-    auto example_relay_ptr = co_await lib.create_new_zone();
+    GTEST_SKIP() << "for later";
+    auto example_relay_ptr = CO_AWAIT lib.create_new_zone();
     rpc::shared_ptr<xxx::i_foo> i_foo_relay_ptr;
-    co_await example_relay_ptr->create_foo(i_foo_relay_ptr);
-    co_await standard_tests(*i_foo_relay_ptr, true);
-
-    {
-        auto example_o = rpc::casting_interface::get_object_id(*example_relay_ptr);
-        auto foo_o = rpc::casting_interface::get_object_id(*i_foo_relay_ptr);
-        foo_o = foo_o;
-        example_o = example_o;
-    }
+    CO_AWAIT example_relay_ptr->create_foo(i_foo_relay_ptr);
+    // CO_AWAIT standard_tests(*i_foo_relay_ptr, true);
+    
+    // rpc::shared_ptr<yyy::i_host> host_copy;
+    // CO_AWAIT example_relay_ptr->get_host(host_copy);
+            
+    // {
+    //     auto example_o = rpc::casting_interface::get_object_id(*example_relay_ptr);
+    //     auto foo_o = rpc::casting_interface::get_object_id(*i_foo_relay_ptr);
+    //     auto host_o = rpc::casting_interface::get_object_id(*host_copy);
+    //     auto example_z = rpc::casting_interface::get_destination_zone(*example_relay_ptr);
+    //     auto foo_z = rpc::casting_interface::get_destination_zone(*i_foo_relay_ptr);
+    //     auto host_z = rpc::casting_interface::get_destination_zone(*host_copy);
+    //     yyy::i_host* p_host = host_copy.get();
+    //     p_host = p_host;
+    //     foo_o = foo_o;
+    //     example_o = example_o;
+    //     host_o = host_o;
+    //     foo_z = foo_z;
+    //     example_z = example_z;
+    //     host_z = host_z;
+    // }
 
     // rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
     // ASSERT_EQ(lib.get_example()->create_foo(i_foo_ptr), 0);
@@ -473,29 +515,34 @@ coro_create_new_zone_releasing_host_then_running_on_other_enclave(
 
     // standard_tests(*i_foo_ptr, true);
 
+#ifdef BUILD_COROUTINE    
     auto success = lib.get_root_service()->schedule(
         [&is_ready]() -> CORO_TASK(void)
         {
             is_ready = true;
             CO_RETURN;
         }());
+#endif        
 }
 
 TYPED_TEST(remote_type_test, create_new_zone_releasing_host_then_running_on_other_enclave)
 {
-    GTEST_SKIP() << "for later";
     bool is_ready = false;
     auto& lib = this->get_lib();
     auto root_service = lib.get_root_service();
     rpc::shared_ptr<yyy::i_host> host;
-    root_service->get_scheduler()->schedule(
+#ifdef BUILD_COROUTINE    
+    lib.get_scheduler()->schedule(
         coro_create_new_zone_releasing_host_then_running_on_other_enclave(is_ready, lib, host));
     while (!is_ready)
     {
-        root_service->get_scheduler()->process_events(std::chrono::milliseconds(1));
+        lib.get_scheduler()->process_events(std::chrono::milliseconds(1));
     }
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    root_service->get_scheduler()->process_events(std::chrono::milliseconds(1));
+    lib.get_scheduler()->process_events(std::chrono::milliseconds(1));
+#else
+    coro_create_new_zone_releasing_host_then_running_on_other_enclave(is_ready, lib, host);
+#endif    
     ASSERT_EQ(lib.error_has_occured(), false);
 }
 

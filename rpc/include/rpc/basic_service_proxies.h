@@ -95,7 +95,7 @@ namespace rpc
             add_ref_options build_out_param_channel) override
         {
             RPC_ASSERT(((std::uint8_t)build_out_param_channel & (std::uint8_t)rpc::add_ref_options::build_caller_route)
-                       || destination_channel_zone_id == 0
+                       || destination_channel_zone_id == 0u
                        || destination_channel_zone_id == get_destination_channel_zone_id());
             auto dest = parent_service_.lock();
             auto ret = CO_AWAIT dest->add_ref(protocol_version,

@@ -61,8 +61,9 @@ public:
         i_host_ptr_ = rpc::shared_ptr<yyy::i_host>(new host(root_service_->get_zone_id()));
         local_host_ptr_ = i_host_ptr_;
 
+        auto new_zone_id = ++(*zone_gen);
         auto err_code = root_service_->connect_to_zone<rpc::enclave_service_proxy>(
-            "main child", {++(*zone_gen)}, use_host_in_child_ ? i_host_ptr_ : nullptr, i_example_ptr_, enclave_path);
+            "main child", {new_zone_id}, use_host_in_child_ ? i_host_ptr_ : nullptr, i_example_ptr_, enclave_path);
 
         ASSERT_ERROR_CODE(err_code);
     }
@@ -81,9 +82,9 @@ public:
     rpc::shared_ptr<yyy::i_example> create_new_zone()
     {
         rpc::shared_ptr<yyy::i_example> ptr;
-
+        auto new_zone_id = ++(zone_gen_);
         auto err_code = root_service_->connect_to_zone<rpc::enclave_service_proxy>(
-            "main child", {++zone_gen_}, use_host_in_child_ ? i_host_ptr_ : nullptr, ptr, enclave_path);
+            "main child", {new_zone_id}, use_host_in_child_ ? i_host_ptr_ : nullptr, ptr, enclave_path);
 
         if (err_code != rpc::error::OK())
             return nullptr;

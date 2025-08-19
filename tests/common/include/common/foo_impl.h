@@ -439,7 +439,7 @@ namespace marshalled_tests
 
             auto err_code
                 = CO_AWAIT this_service->connect_to_zone<rpc::local_child_service_proxy<yyy::i_example, yyy::i_host>>(
-                    "subordinate_zone",
+                    "example_zone",
                     {new_zone_id},
                     host_ptr,
                     target,
