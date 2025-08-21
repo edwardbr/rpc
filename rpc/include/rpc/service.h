@@ -138,7 +138,7 @@ namespace rpc
         void set_zone_id(zone zone_id) { zone_id_ = zone_id; }
         virtual destination_zone get_parent_zone_id() const { return {0}; }
         virtual rpc::shared_ptr<rpc::service_proxy> get_parent() const { return nullptr; }
-        virtual void set_parent_proxy(const rpc::shared_ptr<rpc::service_proxy>&) { RPC_ASSERT(false); };
+        virtual void set_parent_proxy(const rpc::shared_ptr<rpc::service_proxy>&) { RPC_ASSERT(false); }
 
         // passed by value implementing an implicit lock on the life time of ptr
         object get_object_id(shared_ptr<casting_interface> ptr) const;
@@ -339,7 +339,7 @@ namespace rpc
             auto child_svc = rpc::shared_ptr<rpc::child_service>(new rpc::child_service(name, zone_id, parent_zone_id));
 
             // link the child to the parent
-            auto parent_service_proxy = SERVICE_PROXY::create(name, parent_zone_id, child_svc, args...);
+            auto parent_service_proxy = SERVICE_PROXY::create("parent", parent_zone_id, child_svc, args...);
             if (!parent_service_proxy)
                 return rpc::error::UNABLE_TO_CREATE_SERVICE_PROXY();
             child_svc->add_zone_proxy(parent_service_proxy);

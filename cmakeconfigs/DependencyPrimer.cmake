@@ -33,6 +33,7 @@ if(NOT DEPENDENCIES_LOADED)
   option(USE_RPC_LOGGING "turn on rpc logging" OFF)
   option(RPC_HANG_ON_FAILED_ASSERT "hang on failed assert" OFF)
   option(USE_RPC_TELEMETRY "turn on rpc telemetry" OFF)
+  option(USE_CONSOLE_TELEMETRY "turn on rpc telemetry" OFF)  
   option(USE_RPC_TELEMETRY_RAII_LOGGING
     "turn on the logging of the addref release and try cast activity of the services, proxies and stubs" OFF)
 
@@ -156,6 +157,12 @@ if(NOT DEPENDENCIES_LOADED)
     set(USE_RPC_TELEMETRY_FLAG)
   endif()
 
+  if(USE_CONSOLE_TELEMETRY)
+    set(USE_CONSOLE_TELEMETRY_FLAG USE_CONSOLE_TELEMETRY)
+  else()
+    set(USE_CONSOLE_TELEMETRY_FLAG)
+  endif()
+  
   if(USE_RPC_TELEMETRY_RAII_LOGGING)
     set(USE_RPC_TELEMETRY_RAII_LOGGING_FLAG USE_RPC_TELEMETRY_RAII_LOGGING)
   else()
@@ -184,6 +191,7 @@ if(NOT DEPENDENCIES_LOADED)
       ${USE_RPC_LOGGING_FLAG}
       ${RPC_HANG_ON_FAILED_ASSERT_FLAG}
       ${USE_RPC_TELEMETRY_FLAG}
+      ${USE_CONSOLE_TELEMETRY_FLAG}
       ${USE_RPC_TELEMETRY_RAII_LOGGING_FLAG}
       ${BUILD_ENCLAVE_FLAG}
       ${BUILD_TEST_FLAG}

@@ -11,7 +11,7 @@ if(USE_RPC_TELEMETRY)
 
   if(BUILD_ENCLAVE)
     message("rpc_telemetry_enclave")
-    add_library(rpc_telemetry_enclave STATIC src/enclave_telemetry_service.cpp)
+    add_library(rpc_telemetry_enclave STATIC src/enclave_telemetry_service.cpp src/telemetry_service_factory.cpp)
 
     target_compile_definitions(rpc_telemetry_enclave PRIVATE ${ENCLAVE_DEFINES})
     target_include_directories(
@@ -38,7 +38,7 @@ endif()
 if(${BUILD_HOST})
 
   message("rpc_telemetry_host")
-  add_library(rpc_telemetry_host STATIC src/host_telemetry_service.cpp src/telemetry_handler.cpp)
+  add_library(rpc_telemetry_host STATIC src/host_telemetry_service.cpp src/console_telemetry_service.cpp src/telemetry_handler.cpp src/telemetry_service_factory.cpp)
 
   target_include_directories(rpc_telemetry_host PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>")
   target_compile_options(rpc_telemetry_host PRIVATE ${HOST_COMPILE_OPTIONS} ${WARN_OK})

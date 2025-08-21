@@ -219,6 +219,9 @@ namespace rpc
         destination_channel_zone destination_channel_zone_ = {0};
         caller_zone caller_zone_id_ = {0};
         rpc::weak_ptr<service> service_;
+        // if this service proxy represents a child service, hold a strong reference to the parent service to prevent premature destruction
+        rpc::shared_ptr<service> parent_service_ref_;
+
         rpc::shared_ptr<service_proxy> lifetime_lock_;
         std::atomic<int> lifetime_lock_count_ = 0;
         std::atomic<uint64_t> version_ = rpc::get_version();
@@ -240,7 +243,7 @@ namespace rpc
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             {
                 telemetry_service->on_service_proxy_creation(
-                    name, get_zone_id(), get_destination_zone_id(), svc->get_zone_id().as_caller());
+                    svc->get_name().c_str(), name, get_zone_id(), get_destination_zone_id(), svc->get_zone_id().as_caller());
             }
 #endif
             RPC_ASSERT(svc != nullptr);
@@ -287,11 +290,11 @@ namespace rpc
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             {
                 telemetry_service->on_service_proxy_deletion(
-                    get_zone_id(), get_destination_zone_id(), get_caller_zone_id());
+                    get_zone_id(), destination_zone_id_, caller_zone_id_);
             }
 #endif
         }
-
+        
         std::string get_name() const { return name_; }
 
         uint64_t get_remote_rpc_version() const { return version_.load(); }
@@ -505,6 +508,9 @@ namespace rpc
 
         void on_object_proxy_released(object object_id)
         {
+            // this keeps the underlying service alive while the service proxy is released
+            auto current_service = get_operating_zone_service();
+            
             auto caller_zone_id = get_zone_id().as_caller();
             RPC_ASSERT(caller_zone_id == get_caller_zone_id());
 
@@ -554,14 +560,24 @@ namespace rpc
 
         std::unordered_map<object, rpc::weak_ptr<object_proxy>> get_proxies() { return proxies_; }
 
+        // Set parent service reference for child service proxies to prevent premature parent destruction
+        void set_parent_service_reference(const rpc::shared_ptr<service>& parent_service)
+        {
+            parent_service_ref_ = parent_service;
+        }
+
         virtual rpc::shared_ptr<service_proxy> clone() = 0;
         virtual void clone_completed()
         {
 #ifdef USE_RPC_TELEMETRY
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             {
-                telemetry_service->on_service_proxy_creation(
-                    name_.c_str(), get_zone_id(), get_destination_zone_id(), get_caller_zone_id());
+                telemetry_service->on_cloned_service_proxy_creation(
+                    service_.lock()->get_name().c_str(),
+                    name_.c_str(),
+                    get_zone_id(),
+                    get_destination_zone_id(),
+                    get_caller_zone_id());
             }
 #endif
         }

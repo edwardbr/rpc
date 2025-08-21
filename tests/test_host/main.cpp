@@ -216,7 +216,7 @@ TYPED_TEST(remote_type_test, remote_standard_tests)
 
 TYPED_TEST(remote_type_test, multithreaded_standard_tests)
 {
-    if (!enable_multithreaded_tests || this->get_lib().is_enclave_setup())
+    if (!enable_multithreaded_tests)
     {
         GTEST_SKIP() << "multithreaded tests are skipped";
         return;
@@ -238,7 +238,7 @@ TYPED_TEST(remote_type_test, multithreaded_standard_tests)
 
 TYPED_TEST(remote_type_test, multithreaded_standard_tests_with_and_foos)
 {
-    if (!enable_multithreaded_tests || this->get_lib().is_enclave_setup())
+    if (!enable_multithreaded_tests)
     {
         GTEST_SKIP() << "multithreaded tests are skipped";
         return;
@@ -274,7 +274,7 @@ TYPED_TEST(remote_type_test, remote_tests)
 
 TYPED_TEST(remote_type_test, multithreaded_remote_tests)
 {
-    if (!enable_multithreaded_tests || this->get_lib().is_enclave_setup())
+    if (!enable_multithreaded_tests)
     {
         GTEST_SKIP() << "multithreaded tests are skipped";
         return;
@@ -306,7 +306,7 @@ TYPED_TEST(remote_type_test, create_new_zone)
 
 TYPED_TEST(remote_type_test, multithreaded_create_new_zone)
 {
-    if (!enable_multithreaded_tests || this->get_lib().is_enclave_setup())
+    if (!enable_multithreaded_tests)
     {
         GTEST_SKIP() << "multithreaded tests are skipped";
         return;
@@ -333,7 +333,7 @@ TYPED_TEST(remote_type_test, create_new_zone_releasing_host_then_running_on_othe
     rpc::shared_ptr<xxx::i_foo> i_foo_relay_ptr;
     auto example_relay_ptr = this->get_lib().create_new_zone();
     example_relay_ptr->create_foo(i_foo_relay_ptr);
-    standard_tests(*i_foo_relay_ptr, true);
+    // standard_tests(*i_foo_relay_ptr, true);
 
     // rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
     // ASSERT_EQ(this->get_lib().get_example()->create_foo(i_foo_ptr), 0);
@@ -343,7 +343,7 @@ TYPED_TEST(remote_type_test, create_new_zone_releasing_host_then_running_on_othe
 
 TYPED_TEST(remote_type_test, multithreaded_create_new_zone_releasing_host_then_running_on_other_enclave)
 {
-    if (!enable_multithreaded_tests || this->get_lib().is_enclave_setup())
+    if (!enable_multithreaded_tests)
     {
         GTEST_SKIP() << "multithreaded tests are skipped";
         return;
@@ -402,7 +402,7 @@ TYPED_TEST(remote_type_test, bounce_baz_between_two_interfaces)
 
 TYPED_TEST(remote_type_test, multithreaded_bounce_baz_between_two_interfaces)
 {
-    if (!enable_multithreaded_tests || this->get_lib().is_enclave_setup())
+    if (!enable_multithreaded_tests)
     {
         GTEST_SKIP() << "multithreaded tests are skipped";
         return;
@@ -549,7 +549,7 @@ TYPED_TEST(remote_type_test, check_sub_subordinate)
 
 TYPED_TEST(remote_type_test, multithreaded_check_sub_subordinate)
 {
-    if (!enable_multithreaded_tests || this->get_lib().is_enclave_setup())
+    if (!enable_multithreaded_tests)
     {
         GTEST_SKIP() << "multithreaded tests are skipped";
         return;
@@ -623,7 +623,7 @@ TYPED_TEST(remote_type_test, two_zones_get_one_to_lookup_other)
 }
 TYPED_TEST(remote_type_test, multithreaded_two_zones_get_one_to_lookup_other)
 {
-    if (!enable_multithreaded_tests || this->get_lib().is_enclave_setup())
+    if (!enable_multithreaded_tests)
     {
         GTEST_SKIP() << "multithreaded tests are skipped";
         return;

@@ -19,6 +19,9 @@ namespace rpc
         : service_proxy(name, destination_zone_id, svc)
         , filename_(filename)
     {
+        // This proxy is for a child service, so hold a strong reference to the parent service
+        // to prevent premature parent destruction until after child cleanup
+        set_parent_service_reference(svc);
     }
 
     enclave_service_proxy::enclave_owner::~enclave_owner()
@@ -138,6 +141,10 @@ namespace rpc
                 telemetry_service->message(rpc::i_telemetry_service::err, error_message.c_str());
             }
 #endif
+            std::string error = "call_enclave gave an enclave error ";
+            error += std::to_string(status);
+            LOG_STR(error.c_str(), error.length());
+            RPC_ASSERT(!error.c_str());
             return rpc::error::TRANSPORT_ERROR();
         }
 
@@ -172,6 +179,10 @@ namespace rpc
                     telemetry_service->message(rpc::i_telemetry_service::err, error_message.c_str());
                 }
 #endif
+                std::string error = "call_enclave gave an enclave error ";
+                error += std::to_string(status);
+                LOG_STR(error.c_str(), error.length());
+                RPC_ASSERT(!error.c_str());
                 return rpc::error::TRANSPORT_ERROR();
             }
         }
@@ -208,7 +219,10 @@ namespace rpc
                 telemetry_service->message(rpc::i_telemetry_service::err, error_message.c_str());
             }
 #endif
-            RPC_ASSERT(false);
+            std::string error = "try_cast_enclave gave an enclave error ";
+            error += std::to_string(status);
+            LOG_STR(error.c_str(), error.length());
+            RPC_ASSERT(!error.c_str());
             return rpc::error::TRANSPORT_ERROR();
         }
         return err_code;
@@ -270,7 +284,10 @@ namespace rpc
                 telemetry_service->message(rpc::i_telemetry_service::err, error_message.c_str());
             }
 #endif
-            RPC_ASSERT(false);
+            std::string error = "add_ref_enclave gave an enclave error ";
+            error += std::to_string(status);
+            LOG_STR(error.c_str(), error.length());
+            RPC_ASSERT(!error.c_str());
             return add_ref_failed_val;
         }
         return ret;
@@ -305,6 +322,10 @@ namespace rpc
                 telemetry_service->message(rpc::i_telemetry_service::err, error_message.c_str());
             }
 #endif
+            std::string error = "release_enclave gave an enclave error ";
+            error += std::to_string(status);
+            LOG_STR(error.c_str(), error.length());
+            RPC_ASSERT(!error.c_str());
             return std::numeric_limits<uint64_t>::max();
         }
         return ret;

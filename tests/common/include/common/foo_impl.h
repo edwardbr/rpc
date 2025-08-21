@@ -19,7 +19,10 @@
 
 void log(const std::string& data)
 {
-    LOG_STR(data.data(), data.size());
+    std::ignore = data;
+#ifdef USE_RPC_LOGGING
+    rpc_log(data.data(), data.size());
+#endif
 }
 
 namespace marshalled_tests
@@ -432,7 +435,7 @@ namespace marshalled_tests
             auto this_service = this_service_.lock();
 
             auto err_code = this_service->connect_to_zone<rpc::local_child_service_proxy<yyy::i_example, yyy::i_host>>(
-                "subordinate_zone",
+                "example_zone",
                 {new_zone_id},
                 host_ptr,
                 target,

@@ -1,21 +1,42 @@
 #pragma once
 
+#include <string>
+#include <filesystem>
+#include <unordered_map>
+#include <memory>
+#include <rpc/types.h>
 #include <rpc/telemetry/i_telemetry_service.h>
+
+namespace spdlog
+{
+    class logger;    
+}
 
 namespace rpc
 {
-    class enclave_telemetry_service : public i_telemetry_service
+    class console_telemetry_service : public rpc::i_telemetry_service
     {
-        enclave_telemetry_service() = default;
-        static bool create(std::shared_ptr<i_telemetry_service>& out)
-        {
-            out = std::shared_ptr<enclave_telemetry_service>(new enclave_telemetry_service());
-            return true;
-        }
-        friend telemetry_service_manager;
+        mutable std::unordered_map<uint64_t, std::string> zone_names_;
+        mutable std::shared_ptr<spdlog::logger> logger_;
+        static constexpr size_t ASYNC_QUEUE_SIZE = 8192;
+
+        std::string get_zone_name(uint64_t zone_id) const;
+        std::string get_zone_color(uint64_t zone_id) const;
+        std::string get_level_color(level_enum level) const;
+        std::string reset_color() const;
+        void register_zone_name(uint64_t zone_id, const char* name, bool optional_replace) const;
+        void init_logger() const;
 
     public:
-        virtual ~enclave_telemetry_service() = default;
+        static bool create(std::shared_ptr<rpc::i_telemetry_service>& service,
+            const std::string& test_suite_name,
+            const std::string& name,
+            const std::filesystem::path& directory);
+
+        virtual ~console_telemetry_service();
+        console_telemetry_service();
+        console_telemetry_service(const console_telemetry_service&) = delete;
+        console_telemetry_service& operator=(const console_telemetry_service&) = delete;
 
         void on_service_creation(const char* name, rpc::zone zone_id) const override;
         void on_service_deletion(rpc::zone zone_id) const override;

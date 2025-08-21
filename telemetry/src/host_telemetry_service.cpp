@@ -409,10 +409,72 @@ namespace rpc
 #endif
     }
 
-    void host_telemetry_service::on_service_proxy_creation(
-        const char* name, rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::caller_zone caller_zone_id) const
+    void host_telemetry_service::on_service_proxy_creation(const char* service_name,
+        const char* service_proxy_name,
+        rpc::zone zone_id,
+        rpc::destination_zone destination_zone_id,
+        rpc::caller_zone caller_zone_id) const
     {
-        std::ignore = name;
+        std::ignore = service_name;
+        std::ignore = service_proxy_name;
+        std::ignore = zone_id;
+        std::ignore = destination_zone_id;
+        std::ignore = caller_zone_id;
+
+#ifdef USE_RPC_TELEMETRY_RAII_LOGGING
+        std::string route_name;
+        std::string destination_name;
+
+        auto search = services.find({destination_zone_id.id});
+        if (search != services.end())
+            destination_name = search->second.name;
+        else
+            destination_name = std::to_string(destination_zone_id.id);
+
+        if (zone_id.as_caller() == caller_zone_id)
+        {
+            route_name = "To:"s + destination_name;
+        }
+        else
+        {
+            std::string caller_name;
+            search = services.find({caller_zone_id.id});
+            if (search != services.end())
+                caller_name = search->second.name;
+            else
+                caller_name = std::to_string(caller_zone_id.id);
+            route_name = "channel from "s + caller_name + " to " + destination_name;
+        }
+
+        fmt::println(output_,
+            "participant \"{} \\nzone {} \\ndestination {} \\ncaller {}\" as {} order {} #cyan",
+            route_name,
+            zone_id.get_val(),
+            destination_zone_id.get_val(),
+            caller_zone_id.get_val(),
+            service_proxy_alias(zone_id, destination_zone_id, caller_zone_id),
+            service_proxy_order(zone_id, destination_zone_id));
+        // fmt::println(output_, "{} --> {} : links to", service_proxy_alias(zone_id, destination_zone_id,
+        // caller_zone_id), service_alias(destination_zone_id.as_zone()));
+        fmt::println(output_, "activate {} #cyan", service_proxy_alias(zone_id, destination_zone_id, caller_zone_id));
+        std::lock_guard g(mux);
+        auto found = service_proxies.find(orig_zone{zone_id, destination_zone_id, caller_zone_id});
+        if (found == service_proxies.end())
+        {
+            service_proxies.emplace(orig_zone{zone_id, destination_zone_id, caller_zone_id}, name_count{service_name, 0});
+        }
+        fflush(output_);
+#endif
+    }
+
+    void host_telemetry_service::on_cloned_service_proxy_creation(const char* service_name,
+        const char* service_proxy_name,
+        rpc::zone zone_id,
+        rpc::destination_zone destination_zone_id,
+        rpc::caller_zone caller_zone_id) const
+    {
+        std::ignore = service_name;
+        std::ignore = service_proxy_name;
         std::ignore = zone_id;
         std::ignore = destination_zone_id;
         std::ignore = caller_zone_id;

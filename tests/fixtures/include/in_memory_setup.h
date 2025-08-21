@@ -45,8 +45,7 @@ public:
         auto test_info = ::testing::UnitTest::GetInstance()->current_test_info();
 #ifdef USE_RPC_TELEMETRY
         if (enable_telemetry_server)
-            CREATE_TELEMETRY_SERVICE(
-                rpc::host_telemetry_service, test_info->test_suite_name(), test_info->name(), "../../rpc_test_diagram/")
+            telemetry_service_manager_.create(test_info->test_suite_name(), test_info->name(), "../../rpc_test_diagram/");
 #endif
         i_host_ptr_ = rpc::shared_ptr<yyy::i_host>(new host({++zone_gen_}));
         local_host_ptr_ = i_host_ptr_;

@@ -77,6 +77,10 @@ namespace rpc
             telemetry_service->on_service_deletion(zone_id_);
 #endif
 
+        // For child services, the destructor should only be called when the parent has released it.
+        // For parent services, reference counting via child service proxies prevents premature destruction.
+        // The cleanup_after_object mechanism in service_proxy handles the proper ordering.
+
         object_id_generator = 0;
         // to do: RPC_ASSERT that there are no more object_stubs in memory
         bool is_empty = check_is_empty();

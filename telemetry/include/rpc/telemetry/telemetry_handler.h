@@ -19,8 +19,16 @@ extern "C"
         uint64_t object_id,
         uint64_t caller_zone_id);
 
-    void on_service_proxy_creation_host(
-        const char* name, uint64_t zone_id, uint64_t destination_zone_id, uint64_t caller_zone_id);
+    void on_service_proxy_creation_host(const char* service_name,
+        const char* service_proxy_name,
+        uint64_t zone_id,
+        uint64_t destination_zone_id,
+        uint64_t caller_zone_id);
+    void on_cloned_service_proxy_creation_host(const char* service_name,
+        const char* service_proxy_name,
+        uint64_t zone_id,
+        uint64_t destination_zone_id,
+        uint64_t caller_zone_id);
     void on_service_proxy_deletion_host(uint64_t zone_id, uint64_t destination_zone_id, uint64_t caller_zone_id);
     void on_service_proxy_try_cast_host(
         uint64_t zone_id, uint64_t destination_zone_id, uint64_t caller_zone_id, uint64_t object_id, uint64_t interface_id);

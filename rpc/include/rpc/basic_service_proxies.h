@@ -133,6 +133,9 @@ namespace rpc
             : service_proxy(name, destination_zone_id, parent_svc)
             , fn_(fn)
         {
+            // This proxy is for a child service, so hold a strong reference to the parent service
+            // to prevent premature parent destruction until after child cleanup
+            set_parent_service_reference(parent_svc);
         }
         local_child_service_proxy(const local_child_service_proxy& other) = default;
 
