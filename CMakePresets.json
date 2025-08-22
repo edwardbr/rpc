@@ -26,8 +26,8 @@
         "SGX_HW": "OFF",
         "SGX_MODE": "debug",
         "USE_RPC_LOGGING": "ON",
-        "USE_RPC_TELEMETRY": "OFF",
-        "USE_CONSOLE_TELEMETRY": "OFF"
+        "USE_RPC_TELEMETRY": "ON",
+        "USE_CONSOLE_TELEMETRY": "ON"
         // "LIBCORO_BUILD_EXAMPLES": "ON",
         // "LIBCORO_BUILD_TESTS": "ON",
         // "LIBCORO_FEATURE_NETWORKING": "ON",

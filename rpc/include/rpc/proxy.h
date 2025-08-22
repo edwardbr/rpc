@@ -229,6 +229,7 @@ namespace rpc
         rpc::weak_ptr<service> service_;
         // if this service proxy represents a child service, hold a strong reference to the parent service to prevent premature destruction
         rpc::shared_ptr<service> parent_service_ref_;
+        bool is_responsible_for_cleaning_up_service_ = true;
 
         rpc::shared_ptr<service_proxy> lifetime_lock_;
         std::atomic<int> lifetime_lock_count_ = 0;
@@ -288,11 +289,25 @@ namespace rpc
     public:
         virtual ~service_proxy()
         {
+            if (!proxies_.empty()) {
+                auto debug_msg = "service_proxy destructor: " + std::to_string(proxies_.size()) + " proxies still in map for destination_zone=" + std::to_string(destination_zone_id_.get_val()) + ", caller_zone=" + std::to_string(caller_zone_id_.get_val());
+                LOG_STR(debug_msg.c_str(), debug_msg.size());
+                
+                // Log details of remaining proxies
+                for (const auto& proxy_entry : proxies_) {
+                    auto proxy = proxy_entry.second.lock();
+                    auto proxy_debug_msg = "  Remaining proxy: object_id=" + std::to_string(proxy_entry.first.get_val()) + ", valid=" + (proxy ? "true" : "false");
+                    LOG_STR(proxy_debug_msg.c_str(), proxy_debug_msg.size());
+                }
+            }
             RPC_ASSERT(proxies_.empty());
-            auto svc = service_.lock();
-            if (svc)
+            if(is_responsible_for_cleaning_up_service_)
             {
-                svc->remove_zone_proxy(destination_zone_id_, caller_zone_id_);
+                auto svc = service_.lock();
+                if (svc)
+                {
+                    svc->remove_zone_proxy(destination_zone_id_, caller_zone_id_);
+                }
             }
 #ifdef USE_RPC_TELEMETRY
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
@@ -519,6 +534,9 @@ namespace rpc
 
         void on_object_proxy_released(object object_id, int inherited_reference_count)
         {
+            auto debug_msg = "on_object_proxy_released service zone: " + std::to_string(zone_id_.id) + " destination_zone=" + std::to_string(destination_zone_id_.get_val()) + ", caller_zone=" + std::to_string(caller_zone_id_.get_val()) + ", object_id = " + std::to_string(object_id.id);
+            LOG_CSTR(debug_msg.c_str());
+            
             // this keeps the underlying service alive while the service proxy is released
             auto current_service = get_operating_zone_service();
 
@@ -532,21 +550,22 @@ namespace rpc
                 if (item != proxies_.end())
                 {
                     auto existing_proxy = item->second.lock();
-                    if (existing_proxy == nullptr)
+                    if (existing_proxy != nullptr)
                     {
-                        // Stale entry, safe to remove
-                        proxies_.erase(item);
+                        // Check if there are other proxies that need to handle the cleanup
+                        if (inherited_reference_count > 0)
+                        {
+                            // There are other proxies - we need to create a new entry to handle the remaining references
+                            LOG_CSTR("RACE CONDITION DETECTED - TRANSFERRING REFERENCE!");
+                            auto log_msg = "Object ID: " + std::to_string(object_id.get_val()) + ", transferring to new proxy entry";
+                            LOG_STR(log_msg.c_str(), log_msg.size());
+                            existing_proxy->inherit_extra_reference();
+                            LOG_CSTR("Reference transferred - skipping remote release calls");
+                            return;
+                        }
                     }
-                    else
-                    {
-                        // Another proxy exists with same object_id - transfer responsibility
-                        LOG_CSTR("RACE CONDITION DETECTED - TRANSFERRING REFERENCE!");
-                        auto log_msg = "Object ID: " + std::to_string(object_id.get_val()) + ", transferring to proxy: " + std::to_string(reinterpret_cast<uintptr_t>(existing_proxy.get()));
-                        LOG_STR(log_msg.c_str(), log_msg.size());
-                        existing_proxy->inherit_extra_reference();
-                        LOG_CSTR("Reference transferred - skipping remote release calls");
-                        return;
-                    }
+                    // Always remove this entry from the map since this object proxy is being released
+                    proxies_.erase(item);
                 }
             }
 
@@ -559,43 +578,28 @@ namespace rpc
 #endif
 
             // Handle normal reference release
-            auto original_version = version_.load();
-            auto version = original_version;
-            while (version)
+            auto ret = release(version_.load(), destination_zone_id_, object_id, caller_zone_id);
+            if (ret == std::numeric_limits<uint64_t>::max())
             {
-                auto ret = release(version, destination_zone_id_, object_id, caller_zone_id);
-                if (ret != std::numeric_limits<uint64_t>::max())
-                {
-                    inner_release_external_ref();
-                    if (original_version != version)
-                    {
-                        version_.compare_exchange_strong(original_version, version);
-                    }
-                    break;
-                }
-                version--;
+                LOG_CSTR("on_object_proxy_released release failed");
+                RPC_ASSERT(false);
+                return;
             }
-            
+            inner_release_external_ref();
+
             // Handle inherited references from race conditions
             for (int i = 0; i < inherited_reference_count; i++) {
                 auto inherit_msg = "Releasing inherited reference " + std::to_string(i + 1) + "/" + std::to_string(inherited_reference_count) + " for object " + std::to_string(object_id.get_val());
                 LOG_STR(inherit_msg.c_str(), inherit_msg.size());
-                       
-                version = original_version;
-                while (version)
+
+                auto ret = release(version_.load(), destination_zone_id_, object_id, caller_zone_id);
+                if (ret == std::numeric_limits<uint64_t>::max())
                 {
-                    auto ret = release(version, destination_zone_id_, object_id, caller_zone_id);
-                    if (ret != std::numeric_limits<uint64_t>::max())
-                    {
-                        inner_release_external_ref();
-                        if (original_version != version)
-                        {
-                            version_.compare_exchange_strong(original_version, version);
-                        }
-                        break;
-                    }
-                    version--;
+                    LOG_CSTR("on_object_proxy_released release failed");
+                    RPC_ASSERT(false);
+                    return;
                 }
+                inner_release_external_ref();
             }
         }
 
@@ -608,19 +612,6 @@ namespace rpc
         }
 
         virtual rpc::shared_ptr<service_proxy> clone() = 0;
-        virtual void clone_completed()
-        {
-#ifdef USE_RPC_TELEMETRY
-            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
-            {
-                telemetry_service->on_cloned_service_proxy_creation(service_.lock()->get_name().c_str(),
-                    name_.c_str(),
-                    get_zone_id(),
-                    get_destination_zone_id(),
-                    get_caller_zone_id());
-            }
-#endif
-        }
         rpc::shared_ptr<service_proxy> clone_for_zone(destination_zone destination_zone_id, caller_zone caller_zone_id)
         {
             RPC_ASSERT(!(caller_zone_id_ == caller_zone_id && destination_zone_id_ == destination_zone_id));
@@ -634,7 +625,16 @@ namespace rpc
                     ret->destination_channel_zone_ = destination_zone_id_.as_destination_channel();
             }
 
-            ret->clone_completed();
+#ifdef USE_RPC_TELEMETRY
+            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            {
+                telemetry_service->on_cloned_service_proxy_creation(ret->service_.lock()->get_name().c_str(),
+                    ret->name_.c_str(),
+                    ret->get_zone_id(),
+                    ret->get_destination_zone_id(),
+                    ret->get_caller_zone_id());
+            }
+#endif
             return ret;
         }
 
@@ -659,6 +659,9 @@ namespace rpc
         rpc::shared_ptr<object_proxy> get_or_create_object_proxy(
             object object_id, object_proxy_creation_rule rule, bool new_proxy_added)
         {
+            auto debug_msg = "get_or_create_object_proxy service zone: " + std::to_string(zone_id_.id) + " destination_zone=" + std::to_string(destination_zone_id_.get_val()) + ", caller_zone=" + std::to_string(caller_zone_id_.get_val()) + ", object_id = " + std::to_string(object_id.id);
+            LOG_CSTR(debug_msg.c_str());
+
             rpc::shared_ptr<object_proxy> op;
             bool is_new = false;
             rpc::shared_ptr<service_proxy> self_ref;  // Hold reference to prevent destruction

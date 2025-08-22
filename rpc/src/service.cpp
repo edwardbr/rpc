@@ -217,6 +217,7 @@ namespace rpc
                     success = false;
                 }
             }
+            success = false;
         }
         return success;
     }
@@ -254,7 +255,7 @@ namespace rpc
                 LOG_CSTR("ERROR: Zone not found in send operation");
                 return rpc::error::ZONE_NOT_FOUND();
             }
-            return other_zone->send(protocol_version,
+            auto result = other_zone->send(protocol_version,
                 encoding,
                 tag,
                 zone_id_.as_caller_channel(),
@@ -266,6 +267,7 @@ namespace rpc
                 in_size_,
                 in_buf_,
                 out_buf_);
+            return result;
         }
         else
         {
@@ -354,13 +356,13 @@ namespace rpc
             if (found != other_zones.end())
             {
                 destination_zone = found->second.lock();
+                destination_zone->add_external_ref();
             }
             else
             {
                 destination_zone = object_service_proxy->clone_for_zone(destination_zone_id, caller_zone_id);
-                other_zones[{destination_zone_id, caller_zone_id}] = destination_zone;
+                inner_add_zone_proxy(destination_zone);
             }
-            destination_zone->add_external_ref();
         }
 
 #ifdef USE_RPC_TELEMETRY
@@ -483,6 +485,8 @@ namespace rpc
                         caller = alternative_caller_service_proxy->clone_for_zone(
                             {caller_channel_zone_id.get_val()}, zone_id_.as_caller());
                         other_zones[{{caller_channel_zone_id.get_val()}, zone_id_.as_caller()}] = caller;
+                        auto debug_msg = "prepare_out_param service zone: " + std::to_string(zone_id_.id) + " destination_zone=" + std::to_string(caller->destination_zone_id_.get_val()) + ", caller_zone=" + std::to_string(caller->caller_zone_id_.get_val());
+                        LOG_CSTR(debug_msg.c_str());
                     }
                     else
                     {
@@ -709,7 +713,11 @@ namespace rpc
                 telemetry_service->on_service_try_cast(zone_id_, destination_zone_id, {0}, object_id, interface_id);
             }
 #endif
-            return other_zone->try_cast(protocol_version, destination_zone_id, object_id, interface_id);
+            other_zone->add_external_ref();
+            auto result = other_zone->try_cast(protocol_version, destination_zone_id, object_id, interface_id);
+            // Balance external ref taken when building route; then drop unused proxies
+            other_zone->release_external_ref();
+            return result;
         }
         else
         {
@@ -993,7 +1001,7 @@ namespace rpc
                             auto tmp = found->second.lock();
                             RPC_ASSERT(tmp != nullptr);
                             other_zone = tmp->clone_for_zone(destination_zone_id, caller_zone_id);
-                            inner_add_zone_proxy(other_zone);
+                            other_zones[{destination_zone_id, caller_zone_id}] = other_zone;
                         }
                     }
 
@@ -1145,7 +1153,32 @@ namespace rpc
             auto ret = other_zone->sp_release(object_id);
             if (ret != std::numeric_limits<uint64_t>::max())
             {
-                other_zone->release_external_ref();
+                bool should_cleanup = !other_zone->release_external_ref();                
+                if (should_cleanup)
+                {
+                    auto debug_msg = "service::release cleaning up unused routing service_proxy destination_zone=" + std::to_string(destination_zone_id.get_val()) + ", caller_zone=" + std::to_string(caller_zone_id.get_val());
+                    LOG_STR(debug_msg.c_str(), debug_msg.size());
+                    
+                    std::lock_guard g(zone_control);
+
+                    RPC_ASSERT(other_zone->proxies_.empty());
+
+                    other_zone->is_responsible_for_cleaning_up_service_ = false;
+                    auto found_again = other_zones.find({destination_zone_id, caller_zone_id});
+                    if (found_again != other_zones.end())
+                    {
+                        auto sp_check = found_again->second.lock();
+                        RPC_ASSERT(other_zone == sp_check);
+                        if (!sp_check || sp_check->is_unused())
+                        {
+                            other_zones.erase(found_again);
+                        }
+                    }
+                    else
+                    {
+                        RPC_ASSERT("dying proxy not found");
+                    }
+                }
             }
             return ret;
         }
@@ -1234,6 +1267,8 @@ namespace rpc
         RPC_ASSERT(destination_zone_id != zone_id_.as_destination());
         RPC_ASSERT(other_zones.find({destination_zone_id, caller_zone_id}) == other_zones.end());
         other_zones[{destination_zone_id, caller_zone_id}] = service_proxy;
+        auto debug_msg = "inner_add_zone_proxy service zone: " + std::to_string(zone_id_.id) + " destination_zone=" + std::to_string(service_proxy->destination_zone_id_.get_val()) + ", caller_zone=" + std::to_string(service_proxy->caller_zone_id_.get_val());
+        LOG_CSTR(debug_msg.c_str());
     }
 
     void service::add_zone_proxy(const rpc::shared_ptr<service_proxy>& service_proxy)

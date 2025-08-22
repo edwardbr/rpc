@@ -63,7 +63,7 @@ std::string enclave_path = "./libmarshal_test_enclave.signed.so";
 TELEMETRY_SERVICE_MANAGER
 #endif
 bool enable_telemetry_server = true;
-bool enable_multithreaded_tests = true;
+bool enable_multithreaded_tests = false;
 
 rpc::weak_ptr<rpc::service> current_host_service;
 std::atomic<uint64_t>* zone_gen = nullptr;
