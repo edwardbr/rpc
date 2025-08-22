@@ -185,6 +185,85 @@ namespace rpc
         register_zone_name(zone_id.id, name, false);
         init_logger();
         logger_->info("{}{} service_creation{}", get_zone_color(zone_id.id), get_zone_name(zone_id.id), reset_color());
+        
+        // Print topology diagram after each service creation
+        print_topology_diagram();
+    }
+    
+    void console_telemetry_service::on_child_zone_creation(const char* name, rpc::zone child_zone_id, rpc::destination_zone parent_zone_id) const
+    {
+        register_zone_name(child_zone_id.id, name, false);
+        init_logger();
+        logger_->info("{}{} child_zone_creation: parent={}{}", 
+            get_zone_color(child_zone_id.id), get_zone_name(child_zone_id.id), 
+            get_zone_name(parent_zone_id.get_val()), reset_color());
+        
+        // Track the parent-child relationship
+        zone_children_[parent_zone_id.get_val()].insert(child_zone_id.id);
+        zone_parents_[child_zone_id.id] = parent_zone_id.get_val();
+        
+        // Print topology diagram after child zone creation
+        print_topology_diagram();
+    }
+    
+    void console_telemetry_service::print_topology_diagram() const
+    {
+        init_logger();
+        logger_->info("{}=== TOPOLOGY DIAGRAM ==={}", get_level_color(level_enum::info), reset_color());
+        
+        if (zone_names_.empty()) {
+            logger_->info("{}No zones registered yet{}", get_level_color(level_enum::info), reset_color());
+            return;
+        }
+        
+        // Find root zones (zones with no parent)
+        std::set<uint64_t> root_zones;
+        for (const auto& zone_pair : zone_names_) {
+            uint64_t zone_id = zone_pair.first;
+            if (zone_parents_.find(zone_id) == zone_parents_.end() || zone_parents_.at(zone_id) == 0) {
+                root_zones.insert(zone_id);
+            }
+        }
+        
+        if (root_zones.empty()) {
+            // No parent-child relationships tracked yet, show flat list
+            logger_->info("{}Active Zones (no hierarchy tracked yet):{}", get_level_color(level_enum::info), reset_color());
+            for (const auto& zone_pair : zone_names_) {
+                uint64_t zone_id = zone_pair.first;
+                const std::string& zone_name = zone_pair.second;
+                logger_->info("{}  Zone {}: {}{}", 
+                    get_zone_color(zone_id), zone_id, zone_name, reset_color());
+            }
+        } else {
+            // Show hierarchical structure
+            logger_->info("{}Zone Hierarchy:{}", get_level_color(level_enum::info), reset_color());
+            for (uint64_t root_zone : root_zones) {
+                print_zone_tree(root_zone, 0);
+            }
+        }
+        
+        logger_->info("{}========================={}", get_level_color(level_enum::info), reset_color());
+    }
+    
+    void console_telemetry_service::print_zone_tree(uint64_t zone_id, int depth) const
+    {
+        std::string indent(depth * 2, ' ');
+        std::string branch = (depth > 0) ? "├─ " : "";
+        
+        auto zone_name_it = zone_names_.find(zone_id);
+        std::string zone_name = (zone_name_it != zone_names_.end()) ? zone_name_it->second : "unknown";
+        
+        logger_->info("{}{}{}{}Zone {}: {} {}", 
+            get_level_color(level_enum::info), indent, branch, reset_color(),
+            get_zone_color(zone_id), zone_id, zone_name, reset_color());
+        
+        // Print children
+        auto children_it = zone_children_.find(zone_id);
+        if (children_it != zone_children_.end()) {
+            for (uint64_t child_zone : children_it->second) {
+                print_zone_tree(child_zone, depth + 1);
+            }
+        }
     }
 
     void console_telemetry_service::on_service_deletion(rpc::zone zone_id) const

@@ -17,6 +17,18 @@ namespace rpc
 
     object_proxy::~object_proxy()
     {
+        // Add detailed logging to track object_proxy destruction
+        if (service_proxy_) {
+            auto destructor_msg = "object_proxy destructor: service zone=" + std::to_string(service_proxy_->get_zone_id().get_val()) + 
+                                 " destination_zone=" + std::to_string(service_proxy_->get_destination_zone_id().get_val()) +
+                                 " caller_zone=" + std::to_string(service_proxy_->get_caller_zone_id().get_val()) +
+                                 " object_id=" + std::to_string(object_id_.get_val());
+            LOG_STR(destructor_msg.c_str(), destructor_msg.size());
+        } else {
+            auto msg = "object_proxy destructor: service_proxy_ is nullptr for object_id=" + std::to_string(object_id_.get_val());
+            LOG_STR(msg.c_str(), msg.size());
+        }
+
 #ifdef USE_RPC_TELEMETRY
         if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
         {
@@ -33,7 +45,12 @@ namespace rpc
         }
 
         // Handle both normal destruction and inherited references in on_object_proxy_released
-        service_proxy_->on_object_proxy_released(object_id_, inherited_count);
+        if (service_proxy_) {
+            service_proxy_->on_object_proxy_released(object_id_, inherited_count);
+        } else {
+            auto error_msg = "ERROR: Cannot call on_object_proxy_released - service_proxy_ is nullptr for object_id=" + std::to_string(object_id_.get_val());
+            LOG_STR(error_msg.c_str(), error_msg.size());
+        }
         service_proxy_ = nullptr;
     }
 

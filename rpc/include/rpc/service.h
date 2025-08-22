@@ -338,6 +338,13 @@ namespace rpc
         {
             auto child_svc = rpc::shared_ptr<rpc::child_service>(new rpc::child_service(name, zone_id, parent_zone_id));
 
+#ifdef USE_RPC_TELEMETRY
+            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            {
+                telemetry_service->on_child_zone_creation(name, zone_id, parent_zone_id);
+            }
+#endif
+
             // link the child to the parent
             auto parent_service_proxy = SERVICE_PROXY::create("parent", parent_zone_id, child_svc, args...);
             if (!parent_service_proxy)

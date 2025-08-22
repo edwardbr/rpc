@@ -36,6 +36,7 @@ namespace rpc
         virtual ~i_telemetry_service() = default;
 
         virtual void on_service_creation(const char* name, zone zone_id) const = 0;
+        virtual void on_child_zone_creation(const char* name, zone child_zone_id, destination_zone parent_zone_id) const = 0;
         virtual void on_service_deletion(zone zone_id) const = 0;
         virtual void on_service_try_cast(zone zone_id,
             destination_zone destination_zone_id,

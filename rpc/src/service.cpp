@@ -1161,7 +1161,24 @@ namespace rpc
                     
                     std::lock_guard g(zone_control);
 
-                    RPC_ASSERT(other_zone->proxies_.empty());
+                    // Routing service_proxies should NEVER have object_proxies - this is a bug
+                    if (!other_zone->proxies_.empty()) {
+                        auto bug_msg = "BUG: Routing service_proxy (destination_zone=" + std::to_string(destination_zone_id.get_val()) + 
+                                     " != zone=" + std::to_string(zone_id_.get_val()) + ") has " + std::to_string(other_zone->proxies_.size()) + 
+                                     " object_proxies - routing proxies should never host objects";
+                        LOG_STR(bug_msg.c_str(), bug_msg.size());
+                        
+                        // Log details of the problematic object_proxies for debugging
+                        for (const auto& proxy_pair : other_zone->proxies_) {
+                            auto object_proxy_ptr = proxy_pair.second.lock();
+                            auto detail_msg = "  BUG: object_proxy object_id=" + std::to_string(proxy_pair.first.get_val()) + 
+                                            " in routing service_proxy, alive=" + (object_proxy_ptr ? "yes" : "no");
+                            LOG_STR(detail_msg.c_str(), detail_msg.size());
+                        }
+                        
+                        // This should not happen - routing service_proxies should not have object_proxies
+                        RPC_ASSERT(other_zone->proxies_.empty() && "Routing service_proxy should not have object_proxies");
+                    }
 
                     other_zone->is_responsible_for_cleaning_up_service_ = false;
                     auto found_again = other_zones.find({destination_zone_id, caller_zone_id});

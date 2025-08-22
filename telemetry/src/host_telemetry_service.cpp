@@ -221,6 +221,13 @@ namespace rpc
         }
         fflush(output_);
     }
+    
+    void host_telemetry_service::on_child_zone_creation(const char* name, rpc::zone child_zone_id, rpc::destination_zone parent_zone_id) const
+    {
+        // Just call regular service creation - this telemetry service doesn't need special child zone handling
+        // The parent-child relationship is tracked by console_telemetry_service for topology diagrams
+        on_service_creation(name, child_zone_id);
+    }
 
     void host_telemetry_service::on_service_deletion(rpc::zone zone_id) const
     {
