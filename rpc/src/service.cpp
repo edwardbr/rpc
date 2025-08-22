@@ -822,6 +822,7 @@ namespace rpc
                 rpc::shared_ptr<rpc::service_proxy> destination;
                 rpc::shared_ptr<rpc::service_proxy> caller;
                 {
+                    bool has_called_inner_add_zone_proxy = false;
                     {
                         std::lock_guard g(zone_control);
 
@@ -847,6 +848,7 @@ namespace rpc
                                 destination = get_parent()->clone_for_zone(destination_zone_id, caller_zone_id);
                             }
                             inner_add_zone_proxy(destination);
+                            has_called_inner_add_zone_proxy = true;
                         }
 
                         if (caller_zone_id == zone_id_.as_caller())
@@ -887,7 +889,7 @@ namespace rpc
                     }
                     
                     // Call add_external_ref() outside mutex to prevent TOCTOU race  
-                    if (destination)
+                    if (destination && !has_called_inner_add_zone_proxy)
                     {
                         destination->add_external_ref();
                     }
