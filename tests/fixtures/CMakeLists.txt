@@ -9,6 +9,7 @@ add_library(test_fixtures STATIC
     src/test_service_logger.cpp
     src/test_globals.cpp
     src/rpc_log.cpp
+    src/rpc_global_logger.cpp
 )
 
 # Add compile definitions

@@ -251,6 +251,7 @@ namespace rpc
             if (!other_zone)
             {
                 RPC_ASSERT(false);
+                LOG_CSTR("ERROR: Zone not found in send operation");
                 return rpc::error::ZONE_NOT_FOUND();
             }
             return other_zone->send(protocol_version,
@@ -274,12 +275,14 @@ namespace rpc
             else
 #endif
             {
+                LOG_CSTR("ERROR: Incompatible service version in send");
                 return rpc::error::INCOMPATIBLE_SERVICE();
             }
             rpc::weak_ptr<object_stub> weak_stub = get_object(object_id);
             auto stub = weak_stub.lock();
             if (stub == nullptr)
             {
+                LOG_CSTR("ERROR: Invalid data - stub is null in send");
                 return rpc::error::INVALID_DATA();
             }
             std::for_each(service_loggers.begin(),
@@ -436,6 +439,9 @@ namespace rpc
         {
             rpc::shared_ptr<service_proxy> destination_zone = object_service_proxy;
             rpc::shared_ptr<service_proxy> caller;
+            bool need_add_ref = false;
+            std::map<zone_route, rpc::weak_ptr<service_proxy>>::iterator caller_found_iter;
+            bool need_caller_from_found = false;
             {
                 std::lock_guard g(zone_control);
                 {
@@ -444,7 +450,7 @@ namespace rpc
                     if (found != other_zones.end())
                     {
                         destination_zone = found->second.lock();
-                        destination_zone->add_external_ref();
+                        need_add_ref = (destination_zone != nullptr);  // Mark that we need add_ref outside lock
                     }
                     else
                     {
@@ -480,10 +486,36 @@ namespace rpc
                     }
                     else
                     {
-                        caller = found->second.lock();
+                        // Don't lock here - do it outside mutex to prevent TOCTOU race
+                        caller_found_iter = found;
+                        need_caller_from_found = true;
                     }
                 }
-                RPC_ASSERT(caller);
+            }
+            
+            // Lock caller outside mutex to prevent TOCTOU race
+            if (need_caller_from_found)
+            {
+                caller = caller_found_iter->second.lock();
+                if (!caller)
+                {
+                    // caller service_proxy was destroyed - this is a race condition
+                    LOG_CSTR("ERROR: caller service_proxy was destroyed during lookup");
+                    return {};  // Return empty interface descriptor to indicate failure
+                }
+            }
+            
+            // Verify we have a valid caller
+            if (!caller)
+            {
+                LOG_CSTR("ERROR: Failed to obtain valid caller service_proxy");
+                return {};
+            }
+            
+            // Call add_external_ref() outside the mutex to prevent race with service_proxy destruction
+            if (need_add_ref && destination_zone)
+            {
+                destination_zone->add_external_ref();
             }
 
 #ifdef USE_RPC_TELEMETRY
@@ -496,13 +528,21 @@ namespace rpc
 
             // the fork is here so we need to add ref the destination normally with caller info
             // note the caller_channel_zone_id is is this zones id as the caller came from a route via this node
-            destination_zone->add_ref(protocol_version,
-                {0},
-                destination_zone_id,
-                object_id,
-                zone_id_.as_caller_channel(),
-                caller_zone_id,
-                rpc::add_ref_options::build_destination_route);
+            if (destination_zone)
+            {
+                destination_zone->add_ref(protocol_version,
+                    {0},
+                    destination_zone_id,
+                    object_id,
+                    zone_id_.as_caller_channel(),
+                    caller_zone_id,
+                    rpc::add_ref_options::build_destination_route);
+            }
+            else
+            {
+                LOG_CSTR("ERROR: destination_zone service_proxy was destroyed during operation");
+                return {};
+            }
 
 #ifdef USE_RPC_TELEMETRY
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
@@ -565,6 +605,8 @@ namespace rpc
                 if (item != wrapped_object_to_stub.end())
                 {
                     stub = item->second.lock();
+                    // Don't mask the race condition - if stub is null here, we have a serious problem
+                    RPC_ASSERT(stub != nullptr);
                     stub->add_ref();
                 }
                 else
@@ -658,6 +700,7 @@ namespace rpc
             if (!other_zone)
             {
                 RPC_ASSERT(false);
+                LOG_CSTR("ERROR: Zone not found in try_cast operation");
                 return rpc::error::ZONE_NOT_FOUND();
             }
 #ifdef USE_RPC_TELEMETRY
@@ -676,12 +719,16 @@ namespace rpc
             else
 #endif
             {
+                LOG_CSTR("ERROR: Incompatible service version in try_cast");
                 return rpc::error::INCOMPATIBLE_SERVICE();
             }
             rpc::weak_ptr<object_stub> weak_stub = get_object(object_id);
             auto stub = weak_stub.lock();
             if (!stub)
+            {
+                LOG_CSTR("ERROR: Invalid data - stub is null in try_cast");
                 return error::INVALID_DATA();
+            }
             return stub->try_cast(interface_id);
         }
     }
@@ -774,7 +821,7 @@ namespace rpc
                         if (found != other_zones.end())
                         {
                             destination = found->second.lock();
-                            destination->add_external_ref();
+                            // Move add_external_ref() outside the lock to prevent TOCTOU race
                         }
                         else
                         {
@@ -782,6 +829,7 @@ namespace rpc
                             if (found != other_zones.end() && found->first.dest.get_val() == dest_channel)
                             {
                                 auto tmp = found->second.lock();
+                                RPC_ASSERT(tmp != nullptr);
                                 destination = tmp->clone_for_zone(destination_zone_id, caller_zone_id);
                             }
                             else
@@ -828,6 +876,12 @@ namespace rpc
 
                             RPC_ASSERT(caller);
                         }
+                    }
+                    
+                    // Call add_external_ref() outside mutex to prevent TOCTOU race  
+                    if (destination)
+                    {
+                        destination->add_external_ref();
                     }
 
                     do
@@ -928,7 +982,7 @@ namespace rpc
                     if (found != other_zones.end())
                     {
                         other_zone = found->second.lock();
-                        other_zone->add_external_ref();
+                        // Move add_external_ref() outside lock to prevent TOCTOU race
                     }
 
                     if (!other_zone)
@@ -937,6 +991,7 @@ namespace rpc
                         if (found != other_zones.end() && found->first.dest == destination_zone_id)
                         {
                             auto tmp = found->second.lock();
+                            RPC_ASSERT(tmp != nullptr);
                             other_zone = tmp->clone_for_zone(destination_zone_id, caller_zone_id);
                             inner_add_zone_proxy(other_zone);
                         }
@@ -951,6 +1006,13 @@ namespace rpc
                         inner_add_zone_proxy(other_zone);
                     }
                 }
+                
+                // Call add_external_ref() outside mutex to prevent TOCTOU race
+                if (other_zone)
+                {
+                    other_zone->add_external_ref();
+                }
+                
 #ifdef USE_RPC_TELEMETRY
                 if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
                 {
@@ -1300,12 +1362,14 @@ namespace rpc
         auto it = stub_factories.find(interface_id);
         if (it == stub_factories.end())
         {
+            LOG_CSTR("stub factory does not have a record of this interface this not an error in the rpc stack");
             return rpc::error::INVALID_CAST();
         }
 
         new_stub = (*it->second)(original);
         if (!new_stub)
         {
+            LOG_CSTR("Object does not support the interface this not an error in the rpc stack");
             return rpc::error::INVALID_CAST();
         }
         // note a nullptr return value is a valid value, it indicates that this object does not implement that interface
@@ -1321,6 +1385,7 @@ namespace rpc
         auto it = stub_factories.find({interface_id});
         if (it != stub_factories.end())
         {
+            LOG_CSTR("ERROR: Invalid data - add_interface_stub_factory failed");
             rpc::error::INVALID_DATA();
         }
         stub_factories[{interface_id}] = factory;

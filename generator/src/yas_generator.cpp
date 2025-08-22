@@ -541,7 +541,10 @@ namespace yas_generator
         {
             proxy("// no hope of reading anything from an empty buffer");
             proxy("if (__rpc_buf_size == 0)");
+            proxy("{{");
+            proxy("    LOG_CSTR(\"ERROR: Proxy deserialisation error - empty buffer\");");
             proxy("    return rpc::error::PROXY_DESERIALISATION_ERROR();");
+            proxy("}}");
             proxy("try");
             proxy("{{");
             proxy("auto __yas_mapping = YAS_OBJECT_NVP(");
@@ -579,6 +582,7 @@ namespace yas_generator
                   "rpc_buf_size), __yas_mapping);");
             proxy("break;");
             proxy("default:");
+            proxy("LOG_CSTR(\"ERROR: Proxy deserialisation error - unknown encoding\");");
             proxy("return rpc::error::PROXY_DESERIALISATION_ERROR();");
             proxy("}}");
             proxy("}}");

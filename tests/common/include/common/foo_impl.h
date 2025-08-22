@@ -270,6 +270,7 @@ namespace marshalled_tests
             auto val1 = rpc::dynamic_pointer_cast<xxx::i_baz>(val);
             // #sgx dynamic cast in an enclave this fails
             auto val2 = rpc::dynamic_pointer_cast<xxx::i_bar>(val);
+            // RPC_ASSERT(val2 == nullptr);
 
             std::vector<uint8_t> in_val{1, 2, 3, 4};
             std::vector<uint8_t> out_val;

@@ -207,3 +207,4 @@ Set `DEBUG_RPC_GEN=ON` in CMake to enable generator debugging output.
 - Enhanced MCP features (output schemas, SSE support)
 
 This codebase represents a mature RPC system with recent enhancements for MCP integration and improved IDL attribute handling. The build system is well-integrated and the code generation pipeline is robust and extensible.
+- when running tests with:

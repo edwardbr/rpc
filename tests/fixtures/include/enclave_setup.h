@@ -77,6 +77,8 @@ public:
         i_example_ptr_ = nullptr;
         i_host_ptr_ = nullptr;
         root_service_ = nullptr;
+        current_host_service.reset();
+        test_service_logger::reset_logger();
         zone_gen = nullptr;
 #ifdef USE_RPC_TELEMETRY
         RESET_TELEMETRY_SERVICE

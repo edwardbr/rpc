@@ -8,6 +8,10 @@
 #include <memory>
 #include <unordered_map>
 #include <mutex>
+#include <thread>
+#include <execinfo.h>
+#include <sstream>
+#include <atomic>
 
 #include <rpc/logger.h>
 #include <rpc/version.h>
@@ -91,6 +95,7 @@ namespace rpc
         rpc::shared_ptr<service_proxy> service_proxy_;
         std::unordered_map<interface_ordinal, rpc::weak_ptr<proxy_base>> proxy_map;
         std::mutex insert_control_;
+        std::atomic<int> inherited_reference_count_{0};  // Track inherited references from race conditions
 
         object_proxy(object object_id, rpc::shared_ptr<service_proxy> service_proxy);
 
@@ -103,6 +108,9 @@ namespace rpc
 
     public:
         virtual ~object_proxy();
+
+        // Called when this object_proxy inherits a reference from a racing destroyed proxy
+        void inherit_extra_reference() { inherited_reference_count_++; }
 
         rpc::shared_ptr<service_proxy> get_service_proxy() const { return service_proxy_; }
         object get_object_id() const { return {object_id_}; }
@@ -289,12 +297,11 @@ namespace rpc
 #ifdef USE_RPC_TELEMETRY
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             {
-                telemetry_service->on_service_proxy_deletion(
-                    get_zone_id(), destination_zone_id_, caller_zone_id_);
+                telemetry_service->on_service_proxy_deletion(get_zone_id(), destination_zone_id_, caller_zone_id_);
             }
 #endif
         }
-        
+
         std::string get_name() const { return name_; }
 
         uint64_t get_remote_rpc_version() const { return version_.load(); }
@@ -312,6 +319,7 @@ namespace rpc
         {
             std::ignore = input_descr;
             std::ignore = output_descr;
+            LOG_CSTR("ERROR: Zone not supported");
             return rpc::error::ZONE_NOT_SUPPORTED();
         }
 
@@ -436,6 +444,7 @@ namespace rpc
                 }
                 version--;
             }
+            LOG_CSTR("ERROR: Incompatible service version in connect");
             return rpc::error::INCOMPATIBLE_SERVICE();
         }
 
@@ -475,6 +484,7 @@ namespace rpc
                 }
                 version--;
             }
+            LOG_CSTR("ERROR: Incompatible service version in sp_add_ref");
             return rpc::error::INCOMPATIBLE_SERVICE();
         }
 
@@ -503,26 +513,40 @@ namespace rpc
                 }
                 version--;
             }
+            LOG_CSTR("ERROR: Incompatible service version in sp_release");
             return rpc::error::INCOMPATIBLE_SERVICE();
         }
 
-        void on_object_proxy_released(object object_id)
+        void on_object_proxy_released(object object_id, int inherited_reference_count)
         {
             // this keeps the underlying service alive while the service proxy is released
             auto current_service = get_operating_zone_service();
-            
+
             auto caller_zone_id = get_zone_id().as_caller();
             RPC_ASSERT(caller_zone_id == get_caller_zone_id());
 
+            // Handle proxy map cleanup - use only insert_control_ to avoid deadlocks
             {
-                std::lock_guard l(insert_control_);
+                std::lock_guard proxy_lock(insert_control_);
                 auto item = proxies_.find(object_id);
-                RPC_ASSERT(item != proxies_.end());
-                if (item->second.lock() == nullptr)
+                if (item != proxies_.end())
                 {
-                    // the reason for this if statement is between an object weak pointer dying and this attempted entry
-                    // being removed another object pointer object may have sneaked in and set to a non null value
-                    proxies_.erase(item);
+                    auto existing_proxy = item->second.lock();
+                    if (existing_proxy == nullptr)
+                    {
+                        // Stale entry, safe to remove
+                        proxies_.erase(item);
+                    }
+                    else
+                    {
+                        // Another proxy exists with same object_id - transfer responsibility
+                        LOG_CSTR("RACE CONDITION DETECTED - TRANSFERRING REFERENCE!");
+                        auto log_msg = "Object ID: " + std::to_string(object_id.get_val()) + ", transferring to proxy: " + std::to_string(reinterpret_cast<uintptr_t>(existing_proxy.get()));
+                        LOG_STR(log_msg.c_str(), log_msg.size());
+                        existing_proxy->inherit_extra_reference();
+                        LOG_CSTR("Reference transferred - skipping remote release calls");
+                        return;
+                    }
                 }
             }
 
@@ -534,6 +558,7 @@ namespace rpc
             }
 #endif
 
+            // Handle normal reference release
             auto original_version = version_.load();
             auto version = original_version;
             while (version)
@@ -546,16 +571,32 @@ namespace rpc
                     {
                         version_.compare_exchange_strong(original_version, version);
                     }
-                    return;
+                    break;
                 }
                 version--;
             }
-            {
-                std::string message("unable to release on service");
-                LOG_STR(message.c_str(), message.size());
-                RPC_ASSERT(false);
+            
+            // Handle inherited references from race conditions
+            for (int i = 0; i < inherited_reference_count; i++) {
+                auto inherit_msg = "Releasing inherited reference " + std::to_string(i + 1) + "/" + std::to_string(inherited_reference_count) + " for object " + std::to_string(object_id.get_val());
+                LOG_STR(inherit_msg.c_str(), inherit_msg.size());
+                       
+                version = original_version;
+                while (version)
+                {
+                    auto ret = release(version, destination_zone_id_, object_id, caller_zone_id);
+                    if (ret != std::numeric_limits<uint64_t>::max())
+                    {
+                        inner_release_external_ref();
+                        if (original_version != version)
+                        {
+                            version_.compare_exchange_strong(original_version, version);
+                        }
+                        break;
+                    }
+                    version--;
+                }
             }
-            return;
         }
 
         std::unordered_map<object, rpc::weak_ptr<object_proxy>> get_proxies() { return proxies_; }
@@ -572,8 +613,7 @@ namespace rpc
 #ifdef USE_RPC_TELEMETRY
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             {
-                telemetry_service->on_cloned_service_proxy_creation(
-                    service_.lock()->get_name().c_str(),
+                telemetry_service->on_cloned_service_proxy_creation(service_.lock()->get_name().c_str(),
                     name_.c_str(),
                     get_zone_id(),
                     get_destination_zone_id(),
@@ -609,28 +649,84 @@ namespace rpc
         // the service that this proxy lives in
         rpc::shared_ptr<service> get_operating_zone_service() const { return service_.lock(); }
 
-        rpc::shared_ptr<object_proxy> get_object_proxy(object object_id, bool& is_new)
+        enum class object_proxy_creation_rule
         {
-            RPC_ASSERT(get_caller_zone_id() == get_zone_id().as_caller());
-            std::lock_guard l(insert_control_);
-            auto item = proxies_.find(object_id);
+            DO_NOTHING,
+            ADD_REF_IF_NEW,
+            RELEASE_IF_NOT_NEW,
+        };
+
+        rpc::shared_ptr<object_proxy> get_or_create_object_proxy(
+            object object_id, object_proxy_creation_rule rule, bool new_proxy_added)
+        {
             rpc::shared_ptr<object_proxy> op;
-            if (item != proxies_.end())
-                op = item->second.lock();
-            if (op == nullptr)
+            bool is_new = false;
+            rpc::shared_ptr<service_proxy> self_ref;  // Hold reference to prevent destruction
+            
             {
-                op = rpc::shared_ptr<object_proxy>(new object_proxy(object_id, shared_from_this()));
-#ifdef USE_RPC_TELEMETRY
-                if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+                RPC_ASSERT(get_caller_zone_id() == get_zone_id().as_caller());
+                std::lock_guard l(insert_control_);
+                
+                // Capture strong reference to self while in critical section
+                self_ref = shared_from_this();
+                
+                auto item = proxies_.find(object_id);
+                if (item != proxies_.end())
                 {
-                    telemetry_service->on_object_proxy_creation(get_zone_id(), get_destination_zone_id(), object_id, true);
+                    op = item->second.lock();
                 }
+                
+                if (!op)
+                {
+                    // Either no entry exists, or the weak_ptr is expired - create new object_proxy
+                    op = rpc::shared_ptr<object_proxy>(new object_proxy(object_id, self_ref));
+#ifdef USE_RPC_TELEMETRY
+                    if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+                    {
+                        telemetry_service->on_object_proxy_creation(
+                            get_zone_id(), get_destination_zone_id(), object_id, true);
+                    }
 #endif
-                proxies_[object_id] = op;
-                is_new = true;
-                return op;
+                    proxies_[object_id] = op;
+                    is_new = true;
+                }
             }
-            is_new = false;
+            
+            // Perform remote operations OUTSIDE the mutex lock
+            // self_ref keeps this service_proxy alive during these operations
+            if (is_new && rule == object_proxy_creation_rule::ADD_REF_IF_NEW)
+            {
+                auto ret = sp_add_ref(object_id, {0}, rpc::add_ref_options::normal);
+                if (ret == std::numeric_limits<uint64_t>::max())
+                {
+                    LOG_CSTR("sp_add_ref failed");
+                    RPC_ASSERT(false);
+                    return nullptr;
+                }
+                if (!new_proxy_added)
+                {
+                    // This is now safe because self_ref keeps us alive
+                    add_external_ref();
+                }
+            }
+            if (!is_new && rule == object_proxy_creation_rule::RELEASE_IF_NOT_NEW)
+            {
+                // as this is an out parameter the callee will be doing an add ref if the object proxy is already
+                // found we can do a release
+                RPC_ASSERT(!new_proxy_added);
+                auto ret = sp_release(object_id);
+                if (ret != std::numeric_limits<uint64_t>::max())
+                {
+                    // This is now safe because self_ref keeps us alive
+                    release_external_ref();
+                }
+                else
+                {
+                    LOG_CSTR("sp_release failed");
+                }
+            }
+            
+            // self_ref goes out of scope here, allowing normal destruction if needed                
             return op;
         }
 
@@ -680,7 +776,10 @@ namespace rpc
         {
             iface = serv.get_local_interface<T>(protocol_version, encap.object_id);
             if (!iface)
+            {
+                LOG_CSTR("ERROR: Object not found in local interface lookup");
                 return rpc::error::OBJECT_NOT_FOUND();
+            }
             return rpc::error::OK();
         }
         else
@@ -692,19 +791,18 @@ namespace rpc
             auto service_proxy = serv.get_zone_proxy(
                 caller_channel_zone_id, caller_zone_id, encap.destination_zone_id, zone_id.as_caller(), new_proxy_added);
             if (!service_proxy)
-                return rpc::error::OBJECT_NOT_FOUND();
-
-            bool is_new = false;
-            rpc::shared_ptr<object_proxy> op = service_proxy->get_object_proxy(encap.object_id, is_new);
-            if (is_new)
             {
-                auto ret = service_proxy->sp_add_ref(encap.object_id, {0}, rpc::add_ref_options::normal);
-                if (ret == std::numeric_limits<uint64_t>::max())
-                    return -1;
-                if (!new_proxy_added)
-                {
-                    service_proxy->add_external_ref();
-                }
+                LOG_CSTR("ERROR: Object not found - service proxy is null");
+                return rpc::error::OBJECT_NOT_FOUND();
+            }
+
+            rpc::shared_ptr<object_proxy> op = service_proxy->get_or_create_object_proxy(
+                encap.object_id, service_proxy::object_proxy_creation_rule::ADD_REF_IF_NEW, new_proxy_added);
+            RPC_ASSERT(op != nullptr);
+            if (!op)
+            {
+                LOG_CSTR("ERROR: Object not found - object proxy is null");
+                return rpc::error::OBJECT_NOT_FOUND();
             }
             auto ret = op->query_interface(iface, false);
             return ret;
@@ -753,12 +851,16 @@ namespace rpc
         {
             auto ob = serv->get_object(encap.object_id).lock();
             if (!ob)
+            {
+                LOG_CSTR("ERROR: Object not found - object is null in release");
                 return rpc::error::OBJECT_NOT_FOUND();
+            }
 
             auto count = serv->release_local_stub(ob);
             RPC_ASSERT(count);
             if (!count || count == std::numeric_limits<uint64_t>::max())
             {
+                LOG_CSTR("ERROR: Reference count error in release");
                 return rpc::error::REFERENCE_COUNT_ERROR();
             }
 
@@ -768,6 +870,7 @@ namespace rpc
             {
                 if (!interface_stub)
                 {
+                    LOG_CSTR("ERROR: Invalid interface ID in proxy release");
                     return rpc::error::INVALID_INTERFACE_ID();
                 }
             }
@@ -795,18 +898,14 @@ namespace rpc
         }
 
         bool is_new = false;
-        rpc::shared_ptr<object_proxy> op = service_proxy->get_object_proxy(encap.object_id, is_new);
-        if (!is_new)
+        rpc::shared_ptr<object_proxy> op = service_proxy->get_or_create_object_proxy(
+            encap.object_id, service_proxy::object_proxy_creation_rule::RELEASE_IF_NOT_NEW, false);
+        if (!op)
         {
-            // as this is an out parameter the callee will be doing an add ref if the object proxy is already found we
-            // can do a release
-            RPC_ASSERT(!new_proxy_added);
-            auto ret = service_proxy->sp_release(encap.object_id);
-            if (ret != std::numeric_limits<uint64_t>::max())
-            {
-                service_proxy->release_external_ref();
-            }
+            LOG_CSTR("ERROR: Object not found in proxy_bind_out_param");
+            return rpc::error::OBJECT_NOT_FOUND();
         }
+        RPC_ASSERT(op != nullptr);
         return op->query_interface(val, false);
     }
 
@@ -818,7 +917,10 @@ namespace rpc
         rpc::shared_ptr<T>& val)
     {
         if (protocol_version > rpc::get_version())
+        {
+            LOG_CSTR("ERROR: Incompatible service in demarshall_interface_proxy");
             return rpc::error::INCOMPATIBLE_SERVICE();
+        }
 
         // if we have a null object id then return a null ptr
         if (encap.object_id == 0 || encap.destination_zone_id == 0)
@@ -837,6 +939,7 @@ namespace rpc
         {
             // if we get here then we need to invent a test for this
             RPC_ASSERT(false);
+            LOG_CSTR("ERROR: Invalid data in demarshall_interface_proxy");
             return rpc::error::INVALID_DATA();
             // val = serv->get_local_interface<T>(protocol_version, encap.object_id);
             // if(!val)
@@ -850,6 +953,7 @@ namespace rpc
         {
             // if we get here then we need to invent a test for this
             RPC_ASSERT(false);
+            LOG_CSTR("ERROR: Invalid data in demarshall_interface_proxy");
             return rpc::error::INVALID_DATA();
 
             // //if the zone is different lookup or clone the right proxy
@@ -865,7 +969,14 @@ namespace rpc
             service_proxy->add_external_ref();
 
         bool is_new = false;
-        rpc::shared_ptr<object_proxy> op = service_proxy->get_object_proxy(encap.object_id, is_new);
+        rpc::shared_ptr<object_proxy> op = service_proxy->get_or_create_object_proxy(
+            encap.object_id, service_proxy::object_proxy_creation_rule::DO_NOTHING, false);
+        if (!op)
+        {
+            LOG_CSTR("ERROR: Object not found in demarshall_interface_proxy");
+            return rpc::error::OBJECT_NOT_FOUND();
+        }
+        RPC_ASSERT(op != nullptr);
         return op->query_interface(val, false);
     }
 }

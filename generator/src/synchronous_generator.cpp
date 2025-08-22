@@ -1151,12 +1151,14 @@ namespace synchronous_generator
             }
 
             stub("default:");
+            stub("LOG_CSTR(\"ERROR: Invalid method ID - unknown method in stub\");");
             stub("return rpc::error::INVALID_METHOD_ID();");
             stub("}};");
         }
         proxy("}};");
         proxy("");
 
+        stub("LOG_CSTR(\"ERROR: Invalid method ID - no methods found\");");
         stub("return rpc::error::INVALID_METHOD_ID();");
         stub("}}");
         stub("");

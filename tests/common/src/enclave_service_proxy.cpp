@@ -8,6 +8,7 @@
 
 #ifdef BUILD_ENCLAVE
 #include "common/enclave_service_proxy.h"
+#include <rpc/logger.h>
 #include <sgx_urts.h>
 #include <sgx_capable.h>
 #include <untrusted/enclave_marshal_test_u.h>
@@ -63,6 +64,7 @@ namespace rpc
                 telemetry_service->message(rpc::i_telemetry_service::err, error_message.c_str());
             }
 #endif
+            LOG_CSTR("ERROR: Transport error - sgx_create_enclave failed");
             return rpc::error::TRANSPORT_ERROR();
         }
         int err_code = error::OK();
@@ -81,6 +83,7 @@ namespace rpc
             }
 #endif
             sgx_destroy_enclave(eid_);
+            LOG_CSTR("ERROR: Transport error - marshal_test_init_enclave failed");
             return rpc::error::TRANSPORT_ERROR();
         }
         if (err_code)
@@ -109,7 +112,10 @@ namespace rpc
         std::vector<char>& out_buf_)
     {
         if (destination_zone_id != get_destination_zone_id())
+        {
+            LOG_CSTR("ERROR: Zone not supported");
             return rpc::error::ZONE_NOT_SUPPORTED();
+        }
 
         int err_code = 0;
         size_t data_out_sz = 0;

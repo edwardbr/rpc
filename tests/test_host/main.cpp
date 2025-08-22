@@ -13,9 +13,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-#include <spdlog/spdlog.h>
-#include <spdlog/sinks/basic_file_sink.h>
-#include <spdlog/sinks/stdout_color_sinks.h>
+#include "rpc_global_logger.h"
 #include <rpc/error_codes.h>
 
 // Include extracted setup classes
@@ -65,7 +63,7 @@ std::string enclave_path = "./libmarshal_test_enclave.signed.so";
 TELEMETRY_SERVICE_MANAGER
 #endif
 bool enable_telemetry_server = true;
-bool enable_multithreaded_tests = false;
+bool enable_multithreaded_tests = true;
 
 rpc::weak_ptr<rpc::service> current_host_service;
 std::atomic<uint64_t>* zone_gen = nullptr;
@@ -85,11 +83,12 @@ namespace
                 enable_multithreaded_tests = true;
         }
 
-        auto logger = spdlog::stdout_color_mt("console");
-        logger->set_pattern("[%^%l%$] %v");
-        spdlog::set_default_logger(logger);
+        // Initialize global logger for consistent logging
+        rpc_global_logger::get_logger();
         ::testing::InitGoogleTest(&argc, argv);
-        return RUN_ALL_TESTS();
+        auto ret = RUN_ALL_TESTS();
+        rpc_global_logger::reset_logger();
+        return ret;
     }
 }
 

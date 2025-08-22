@@ -6,18 +6,19 @@
 #pragma once
 
 #include <rpc/basic_service_proxies.h>
-#include <spdlog/spdlog.h>
-#include <spdlog/sinks/basic_file_sink.h>
+#include "rpc_global_logger.h"
 #include <gtest/gtest.h>
 
 class test_service_logger : public rpc::service_logger
 {
-    inline static std::shared_ptr<spdlog::logger> logr
-        = spdlog::basic_logger_mt("basic_logger", "./conversation.txt", true);
-
 public:
     test_service_logger();
     virtual ~test_service_logger();
+    
+    static void reset_logger() 
+    { 
+        rpc_global_logger::reset_logger();
+    }
 
     void before_send(rpc::caller_zone caller_zone_id,
         rpc::object object_id,

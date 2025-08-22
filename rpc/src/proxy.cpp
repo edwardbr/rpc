@@ -4,6 +4,8 @@
  */
 #include "rpc/proxy.h"
 #include "rpc/logger.h"
+#include <cstdio>
+#include <limits>
 
 namespace rpc
 {
@@ -23,7 +25,15 @@ namespace rpc
         }
 #endif
 
-        service_proxy_->on_object_proxy_released(object_id_);
+        // Handle inherited references from race conditions by passing the count to on_object_proxy_released
+        int inherited_count = inherited_reference_count_.load();
+        if (inherited_count > 0) {
+            auto destructor_msg = "object_proxy destructor: " + std::to_string(inherited_count) + " inherited references will be handled by on_object_proxy_released for object " + std::to_string(object_id_.get_val());
+            LOG_STR(destructor_msg.c_str(), destructor_msg.size());
+        }
+
+        // Handle both normal destruction and inherited references in on_object_proxy_released
+        service_proxy_->on_object_proxy_released(object_id_, inherited_count);
         service_proxy_ = nullptr;
     }
 

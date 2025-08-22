@@ -8,7 +8,7 @@
 #include <sgx_error.h>
 extern "C"
 {
-    sgx_status_t __cdecl rpc_log(const char* str, size_t sz);
+    sgx_status_t rpc_log(const char* str, size_t sz);
 }
 #else
 extern "C"

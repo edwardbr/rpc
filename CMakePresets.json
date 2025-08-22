@@ -9,7 +9,7 @@
       "cacheVariables": {
         "CMAKE_VERBOSE_MAKEFILE": "OFF",
         "BUILD_COROUTINE": "ON",
-        "BUILD_ENCLAVE": "ON",
+        "BUILD_ENCLAVE": "OFF",
         "BUILD_HOST": "ON",
         "BUILD_TEST": "ON",
         "c-ares_DIR": "/home/edward/projects/rpc/submodules/c-ares",
@@ -25,7 +25,7 @@
         "SGX_DIR:FILEPATH": "/home/edward/sgx/sgxsdk",
         "SGX_HW": "OFF",
         "SGX_MODE": "debug",
-        "USE_RPC_LOGGING": "OFF",
+        "USE_RPC_LOGGING": "ON",
         "USE_RPC_TELEMETRY": "OFF",
         "USE_CONSOLE_TELEMETRY": "OFF"
         // "LIBCORO_BUILD_EXAMPLES": "ON",

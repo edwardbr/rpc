@@ -39,7 +39,10 @@ namespace rpc
         std::vector<char>& out_buf_)
     {
         if (destination_zone_id != get_destination_zone_id())
+        {
+            LOG_CSTR("ERROR: Zone not supported");
             return rpc::error::ZONE_NOT_SUPPORTED();
+        }
 
         int err_code = 0;
         size_t data_out_sz = 0;
@@ -67,6 +70,7 @@ namespace rpc
                 telemetry_service->message(rpc::i_telemetry_service::err, "call_host failed");
             }
 #endif
+            LOG_CSTR("ERROR: Transport error - call_host failed");
             return rpc::error::TRANSPORT_ERROR();
         }
 
@@ -102,6 +106,7 @@ namespace rpc
                 error += std::to_string(status);
                 LOG_STR(error.c_str(), error.length());
                 RPC_ASSERT(!error.c_str());
+                LOG_CSTR("ERROR: Transport error - call_host failed on retry");
                 return rpc::error::TRANSPORT_ERROR();
             }
         }
@@ -127,6 +132,7 @@ namespace rpc
             error += std::to_string(status);
             LOG_STR(error.c_str(), error.length());
             RPC_ASSERT(!error.c_str());
+            LOG_CSTR("ERROR: Transport error - try_cast_host failed");
             return rpc::error::TRANSPORT_ERROR();
         }
         return err_code;
