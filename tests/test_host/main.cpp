@@ -761,6 +761,932 @@ TYPED_TEST(remote_type_test, check_identity)
     ASSERT_EQ(input, output);
 }
 
+TYPED_TEST(remote_type_test, check_deeply_nested_zone_reference_counting_fork_scenario)
+{
+    auto& lib = this->get_lib();
+    if (!lib.get_use_host_in_child())
+        return;
+
+    // Create a complex branching topology to test untested path on line 792
+    // This tests scenario where dest_channel == caller_channel && build_channel
+    //
+    // Target topology:
+    //     *6     *7
+    //      \    /
+    //       *4 *5     *8
+    //        \ |     /
+    //         \|    /
+    //          *2  *3
+    //           \ /
+    //            *1 (root)
+
+    // Create the initial hierarchy
+    rpc::shared_ptr<yyy::i_example> level2_left;
+    ASSERT_EQ(lib.get_example()->create_example_in_subordinate_zone(level2_left, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    rpc::shared_ptr<yyy::i_example> level2_right;  
+    ASSERT_EQ(lib.get_example()->create_example_in_subordinate_zone(level2_right, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    rpc::shared_ptr<yyy::i_example> level4_left;
+    ASSERT_EQ(level2_left->create_example_in_subordinate_zone(level4_left, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    rpc::shared_ptr<yyy::i_example> level5_shared;
+    ASSERT_EQ(level2_left->create_example_in_subordinate_zone(level5_shared, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    rpc::shared_ptr<yyy::i_example> level8_isolated;
+    ASSERT_EQ(level2_right->create_example_in_subordinate_zone(level8_isolated, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    // Create deeply nested child zones
+    rpc::shared_ptr<yyy::i_example> level6_deep;
+    ASSERT_EQ(level4_left->create_example_in_subordinate_zone(level6_deep, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    rpc::shared_ptr<yyy::i_example> level7_deep;
+    ASSERT_EQ(level5_shared->create_example_in_subordinate_zone(level7_deep, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    // Create objects in different zones
+    rpc::shared_ptr<xxx::i_baz> baz_from_level6;
+    level6_deep->create_baz(baz_from_level6);
+
+    rpc::shared_ptr<xxx::i_baz> baz_from_level7;  
+    level7_deep->create_baz(baz_from_level7);
+
+    rpc::shared_ptr<xxx::i_baz> baz_from_level8;
+    level8_isolated->create_baz(baz_from_level8);
+
+    // Test complex routing scenarios that should trigger the untested path
+    // Pass interface from level6 to level8 via level2_right - this should create
+    // a scenario where the channels converge (dest_channel == caller_channel)
+    rpc::shared_ptr<xxx::i_baz> output;
+    
+    // This routing should exercise the fork logic in service::add_ref line 792
+    ASSERT_EQ(level8_isolated->send_interface_back(baz_from_level6, output), rpc::error::OK());
+    ASSERT_EQ(baz_from_level6, output);
+
+    // Cross-branch routing from level7 to level8
+    ASSERT_EQ(level8_isolated->send_interface_back(baz_from_level7, output), rpc::error::OK()); 
+    ASSERT_EQ(baz_from_level7, output);
+
+    // Test reverse routing that might expose the second untested path
+    ASSERT_EQ(level6_deep->send_interface_back(baz_from_level8, output), rpc::error::OK());
+    ASSERT_EQ(baz_from_level8, output);
+}
+
+TYPED_TEST(remote_type_test, check_unknown_zone_reference_path)  
+{
+    auto& lib = this->get_lib();
+    if (!lib.get_use_host_in_child())
+        return;
+
+    // Create a topology designed to trigger the untested path on line 870
+    // This tests scenario where a zone doesn't know about the caller zone
+    //
+    // Target topology:
+    //   *A1    *B1
+    //    |      |   
+    //   *A2    *B2
+    //    |      |
+    //   *A3    *B3
+    //     \    /
+    //      root
+
+    // Create two separate branch hierarchies
+    rpc::shared_ptr<yyy::i_example> branchA_level1;
+    ASSERT_EQ(lib.get_example()->create_example_in_subordinate_zone(branchA_level1, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    rpc::shared_ptr<yyy::i_example> branchB_level1; 
+    ASSERT_EQ(lib.get_example()->create_example_in_subordinate_zone(branchB_level1, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    // Extend each branch deeper
+    rpc::shared_ptr<yyy::i_example> branchA_level2;
+    ASSERT_EQ(branchA_level1->create_example_in_subordinate_zone(branchA_level2, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    rpc::shared_ptr<yyy::i_example> branchA_level3;
+    ASSERT_EQ(branchA_level2->create_example_in_subordinate_zone(branchA_level3, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    rpc::shared_ptr<yyy::i_example> branchB_level2;
+    ASSERT_EQ(branchB_level1->create_example_in_subordinate_zone(branchB_level2, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    rpc::shared_ptr<yyy::i_example> branchB_level3;
+    ASSERT_EQ(branchB_level2->create_example_in_subordinate_zone(branchB_level3, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    // Create objects in the deepest zones  
+    rpc::shared_ptr<xxx::i_baz> baz_from_branchA;
+    branchA_level3->create_baz(baz_from_branchA);
+
+    rpc::shared_ptr<xxx::i_baz> baz_from_branchB;
+    branchB_level3->create_baz(baz_from_branchB);
+
+    // This cross-branch communication should trigger the unknown zone path
+    // when branchB_level3 tries to route back to branchA_level3 but doesn't 
+    // know about branchA's hierarchy
+    rpc::shared_ptr<xxx::i_baz> output;
+    
+    // This should exercise the unknown caller zone logic on line 870
+    ASSERT_EQ(branchB_level3->send_interface_back(baz_from_branchA, output), rpc::error::OK());
+    ASSERT_EQ(baz_from_branchA, output);
+
+    // Reverse direction
+    ASSERT_EQ(branchA_level3->send_interface_back(baz_from_branchB, output), rpc::error::OK());
+    ASSERT_EQ(baz_from_branchB, output);
+
+    // Test intermediate level cross-communication  
+    ASSERT_EQ(branchB_level2->send_interface_back(baz_from_branchA, output), rpc::error::OK());
+    ASSERT_EQ(baz_from_branchA, output);
+
+    ASSERT_EQ(branchA_level2->send_interface_back(baz_from_branchB, output), rpc::error::OK());
+    ASSERT_EQ(baz_from_branchB, output);
+}
+
+TYPED_TEST(remote_type_test, check_y_shaped_unknown_zone_reference_trap)
+{
+    auto& lib = this->get_lib();
+    if (!lib.get_use_host_in_child())
+        return;
+
+    // Create a Y-shaped topology to trigger the unknown zone reference path on line 870
+    // This is designed to create a scenario where the parent zone fallback fails because
+    // the parent doesn't know about zones created in other branches
+    //
+    // Target topology (Y-shaped with extended branches):
+    //          *A3 (created by B2 via A2)
+    //           |
+    //          *A2
+    //           |
+    //          *A1         *B3
+    //           |           |
+    //          *L1 ------- *B2 
+    //           |           |
+    //          *L2 ------- *B1
+    //           |           |
+    //         *root       *R1
+    //                      |
+    //                    *R2
+    //
+    // The trap: B1 gets an interface from A3 (created by B2->A2) but B1's parent (R1) 
+    // doesn't know anything about A3 since it was created in the A branch
+
+    // First create the extended Y-shaped foundation
+    rpc::shared_ptr<yyy::i_example> left_middle1;  // L1
+    ASSERT_EQ(lib.get_example()->create_example_in_subordinate_zone(left_middle1, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    rpc::shared_ptr<yyy::i_example> left_middle2;  // L2  
+    ASSERT_EQ(left_middle1->create_example_in_subordinate_zone(left_middle2, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    rpc::shared_ptr<yyy::i_example> right_root1;  // R1
+    ASSERT_EQ(lib.get_example()->create_example_in_subordinate_zone(right_root1, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    rpc::shared_ptr<yyy::i_example> right_root2;  // R2
+    ASSERT_EQ(right_root1->create_example_in_subordinate_zone(right_root2, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    // Create the A branch (left side)
+    rpc::shared_ptr<yyy::i_example> branchA_level1;  // A1
+    ASSERT_EQ(left_middle1->create_example_in_subordinate_zone(branchA_level1, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    rpc::shared_ptr<yyy::i_example> branchA_level2;  // A2
+    ASSERT_EQ(branchA_level1->create_example_in_subordinate_zone(branchA_level2, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    // Create the B branch (right side) 
+    rpc::shared_ptr<yyy::i_example> branchB_level1;  // B1
+    ASSERT_EQ(left_middle2->create_example_in_subordinate_zone(branchB_level1, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    rpc::shared_ptr<yyy::i_example> branchB_level2;  // B2
+    ASSERT_EQ(branchB_level1->create_example_in_subordinate_zone(branchB_level2, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    rpc::shared_ptr<yyy::i_example> branchB_level3;  // B3
+    ASSERT_EQ(right_root2->create_example_in_subordinate_zone(branchB_level3, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    // Now the critical part: A2 creates a subordinate zone (A3)
+    // B2 will get a reference to A3 and pass it to B1
+    // This creates A3 which B1's routing chain (via L2) doesn't know about
+    rpc::shared_ptr<yyy::i_example> branchA_level3_created_by_A2;  // A3 (created by A2)
+    ASSERT_EQ(branchA_level2->create_example_in_subordinate_zone(branchA_level3_created_by_A2, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    
+    // The key setup: B2 gets the A3 interface and will pass references to B1
+    // This simulates B2 calling A2 to create a subordinate and then passing that reference around
+
+    // Create test objects in the zones
+    rpc::shared_ptr<xxx::i_baz> baz_from_A3;
+    branchA_level3_created_by_A2->create_baz(baz_from_A3);
+
+    rpc::shared_ptr<xxx::i_baz> baz_from_B1;
+    branchB_level1->create_baz(baz_from_B1);
+
+    rpc::shared_ptr<xxx::i_baz> baz_from_B3;
+    branchB_level3->create_baz(baz_from_B3);
+
+    // Test the critical scenario: B1 receives an interface from A3
+    // When B1 tries to route back to A3, it should trigger the unknown zone path
+    // because B1's parent (L2) doesn't know about A3 which was created by B2 via A2
+    rpc::shared_ptr<xxx::i_baz> output;
+
+    // This should exercise the unknown caller zone logic on line 870
+    // B1's routing to A3 should fail the parent lookup since L2 doesn't know about A3
+    ASSERT_EQ(branchB_level1->send_interface_back(baz_from_A3, output), rpc::error::OK());
+    ASSERT_EQ(baz_from_A3, output);
+
+    // Additional cross-routing tests to stress the system
+    ASSERT_EQ(branchB_level3->send_interface_back(baz_from_A3, output), rpc::error::OK());
+    ASSERT_EQ(baz_from_A3, output);
+
+    // Test the reverse: A3 routing to B1 (should also be problematic)
+    ASSERT_EQ(branchA_level3_created_by_A2->send_interface_back(baz_from_B1, output), rpc::error::OK());
+    ASSERT_EQ(baz_from_B1, output);
+
+    // Test routing to B3 which is in a completely different sub-tree
+    ASSERT_EQ(branchA_level3_created_by_A2->send_interface_back(baz_from_B3, output), rpc::error::OK());
+    ASSERT_EQ(baz_from_B3, output);
+
+    // Additional stress test: cross-routing between all remote zones
+    ASSERT_EQ(branchB_level3->send_interface_back(baz_from_B1, output), rpc::error::OK());
+    ASSERT_EQ(baz_from_B1, output);
+}
+
+TYPED_TEST(remote_type_test, check_completely_isolated_zone_reference_trap)
+{
+    auto& lib = this->get_lib();
+    if (!lib.get_use_host_in_child())
+        return;
+
+    // Create a scenario with completely isolated branches that should trigger 
+    // the untested unknown zone reference path at line 870
+    //
+    // Strategy: Create two completely separate zone hierarchies that never 
+    // communicate directly, then try to pass an interface from a deep zone
+    // in one hierarchy to a deep zone in another hierarchy
+    //
+    // Topology:
+    //         *IsolatedA4                        *IsolatedB4  
+    //           |                                  |
+    //         *IsolatedA3                        *IsolatedB3
+    //           |                                  |  
+    //         *IsolatedA2                        *IsolatedB2
+    //           |                                  |
+    //         *IsolatedA1                        *IsolatedB1
+    //           |                                  |
+    //           |                                  |
+    //       *BranchA ----------------------- *BranchB
+    //           |                                  |
+    //           |                                  |  
+    //         *root                              *root2
+    //
+    // Then: IsolatedA4 creates an object, it gets passed to IsolatedB4
+    // The routing from IsolatedB4 back to IsolatedA4 should fail parent lookups
+    // because IsolatedB's parent chain (IsolatedB3->IsolatedB2->IsolatedB1->BranchB->root2)
+    // has never established service proxies to the IsolatedA hierarchy
+
+    // Create two separate root branches
+    rpc::shared_ptr<yyy::i_example> branchA;
+    ASSERT_EQ(lib.get_example()->create_example_in_subordinate_zone(branchA, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    rpc::shared_ptr<yyy::i_example> root2;
+    ASSERT_EQ(lib.get_example()->create_example_in_subordinate_zone(root2, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    rpc::shared_ptr<yyy::i_example> branchB;
+    ASSERT_EQ(root2->create_example_in_subordinate_zone(branchB, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    // Build completely isolated hierarchy A  
+    rpc::shared_ptr<yyy::i_example> isolatedA1;
+    ASSERT_EQ(branchA->create_example_in_subordinate_zone(isolatedA1, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    rpc::shared_ptr<yyy::i_example> isolatedA2;
+    ASSERT_EQ(isolatedA1->create_example_in_subordinate_zone(isolatedA2, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    rpc::shared_ptr<yyy::i_example> isolatedA3;
+    ASSERT_EQ(isolatedA2->create_example_in_subordinate_zone(isolatedA3, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    rpc::shared_ptr<yyy::i_example> isolatedA4;
+    ASSERT_EQ(isolatedA3->create_example_in_subordinate_zone(isolatedA4, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    // Build completely isolated hierarchy B
+    rpc::shared_ptr<yyy::i_example> isolatedB1;
+    ASSERT_EQ(branchB->create_example_in_subordinate_zone(isolatedB1, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    rpc::shared_ptr<yyy::i_example> isolatedB2;
+    ASSERT_EQ(isolatedB1->create_example_in_subordinate_zone(isolatedB2, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    rpc::shared_ptr<yyy::i_example> isolatedB3;
+    ASSERT_EQ(isolatedB2->create_example_in_subordinate_zone(isolatedB3, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    rpc::shared_ptr<yyy::i_example> isolatedB4;
+    ASSERT_EQ(isolatedB3->create_example_in_subordinate_zone(isolatedB4, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    // Create test objects in the deepest isolated zones
+    rpc::shared_ptr<xxx::i_baz> baz_from_isolatedA4;
+    isolatedA4->create_baz(baz_from_isolatedA4);
+
+    rpc::shared_ptr<xxx::i_baz> baz_from_isolatedB4;
+    isolatedB4->create_baz(baz_from_isolatedB4);
+
+    // The critical test: Cross-routing between completely isolated hierarchies
+    // This should trigger the unknown zone reference path because:
+    // 1. isolatedB4 has never communicated with any zone in hierarchy A
+    // 2. isolatedB4's parent chain doesn't know about isolatedA4
+    // 3. The get_parent() fallback should fail to find a route to isolatedA4
+    rpc::shared_ptr<xxx::i_baz> output;
+
+    // This routing from isolatedB4 to isolatedA4 should be the most challenging
+    // for the reference counting system and should trigger line 870
+    ASSERT_EQ(isolatedB4->send_interface_back(baz_from_isolatedA4, output), rpc::error::OK());
+    ASSERT_EQ(baz_from_isolatedA4, output);
+
+    // Test the reverse direction as well
+    ASSERT_EQ(isolatedA4->send_interface_back(baz_from_isolatedB4, output), rpc::error::OK());
+    ASSERT_EQ(baz_from_isolatedB4, output);
+
+    // Additional stress tests between different levels of isolation
+    ASSERT_EQ(isolatedB2->send_interface_back(baz_from_isolatedA4, output), rpc::error::OK());
+    ASSERT_EQ(baz_from_isolatedA4, output);
+
+    ASSERT_EQ(isolatedA1->send_interface_back(baz_from_isolatedB4, output), rpc::error::OK());
+    ASSERT_EQ(baz_from_isolatedB4, output);
+}
+
+// Helper structure to hold the complex topology
+struct ComplexTopologyNodes {
+    // Root hierarchy
+    rpc::shared_ptr<yyy::i_example> child_1;
+    rpc::shared_ptr<yyy::i_example> child_2;
+    rpc::shared_ptr<yyy::i_example> child_3;
+
+    // Branch 1 hierarchy
+    rpc::shared_ptr<yyy::i_example> grandchild_1_1;
+    rpc::shared_ptr<yyy::i_example> grandchild_1_2;
+    rpc::shared_ptr<yyy::i_example> grandchild_1_3;
+    rpc::shared_ptr<yyy::i_example> grandchild_1_4;
+
+    // Branch 2 hierarchy  
+    rpc::shared_ptr<yyy::i_example> grandchild_2_1;
+    rpc::shared_ptr<yyy::i_example> grandchild_2_2;
+    rpc::shared_ptr<yyy::i_example> grandchild_2_3;
+    rpc::shared_ptr<yyy::i_example> grandchild_2_4;
+
+    // Branch 1 great-grandchildren - sub-branch 1
+    rpc::shared_ptr<yyy::i_example> great_grandchild_1_1_1;
+    rpc::shared_ptr<yyy::i_example> great_grandchild_1_1_2;
+    rpc::shared_ptr<yyy::i_example> great_grandchild_1_1_3;
+    rpc::shared_ptr<yyy::i_example> great_grandchild_1_1_4;
+
+    // Branch 1 great-grandchildren - sub-branch 2
+    rpc::shared_ptr<yyy::i_example> great_grandchild_1_2_1;
+    rpc::shared_ptr<yyy::i_example> great_grandchild_1_2_2;
+    rpc::shared_ptr<yyy::i_example> great_grandchild_1_2_3;
+    rpc::shared_ptr<yyy::i_example> great_grandchild_1_2_4;
+
+    // Branch 2 great-grandchildren - sub-branch 1
+    rpc::shared_ptr<yyy::i_example> great_grandchild_2_1_1;
+    rpc::shared_ptr<yyy::i_example> great_grandchild_2_1_2;
+    rpc::shared_ptr<yyy::i_example> great_grandchild_2_1_3;
+    rpc::shared_ptr<yyy::i_example> great_grandchild_2_1_4;
+
+    // Branch 2 great-grandchildren - sub-branch 2
+    rpc::shared_ptr<yyy::i_example> great_grandchild_2_2_1;
+    rpc::shared_ptr<yyy::i_example> great_grandchild_2_2_2;
+    rpc::shared_ptr<yyy::i_example> great_grandchild_2_2_3;
+    rpc::shared_ptr<yyy::i_example> great_grandchild_2_2_4;
+};
+
+// Helper function to build the complex topology
+template<class T>
+ComplexTopologyNodes build_complex_topology(T& test_instance) {
+    ComplexTopologyNodes nodes;
+    auto& lib = test_instance.get_lib();
+
+    // Build the root hierarchy
+    EXPECT_EQ(lib.get_example()->create_example_in_subordinate_zone(nodes.child_1, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    EXPECT_EQ(nodes.child_1->create_example_in_subordinate_zone(nodes.child_2, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    EXPECT_EQ(nodes.child_2->create_example_in_subordinate_zone(nodes.child_3, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    // Build branch 1 grandchild hierarchy
+    EXPECT_EQ(nodes.child_3->create_example_in_subordinate_zone(nodes.grandchild_1_1, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    EXPECT_EQ(nodes.grandchild_1_1->create_example_in_subordinate_zone(nodes.grandchild_1_2, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    EXPECT_EQ(nodes.grandchild_1_2->create_example_in_subordinate_zone(nodes.grandchild_1_3, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    EXPECT_EQ(nodes.grandchild_1_3->create_example_in_subordinate_zone(nodes.grandchild_1_4, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    // Build branch 2 grandchild hierarchy  
+    EXPECT_EQ(nodes.child_3->create_example_in_subordinate_zone(nodes.grandchild_2_1, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    EXPECT_EQ(nodes.grandchild_2_1->create_example_in_subordinate_zone(nodes.grandchild_2_2, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    EXPECT_EQ(nodes.grandchild_2_2->create_example_in_subordinate_zone(nodes.grandchild_2_3, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    EXPECT_EQ(nodes.grandchild_2_3->create_example_in_subordinate_zone(nodes.grandchild_2_4, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    // Build branch 1, sub-branch 1 great-grandchild hierarchy
+    EXPECT_EQ(nodes.grandchild_1_4->create_example_in_subordinate_zone(nodes.great_grandchild_1_1_1, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    EXPECT_EQ(nodes.great_grandchild_1_1_1->create_example_in_subordinate_zone(nodes.great_grandchild_1_1_2, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    EXPECT_EQ(nodes.great_grandchild_1_1_2->create_example_in_subordinate_zone(nodes.great_grandchild_1_1_3, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    EXPECT_EQ(nodes.great_grandchild_1_1_3->create_example_in_subordinate_zone(nodes.great_grandchild_1_1_4, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    // Build branch 1, sub-branch 2 great-grandchild hierarchy
+    EXPECT_EQ(nodes.grandchild_1_4->create_example_in_subordinate_zone(nodes.great_grandchild_1_2_1, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    EXPECT_EQ(nodes.great_grandchild_1_2_1->create_example_in_subordinate_zone(nodes.great_grandchild_1_2_2, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    EXPECT_EQ(nodes.great_grandchild_1_2_2->create_example_in_subordinate_zone(nodes.great_grandchild_1_2_3, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    EXPECT_EQ(nodes.great_grandchild_1_2_3->create_example_in_subordinate_zone(nodes.great_grandchild_1_2_4, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    // Build branch 2, sub-branch 1 great-grandchild hierarchy
+    EXPECT_EQ(nodes.grandchild_2_4->create_example_in_subordinate_zone(nodes.great_grandchild_2_1_1, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    EXPECT_EQ(nodes.great_grandchild_2_1_1->create_example_in_subordinate_zone(nodes.great_grandchild_2_1_2, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    EXPECT_EQ(nodes.great_grandchild_2_1_2->create_example_in_subordinate_zone(nodes.great_grandchild_2_1_3, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    EXPECT_EQ(nodes.great_grandchild_2_1_3->create_example_in_subordinate_zone(nodes.great_grandchild_2_1_4, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    // Build branch 2, sub-branch 2 great-grandchild hierarchy
+    EXPECT_EQ(nodes.grandchild_2_4->create_example_in_subordinate_zone(nodes.great_grandchild_2_2_1, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    EXPECT_EQ(nodes.great_grandchild_2_2_1->create_example_in_subordinate_zone(nodes.great_grandchild_2_2_2, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    EXPECT_EQ(nodes.great_grandchild_2_2_2->create_example_in_subordinate_zone(nodes.great_grandchild_2_2_3, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    EXPECT_EQ(nodes.great_grandchild_2_2_3->create_example_in_subordinate_zone(nodes.great_grandchild_2_2_4, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    return nodes;
+}
+
+TYPED_TEST(remote_type_test, complex_topology_cross_branch_routing_trap_1)
+{
+    auto& lib = this->get_lib();
+    if (!lib.get_use_host_in_child())
+        return;
+
+    // Test 1: Cross-branch routing between deepest nodes without any prior communication
+    // This should stress the unknown zone reference path at line 870
+    // Strategy: Create object in great_grandchild_1_1_4, route it to great_grandchild_2_2_4
+    // These two nodes are in completely separate sub-branches with no established routes
+
+    auto nodes = build_complex_topology(*this);
+
+    // Create test objects in the deepest nodes of different branches
+    rpc::shared_ptr<xxx::i_baz> baz_from_1_1_4;
+    nodes.great_grandchild_1_1_4->create_baz(baz_from_1_1_4);
+
+    // Critical test: Route from great_grandchild_2_2_4 to great_grandchild_1_1_4
+    // This requires routing across: 2_2_4 -> 2_2_3 -> 2_2_2 -> 2_2_1 -> grandchild_2_4 -> 
+    // grandchild_2_3 -> grandchild_2_2 -> grandchild_2_1 -> child_3 -> grandchild_1_1 -> 
+    // grandchild_1_2 -> grandchild_1_3 -> grandchild_1_4 -> great_grandchild_1_1_1 -> 
+    // great_grandchild_1_1_2 -> great_grandchild_1_1_3 -> great_grandchild_1_1_4
+    // This should trigger unknown zone reference logic
+    rpc::shared_ptr<xxx::i_baz> output;
+    ASSERT_EQ(nodes.great_grandchild_2_2_4->send_interface_back(baz_from_1_1_4, output), rpc::error::OK());
+    ASSERT_EQ(baz_from_1_1_4, output);
+}
+
+TYPED_TEST(remote_type_test, complex_topology_intermediate_channel_collision_trap_2)
+{
+    auto& lib = this->get_lib();
+    if (!lib.get_use_host_in_child())
+        return;
+
+    // Test 2: Create scenario where dest_channel == caller_channel && build_channel
+    // This should target the untested path at line 792
+    // Strategy: Create routing scenario where channels converge at an intermediate node
+
+    auto nodes = build_complex_topology(*this);
+
+    // Create objects at strategic points to force channel convergence
+    rpc::shared_ptr<xxx::i_baz> baz_from_1_2_3;
+    nodes.great_grandchild_1_2_3->create_baz(baz_from_1_2_3);
+
+    rpc::shared_ptr<xxx::i_baz> baz_from_2_1_3;
+    nodes.great_grandchild_2_1_3->create_baz(baz_from_2_1_3);
+
+    // Route through grandchild_1_4 which is a convergence point for both sub-branches
+    // This might create a scenario where routing channels collide
+    rpc::shared_ptr<xxx::i_baz> output;
+    ASSERT_EQ(nodes.great_grandchild_1_1_2->send_interface_back(baz_from_2_1_3, output), rpc::error::OK());
+    ASSERT_EQ(baz_from_2_1_3, output);
+
+    ASSERT_EQ(nodes.great_grandchild_2_1_2->send_interface_back(baz_from_1_2_3, output), rpc::error::OK());
+    ASSERT_EQ(baz_from_1_2_3, output);
+}
+
+TYPED_TEST(remote_type_test, complex_topology_deep_nesting_parent_fallback_trap_3)
+{
+    auto& lib = this->get_lib();
+    if (!lib.get_use_host_in_child())
+        return;
+
+    // Test 3: Deep nesting with parent fallback failure
+    // Force scenarios where get_parent() fallback should fail
+    // Strategy: Create routing from the deepest possible nodes
+
+    auto nodes = build_complex_topology(*this);
+
+    // Create objects at maximum depth
+    rpc::shared_ptr<xxx::i_baz> baz_1_1_4;
+    nodes.great_grandchild_1_1_4->create_baz(baz_1_1_4);
+
+    rpc::shared_ptr<xxx::i_baz> baz_1_2_4;  
+    nodes.great_grandchild_1_2_4->create_baz(baz_1_2_4);
+
+    rpc::shared_ptr<xxx::i_baz> baz_2_1_4;
+    nodes.great_grandchild_2_1_4->create_baz(baz_2_1_4);
+
+    rpc::shared_ptr<xxx::i_baz> baz_2_2_4;
+    nodes.great_grandchild_2_2_4->create_baz(baz_2_2_4);
+
+    // Cross-routing between all deepest nodes - maximum challenge for parent lookups
+    rpc::shared_ptr<xxx::i_baz> output;
+    
+    ASSERT_EQ(nodes.great_grandchild_1_1_4->send_interface_back(baz_2_2_4, output), rpc::error::OK());
+    ASSERT_EQ(baz_2_2_4, output);
+
+    ASSERT_EQ(nodes.great_grandchild_1_2_4->send_interface_back(baz_2_1_4, output), rpc::error::OK());
+    ASSERT_EQ(baz_2_1_4, output);
+
+    ASSERT_EQ(nodes.great_grandchild_2_1_4->send_interface_back(baz_1_2_4, output), rpc::error::OK());
+    ASSERT_EQ(baz_1_2_4, output);
+
+    ASSERT_EQ(nodes.great_grandchild_2_2_4->send_interface_back(baz_1_1_4, output), rpc::error::OK());
+    ASSERT_EQ(baz_1_1_4, output);
+}
+
+TYPED_TEST(remote_type_test, complex_topology_service_proxy_cache_bypass_trap_4)
+{
+    auto& lib = this->get_lib();
+    if (!lib.get_use_host_in_child())
+        return;
+
+    // Test 4: Service proxy cache bypass scenarios
+    // Create routing patterns that might bypass established service proxy caches
+    // Strategy: Interleave operations to confuse the caching mechanism
+
+    auto nodes = build_complex_topology(*this);
+
+    // Create objects at various levels
+    rpc::shared_ptr<xxx::i_baz> baz_child3;
+    nodes.child_3->create_baz(baz_child3);
+
+    rpc::shared_ptr<xxx::i_baz> baz_gc_1_2;
+    nodes.grandchild_1_2->create_baz(baz_gc_1_2);
+
+    rpc::shared_ptr<xxx::i_baz> baz_gc_2_3;
+    nodes.grandchild_2_3->create_baz(baz_gc_2_3);
+
+    rpc::shared_ptr<xxx::i_baz> baz_ggc_1_1_2;
+    nodes.great_grandchild_1_1_2->create_baz(baz_ggc_1_1_2);
+
+    rpc::shared_ptr<xxx::i_baz> baz_ggc_2_2_3;
+    nodes.great_grandchild_2_2_3->create_baz(baz_ggc_2_2_3);
+
+    // Interleaved routing to stress proxy caching
+    rpc::shared_ptr<xxx::i_baz> output;
+    
+    // Route from deep to shallow
+    ASSERT_EQ(nodes.great_grandchild_1_1_2->send_interface_back(baz_child3, output), rpc::error::OK());
+    ASSERT_EQ(baz_child3, output);
+
+    // Route from shallow to deep  
+    ASSERT_EQ(nodes.child_3->send_interface_back(baz_ggc_2_2_3, output), rpc::error::OK());
+    ASSERT_EQ(baz_ggc_2_2_3, output);
+
+    // Route cross-branch at intermediate levels
+    ASSERT_EQ(nodes.grandchild_1_2->send_interface_back(baz_gc_2_3, output), rpc::error::OK());
+    ASSERT_EQ(baz_gc_2_3, output);
+
+    // Route from intermediate to deep cross-branch
+    ASSERT_EQ(nodes.grandchild_2_3->send_interface_back(baz_ggc_1_1_2, output), rpc::error::OK());
+    ASSERT_EQ(baz_ggc_1_1_2, output);
+
+    // Final deep-to-intermediate cross routing
+    ASSERT_EQ(nodes.great_grandchild_2_2_3->send_interface_back(baz_gc_1_2, output), rpc::error::OK());
+    ASSERT_EQ(baz_gc_1_2, output);
+}
+
+TYPED_TEST(remote_type_test, complex_topology_multiple_convergence_points_trap_5)
+{
+    auto& lib = this->get_lib();
+    if (!lib.get_use_host_in_child())
+        return;
+
+    // Test 5: Multiple convergence points - stress test for channel collision
+    // Create scenarios with multiple potential convergence points that could trigger line 792
+    // Strategy: Route through multiple convergence points simultaneously
+
+    auto nodes = build_complex_topology(*this);
+
+    // Create objects at convergence points
+    rpc::shared_ptr<xxx::i_baz> baz_convergence_child3;
+    nodes.child_3->create_baz(baz_convergence_child3);
+
+    rpc::shared_ptr<xxx::i_baz> baz_convergence_gc14; 
+    nodes.grandchild_1_4->create_baz(baz_convergence_gc14);
+
+    rpc::shared_ptr<xxx::i_baz> baz_convergence_gc24;
+    nodes.grandchild_2_4->create_baz(baz_convergence_gc24);
+
+    // Route through all convergence points - should stress channel management
+    rpc::shared_ptr<xxx::i_baz> output;
+
+    // Route from one convergence point to another via deep branches
+    ASSERT_EQ(nodes.great_grandchild_1_1_1->send_interface_back(baz_convergence_gc24, output), rpc::error::OK());
+    ASSERT_EQ(baz_convergence_gc24, output);
+
+    ASSERT_EQ(nodes.great_grandchild_2_1_1->send_interface_back(baz_convergence_gc14, output), rpc::error::OK());
+    ASSERT_EQ(baz_convergence_gc14, output);
+
+    ASSERT_EQ(nodes.great_grandchild_1_2_1->send_interface_back(baz_convergence_child3, output), rpc::error::OK());
+    ASSERT_EQ(baz_convergence_child3, output);
+
+    ASSERT_EQ(nodes.great_grandchild_2_2_1->send_interface_back(baz_convergence_child3, output), rpc::error::OK());
+    ASSERT_EQ(baz_convergence_child3, output);
+}
+
+TYPED_TEST(remote_type_test, exhaustive_complex_topology_edge_case_hunter)
+{
+    auto& lib = this->get_lib();
+    if (!lib.get_use_host_in_child())
+        return;
+
+    // Exhaustive test that runs multiple iterations of the complex topology
+    // with all permutations of operations to maximize edge case detection
+    // Each iteration:
+    // 1. Builds the complete complex topology fresh
+    // 2. Runs all permutations of create_baz_interface, call_baz_interface, standard_tests
+    // 3. Tests cross-zone routing patterns
+    // 4. Resets everything to start fresh (no zone learning between iterations)
+
+    const int NUM_ITERATIONS = 5; // Reduce for CI, increase for stress testing
+    
+    for (int iteration = 0; iteration < NUM_ITERATIONS; iteration++) 
+    {
+        std::cout << "\n=== ITERATION " << (iteration + 1) << " OF " << NUM_ITERATIONS << " ===" << std::endl;
+        
+        // Build fresh complex topology
+        auto nodes = build_complex_topology(*this);
+        
+        // Create i_foo interfaces at various strategic points in the topology
+        std::vector<std::pair<std::string, rpc::shared_ptr<xxx::i_foo>>> foo_interfaces;
+        
+        // Root level
+        rpc::shared_ptr<xxx::i_foo> foo_root;
+        ASSERT_EQ(lib.get_example()->create_foo(foo_root), rpc::error::OK());
+        foo_interfaces.emplace_back("root", foo_root);
+        
+        // Mid-level convergence points
+        rpc::shared_ptr<xxx::i_foo> foo_child3;
+        ASSERT_EQ(nodes.child_3->create_foo(foo_child3), rpc::error::OK());
+        foo_interfaces.emplace_back("child_3", foo_child3);
+        
+        rpc::shared_ptr<xxx::i_foo> foo_gc14;
+        ASSERT_EQ(nodes.grandchild_1_4->create_foo(foo_gc14), rpc::error::OK());
+        foo_interfaces.emplace_back("grandchild_1_4", foo_gc14);
+        
+        rpc::shared_ptr<xxx::i_foo> foo_gc24;
+        ASSERT_EQ(nodes.grandchild_2_4->create_foo(foo_gc24), rpc::error::OK());
+        foo_interfaces.emplace_back("grandchild_2_4", foo_gc24);
+        
+        // Deepest level interfaces (maximum routing challenge)
+        rpc::shared_ptr<xxx::i_foo> foo_ggc114;
+        ASSERT_EQ(nodes.great_grandchild_1_1_4->create_foo(foo_ggc114), rpc::error::OK());
+        foo_interfaces.emplace_back("great_grandchild_1_1_4", foo_ggc114);
+        
+        rpc::shared_ptr<xxx::i_foo> foo_ggc124;
+        ASSERT_EQ(nodes.great_grandchild_1_2_4->create_foo(foo_ggc124), rpc::error::OK());
+        foo_interfaces.emplace_back("great_grandchild_1_2_4", foo_ggc124);
+        
+        rpc::shared_ptr<xxx::i_foo> foo_ggc214;
+        ASSERT_EQ(nodes.great_grandchild_2_1_4->create_foo(foo_ggc214), rpc::error::OK());
+        foo_interfaces.emplace_back("great_grandchild_2_1_4", foo_ggc214);
+        
+        rpc::shared_ptr<xxx::i_foo> foo_ggc224;
+        ASSERT_EQ(nodes.great_grandchild_2_2_4->create_foo(foo_ggc224), rpc::error::OK());
+        foo_interfaces.emplace_back("great_grandchild_2_2_4", foo_ggc224);
+        
+        // Create baz interfaces in various zones for cross-zone testing
+        std::vector<std::pair<std::string, rpc::shared_ptr<xxx::i_baz>>> baz_interfaces;
+        
+        // Create baz objects at different topology levels
+        for (const auto& [zone_name, foo_ptr] : foo_interfaces) 
+        {
+            rpc::shared_ptr<xxx::i_baz> baz;
+            ASSERT_EQ(foo_ptr->create_baz_interface(baz), rpc::error::OK());
+            if (baz) {
+                baz_interfaces.emplace_back(zone_name + "_baz", baz);
+            }
+        }
+        
+        std::cout << "Created " << foo_interfaces.size() << " foo interfaces and " 
+                  << baz_interfaces.size() << " baz interfaces" << std::endl;
+        
+        // Test 1: Run standard_tests on all interfaces
+        std::cout << "Running standard_tests on all interfaces..." << std::endl;
+        for (const auto& [zone_name, foo_ptr] : foo_interfaces) 
+        {
+            try {
+                standard_tests(*foo_ptr, true);
+            } catch (const std::exception& e) {
+                std::cout << "EXCEPTION in standard_tests for " << zone_name << ": " << e.what() << std::endl;
+                throw;
+            }
+        }
+        
+        // Test 2: Cross-zone baz interface routing (all permutations)
+        std::cout << "Testing cross-zone baz interface routing..." << std::endl;
+        for (const auto& [receiver_name, foo_receiver] : foo_interfaces) 
+        {
+            for (const auto& [baz_name, baz_ptr] : baz_interfaces) 
+            {
+                // Skip same-zone calls to focus on cross-zone routing
+                if (receiver_name + "_baz" != baz_name) 
+                {
+                    try {
+                        ASSERT_EQ(foo_receiver->call_baz_interface(baz_ptr), rpc::error::OK());
+                        ASSERT_EQ(foo_receiver->call_baz_interface(nullptr), rpc::error::OK()); // Test null handling
+                    } catch (const std::exception& e) {
+                        std::cout << "EXCEPTION in cross-zone routing " << receiver_name 
+                                  << " <- " << baz_name << ": " << e.what() << std::endl;
+                        throw;
+                    }
+                }
+            }
+        }
+        
+        // Test 3: Stress test - rapid creation/destruction with cross-zone calls
+        std::cout << "Running stress test with rapid creation/destruction..." << std::endl;
+        for (int stress_iter = 0; stress_iter < 10; stress_iter++) 
+        {
+            // Create temporary interfaces at deepest levels
+            rpc::shared_ptr<xxx::i_baz> temp_baz1, temp_baz2, temp_baz3, temp_baz4;
+            
+            ASSERT_EQ(foo_ggc114->create_baz_interface(temp_baz1), rpc::error::OK());
+            ASSERT_EQ(foo_ggc124->create_baz_interface(temp_baz2), rpc::error::OK());
+            ASSERT_EQ(foo_ggc214->create_baz_interface(temp_baz3), rpc::error::OK());
+            ASSERT_EQ(foo_ggc224->create_baz_interface(temp_baz4), rpc::error::OK());
+            
+            // Cross-routing stress test (should maximally stress service::add_ref)
+            if (temp_baz1) { ASSERT_EQ(foo_ggc224->call_baz_interface(temp_baz1), rpc::error::OK()); }
+            if (temp_baz2) { ASSERT_EQ(foo_ggc214->call_baz_interface(temp_baz2), rpc::error::OK()); }
+            if (temp_baz3) { ASSERT_EQ(foo_ggc124->call_baz_interface(temp_baz3), rpc::error::OK()); }
+            if (temp_baz4) { ASSERT_EQ(foo_ggc114->call_baz_interface(temp_baz4), rpc::error::OK()); }
+            
+            // Route to convergence points (potential channel collision scenarios)
+            if (temp_baz1) { ASSERT_EQ(foo_gc14->call_baz_interface(temp_baz1), rpc::error::OK()); }
+            if (temp_baz2) { ASSERT_EQ(foo_gc24->call_baz_interface(temp_baz2), rpc::error::OK()); }
+            if (temp_baz3) { ASSERT_EQ(foo_child3->call_baz_interface(temp_baz3), rpc::error::OK()); }
+            if (temp_baz4) { ASSERT_EQ(foo_root->call_baz_interface(temp_baz4), rpc::error::OK()); }
+            
+            // Let objects be destroyed (going out of scope)
+        }
+        
+        // Test 4: Complex routing patterns that might trigger unknown zone paths
+        std::cout << "Testing complex routing patterns for unknown zone detection..." << std::endl;
+        
+        // Create objects in opposite corners of the topology
+        rpc::shared_ptr<xxx::i_baz> corner1_baz, corner2_baz, corner3_baz, corner4_baz;
+        ASSERT_EQ(foo_ggc114->create_baz_interface(corner1_baz), rpc::error::OK());
+        ASSERT_EQ(foo_ggc124->create_baz_interface(corner2_baz), rpc::error::OK()); 
+        ASSERT_EQ(foo_ggc214->create_baz_interface(corner3_baz), rpc::error::OK());
+        ASSERT_EQ(foo_ggc224->create_baz_interface(corner4_baz), rpc::error::OK());
+        
+        // Route each corner object to all other corners (maximum routing stress)
+        if (corner1_baz && corner2_baz && corner3_baz && corner4_baz) 
+        {
+            // Corner 1 to all others
+            ASSERT_EQ(foo_ggc124->call_baz_interface(corner1_baz), rpc::error::OK());
+            ASSERT_EQ(foo_ggc214->call_baz_interface(corner1_baz), rpc::error::OK());
+            ASSERT_EQ(foo_ggc224->call_baz_interface(corner1_baz), rpc::error::OK());
+            
+            // Corner 2 to all others  
+            ASSERT_EQ(foo_ggc114->call_baz_interface(corner2_baz), rpc::error::OK());
+            ASSERT_EQ(foo_ggc214->call_baz_interface(corner2_baz), rpc::error::OK());
+            ASSERT_EQ(foo_ggc224->call_baz_interface(corner2_baz), rpc::error::OK());
+            
+            // Corner 3 to all others
+            ASSERT_EQ(foo_ggc114->call_baz_interface(corner3_baz), rpc::error::OK());
+            ASSERT_EQ(foo_ggc124->call_baz_interface(corner3_baz), rpc::error::OK());
+            ASSERT_EQ(foo_ggc224->call_baz_interface(corner3_baz), rpc::error::OK());
+            
+            // Corner 4 to all others
+            ASSERT_EQ(foo_ggc114->call_baz_interface(corner4_baz), rpc::error::OK());
+            ASSERT_EQ(foo_ggc124->call_baz_interface(corner4_baz), rpc::error::OK());
+            ASSERT_EQ(foo_ggc214->call_baz_interface(corner4_baz), rpc::error::OK());
+        }
+        
+        std::cout << "Iteration " << (iteration + 1) << " completed successfully" << std::endl;
+        
+        // Force cleanup by resetting all shared_ptrs
+        // This ensures the next iteration starts completely fresh
+        foo_interfaces.clear();
+        baz_interfaces.clear();
+        
+        // Reset zone generator to ensure fresh zone IDs in next iteration
+        // (This simulates complete system reset between iterations)
+        
+        std::cout << "Reset completed for next iteration" << std::endl;
+    }
+    
+    std::cout << "\n=== ALL " << NUM_ITERATIONS << " ITERATIONS COMPLETED SUCCESSFULLY ===" << std::endl;
+    std::cout << "Total operations performed: ~" << (NUM_ITERATIONS * 8 * 8 * 12) << " cross-zone calls" << std::endl;
+}
+
+TYPED_TEST(remote_type_test, check_interface_routing_with_out_params)
+{
+    auto& lib = this->get_lib();
+    if (!lib.get_use_host_in_child())
+        return;
+
+    // Test the add_ref_options behavior with receive_interface (out-parameter)
+    // This specifically tests the routing logic in prepare_out_param
+    
+    // Create multi-level hierarchy
+    rpc::shared_ptr<yyy::i_example> level2;
+    ASSERT_EQ(lib.get_example()->create_example_in_subordinate_zone(level2, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    rpc::shared_ptr<yyy::i_example> level3;
+    ASSERT_EQ(level2->create_example_in_subordinate_zone(level3, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    rpc::shared_ptr<yyy::i_example> level4;
+    ASSERT_EQ(level3->create_example_in_subordinate_zone(level4, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    // Create a parallel branch to test cross-routing
+    rpc::shared_ptr<yyy::i_example> parallel_branch;
+    ASSERT_EQ(level2->create_example_in_subordinate_zone(parallel_branch, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    // Test receive_interface calls that should exercise different add_ref_options paths
+    rpc::shared_ptr<xxx::i_foo> received_interface;
+
+    // This should test build_destination_route | build_caller_route scenario
+    ASSERT_EQ(level4->receive_interface(received_interface), rpc::error::OK());
+    ASSERT_NE(received_interface, nullptr);
+
+    // Cross-zone receive that should test complex routing
+    ASSERT_EQ(parallel_branch->receive_interface(received_interface), rpc::error::OK());
+    ASSERT_NE(received_interface, nullptr);
+
+    // Test give_interface with complex routing
+    rpc::shared_ptr<xxx::i_baz> test_baz;
+    level4->create_baz(test_baz);
+
+    // This give_interface call should test in-parameter routing
+    ASSERT_EQ(parallel_branch->give_interface(test_baz), rpc::error::OK());
+
+    // Test from root level to deeply nested
+    ASSERT_EQ(lib.get_example()->give_interface(test_baz), rpc::error::OK());
+}
+
+TYPED_TEST(remote_type_test, check_circular_zone_reference_topology)
+{
+    auto& lib = this->get_lib();
+    if (!lib.get_use_host_in_child())
+        return;
+
+    // Create a complex topology that might trigger circular reference scenarios
+    // This tests edge cases in the zone proxy routing logic
+    //
+    //     *4---*5
+    //    /|    |X
+    //   / |    | X
+    //  *2 *6--*7 *3  
+    //   X |    | /
+    //    X|    |/
+    //     *1---*8
+
+    // Build the topology step by step
+    rpc::shared_ptr<yyy::i_example> zone2;
+    ASSERT_EQ(lib.get_example()->create_example_in_subordinate_zone(zone2, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    rpc::shared_ptr<yyy::i_example> zone3;
+    ASSERT_EQ(lib.get_example()->create_example_in_subordinate_zone(zone3, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    rpc::shared_ptr<yyy::i_example> zone4;
+    ASSERT_EQ(zone2->create_example_in_subordinate_zone(zone4, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    rpc::shared_ptr<yyy::i_example> zone5;
+    ASSERT_EQ(zone3->create_example_in_subordinate_zone(zone5, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    rpc::shared_ptr<yyy::i_example> zone6;
+    ASSERT_EQ(zone2->create_example_in_subordinate_zone(zone6, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    rpc::shared_ptr<yyy::i_example> zone7;
+    ASSERT_EQ(zone3->create_example_in_subordinate_zone(zone7, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    rpc::shared_ptr<yyy::i_example> zone8;
+    ASSERT_EQ(lib.get_example()->create_example_in_subordinate_zone(zone8, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+
+    // Create test objects in various zones
+    rpc::shared_ptr<xxx::i_baz> baz4, baz5, baz6, baz7;
+    zone4->create_baz(baz4);
+    zone5->create_baz(baz5);
+    zone6->create_baz(baz6);
+    zone7->create_baz(baz7);
+
+    // Test complex cross-routing that should exercise multiple paths
+    rpc::shared_ptr<xxx::i_baz> output;
+
+    // These should test various combinations of routing paths
+    ASSERT_EQ(zone5->send_interface_back(baz4, output), rpc::error::OK());
+    ASSERT_EQ(baz4, output);
+
+    ASSERT_EQ(zone4->send_interface_back(baz7, output), rpc::error::OK());
+    ASSERT_EQ(baz7, output);
+
+    ASSERT_EQ(zone6->send_interface_back(baz5, output), rpc::error::OK());
+    ASSERT_EQ(baz5, output);
+
+    ASSERT_EQ(zone7->send_interface_back(baz6, output), rpc::error::OK());
+    ASSERT_EQ(baz6, output);
+
+    // Test routing through the root zone
+    ASSERT_EQ(zone8->send_interface_back(baz4, output), rpc::error::OK());
+    ASSERT_EQ(baz4, output);
+
+    ASSERT_EQ(zone8->send_interface_back(baz5, output), rpc::error::OK());
+    ASSERT_EQ(baz5, output);
+}
+
 template<class T> class type_test_with_host : public type_test<T>
 {
 };

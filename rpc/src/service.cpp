@@ -788,7 +788,10 @@ namespace rpc
                     auto found = other_zones.find({destination_zone_id, caller_zone_id});
                     if (found != other_zones.end())
                     {
-                        // untested section
+                        // Previously untested section - now logging to verify if it's called
+                        LOG_CSTR("*** EDGE CASE PATH HIT AT LINE 792 ***");
+                        LOG_CSTR("dest_channel == caller_channel && build_channel condition met!");
+                        LOG_CSTR("*** END EDGE CASE PATH 792 ***");
                         RPC_ASSERT(false);
                         // destination = found->second.lock();
                         // destination->add_external_ref();//update the local ref count the object refcount is done
@@ -867,7 +870,12 @@ namespace rpc
                             }
                             else
                             {
-                                // UNTESTED PATH!!!
+                                // PREVIOUSLY UNTESTED PATH!!! - now logging to verify if it's called
+                                LOG_CSTR("*** EDGE CASE PATH HIT AT LINE 870+ ***");
+                                LOG_CSTR("Unknown zone reference path - zone doesn't know of caller existence!");
+                                LOG_CSTR("Falling back to get_parent() - this assumes parent knows about the zone");
+                                LOG_CSTR("*** POTENTIAL ISSUE: parent may not know about zones in other branches ***");
+                                
                                 // It has been worked out that this happens when a reference to an zone is passed to a
                                 // zone that does not know of its existence.
                                 // SOLUTION:
@@ -885,6 +893,13 @@ namespace rpc
                                 // know about so this will break.  With the proposed snail trail fix this logic branch
                                 // should assert false as it should then be impossible to get to this position.
                                 caller = get_parent();
+                                
+                                if (caller) {
+                                    LOG_CSTR("get_parent() returned: valid caller");
+                                } else {
+                                    LOG_CSTR("get_parent() returned: nullptr - THIS IS A PROBLEM!");
+                                }
+                                LOG_CSTR("*** END EDGE CASE PATH 870+ ***");
                             }
 
                             RPC_ASSERT(caller);
