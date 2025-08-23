@@ -289,7 +289,8 @@ namespace rpc
             }
             std::for_each(service_loggers.begin(),
                 service_loggers.end(),
-                [&](const std::shared_ptr<service_logger>& logger) {
+                [&](const std::shared_ptr<service_logger>& logger)
+                {
                     logger->before_send(
                         caller_zone_id, object_id, interface_id, method_id, in_size_, in_buf_ ? in_buf_ : "");
                 });
@@ -452,7 +453,7 @@ namespace rpc
                     if (found != other_zones.end())
                     {
                         destination_zone = found->second.lock();
-                        need_add_ref = (destination_zone != nullptr);  // Mark that we need add_ref outside lock
+                        need_add_ref = (destination_zone != nullptr); // Mark that we need add_ref outside lock
                     }
                     else
                     {
@@ -485,7 +486,9 @@ namespace rpc
                         caller = alternative_caller_service_proxy->clone_for_zone(
                             {caller_channel_zone_id.get_val()}, zone_id_.as_caller());
                         other_zones[{{caller_channel_zone_id.get_val()}, zone_id_.as_caller()}] = caller;
-                        auto debug_msg = "prepare_out_param service zone: " + std::to_string(zone_id_.id) + " destination_zone=" + std::to_string(caller->destination_zone_id_.get_val()) + ", caller_zone=" + std::to_string(caller->caller_zone_id_.get_val());
+                        auto debug_msg = "prepare_out_param service zone: " + std::to_string(zone_id_.id)
+                                         + " destination_zone=" + std::to_string(caller->destination_zone_id_.get_val())
+                                         + ", caller_zone=" + std::to_string(caller->caller_zone_id_.get_val());
                         LOG_CSTR(debug_msg.c_str());
                     }
                     else
@@ -496,7 +499,7 @@ namespace rpc
                     }
                 }
             }
-            
+
             // Lock caller outside mutex to prevent TOCTOU race
             if (need_caller_from_found)
             {
@@ -505,17 +508,17 @@ namespace rpc
                 {
                     // caller service_proxy was destroyed - this is a race condition
                     LOG_CSTR("ERROR: caller service_proxy was destroyed during lookup");
-                    return {};  // Return empty interface descriptor to indicate failure
+                    return {}; // Return empty interface descriptor to indicate failure
                 }
             }
-            
+
             // Verify we have a valid caller
             if (!caller)
             {
                 LOG_CSTR("ERROR: Failed to obtain valid caller service_proxy");
                 return {};
             }
-            
+
             // Call add_external_ref() outside the mutex to prevent race with service_proxy destruction
             if (need_add_ref && destination_zone)
             {
@@ -887,8 +890,8 @@ namespace rpc
                             RPC_ASSERT(caller);
                         }
                     }
-                    
-                    // Call add_external_ref() outside mutex to prevent TOCTOU race  
+
+                    // Call add_external_ref() outside mutex to prevent TOCTOU race
                     if (destination && !has_called_inner_add_zone_proxy)
                     {
                         destination->add_external_ref();
@@ -992,7 +995,10 @@ namespace rpc
                     if (found != other_zones.end())
                     {
                         other_zone = found->second.lock();
-                        // Move add_external_ref() outside lock to prevent TOCTOU race
+                        if (other_zone)
+                        {
+                            other_zone->add_external_ref();
+                        }
                     }
 
                     if (!other_zone)
@@ -1003,26 +1009,17 @@ namespace rpc
                             auto tmp = found->second.lock();
                             RPC_ASSERT(tmp != nullptr);
                             other_zone = tmp->clone_for_zone(destination_zone_id, caller_zone_id);
-                            other_zones[{destination_zone_id, caller_zone_id}] = other_zone;
                         }
-                    }
-
-                    // as we are a child we can consult the parent to see if it can do the job of proxying this
-                    if (!other_zone)
-                    {
-                        auto parent = get_parent();
-                        RPC_ASSERT(parent);
-                        other_zone = parent->clone_for_zone(destination_zone_id, caller_zone_id);
+                        else
+                        {
+                            auto parent = get_parent();
+                            RPC_ASSERT(parent);
+                            other_zone = parent->clone_for_zone(destination_zone_id, caller_zone_id);
+                        }
                         inner_add_zone_proxy(other_zone);
                     }
                 }
-                
-                // Call add_external_ref() outside mutex to prevent TOCTOU race
-                if (other_zone)
-                {
-                    other_zone->add_external_ref();
-                }
-                
+
 #ifdef USE_RPC_TELEMETRY
                 if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
                 {
@@ -1155,29 +1152,35 @@ namespace rpc
             auto ret = other_zone->sp_release(object_id);
             if (ret != std::numeric_limits<uint64_t>::max())
             {
-                bool should_cleanup = !other_zone->release_external_ref();                
+                bool should_cleanup = !other_zone->release_external_ref();
                 if (should_cleanup)
                 {
-                    auto debug_msg = "service::release cleaning up unused routing service_proxy destination_zone=" + std::to_string(destination_zone_id.get_val()) + ", caller_zone=" + std::to_string(caller_zone_id.get_val());
+                    auto debug_msg = "service::release cleaning up unused routing service_proxy destination_zone="
+                                     + std::to_string(destination_zone_id.get_val())
+                                     + ", caller_zone=" + std::to_string(caller_zone_id.get_val());
                     LOG_STR(debug_msg.c_str(), debug_msg.size());
-                    
+
                     std::lock_guard g(zone_control);
 
                     // Routing service_proxies should NEVER have object_proxies - this is a bug
-                    if (!other_zone->proxies_.empty()) {
-                        auto bug_msg = "BUG: Routing service_proxy (destination_zone=" + std::to_string(destination_zone_id.get_val()) + 
-                                     " != zone=" + std::to_string(zone_id_.get_val()) + ") has " + std::to_string(other_zone->proxies_.size()) + 
-                                     " object_proxies - routing proxies should never host objects";
+                    if (!other_zone->proxies_.empty())
+                    {
+                        auto bug_msg = "BUG: Routing service_proxy (destination_zone="
+                                       + std::to_string(destination_zone_id.get_val())
+                                       + " != zone=" + std::to_string(zone_id_.get_val()) + ") has "
+                                       + std::to_string(other_zone->proxies_.size())
+                                       + " object_proxies - routing proxies should never host objects";
                         LOG_STR(bug_msg.c_str(), bug_msg.size());
-                        
+
                         // Log details of the problematic object_proxies for debugging
-                        for (const auto& proxy_pair : other_zone->proxies_) {
+                        for (const auto& proxy_pair : other_zone->proxies_)
+                        {
                             auto object_proxy_ptr = proxy_pair.second.lock();
-                            auto detail_msg = "  BUG: object_proxy object_id=" + std::to_string(proxy_pair.first.get_val()) + 
-                                            " in routing service_proxy, alive=" + (object_proxy_ptr ? "yes" : "no");
+                            auto detail_msg = "  BUG: object_proxy object_id=" + std::to_string(proxy_pair.first.get_val())
+                                              + " in routing service_proxy, alive=" + (object_proxy_ptr ? "yes" : "no");
                             LOG_STR(detail_msg.c_str(), detail_msg.size());
                         }
-                        
+
                         // This should not happen - routing service_proxies should not have object_proxies
                         RPC_ASSERT(other_zone->proxies_.empty() && "Routing service_proxy should not have object_proxies");
                     }
@@ -1286,7 +1289,9 @@ namespace rpc
         RPC_ASSERT(destination_zone_id != zone_id_.as_destination());
         RPC_ASSERT(other_zones.find({destination_zone_id, caller_zone_id}) == other_zones.end());
         other_zones[{destination_zone_id, caller_zone_id}] = service_proxy;
-        auto debug_msg = "inner_add_zone_proxy service zone: " + std::to_string(zone_id_.id) + " destination_zone=" + std::to_string(service_proxy->destination_zone_id_.get_val()) + ", caller_zone=" + std::to_string(service_proxy->caller_zone_id_.get_val());
+        auto debug_msg = "inner_add_zone_proxy service zone: " + std::to_string(zone_id_.id)
+                         + " destination_zone=" + std::to_string(service_proxy->destination_zone_id_.get_val())
+                         + ", caller_zone=" + std::to_string(service_proxy->caller_zone_id_.get_val());
         LOG_CSTR(debug_msg.c_str());
     }
 

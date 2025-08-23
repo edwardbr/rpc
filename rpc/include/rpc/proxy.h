@@ -604,6 +604,7 @@ namespace rpc
         }
 
         std::unordered_map<object, rpc::weak_ptr<object_proxy>> get_proxies() { return proxies_; }
+        int get_lifetime_lock_count() const { return lifetime_lock_count_.load(); }
 
         // Set parent service reference for child service proxies to prevent premature parent destruction
         void set_parent_service_reference(const rpc::shared_ptr<service>& parent_service)
