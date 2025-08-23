@@ -287,13 +287,7 @@ namespace rpc
                 LOG_CSTR("ERROR: Invalid data - stub is null in send");
                 return rpc::error::INVALID_DATA();
             }
-            std::for_each(service_loggers.begin(),
-                service_loggers.end(),
-                [&](const std::shared_ptr<service_logger>& logger)
-                {
-                    logger->before_send(
-                        caller_zone_id, object_id, interface_id, method_id, in_size_, in_buf_ ? in_buf_ : "");
-                });
+
 
             auto ret = stub->call(protocol_version,
                 encoding,
@@ -304,11 +298,6 @@ namespace rpc
                 in_size_,
                 in_buf_,
                 out_buf_);
-
-            std::for_each(service_loggers.begin(),
-                service_loggers.end(),
-                [&](const std::shared_ptr<service_logger>& logger)
-                { logger->after_send(caller_zone_id, object_id, interface_id, method_id, ret, out_buf_); });
 
             return ret;
         }
@@ -486,10 +475,12 @@ namespace rpc
                         caller = alternative_caller_service_proxy->clone_for_zone(
                             {caller_channel_zone_id.get_val()}, zone_id_.as_caller());
                         other_zones[{{caller_channel_zone_id.get_val()}, zone_id_.as_caller()}] = caller;
+#ifdef USE_RPC_LOGGING
                         auto debug_msg = "prepare_out_param service zone: " + std::to_string(zone_id_.id)
                                          + " destination_zone=" + std::to_string(caller->destination_zone_id_.get_val())
                                          + ", caller_zone=" + std::to_string(caller->caller_zone_id_.get_val());
                         LOG_CSTR(debug_msg.c_str());
+#endif
                     }
                     else
                     {
@@ -1170,16 +1161,19 @@ namespace rpc
                 bool should_cleanup = !other_zone->release_external_ref();
                 if (should_cleanup)
                 {
+#ifdef USE_RPC_LOGGING
                     auto debug_msg = "service::release cleaning up unused routing service_proxy destination_zone="
                                      + std::to_string(destination_zone_id.get_val())
                                      + ", caller_zone=" + std::to_string(caller_zone_id.get_val());
                     LOG_STR(debug_msg.c_str(), debug_msg.size());
+#endif
 
                     std::lock_guard g(zone_control);
 
                     // Routing service_proxies should NEVER have object_proxies - this is a bug
                     if (!other_zone->proxies_.empty())
                     {
+#ifdef USE_RPC_LOGGING
                         auto bug_msg = "BUG: Routing service_proxy (destination_zone="
                                        + std::to_string(destination_zone_id.get_val())
                                        + " != zone=" + std::to_string(zone_id_.get_val()) + ") has "
@@ -1195,6 +1189,7 @@ namespace rpc
                                               + " in routing service_proxy, alive=" + (object_proxy_ptr ? "yes" : "no");
                             LOG_STR(detail_msg.c_str(), detail_msg.size());
                         }
+#endif
 
                         // This should not happen - routing service_proxies should not have object_proxies
                         RPC_ASSERT(other_zone->proxies_.empty() && "Routing service_proxy should not have object_proxies");
@@ -1304,10 +1299,12 @@ namespace rpc
         RPC_ASSERT(destination_zone_id != zone_id_.as_destination());
         RPC_ASSERT(other_zones.find({destination_zone_id, caller_zone_id}) == other_zones.end());
         other_zones[{destination_zone_id, caller_zone_id}] = service_proxy;
+#ifdef USE_RPC_LOGGING
         auto debug_msg = "inner_add_zone_proxy service zone: " + std::to_string(zone_id_.id)
                          + " destination_zone=" + std::to_string(service_proxy->destination_zone_id_.get_val())
                          + ", caller_zone=" + std::to_string(service_proxy->caller_zone_id_.get_val());
         LOG_CSTR(debug_msg.c_str());
+#endif
     }
 
     void service::add_zone_proxy(const rpc::shared_ptr<service_proxy>& service_proxy)

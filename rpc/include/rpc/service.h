@@ -97,7 +97,6 @@ namespace rpc
 
         mutable std::mutex zone_control;
         std::map<zone_route, rpc::weak_ptr<service_proxy>> other_zones;
-        std::list<std::shared_ptr<service_logger>> service_loggers;
 
         rpc::shared_ptr<casting_interface> get_castable_interface(object object_id, interface_ordinal interface_id);
 
@@ -285,8 +284,6 @@ namespace rpc
             std::shared_ptr<std::function<rpc::shared_ptr<rpc::i_interface_stub>(const rpc::shared_ptr<rpc::i_interface_stub>&)>>
                 factory);
 
-        // note this is not thread safe and should only be used on setup
-        void add_service_logger(const std::shared_ptr<service_logger>& logger) { service_loggers.push_back(logger); }
         friend service_proxy;
     };
 

@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <set>
 #include <memory>
+#include <shared_mutex>
 #include <rpc/types.h>
 #include <rpc/telemetry/i_telemetry_service.h>
 
@@ -23,6 +24,12 @@ namespace rpc
         mutable std::unordered_map<uint64_t, std::set<uint64_t>> zone_children_;
         // Track zone relationships: zone_id -> parent zone (0 if root)
         mutable std::unordered_map<uint64_t, uint64_t> zone_parents_;
+        
+        // Thread safety: shared_mutex allows multiple concurrent readers with exclusive writers
+        mutable std::shared_mutex zone_names_mutex_;
+        mutable std::shared_mutex zone_children_mutex_;
+        mutable std::shared_mutex zone_parents_mutex_;
+        
         static constexpr size_t ASYNC_QUEUE_SIZE = 8192;
 
         std::string get_zone_name(uint64_t zone_id) const;

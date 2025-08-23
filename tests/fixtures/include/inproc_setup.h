@@ -54,7 +54,6 @@ public:
 #endif
 
         root_service_ = rpc::make_shared<rpc::service>("host", rpc::zone{++zone_gen_});
-        root_service_->add_service_logger(std::make_shared<test_service_logger>());
         current_host_service = root_service_;
 
         rpc::shared_ptr<yyy::i_host> hst(new host(root_service_->get_zone_id()));

@@ -102,11 +102,12 @@ namespace rpc
                     telemetry_service->message(rpc::i_telemetry_service::err, "call_host failed");
                 }
 #endif
-                std::string error = "call_host gave an enclave error ";
+#ifdef USE_RPC_LOGGING
+                std::string error = "Transport error - call_host failed on retry gave an enclave error ";
                 error += std::to_string(status);
                 LOG_STR(error.c_str(), error.length());
+#endif
                 RPC_ASSERT(!error.c_str());
-                LOG_CSTR("ERROR: Transport error - call_host failed on retry");
                 return rpc::error::TRANSPORT_ERROR();
             }
         }
@@ -128,11 +129,12 @@ namespace rpc
                 telemetry_service->message(rpc::i_telemetry_service::err, "try_cast failed");
             }
 #endif
-            std::string error = "try_cast_host gave an enclave error ";
+#ifdef USE_RPC_LOGGING
+            std::string error = "Transport error - try_cast_host gave an enclave error ";
             error += std::to_string(status);
             LOG_STR(error.c_str(), error.length());
+#endif
             RPC_ASSERT(!error.c_str());
-            LOG_CSTR("ERROR: Transport error - try_cast_host failed");
             return rpc::error::TRANSPORT_ERROR();
         }
         return err_code;
@@ -174,9 +176,11 @@ namespace rpc
                 telemetry_service->message(rpc::i_telemetry_service::err, "add_ref_host failed");
             }
 #endif
+#ifdef USE_RPC_LOGGING
             std::string error = "add_ref_host gave an enclave error ";
             error += std::to_string(status);
             LOG_STR(error.c_str(), error.length());
+#endif
             RPC_ASSERT(!error.c_str());
             return std::numeric_limits<uint64_t>::max();
         }
@@ -199,9 +203,11 @@ namespace rpc
                 telemetry_service->message(rpc::i_telemetry_service::err, "release_host failed");
             }
 #endif
+#ifdef USE_RPC_LOGGING
             std::string error = "release_host gave an enclave error ";
             error += std::to_string(status);
             LOG_STR(error.c_str(), error.length());
+#endif
             RPC_ASSERT(!error.c_str());
             return std::numeric_limits<uint64_t>::max();
         }

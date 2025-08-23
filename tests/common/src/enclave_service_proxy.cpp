@@ -147,9 +147,11 @@ namespace rpc
                 telemetry_service->message(rpc::i_telemetry_service::err, error_message.c_str());
             }
 #endif
+#ifdef USE_RPC_LOGGING
             std::string error = "call_enclave gave an enclave error ";
             error += std::to_string(status);
             LOG_STR(error.c_str(), error.length());
+#endif
             RPC_ASSERT(!error.c_str());
             return rpc::error::TRANSPORT_ERROR();
         }
@@ -185,9 +187,11 @@ namespace rpc
                     telemetry_service->message(rpc::i_telemetry_service::err, error_message.c_str());
                 }
 #endif
+#ifdef USE_RPC_LOGGING
                 std::string error = "call_enclave gave an enclave error ";
                 error += std::to_string(status);
                 LOG_STR(error.c_str(), error.length());
+#endif
                 RPC_ASSERT(!error.c_str());
                 return rpc::error::TRANSPORT_ERROR();
             }
@@ -225,9 +229,11 @@ namespace rpc
                 telemetry_service->message(rpc::i_telemetry_service::err, error_message.c_str());
             }
 #endif
+#ifdef USE_RPC_LOGGING
             std::string error = "try_cast_enclave gave an enclave error ";
             error += std::to_string(status);
             LOG_STR(error.c_str(), error.length());
+#endif
             RPC_ASSERT(!error.c_str());
             return rpc::error::TRANSPORT_ERROR();
         }
@@ -290,9 +296,11 @@ namespace rpc
                 telemetry_service->message(rpc::i_telemetry_service::err, error_message.c_str());
             }
 #endif
+#ifdef USE_RPC_LOGGING
             std::string error = "add_ref_enclave gave an enclave error ";
             error += std::to_string(status);
             LOG_STR(error.c_str(), error.length());
+#endif
             RPC_ASSERT(!error.c_str());
             return add_ref_failed_val;
         }
@@ -328,9 +336,11 @@ namespace rpc
                 telemetry_service->message(rpc::i_telemetry_service::err, error_message.c_str());
             }
 #endif
+#ifdef USE_RPC_LOGGING
             std::string error = "release_enclave gave an enclave error ";
             error += std::to_string(status);
             LOG_STR(error.c_str(), error.length());
+#endif
             RPC_ASSERT(!error.c_str());
             return std::numeric_limits<uint64_t>::max();
         }

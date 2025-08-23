@@ -61,6 +61,7 @@ namespace rpc
 
     std::string console_telemetry_service::get_zone_name(uint64_t zone_id) const
     {
+        std::shared_lock<std::shared_mutex> lock(zone_names_mutex_);
         auto it = zone_names_.find(zone_id);
         if (it != zone_names_.end())
         {
@@ -148,6 +149,7 @@ namespace rpc
 
     void console_telemetry_service::register_zone_name(uint64_t zone_id, const char* name, bool optional_replace) const
     {
+        std::unique_lock<std::shared_mutex> lock(zone_names_mutex_);
         auto it = zone_names_.find(zone_id);
         if (it != zone_names_.end())
         {
@@ -199,8 +201,14 @@ namespace rpc
             get_zone_name(parent_zone_id.get_val()), reset_color());
         
         // Track the parent-child relationship
-        zone_children_[parent_zone_id.get_val()].insert(child_zone_id.id);
-        zone_parents_[child_zone_id.id] = parent_zone_id.get_val();
+        {
+            std::unique_lock<std::shared_mutex> lock(zone_children_mutex_);
+            zone_children_[parent_zone_id.get_val()].insert(child_zone_id.id);
+        }
+        {
+            std::unique_lock<std::shared_mutex> lock(zone_parents_mutex_);
+            zone_parents_[child_zone_id.id] = parent_zone_id.get_val();
+        }
         
         // Print topology diagram after child zone creation
         print_topology_diagram();
@@ -211,6 +219,7 @@ namespace rpc
         init_logger();
         logger_->info("{}=== TOPOLOGY DIAGRAM ==={}", get_level_color(level_enum::info), reset_color());
         
+        std::shared_lock<std::shared_mutex> names_lock(zone_names_mutex_);
         if (zone_names_.empty()) {
             logger_->info("{}No zones registered yet{}", get_level_color(level_enum::info), reset_color());
             return;
@@ -218,10 +227,13 @@ namespace rpc
         
         // Find root zones (zones with no parent)
         std::set<uint64_t> root_zones;
-        for (const auto& zone_pair : zone_names_) {
-            uint64_t zone_id = zone_pair.first;
-            if (zone_parents_.find(zone_id) == zone_parents_.end() || zone_parents_.at(zone_id) == 0) {
-                root_zones.insert(zone_id);
+        {
+            std::shared_lock<std::shared_mutex> parents_lock(zone_parents_mutex_);
+            for (const auto& zone_pair : zone_names_) {
+                uint64_t zone_id = zone_pair.first;
+                if (zone_parents_.find(zone_id) == zone_parents_.end() || zone_parents_.at(zone_id) == 0) {
+                    root_zones.insert(zone_id);
+                }
             }
         }
         
@@ -250,14 +262,19 @@ namespace rpc
         std::string indent(depth * 2, ' ');
         std::string branch = (depth > 0) ? "├─ " : "";
         
-        auto zone_name_it = zone_names_.find(zone_id);
-        std::string zone_name = (zone_name_it != zone_names_.end()) ? zone_name_it->second : "unknown";
+        std::string zone_name;
+        {
+            std::shared_lock<std::shared_mutex> names_lock(zone_names_mutex_);
+            auto zone_name_it = zone_names_.find(zone_id);
+            zone_name = (zone_name_it != zone_names_.end()) ? zone_name_it->second : "unknown";
+        }
         
         logger_->info("{}{}{}{}Zone {}: {} {}", 
             get_level_color(level_enum::info), indent, branch, reset_color(),
             get_zone_color(zone_id), zone_id, zone_name, reset_color());
         
         // Print children
+        std::shared_lock<std::shared_mutex> children_lock(zone_children_mutex_);
         auto children_it = zone_children_.find(zone_id);
         if (children_it != zone_children_.end()) {
             for (uint64_t child_zone : children_it->second) {

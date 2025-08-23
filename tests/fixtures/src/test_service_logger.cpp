@@ -9,9 +9,6 @@
 
 test_service_logger::test_service_logger()
 {
-    rpc_global_logger::info("************************************");
-    std::string test_name = "test " + std::string(::testing::UnitTest::GetInstance()->current_test_info()->name());
-    rpc_global_logger::info(test_name);
 }
 
 test_service_logger::~test_service_logger()
