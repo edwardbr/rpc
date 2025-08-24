@@ -137,7 +137,11 @@ namespace rpc
         void set_zone_id(zone zone_id) { zone_id_ = zone_id; }
         virtual destination_zone get_parent_zone_id() const { return {0}; }
         virtual rpc::shared_ptr<rpc::service_proxy> get_parent() const { return nullptr; }
-        virtual void set_parent_proxy(const rpc::shared_ptr<rpc::service_proxy>&) { RPC_ASSERT(false); }
+        virtual bool set_parent_proxy(const rpc::shared_ptr<rpc::service_proxy>&) 
+        { 
+            RPC_ASSERT(false); 
+            return false;
+        }
 
         // passed by value implementing an implicit lock on the life time of ptr
         object get_object_id(shared_ptr<casting_interface> ptr) const;
@@ -304,6 +308,7 @@ namespace rpc
     {
         // the enclave needs to hold a hard lock to a root object that represents a runtime
         // the enclave service lifetime is managed by the transport functions
+        std::mutex parent_protect;
         rpc::shared_ptr<rpc::service_proxy> parent_service_proxy_;
         destination_zone parent_zone_id_;
 
@@ -317,7 +322,7 @@ namespace rpc
         virtual ~child_service();
 
         rpc::shared_ptr<rpc::service_proxy> get_parent() const override { return parent_service_proxy_; }
-        void set_parent_proxy(const rpc::shared_ptr<rpc::service_proxy>& parent_service_proxy) override;
+        bool set_parent_proxy(const rpc::shared_ptr<rpc::service_proxy>& parent_service_proxy) override;
 
         destination_zone get_parent_zone_id() const override { return parent_zone_id_; }
 
@@ -350,7 +355,11 @@ namespace rpc
                 return rpc::error::UNABLE_TO_CREATE_SERVICE_PROXY();
             }
             child_svc->add_zone_proxy(parent_service_proxy);
-            child_svc->set_parent_proxy(parent_service_proxy);
+            if(!child_svc->set_parent_proxy(parent_service_proxy))
+            {
+                LOG_CSTR("ERROR: Unable to create set_parent_proxy in create_child_service"); 
+                return rpc::error::UNABLE_TO_CREATE_SERVICE_PROXY();
+            }
             parent_service_proxy->set_parent_channel(true);
 
             rpc::shared_ptr<PARENT_INTERFACE> parent_ptr;

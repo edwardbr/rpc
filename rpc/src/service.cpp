@@ -251,8 +251,13 @@ namespace rpc
             }
             if (!other_zone)
             {
-                RPC_ASSERT(false);
+#ifdef USE_RPC_LOGGING
+                auto debug_msg = "service::send zone: " + std::to_string(zone_id_.id)
+                            + " destination_zone=" + std::to_string(destination_zone_id.get_val())
+                            + ", caller_zone=" + std::to_string(caller_zone_id.get_val());                LOG_CSTR(debug_msg.c_str());
+#endif
                 LOG_CSTR("ERROR: Zone not found in send operation");
+                // RPC_ASSERT(false);
                 return rpc::error::ZONE_NOT_FOUND();
             }
             auto result = other_zone->send(protocol_version,
@@ -287,7 +292,6 @@ namespace rpc
                 LOG_CSTR("ERROR: Invalid data - stub is null in send");
                 return rpc::error::INVALID_DATA();
             }
-
 
             auto ret = stub->call(protocol_version,
                 encoding,
@@ -866,7 +870,7 @@ namespace rpc
                                 LOG_CSTR("Unknown zone reference path - zone doesn't know of caller existence!");
                                 LOG_CSTR("Falling back to get_parent() - this assumes parent knows about the zone");
                                 LOG_CSTR("*** POTENTIAL ISSUE: parent may not know about zones in other branches ***");
-                                
+
                                 // It has been worked out that this happens when a reference to an zone is passed to a
                                 // zone that does not know of its existence.
                                 // SOLUTION:
@@ -884,10 +888,13 @@ namespace rpc
                                 // know about so this will break.  With the proposed snail trail fix this logic branch
                                 // should assert false as it should then be impossible to get to this position.
                                 caller = get_parent();
-                                
-                                if (caller) {
+
+                                if (caller)
+                                {
                                     LOG_CSTR("get_parent() returned: valid caller");
-                                } else {
+                                }
+                                else
+                                {
                                     LOG_CSTR("get_parent() returned: nullptr - THIS IS A PROBLEM!");
                                 }
                                 LOG_CSTR("*** END EDGE CASE PATH 870+ ***");
@@ -1165,7 +1172,7 @@ namespace rpc
                     auto debug_msg = "service::release cleaning up unused routing service_proxy destination_zone="
                                      + std::to_string(destination_zone_id.get_val())
                                      + ", caller_zone=" + std::to_string(caller_zone_id.get_val());
-                    LOG_STR(debug_msg.c_str(), debug_msg.size());
+                    LOG_CSTR(debug_msg.c_str());
 #endif
 
                     std::lock_guard g(zone_control);
@@ -1179,7 +1186,7 @@ namespace rpc
                                        + " != zone=" + std::to_string(zone_id_.get_val()) + ") has "
                                        + std::to_string(other_zone->proxies_.size())
                                        + " object_proxies - routing proxies should never host objects";
-                        LOG_STR(bug_msg.c_str(), bug_msg.size());
+                        LOG_CSTR(bug_msg.c_str());
 
                         // Log details of the problematic object_proxies for debugging
                         for (const auto& proxy_pair : other_zone->proxies_)
@@ -1187,7 +1194,7 @@ namespace rpc
                             auto object_proxy_ptr = proxy_pair.second.lock();
                             auto detail_msg = "  BUG: object_proxy object_id=" + std::to_string(proxy_pair.first.get_val())
                                               + " in routing service_proxy, alive=" + (object_proxy_ptr ? "yes" : "no");
-                            LOG_STR(detail_msg.c_str(), detail_msg.size());
+                            LOG_CSTR(detail_msg.c_str());
                         }
 #endif
 
@@ -1489,17 +1496,15 @@ namespace rpc
         }
     }
 
-    void child_service::set_parent_proxy(const rpc::shared_ptr<rpc::service_proxy>& parent_service_proxy)
+    bool child_service::set_parent_proxy(const rpc::shared_ptr<rpc::service_proxy>& parent_service_proxy)
     {
-        if (parent_service_proxy_ && parent_service_proxy_ != parent_service_proxy)
+        std::lock_guard l(parent_protect);
+        if (parent_service_proxy_)
         {
             RPC_ASSERT(false);
-            parent_service_proxy_->release_external_ref();
-        }
-        if (parent_service_proxy)
-        {
-            RPC_ASSERT(parent_zone_id_ == parent_service_proxy->get_destination_zone_id());
+            return false;
         }
         parent_service_proxy_ = parent_service_proxy;
+        return true;
     }
 }

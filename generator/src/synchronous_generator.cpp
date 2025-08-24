@@ -727,6 +727,7 @@ namespace synchronous_generator
                   "with your error code system to the rpc library");
             proxy("//this is only here to handle rpc generated errors and not application errors");
             proxy("//clean up any input stubs, this code has to assume that the destination is behaving correctly");
+            proxy("printf(\"failed in {}\");", function->get_name());
             {
                 uint64_t count = 1;
                 for (auto& parameter : function->get_parameters())

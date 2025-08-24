@@ -22,6 +22,7 @@
 #include "in_memory_setup.h"
 #include "inproc_setup.h"
 #include "enclave_setup.h"
+#include "crash_handler.h"
 
 // This list should be kept sorted.
 using testing::_;
@@ -62,7 +63,7 @@ std::string enclave_path = "./libmarshal_test_enclave.signed.so";
 #ifdef USE_RPC_TELEMETRY
 TELEMETRY_SERVICE_MANAGER
 #endif
-bool enable_telemetry_server = true;
+bool enable_telemetry_server = false;
 bool enable_multithreaded_tests = false;
 
 rpc::weak_ptr<rpc::service> current_host_service;
@@ -74,20 +75,86 @@ namespace
 
     extern "C" int main(int argc, char* argv[])
     {
+        // Parse command line arguments
         for (size_t i = 1; i < argc; ++i)
         {
             std::string arg = argv[i];
-            if (arg == "-t" || arg == "--disable_telemetry_server")
-                enable_telemetry_server = false;
+            if (arg == "-t" || arg == "--enable_telemetry_server")
+                enable_telemetry_server = true;
             if (arg == "-m" || arg == "--enable_multithreaded_tests")
                 enable_multithreaded_tests = true;
         }
 
-        // Initialize global logger for consistent logging
-        rpc_global_logger::get_logger();
-        ::testing::InitGoogleTest(&argc, argv);
-        auto ret = RUN_ALL_TESTS();
-        rpc_global_logger::reset_logger();
+        // Initialize comprehensive crash handler with multi-threaded support
+        crash_handler::CrashHandler::Config crash_config;
+        crash_config.enable_multithreaded_traces = true;
+        crash_config.enable_symbol_resolution = true;
+        crash_config.enable_threading_debug_info = true;
+        crash_config.enable_pattern_detection = true;
+        crash_config.max_stack_frames = 64;
+        crash_config.max_threads = 50;
+        crash_config.save_crash_dump = true;
+        crash_config.crash_dump_path = "/tmp";
+
+        // Set up custom crash analysis callback
+        crash_handler::CrashHandler::SetAnalysisCallback(
+            [](const crash_handler::CrashHandler::CrashReport& report) {
+                std::cout << "\n=== CUSTOM CRASH ANALYSIS ===" << std::endl;
+                std::cout << "Crash occurred at: " << std::chrono::duration_cast<std::chrono::seconds>(
+                    report.crash_time.time_since_epoch()).count() << std::endl;
+                
+                // Check for threading debug patterns
+                bool threading_bug_detected = false;
+                for (const auto& pattern : report.detected_patterns) {
+                    if (pattern.find("THREADING") != std::string::npos || 
+                        pattern.find("ZONE PROXY") != std::string::npos) {
+                        threading_bug_detected = true;
+                        break;
+                    }
+                }
+                
+                if (threading_bug_detected) {
+                    std::cout << "🐛 THREADING BUG CONFIRMED: This crash was caused by a race condition!" << std::endl;
+                    std::cout << "   The threading debug system successfully detected the issue." << std::endl;
+                } else {
+                    std::cout << "ℹ️  Standard crash - not detected as threading-related." << std::endl;
+                }
+                
+                std::cout << "=== END CUSTOM ANALYSIS ===" << std::endl;
+            }
+        );
+
+        if (!crash_handler::CrashHandler::Initialize(crash_config)) {
+            std::cerr << "Failed to initialize crash handler" << std::endl;
+            return 1;
+        }
+
+        std::cout << "[Main] Comprehensive crash handler initialized" << std::endl;
+        std::cout << "[Main] - Multi-threaded stack traces: ENABLED" << std::endl;
+        std::cout << "[Main] - Symbol resolution: ENABLED" << std::endl;
+        std::cout << "[Main] - Threading debug integration: ENABLED" << std::endl;
+        std::cout << "[Main] - Pattern detection: ENABLED" << std::endl;
+        std::cout << "[Main] - Crash dumps will be saved to: " << crash_config.crash_dump_path << std::endl;
+
+        int ret = 0;
+        try {
+            // Initialize global logger for consistent logging
+            rpc_global_logger::get_logger();
+            ::testing::InitGoogleTest(&argc, argv);
+            ret = RUN_ALL_TESTS();
+            rpc_global_logger::reset_logger();
+        } catch (const std::exception& e) {
+            std::cerr << "Exception caught in main: " << e.what() << std::endl;
+            ret = 1;
+        } catch (...) {
+            std::cerr << "Unknown exception caught in main" << std::endl;
+            ret = 1;
+        }
+
+        // Cleanup crash handler
+        crash_handler::CrashHandler::Shutdown();
+        std::cout << "[Main] Crash handler shutdown complete" << std::endl;
+
         return ret;
     }
 }
