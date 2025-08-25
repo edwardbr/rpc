@@ -66,8 +66,15 @@ namespace rpc
     {
 #ifdef USE_RPC_TELEMETRY
         if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
-            telemetry_service->on_service_creation(name, zone_id);
+            telemetry_service->on_service_creation(name, zone_id, destination_zone{0});
 #endif
+    }
+
+    service::service(const char* name, zone zone_id, child_service_tag)
+        : zone_id_(zone_id)
+        , name_(name)
+    {
+        // No telemetry call for child services
     }
 
     service::~service()
@@ -1480,6 +1487,16 @@ namespace rpc
             return nullptr;
         return interface_stub->get_castable_interface();
     }
+    
+    child_service::child_service(const char* name, zone zone_id, destination_zone parent_zone_id)
+            : service(name, zone_id, child_service_tag{})
+            , parent_zone_id_(parent_zone_id)
+        {
+#ifdef USE_RPC_TELEMETRY
+            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+                telemetry_service->on_service_creation(name, zone_id, parent_zone_id);
+#endif            
+        }    
 
     child_service::~child_service()
     {

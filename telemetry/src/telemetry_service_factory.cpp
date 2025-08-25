@@ -1,7 +1,4 @@
-#include <iostream>
 #include <unordered_map>
-#include <chrono>
-#include <thread>
 
 #include <rpc/basic_service_proxies.h>
 
@@ -11,8 +8,6 @@
 #include <rpc/telemetry/telemetry_handler.h>
 #include <rpc/telemetry/host_telemetry_service.h>
 #include <rpc/telemetry/console_telemetry_service.h>
-
-using namespace std::chrono_literals;
 #endif
 
 namespace rpc

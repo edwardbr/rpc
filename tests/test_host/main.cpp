@@ -153,7 +153,7 @@ namespace
 
         // Cleanup crash handler
         crash_handler::CrashHandler::Shutdown();
-        std::cout << "[Main] Crash handler shutdown complete" << std::endl;
+        std::cout << "[Main] test shutdown complete" << std::endl;
 
         return ret;
     }

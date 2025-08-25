@@ -1,22 +1,17 @@
-#include <iostream>
 #include <unordered_map>
-#include <chrono>
-#include <thread>
 
 #include <rpc/basic_service_proxies.h>
 
 #include <rpc/telemetry/i_telemetry_service.h>
 #include <rpc/telemetry/telemetry_handler.h>
 
-using namespace std::chrono_literals;
-
 // an ocall for logging the test
 extern "C"
 {
-    void on_service_creation_host(const char* name, uint64_t zone_id)
+    void on_service_creation_host(const char* name, uint64_t zone_id, uint64_t parent_zone_id)
     {
         if (auto telemetry_service = rpc::telemetry_service_manager::get())
-            telemetry_service->on_service_creation(name, {zone_id});
+            telemetry_service->on_service_creation(name, {zone_id}, {parent_zone_id});
     }
     void on_service_deletion_host(uint64_t zone_id)
     {

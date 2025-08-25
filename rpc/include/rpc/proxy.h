@@ -8,9 +8,6 @@
 #include <memory>
 #include <unordered_map>
 #include <mutex>
-#include <thread>
-#include <execinfo.h>
-#include <sstream>
 #include <atomic>
 
 #include <rpc/logger.h>
@@ -912,7 +909,6 @@ namespace rpc
                 new_proxy_added);
         }
 
-        bool is_new = false;
         rpc::shared_ptr<object_proxy> op = service_proxy->get_or_create_object_proxy(
             encap.object_id, service_proxy::object_proxy_creation_rule::RELEASE_IF_NOT_NEW, false);
         if (!op)
@@ -983,7 +979,6 @@ namespace rpc
         if (serv->get_parent_zone_id() == service_proxy->get_destination_zone_id())
             service_proxy->add_external_ref();
 
-        bool is_new = false;
         rpc::shared_ptr<object_proxy> op = service_proxy->get_or_create_object_proxy(
             encap.object_id, service_proxy::object_proxy_creation_rule::DO_NOTHING, false);
         if (!op)

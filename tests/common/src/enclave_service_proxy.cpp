@@ -152,7 +152,7 @@ namespace rpc
             error += std::to_string(status);
             LOG_STR(error.c_str(), error.length());
 #endif
-            RPC_ASSERT(!error.c_str());
+            RPC_ASSERT(false);
             return rpc::error::TRANSPORT_ERROR();
         }
 
@@ -192,7 +192,7 @@ namespace rpc
                 error += std::to_string(status);
                 LOG_STR(error.c_str(), error.length());
 #endif
-                RPC_ASSERT(!error.c_str());
+                RPC_ASSERT(false);
                 return rpc::error::TRANSPORT_ERROR();
             }
         }
@@ -234,7 +234,7 @@ namespace rpc
             error += std::to_string(status);
             LOG_STR(error.c_str(), error.length());
 #endif
-            RPC_ASSERT(!error.c_str());
+            RPC_ASSERT(false);
             return rpc::error::TRANSPORT_ERROR();
         }
         return err_code;
@@ -301,7 +301,7 @@ namespace rpc
             error += std::to_string(status);
             LOG_STR(error.c_str(), error.length());
 #endif
-            RPC_ASSERT(!error.c_str());
+            RPC_ASSERT(false);
             return add_ref_failed_val;
         }
         return ret;
@@ -341,7 +341,7 @@ namespace rpc
             error += std::to_string(status);
             LOG_STR(error.c_str(), error.length());
 #endif
-            RPC_ASSERT(!error.c_str());
+            RPC_ASSERT(false);
             return std::numeric_limits<uint64_t>::max();
         }
         return ret;

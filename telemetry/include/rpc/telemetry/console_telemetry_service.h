@@ -52,8 +52,7 @@ namespace rpc
         console_telemetry_service(const console_telemetry_service&) = delete;
         console_telemetry_service& operator=(const console_telemetry_service&) = delete;
 
-        void on_service_creation(const char* name, rpc::zone zone_id) const override;
-        void on_child_zone_creation(const char* name, rpc::zone child_zone_id, rpc::destination_zone parent_zone_id) const override;
+        void on_service_creation(const char* name, rpc::zone zone_id, rpc::destination_zone parent_zone_id) const override;
         void on_service_deletion(rpc::zone zone_id) const override;
         void on_service_try_cast(rpc::zone zone_id,
             rpc::destination_zone destination_zone_id,
