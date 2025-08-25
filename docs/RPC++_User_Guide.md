@@ -1,0 +1,839 @@
+# RPC++ User Guide
+
+**A Modern C++ Remote Procedure Call Library**
+
+*Version 2.2.0*
+
+---
+
+## Table of Contents
+
+1. [Introduction](#introduction)
+2. [What are Remote Procedure Calls?](#what-are-remote-procedure-calls)
+3. [Interface Definition Language (IDL)](#interface-definition-language-idl)
+4. [Code Generators and Language Support](#code-generators-and-language-support)
+5. [Telemetry System](#telemetry-system)
+6. [Logging Framework](#logging-framework)
+7. [Multithreading and Coroutines](#multithreading-and-coroutines)
+8. [Service Proxies and Transport Abstraction](#service-proxies-and-transport-abstraction)
+9. [The i_marshaller Interface](#the-i_marshaller-interface)
+10. [Getting Started](#getting-started)
+11. [Architecture Overview](#architecture-overview)
+
+---
+
+## Introduction
+
+RPC++ is a modern C++ Remote Procedure Call library designed for type-safe communication across different execution contexts including in-process calls, inter-process communication, remote machines, embedded devices, and secure enclaves (SGX). 
+
+**Key Features:**
+- **Pure C++ Experience**: Native C++ type support with automatic code generation
+- **Transport Agnostic**: Works across processes, threads, memory arenas, enclaves, and networks
+- **Type Safe**: Full C++ type system integration with compile-time verification
+- **High Performance**: Zero-copy serialization where possible
+- **Modern Design**: C++17 features, coroutine support (planned), and extensive telemetry
+
+The library treats transport protocols and programming APIs as separate concerns, allowing developers to focus on business logic rather than communication details.
+
+---
+
+## What are Remote Procedure Calls?
+
+Remote Procedure Calls (RPC) enable applications to communicate with each other without getting entangled in underlying communication protocols. You can easily create APIs accessible from different machines, processes, arenas, or embedded devices without worrying about serialization.
+
+### How RPC Works
+
+RPC calls are function calls that appear to run locally but are actually serialized and sent to a different location where parameters are unpacked and the function is executed. Return values are sent back similarly, making the caller potentially unaware that the call was made remotely.
+
+**The RPC Flow:**
+1. **Caller** → calls function through a **Proxy** (same signature as implementation)
+2. **Proxy** → packages call and sends to intended target
+3. **Target** → receives call through **Stub** that unpacks request
+4. **Stub** → calls actual function on caller's behalf
+5. **Return** → results flow back through the same path
+
+### Interface Definition Language (IDL)
+
+Functions are defined in Interface Definition Language files (`.idl`) that describe:
+- **Interfaces**: Pure abstract virtual base classes in C++
+- **Structures**: Data types with C++ STL support
+- **Namespaces**: Organizational boundaries
+- **Attributes**: Metadata including JSON schema descriptions
+
+**Example IDL File:**
+```idl
+namespace calculator {
+    
+    struct complex_number {
+        double real;
+        double imaginary;
+    };
+    
+    [description="Mathematical calculator interface"]
+    interface i_calculator {
+        [description="Adds two integers and returns the result"]
+        error_code add(int a, int b, [out, by_value] int& result);
+        
+        [description="Computes complex number multiplication"]
+        error_code multiply_complex(
+            const complex_number& a, 
+            const complex_number& b, 
+            [out, by_value] complex_number& result
+        );
+        
+        [description="Gets the calculation history"]
+        error_code get_history([out, by_value] std::vector<std::string>& operations);
+    };
+}
+```
+
+### IDL Syntax and Features
+
+**Supported Types:**
+- **Basic Types**: `int`, `uint64_t`, `double`, `bool`, `std::string`
+- **STL Containers**: `std::vector<T>`, `std::map<K,V>`, `std::set<T>`, `std::array<T,N>`
+- **Smart Types**: `std::optional<T>`, `std::variant<T1,T2,...>`
+- **Custom Structures**: User-defined POD types
+- **Interface References**: `rpc::shared_ptr<interface_type>`
+
+**Parameter Attributes:**
+- **`[in]`**: Input parameter (default)
+- **`[out]`**: Output parameter  
+- **`[by_value]`**: Pass by value (required for out parameters)
+- **`[by_ref]`**: Pass by reference (default for in parameters)
+
+**Interface Attributes:**
+- **`[description="text"]`**: Human-readable descriptions for JSON schema generation
+- **`[deprecated]`**: Mark interfaces/functions as deprecated
+
+---
+
+## Code Generators and Language Support
+
+### The Synchronous Generator
+
+The primary code generator (`synchronous_generator.cpp`) reads IDL files and produces:
+
+1. **Header Files** (`.h`):
+   - Pure virtual base classes for interfaces
+   - Structure definitions
+   - Function metadata with MCP integration
+   - Type serialization support
+
+2. **Proxy Implementation** (`.cpp`):
+   - Client-side proxy classes that marshal calls
+   - Error handling with enclave-compatible logging
+   - JSON schema generation for metadata support
+   - Template parameter resolution for complex types
+
+3. **Stub Implementation** (`.cpp`):
+   - Server-side stub classes that unmarshal calls
+   - Automatic interface routing
+   - Type-safe parameter handling
+
+**Generated Code Example:**
+```cpp
+// Generated from calculator.idl
+namespace calculator {
+    
+    class i_calculator_proxy : public rpc::proxy_impl<i_calculator> {
+    public:
+        error_code add(int a, int b, int& result) override {
+            // Automatic marshalling, transport, and error handling
+            // ...
+        }
+    };
+    
+    // JSON Schema Integration - automatically generated
+    std::vector<rpc::function_info> i_calculator::get_function_info() {
+        return {
+            {"calculator.i_calculator.add", "add", {1}, 0, false, 
+             "Adds two integers and returns the result",
+             R"({"type":"object","properties":{"a":{"type":"integer"},"b":{"type":"integer"}}})"}
+        };
+    }
+}
+```
+
+### Extensibility to Other Languages and Formats
+
+The generator architecture is designed for extensibility:
+
+**Other Serialization Formats:**
+- **Current**: YAS (Yet Another Serialization) library
+- **Planned**: Protocol Buffers, MessagePack, Apache Avro
+- **Custom**: Plugin architecture for proprietary formats
+
+**Other Programming Languages:**
+- **Python**: Generate Python binding code with ctypes/pybind11
+- **JavaScript/TypeScript**: Generate web-compatible RPC clients
+- **Rust**: Generate safe Rust bindings
+- **Go**: Generate Go client libraries
+
+**Implementation Pattern:**
+```cpp
+class custom_generator : public base_generator {
+public:
+    void generate_language_binding(const interface& iface) {
+        // Language-specific code generation
+        output_file_ << generate_client_stub(iface);
+        output_file_ << generate_serialization(iface);
+    }
+    
+    void generate_serialization_format(const structure& struct_def) {
+        // Custom serialization protocol
+    }
+};
+```
+
+---
+
+## Telemetry System
+
+RPC++ includes a comprehensive telemetry system for monitoring distributed RPC operations across complex topologies.
+
+### Core Telemetry Interfaces
+
+**i_telemetry_service** - Base interface for all telemetry implementations:
+```cpp
+class i_telemetry_service {
+public:
+    // Service lifecycle tracking
+    virtual void on_service_creation(const char* name, rpc::zone zone_id, rpc::destination_zone parent_zone_id) = 0;
+    virtual void on_service_deletion(rpc::zone zone_id) = 0;
+    
+    // RPC operation monitoring  
+    virtual void on_service_try_cast(rpc::zone zone_id, rpc::destination_zone destination_zone_id, /* ... */) = 0;
+    virtual void on_service_add_ref(/* reference counting parameters */) = 0;
+    virtual void on_service_release(/* release parameters */) = 0;
+    
+    // Interface proxy lifecycle
+    virtual void on_interface_proxy_creation(const char* interface_name, /* ... */) = 0;
+    virtual void on_interface_proxy_send(const char* method_name, /* ... */) = 0;
+    virtual void on_interface_proxy_deletion(/* ... */) = 0;
+    
+    // Custom events and debugging
+    virtual void message(level level, const char* msg) = 0;
+};
+```
+
+### Telemetry Implementations
+
+**1. Console Telemetry Service**
+- Real-time visualization of zone hierarchies and communication
+- Color-coded output for different zones
+- Topology diagrams showing parent-child relationships
+- Thread-safe async logging with spdlog integration
+
+**2. Host Telemetry Service**
+- File-based logging for persistent monitoring
+- Performance metrics and timing information
+- Statistical analysis of RPC patterns
+- Integration with external monitoring systems
+
+**3. Enclave Telemetry Service**
+- SGX-compatible telemetry for secure enclaves
+- Minimal overhead operation
+- Secure logging through untrusted proxy
+
+### Telemetry Features
+
+**Zone Topology Visualization:**
+```
+=== TOPOLOGY DIAGRAM ===
+Zone Hierarchy:
+  Zone 1: host_service 
+  ├─ Zone 2: main_child_service 
+     ├─ Zone 3: example_service 
+     └─ Zone 4: worker_service
+=========================
+```
+
+**Real-time Communication Tracking:**
+- Inter-zone call monitoring with timing
+- Reference counting operation tracking  
+- Interface proxy lifecycle management
+- Custom event logging with structured data
+
+### Configuration and Usage
+
+```cpp
+// Enable comprehensive telemetry
+#define USE_RPC_TELEMETRY
+#define USE_RPC_TELEMETRY_RAII_LOGGING  // Detailed proxy lifecycle
+
+// Initialize telemetry service
+auto telemetry = std::make_shared<rpc::console_telemetry_service>();
+rpc::telemetry_service_manager::set(telemetry);
+
+// Automatic integration with RPC operations
+// Telemetry calls are inserted automatically by code generation
+```
+
+---
+
+## Logging Framework
+
+Separate from telemetry, RPC++ provides a dedicated logging system optimized for performance and enclave compatibility.
+
+### Logger Interface
+
+**Enclave-Compatible Design:**
+```cpp
+// Conditional compilation for different environments
+#ifdef _IN_ENCLAVE
+    // SGX-safe logging functions
+    extern "C" sgx_status_t rpc_log(const char* str, size_t sz);
+    #define LOG_CSTR(str) rpc_log(str, strlen(str))
+#else 
+    // Standard logging functions
+    extern "C" void rpc_log(const char* str, size_t sz);
+    #define LOG_CSTR(str) rpc_log(str, strlen(str))
+#endif
+```
+
+### Logging Capabilities
+
+**Performance Optimized:**
+- Zero-overhead when disabled (`USE_RPC_LOGGING=OFF`)
+- Minimal string formatting overhead
+- Direct C-style logging for maximum performance
+
+**Multi-Environment Support:**
+- Host applications: Full featured logging
+- SGX Enclaves: Secure, restricted logging
+- Embedded systems: Minimal footprint logging
+
+**Thread Safety:**
+- Lock-free logging paths where possible
+- Thread-safe buffer management
+- Async logging support for high-throughput scenarios
+
+---
+
+## Multithreading and Coroutines
+
+### Current Multithreading Support
+
+RPC++ is designed as a **fully multithreaded system** with comprehensive thread-safety mechanisms:
+
+**Thread-Safe Components:**
+- **Service Registration**: Atomic reference counting and mutex-protected data structures
+- **Proxy Management**: Thread-safe proxy creation, caching, and cleanup
+- **Object Lifecycle**: Reference counting with race condition detection
+- **Zone Communication**: Synchronized inter-zone call routing
+
+**Synchronization Primitives:**
+```cpp
+// Service-level synchronization
+std::recursive_mutex service_protect_; // Service state protection
+std::mutex insert_control_;            // Proxy insertion synchronization
+
+// Reference counting atomics
+std::atomic<int> lifetime_lock_count_;  // External reference tracking
+std::atomic<int> inherited_reference_count_; // Race condition handling
+```
+
+**Threading Debug System:**
+- Comprehensive crash handler with multi-threaded stack trace collection
+- Threading bug detection and pattern analysis
+- Reference counting validation and leak detection
+- Real-time thread state monitoring
+
+### Coroutine Support (Planned)
+
+**Async/Await Pattern:**
+```cpp
+// Planned coroutine interface
+rpc::task<int> calculator_service::add_async(int a, int b) {
+    // Asynchronous RPC call
+    auto result = co_await remote_calculator->add(a, b);
+    co_return result;
+}
+
+// Usage
+auto task = calculator->add_async(5, 3);
+int result = co_await task;
+```
+
+**Benefits of Coroutine Integration:**
+- **Non-blocking I/O**: Efficient handling of remote calls
+- **Scalability**: Support for thousands of concurrent operations
+- **Composability**: Easy chaining of async operations
+- **Exception Safety**: Proper cleanup on coroutine cancellation
+
+### Thread Safety Best Practices
+
+**Reference Counting Patterns:**
+```cpp
+// RAII-based reference management
+class scoped_service_proxy_ref {
+    rpc::shared_ptr<service_proxy> proxy_;
+public:
+    scoped_service_proxy_ref(rpc::shared_ptr<service_proxy> p) : proxy_(p) {
+        if (proxy_) proxy_->add_external_ref();
+    }
+    ~scoped_service_proxy_ref() {
+        if (proxy_) proxy_->release_external_ref();
+    }
+};
+```
+
+---
+
+## Service Proxies and Transport Abstraction
+
+Service proxies provide the transport abstraction layer that enables RPC++ to work across different communication mechanisms.
+
+### Why Custom Service Proxies?
+
+Users are **strongly encouraged** to write custom service proxies to:
+
+1. **Attach Different Transports**:
+   - TCP/IP networking
+   - Named pipes
+   - Shared memory
+   - Message queues
+   - Custom protocols
+
+2. **Implement Security Subsystems**:
+   - Authentication and authorization
+   - Encryption and secure channels
+   - Certificate validation
+   - Access control policies
+
+3. **Add Custom Features**:
+   - Compression and decompression
+   - Request routing and load balancing
+   - Circuit breakers and retry logic
+   - Custom serialization formats
+
+### Service Proxy Architecture
+
+**Base Class Interface:**
+```cpp
+class service_proxy : public i_marshaller {
+protected:
+    destination_zone destination_zone_id_;
+    zone caller_zone_id_;
+    
+public:
+    // Core marshalling interface
+    virtual int send(uint64_t protocol_version, encoding enc, uint64_t tag,
+                    caller_channel_zone caller_channel_zone_id,
+                    caller_zone caller_zone_id, destination_zone destination_zone_id,
+                    object object_id, interface_ordinal interface_id, method method_id,
+                    size_t data_in_sz, const char* data_in, 
+                    std::vector<char>& data_out) = 0;
+    
+    // Reference counting for distributed objects
+    virtual uint64_t add_ref(uint64_t protocol_version, /* ... */) = 0;
+    virtual uint64_t release(uint64_t protocol_version, /* ... */) = 0;
+    virtual int try_cast(uint64_t protocol_version, /* ... */) = 0;
+    
+    // Lifecycle management
+    virtual void add_external_ref() = 0;
+    virtual int release_external_ref() = 0;
+};
+```
+
+### Built-in Service Proxy Types
+
+**1. In-Memory Service Proxy**
+- Direct function calls within the same process
+- Zero serialization overhead
+- Immediate execution
+
+**2. Arena Service Proxy** 
+- Communication between different memory arenas
+- Memory management isolation
+- Fault tolerance boundaries
+
+**3. SGX Enclave Service Proxy**
+- Secure communication with SGX enclaves
+- Hardware-enforced security boundaries
+- Attestation and secure channel establishment
+
+**4. Host Service Proxy**
+- Communication from enclave to untrusted host
+- Careful data validation and sanitization
+- Security policy enforcement
+
+### Custom Transport Implementation Example
+
+```cpp
+class tcp_service_proxy : public service_proxy {
+private:
+    std::string remote_host_;
+    uint16_t remote_port_;
+    std::unique_ptr<tcp_connection> connection_;
+    
+public:
+    tcp_service_proxy(const std::string& host, uint16_t port) 
+        : remote_host_(host), remote_port_(port) {
+        connection_ = std::make_unique<tcp_connection>(host, port);
+    }
+    
+    int send(uint64_t protocol_version, encoding enc, uint64_t tag,
+             caller_channel_zone caller_channel_zone_id,
+             caller_zone caller_zone_id, destination_zone destination_zone_id,
+             object object_id, interface_ordinal interface_id, method method_id,
+             size_t data_in_sz, const char* data_in,
+             std::vector<char>& data_out) override {
+        
+        // 1. Serialize RPC header
+        rpc_header header{protocol_version, enc, tag, /* ... */};
+        
+        // 2. Send header + payload over TCP
+        connection_->send(reinterpret_cast<char*>(&header), sizeof(header));
+        connection_->send(data_in, data_in_sz);
+        
+        // 3. Receive response
+        rpc_response_header response;
+        connection_->receive(reinterpret_cast<char*>(&response), sizeof(response));
+        
+        data_out.resize(response.payload_size);
+        connection_->receive(data_out.data(), response.payload_size);
+        
+        return response.error_code;
+    }
+    
+    // Implement reference counting, try_cast, etc.
+};
+```
+
+### Security Integration Example
+
+```cpp
+class authenticated_service_proxy : public service_proxy {
+private:
+    std::shared_ptr<authentication_service> auth_;
+    std::string session_token_;
+    
+public:
+    int send(/* parameters */) override {
+        // 1. Validate session token
+        if (!auth_->validate_token(session_token_)) {
+            return rpc::error::AUTHENTICATION_FAILED();
+        }
+        
+        // 2. Apply authorization policies
+        if (!auth_->authorize_call(interface_id, method_id, session_token_)) {
+            return rpc::error::AUTHORIZATION_FAILED();
+        }
+        
+        // 3. Encrypt payload
+        auto encrypted_data = encrypt_payload(data_in, data_in_sz);
+        
+        // 4. Forward to underlying transport
+        return underlying_proxy_->send(/* encrypted parameters */);
+    }
+};
+```
+
+---
+
+## The i_marshaller Interface
+
+The `i_marshaller` interface is the core abstraction that enables RPC++ to work across different transport mechanisms and execution contexts.
+
+### Interface Definition
+
+```cpp
+class i_marshaller {
+public:
+    virtual ~i_marshaller() = default;
+    
+    // Core RPC call marshalling
+    virtual int send(uint64_t protocol_version, encoding enc, uint64_t tag,
+                    caller_channel_zone caller_channel_zone_id,
+                    caller_zone caller_zone_id, 
+                    destination_zone destination_zone_id,
+                    object object_id, 
+                    interface_ordinal interface_id, 
+                    method method_id,
+                    size_t data_in_sz, const char* data_in,
+                    std::vector<char>& data_out) = 0;
+    
+    // Distributed object lifecycle management
+    virtual int try_cast(uint64_t protocol_version,
+                        destination_zone destination_zone_id,
+                        object object_id,
+                        interface_ordinal interface_id) = 0;
+    
+    virtual uint64_t add_ref(uint64_t protocol_version,
+                           destination_channel_zone destination_channel_zone_id,
+                           destination_zone destination_zone_id,
+                           object object_id,
+                           caller_channel_zone caller_channel_zone_id,
+                           caller_zone caller_zone_id,
+                           add_ref_options options) = 0;
+    
+    virtual uint64_t release(uint64_t protocol_version,
+                           destination_zone destination_zone_id,
+                           object object_id,
+                           caller_zone caller_zone_id) = 0;
+};
+```
+
+### Function-by-Function Analysis
+
+#### 1. send() - Core RPC Call Marshalling
+
+**Purpose**: The primary function for executing remote procedure calls.
+
+**Parameters Explained:**
+- **`protocol_version`**: Version compatibility check for wire protocol
+- **`encoding`**: Serialization format (YAS binary, JSON, etc.)  
+- **`tag`**: Unique identifier for call correlation and debugging
+- **Zone Parameters**: Complex routing information for multi-hop calls
+- **`object_id`**: Target object instance identifier
+- **`interface_id`**: Interface type identifier for polymorphic dispatch
+- **`method_id`**: Specific method within the interface
+- **`data_in/data_out`**: Serialized parameter data
+
+**Use Cases:**
+```cpp
+// Direct function call marshalling
+int result = send(RPC_VERSION_1, encoding::YAS_BINARY, generate_tag(),
+                 caller_channel, caller_zone, destination_zone,
+                 object_42, i_calculator_id, add_method_id,
+                 serialized_params.size(), serialized_params.data(),
+                 response_buffer);
+```
+
+#### 2. try_cast() - Interface Type Checking
+
+**Purpose**: Determine if a remote object supports a specific interface (similar to `dynamic_cast`).
+
+**Implementation Pattern:**
+```cpp
+// Check if remote object supports i_calculator interface
+int cast_result = try_cast(RPC_VERSION_1, destination_zone, object_id, i_calculator_id);
+if (cast_result == rpc::error::OK()) {
+    // Object supports interface, safe to call calculator methods
+    auto calculator = create_interface_proxy<i_calculator>(object_id);
+}
+```
+
+**Error Cases:**
+- `rpc::error::INTERFACE_NOT_SUPPORTED()` - Object doesn't implement interface
+- `rpc::error::OBJECT_NOT_FOUND()` - Object no longer exists
+- `rpc::error::TRANSPORT_ERROR()` - Communication failure
+
+#### 3. add_ref() - Complex Reference Counting
+
+**Purpose**: The most sophisticated function in the interface, managing distributed object lifetimes across complex zone topologies.
+
+**The add_ref_options System:**
+```cpp
+enum add_ref_options {
+    normal = 1,                    // Standard reference counting
+    build_destination_route = 2,   // Unidirectional add_ref to destination
+    build_caller_route = 4         // Unidirectional add_ref to caller (reverse)
+};
+```
+
+**Complex Routing Scenarios:**
+
+**Scenario 1: Direct Reference** (`options = normal`)
+```
+Zone A → Zone B
+```
+Simple increment of reference count on target object.
+
+**Scenario 2: Destination Route Building** (`options = build_destination_route`)
+```
+Zone A → Zone B → Zone C
+```
+Establishes forward routing path for future calls from A to C via B.
+
+**Scenario 3: Caller Route Building** (`options = build_caller_route`)  
+```
+Zone C ← Zone B ← Zone A
+```
+Establishes reverse routing path for callbacks from C back to A via B.
+
+**Scenario 4: Bidirectional Route Building** (`options = build_destination_route | build_caller_route`)
+```
+Zone A ↔ Zone B ↔ Zone C
+```
+Establishes routing in both directions for complex interface passing scenarios.
+
+**Channel vs Zone Distinction:**
+- **`destination_zone_id`**: Final target zone containing the object
+- **`destination_channel_zone_id`**: Next hop in routing chain (may be different)
+- **`caller_zone_id`**: Original zone making the reference
+- **`caller_channel_zone_id`**: Previous hop in routing chain
+
+**Edge Case Handling:**
+The implementation includes two critical untested paths:
+
+1. **Line 792 Path**: When `dest_channel == caller_channel && build_channel` - occurs when zone is "passing the buck" to another zone
+2. **Line 870 Path**: When building caller route but caller zone is unknown - uses `get_parent()` fallback
+
+#### 4. release() - Reference Cleanup
+
+**Purpose**: Decrement reference count and clean up resources when objects are no longer needed.
+
+**Implementation Considerations:**
+```cpp
+// Standard release pattern
+uint64_t remaining_refs = release(RPC_VERSION_1, destination_zone, object_id, caller_zone);
+if (remaining_refs == 0) {
+    // Object has been destroyed on remote side
+    // Local proxy should be cleaned up
+}
+```
+
+**Synchronization with add_ref():**
+Every `add_ref()` call must be balanced with a corresponding `release()` call to prevent resource leaks. The reference counting system tracks this automatically but requires careful implementation in custom service proxies.
+
+### Implementation Best Practices
+
+**1. Error Handling:**
+```cpp
+int send_result = send(/* parameters */);
+if (send_result != rpc::error::OK()) {
+    // Handle transport errors, timeouts, serialization failures
+    LOG_CSTR("RPC call failed with error: " + std::to_string(send_result));
+    return send_result;
+}
+```
+
+**2. Reference Counting Balance:**
+```cpp
+// Always balance add_ref with release
+auto ref_count = add_ref(/* parameters */);
+// ... use object ...
+auto remaining = release(/* parameters */);
+```
+
+**3. Protocol Version Handling:**
+```cpp
+if (protocol_version > MAX_SUPPORTED_VERSION) {
+    return rpc::error::VERSION_NOT_SUPPORTED();
+}
+```
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+- **C++ Compiler**: Clang 10+, GCC 9.4+, or Visual Studio 2017+
+- **CMake**: Version 3.24 or higher
+- **Build System**: Ninja (recommended) or Make
+
+### Basic Setup
+
+1. **Clone and Configure:**
+```bash
+git clone <rpc-repository>
+cd rpc2
+mkdir build
+cd build
+cmake .. -G Ninja
+```
+
+2. **Build the Library:**
+```bash
+cmake --build . --target rpc
+```
+
+3. **Create Your First IDL:**
+```idl
+// hello.idl
+namespace hello {
+    [description="Simple greeting service"]
+    interface i_greeter {
+        [description="Returns a personalized greeting"]
+        error_code greet(const std::string& name, [out, by_value] std::string& greeting);
+    };
+}
+```
+
+4. **Generate Code:**
+```bash
+cmake --build . --target hello_idl
+```
+
+5. **Implement Service:**
+```cpp
+#include "hello/hello.h"
+
+class greeter_impl : public hello::i_greeter {
+public:
+    error_code greet(const std::string& name, std::string& greeting) override {
+        greeting = "Hello, " + name + "!";
+        return rpc::error::OK();
+    }
+};
+```
+
+### CMake Integration
+
+```cmake
+# Add RPC++ to your project
+find_package(rpc REQUIRED)
+
+# Generate code from IDL
+RPCGenerate(
+    hello                    # Target name
+    hello.idl               # IDL file
+    HEADER hello/hello.h    # Generated header
+    PROXY hello/hello_proxy.cpp
+    STUB hello/hello_stub.cpp
+)
+
+# Link with generated code
+target_link_libraries(your_app PRIVATE rpc hello)
+```
+
+---
+
+## Architecture Overview
+
+### High-Level System Design
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        Application Layer                        │
+├─────────────────────────────────────────────────────────────────┤
+│  Interface Implementations  │  Generated Proxies & Stubs       │
+├─────────────────────────────────────────────────────────────────┤
+│                      RPC++ Core Library                        │  
+│  ├── Service Management    ├── Object Lifecycle               │
+│  ├── Reference Counting    ├── Zone Communication             │
+│  └── Interface Routing     └── Error Handling                 │
+├─────────────────────────────────────────────────────────────────┤
+│                     Service Proxy Layer                        │
+│  ├── In-Memory Proxy      ├── Network Proxy                   │
+│  ├── SGX Enclave Proxy    ├── Custom Transport Proxy          │
+│  └── Arena Proxy          └── Authentication & Security       │
+├─────────────────────────────────────────────────────────────────┤
+│                    Serialization Layer                         │
+│  ├── YAS Binary Format    ├── JSON Format                     │ 
+│  └── Custom Formats       └── Compression & Encryption        │
+├─────────────────────────────────────────────────────────────────┤
+│                      Transport Layer                           │
+│  ├── In-Process Calls     ├── TCP/IP Networking               │
+│  ├── Shared Memory        ├── Named Pipes                     │
+│  ├── SGX Enclaves         └── Custom Protocols                │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Key Architectural Principles
+
+1. **Separation of Concerns**: Transport, serialization, and business logic are independent
+2. **Type Safety**: Full C++ type system integration with compile-time verification  
+3. **Performance**: Zero-copy paths and minimal overhead design
+4. **Extensibility**: Plugin architecture for custom transports and formats
+5. **Reliability**: Comprehensive error handling and reference counting
+6. **Security**: Built-in support for secure enclaves and authentication
+
+---
+
+**RPC++ - Modern C++ Remote Procedure Calls**
+*Bringing distributed computing into the type-safe, high-performance world of modern C++*

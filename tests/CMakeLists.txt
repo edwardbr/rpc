@@ -16,7 +16,7 @@ add_subdirectory(idls)
 add_subdirectory(common)
 add_subdirectory(fixtures)
 add_subdirectory(test_host)
-add_subdirectory(mcp_test)
+add_subdirectory(json_schema_test)
 
 if(BUILD_ENCLAVE)
   add_subdirectory(test_enclave)

@@ -1,7 +1,7 @@
 # RPC++ Codebase Analysis for Claude Code
 
 ## Overview
-RPC++ is a Remote Procedure Call library for modern C++ that enables type-safe communication across different execution contexts (in-process, inter-process, remote machines, embedded devices, SGX enclaves). The system uses Interface Definition Language (IDL) files to generate C++ proxy/stub code with full MCP (Model Context Protocol) integration.
+RPC++ is a Remote Procedure Call library for modern C++ that enables type-safe communication across different execution contexts (in-process, inter-process, remote machines, embedded devices, SGX enclaves). The system uses Interface Definition Language (IDL) files to generate C++ proxy/stub code with full JSON schema generation capabilities.
 
 ## Project Structure
 
@@ -9,13 +9,13 @@ RPC++ is a Remote Procedure Call library for modern C++ that enables type-safe c
 - **`/rpc/`** - Core RPC library implementation
 - **`/generator/`** - IDL code generator (creates C++ from .idl files)
 - **`/submodules/idlparser/`** - IDL parsing engine with recent attributes refactoring
-- **`/tests/`** - Test suite including MCP integration tests
+- **`/tests/`** - Test suite including JSON schema generation tests
 - **`/telemetry/`** - Optional telemetry/logging subsystem
 
 ### Key Files
 - **`CMakeLists.txt`** - Main build configuration (version 2.2.0)
 - **`README.md`** - Project documentation and build instructions
-- **`MCP_IMPLEMENTATION_GUIDE.md`** - Complete MCP integration documentation
+- **`JSON_SCHEMA_IMPLEMENTATION_GUIDE.md`** - Complete JSON schema generation documentation
 - **`CMakePresets.json`** - CMake preset configurations for different build modes
 - **`.vscode/settings.json`** - VSCode configuration (file associations only)
 
@@ -94,18 +94,18 @@ public:
 - Updated all search operations to use lambdas with std::find_if
 - Enhanced GetAttributes function in library_loader.cpp for value extraction
 
-### 3. MCP Integration (COMPLETED)
-**Documentation**: See `MCP_IMPLEMENTATION_GUIDE.md` for complete details.
+### 3. JSON Schema Generation Integration (COMPLETED)
+**Documentation**: See `JSON_SCHEMA_IMPLEMENTATION_GUIDE.md` for complete details.
 
 **Key Changes**:
-- Extended `rpc::function_info` with `mcp_description` and `json_schema` fields
+- Extended `rpc::function_info` with `description`, `in_json_schema`, and `out_json_schema` fields
 - Enhanced code generator with comprehensive JSON schema generation:
   - Template parameter substitution using first-principles detection
   - Generic namespace resolution for complex types
   - Support for nested complex types in containers (vectors, maps)
   - Template instantiations with proper parameter mapping
 - Added description attribute support in IDL files
-- Created comprehensive test suite in `/tests/mcp_test/`
+- Created comprehensive test suite in `/tests/json_schema_test/`
 
 **Usage Example**:
 ```idl
@@ -146,14 +146,14 @@ error_code add(int a, int b, [out, by_value] int& c);
 ### Testing Strategy
 - **Unit Tests**: Individual component testing
 - **Integration Tests**: Full IDL→C++ generation pipeline
-- **MCP Tests**: Metadata extraction and schema validation
+- **JSON Schema Tests**: Metadata extraction and schema validation
 - **Build Integration**: CMake-based test execution
 
 ### Code Generation Process
 1. Parse .idl files using idlparser
 2. Extract attributes (including descriptions)
 3. Generate C++ headers with proxy/stub code
-4. Include MCP metadata in function_info structures
+4. Include JSON schema metadata in function_info structures
 5. Compile generated code with main project
 
 ## Transport Layer
@@ -183,10 +183,10 @@ error_code add(int a, int b, [out, by_value] int& c);
 cmake --build build --target <interface_name>_idl
 ```
 
-### Run MCP Tests
+### Run JSON Schema Tests
 ```bash
-cmake --build build --target simple_mcp_metadata_test
-./build/tests/mcp_test/simple_mcp_metadata_test
+cmake --build build --target simple_json_schema_metadata_test
+./build/tests/json_schema_test/simple_json_schema_metadata_test
 ```
 
 ### Debug Code Generation
@@ -204,7 +204,7 @@ Set `DEBUG_RPC_GEN=ON` in CMake to enable generator debugging output.
 - Exception-based error handling (planned)
 - Additional serialization backends
 - Network transport implementations
-- Enhanced MCP features (output schemas, SSE support)
+- Enhanced JSON schema features (improved output schemas, additional format support)
 
-This codebase represents a mature RPC system with recent enhancements for MCP integration and improved IDL attribute handling. The build system is well-integrated and the code generation pipeline is robust and extensible.
+This codebase represents a mature RPC system with recent enhancements for JSON schema generation and improved IDL attribute handling. The build system is well-integrated and the code generation pipeline is robust and extensible.
 - when running tests with:

@@ -1,20 +1,20 @@
-# MCP Integration Tests
+# JSON Schema Generation Tests
 
-This directory contains tests and examples for the Model Context Protocol (MCP) integration with the RPC system.
+This directory contains tests and examples for the JSON schema generation capabilities in the RPC system.
 
 ## Files
 
 ### Test Programs
-- **`simple_mcp_metadata_test.cpp`** - Self-contained test with no external dependencies
-- **`mcp_metadata_test.cpp`** - Advanced test using nlohmann/json (optional dependency)
+- **`simple_json_schema_metadata_test.cpp`** - Self-contained test with no external dependencies
+- **`json_schema_metadata_test.cpp`** - Advanced test using nlohmann/json (optional dependency)
 
 ### Build Configuration
-- **`CMakeLists.txt`** - Build configuration for MCP tests
+- **`CMakeLists.txt`** - Build configuration for JSON schema tests
 
 ## Building and Running
 
 ### Using CMakePresets (Recommended)
-The MCP tests are integrated with the main CMake build system. Use the existing build presets:
+The JSON schema tests are integrated with the main CMake build system. Use the existing build presets:
 
 ```bash
 cd /path/to/rpc
@@ -22,13 +22,13 @@ cd /path/to/rpc
 # Configure with your preferred preset
 cmake --preset Debug  # or Release, Debug_SGX, etc.
 
-# Build the MCP tests
-cmake --build build --target simple_mcp_metadata_test
-# Optional: cmake --build build --target mcp_metadata_test (if nlohmann/json available)
+# Build the JSON schema tests
+cmake --build build --target simple_json_schema_metadata_test
+# Optional: cmake --build build --target json_schema_metadata_test (if nlohmann/json available)
 
 # Run the tests
-./build/tests/mcp_test/simple_mcp_metadata_test
-./build/tests/mcp_test/mcp_metadata_test  # if built
+./build/tests/json_schema_test/simple_json_schema_metadata_test
+./build/tests/json_schema_test/json_schema_metadata_test  # if built
 ```
 
 ### Alternative: Build All Tests
@@ -36,7 +36,7 @@ cmake --build build --target simple_mcp_metadata_test
 cd /path/to/rpc
 cmake --preset Debug
 cmake --build build --target all
-# All MCP tests will be built automatically
+# All JSON schema tests will be built automatically
 ```
 
 ### Running with CTest
@@ -44,16 +44,16 @@ If your project has CTest enabled:
 ```bash
 cd /path/to/rpc
 cmake --build build
-ctest --test-dir build -R mcp  # Run only MCP tests
+ctest --test-dir build -R json_schema  # Run only JSON schema tests
 ```
 
 ## What These Tests Validate
 
-### ✅ Core MCP Features
+### ✅ Core JSON Schema Features
 - **Function Descriptions**: Extraction from IDL `[description="..."]` attributes
 - **JSON Schema Generation**: Automatic parameter schema creation
 - **Metadata Querying**: Runtime access to function information
-- **MCP Compatibility**: Generated metadata works with MCP tools
+- **JSON Schema Compatibility**: Generated metadata follows JSON schema standards
 
 ### ✅ RPC Integration
 - **Transport Independence**: Works with any transport layer
@@ -78,7 +78,7 @@ Will generate function_info with MCP-compatible metadata:
     {1},                                          // method id
     0,                                            // tag
     false,                                        // marshalls_interfaces
-    "Adds two integers and returns the result",   // mcp_description
+    "Adds two integers and returns the result",   // description
     "{\"type\":\"object\",\"properties\":{...}"   // json_schema
 }
 ```
