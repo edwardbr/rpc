@@ -334,6 +334,110 @@ std::atomic<int> lifetime_lock_count_;  // External reference tracking
 std::atomic<int> inherited_reference_count_; // Race condition handling
 ```
 
+
+## Thread Safety and member_ptr
+
+RPC++ is designed to be thread-safe and supports concurrent access to RPC services from multiple threads. A key component of this thread safety is the `member_ptr` template class.
+
+### What is member_ptr?
+
+`member_ptr` is a thread-safe wrapper around `std::shared_ptr` and `rpc::shared_ptr` that guarantees pointer consistency in multithreaded environments. It prevents race conditions where a shared pointer could change between multiple accesses within the same function call.
+
+### The Problem
+
+In a multithreaded RPC environment, member variables that hold shared pointers could potentially be modified by other threads during function execution. For example:
+
+```cpp
+// PROBLEMATIC CODE - Race condition possible
+class MyService {
+    std::shared_ptr<SomeService> service_;
+public:
+    void someMethod() {
+        if (service_) {                    // First access - service_ could be valid
+            service_->doSomething();       // Second access - service_ could be null if another thread cleared it
+        }
+    }
+};
+```
+
+### The Solution: member_ptr
+
+`member_ptr` solves this by requiring a single access per function that caches the shared pointer value:
+
+```cpp
+// SAFE CODE - Guaranteed consistency
+class MyService {
+    rpc::member_ptr<SomeService> service_;
+public:
+    void someMethod() {
+        auto service = service_.get_nullable();  // Single access - cached for entire function
+        if (service) {                          // Use cached value
+            service->doSomething();             // Use same cached value - guaranteed consistent
+        }
+    }
+};
+```
+
+### Key Features
+
+- **Single Access Guarantee**: Each function should call `get_nullable()` only once and cache the result
+- **Thread Safety**: Multiple threads can safely access the same `member_ptr` without data races
+- **Consistency**: The cached shared_ptr remains valid throughout the function lifetime
+- **Performance**: Minimal overhead compared to raw shared_ptr usage
+- **Standard Interface**: Provides familiar `reset()` method and assignment operators
+
+### Available in Two Flavors
+
+```cpp
+namespace stdex {
+    template<typename T>
+    class member_ptr;  // Wraps std::shared_ptr<T>
+}
+
+namespace rpc {
+    template<typename T> 
+    class member_ptr;   // Wraps rpc::shared_ptr<T>
+}
+```
+
+### Usage Patterns
+
+**Correct Usage:**
+```cpp
+void MyClass::processRequest() {
+    auto service = service_.get_nullable();  // Cache once
+    if (service) {
+        service->method1();                  // Use cached value
+        service->method2();                  // Use same cached value
+    }
+}
+```
+
+**Incorrect Usage:**
+```cpp
+void MyClass::processRequest() {
+    if (service_.get_nullable()) {           // First call
+        service_.get_nullable()->method();   // Second call - could be different!
+    }
+}
+```
+
+### Reset and Assignment
+
+```cpp
+// Reset to null
+service_.reset();
+
+// Assignment from shared_ptr
+service_ = rpc::member_ptr<ServiceType>(my_shared_ptr);
+
+// Direct assignment (also supported)
+service_ = my_shared_ptr;
+```
+
+This design ensures that RPC++ services remain robust and thread-safe even under heavy concurrent load, preventing subtle race conditions that could cause crashes or undefined behavior.
+
+
 **Threading Debug System:**
 - Comprehensive crash handler with multi-threaded stack trace collection
 - Threading bug detection and pattern analysis

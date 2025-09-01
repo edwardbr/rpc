@@ -7,6 +7,7 @@
 #include <rpc/types.h>
 #include <rpc/proxy.h>
 #include <rpc/error_codes.h>
+#include <rpc/member_ptr.h>
 #ifdef USE_RPC_TELEMETRY
 #include <rpc/telemetry/i_telemetry_service.h>
 #endif
@@ -119,7 +120,7 @@ namespace rpc
     // this is an equivelent to an host looking at its enclave
     template<class CHILD_PTR_TYPE, class PARENT_PTR_TYPE> class local_child_service_proxy : public service_proxy
     {
-        rpc::shared_ptr<child_service> child_service_;
+        rpc::member_ptr<child_service> child_service_;
 
         typedef std::function<int(
             const rpc::shared_ptr<PARENT_PTR_TYPE>&, rpc::shared_ptr<CHILD_PTR_TYPE>&, const rpc::shared_ptr<child_service>&)>
@@ -154,14 +155,22 @@ namespace rpc
         int connect(rpc::interface_descriptor input_descr, rpc::interface_descriptor& output_descr) override
         {
             // local_child_service_proxy nests a local_service_proxy back to the parent service
-            return rpc::child_service::create_child_zone<rpc::local_service_proxy>(get_name().c_str(),
+            rpc::shared_ptr<rpc::child_service> new_child_service;
+            auto result = rpc::child_service::create_child_zone<rpc::local_service_proxy>(get_name().c_str(),
                 get_destination_zone_id().as_zone(),
                 get_zone_id().as_destination(),
                 input_descr,
                 output_descr,
                 fn_,
-                child_service_,
+                new_child_service,
                 get_operating_zone_service());
+
+            if (result == rpc::error::OK())
+            {
+                child_service_ = rpc::member_ptr<rpc::child_service>(new_child_service);
+            }
+
+            return result;
         }
 
         int send(uint64_t protocol_version,
@@ -177,7 +186,11 @@ namespace rpc
             const char* in_buf_,
             std::vector<char>& out_buf_) override
         {
-            return child_service_->send(protocol_version,
+            auto child_service = child_service_.get_nullable();
+            RPC_ASSERT(child_service);
+            if (!child_service)
+                return rpc::error::ZONE_NOT_INITIALISED();
+            return child_service->send(protocol_version,
                 encoding,
                 tag,
                 caller_channel_zone_id,
@@ -195,7 +208,11 @@ namespace rpc
             object object_id,
             interface_ordinal interface_id) override
         {
-            return child_service_->try_cast(protocol_version, destination_zone_id, object_id, interface_id);
+            auto child_service = child_service_.get_nullable();
+            RPC_ASSERT(child_service);
+            if (!child_service)
+                return rpc::error::ZONE_NOT_INITIALISED();
+            return child_service->try_cast(protocol_version, destination_zone_id, object_id, interface_id);
         }
         uint64_t add_ref(uint64_t protocol_version,
             destination_channel_zone destination_channel_zone_id,
@@ -205,7 +222,11 @@ namespace rpc
             caller_zone caller_zone_id,
             add_ref_options build_out_param_channel) override
         {
-            auto ret = child_service_->add_ref(protocol_version,
+            auto child_service = child_service_.get_nullable();
+            RPC_ASSERT(child_service);
+            if (!child_service)
+                return std::numeric_limits<uint64_t>::max();
+            auto ret = child_service->add_ref(protocol_version,
                 destination_channel_zone_id,
                 destination_zone_id,
                 object_id,
@@ -217,7 +238,11 @@ namespace rpc
         uint64_t release(
             uint64_t protocol_version, destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id) override
         {
-            auto ret = child_service_->release(protocol_version, destination_zone_id, object_id, caller_zone_id);
+            auto child_service = child_service_.get_nullable();
+            RPC_ASSERT(child_service);
+            if (!child_service)
+                return std::numeric_limits<uint64_t>::max();
+            auto ret = child_service->release(protocol_version, destination_zone_id, object_id, caller_zone_id);
             return ret;
         }
 

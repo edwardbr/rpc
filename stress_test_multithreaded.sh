@@ -174,7 +174,7 @@ run_test_iteration() {
     
     # Run the test with timeout
     local start_time=$(date +%s)
-    timeout $TIMEOUT "$TEST_BINARY" --gtest_filter="$TEST_FILTER" --gtest_repeat=$REPEAT > "$log_file" 2>&1
+    timeout $TIMEOUT "$TEST_BINARY" -m --gtest_filter="$TEST_FILTER" --gtest_repeat=$REPEAT > "$log_file" 2>&1
     local exit_code=$?
     local end_time=$(date +%s)
     local duration=$((end_time - start_time))

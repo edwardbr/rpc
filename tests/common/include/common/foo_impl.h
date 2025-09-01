@@ -86,7 +86,7 @@ namespace marshalled_tests
             return nullptr;
         }
 
-        rpc::shared_ptr<xxx::i_baz> cached_;
+        rpc::member_ptr<xxx::i_baz> cached_;
 
     public:
         foo(rpc::zone zone_id)
@@ -307,7 +307,7 @@ namespace marshalled_tests
         }
         error_code get_interface(rpc::shared_ptr<xxx::i_baz>& val) override
         {
-            val = cached_;
+            val = cached_.get_nullable();
             return rpc::error::OK();
         }
 
@@ -368,7 +368,7 @@ namespace marshalled_tests
 
     class example : public yyy::i_example
     {
-        rpc::shared_ptr<yyy::i_host> host_;
+        rpc::member_ptr<yyy::i_host> host_;
         rpc::weak_ptr<rpc::child_service> this_service_;
         rpc::zone zone_id_;
 
@@ -403,7 +403,7 @@ namespace marshalled_tests
 
         error_code get_host(rpc::shared_ptr<yyy::i_host>& host) override
         {
-            host = host_;
+            host = host_.get_nullable();
             return rpc::error::OK();
         }
         error_code set_host(const rpc::shared_ptr<yyy::i_host>& host) override
@@ -505,10 +505,11 @@ namespace marshalled_tests
 
         error_code call_host_create_enclave_and_throw_away(bool run_standard_tests) override
         {
-            if (!host_)
+            auto host = host_.get_nullable();
+            if (!host)
                 return rpc::error::INVALID_DATA();
             rpc::shared_ptr<i_example> target;
-            auto err = host_->create_enclave(target);
+            auto err = host->create_enclave(target);
             if (err != rpc::error::OK())
                 return err;
             if (!target)
@@ -527,9 +528,10 @@ namespace marshalled_tests
 
         error_code call_host_create_enclave(rpc::shared_ptr<i_example>& target, bool run_standard_tests) override
         {
-            if (!host_)
+            auto host = host_.get_nullable();
+            if (!host)
                 return rpc::error::INVALID_DATA();
-            auto err = host_->create_enclave(target);
+            auto err = host->create_enclave(target);
             if (err != rpc::error::OK())
                 return err;
             if (!target)
@@ -548,7 +550,8 @@ namespace marshalled_tests
 
         error_code call_host_look_up_app_not_return(const std::string& name, bool run_standard_tests) override
         {
-            if (!host_)
+            auto host = host_.get_nullable();
+            if (!host)
                 return rpc::error::INVALID_DATA();
 
             rpc::shared_ptr<i_example> app;
@@ -558,7 +561,7 @@ namespace marshalled_tests
                 if (telemetry_service)
                     telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return");
 #endif
-                auto err = host_->look_up_app(name, app);
+                auto err = host->look_up_app(name, app);
 
 #ifdef USE_RPC_TELEMETRY
                 if (telemetry_service)
@@ -583,7 +586,8 @@ namespace marshalled_tests
         error_code call_host_look_up_app(
             const std::string& name, rpc::shared_ptr<i_example>& app, bool run_standard_tests) override
         {
-            if (!host_)
+            auto host = host_.get_nullable();
+            if (!host)
                 return rpc::error::INVALID_DATA();
 
             {
@@ -593,7 +597,7 @@ namespace marshalled_tests
                     telemetry_service->message(rpc::i_telemetry_service::info, "look_up_app");
 #endif
 
-                auto err = host_->look_up_app(name, app);
+                auto err = host->look_up_app(name, app);
 
 #ifdef USE_RPC_TELEMETRY
                 if (telemetry_service)
@@ -618,7 +622,8 @@ namespace marshalled_tests
 
         error_code call_host_look_up_app_not_return_and_delete(const std::string& name, bool run_standard_tests) override
         {
-            if (!host_)
+            auto host = host_.get_nullable();
+            if (!host)
                 return rpc::error::INVALID_DATA();
 
             rpc::shared_ptr<i_example> app;
@@ -631,8 +636,8 @@ namespace marshalled_tests
                         rpc::i_telemetry_service::info, "call_host_look_up_app_not_return_and_delete");
 #endif
 
-                auto err = host_->look_up_app(name, app);
-                host_->unload_app(name);
+                auto err = host->look_up_app(name, app);
+                host->unload_app(name);
 
 #ifdef USE_RPC_TELEMETRY
                 if (telemetry_service)
@@ -657,7 +662,8 @@ namespace marshalled_tests
         error_code call_host_look_up_app_and_delete(
             const std::string& name, rpc::shared_ptr<i_example>& app, bool run_standard_tests) override
         {
-            if (!host_)
+            auto host = host_.get_nullable();
+            if (!host)
                 return rpc::error::INVALID_DATA();
 
             {
@@ -666,8 +672,8 @@ namespace marshalled_tests
                 if (telemetry_service)
                     telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_and_delete");
 #endif
-                auto err = host_->look_up_app(name, app);
-                host_->unload_app(name);
+                auto err = host->look_up_app(name, app);
+                host->unload_app(name);
 
 #ifdef USE_RPC_TELEMETRY
                 if (telemetry_service)
@@ -692,9 +698,10 @@ namespace marshalled_tests
         error_code call_host_set_app(
             const std::string& name, const rpc::shared_ptr<i_example>& app, bool run_standard_tests) override
         {
-            if (!host_)
+            auto host = host_.get_nullable();            
+            if (!host)
                 return rpc::error::INVALID_DATA();
-            auto err = host_->set_app(name, app);
+            auto err = host->set_app(name, app);
             if (err != rpc::error::OK())
                 return err;
             if (run_standard_tests && app)
@@ -710,9 +717,10 @@ namespace marshalled_tests
         }
         error_code call_host_unload_app(const std::string& name) override
         {
-            if (!host_)
+            auto host = host_.get_nullable();
+            if (!host)
                 return rpc::error::INVALID_DATA();
-            auto err = host_->unload_app(name);
+            auto err = host->unload_app(name);
             if (err != rpc::error::OK())
                 return err;
             return rpc::error::OK();

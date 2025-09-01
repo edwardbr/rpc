@@ -17,14 +17,17 @@ namespace rpc
 
     object_proxy::~object_proxy()
     {
+        // Get service_proxy once for the entire destructor to ensure consistency
+        auto service_proxy = service_proxy_.get_nullable();
+
         // Add detailed logging to track object_proxy destruction
 #ifdef USE_RPC_LOGGING
-        if (service_proxy_)
+        if (service_proxy)
         {
             auto destructor_msg
-                = "object_proxy destructor: service zone=" + std::to_string(service_proxy_->get_zone_id().get_val())
-                  + " destination_zone=" + std::to_string(service_proxy_->get_destination_zone_id().get_val())
-                  + " caller_zone=" + std::to_string(service_proxy_->get_caller_zone_id().get_val())
+                = "object_proxy destructor: service zone=" + std::to_string(service_proxy->get_zone_id().get_val())
+                  + " destination_zone=" + std::to_string(service_proxy->get_destination_zone_id().get_val())
+                  + " caller_zone=" + std::to_string(service_proxy->get_caller_zone_id().get_val())
                   + " object_id=" + std::to_string(object_id_.get_val());
             LOG_STR(destructor_msg.c_str(), destructor_msg.size());
         }
@@ -37,10 +40,10 @@ namespace rpc
 #endif
 
 #ifdef USE_RPC_TELEMETRY
-        if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+        if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service && service_proxy)
         {
             telemetry_service->on_object_proxy_deletion(
-                service_proxy_->get_zone_id(), service_proxy_->get_destination_zone_id(), object_id_);
+                service_proxy->get_zone_id(), service_proxy->get_destination_zone_id(), object_id_);
         }
 #endif
 
@@ -57,9 +60,9 @@ namespace rpc
 #endif
 
         // Handle both normal destruction and inherited references in on_object_proxy_released
-        if (service_proxy_)
+        if (service_proxy)
         {
-            service_proxy_->on_object_proxy_released(object_id_, inherited_count);
+            service_proxy->on_object_proxy_released(object_id_, inherited_count);
         }
         else
         {
@@ -69,7 +72,7 @@ namespace rpc
             LOG_STR(error_msg.c_str(), error_msg.size());
 #endif
         }
-        service_proxy_ = nullptr;
+        service_proxy_.reset();
     }
 
     int object_proxy::send(uint64_t protocol_version,
@@ -81,7 +84,11 @@ namespace rpc
         const char* in_buf_,
         std::vector<char>& out_buf_)
     {
-        return service_proxy_->send_from_this_zone(
+        auto service_proxy = service_proxy_.get_nullable();
+        RPC_ASSERT(service_proxy);
+        if (!service_proxy)
+            return rpc::error::ZONE_NOT_INITIALISED();
+        return service_proxy->send_from_this_zone(
             protocol_version, encoding, tag, object_id_, interface_id, method_id, in_size_, in_buf_, out_buf_);
     }
 
@@ -92,17 +99,29 @@ namespace rpc
         const char* in_buf_,
         std::vector<char>& out_buf_)
     {
-        return service_proxy_->send_from_this_zone(
+        auto service_proxy = service_proxy_.get_nullable();
+        RPC_ASSERT(service_proxy);
+        if (!service_proxy)
+            return rpc::error::ZONE_NOT_INITIALISED();
+        return service_proxy->send_from_this_zone(
             encoding::enc_default, tag, object_id_, id_getter, method_id, in_size_, in_buf_, out_buf_);
     }
 
     int object_proxy::try_cast(std::function<interface_ordinal(uint64_t)> id_getter)
     {
-        return service_proxy_->sp_try_cast(service_proxy_->get_destination_zone_id(), object_id_, id_getter);
+        auto service_proxy = service_proxy_.get_nullable();
+        RPC_ASSERT(service_proxy);
+        if (!service_proxy)
+            return rpc::error::ZONE_NOT_INITIALISED();
+        return service_proxy->sp_try_cast(service_proxy->get_destination_zone_id(), object_id_, id_getter);
     }
 
     destination_zone object_proxy::get_destination_zone_id() const
     {
-        return service_proxy_->get_destination_zone_id();
+        auto service_proxy = service_proxy_.get_nullable();
+        RPC_ASSERT(service_proxy);
+        if (!service_proxy)
+            return destination_zone{0};
+        return service_proxy->get_destination_zone_id();
     }
 }

@@ -16,6 +16,7 @@
 #include <rpc/marshaller.h>
 #include <rpc/service.h>
 #include <rpc/remote_pointer.h>
+#include <rpc/member_ptr.h>
 #ifdef USE_RPC_TELEMETRY
 #include <rpc/telemetry/i_telemetry_service.h>
 #endif
@@ -32,7 +33,7 @@ namespace rpc
     // non virtual class to allow for type erasure
     class proxy_base
     {
-        rpc::shared_ptr<object_proxy> object_proxy_;
+        rpc::member_ptr<object_proxy> object_proxy_;
 
     protected:
         proxy_base(rpc::shared_ptr<object_proxy> object_proxy)
@@ -55,7 +56,7 @@ namespace rpc
         friend service;
 
     public:
-        rpc::shared_ptr<object_proxy> get_object_proxy() const { return object_proxy_; }
+        rpc::shared_ptr<object_proxy> get_object_proxy() const { return object_proxy_.get_nullable(); }
     };
 
     template<class T> class proxy_impl : public proxy_base, public T
@@ -89,10 +90,10 @@ namespace rpc
     class object_proxy : public rpc::enable_shared_from_this<object_proxy>
     {
         object object_id_;
-        rpc::shared_ptr<service_proxy> service_proxy_;
+        rpc::member_ptr<service_proxy> service_proxy_;
         std::unordered_map<interface_ordinal, rpc::weak_ptr<proxy_base>> proxy_map;
         std::mutex insert_control_;
-        std::atomic<int> inherited_reference_count_{0};  // Track inherited references from race conditions
+        std::atomic<int> inherited_reference_count_{0}; // Track inherited references from race conditions
 
         object_proxy(object object_id, rpc::shared_ptr<service_proxy> service_proxy);
 
@@ -109,7 +110,7 @@ namespace rpc
         // Called when this object_proxy inherits a reference from a racing destroyed proxy
         void inherit_extra_reference() { inherited_reference_count_++; }
 
-        rpc::shared_ptr<service_proxy> get_service_proxy() const { return service_proxy_; }
+        rpc::shared_ptr<service_proxy> get_service_proxy() const { return service_proxy_.get_nullable(); }
         object get_object_id() const { return {object_id_}; }
         destination_zone get_destination_zone_id() const;
 
@@ -225,10 +226,10 @@ namespace rpc
         caller_zone caller_zone_id_ = {0};
         rpc::weak_ptr<service> service_;
         // if this service proxy represents a child service, hold a strong reference to the parent service to prevent premature destruction
-        rpc::shared_ptr<service> parent_service_ref_;
+        rpc::member_ptr<service> parent_service_ref_;
         bool is_responsible_for_cleaning_up_service_ = true;
 
-        rpc::shared_ptr<service_proxy> lifetime_lock_;
+        rpc::member_ptr<service_proxy> lifetime_lock_;
         std::atomic<int> lifetime_lock_count_ = 0;
         std::atomic<uint64_t> version_ = rpc::get_version();
         encoding enc_ = encoding::enc_default;
@@ -278,29 +279,35 @@ namespace rpc
 
             if (lifetime_lock_count_ == 0 && is_parent_channel_ == false)
             {
-                RPC_ASSERT(lifetime_lock_);
-                lifetime_lock_ = nullptr;
+                RPC_ASSERT(lifetime_lock_.get_nullable());
+                lifetime_lock_.reset();
             }
         }
 
     public:
         virtual ~service_proxy()
         {
-            if (!proxies_.empty()) {
+            if (!proxies_.empty())
+            {
 #ifdef USE_RPC_LOGGING
-                auto debug_msg = "service_proxy destructor: " + std::to_string(proxies_.size()) + " proxies still in map for destination_zone=" + std::to_string(destination_zone_id_.get_val()) + ", caller_zone=" + std::to_string(caller_zone_id_.get_val());
+                auto debug_msg
+                    = "service_proxy destructor: " + std::to_string(proxies_.size())
+                      + " proxies still in map for destination_zone=" + std::to_string(destination_zone_id_.get_val())
+                      + ", caller_zone=" + std::to_string(caller_zone_id_.get_val());
                 LOG_STR(debug_msg.c_str(), debug_msg.size());
-                
+
                 // Log details of remaining proxies
-                for (const auto& proxy_entry : proxies_) {
+                for (const auto& proxy_entry : proxies_)
+                {
                     auto proxy = proxy_entry.second.lock();
-                    auto proxy_debug_msg = "  Remaining proxy: object_id=" + std::to_string(proxy_entry.first.get_val()) + ", valid=" + (proxy ? "true" : "false");
+                    auto proxy_debug_msg = "  Remaining proxy: object_id=" + std::to_string(proxy_entry.first.get_val())
+                                           + ", valid=" + (proxy ? "true" : "false");
                     LOG_STR(proxy_debug_msg.c_str(), proxy_debug_msg.size());
                 }
 #endif
             }
             RPC_ASSERT(proxies_.empty());
-            if(is_responsible_for_cleaning_up_service_)
+            if (is_responsible_for_cleaning_up_service_)
             {
                 auto svc = service_.lock();
                 if (svc)
@@ -351,9 +358,11 @@ namespace rpc
             RPC_ASSERT(count >= 1);
             if (count == 1)
             {
-                RPC_ASSERT(!lifetime_lock_);
-                lifetime_lock_ = shared_from_this();
-                RPC_ASSERT(lifetime_lock_);
+                // Cache lifetime_lock value for consistency throughout function
+                RPC_ASSERT(!lifetime_lock_.get_nullable());
+                lifetime_lock_ = rpc::member_ptr<service_proxy>(shared_from_this());
+                // Use cached value to ensure consistency
+                RPC_ASSERT(lifetime_lock_.get_nullable());
             }
         }
 
@@ -376,8 +385,8 @@ namespace rpc
             RPC_ASSERT(count >= 0);
             if (count == 0 && is_parent_channel_ == false)
             {
-                RPC_ASSERT(lifetime_lock_);
-                lifetime_lock_ = nullptr;
+                RPC_ASSERT(lifetime_lock_.get_nullable());
+                lifetime_lock_.reset();
             }
             return count;
         }
@@ -534,10 +543,13 @@ namespace rpc
         void on_object_proxy_released(object object_id, int inherited_reference_count)
         {
 #ifdef USE_RPC_LOGGING
-            auto debug_msg = "on_object_proxy_released service zone: " + std::to_string(zone_id_.id) + " destination_zone=" + std::to_string(destination_zone_id_.get_val()) + ", caller_zone=" + std::to_string(caller_zone_id_.get_val()) + ", object_id = " + std::to_string(object_id.id);
+            auto debug_msg = "on_object_proxy_released service zone: " + std::to_string(zone_id_.id)
+                             + " destination_zone=" + std::to_string(destination_zone_id_.get_val())
+                             + ", caller_zone=" + std::to_string(caller_zone_id_.get_val())
+                             + ", object_id = " + std::to_string(object_id.id);
             LOG_CSTR(debug_msg.c_str());
 #endif
-            
+
             // this keeps the underlying service alive while the service proxy is released
             auto current_service = get_operating_zone_service();
 
@@ -559,7 +571,8 @@ namespace rpc
                             // There are other proxies - we need to create a new entry to handle the remaining references
 #ifdef USE_RPC_LOGGING
                             LOG_CSTR("RACE CONDITION DETECTED - TRANSFERRING REFERENCE!");
-                            auto log_msg = "Object ID: " + std::to_string(object_id.get_val()) + ", transferring to new proxy entry";
+                            auto log_msg = "Object ID: " + std::to_string(object_id.get_val())
+                                           + ", transferring to new proxy entry";
                             LOG_STR(log_msg.c_str(), log_msg.size());
 #endif
                             existing_proxy->inherit_extra_reference();
@@ -591,10 +604,12 @@ namespace rpc
             inner_release_external_ref();
 
             // Handle inherited references from race conditions
-            for (int i = 0; i < inherited_reference_count; i++) 
+            for (int i = 0; i < inherited_reference_count; i++)
             {
 #ifdef USE_RPC_LOGGING
-                auto inherit_msg = "Releasing inherited reference " + std::to_string(i + 1) + "/" + std::to_string(inherited_reference_count) + " for object " + std::to_string(object_id.get_val());
+                auto inherit_msg = "Releasing inherited reference " + std::to_string(i + 1) + "/"
+                                   + std::to_string(inherited_reference_count) + " for object "
+                                   + std::to_string(object_id.get_val());
                 LOG_STR(inherit_msg.c_str(), inherit_msg.size());
 #endif
 
@@ -667,27 +682,30 @@ namespace rpc
             object object_id, object_proxy_creation_rule rule, bool new_proxy_added)
         {
 #ifdef USE_RPC_LOGGING
-            auto debug_msg = "get_or_create_object_proxy service zone: " + std::to_string(zone_id_.id) + " destination_zone=" + std::to_string(destination_zone_id_.get_val()) + ", caller_zone=" + std::to_string(caller_zone_id_.get_val()) + ", object_id = " + std::to_string(object_id.id);
+            auto debug_msg = "get_or_create_object_proxy service zone: " + std::to_string(zone_id_.id)
+                             + " destination_zone=" + std::to_string(destination_zone_id_.get_val())
+                             + ", caller_zone=" + std::to_string(caller_zone_id_.get_val())
+                             + ", object_id = " + std::to_string(object_id.id);
             LOG_CSTR(debug_msg.c_str());
 #endif
 
             rpc::shared_ptr<object_proxy> op;
             bool is_new = false;
-            rpc::shared_ptr<service_proxy> self_ref;  // Hold reference to prevent destruction
-            
+            rpc::shared_ptr<service_proxy> self_ref; // Hold reference to prevent destruction
+
             {
                 RPC_ASSERT(get_caller_zone_id() == get_zone_id().as_caller());
                 std::lock_guard l(insert_control_);
-                
+
                 // Capture strong reference to self while in critical section
                 self_ref = shared_from_this();
-                
+
                 auto item = proxies_.find(object_id);
                 if (item != proxies_.end())
                 {
                     op = item->second.lock();
                 }
-                
+
                 if (!op)
                 {
                     // Either no entry exists, or the weak_ptr is expired - create new object_proxy
@@ -703,7 +721,7 @@ namespace rpc
                     is_new = true;
                 }
             }
-            
+
             // Perform remote operations OUTSIDE the mutex lock
             // self_ref keeps this service_proxy alive during these operations
             if (is_new && rule == object_proxy_creation_rule::ADD_REF_IF_NEW)
@@ -737,8 +755,8 @@ namespace rpc
                     LOG_CSTR("sp_release failed");
                 }
             }
-            
-            // self_ref goes out of scope here, allowing normal destruction if needed                
+
+            // self_ref goes out of scope here, allowing normal destruction if needed
             return op;
         }
 
@@ -754,7 +772,11 @@ namespace rpc
         if (!iface)
             return interface_descriptor();
 
-        auto operating_service = object_proxy_->get_service_proxy()->get_operating_zone_service();
+        auto object_proxy = object_proxy_.get_nullable();
+        RPC_ASSERT(object_proxy);
+        if (!object_proxy)
+            return interface_descriptor();
+        auto operating_service = object_proxy->get_service_proxy()->get_operating_zone_service();
 
         // this is to check that an interface is belonging to another zone and not the operating zone
         auto proxy = iface->query_proxy_base();
@@ -831,7 +853,11 @@ namespace rpc
         if (!iface)
             return {{0}, {0}};
 
-        auto operating_service = object_proxy_->get_service_proxy()->get_operating_zone_service();
+        auto object_proxy = object_proxy_.get_nullable();
+        RPC_ASSERT(object_proxy);
+        if (!object_proxy)
+            return {{0}, {0}};
+        auto operating_service = object_proxy->get_service_proxy()->get_operating_zone_service();
 
         // this is to check that an interface is belonging to another zone and not the operating zone
         auto proxy = iface->query_proxy_base();

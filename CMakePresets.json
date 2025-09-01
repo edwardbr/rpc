@@ -8,7 +8,7 @@
       "generator": "Ninja",
       "cacheVariables": {
         "CMAKE_VERBOSE_MAKEFILE": "OFF",
-        "BUILD_COROUTINE": "ON",
+        "BUILD_COROUTINE": "OFF",
         "BUILD_ENCLAVE": "OFF",
         "BUILD_HOST": "ON",
         "BUILD_TEST": "ON",
