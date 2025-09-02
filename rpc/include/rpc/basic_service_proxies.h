@@ -87,6 +87,7 @@ namespace rpc
             object object_id,
             caller_channel_zone caller_channel_zone_id,
             caller_zone caller_zone_id,
+            requester_zone requester_zone_id,
             add_ref_options build_out_param_channel) override
         {
             RPC_ASSERT(((std::uint8_t)build_out_param_channel & (std::uint8_t)rpc::add_ref_options::build_caller_route)
@@ -99,6 +100,7 @@ namespace rpc
                 object_id,
                 caller_channel_zone_id,
                 caller_zone_id,
+                requester_zone_id,
                 build_out_param_channel);
 
             // auto svc = rpc::static_pointer_cast<child_service>(get_operating_zone_service());
@@ -220,6 +222,7 @@ namespace rpc
             object object_id,
             caller_channel_zone caller_channel_zone_id,
             caller_zone caller_zone_id,
+            requester_zone requester_zone_id,
             add_ref_options build_out_param_channel) override
         {
             auto child_service = child_service_.get_nullable();
@@ -232,6 +235,7 @@ namespace rpc
                 object_id,
                 caller_channel_zone_id,
                 caller_zone_id,
+                requester_zone_id,
                 build_out_param_channel);
             return ret;
         }

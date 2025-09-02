@@ -173,6 +173,7 @@ uint64_t add_ref_enclave(uint64_t protocol_version,
     uint64_t object_id,
     uint64_t caller_channel_zone_id,
     uint64_t caller_zone_id,
+    uint64_t requester_zone_id,
     char build_out_param_channel)
 {
     if (protocol_version > rpc::get_version())
@@ -185,6 +186,7 @@ uint64_t add_ref_enclave(uint64_t protocol_version,
         {object_id},
         {caller_channel_zone_id},
         {caller_zone_id},
+        {requester_zone_id},
         static_cast<rpc::add_ref_options>(build_out_param_channel));
 }
 

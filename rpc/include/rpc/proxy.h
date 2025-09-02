@@ -496,6 +496,7 @@ namespace rpc
                     object_id,
                     caller_channel_zone_id,
                     caller_zone_id_,
+                    requester_zone(caller_zone_id_),
                     build_out_param_channel);
                 if (ret != std::numeric_limits<uint64_t>::max())
                 {
@@ -726,6 +727,13 @@ namespace rpc
             // self_ref keeps this service_proxy alive during these operations
             if (is_new && rule == object_proxy_creation_rule::ADD_REF_IF_NEW)
             {
+#ifdef USE_RPC_TELEMETRY
+                if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+                {
+                    telemetry_service->message(rpc::i_telemetry_service::level_enum::info, "get_or_create_object_proxy calling sp_add_ref with normal options for new object_proxy");
+                }
+#endif
+
                 auto ret = sp_add_ref(object_id, {0}, rpc::add_ref_options::normal);
                 if (ret == std::numeric_limits<uint64_t>::max())
                 {
@@ -741,6 +749,10 @@ namespace rpc
             }
             if (!is_new && rule == object_proxy_creation_rule::RELEASE_IF_NOT_NEW)
             {
+#ifdef USE_RPC_LOGGING
+                LOG_CSTR("get_or_create_object_proxy calling sp_release due to object_proxy_creation_rule::RELEASE_IF_NOT_NEW");
+#endif
+
                 // as this is an out parameter the callee will be doing an add ref if the object proxy is already
                 // found we can do a release
                 RPC_ASSERT(!new_proxy_added);

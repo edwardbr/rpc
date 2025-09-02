@@ -89,6 +89,7 @@ extern "C"
         uint64_t object_id,
         uint64_t caller_channel_zone_id,
         uint64_t caller_zone_id,
+        uint64_t requester_zone_id,
         char build_out_param_channel)
     {
         auto root_service = current_host_service.lock();
@@ -103,6 +104,7 @@ extern "C"
             {object_id},
             {caller_channel_zone_id},
             {caller_zone_id},
+            {requester_zone_id}, // requester_zone - using 0 for unknown
             static_cast<rpc::add_ref_options>(build_out_param_channel));
     }
     uint64_t release_host(uint64_t protocol_version, // version of the rpc call protocol

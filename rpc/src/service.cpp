@@ -261,7 +261,8 @@ namespace rpc
 #ifdef USE_RPC_LOGGING
                 auto debug_msg = "service::send zone: " + std::to_string(zone_id_.id)
                             + " destination_zone=" + std::to_string(destination_zone_id.get_val())
-                            + ", caller_zone=" + std::to_string(caller_zone_id.get_val());                LOG_CSTR(debug_msg.c_str());
+                            + ", caller_zone=" + std::to_string(caller_zone_id.get_val());                
+                LOG_CSTR(debug_msg.c_str());
 #endif
                 LOG_CSTR("ERROR: Zone not found in send operation");
                 // RPC_ASSERT(false);
@@ -386,6 +387,7 @@ namespace rpc
             object_id,
             zone_id_.as_caller_channel(),
             caller_zone_id,
+            requester_zone(zone_id_),
             rpc::add_ref_options::build_destination_route);
 
         return {object_id, destination_zone_id};
@@ -436,6 +438,7 @@ namespace rpc
                 object_id,
                 {0},
                 caller_zone_id,
+                requester_zone(zone_id_),
                 rpc::add_ref_options::build_caller_route | rpc::add_ref_options::build_destination_route);
         }
         else
@@ -545,6 +548,7 @@ namespace rpc
                     object_id,
                     zone_id_.as_caller_channel(),
                     caller_zone_id,
+                    requester_zone(zone_id_),
                     rpc::add_ref_options::build_destination_route);
             }
             else
@@ -572,6 +576,7 @@ namespace rpc
                 object_id,
                 {0},
                 caller_zone_id,
+                requester_zone(zone_id_),
                 rpc::add_ref_options::build_caller_route);
         }
 
@@ -673,6 +678,7 @@ namespace rpc
                 stub->get_id(),
                 {0},
                 caller_zone_id,
+                requester_zone(zone_id_),
                 rpc::add_ref_options::build_caller_route);
         }
         return {stub->get_id(), zone_id_.as_destination()};
@@ -752,6 +758,7 @@ namespace rpc
         object object_id,
         caller_channel_zone caller_channel_zone_id,
         caller_zone caller_zone_id,
+        requester_zone requester_zone_id,
         add_ref_options build_out_param_channel)
     {
         current_service_tracker tracker(this);
@@ -777,42 +784,34 @@ namespace rpc
 
         if (destination_zone_id != zone_id_.as_destination())
         {
+            // service is being used as a bridge to other zones
+            
             auto build_channel = !!(build_out_param_channel & add_ref_options::build_destination_route)
                                  || !!(build_out_param_channel & add_ref_options::build_caller_route);
+
             if (dest_channel == caller_channel && build_channel)
             {
+                // we are passing a reference to a caller and destination that is beyond this service
                 // we are here as we are passing the buck to the zone that knows to either splits or terminates this
-                // zone has no refcount issues to deal with
+                // zone has no refcount issues to deal with 
+                // there should always be a destination service_proxy in 
+                // other_zones as the requester has a positive ref count to it through this service
                 rpc::shared_ptr<rpc::service_proxy> destination;
-                do
                 {
                     std::lock_guard g(zone_control);
-                    auto found = other_zones.find({destination_zone_id, caller_zone_id});
-                    if (found != other_zones.end())
+                    auto found = other_zones.lower_bound({{dest_channel}, {0}});
+                    if (found == other_zones.end() || found->first.dest.get_val() != dest_channel)
                     {
-                        // Previously untested section - now logging to verify if it's called
-                        LOG_CSTR("*** EDGE CASE PATH HIT AT LINE 792 ***");
-                        LOG_CSTR("dest_channel == caller_channel && build_channel condition met!");
-                        LOG_CSTR("*** END EDGE CASE PATH 792 ***");
+#ifdef USE_RPC_LOGGING
+                        std::string error_msg = "unable to find destination channel to build a channel with - current_zone: " + std::to_string(zone_id_.id) + ", requester: " + std::to_string(requester_zone_id.id) + ", caller: " + std::to_string(caller_zone_id.id) + ", sender: " + std::to_string(destination_zone_id.id);
+                        LOG_CSTR(error_msg.c_str());
+#endif                        
                         RPC_ASSERT(false);
-                        // destination = found->second.lock();
-                        // destination->add_external_ref();//update the local ref count the object refcount is done
-                        // further down the stack
-                        break;
+                        return rpc::error::OBJECT_NOT_FOUND();
                     }
 
-                    found = other_zones.lower_bound({{dest_channel}, {0}});
-                    if (found != other_zones.end() && found->first.dest.get_val() == dest_channel)
-                    {
-                        destination = found->second.lock();
-                        break;
-                    }
-
-                    RPC_ASSERT(get_parent() != nullptr);
-                    destination = get_parent();
-                    RPC_ASSERT(false);
-
-                } while (false);
+                    destination = found->second.lock();
+                }
 
 #ifdef USE_RPC_TELEMETRY
                 if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
@@ -822,11 +821,11 @@ namespace rpc
                 }
 #endif
                 return destination->add_ref(
-                    protocol_version, {0}, destination_zone_id, object_id, {0}, caller_zone_id, build_out_param_channel);
+                    protocol_version, {0}, destination_zone_id, object_id, {0}, caller_zone_id, requester_zone(zone_id_), build_out_param_channel);
             }
             else if (build_channel)
             {
-                // we are here as this zone needs to send the destination addref and caller addref to different zones
+                // we are here as this zone needs to send the destination addref and caller addref to different zones a fork is in progress
                 rpc::shared_ptr<rpc::service_proxy> destination;
                 rpc::shared_ptr<rpc::service_proxy> caller;
                 {
@@ -865,6 +864,7 @@ namespace rpc
 
                         if (!!(build_out_param_channel & add_ref_options::build_caller_route))
                         {
+                            // connect the remote sender to the destinaton
                             found = other_zones.lower_bound({{caller_channel}, {0}});
                             if (found != other_zones.end() && found->first.dest.get_val() == caller_channel)
                             {
@@ -872,6 +872,7 @@ namespace rpc
                             }
                             else
                             {
+                                RPC_ASSERT(false);
                                 // PREVIOUSLY UNTESTED PATH!!! - now logging to verify if it's called
                                 LOG_CSTR("*** EDGE CASE PATH HIT AT LINE 870+ ***");
                                 LOG_CSTR("Unknown zone reference path - zone doesn't know of caller existence!");
@@ -946,6 +947,7 @@ namespace rpc
                                     object_id,
                                     {0},
                                     caller_zone_id,
+                                    requester_zone(zone_id_),
                                     build_out_param_channel);
                                 destination->release_external_ref(); // perhaps this could be optimised
                                 if (ret == std::numeric_limits<uint64_t>::max())
@@ -976,6 +978,7 @@ namespace rpc
                                 object_id,
                                 zone_id_.as_caller_channel(),
                                 caller_zone_id,
+                                requester_zone(zone_id_),
                                 add_ref_options::build_destination_route);
                         }
                         // back fill the ref count to the caller
@@ -999,6 +1002,7 @@ namespace rpc
                                 object_id,
                                 caller_channel_zone_id,
                                 caller_zone_id,
+                                requester_zone(zone_id_),
                                 add_ref_options::build_caller_route);
                         }
                     } while (false);
@@ -1054,11 +1058,13 @@ namespace rpc
                     object_id,
                     caller_channel_zone_id,
                     caller_zone_id,
+                    requester_zone(zone_id_),
                     build_out_param_channel);
             }
         }
         else
         {
+            // service has the implementation
 #ifdef RPC_V2
             if (protocol_version == rpc::VERSION_2)
                 ;
@@ -1076,16 +1082,19 @@ namespace rpc
                     std::lock_guard g(zone_control);
                     // we swap the parameter types as this is from perspective of the caller and not the proxy that
                     // called this function
-                    auto found = other_zones.find({caller_zone_id.as_destination(), destination_zone_id.as_caller()});
-                    if (found != other_zones.end())
+                    // there should always be a destination service_proxy in 
+                    // other_zones as the requester has a positive ref count to it through this service
+                    
+                    auto found = other_zones.lower_bound({caller_zone_id.as_destination(), {0}});
+                    if (found != other_zones.end() && found->first.dest == caller_zone_id.as_destination())
                     {
                         caller = found->second.lock();
                     }
                     else
                     {
-                        // untested
+                        LOG_CSTR("Unable to build add_ref_options::build_caller_route");
                         RPC_ASSERT(false);
-                        // caller = get_parent();
+                        return rpc::error::OBJECT_NOT_FOUND();
                     }
                     RPC_ASSERT(caller);
                 }
@@ -1097,7 +1106,7 @@ namespace rpc
                 }
 #endif
                 caller->add_ref(
-                    protocol_version, {0}, destination_zone_id, object_id, {}, caller_zone_id, add_ref_options::build_caller_route);
+                    protocol_version, {0}, destination_zone_id, object_id, {}, caller_zone_id, requester_zone(zone_id_), add_ref_options::build_caller_route);
             }
             if (object_id == dummy_object_id)
             {
@@ -1161,6 +1170,12 @@ namespace rpc
             }
             if (!other_zone)
             {
+#ifdef USE_RPC_LOGGING
+                    auto debug_msg = "service::release other_zone is null destination_zone="
+                                     + std::to_string(destination_zone_id.get_val())
+                                     + ", caller_zone=" + std::to_string(caller_zone_id.get_val());
+                    LOG_CSTR(debug_msg.c_str());
+#endif
                 RPC_ASSERT(false);
                 return std::numeric_limits<uint64_t>::max();
             }

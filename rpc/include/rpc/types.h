@@ -66,13 +66,18 @@ namespace rpc
     {
     };
 
+    // the zone that made the add_ref request (provides authoritative routing context)
+    struct RequesterZoneId
+    {
+    };
+
     struct zone;
     struct destination_zone;
     struct destination_channel_zone;
     struct operating_zone;
     struct caller_zone;
     struct caller_channel_zone;
-    struct caller_channel_zone;
+    struct requester_zone;
 
     struct zone : public type_id<ZoneId>
     {
@@ -146,6 +151,28 @@ namespace rpc
             return {id};
         } // this one is wierd, its for cloning service proxies
         type_id<DestinationChannelZoneId> as_destination_channel() const { return {id}; }
+    };
+
+    // the zone that made the add_ref request (provides authoritative routing context)
+    struct requester_zone : public type_id<RequesterZoneId>
+    {
+        requester_zone() = default;
+        requester_zone(const type_id<RequesterZoneId>& other)
+            : type_id<RequesterZoneId>(other)
+        {
+        }
+        
+        // Construct from any zone type
+        requester_zone(const zone& zone_id) : type_id<RequesterZoneId>(zone_id.id) {}
+        requester_zone(const destination_zone& zone_id) : type_id<RequesterZoneId>(zone_id.id) {}
+        requester_zone(const caller_zone& zone_id) : type_id<RequesterZoneId>(zone_id.id) {}
+
+        // Indicates this requester has first-hand knowledge of the reference origin
+        bool is_authoritative() const { return id != 0; }
+        
+        // Convert to other zone types for routing purposes  
+        type_id<DestinationZoneId> as_destination() const { return {id}; }
+        type_id<ZoneId> as_zone() const { return {id}; }
     };
 
     // an id for objects unique to each zone
@@ -231,6 +258,11 @@ template<> struct std::hash<rpc::caller_zone>
 template<> struct std::hash<rpc::caller_channel_zone>
 {
     auto operator()(const rpc::caller_channel_zone& item) const noexcept { return (std::size_t)item.id; }
+};
+
+template<> struct std::hash<rpc::requester_zone>
+{
+    auto operator()(const rpc::requester_zone& item) const noexcept { return (std::size_t)item.id; }
 };
 
 template<> struct std::hash<rpc::interface_ordinal>

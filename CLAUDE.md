@@ -208,3 +208,4 @@ Set `DEBUG_RPC_GEN=ON` in CMake to enable generator debugging output.
 
 This codebase represents a mature RPC system with recent enhancements for JSON schema generation and improved IDL attribute handling. The build system is well-integrated and the code generation pipeline is robust and extensible.
 - when running tests with:
+- Always load all the .md files in the root directory and in the docs folder
