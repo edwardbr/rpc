@@ -31,7 +31,7 @@ target_link_libraries(
   macro_parser
   utils
   args::args
-  fmt::fmt)
+  fmt::fmt-header-only)
 target_link_options(generator PRIVATE ${HOST_LINK_EXE_OPTIONS})
 
 set_property(TARGET generator PROPERTY COMPILE_PDB_NAME generator)

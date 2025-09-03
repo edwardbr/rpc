@@ -31,7 +31,7 @@ target_link_libraries(json_schema_metadata_test
     example_shared_idl_host
     rpc::rpc_host
     yas_common
-    fmt::fmt
+    fmt::fmt-header-only
     GTest::gtest_main
     GTest::gmock_main
     spdlog::spdlog

@@ -38,7 +38,7 @@ target_link_libraries(test_fixtures
     example_shared_idl_host
     rpc::rpc_host
     yas_common
-    fmt::fmt
+    fmt::fmt-header-only
     spdlog::spdlog
     GTest::gtest
     GTest::gmock

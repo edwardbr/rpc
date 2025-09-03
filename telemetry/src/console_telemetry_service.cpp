@@ -114,7 +114,7 @@ namespace rpc
 
     void console_telemetry_service::init_logger() const
     {
-        if (!logger_)
+        /*if (!logger_)
         {
             try
             {
@@ -153,7 +153,9 @@ namespace rpc
                     logger_ = spdlog::default_logger();
                 }
             }
-        }
+        }*/
+
+        logger_ = spdlog::default_logger();
     }
 
     void console_telemetry_service::register_zone_name(uint64_t zone_id, const char* name, bool optional_replace) const
@@ -280,7 +282,7 @@ namespace rpc
             zone_name = (zone_name_it != zone_names_.end()) ? zone_name_it->second : "unknown";
         }
 
-        logger_->info("{}{}{}{}Zone {}: {} {}",
+        logger_->info("{}{}{}{}Zone {}: {} {}{}",
             get_level_color(level_enum::info),
             indent,
             branch,

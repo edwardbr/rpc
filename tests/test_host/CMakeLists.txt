@@ -29,7 +29,7 @@ target_link_libraries(
   example_shared_idl_host
   rpc::rpc_host
   yas_common
-  fmt::fmt
+  fmt::fmt-header-only
   GTest::gtest_main
   GTest::gmock_main
   spdlog::spdlog

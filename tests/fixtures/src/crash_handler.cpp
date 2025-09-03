@@ -168,7 +168,7 @@ namespace crash_handler
 
     void CrashHandler::PrintCrashReport(const CrashReport& report)
     {
-        std::cout << "\n" << std::string(80, '=') << std::endl;
+        /*std::cout << "\n" << std::string(80, '=') << std::endl;
         std::cout << "CRASH DETECTED! Signal: " << report.signal_number;
         if (!report.signal_name.empty()) {
             std::cout << " (" << report.signal_name << ")";
@@ -219,7 +219,7 @@ namespace crash_handler
             }
         }
 
-        std::cout << std::string(80, '=') << std::endl;
+        std::cout << std::string(80, '=') << std::endl;*/
     }
 
     std::vector<void*> CrashHandler::CollectStackTrace(int max_frames)

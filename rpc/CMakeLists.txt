@@ -77,7 +77,7 @@ target_include_directories(
 
 target_link_libraries(
   rpc_host
-  PUBLIC ${RPC_TELEMETRY_INTERFACE} ${RPC_HOST_TELEMETRY_SERVICE}
+  PUBLIC ${RPC_TELEMETRY_INTERFACE} ${RPC_HOST_TELEMETRY}
   PRIVATE yas_common ${HOST_LIBRARIES} ${RPC_HOST_FMT_LIB})
 
 target_compile_options(rpc_host PRIVATE ${HOST_COMPILE_OPTIONS} ${WARN_OK})

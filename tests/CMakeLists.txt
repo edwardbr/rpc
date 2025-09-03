@@ -16,7 +16,10 @@ add_subdirectory(idls)
 add_subdirectory(common)
 add_subdirectory(fixtures)
 add_subdirectory(test_host)
-add_subdirectory(json_schema_test)
+# this is a way to detect if we have nlohman that we can use for testing json schemas
+if(DEFINED NLOHMANN_JSON_CONFIG_INSTALL_DIR)
+  add_subdirectory(json_schema_test)
+endif()
 
 if(BUILD_ENCLAVE)
   add_subdirectory(test_enclave)

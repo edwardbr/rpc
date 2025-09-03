@@ -33,7 +33,7 @@ if(NOT DEPENDENCIES_LOADED)
   option(USE_RPC_LOGGING "turn on rpc logging" OFF)
   option(RPC_HANG_ON_FAILED_ASSERT "hang on failed assert" OFF)
   option(USE_RPC_TELEMETRY "turn on rpc telemetry" OFF)
-  option(USE_CONSOLE_TELEMETRY "turn on rpc telemetry" OFF)  
+  option(USE_CONSOLE_TELEMETRY "turn on rpc telemetry" OFF)
   option(USE_RPC_TELEMETRY_RAII_LOGGING
     "turn on the logging of the addref release and try cast activity of the services, proxies and stubs" OFF)
 
@@ -144,7 +144,7 @@ if(NOT DEPENDENCIES_LOADED)
   else()
     set(USE_RPC_LOGGING_FLAG)
   endif()
-  
+
   if(RPC_HANG_ON_FAILED_ASSERT)
     set(RPC_HANG_ON_FAILED_ASSERT_FLAG RPC_HANG_ON_FAILED_ASSERT)
   else()
@@ -162,7 +162,7 @@ if(NOT DEPENDENCIES_LOADED)
   else()
     set(USE_CONSOLE_TELEMETRY_FLAG)
   endif()
-  
+
   if(USE_RPC_TELEMETRY_RAII_LOGGING)
     set(USE_RPC_TELEMETRY_RAII_LOGGING_FLAG USE_RPC_TELEMETRY_RAII_LOGGING)
   else()
@@ -172,9 +172,9 @@ if(NOT DEPENDENCIES_LOADED)
   set(RPC_ENCLAVE_FMT_LIB)
   set(RPC_HOST_FMT_LIB)
   if(USE_RPC_LOGGING)
-    set(RPC_HOST_FMT_LIB fmt::fmt)
+    set(RPC_HOST_FMT_LIB fmt::fmt-header-only)
   endif()
-  
+
   if(BUILD_ENCLAVE)
     set(BUILD_ENCLAVE_FLAG BUILD_ENCLAVE)
     if(USE_RPC_LOGGING)
@@ -183,7 +183,7 @@ if(NOT DEPENDENCIES_LOADED)
   else()
     set(BUILD_ENCLAVE_FLAG)
   endif()
-  
+
   if(${ENCLAVE_TARGET} STREQUAL "SGX")
     if(${SGX_HW}) # not simulation
       set(SGX_HW_OR_SIM_DEFINE SGX_HW)
