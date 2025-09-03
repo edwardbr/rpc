@@ -98,6 +98,16 @@ void rpc_global_logger::reset_logger()
     }*/
 }
 
+void rpc_global_logger::debug(const std::string& message)
+{
+    printf("[DEBUG] %s\n", message.c_str());
+}
+
+void rpc_global_logger::trace(const std::string& message)
+{
+    printf("[TRACE] %s\n", message.c_str());
+}
+
 void rpc_global_logger::info(const std::string& message)
 {
     printf("[INFO] %s\n", message.c_str());
@@ -113,7 +123,7 @@ void rpc_global_logger::error(const std::string& message)
     printf("[ERROR] %s\n", message.c_str());
 }
 
-void rpc_global_logger::debug(const std::string& message)
+void rpc_global_logger::critical(const std::string& message)
 {
-    printf("[DEBUG] %s\n", message.c_str());
+    printf("[CRITICAL] %s\n", message.c_str());
 }

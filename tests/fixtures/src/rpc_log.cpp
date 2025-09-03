@@ -124,7 +124,30 @@ extern "C"
     void rpc_log(int level, const char* str, size_t sz)
     {
 #ifdef USE_RPC_LOGGING
-        rpc_global_logger::info(std::string(str, sz));
+        std::string message(str, sz);
+        switch (level) {
+            case 0:
+                rpc_global_logger::debug(message);
+                break;
+            case 1:
+                rpc_global_logger::trace(message);
+                break;
+            case 2:
+                rpc_global_logger::info(message);
+                break;
+            case 3:
+                rpc_global_logger::warn(message);
+                break;
+            case 4:
+                rpc_global_logger::error(message);
+                break;
+            case 5:
+                rpc_global_logger::critical(message);
+                break;
+            default:
+                rpc_global_logger::info(message);
+                break;
+        }
 #endif
     }
 
