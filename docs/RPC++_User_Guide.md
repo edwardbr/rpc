@@ -274,40 +274,75 @@ rpc::telemetry_service_manager::set(telemetry);
 
 ## Logging Framework
 
-Separate from telemetry, RPC++ provides a dedicated logging system optimized for performance and enclave compatibility.
+Separate from telemetry, RPC++ provides a dedicated logging system optimized for performance and enclave compatibility. **Recently refactored in 2024** to use modern fmt::format-based structured logging with improved performance and developer experience.
 
 ### Logger Interface
 
 **Enclave-Compatible Design:**
 ```cpp
-// Conditional compilation for different environments
+// Modern logging with fmt::format support
 #ifdef _IN_ENCLAVE
     // SGX-safe logging functions
-    extern "C" sgx_status_t rpc_log(const char* str, size_t sz);
-    #define LOG_CSTR(str) rpc_log(str, strlen(str))
+    extern "C" sgx_status_t rpc_log(int level, const char* str, size_t sz);
 #else 
     // Standard logging functions
-    extern "C" void rpc_log(const char* str, size_t sz);
-    #define LOG_CSTR(str) rpc_log(str, strlen(str))
+    extern "C" void rpc_log(int level, const char* str, size_t sz);
 #endif
+
+// New structured logging macros with levels (2024 refactoring)
+#define RPC_DEBUG(format_str, ...)    // Level 0 - Debug information
+#define RPC_TRACE(format_str, ...)    // Level 1 - Detailed tracing
+#define RPC_INFO(format_str, ...)     // Level 2 - General information  
+#define RPC_WARNING(format_str, ...)  // Level 3 - Warning conditions
+#define RPC_ERROR(format_str, ...)    // Level 4 - Error conditions
+#define RPC_CRITICAL(format_str, ...) // Level 5 - Critical failures
 ```
+
+### Recent Logging Refactoring (2024)
+
+**Migration from Legacy Macros:**
+The logging system was completely refactored to eliminate the old `LOG_STR` and `LOG_CSTR` macros in favor of modern, structured logging:
+
+```cpp
+// OLD STYLE (deprecated and removed)
+std::string msg = "Processing request " + std::to_string(id);
+LOG_CSTR(msg.c_str());
+
+// NEW STYLE (current)
+RPC_INFO("Processing request {}", id);
+```
+
+**Key Improvements:**
+- **fmt::format Integration**: Direct use of fmt::format for efficient string formatting
+- **Eliminated Temporary Strings**: Removed unnecessary string concatenation and temporary variables
+- **Structured Logging**: Consistent format string patterns with type-safe parameter substitution
+- **Level-based Categorization**: All log calls now properly categorized by severity
+- **Generator Code Cleanup**: Fixed code generators to eliminate temporaries in generated code
+
+**Performance Benefits:**
+- **Zero String Copying**: Direct formatting eliminates intermediate string objects
+- **Compile-time Format Validation**: fmt::format provides compile-time format string checking
+- **Reduced Memory Allocations**: Fewer temporary objects means better memory efficiency
+- **Better Code Generation**: Generators now produce cleaner, more efficient logging code
 
 ### Logging Capabilities
 
 **Performance Optimized:**
 - Zero-overhead when disabled (`USE_RPC_LOGGING=OFF`)
-- Minimal string formatting overhead
+- Minimal string formatting overhead with fmt::format
 - Direct C-style logging for maximum performance
+- Eliminated unnecessary temporary string variables
 
 **Multi-Environment Support:**
-- Host applications: Full featured logging
-- SGX Enclaves: Secure, restricted logging
-- Embedded systems: Minimal footprint logging
+- Host applications: Full featured logging with fmt::format
+- SGX Enclaves: Secure, restricted logging with format validation
+- Embedded systems: Minimal footprint logging with optional fmt support
 
 **Thread Safety:**
 - Lock-free logging paths where possible
 - Thread-safe buffer management
 - Async logging support for high-throughput scenarios
+- Atomic reference counting in member_ptr logging
 
 ---
 
@@ -800,7 +835,7 @@ Every `add_ref()` call must be balanced with a corresponding `release()` call to
 int send_result = send(/* parameters */);
 if (send_result != rpc::error::OK()) {
     // Handle transport errors, timeouts, serialization failures
-    LOG_CSTR("RPC call failed with error: " + std::to_string(send_result));
+    RPC_ERROR("RPC call failed with error: {}", send_result);
     return send_result;
 }
 ```

@@ -134,23 +134,13 @@ namespace rpc
             auto stub = item.second.lock();
             if (!stub)
             {
-#ifdef USE_RPC_LOGGING
-                auto message = std::string("stub zone_id ") + std::to_string(zone_id_) + std::string(", object stub ")
-                               + std::to_string(item.first)
-                               + std::string(
-                                   " has been released but not deregistered in the service suspected unclean shutdown");
-                LOG_STR(message.c_str(), message.size());
-#endif
+                RPC_WARNING("stub zone_id {}, object stub {} has been released but not deregistered in the service suspected unclean shutdown",
+                           std::to_string(zone_id_), std::to_string(item.first));
             }
             else
             {
-#ifdef USE_RPC_LOGGING
-                auto message = std::string("stub zone_id ") + std::to_string(zone_id_) + std::string(", object stub ")
-                               + std::to_string(item.first)
-                               + std::string(" has not been released, there is a strong pointer maintaining a positive "
-                                             "reference count suspected unclean shutdown");
-                LOG_STR(message.c_str(), message.size());
-#endif
+                RPC_WARNING("stub zone_id {}, object stub {} has not been released, there is a strong pointer maintaining a positive reference count suspected unclean shutdown",
+                           std::to_string(zone_id_), std::to_string(item.first));
             }
             success = false;
         }
@@ -159,21 +149,13 @@ namespace rpc
             auto stub = item.second.lock();
             if (!stub)
             {
-#ifdef USE_RPC_LOGGING
-                auto message = std::string("wrapped stub zone_id ") + std::to_string(zone_id_)
-                               + std::string(", wrapped_object has been released but not deregistered in the service "
-                                             "suspected unclean shutdown");
-                LOG_STR(message.c_str(), message.size());
-#endif
+                RPC_WARNING("wrapped stub zone_id {}, wrapped_object has been released but not deregistered in the service suspected unclean shutdown",
+                           std::to_string(zone_id_));
             }
             else
             {
-#ifdef USE_RPC_LOGGING
-                auto message = std::string("wrapped stub zone_id ") + std::to_string(zone_id_)
-                               + std::string(", wrapped_object ") + std::to_string(stub->get_id())
-                               + std::string(" has not been deregisted in the service suspected unclean shutdown");
-                LOG_STR(message.c_str(), message.size());
-#endif
+                RPC_WARNING("wrapped stub zone_id {}, wrapped_object {} has not been deregisted in the service suspected unclean shutdown",
+                           std::to_string(zone_id_), std::to_string(stub->get_id()));
             }
             success = false;
         }
@@ -183,43 +165,24 @@ namespace rpc
             auto svcproxy = item.second.lock();
             if (!svcproxy)
             {
-#ifdef USE_RPC_LOGGING
-                auto message = std::string("service proxy zone_id ") + std::to_string(zone_id_)
-                               + std::string(", caller_zone_id ") + std::to_string(item.first.source.id)
-                               + std::string(", destination_zone_id ") + std::to_string(item.first.dest.id)
-                               + std::string(", has been released but not deregistered in the service");
-                LOG_STR(message.c_str(), message.size());
-#endif
+                RPC_WARNING("service proxy zone_id {}, caller_zone_id {}, destination_zone_id {}, has been released but not deregistered in the service",
+                           std::to_string(zone_id_), std::to_string(item.first.source), std::to_string(item.first.dest));
             }
             else
             {
-#ifdef USE_RPC_LOGGING
-                auto message = std::string("service proxy zone_id ") + std::to_string(zone_id_)
-                               + std::string(", caller_zone_id ") + std::to_string(item.first.source.id)
-                               + std::string(", destination_zone_id ")
-                               + std::to_string(svcproxy->get_destination_zone_id())
-                               + std::string(", destination_channel_zone_id ")
-                               + std::to_string(svcproxy->get_destination_channel_zone_id())
-                               + std::string(" has not been released in the service suspected unclean shutdown");
-                LOG_STR(message.c_str(), message.size());
-#endif
+                RPC_WARNING("service proxy zone_id {}, caller_zone_id {}, destination_zone_id {}, destination_channel_zone_id {} has not been released in the service suspected unclean shutdown",
+                           std::to_string(zone_id_), std::to_string(item.first.source), std::to_string(svcproxy->get_destination_zone_id()), std::to_string(svcproxy->get_destination_channel_zone_id()));
 
                 for (auto proxy : svcproxy->get_proxies())
                 {
                     auto op = proxy.second.lock();
                     if (op)
                     {
-#ifdef USE_RPC_LOGGING
-                        auto message = std::string("has object_proxy ") + std::to_string(op->get_object_id());
-                        LOG_STR(message.c_str(), message.size());
-#endif
+                        RPC_WARNING("has object_proxy {}", std::to_string(op->get_object_id()));
                     }
                     else
                     {
-#ifdef USE_RPC_LOGGING
-                        auto message = std::string("has null object_proxy");
-                        LOG_STR(message.c_str(), message.size());
-#endif
+                        RPC_WARNING("has null object_proxy");
                     }
                     success = false;
                 }
@@ -258,14 +221,8 @@ namespace rpc
             }
             if (!other_zone)
             {
-#ifdef USE_RPC_LOGGING
-                auto debug_msg = "service::send zone: " + std::to_string(zone_id_.id)
-                            + " destination_zone=" + std::to_string(destination_zone_id.get_val())
-                            + ", caller_zone=" + std::to_string(caller_zone_id.get_val());                
-                LOG_CSTR(debug_msg.c_str());
-#endif
-                LOG_CSTR("ERROR: Zone not found in send operation");
-                // RPC_ASSERT(false);
+                RPC_ERROR("service::send Zone not found in send operation zone: {} destination_zone={}, caller_zone={}", 
+                          std::to_string(zone_id_), std::to_string(destination_zone_id), std::to_string(caller_zone_id));
                 return rpc::error::ZONE_NOT_FOUND();
             }
             auto result = other_zone->send(protocol_version,
@@ -290,14 +247,14 @@ namespace rpc
             else
 #endif
             {
-                LOG_CSTR("ERROR: Incompatible service version in send");
+                RPC_ERROR("Incompatible service version in send");
                 return rpc::error::INCOMPATIBLE_SERVICE();
             }
             rpc::weak_ptr<object_stub> weak_stub = get_object(object_id);
             auto stub = weak_stub.lock();
             if (stub == nullptr)
             {
-                LOG_CSTR("ERROR: Invalid data - stub is null in send");
+                RPC_ERROR("Invalid data - stub is null in send");
                 return rpc::error::INVALID_DATA();
             }
 
@@ -489,12 +446,8 @@ namespace rpc
                         caller = alternative_caller_service_proxy->clone_for_zone(
                             {caller_channel_zone_id.get_val()}, zone_id_.as_caller());
                         other_zones[{{caller_channel_zone_id.get_val()}, zone_id_.as_caller()}] = caller;
-#ifdef USE_RPC_LOGGING
-                        auto debug_msg = "prepare_out_param service zone: " + std::to_string(zone_id_.id)
-                                         + " destination_zone=" + std::to_string(caller->destination_zone_id_.get_val())
-                                         + ", caller_zone=" + std::to_string(caller->caller_zone_id_.get_val());
-                        LOG_CSTR(debug_msg.c_str());
-#endif
+                        RPC_DEBUG("prepare_out_param service zone: {} destination_zone={}, caller_zone={}",
+                                  std::to_string(zone_id_), std::to_string(caller->destination_zone_id_), std::to_string(caller->caller_zone_id_));
                     }
                     else
                     {
@@ -512,7 +465,7 @@ namespace rpc
                 if (!caller)
                 {
                     // caller service_proxy was destroyed - this is a race condition
-                    LOG_CSTR("ERROR: caller service_proxy was destroyed during lookup");
+                    RPC_ERROR("caller service_proxy was destroyed during lookup");
                     return {}; // Return empty interface descriptor to indicate failure
                 }
             }
@@ -520,7 +473,7 @@ namespace rpc
             // Verify we have a valid caller
             if (!caller)
             {
-                LOG_CSTR("ERROR: Failed to obtain valid caller service_proxy");
+                RPC_ERROR("Failed to obtain valid caller service_proxy");
                 return {};
             }
 
@@ -553,7 +506,7 @@ namespace rpc
             }
             else
             {
-                LOG_CSTR("ERROR: destination_zone service_proxy was destroyed during operation");
+                RPC_ERROR("destination_zone service_proxy was destroyed during operation");
                 return {};
             }
 
@@ -715,7 +668,7 @@ namespace rpc
             if (!other_zone)
             {
                 RPC_ASSERT(false);
-                LOG_CSTR("ERROR: Zone not found in try_cast operation");
+                RPC_ERROR("Zone not found in try_cast operation");
                 return rpc::error::ZONE_NOT_FOUND();
             }
 #ifdef USE_RPC_TELEMETRY
@@ -738,14 +691,14 @@ namespace rpc
             else
 #endif
             {
-                LOG_CSTR("ERROR: Incompatible service version in try_cast");
+                RPC_ERROR("Incompatible service version in try_cast");
                 return rpc::error::INCOMPATIBLE_SERVICE();
             }
             rpc::weak_ptr<object_stub> weak_stub = get_object(object_id);
             auto stub = weak_stub.lock();
             if (!stub)
             {
-                LOG_CSTR("ERROR: Invalid data - stub is null in try_cast");
+                RPC_ERROR("Invalid data - stub is null in try_cast");
                 return error::INVALID_DATA();
             }
             return stub->try_cast(interface_id);
@@ -802,10 +755,8 @@ namespace rpc
                     auto found = other_zones.lower_bound({{dest_channel}, {0}});
                     if (found == other_zones.end() || found->first.dest.get_val() != dest_channel)
                     {
-#ifdef USE_RPC_LOGGING
-                        std::string error_msg = "unable to find destination channel to build a channel with - current_zone: " + std::to_string(zone_id_.id) + ", requester: " + std::to_string(requester_zone_id.id) + ", caller: " + std::to_string(caller_zone_id.id) + ", sender: " + std::to_string(destination_zone_id.id);
-                        LOG_CSTR(error_msg.c_str());
-#endif                        
+                        RPC_ERROR("unable to find destination channel to build a channel with - current_zone: {}, requester: {}, caller: {}, sender: {}",
+                                  zone_id_.id, requester_zone_id.id, caller_zone_id.id, destination_zone_id.id);
                         RPC_ASSERT(false);
                         return rpc::error::OBJECT_NOT_FOUND();
                     }
@@ -874,10 +825,10 @@ namespace rpc
                             {
                                 RPC_ASSERT(false);
                                 // PREVIOUSLY UNTESTED PATH!!! - now logging to verify if it's called
-                                LOG_CSTR("*** EDGE CASE PATH HIT AT LINE 870+ ***");
-                                LOG_CSTR("Unknown zone reference path - zone doesn't know of caller existence!");
-                                LOG_CSTR("Falling back to get_parent() - this assumes parent knows about the zone");
-                                LOG_CSTR("*** POTENTIAL ISSUE: parent may not know about zones in other branches ***");
+                                RPC_WARNING("*** EDGE CASE PATH HIT AT LINE 870+ ***");
+                                RPC_WARNING("Unknown zone reference path - zone doesn't know of caller existence!");
+                                RPC_WARNING("Falling back to get_parent() - this assumes parent knows about the zone");
+                                RPC_WARNING("*** POTENTIAL ISSUE: parent may not know about zones in other branches ***");
 
                                 // It has been worked out that this happens when a reference to an zone is passed to a
                                 // zone that does not know of its existence.
@@ -899,13 +850,13 @@ namespace rpc
 
                                 if (caller)
                                 {
-                                    LOG_CSTR("get_parent() returned: valid caller");
+                                    RPC_DEBUG("get_parent() returned: valid caller");
                                 }
                                 else
                                 {
-                                    LOG_CSTR("get_parent() returned: nullptr - THIS IS A PROBLEM!");
+                                    RPC_ERROR("get_parent() returned: nullptr - THIS IS A PROBLEM!");
                                 }
-                                LOG_CSTR("*** END EDGE CASE PATH 870+ ***");
+                                RPC_WARNING("*** END EDGE CASE PATH 870+ ***");
                             }
 
                             RPC_ASSERT(caller);
@@ -1092,7 +1043,7 @@ namespace rpc
                     }
                     else
                     {
-                        LOG_CSTR("Unable to build add_ref_options::build_caller_route");
+                        RPC_ERROR("Unable to build add_ref_options::build_caller_route");
                         RPC_ASSERT(false);
                         return rpc::error::OBJECT_NOT_FOUND();
                     }
@@ -1170,12 +1121,8 @@ namespace rpc
             }
             if (!other_zone)
             {
-#ifdef USE_RPC_LOGGING
-                    auto debug_msg = "service::release other_zone is null destination_zone="
-                                     + std::to_string(destination_zone_id.get_val())
-                                     + ", caller_zone=" + std::to_string(caller_zone_id.get_val());
-                    LOG_CSTR(debug_msg.c_str());
-#endif
+                RPC_ERROR("service::release other_zone is null destination_zone={}, caller_zone={}",
+                    std::to_string(destination_zone_id), std::to_string(caller_zone_id));
                 RPC_ASSERT(false);
                 return std::numeric_limits<uint64_t>::max();
             }
@@ -1190,12 +1137,8 @@ namespace rpc
                 bool should_cleanup = !other_zone->release_external_ref();
                 if (should_cleanup)
                 {
-#ifdef USE_RPC_LOGGING
-                    auto debug_msg = "service::release cleaning up unused routing service_proxy destination_zone="
-                                     + std::to_string(destination_zone_id.get_val())
-                                     + ", caller_zone=" + std::to_string(caller_zone_id.get_val());
-                    LOG_CSTR(debug_msg.c_str());
-#endif
+                    RPC_DEBUG("service::release cleaning up unused routing service_proxy destination_zone={}, caller_zone={}",
+                              std::to_string(destination_zone_id), std::to_string(caller_zone_id));
 
                     std::lock_guard g(zone_control);
 
@@ -1203,20 +1146,15 @@ namespace rpc
                     if (!other_zone->proxies_.empty())
                     {
 #ifdef USE_RPC_LOGGING
-                        auto bug_msg = "BUG: Routing service_proxy (destination_zone="
-                                       + std::to_string(destination_zone_id.get_val())
-                                       + " != zone=" + std::to_string(zone_id_.get_val()) + ") has "
-                                       + std::to_string(other_zone->proxies_.size())
-                                       + " object_proxies - routing proxies should never host objects";
-                        LOG_CSTR(bug_msg.c_str());
+                        RPC_ERROR("BUG: Routing service_proxy (destination_zone={} != zone={}) has {} object_proxies - routing proxies should never host objects",
+                                  destination_zone_id.get_val(), zone_id_.get_val(), other_zone->proxies_.size());
 
                         // Log details of the problematic object_proxies for debugging
                         for (const auto& proxy_pair : other_zone->proxies_)
                         {
                             auto object_proxy_ptr = proxy_pair.second.lock();
-                            auto detail_msg = "  BUG: object_proxy object_id=" + std::to_string(proxy_pair.first.get_val())
-                                              + " in routing service_proxy, alive=" + (object_proxy_ptr ? "yes" : "no");
-                            LOG_CSTR(detail_msg.c_str());
+                            RPC_ERROR("  BUG: object_proxy object_id={} in routing service_proxy, alive={}",
+                                      proxy_pair.first.get_val(), (object_proxy_ptr ? "yes" : "no"));
                         }
 #endif
 
@@ -1328,12 +1266,8 @@ namespace rpc
         RPC_ASSERT(destination_zone_id != zone_id_.as_destination());
         RPC_ASSERT(other_zones.find({destination_zone_id, caller_zone_id}) == other_zones.end());
         other_zones[{destination_zone_id, caller_zone_id}] = service_proxy;
-#ifdef USE_RPC_LOGGING
-        auto debug_msg = "inner_add_zone_proxy service zone: " + std::to_string(zone_id_.id)
-                         + " destination_zone=" + std::to_string(service_proxy->destination_zone_id_.get_val())
-                         + ", caller_zone=" + std::to_string(service_proxy->caller_zone_id_.get_val());
-        LOG_CSTR(debug_msg.c_str());
-#endif
+        RPC_DEBUG("inner_add_zone_proxy service zone: {} destination_zone={}, caller_zone={}",
+                  std::to_string(zone_id_), std::to_string(service_proxy->destination_zone_id_), std::to_string(service_proxy->caller_zone_id_));
     }
 
     void service::add_zone_proxy(const rpc::shared_ptr<service_proxy>& service_proxy)
@@ -1462,14 +1396,14 @@ namespace rpc
         auto it = stub_factories.find(interface_id);
         if (it == stub_factories.end())
         {
-            LOG_CSTR("stub factory does not have a record of this interface this not an error in the rpc stack");
+            RPC_ERROR("stub factory does not have a record of this interface this not an error in the rpc stack");
             return rpc::error::INVALID_CAST();
         }
 
         new_stub = (*it->second)(original);
         if (!new_stub)
         {
-            LOG_CSTR("Object does not support the interface this not an error in the rpc stack");
+            RPC_ERROR("Object does not support the interface this not an error in the rpc stack");
             return rpc::error::INVALID_CAST();
         }
         // note a nullptr return value is a valid value, it indicates that this object does not implement that interface
@@ -1485,7 +1419,7 @@ namespace rpc
         auto it = stub_factories.find({interface_id});
         if (it != stub_factories.end())
         {
-            LOG_CSTR("ERROR: Invalid data - add_interface_stub_factory failed");
+            RPC_ERROR("Invalid data - add_interface_stub_factory failed");
             rpc::error::INVALID_DATA();
         }
         stub_factories[{interface_id}] = factory;

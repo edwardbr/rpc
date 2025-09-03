@@ -176,8 +176,8 @@ FINAL STATE: reference_count=1, proxies_count=0  ← BUG: Unmatched reference
 #include <iostream>
 #endif
 
-// Replace printf with LOG_CSTR in generated code
-LOG_CSTR("failed in {}");  // Instead of printf
+// Modern logging with fmt::format in generated code
+RPC_ERROR("failed in {}", function_name);  // Instead of printf
 ```
 
 ## Development Patterns and Best Practices
@@ -279,7 +279,7 @@ struct function_info {
 void verify_reference_balance() {
     RPC_ASSERT(lifetime_lock_count_ >= 0);
     if (is_unused() && !proxies_.empty()) {
-        LOG_CSTR("WARNING: Service proxy unused but has object proxies");
+        RPC_WARNING("Service proxy unused but has object proxies");
     }
 }
 #endif

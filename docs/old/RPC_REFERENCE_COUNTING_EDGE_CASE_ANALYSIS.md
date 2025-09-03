@@ -123,24 +123,24 @@ We added comprehensive logging to both edge case paths:
 
 **Line 792 logging**:
 ```cpp
-LOG_CSTR("*** EDGE CASE PATH HIT AT LINE 792 ***");
-LOG_CSTR("dest_channel == caller_channel && build_channel condition met!");
-LOG_CSTR("*** END EDGE CASE PATH 792 ***");
+RPC_WARNING("*** EDGE CASE PATH HIT AT LINE 792 ***");
+RPC_WARNING("dest_channel == caller_channel && build_channel condition met!");
+RPC_WARNING("*** END EDGE CASE PATH 792 ***");
 ```
 
 **Line 870+ logging**:
 ```cpp
-LOG_CSTR("*** EDGE CASE PATH HIT AT LINE 870+ ***");
-LOG_CSTR("Unknown zone reference path - zone doesn't know of caller existence!");
-LOG_CSTR("Falling back to get_parent() - this assumes parent knows about the zone");
-LOG_CSTR("*** POTENTIAL ISSUE: parent may not know about zones in other branches ***");
+RPC_WARNING("*** EDGE CASE PATH HIT AT LINE 870+ ***");
+RPC_WARNING("Unknown zone reference path - zone doesn't know of caller existence!");
+RPC_WARNING("Falling back to get_parent() - this assumes parent knows about the zone");
+RPC_WARNING("*** POTENTIAL ISSUE: parent may not know about zones in other branches ***");
 // ... execution of get_parent() fallback ...
 if (caller) {
-    LOG_CSTR("get_parent() returned: valid caller");
+    RPC_WARNING("get_parent() returned: valid caller");
 } else {
-    LOG_CSTR("get_parent() returned: nullptr - THIS IS A PROBLEM!");
+    RPC_WARNING("get_parent() returned: nullptr - THIS IS A PROBLEM!");
 }
-LOG_CSTR("*** END EDGE CASE PATH 870+ ***");
+RPC_WARNING("*** END EDGE CASE PATH 870+ ***");
 ```
 
 ---

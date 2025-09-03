@@ -17,13 +17,6 @@
 #include <example_import/example_import_stub.h>
 #include <example/example_stub.h>
 
-void log(const std::string& data)
-{
-    std::ignore = data;
-#ifdef USE_RPC_LOGGING
-    rpc_log(data.data(), data.size());
-#endif
-}
 
 namespace marshalled_tests
 {
@@ -59,18 +52,18 @@ namespace marshalled_tests
         }
         int callback(int val) override
         {
-            log(std::string("callback ") + std::to_string(val));
+            RPC_INFO("callback {}", val);
             return rpc::error::OK();
         }
         error_code blob_test(const std::vector<uint8_t>& inval, std::vector<uint8_t>& out_val) override
         {
-            log(std::string("baz blob_test ") + std::to_string(inval.size()));
+            RPC_INFO("baz blob_test {}", inval.size());
             out_val = inval;
             return rpc::error::OK();
         }
         error_code do_something_else(int val) override
         {
-            log(std::string("baz do_something_else"));
+            RPC_INFO("baz do_something_else");
             return rpc::error::OK();
         }
     };
@@ -106,27 +99,27 @@ namespace marshalled_tests
         }
         error_code do_something_in_val(int val) override
         {
-            log(std::string("got ") + std::to_string(val));
+            RPC_INFO("got {}", val);
             return rpc::error::OK();
         }
         error_code do_something_in_ref(const int& val) override
         {
-            log(std::string("got ") + std::to_string(val));
+            RPC_INFO("got {}", val);
             return rpc::error::OK();
         }
         error_code do_something_in_by_val_ref(const int& val) override
         {
-            log(std::string("got ") + std::to_string(val));
+            RPC_INFO("got {}", val);
             return rpc::error::OK();
         }
         error_code do_something_in_move_ref(int&& val) override
         {
-            log(std::string("got ") + std::to_string(val));
+            RPC_INFO("got {}", val);
             return rpc::error::OK();
         }
         error_code do_something_in_ptr(const int* val) override
         {
-            log(std::string("got ") + std::to_string(*val));
+            RPC_INFO("got {}", *val);
             return rpc::error::OK();
         }
         error_code do_something_out_val(int& val) override
@@ -146,33 +139,33 @@ namespace marshalled_tests
         }
         error_code do_something_in_out_ref(int& val) override
         {
-            log(std::string("got ") + std::to_string(val));
+            RPC_INFO("got {}", val);
             val = 33;
             return rpc::error::OK();
         }
         error_code give_something_complicated_val(const xxx::something_complicated val) override
         {
-            log(std::string("got ") + std::to_string(val.int_val));
+            RPC_INFO("got {}", val.int_val);
             return rpc::error::OK();
         }
         error_code give_something_complicated_ref(const xxx::something_complicated& val) override
         {
-            log(std::string("got ") + std::to_string(val.int_val));
+            RPC_INFO("got {}", val.int_val);
             return rpc::error::OK();
         }
         error_code give_something_complicated_ref_val(const xxx::something_complicated& val) override
         {
-            log(std::string("got ") + std::to_string(val.int_val));
+            RPC_INFO("got {}", val.int_val);
             return rpc::error::OK();
         }
         error_code give_something_complicated_move_ref(xxx::something_complicated&& val) override
         {
-            log(std::string("got ") + std::to_string(val.int_val));
+            RPC_INFO("got {}", val.int_val);
             return rpc::error::OK();
         }
         error_code give_something_complicated_ptr(const xxx::something_complicated* val) override
         {
-            log(std::string("got ") + std::to_string(val->int_val));
+            RPC_INFO("got {}", val->int_val);
             return rpc::error::OK();
         }
         error_code receive_something_complicated_ref(xxx::something_complicated& val) override
@@ -187,33 +180,33 @@ namespace marshalled_tests
         }
         error_code receive_something_complicated_in_out_ref(xxx::something_complicated& val) override
         {
-            log(std::string("got ") + std::to_string(val.int_val));
+            RPC_INFO("got {}", val.int_val);
             val.int_val = 33;
             return rpc::error::OK();
         }
         error_code give_something_more_complicated_val(const xxx::something_more_complicated val) override
         {
-            log(std::string("got ") + val.map_val.begin()->first);
+            RPC_INFO("got {}", val.map_val.begin()->first);
             return rpc::error::OK();
         }
         error_code give_something_more_complicated_ref(const xxx::something_more_complicated& val) override
         {
-            log(std::string("got ") + val.map_val.begin()->first);
+            RPC_INFO("got {}", val.map_val.begin()->first);
             return rpc::error::OK();
         }
         error_code give_something_more_complicated_move_ref(xxx::something_more_complicated&& val) override
         {
-            log(std::string("got ") + val.map_val.begin()->first);
+            RPC_INFO("got {}", val.map_val.begin()->first);
             return rpc::error::OK();
         }
         error_code give_something_more_complicated_ref_val(const xxx::something_more_complicated& val) override
         {
-            log(std::string("got ") + val.map_val.begin()->first);
+            RPC_INFO("got {}", val.map_val.begin()->first);
             return rpc::error::OK();
         }
         error_code give_something_more_complicated_ptr(const xxx::something_more_complicated* val) override
         {
-            log(std::string("got ") + val->map_val.begin()->first);
+            RPC_INFO("got {}", val->map_val.begin()->first);
             return rpc::error::OK();
         }
         error_code receive_something_more_complicated_ref(xxx::something_more_complicated& val) override
@@ -230,7 +223,7 @@ namespace marshalled_tests
         error_code receive_something_more_complicated_in_out_ref(xxx::something_more_complicated& val) override
         {
             if (val.map_val.size())
-                log(std::string("got ") + val.map_val.begin()->first);
+                RPC_INFO("got {}", val.map_val.begin()->first);
             else
                 RPC_ASSERT(!"value is null");
             val.map_val["22"] = xxx::something_complicated{33, "23"};
@@ -238,13 +231,13 @@ namespace marshalled_tests
         }
         error_code do_multi_val(int val1, int val2) override
         {
-            log(std::string("got ") + std::to_string(val1));
+            RPC_INFO("got {}", val1);
             return rpc::error::OK();
         }
         error_code do_multi_complicated_val(
             const xxx::something_more_complicated val1, const xxx::something_more_complicated val2) override
         {
-            log(std::string("got ") + val1.map_val.begin()->first);
+            RPC_INFO("got {}", val1.map_val.begin()->first);
             return rpc::error::OK();
         }
 
@@ -356,7 +349,7 @@ namespace marshalled_tests
         error_code do_something_else(int val) override { return rpc::error::OK(); }
         int callback(int val) override
         {
-            log(std::string("callback ") + std::to_string(val));
+            RPC_INFO("callback {}", val);
             return rpc::error::OK();
         }
         error_code blob_test(const std::vector<uint8_t>& inval, std::vector<uint8_t>& out_val) override

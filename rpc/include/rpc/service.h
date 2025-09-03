@@ -344,13 +344,13 @@ namespace rpc
             auto parent_service_proxy = SERVICE_PROXY::create("parent", parent_zone_id, child_svc, args...);
             if (!parent_service_proxy)
             {
-                LOG_CSTR("ERROR: Unable to create service proxy in create_child_service");
+                RPC_ERROR("Unable to create service proxy in create_child_service");
                 return rpc::error::UNABLE_TO_CREATE_SERVICE_PROXY();
             }
             child_svc->add_zone_proxy(parent_service_proxy);
             if(!child_svc->set_parent_proxy(parent_service_proxy))
             {
-                LOG_CSTR("ERROR: Unable to create set_parent_proxy in create_child_service"); 
+                RPC_ERROR("Unable to create set_parent_proxy in create_child_service"); 
                 return rpc::error::UNABLE_TO_CREATE_SERVICE_PROXY();
             }
             parent_service_proxy->set_parent_channel(true);

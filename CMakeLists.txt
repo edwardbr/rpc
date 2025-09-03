@@ -37,6 +37,18 @@ if(RPC_STANDALONE)
   add_subdirectory(submodules)
 endif()
 
+if(USE_RPC_TELEMETRY)
+  set(RPC_ENCLAVE_TELEMETRY rpc::rpc_telemetry_enclave)
+  set(RPC_TELEMETRY_ENCLAVE_EDL rpc_telemetry_edl_header_enclave)
+  set(RPC_HOST_TELEMETRY_SERVICE rpc::rpc_telemetry_host)
+  set(RPC_TELEMETRY_INTERFACE rpc::rpc_telemetry_interface)
+else()
+  set(RPC_ENCLAVE_TELEMETRY)
+  set(RPC_TELEMETRY_ENCLAVE_EDL)
+  set(RPC_HOST_TELEMETRY_SERVICE)
+  set(RPC_TELEMETRY_INTERFACE)
+endif()
+
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 include(FindRPCGenerator)
 

@@ -168,8 +168,8 @@ Graceful handling of destroyed service proxies with proper logging:
 
 ### Logging Infrastructure
 All debug and error messages now use the proper RPC logging system:
-- **LOG_CSTR()**: For simple string messages
-- **LOG_STR()**: For formatted messages with size parameter
+- **RPC_WARNING()**: For simple string messages
+- **RPC_DEBUG()**: For formatted messages with size parameter
 - **USE_RPC_LOGGING**: Build flag to enable/disable logging output
 
 ## Files Modified

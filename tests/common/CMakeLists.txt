@@ -26,6 +26,7 @@ if(${BUILD_ENCLAVE})
     PRIVATE rpc_enclave
             marshal_test_edl_enclave
             ${RPC_TELEMETRY_ENCLAVE_EDL}
+            ${RPC_ENCLAVE_FMT_LIB}
             example_idl_enclave
             yas_common)
 
@@ -53,6 +54,7 @@ if(BUILD_ENCLAVE)
             marshal_test_edl_host
             rpc_telemetry_edl_header_host
             example_idl_host
+            ${RPC_HOST_FMT_LIB}
             yas_common)
 
   set_property(TARGET common_host PROPERTY COMPILE_PDB_NAME common_host)

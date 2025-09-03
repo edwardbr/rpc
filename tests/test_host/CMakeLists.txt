@@ -34,6 +34,7 @@ target_link_libraries(
   GTest::gmock_main
   spdlog::spdlog
   ${HOST_LIBRARIES}
+  ${RPC_HOST_FMT_LIB}
   ${ENCLAVE_DEPENDENCIES}
   test_fixtures
 )

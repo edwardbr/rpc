@@ -18,7 +18,7 @@ if(${BUILD_ENCLAVE})
     TRUSTED_LIBS
       rpc_enclave
       marshal_test_edl_enclave
-      ${RPC_ENCLAVE_TELEMETRY_SERVICE}
+      ${RPC_ENCLAVE_TELEMETRY}
       ${RPC_TELEMETRY_ENCLAVE_EDL}
       common_enclave
       example_import_idl_enclave

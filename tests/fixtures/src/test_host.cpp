@@ -33,7 +33,7 @@ error_code host::create_enclave(rpc::shared_ptr<yyy::i_example>& target)
 
     return err_code;
 #endif
-    LOG_CSTR("ERROR: Incompatible service - enclave not built");
+    RPC_ERROR("Incompatible service - enclave not built");
     return rpc::error::INCOMPATIBLE_SERVICE();
 }
 

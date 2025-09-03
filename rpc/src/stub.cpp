@@ -76,7 +76,7 @@ namespace rpc
             return stub->call(
                 protocol_version, enc, caller_channel_zone_id, caller_zone_id, method_id, in_size_, in_buf_, out_buf_);
         }
-        LOG_CSTR("ERROR: Invalid interface ID in stub call");
+        RPC_ERROR("Invalid interface ID in stub call");
         return rpc::error::INVALID_INTERFACE_ID();
     }
 

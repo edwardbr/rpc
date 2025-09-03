@@ -265,7 +265,7 @@ public:
 void verify_reference_balance() {
     RPC_ASSERT(lifetime_lock_count_ >= 0);
     if (is_unused() && !proxies_.empty()) {
-        LOG_CSTR("WARNING: Service proxy unused but has object proxies");
+        RPC_WARNING("WARNING: Service proxy unused but has object proxies");
     }
 }
 #endif

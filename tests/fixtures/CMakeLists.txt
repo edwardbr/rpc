@@ -43,6 +43,7 @@ target_link_libraries(test_fixtures
     GTest::gtest
     GTest::gmock
     ${HOST_LIBRARIES}
+    ${RPC_HOST_FMT_LIB}
     ${ENCLAVE_DEPENDENCIES}
 )
 

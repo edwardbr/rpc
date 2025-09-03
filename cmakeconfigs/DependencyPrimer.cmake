@@ -144,7 +144,7 @@ if(NOT DEPENDENCIES_LOADED)
   else()
     set(USE_RPC_LOGGING_FLAG)
   endif()
-
+  
   if(RPC_HANG_ON_FAILED_ASSERT)
     set(RPC_HANG_ON_FAILED_ASSERT_FLAG RPC_HANG_ON_FAILED_ASSERT)
   else()
@@ -169,12 +169,21 @@ if(NOT DEPENDENCIES_LOADED)
     set(USE_RPC_TELEMETRY_RAII_LOGGING_FLAG)
   endif()
 
+  set(RPC_ENCLAVE_FMT_LIB)
+  set(RPC_HOST_FMT_LIB)
+  if(USE_RPC_LOGGING)
+    set(RPC_HOST_FMT_LIB fmt::fmt)
+  endif()
+  
   if(BUILD_ENCLAVE)
     set(BUILD_ENCLAVE_FLAG BUILD_ENCLAVE)
+    if(USE_RPC_LOGGING)
+      set(RPC_ENCLAVE_FMT_LIB fmt::fmt-header-only)
+    endif()
   else()
     set(BUILD_ENCLAVE_FLAG)
   endif()
-
+  
   if(${ENCLAVE_TARGET} STREQUAL "SGX")
     if(${SGX_HW}) # not simulation
       set(SGX_HW_OR_SIM_DEFINE SGX_HW)

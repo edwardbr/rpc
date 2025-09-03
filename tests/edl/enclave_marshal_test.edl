@@ -94,7 +94,7 @@ enclave {
             uint64_t caller_zone_id                             // the original zone where the call came from
             );
 
-        void rpc_log([in, size=sz] const char* str, size_t sz);
+        void rpc_log(int level, [in, size=sz] const char* str, size_t sz);
         void hang();
     };
 };

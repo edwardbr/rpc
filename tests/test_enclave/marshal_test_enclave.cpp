@@ -27,7 +27,7 @@
 using namespace marshalled_tests;
 
 #ifdef USE_RPC_TELEMETRY
-TELEMETRY_SERVICE_MANAGER
+std::shared_ptr<rpc::i_telemetry_service> telemetry_service_;
 #endif
 
 rpc::shared_ptr<rpc::child_service> rpc_server;
@@ -43,7 +43,7 @@ int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t host_id, uint64_t 
     }
 
 #ifdef USE_RPC_TELEMETRY
-    telemetry_service_manager_.create();
+    rpc::enclave_telemetry_service::create(telemetry_service_);
 #endif
 
     auto ret = rpc::child_service::create_child_zone<rpc::host_service_proxy, yyy::i_host, yyy::i_example>(
@@ -95,21 +95,21 @@ int call_enclave(uint64_t protocol_version, // version of the rpc call protocol
 {
     if (protocol_version > rpc::get_version())
     {
-        LOG_CSTR("ERROR: Invalid version in call_enclave");
+        RPC_ERROR("Invalid version in call_enclave");
         return rpc::error::INVALID_VERSION();
     }
     // a retry cache using enclave_retry_buffer as thread local storage, leaky if the client does not retry with more
     // memory
     if (!enclave_retry_buffer)
     {
-        LOG_CSTR("ERROR: Invalid data - null enclave_retry_buffer");
+        RPC_ERROR("Invalid data - null enclave_retry_buffer");
         return rpc::error::INVALID_DATA();
     }
 
     auto*& retry_buf = *reinterpret_cast<rpc::retry_buffer**>(enclave_retry_buffer);
     if (retry_buf && !sgx_is_within_enclave(retry_buf, sizeof(rpc::retry_buffer*)))
     {
-        LOG_CSTR("ERROR: Security error - retry_buf not within enclave");
+        RPC_ERROR("Security error - retry_buf not within enclave");
         return rpc::error::SECURITY_ERROR();
     }
 
@@ -160,7 +160,7 @@ int try_cast_enclave(uint64_t protocol_version, uint64_t zone_id, uint64_t objec
 {
     if (protocol_version > rpc::get_version())
     {
-        LOG_CSTR("ERROR: Invalid version in try_cast_enclave");
+        RPC_ERROR("Invalid version in try_cast_enclave");
         return rpc::error::INVALID_VERSION();
     }
     int ret = rpc_server->try_cast(protocol_version, {zone_id}, {object_id}, {interface_id});

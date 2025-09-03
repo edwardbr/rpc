@@ -542,7 +542,7 @@ namespace yas_generator
             proxy("// no hope of reading anything from an empty buffer");
             proxy("if (__rpc_buf_size == 0)");
             proxy("{{");
-            proxy("    LOG_CSTR(\"ERROR: Proxy deserialisation error - empty buffer\");");
+            proxy("    RPC_ERROR(\"Proxy deserialisation error - empty buffer\");");
             proxy("    return rpc::error::PROXY_DESERIALISATION_ERROR();");
             proxy("}}");
             proxy("try");
@@ -582,30 +582,24 @@ namespace yas_generator
                   "rpc_buf_size), __yas_mapping);");
             proxy("break;");
             proxy("default:");
-            proxy("LOG_CSTR(\"ERROR: Proxy deserialisation error - unknown encoding\");");
+            proxy("RPC_ERROR(\"Proxy deserialisation error - unknown encoding\");");
             proxy("return rpc::error::PROXY_DESERIALISATION_ERROR();");
             proxy("}}");
             proxy("}}");
             proxy("#ifdef USE_RPC_LOGGING");
             proxy("catch(std::exception& ex)");
             proxy("{{");
-            proxy("auto error_message = std::string(\"A proxy deserialisation error has occurred in an {} "
-                  "implementation in function {} \") + ex.what();",
-                interface_name,
-                function->get_name());
-            proxy("LOG_STR(error_message.data(), error_message.length());");
+            proxy("RPC_ERROR(\"A proxy deserialisation error has occurred in an {} implementation in function {} {{}}\", ex.what());",
+                  interface_name,
+                  function->get_name());
             proxy("return rpc::error::PROXY_DESERIALISATION_ERROR();");
             proxy("}}");
             proxy("#endif");
             proxy("catch(...)");
             proxy("{{");
-            proxy("#ifdef USE_RPC_LOGGING");
-            proxy("auto error_message = std::string(\"exception has occurred in an {} implementation in "
-                  "function {}\");",
-                interface_name,
-                function->get_name());
-            proxy("LOG_STR(error_message.data(), error_message.length());");
-            proxy("#endif");
+            proxy("RPC_ERROR(\"Exception has occurred in an {} implementation in function {}\");",
+                  interface_name,
+                  function->get_name());
             proxy("return rpc::error::PROXY_DESERIALISATION_ERROR();");
             proxy("}}");
         }
@@ -683,23 +677,17 @@ namespace yas_generator
             stub("#ifdef USE_RPC_LOGGING");
             stub("catch(std::exception& ex)");
             stub("{{");
-            stub("auto error_message = std::string(\"A stub deserialisation error has occurred in an {} "
-                 "implementation in function {} \") + ex.what();",
-                interface_name,
-                function->get_name());
-            stub("LOG_STR(error_message.data(), error_message.length());");
+            stub("RPC_ERROR(\"A stub deserialisation error has occurred in an {} implementation in function {} {{}}\", ex.what());",
+                 interface_name,
+                 function->get_name());
             stub("return rpc::error::STUB_DESERIALISATION_ERROR();");
             stub("}}");
             stub("#endif");
             stub("catch(...)");
             stub("{{");
-            stub("#ifdef USE_RPC_LOGGING");
-            stub("auto error_message = std::string(\"exception has occurred in an {} implementation in "
-                 "function {}\");",
-                interface_name,
-                function->get_name());
-            stub("LOG_STR(error_message.data(), error_message.length());");
-            stub("#endif");
+            stub("RPC_ERROR(\"Exception has occurred in an {} implementation in function {}\");",
+                 interface_name,
+                 function->get_name());
             stub("return rpc::error::STUB_DESERIALISATION_ERROR();");
             stub("}}");
         }

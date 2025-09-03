@@ -119,6 +119,48 @@ error_code add(int a, int b, [out, by_value] int& c);
 - Nested containers (e.g., `std::vector<MyStruct>`, `std::map<string, MyClass>`)
 - Multi-parameter templates with any parameter names
 
+### 4. Logging System Refactoring (COMPLETED - Sept 2024)
+**Locations**: 
+- `/rpc/include/rpc/logger.h` - Core logging macros and fmt integration
+- `/generator/src/synchronous_generator.cpp` - Generator logging cleanup  
+- `/generator/src/yas_generator.cpp` - YAS generator logging cleanup
+- `/tests/common/include/common/foo_impl.h` - Test code logging migration
+
+**Major Changes**:
+- **Legacy Macro Elimination**: Completely removed `LOG_STR` and `LOG_CSTR` macros across entire codebase
+- **fmt::format Integration**: All logging now uses modern fmt::format with structured parameter substitution
+- **New Structured Logging Macros**:
+  ```cpp
+  #define RPC_DEBUG(format_str, ...)    // Level 0 - Debug information
+  #define RPC_TRACE(format_str, ...)    // Level 1 - Detailed tracing  
+  #define RPC_INFO(format_str, ...)     // Level 2 - General information
+  #define RPC_WARNING(format_str, ...)  // Level 3 - Warning conditions
+  #define RPC_ERROR(format_str, ...)    // Level 4 - Error conditions
+  #define RPC_CRITICAL(format_str, ...) // Level 5 - Critical failures
+  ```
+- **Temporary String Variable Elimination**: Removed all unnecessary string concatenation and temporary variables
+- **Generator Code Cleanup**: Fixed generators to eliminate temporaries in generated logging code
+- **Conditional Compilation Cleanup**: Removed unnecessary `#ifdef USE_RPC_LOGGING` blocks around single macro calls
+
+**Migration Example**:
+```cpp
+// OLD STYLE (removed)
+std::string debug_msg = "service::send zone: " + std::to_string(zone_id);
+LOG_CSTR(debug_msg.c_str());
+
+// NEW STYLE (current)  
+RPC_DEBUG("service::send zone: {} destination_zone={}, caller_zone={}", 
+          zone_id, destination_zone_id.get_val(), caller_zone_id.get_val());
+```
+
+**Performance Benefits**:
+- **Zero String Copying**: Direct fmt::format eliminates intermediate string objects
+- **Reduced Memory Allocations**: Fewer temporary objects means better memory efficiency  
+- **Better Code Generation**: Generators produce cleaner, more efficient logging code
+- **Compile-time Format Validation**: fmt::format provides compile-time format string checking
+
+**Files Affected**: 28+ files across the codebase including core service files, generators, and test implementations
+
 ## IDL System
 
 ### Parser Architecture

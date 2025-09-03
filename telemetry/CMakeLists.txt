@@ -11,7 +11,7 @@ if(USE_RPC_TELEMETRY)
 
   if(BUILD_ENCLAVE)
     message("rpc_telemetry_enclave")
-    add_library(rpc_telemetry_enclave STATIC src/enclave_telemetry_service.cpp src/telemetry_service_factory.cpp)
+    add_library(rpc_telemetry_enclave STATIC src/enclave_telemetry_service.cpp)
 
     target_compile_definitions(rpc_telemetry_enclave PRIVATE ${ENCLAVE_DEFINES})
     target_include_directories(
@@ -25,7 +25,7 @@ if(USE_RPC_TELEMETRY)
       set_target_properties(rpc_telemetry_enclave PROPERTIES CXX_CLANG_TIDY "${CLANG_TIDY_COMMAND}")
     endif()
 
-    target_link_libraries(rpc_telemetry_enclave PRIVATE rpc_telemetry_edl_header_enclave yas_common rpc::rpc_enclave)
+    target_link_libraries(rpc_telemetry_enclave PRIVATE rpc_telemetry_edl_header_enclave yas_common rpc::rpc_enclave ${RPC_ENCLAVE_FMT_LIB})
 
     set_property(TARGET rpc_telemetry_enclave PROPERTY COMPILE_PDB_NAME rpc_telemetry_enclave)
 
@@ -43,7 +43,7 @@ if(${BUILD_HOST})
   target_link_options(rpc_telemetry_host PRIVATE ${HOST_LINK_OPTIONS})
   target_link_directories(rpc_telemetry_host PUBLIC ${SGX_LIBRARY_PATH})
   target_compile_definitions(rpc_telemetry_host PRIVATE ${HOST_DEFINES})
-  target_link_libraries(rpc_telemetry_host PRIVATE rpc::rpc_host fmt::fmt yas_common spdlog::spdlog)
+  target_link_libraries(rpc_telemetry_host PRIVATE rpc::rpc_host fmt::fmt-header-only yas_common spdlog::spdlog ${RPC_HOST_FMT_LIB})
 
   add_library(rpc::rpc_telemetry_host ALIAS rpc_telemetry_host)
   set_property(TARGET rpc_telemetry_host PROPERTY COMPILE_PDB_NAME rpc_telemetry_host)

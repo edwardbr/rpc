@@ -38,7 +38,7 @@ extern "C"
         if (!root_service)
         {
             retry_buf.data.clear();
-            LOG_CSTR("ERROR: Transport error - no root service in call_host");
+            RPC_ERROR("Transport error - no root service in call_host");
             return rpc::error::TRANSPORT_ERROR();
         }
         if (retry_buf.data.empty())
@@ -77,7 +77,7 @@ extern "C"
         auto root_service = current_host_service.lock();
         if (!root_service)
         {
-            LOG_CSTR("ERROR: Transport error - no root service in try_cast_host");
+            RPC_ERROR("Transport error - no root service in try_cast_host");
             return rpc::error::TRANSPORT_ERROR();
         }
         int ret = root_service->try_cast(protocol_version, {zone_id}, {object_id}, {interface_id});
@@ -95,7 +95,7 @@ extern "C"
         auto root_service = current_host_service.lock();
         if (!root_service)
         {
-            LOG_CSTR("ERROR: Transport error - no root service in add_ref_host");
+            RPC_ERROR("Transport error - no root service in add_ref_host");
             return rpc::error::TRANSPORT_ERROR();
         }
         return root_service->add_ref(protocol_version,
@@ -115,13 +115,13 @@ extern "C"
         auto root_service = current_host_service.lock();
         if (!root_service)
         {
-            LOG_CSTR("ERROR: Transport error - no root service in release_host");
+            RPC_ERROR("Transport error - no root service in release_host");
             return rpc::error::TRANSPORT_ERROR();
         }
         return root_service->release(protocol_version, {zone_id}, {object_id}, {caller_zone_id});
     }
 
-    void rpc_log(const char* str, size_t sz)
+    void rpc_log(int level, const char* str, size_t sz)
     {
 #ifdef USE_RPC_LOGGING
         rpc_global_logger::info(std::string(str, sz));

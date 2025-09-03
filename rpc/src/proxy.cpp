@@ -24,18 +24,16 @@ namespace rpc
 #ifdef USE_RPC_LOGGING
         if (service_proxy)
         {
-            auto destructor_msg
-                = "object_proxy destructor: service zone=" + std::to_string(service_proxy->get_zone_id().get_val())
-                  + " destination_zone=" + std::to_string(service_proxy->get_destination_zone_id().get_val())
-                  + " caller_zone=" + std::to_string(service_proxy->get_caller_zone_id().get_val())
-                  + " object_id=" + std::to_string(object_id_.get_val());
-            LOG_STR(destructor_msg.c_str(), destructor_msg.size());
+            RPC_DEBUG("object_proxy destructor: service zone={} destination_zone={} caller_zone={} object_id={}",
+                      service_proxy->get_zone_id().get_val(),
+                      service_proxy->get_destination_zone_id().get_val(),
+                      service_proxy->get_caller_zone_id().get_val(),
+                      object_id_.get_val());
         }
         else
         {
-            auto msg = "object_proxy destructor: service_proxy_ is nullptr for object_id="
-                       + std::to_string(object_id_.get_val());
-            LOG_STR(msg.c_str(), msg.size());
+            RPC_DEBUG("object_proxy destructor: service_proxy_ is nullptr for object_id={}",
+                      object_id_.get_val());
         }
 #endif
 
@@ -52,10 +50,8 @@ namespace rpc
 #ifdef USE_RPC_LOGGING
         if (inherited_count > 0)
         {
-            auto destructor_msg = "object_proxy destructor: " + std::to_string(inherited_count)
-                                  + " inherited references will be handled by on_object_proxy_released for object "
-                                  + std::to_string(object_id_.get_val());
-            LOG_STR(destructor_msg.c_str(), destructor_msg.size());
+            RPC_DEBUG("object_proxy destructor: {} inherited references will be handled by on_object_proxy_released for object {}",
+                      inherited_count, object_id_.get_val());
         }
 #endif
 
@@ -66,11 +62,8 @@ namespace rpc
         }
         else
         {
-#ifdef USE_RPC_LOGGING
-            auto error_msg = "ERROR: Cannot call on_object_proxy_released - service_proxy_ is nullptr for object_id="
-                             + std::to_string(object_id_.get_val());
-            LOG_STR(error_msg.c_str(), error_msg.size());
-#endif
+            RPC_ERROR("Cannot call on_object_proxy_released - service_proxy_ is nullptr for object_id={}",
+                      object_id_.get_val());
         }
         service_proxy_.reset();
     }

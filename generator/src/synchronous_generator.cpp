@@ -727,7 +727,7 @@ namespace synchronous_generator
                   "with your error code system to the rpc library");
             proxy("//this is only here to handle rpc generated errors and not application errors");
             proxy("//clean up any input stubs, this code has to assume that the destination is behaving correctly");
-            proxy("LOG_CSTR(\"failed in {}\");", function->get_name());
+            proxy("RPC_ERROR(\"failed in {}\");", function->get_name());
             {
                 uint64_t count = 1;
                 for (auto& parameter : function->get_parameters())
@@ -807,24 +807,17 @@ namespace synchronous_generator
                 stub("#ifdef USE_RPC_LOGGING");
                 stub("catch(const std::exception& ex)");
                 stub("{{");
-                stub("auto error_message = std::string(\"exception has occurred in an {} implementation in "
-                     "function {} "
-                     "\") + ex.what();",
-                    interface_name,
-                    function->get_name());
-                stub("LOG_STR(error_message.data(), error_message.length());");
+                stub("RPC_ERROR(\"Exception has occurred in an {} implementation in function {} {{}}\", ex.what());",
+                     interface_name,
+                     function->get_name());
                 stub("__rpc_ret = rpc::error::EXCEPTION();");
                 stub("}}");
                 stub("#endif");
                 stub("catch(...)");
                 stub("{{");
-                stub("#ifdef USE_RPC_LOGGING");
-                stub("auto error_message = std::string(\"exception has occurred in an {} implementation in function "
-                     "{}\");",
-                    interface_name,
-                    function->get_name());
-                stub("LOG_STR(error_message.data(), error_message.length());");
-                stub("#endif");
+                stub("RPC_ERROR(\"Exception has occurred in an {} implementation in function {}\");",
+                     interface_name,
+                     function->get_name());
                 stub("__rpc_ret = rpc::error::EXCEPTION();");
                 stub("}}");
             }
@@ -1152,14 +1145,14 @@ namespace synchronous_generator
             }
 
             stub("default:");
-            stub("LOG_CSTR(\"ERROR: Invalid method ID - unknown method in stub\");");
+            stub("RPC_ERROR(\"Invalid method ID - unknown method in stub\");");
             stub("return rpc::error::INVALID_METHOD_ID();");
             stub("}};");
         }
         proxy("}};");
         proxy("");
 
-        stub("LOG_CSTR(\"ERROR: Invalid method ID - no methods found\");");
+        stub("RPC_ERROR(\"Invalid method ID - no methods found\");");
         stub("return rpc::error::INVALID_METHOD_ID();");
         stub("}}");
         stub("");
@@ -2034,7 +2027,7 @@ namespace synchronous_generator
         proxy("#include <rpc/proxy.h>");
         proxy("#include <rpc/stub.h>");
         proxy("#include <rpc/service.h>");
-        proxy("#include <rpc/logger.h>");  // For LOG_CSTR in error handling
+        proxy("#include <rpc/logger.h>");  // For RPC_ERROR in error handling
         proxy("#include \"{}\"", header_filename);
 
         proxy("");
