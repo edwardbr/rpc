@@ -24,10 +24,8 @@ if(USE_RPC_TELEMETRY)
     if(ENABLE_CLANG_TIDY)
       set_target_properties(rpc_telemetry_enclave PROPERTIES CXX_CLANG_TIDY "${CLANG_TIDY_COMMAND}")
     endif()
-    if(USE_RPC_TELEMETRY)
-      set(TELEMETRY_ENCLAVE_EDL rpc_telemetry_edl_header_enclave)
-    endif()
-    target_link_libraries(rpc_telemetry_enclave PRIVATE ${TELEMETRY_ENCLAVE_EDL} yas_common rpc::rpc_enclave)
+
+    target_link_libraries(rpc_telemetry_enclave PRIVATE rpc_telemetry_edl_header_enclave yas_common rpc::rpc_enclave)
 
     set_property(TARGET rpc_telemetry_enclave PROPERTY COMPILE_PDB_NAME rpc_telemetry_enclave)
 

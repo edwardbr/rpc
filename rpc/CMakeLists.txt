@@ -14,13 +14,15 @@ else()
 endif()
 
 if(USE_RPC_TELEMETRY)
-  set(ENCLAVE_TELEMETRY_SERVICE rpc::rpc_telemetry_enclave)
-  set(HOST_TELEMETRY_SERVICE rpc::rpc_telemetry_host)
-  set(TELEMETRY_INTERFACE rpc::rpc_telemetry_interface)
+  set(RPC_ENCLAVE_TELEMETRY_SERVICE rpc::rpc_telemetry_enclave)
+  set(RPC_TELEMETRY_ENCLAVE_EDL rpc_telemetry_edl_header_enclave)
+  set(RPC_HOST_TELEMETRY_SERVICE rpc::rpc_telemetry_host)
+  set(RPC_TELEMETRY_INTERFACE rpc::rpc_telemetry_interface)
 else()
-  set(ENCLAVE_TELEMETRY_SERVICE)
-  set(HOST_TELEMETRY_SERVICE)
-  set(TELEMETRY_INTERFACE)
+  set(RPC_ENCLAVE_TELEMETRY_SERVICE)
+  set(RPC_TELEMETRY_ENCLAVE_EDL)
+  set(RPC_HOST_TELEMETRY_SERVICE)
+  set(RPC_TELEMETRY_INTERFACE)
 endif()
 
 if(BUILD_ENCLAVE)
@@ -49,7 +51,7 @@ if(BUILD_ENCLAVE)
     PRIVATE ${ENCLAVE_LIBCXX_INCLUDES})
   target_link_libraries(
     rpc_enclave
-    PUBLIC ${TELEMETRY_INTERFACE} ${ENCLAVE_TELEMETRY_SERVICE}
+    PUBLIC ${RPC_TELEMETRY_INTERFACE} ${RPC_ENCLAVE_TELEMETRY_SERVICE}
     PRIVATE yas_common)
   target_link_options(rpc_enclave PRIVATE ${ENCLAVE_LINK_OPTIONS})
 
@@ -87,7 +89,7 @@ target_include_directories(
 
 target_link_libraries(
   rpc_host
-  PUBLIC ${TELEMETRY_INTERFACE} ${HOST_TELEMETRY_SERVICE}
+  PUBLIC ${RPC_TELEMETRY_INTERFACE} ${RPC_HOST_TELEMETRY_SERVICE}
   PRIVATE yas_common ${HOST_LIBRARIES})
 
 target_compile_options(rpc_host PRIVATE ${HOST_COMPILE_OPTIONS} ${WARN_OK})

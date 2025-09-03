@@ -21,15 +21,11 @@ if(${BUILD_ENCLAVE})
   target_compile_options(common_enclave PRIVATE ${ENCLAVE_COMPILE_OPTIONS} ${WARN_BASELINE})
   target_link_options(common_enclave PRIVATE ${ENCLAVE_LINK_OPTIONS})
 
-  if(USE_RPC_TELEMETRY)
-    set(TELEMETRY_ENCLAVE_EDL rpc_telemetry_edl_header_enclave)
-  endif()
-
   target_link_libraries(
     common_enclave
     PRIVATE rpc_enclave
             marshal_test_edl_enclave
-            ${TELEMETRY_ENCLAVE_EDL}
+            ${RPC_TELEMETRY_ENCLAVE_EDL}
             example_idl_enclave
             yas_common)
 
