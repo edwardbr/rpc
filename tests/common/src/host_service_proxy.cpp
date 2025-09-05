@@ -138,7 +138,7 @@ namespace rpc
         object object_id,
         caller_channel_zone caller_channel_zone_id,
         caller_zone caller_zone_id,
-        requester_zone requester_zone_id,
+        known_direction_zone known_direction_zone_id,
         add_ref_options build_out_param_channel)
     {
 #ifdef USE_RPC_TELEMETRY
@@ -160,7 +160,7 @@ namespace rpc
             object_id.get_val(),
             caller_channel_zone_id.get_val(),
             caller_zone_id.get_val(),
-            requester_zone_id.get_val(),
+            known_direction_zone_id.get_val(),
             (std::uint8_t)build_out_param_channel);
         if (status)
         {

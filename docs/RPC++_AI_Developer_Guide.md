@@ -563,7 +563,7 @@ HOST(1) → MAIN_CHILD(2) → SUB_CHILD(3) → DEEP_CHILD(4)
 - `rpc/include/rpc/service.h` - Updated service::add_ref signature
 - `rpc/src/service.cpp` - Updated function definition signature
 
-**Change**: Added `requester_zone requester_zone_id` parameter to all add_ref functions.
+**Change**: Added `known_direction_zone known_direction_zone_id` parameter to all add_ref functions.
 
 ### ✅ Complete add_ref Call Fixes  
 **Files Modified**:
@@ -572,15 +572,15 @@ HOST(1) → MAIN_CHILD(2) → SUB_CHILD(3) → DEEP_CHILD(4)
 - `rpc/include/rpc/basic_service_proxies.h` - Updated 2 add_ref signatures and implementations
 - `tests/fixtures/src/rpc_log.cpp` - Fixed test fixture add_ref call
 
-**Pattern**: All fixes use `requester_zone(zone_id_)` where `zone_id_` is the current service's zone ID.
+**Pattern**: All fixes use `known_direction_zone(zone_id_)` where `zone_id_` is the current service's zone ID.
 **Status**: ✅ **ALL IMPLEMENTATION POINTS COMPLETED**
 
 ### ✅ Complete Type System Support
 **Files Modified**:
-- `rpc/include/rpc/types.h` - Added requester_zone type with proper inheritance and hash support
+- `rpc/include/rpc/types.h` - Added known_direction_zone type with proper inheritance and hash support
 
 **Features Implemented**:
-- Proper type inheritance from `type_id<RequesterZoneId>`
+- Proper type inheritance from `type_id<KnownDirectionZoneId>`
 - Constructor overloads for all zone types
 - `is_authoritative()` method for validation
 - Conversion methods (`as_destination()`, `as_zone()`)
@@ -609,12 +609,12 @@ local_copy->member_access()
 
 ### 3. Requester Zone Context Implementation
 **Issue**: Missing context about add_ref request origin
-**Solution**: Added `requester_zone` parameter to all add_ref calls
+**Solution**: Added `known_direction_zone` parameter to all add_ref calls
 **Status**: ✅ **FULLY COMPLETED**
 
 **Implementation Complete**:
 - ✅ Interface signatures updated across all files
-- ✅ All 12+ add_ref call sites fixed with `requester_zone(zone_id_)` parameter  
+- ✅ All 12+ add_ref call sites fixed with `known_direction_zone(zone_id_)` parameter  
 - ✅ Type system fully implemented with proper inheritance
 - ✅ Hash support for container usage
 - ✅ Build integration completed successfully
@@ -725,7 +725,7 @@ enum class add_ref_options : std::uint8_t {
 ### High Priority
 
 1. **Implement Requester-Based Routing Logic** ✅ INFRASTRUCTURE COMPLETE
-   - Update service.cpp to use requester_zone instead of parent fallback
+   - Update service.cpp to use known_direction_zone instead of parent fallback
    - All parameters in place, ready for logic update
    - Infrastructure testing confirms readiness
 
@@ -792,14 +792,14 @@ The comprehensive add_ref pattern analysis reveals a well-designed system with c
 
 **Key Recommendations**:
 
-1. **Complete the requester_zone rollout** - High impact, low risk improvement
+1. **Complete the known_direction_zone rollout** - High impact, low risk improvement
 2. **Make architectural decision on line 882** - Resolve the defensive code question
 3. **Implement distributed transaction rollback** - Critical for production robustness
 4. **Add comprehensive stress testing** - Ensure threading fixes work under load
 
 The threading safety improvements represent significant progress toward a production-ready distributed RPC system. The edge case analysis provides confidence that the system handles complex scenarios gracefully, even those that were previously untested.
 
-**Current System Maturity**: The RPC++ system shows characteristics of a robust, well-engineered distributed system with sophisticated edge case handling and comprehensive reference counting mechanisms. **The requester_zone parameter infrastructure is 100% complete** and ready for logic implementation. The identified remaining work represents evolution from "working system with complete infrastructure" to "production-hardened system with requester-based routing."
+**Current System Maturity**: The RPC++ system shows characteristics of a robust, well-engineered distributed system with sophisticated edge case handling and comprehensive reference counting mechanisms. **The known_direction_zone parameter infrastructure is 100% complete** and ready for logic implementation. The identified remaining work represents evolution from "working system with complete infrastructure" to "production-hardened system with requester-based routing."
 
 ## Final Integration Assessment
 
@@ -814,7 +814,7 @@ The threading safety improvements represent significant progress toward a produc
 
 ### 🔧 Implementation Phase Ready
 - **Requester-Based Routing**: All infrastructure in place, logic update needed
-- **Enhanced Telemetry**: Add requester_zone to debug output
+- **Enhanced Telemetry**: Add known_direction_zone to debug output
 - **Distributed Transactions**: Rollback mechanism design and implementation
 - **Line 882 Decision**: Architectural decision on defensive code
 
@@ -827,13 +827,13 @@ The threading safety improvements represent significant progress toward a produc
 - No reference counting leaks or orphaned objects detected
 - Service proxy cloning handles complex routing scenarios automatically
 
-The RPC++ system demonstrates **production-level reliability** with comprehensive distributed transaction semantics, robust edge case handling, and sophisticated multi-zone routing capabilities. The requester_zone infrastructure provides the foundation for eliminating the remaining parent fallback dependencies.
+The RPC++ system demonstrates **production-level reliability** with comprehensive distributed transaction semantics, robust edge case handling, and sophisticated multi-zone routing capabilities. The known_direction_zone infrastructure provides the foundation for eliminating the remaining parent fallback dependencies.
 
 ---
 
 *Analysis Period: Multiple comprehensive test analysis sessions*  
 *Code Coverage: Complete service.cpp add_ref function analysis + edge case triggering*  
-*Implementation Status: requester_zone infrastructure 100% complete*  
+*Implementation Status: known_direction_zone infrastructure 100% complete*  
 *Build Integration: All tests passing, zero compilation errors*  
 *Next Phase: Implement requester-based routing logic using completed infrastructure*  
 *System Readiness: PRODUCTION-READY INFRASTRUCTURE, LOGIC UPDATE REMAINING*

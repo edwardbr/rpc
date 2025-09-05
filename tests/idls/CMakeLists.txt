@@ -36,3 +36,13 @@ RPCGenerate(
   mock example/example_mock.h
   dependencies example_import_idl example_shared_idl
   include_paths ${CMAKE_CURRENT_SOURCE_DIR}/.)
+
+RPCGenerate(
+  fuzz_test
+  fuzz_test/fuzz_test.idl
+  ${CMAKE_CURRENT_SOURCE_DIR}
+  ${CMAKE_BINARY_DIR}/generated
+  fuzz_test
+  ""
+  mock fuzz_test/fuzz_test_mock.h
+  include_paths ${CMAKE_CURRENT_SOURCE_DIR}/.)

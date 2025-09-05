@@ -67,7 +67,7 @@ namespace rpc
     };
 
     // the zone that made the add_ref request (provides authoritative routing context)
-    struct RequesterZoneId
+    struct KnownDirectionZoneId
     {
     };
 
@@ -77,7 +77,7 @@ namespace rpc
     struct operating_zone;
     struct caller_zone;
     struct caller_channel_zone;
-    struct requester_zone;
+    struct known_direction_zone;
 
     struct zone : public type_id<ZoneId>
     {
@@ -135,6 +135,7 @@ namespace rpc
             return {id};
         } // this one is wierd, its for cloning service proxies
         type_id<DestinationChannelZoneId> as_destination_channel() const { return {id}; }
+        type_id<KnownDirectionZoneId> as_known_direction_channel() const { return {id}; }
     };
 
     // the zone that initiated the call
@@ -154,18 +155,18 @@ namespace rpc
     };
 
     // the zone that made the add_ref request (provides authoritative routing context)
-    struct requester_zone : public type_id<RequesterZoneId>
+    struct known_direction_zone : public type_id<KnownDirectionZoneId>
     {
-        requester_zone() = default;
-        requester_zone(const type_id<RequesterZoneId>& other)
-            : type_id<RequesterZoneId>(other)
+        known_direction_zone() = default;
+        known_direction_zone(const type_id<KnownDirectionZoneId>& other)
+            : type_id<KnownDirectionZoneId>(other)
         {
         }
         
         // Construct from any zone type
-        requester_zone(const zone& zone_id) : type_id<RequesterZoneId>(zone_id.id) {}
-        requester_zone(const destination_zone& zone_id) : type_id<RequesterZoneId>(zone_id.id) {}
-        requester_zone(const caller_zone& zone_id) : type_id<RequesterZoneId>(zone_id.id) {}
+        known_direction_zone(const zone& zone_id) : type_id<KnownDirectionZoneId>(zone_id.id) {}
+        known_direction_zone(const destination_zone& zone_id) : type_id<KnownDirectionZoneId>(zone_id.id) {}
+        known_direction_zone(const caller_zone& zone_id) : type_id<KnownDirectionZoneId>(zone_id.id) {}
 
         // Indicates this requester has first-hand knowledge of the reference origin
         bool is_authoritative() const { return id != 0; }
@@ -260,9 +261,9 @@ template<> struct std::hash<rpc::caller_channel_zone>
     auto operator()(const rpc::caller_channel_zone& item) const noexcept { return (std::size_t)item.id; }
 };
 
-template<> struct std::hash<rpc::requester_zone>
+template<> struct std::hash<rpc::known_direction_zone>
 {
-    auto operator()(const rpc::requester_zone& item) const noexcept { return (std::size_t)item.id; }
+    auto operator()(const rpc::known_direction_zone& item) const noexcept { return (std::size_t)item.id; }
 };
 
 template<> struct std::hash<rpc::interface_ordinal>

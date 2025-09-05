@@ -400,7 +400,7 @@ namespace rpc
             return send(protocol_version,
                 encoding,
                 tag,
-                caller_channel_zone{},
+                get_zone_id().as_caller_channel(),
                 caller_zone_id_,
                 destination_zone_id_,
                 object_id,
@@ -468,7 +468,7 @@ namespace rpc
         }
 
         [[nodiscard]] uint64_t sp_add_ref(
-            object object_id, caller_channel_zone caller_channel_zone_id, add_ref_options build_out_param_channel)
+            object object_id, caller_channel_zone caller_channel_zone_id, add_ref_options build_out_param_channel, known_direction_zone known_direction_zone_id)
         {
 #ifdef USE_RPC_TELEMETRY
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
@@ -492,7 +492,7 @@ namespace rpc
                     object_id,
                     caller_channel_zone_id,
                     caller_zone_id_,
-                    requester_zone(caller_zone_id_),
+                    known_direction_zone_id,
                     build_out_param_channel);
                 if (ret != std::numeric_limits<uint64_t>::max())
                 {
@@ -662,7 +662,7 @@ namespace rpc
         };
 
         rpc::shared_ptr<object_proxy> get_or_create_object_proxy(
-            object object_id, object_proxy_creation_rule rule, bool new_proxy_added)
+            object object_id, object_proxy_creation_rule rule, bool new_proxy_added, known_direction_zone known_direction_zone_id)
         {
             RPC_DEBUG("get_or_create_object_proxy service zone: {} destination_zone={}, caller_zone={}, object_id = {}",
                       zone_id_.id, destination_zone_id_.get_val(), caller_zone_id_.get_val(), object_id.id);
@@ -711,7 +711,7 @@ namespace rpc
                 }
 #endif
 
-                auto ret = sp_add_ref(object_id, {0}, rpc::add_ref_options::normal);
+                auto ret = sp_add_ref(object_id, {0}, rpc::add_ref_options::normal, known_direction_zone_id);
                 if (ret == std::numeric_limits<uint64_t>::max())
                 {
                     RPC_ERROR("sp_add_ref failed");
@@ -818,7 +818,7 @@ namespace rpc
             }
 
             rpc::shared_ptr<object_proxy> op = service_proxy->get_or_create_object_proxy(
-                encap.object_id, service_proxy::object_proxy_creation_rule::ADD_REF_IF_NEW, new_proxy_added);
+                encap.object_id, service_proxy::object_proxy_creation_rule::ADD_REF_IF_NEW, new_proxy_added, caller_zone_id.as_known_direction_channel());
             RPC_ASSERT(op != nullptr);
             if (!op)
             {
@@ -923,7 +923,7 @@ namespace rpc
         }
 
         rpc::shared_ptr<object_proxy> op = service_proxy->get_or_create_object_proxy(
-            encap.object_id, service_proxy::object_proxy_creation_rule::RELEASE_IF_NOT_NEW, false);
+            encap.object_id, service_proxy::object_proxy_creation_rule::RELEASE_IF_NOT_NEW, false, {});
         if (!op)
         {
             RPC_ERROR("Object not found in proxy_bind_out_param");
@@ -993,7 +993,7 @@ namespace rpc
             service_proxy->add_external_ref();
 
         rpc::shared_ptr<object_proxy> op = service_proxy->get_or_create_object_proxy(
-            encap.object_id, service_proxy::object_proxy_creation_rule::DO_NOTHING, false);
+            encap.object_id, service_proxy::object_proxy_creation_rule::DO_NOTHING, false, {});
         if (!op)
         {
             RPC_ERROR("Object not found in demarshall_interface_proxy");

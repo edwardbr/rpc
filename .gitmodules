@@ -22,3 +22,6 @@
 [submodule "submodules/json-schema-validator"]
 	path = submodules/json-schema-validator
 	url = https://github.com/pboettch/json-schema-validator.git
+[submodule "submodules/fuzztest"]
+	path = submodules/fuzztest
+	url = https://github.com/google/fuzztest.git

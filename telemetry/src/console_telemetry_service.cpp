@@ -22,8 +22,8 @@ namespace rpc
             auto tp = spdlog::thread_pool();
 
             // Remove logger from spdlog registry to prevent conflicts
-            std::string logger_name = logger_->name();
-            spdlog::drop(logger_name);
+            // std::string logger_name = logger_->name();
+            // spdlog::drop(logger_name);
 
             // Drop the logger reference to allow proper cleanup
             logger_.reset();

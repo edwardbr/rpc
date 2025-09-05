@@ -231,6 +231,19 @@ cmake --build build --target simple_json_schema_metadata_test
 ./build/tests/json_schema_test/simple_json_schema_metadata_test
 ```
 
+### Run Hierarchical Zone Fuzz Tests
+```bash
+cmake --build build --target fuzz_test_main
+./build/output/debug/fuzz_test_main 3  # Run 3 iterations of hierarchical tests
+```
+
+**What this tests**:
+- Creates 3-level zone hierarchies where child zones create their own children
+- Tests cross-zone `rpc::shared_ptr` marshalling 
+- Validates `place_shared_object` functionality with [in] parameters
+- Property-based testing with randomized parameters
+- Telemetry visualization showing zone topology graphs
+
 ### Debug Code Generation
 Set `DEBUG_RPC_GEN=ON` in CMake to enable generator debugging output.
 
@@ -248,6 +261,51 @@ Set `DEBUG_RPC_GEN=ON` in CMake to enable generator debugging output.
 - Network transport implementations
 - Enhanced JSON schema features (improved output schemas, additional format support)
 
-This codebase represents a mature RPC system with recent enhancements for JSON schema generation and improved IDL attribute handling. The build system is well-integrated and the code generation pipeline is robust and extensible.
+## Recent Major Update: Hierarchical Zone Graph Testing (September 2024)
+
+**Location**: `/tests/fuzz_test/fuzz_test_main.cpp`
+
+**Achievement**: Successfully implemented and tested true hierarchical zone creation where child zones create their own children, demonstrating complex multi-level RPC++ zone architectures.
+
+**Key Features Implemented**:
+- **Deep Hierarchical Zones**: 3+ level zone hierarchies where child zones autonomously create their own children
+- **Proper Zone Lifecycle Management**: Zones kept alive through `shared_ptr` to objects, not service storage
+- **Cross-Zone shared_ptr Marshalling**: Objects created in one zone and successfully passed/manipulated across multiple zone levels
+- **place_shared_object Implementation**: Working [in] parameter testing with newly created objects across zones
+- **Autonomous Node Architecture**: Nodes can create child zones using `rpc::service::get_current_service()`
+
+**Technical Implementation**:
+```cpp
+// Child zones create their own children using local service context
+auto current_service = rpc::service::get_current_service();
+auto err_code = current_service->connect_to_zone<rpc::local_child_service_proxy<...>>(
+    child_zone_name.c_str(), {zone_id}, parent_interface, child_node, setup_callback);
+```
+
+**Architecture Compliance**: 
+- **No Service Storage**: Removed improper `root_service_` and `child_services_` storage
+- **Hidden Service Principle**: Each object only interacts with current service via `get_current_service()`
+- **Object-Based Zone Lifecycle**: Zones stay alive through references to objects within them
+
+**Test Results**: 
+- **25+ zones created** in various test patterns
+- **3-level hierarchies verified** with telemetry visualization showing true parent-child relationships
+- **Cross-zone marshalling working** with factories, caches, and autonomous nodes
+- **Property-based testing** with randomized parameters demonstrating robustness
+
+**Telemetry Output Example**:
+```
+Zone 2 fuzz_root
+  ├─ Zone 5000 level1_0  
+    ├─ Zone 6000 child_5000_6000  ← Child zone created by parent
+  ├─ Zone 5001 level1_1
+    ├─ Zone 6001 child_5001_6001
+```
+
+This demonstrates RPC++ can handle complex distributed zone topologies where zones act as autonomous entities creating and managing their own sub-hierarchies.
+
+---
+
+This codebase represents a mature RPC system with recent enhancements for JSON schema generation, improved IDL attribute handling, and comprehensive hierarchical zone testing. The build system is well-integrated and the code generation pipeline is robust and extensible.
 - when running tests with:
 - Always load all the .md files in the root directory and in the docs folder

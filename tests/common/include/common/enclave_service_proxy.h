@@ -61,7 +61,7 @@ namespace rpc
             object object_id,
             caller_channel_zone caller_channel_zone_id,
             caller_zone caller_zone_id,
-            requester_zone requester_zone_id,
+            known_direction_zone known_direction_zone_id,
             add_ref_options build_out_param_channel) override;
         uint64_t release(uint64_t protocol_version,
             destination_zone destination_zone_id,

@@ -124,18 +124,26 @@ namespace marshalled_tests
             xxx::something_more_complicated val;
             ASSERT_ERROR_CODE(foo.receive_something_more_complicated_ref(val));
             if (val.map_val.size() == 0)
+            {
                 RPC_ERROR("receive_something_more_complicated_ref returned no data");
+            }
             else
+            {
                 RPC_INFO("got {}", val.map_val.begin()->first);
+            }
         }
         if (!enclave)
         {
             xxx::something_more_complicated* val = nullptr;
             ASSERT_ERROR_CODE(foo.receive_something_more_complicated_ptr(val));
             if (val->map_val.size() == 0)
+            {
                 RPC_ERROR("receive_something_more_complicated_ref returned no data");
+            }
             else
+            {
                 RPC_INFO("got {}", val->map_val.begin()->first);
+            }
             delete val;
         }
         {
@@ -143,9 +151,13 @@ namespace marshalled_tests
             val.map_val["22"] = xxx::something_complicated{33, "22"};
             ASSERT_ERROR_CODE(foo.receive_something_more_complicated_in_out_ref(val));
             if (val.map_val.size() == 0)
+            {
                 RPC_ERROR("receive_something_more_complicated_in_out_ref returned no data");
+            }
             else
+            {
                 RPC_INFO("got {}", val.map_val.begin()->first);
+            }
         }
         {
             int val1 = 1;
@@ -195,7 +207,9 @@ namespace marshalled_tests
             }
 
             if (foo->exception_test() != rpc::error::EXCEPTION())
+            {
                 RPC_ERROR("exception_test failed");
+            }
         }
         {
             rpc::shared_ptr<xxx::i_baz> i_baz_ptr;
