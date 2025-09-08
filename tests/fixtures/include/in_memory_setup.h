@@ -13,7 +13,7 @@
 #include <common/foo_impl.h>
 
 #ifdef USE_RPC_TELEMETRY
-#include <rpc/telemetry/host_telemetry_service.h>
+#include <rpc/telemetry/i_telemetry_service.h>
 #endif
 
 

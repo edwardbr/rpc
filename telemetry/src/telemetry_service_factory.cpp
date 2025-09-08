@@ -6,7 +6,7 @@
 #include <rpc/telemetry/enclave_telemetry_service.h>
 #else
 #include <rpc/telemetry/telemetry_handler.h>
-#include <rpc/telemetry/host_telemetry_service.h>
+#include <rpc/telemetry/sequence_diagram_telemetry_service.h>
 #include <rpc/telemetry/console_telemetry_service.h>
 #endif
 
@@ -29,7 +29,7 @@ namespace rpc
 #ifdef USE_CONSOLE_TELEMETRY
         return rpc::console_telemetry_service::create(telemetry_service_, test_suite_name, name, directory);
 #else
-        return rpc::host_telemetry_service::create(telemetry_service_, test_suite_name, name, directory);
+        return rpc::sequence_diagram_telemetry_service::create(telemetry_service_, test_suite_name, name, directory);
 #endif
     }
 #endif

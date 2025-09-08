@@ -11,7 +11,7 @@
 
 namespace rpc
 {
-    class host_telemetry_service : public rpc::i_telemetry_service
+    class sequence_diagram_telemetry_service : public rpc::i_telemetry_service
     {
         struct name_count
         {
@@ -111,7 +111,7 @@ namespace rpc
 
         FILE* output_ = nullptr;
 
-        host_telemetry_service(FILE* output);
+        sequence_diagram_telemetry_service(FILE* output);
 
         void add_new_object(const char* name, uint64_t address, rpc::zone zone_id) const;
 
@@ -121,7 +121,7 @@ namespace rpc
             const std::string& name,
             const std::filesystem::path& directory);
 
-        virtual ~host_telemetry_service();
+        virtual ~sequence_diagram_telemetry_service();
 
         void on_service_creation(const char* name, rpc::zone zone_id, rpc::destination_zone parent_zone_id) const override;
         void on_service_deletion(rpc::zone zone_id) const override;

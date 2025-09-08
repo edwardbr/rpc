@@ -186,6 +186,7 @@ namespace fuzz_test
         uint64_t random_seed;
         std::string timestamp;
         int runners_count;
+        int instruction_count;  // Number of instructions per runner
         std::vector<runner_target_pair> runner_target_pairs;
         std::vector<uint64_t> zone_sequence;
         std::string error_message;  // Optional, only for failures

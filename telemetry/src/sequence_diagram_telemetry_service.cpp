@@ -7,7 +7,7 @@
 #include <spdlog/spdlog.h>
 #include <fmt/os.h>
 
-#include <rpc/telemetry/host_telemetry_service.h>
+#include <rpc/telemetry/sequence_diagram_telemetry_service.h>
 #include <rpc/assert.h>
 #include <rpc/service.h>
 
@@ -22,7 +22,7 @@ namespace rpc
         return ssr.str();
     }
 
-    bool host_telemetry_service::create(std::shared_ptr<rpc::i_telemetry_service>& service,
+    bool sequence_diagram_telemetry_service::create(std::shared_ptr<rpc::i_telemetry_service>& service,
         const std::string& test_suite_name,
         const std::string& name,
         const std::filesystem::path& directory)
@@ -53,16 +53,16 @@ namespace rpc
         fmt::println(output, "@startuml");
         fmt::println(output, "title {}.{}", test_suite_name, name);
 
-        service = std::shared_ptr<host_telemetry_service>(new host_telemetry_service(output));
+        service = std::shared_ptr<sequence_diagram_telemetry_service>(new sequence_diagram_telemetry_service(output));
         return true;
     }
 
-    host_telemetry_service::host_telemetry_service(FILE* output)
+    sequence_diagram_telemetry_service::sequence_diagram_telemetry_service(FILE* output)
         : output_(output)
     {
     }
 
-    host_telemetry_service::~host_telemetry_service()
+    sequence_diagram_telemetry_service::~sequence_diagram_telemetry_service()
     {
         fmt::println(output_, "note left");
         fmt::println(output_, "orphaned services {}", services.size());
@@ -204,7 +204,7 @@ namespace rpc
         return service_order(zone_id) + destination_zone_id.get_val() * 10000;
     }
 
-    void host_telemetry_service::on_service_creation(const char* name, rpc::zone zone_id, rpc::destination_zone parent_zone_id) const
+    void sequence_diagram_telemetry_service::on_service_creation(const char* name, rpc::zone zone_id, rpc::destination_zone parent_zone_id) const
     {
         std::lock_guard g(mux);
         auto entry = services.find(zone_id);
@@ -222,7 +222,7 @@ namespace rpc
         fflush(output_);
     }
     
-    void host_telemetry_service::on_service_deletion(rpc::zone zone_id) const
+    void sequence_diagram_telemetry_service::on_service_deletion(rpc::zone zone_id) const
     {
         std::lock_guard g(mux);
         auto found = services.find(zone_id);
@@ -248,7 +248,7 @@ namespace rpc
         fflush(output_);
     }
 
-    void host_telemetry_service::on_service_try_cast(rpc::zone zone_id,
+    void sequence_diagram_telemetry_service::on_service_try_cast(rpc::zone zone_id,
         rpc::destination_zone destination_zone_id,
         rpc::caller_zone caller_zone_id,
         rpc::object object_id,
@@ -276,7 +276,7 @@ namespace rpc
 #endif
     }
 
-    void host_telemetry_service::on_service_add_ref(rpc::zone zone_id,
+    void sequence_diagram_telemetry_service::on_service_add_ref(rpc::zone zone_id,
         rpc::destination_channel_zone destination_channel_zone_id,
         rpc::destination_zone destination_zone_id,
         rpc::object object_id,
@@ -375,7 +375,7 @@ namespace rpc
 #endif
     }
 
-    void host_telemetry_service::on_service_release(rpc::zone zone_id,
+    void sequence_diagram_telemetry_service::on_service_release(rpc::zone zone_id,
         rpc::destination_channel_zone destination_channel_zone_id,
         rpc::destination_zone destination_zone_id,
         rpc::object object_id,
@@ -409,7 +409,7 @@ namespace rpc
 #endif
     }
 
-    void host_telemetry_service::on_service_proxy_creation(const char* service_name,
+    void sequence_diagram_telemetry_service::on_service_proxy_creation(const char* service_name,
         const char* service_proxy_name,
         rpc::zone zone_id,
         rpc::destination_zone destination_zone_id,
@@ -467,7 +467,7 @@ namespace rpc
 #endif
     }
 
-    void host_telemetry_service::on_cloned_service_proxy_creation(const char* service_name,
+    void sequence_diagram_telemetry_service::on_cloned_service_proxy_creation(const char* service_name,
         const char* service_proxy_name,
         rpc::zone zone_id,
         rpc::destination_zone destination_zone_id,
@@ -525,7 +525,7 @@ namespace rpc
 #endif
     }
 
-    void host_telemetry_service::on_service_proxy_deletion(
+    void sequence_diagram_telemetry_service::on_service_proxy_deletion(
         rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::caller_zone caller_zone_id) const
     {
         std::ignore = zone_id;
@@ -574,7 +574,7 @@ namespace rpc
 #endif
     }
 
-    void host_telemetry_service::on_service_proxy_try_cast(rpc::zone zone_id,
+    void sequence_diagram_telemetry_service::on_service_proxy_try_cast(rpc::zone zone_id,
         rpc::destination_zone destination_zone_id,
         rpc::caller_zone caller_zone_id,
         rpc::object object_id,
@@ -596,7 +596,7 @@ namespace rpc
 #endif
     }
 
-    void host_telemetry_service::on_service_proxy_add_ref(rpc::zone zone_id,
+    void sequence_diagram_telemetry_service::on_service_proxy_add_ref(rpc::zone zone_id,
         rpc::destination_zone destination_zone_id,
         rpc::destination_channel_zone destination_channel_zone_id,
         rpc::caller_zone caller_zone_id,
@@ -668,7 +668,7 @@ namespace rpc
 #endif
     }
 
-    void host_telemetry_service::on_service_proxy_release(rpc::zone zone_id,
+    void sequence_diagram_telemetry_service::on_service_proxy_release(rpc::zone zone_id,
         rpc::destination_zone destination_zone_id,
         rpc::destination_channel_zone destination_channel_zone_id,
         rpc::caller_zone caller_zone_id,
@@ -704,7 +704,7 @@ namespace rpc
 #endif
     }
 
-    void host_telemetry_service::on_service_proxy_add_external_ref(rpc::zone zone_id,
+    void sequence_diagram_telemetry_service::on_service_proxy_add_external_ref(rpc::zone zone_id,
         rpc::destination_channel_zone destination_channel_zone_id,
         rpc::destination_zone destination_zone_id,
         rpc::caller_zone caller_zone_id,
@@ -773,7 +773,7 @@ namespace rpc
 #endif
     }
 
-    void host_telemetry_service::on_service_proxy_release_external_ref(rpc::zone zone_id,
+    void sequence_diagram_telemetry_service::on_service_proxy_release_external_ref(rpc::zone zone_id,
         rpc::destination_channel_zone destination_channel_zone_id,
         rpc::destination_zone destination_zone_id,
         rpc::caller_zone caller_zone_id,
@@ -822,7 +822,7 @@ namespace rpc
 #endif
     }
 
-    void host_telemetry_service::add_new_object(const char* name, uint64_t address, rpc::zone zone_id) const
+    void sequence_diagram_telemetry_service::add_new_object(const char* name, uint64_t address, rpc::zone zone_id) const
     {
         auto found = impls.find(address);
         if (found == impls.end())
@@ -847,7 +847,7 @@ namespace rpc
         fmt::println(output_, "activate {}", object_alias(address));
     }
 
-    void host_telemetry_service::on_impl_creation(const char* name, uint64_t address, rpc::zone zone_id) const
+    void sequence_diagram_telemetry_service::on_impl_creation(const char* name, uint64_t address, rpc::zone zone_id) const
     {
         std::lock_guard g(mux);
         if (historical_impls.find(address) != historical_impls.end())
@@ -858,7 +858,7 @@ namespace rpc
         fflush(output_);
     }
 
-    void host_telemetry_service::on_impl_deletion(uint64_t address, rpc::zone zone_id) const
+    void sequence_diagram_telemetry_service::on_impl_deletion(uint64_t address, rpc::zone zone_id) const
     {
         std::ignore = zone_id;
 
@@ -878,7 +878,7 @@ namespace rpc
         fflush(output_);
     }
 
-    void host_telemetry_service::on_stub_creation(rpc::zone zone_id, rpc::object object_id, uint64_t address) const
+    void sequence_diagram_telemetry_service::on_stub_creation(rpc::zone zone_id, rpc::object object_id, uint64_t address) const
     {
         std::lock_guard g(mux);
 
@@ -897,7 +897,7 @@ namespace rpc
         fflush(output_);
     }
 
-    void host_telemetry_service::on_stub_deletion(rpc::zone zone_id, rpc::object object_id) const
+    void sequence_diagram_telemetry_service::on_stub_deletion(rpc::zone zone_id, rpc::object object_id) const
     {
         std::lock_guard g(mux);
         auto found = stubs.find(zone_object{zone_id, object_id});
@@ -929,7 +929,7 @@ namespace rpc
         fflush(output_);
     }
 
-    void host_telemetry_service::on_stub_send(
+    void sequence_diagram_telemetry_service::on_stub_send(
         rpc::zone zone_id, rpc::object object_id, rpc::interface_ordinal interface_id, rpc::method method_id) const
     {
         std::ignore = zone_id;
@@ -943,7 +943,7 @@ namespace rpc
 #endif
     }
 
-    void host_telemetry_service::on_stub_add_ref(rpc::zone zone,
+    void sequence_diagram_telemetry_service::on_stub_add_ref(rpc::zone zone,
         rpc::object object_id,
         rpc::interface_ordinal interface_id,
         uint64_t count,
@@ -974,7 +974,7 @@ namespace rpc
 #endif
     }
 
-    void host_telemetry_service::on_stub_release(rpc::zone zone,
+    void sequence_diagram_telemetry_service::on_stub_release(rpc::zone zone,
         rpc::object object_id,
         rpc::interface_ordinal interface_id,
         uint64_t count,
@@ -1011,7 +1011,7 @@ namespace rpc
 #endif
     }
 
-    void host_telemetry_service::on_object_proxy_creation(
+    void sequence_diagram_telemetry_service::on_object_proxy_creation(
         rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, bool add_ref_done) const
     {
         std::ignore = zone_id;
@@ -1053,7 +1053,7 @@ namespace rpc
 #endif
     }
 
-    void host_telemetry_service::on_object_proxy_deletion(
+    void sequence_diagram_telemetry_service::on_object_proxy_deletion(
         rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id) const
     {
         std::ignore = zone_id;
@@ -1094,7 +1094,7 @@ namespace rpc
 #endif
     }
 
-    void host_telemetry_service::on_interface_proxy_creation(const char* name,
+    void sequence_diagram_telemetry_service::on_interface_proxy_creation(const char* name,
         rpc::zone zone_id,
         rpc::destination_zone destination_zone_id,
         rpc::object object_id,
@@ -1118,7 +1118,7 @@ namespace rpc
 #endif
     }
 
-    void host_telemetry_service::on_interface_proxy_deletion(rpc::zone zone_id,
+    void sequence_diagram_telemetry_service::on_interface_proxy_deletion(rpc::zone zone_id,
         rpc::destination_zone destination_zone_id,
         rpc::object object_id,
         rpc::interface_ordinal interface_id) const
@@ -1167,7 +1167,7 @@ namespace rpc
 #endif
     }
 
-    void host_telemetry_service::on_interface_proxy_send(const char* method_name,
+    void sequence_diagram_telemetry_service::on_interface_proxy_send(const char* method_name,
         rpc::zone zone_id,
         rpc::destination_zone destination_zone_id,
         rpc::object object_id,
@@ -1202,7 +1202,7 @@ namespace rpc
         fflush(output_);
     }
 
-    void host_telemetry_service::message(level_enum level, const char* message) const
+    void sequence_diagram_telemetry_service::message(level_enum level, const char* message) const
     {
         std::string colour;
         switch (level)

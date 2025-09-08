@@ -37,7 +37,7 @@
 #include "fuzz_test/fuzz_test_stub.h"
 
 #ifdef USE_RPC_TELEMETRY
-#include "rpc/telemetry/host_telemetry_service.h"
+#include <rpc/telemetry/i_telemetry_service.h>
 // Use extern declaration to reference the global telemetry service manager from test_fixtures
 extern rpc::telemetry_service_manager telemetry_service_manager_;
 #endif
@@ -49,7 +49,7 @@ std::atomic<int> g_instruction_counter;
 
 // Global configuration for replay system
 static std::string g_output_directory = "tests/fuzz_test/replays";
-static bool g_cleanup_successful_tests = false;
+static bool g_cleanup_successful_tests = true;
 
 // Global deterministic random number generator for replay consistency
 static std::mt19937 g_global_rng;
@@ -1259,7 +1259,7 @@ rpc::shared_ptr<i_autonomous_node> create_deep_branch(
 }
 
 // Run a complete autonomous instruction test cycle
-void run_autonomous_instruction_test(int test_cycle, uint64_t override_seed = 0)
+void run_autonomous_instruction_test(int test_cycle, int instruction_count, uint64_t override_seed = 0)
 {
     spdlog::info("=== Starting Autonomous Instruction Test Cycle {} ===", test_cycle);
 
@@ -1274,6 +1274,7 @@ void run_autonomous_instruction_test(int test_cycle, uint64_t override_seed = 0)
     // Initialize test scenario configuration for replay system
     test_scenario_config scenario_config;
     scenario_config.test_cycle = test_cycle;
+    scenario_config.instruction_count = instruction_count;
 
     // Use override seed if provided (for replay), otherwise generate new seed
     if (override_seed != 0)
@@ -1401,12 +1402,13 @@ void run_autonomous_instruction_test(int test_cycle, uint64_t override_seed = 0)
                     std::uniform_int_distribution<size_t> target_dist(0, all_nodes.size() - 1);
                     auto& target_node = all_nodes[target_dist(gen)];
 
-                    RPC_INFO("Executing runner {} (zone {}) → target {} (zone {})",
+                    RPC_INFO("Executing runner {} (zone {}) → target {} (zone {}) with {} instructions",
                         i + 1,
                         scenario_config.runner_target_pairs[i].runner_id,
                         i + 1,
-                        scenario_config.runner_target_pairs[i].target_id);
-                    runner_node->run_script(target_node, 10); // Each runner executes up to 10 instructions
+                        scenario_config.runner_target_pairs[i].target_id,
+                        scenario_config.instruction_count);
+                    runner_node->run_script(target_node, scenario_config.instruction_count);
                 }
             }
 
@@ -1507,13 +1509,14 @@ int main(int argc, char** argv)
 
         // Main test options
         args::ValueFlag<int> test_cycles(parser, "cycles", "Number of test cycles to run (default: 5)", {'c', "cycles"}, 5);
+        args::ValueFlag<int> instruction_count(parser, "instructions", "Number of instructions per runner (default: 10)", {'i', "instructions"}, 10);
         args::ValueFlag<std::string> output_dir(parser,
             "directory",
             "Directory for JSON scenario files (default: tests/fuzz_test/replays)",
             {'o', "output-dir"},
             "tests/fuzz_test/replays");
-        args::Flag cleanup_success(
-            parser, "cleanup", "Delete successful test files, keep only failures", {"cleanup-success"});
+        args::Flag keep_success(
+            parser, "keep", "Keep successful test files (default: delete them)", {"keep-success"});
         args::Flag enable_telemetry(
             parser, "enable telemetry", "Enable telemetry output", {'t', "enable-telemetry"});
 
@@ -1535,7 +1538,7 @@ int main(int argc, char** argv)
 
         // Set global configuration from parsed arguments
         g_output_directory = args::get(output_dir);
-        g_cleanup_successful_tests = args::get(cleanup_success);
+        g_cleanup_successful_tests = !args::get(keep_success);
 
         // Handle mode selection
         if (replay_file)
@@ -1551,10 +1554,12 @@ int main(int argc, char** argv)
 
         // Default: run fuzz test
         int cycles = args::get(test_cycles);
+        int instructions = args::get(instruction_count);
 
         spdlog::info("Starting Autonomous Instruction-Based Fuzz Test");
         spdlog::info("Configuration:");
         spdlog::info("  Test cycles: {}", cycles);
+        spdlog::info("  Instructions per runner: {}", instructions);
         spdlog::info("  Output directory: {}", g_output_directory);
         spdlog::info("  Cleanup successful tests: {}", g_cleanup_successful_tests ? "enabled" : "disabled");
 
@@ -1567,7 +1572,7 @@ int main(int argc, char** argv)
             try
             {
                 // Initialize root service for the cycle
-                run_autonomous_instruction_test(cycle);
+                run_autonomous_instruction_test(cycle, instructions);
             }
             catch (const std::exception& e)
             {
@@ -1722,12 +1727,13 @@ int replay_test_scenario(const std::string& scenario_file)
         spdlog::info("  Test cycle: {}", config.test_cycle);
         spdlog::info("  Random seed: {}", config.random_seed);
         spdlog::info("  Runners count: {}", config.runners_count);
+        spdlog::info("  Instruction count: {}", config.instruction_count);
         spdlog::info("  Runner-target pairs: {}", config.runner_target_pairs.size());
 
         RPC_INFO("Starting replay execution...");
 
         // Run the exact same test scenario with the saved seed
-        run_autonomous_instruction_test(config.test_cycle, config.random_seed);
+        run_autonomous_instruction_test(config.test_cycle, config.instruction_count, config.random_seed);
 
         spdlog::info("=== REPLAY COMPLETED SUCCESSFULLY ===");
         return 0;
