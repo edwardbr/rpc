@@ -167,36 +167,43 @@ int try_cast_enclave(uint64_t protocol_version, uint64_t zone_id, uint64_t objec
     return ret;
 }
 
-uint64_t add_ref_enclave(uint64_t protocol_version,
+int add_ref_enclave(uint64_t protocol_version,
     uint64_t destination_channel_zone_id,
     uint64_t destination_zone_id,
     uint64_t object_id,
     uint64_t caller_channel_zone_id,
     uint64_t caller_zone_id,
     uint64_t known_direction_zone_id,
-    char build_out_param_channel)
+    char build_out_param_channel,
+    uint64_t* reference_count)
 {
     if (protocol_version > rpc::get_version())
     {
-        return std::numeric_limits<uint64_t>::max();
+        *reference_count = 0;
+        return rpc::error::INCOMPATIBLE_SERVICE();
     }
-    return rpc_server->add_ref(protocol_version,
+    
+    auto err_code = rpc_server->add_ref(protocol_version,
         {destination_channel_zone_id},
         {destination_zone_id},
         {object_id},
         {caller_channel_zone_id},
         {caller_zone_id},
         {known_direction_zone_id},
-        static_cast<rpc::add_ref_options>(build_out_param_channel));
+        static_cast<rpc::add_ref_options>(build_out_param_channel),
+        *reference_count);
+    return err_code;
 }
 
-uint64_t release_enclave(uint64_t protocol_version, uint64_t zone_id, uint64_t object_id, uint64_t caller_zone_id)
+int release_enclave(uint64_t protocol_version, uint64_t zone_id, uint64_t object_id, uint64_t caller_zone_id, uint64_t* reference_count)
 {
     if (protocol_version > rpc::get_version())
     {
-        return std::numeric_limits<uint64_t>::max();
+        *reference_count = 0;
+        return rpc::error::INCOMPATIBLE_SERVICE();
     }
-    return rpc_server->release(protocol_version, {zone_id}, {object_id}, {caller_zone_id});
+    auto err_code = rpc_server->release(protocol_version, {zone_id}, {object_id}, {caller_zone_id}, *reference_count);
+    return err_code;
 }
 
 extern "C"

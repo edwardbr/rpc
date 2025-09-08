@@ -132,14 +132,15 @@ namespace rpc
         return err_code;
     }
 
-    uint64_t host_service_proxy::add_ref(uint64_t protocol_version,
+    int host_service_proxy::add_ref(uint64_t protocol_version,
         destination_channel_zone destination_channel_zone_id,
         destination_zone destination_zone_id,
         object object_id,
         caller_channel_zone caller_channel_zone_id,
         caller_zone caller_zone_id,
         known_direction_zone known_direction_zone_id,
-        add_ref_options build_out_param_channel)
+        add_ref_options build_out_param_channel,
+        uint64_t& reference_count)
     {
 #ifdef USE_RPC_TELEMETRY
         if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
@@ -152,8 +153,8 @@ namespace rpc
                 build_out_param_channel);
         }
 #endif
-        uint64_t ret = 0;
-        sgx_status_t status = ::add_ref_host(&ret,
+        int err_code = 0;
+        sgx_status_t status = ::add_ref_host(&err_code,
             protocol_version,
             destination_channel_zone_id.get_val(),
             destination_zone_id.get_val(),
@@ -161,7 +162,8 @@ namespace rpc
             caller_channel_zone_id.get_val(),
             caller_zone_id.get_val(),
             known_direction_zone_id.get_val(),
-            (std::uint8_t)build_out_param_channel);
+            (std::uint8_t)build_out_param_channel,
+            &reference_count);
         if (status)
         {
 #ifdef USE_RPC_TELEMETRY
@@ -172,19 +174,21 @@ namespace rpc
 #endif
             RPC_ERROR("add_ref_host gave an enclave error {}", (int)status);
             RPC_ASSERT(false);
-            return std::numeric_limits<uint64_t>::max();
+            reference_count = 0;
+            return rpc::error::ZONE_NOT_FOUND();
         }
 
         auto svc = rpc::static_pointer_cast<child_service>(get_operating_zone_service());
-        return ret;
+        return err_code;
     }
 
-    uint64_t host_service_proxy::release(
-        uint64_t protocol_version, destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id)
+    int host_service_proxy::release(
+        uint64_t protocol_version, destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id,
+        uint64_t& reference_count)
     {
-        uint64_t ret = 0;
+        int err_code = 0;
         sgx_status_t status = ::release_host(
-            &ret, protocol_version, destination_zone_id.get_val(), object_id.get_val(), caller_zone_id.get_val());
+            &err_code, protocol_version, destination_zone_id.get_val(), object_id.get_val(), caller_zone_id.get_val(), &reference_count);
         if (status)
         {
 #ifdef USE_RPC_TELEMETRY
@@ -195,9 +199,10 @@ namespace rpc
 #endif
             RPC_ERROR("release_host gave an enclave error {}", (int)status);
             RPC_ASSERT(false);
-            return std::numeric_limits<uint64_t>::max();
+            reference_count = 0;
+            return rpc::error::ZONE_NOT_FOUND();
         }
-        return ret;
+        return err_code;
     }
 }
 

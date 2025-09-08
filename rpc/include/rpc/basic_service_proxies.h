@@ -81,14 +81,15 @@ namespace rpc
         {
             return parent_service_.lock()->try_cast(protocol_version, destination_zone_id, object_id, interface_id);
         }
-        uint64_t add_ref(uint64_t protocol_version,
+        int add_ref(uint64_t protocol_version,
             destination_channel_zone destination_channel_zone_id,
             destination_zone destination_zone_id,
             object object_id,
             caller_channel_zone caller_channel_zone_id,
             caller_zone caller_zone_id,
             known_direction_zone known_direction_zone_id,
-            add_ref_options build_out_param_channel) override
+            add_ref_options build_out_param_channel,
+            uint64_t& reference_count) override
         {
             RPC_ASSERT(((std::uint8_t)build_out_param_channel & (std::uint8_t)rpc::add_ref_options::build_caller_route)
                        || destination_channel_zone_id == 0
@@ -101,15 +102,16 @@ namespace rpc
                 caller_channel_zone_id,
                 caller_zone_id,
                 known_direction_zone_id,
-                build_out_param_channel);
+                build_out_param_channel,
+                reference_count);
 
-            // auto svc = rpc::static_pointer_cast<child_service>(get_operating_zone_service());
             return ret;
         }
-        uint64_t release(
-            uint64_t protocol_version, destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id) override
+        int release(
+            uint64_t protocol_version, destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id,
+            uint64_t& reference_count) override
         {
-            auto ret = parent_service_.lock()->release(protocol_version, destination_zone_id, object_id, caller_zone_id);
+            auto ret = parent_service_.lock()->release(protocol_version, destination_zone_id, object_id, caller_zone_id, reference_count);
             return ret;
         }
 
@@ -216,19 +218,22 @@ namespace rpc
                 return rpc::error::ZONE_NOT_INITIALISED();
             return child_service->try_cast(protocol_version, destination_zone_id, object_id, interface_id);
         }
-        uint64_t add_ref(uint64_t protocol_version,
+        int add_ref(uint64_t protocol_version,
             destination_channel_zone destination_channel_zone_id,
             destination_zone destination_zone_id,
             object object_id,
             caller_channel_zone caller_channel_zone_id,
             caller_zone caller_zone_id,
             known_direction_zone known_direction_zone_id,
-            add_ref_options build_out_param_channel) override
+            add_ref_options build_out_param_channel,
+            uint64_t& reference_count) override
         {
             auto child_service = child_service_.get_nullable();
             RPC_ASSERT(child_service);
-            if (!child_service)
-                return std::numeric_limits<uint64_t>::max();
+            if (!child_service) {
+                reference_count = 0;
+                return rpc::error::ZONE_NOT_INITIALISED();
+            }
             auto ret = child_service->add_ref(protocol_version,
                 destination_channel_zone_id,
                 destination_zone_id,
@@ -236,17 +241,21 @@ namespace rpc
                 caller_channel_zone_id,
                 caller_zone_id,
                 known_direction_zone_id,
-                build_out_param_channel);
+                build_out_param_channel,
+                reference_count);
             return ret;
         }
-        uint64_t release(
-            uint64_t protocol_version, destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id) override
+        int release(
+            uint64_t protocol_version, destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id,
+            uint64_t& reference_count) override
         {
             auto child_service = child_service_.get_nullable();
             RPC_ASSERT(child_service);
-            if (!child_service)
-                return std::numeric_limits<uint64_t>::max();
-            auto ret = child_service->release(protocol_version, destination_zone_id, object_id, caller_zone_id);
+            if (!child_service) {
+                reference_count = 0;
+                return rpc::error::ZONE_NOT_INITIALISED();
+            }
+            auto ret = child_service->release(protocol_version, destination_zone_id, object_id, caller_zone_id, reference_count);
             return ret;
         }
 

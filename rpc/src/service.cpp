@@ -308,8 +308,9 @@ namespace rpc
         if (destination_zone && input_interface)
         {
             auto object_id = input_interface->query_proxy_base()->get_object_proxy()->get_object_id();
-            auto ret = destination_zone->sp_release(object_id);
-            if (ret != std::numeric_limits<uint64_t>::max())
+            uint64_t ref_count = 0; 
+            auto ret = destination_zone->sp_release(object_id, ref_count);
+            if (ret == error::OK())
             {
                 destination_zone->release_external_ref();
             }
@@ -368,6 +369,7 @@ namespace rpc
 
         // the fork is here so we need to add ref the destination normally with caller info
         // note the caller_channel_zone_id is is this zones id as the caller came from a route via this node
+        uint64_t temp_ref_count;
         destination_zone->add_ref(rpc::get_version(),
             destination_channel_zone_id,
             destination_zone_id,
@@ -375,7 +377,8 @@ namespace rpc
             zone_id_.as_caller_channel(),
             caller_zone_id,
             known_direction_zone(zone_id_),
-            rpc::add_ref_options::build_destination_route);
+            rpc::add_ref_options::build_destination_route,
+            temp_ref_count);
 
         return {object_id, destination_zone_id};
     }
@@ -419,6 +422,7 @@ namespace rpc
                     rpc::add_ref_options::build_caller_route | rpc::add_ref_options::build_destination_route);
             }
 #endif
+            uint64_t temp_ref_count;
             object_service_proxy->add_ref(protocol_version,
                 {0},
                 destination_zone_id,
@@ -426,7 +430,8 @@ namespace rpc
                 {0},
                 caller_zone_id,
                 known_direction_zone(zone_id_),
-                rpc::add_ref_options::build_caller_route | rpc::add_ref_options::build_destination_route);
+                rpc::add_ref_options::build_caller_route | rpc::add_ref_options::build_destination_route,
+                temp_ref_count);
         }
         else
         {
@@ -525,6 +530,7 @@ namespace rpc
             // note the caller_channel_zone_id is is this zones id as the caller came from a route via this node
             if (destination_zone)
             {
+                uint64_t temp_ref_count;
                 destination_zone->add_ref(protocol_version,
                     {0},
                     destination_zone_id,
@@ -532,7 +538,8 @@ namespace rpc
                     zone_id_.as_caller_channel(),
                     caller_zone_id,
                     known_direction_zone(zone_id_),
-                    rpc::add_ref_options::build_destination_route);
+                    rpc::add_ref_options::build_destination_route,
+                    temp_ref_count);
             }
             else
             {
@@ -553,6 +560,7 @@ namespace rpc
 #endif
 
             // note the caller_channel_zone_id is 0 as the caller came from this route
+            uint64_t temp_ref_count;
             caller->add_ref(protocol_version,
                 zone_id_.as_destination_channel(),
                 destination_zone_id,
@@ -560,7 +568,8 @@ namespace rpc
                 {0},
                 caller_zone_id,
                 known_direction_zone(zone_id_),
-                rpc::add_ref_options::build_caller_route);
+                rpc::add_ref_options::build_caller_route,
+                temp_ref_count);
         }
 
         return {object_id, destination_zone_id};
@@ -655,6 +664,7 @@ namespace rpc
             }
 #endif
             // note the caller_channel_zone_id is 0 as the caller came from this route
+            uint64_t temp_ref_count;
             caller->add_ref(protocol_version,
                 {0},
                 zone_id_.as_destination(),
@@ -662,7 +672,8 @@ namespace rpc
                 {0},
                 caller_zone_id,
                 known_direction_zone(zone_id_),
-                rpc::add_ref_options::build_caller_route);
+                rpc::add_ref_options::build_caller_route,
+                temp_ref_count);
         }
         return {stub->get_id(), zone_id_.as_destination()};
     }
@@ -735,14 +746,15 @@ namespace rpc
         }
     }
 
-    uint64_t service::add_ref(uint64_t protocol_version,
+    int service::add_ref(uint64_t protocol_version,
         destination_channel_zone destination_channel_zone_id,
         destination_zone destination_zone_id,
         object object_id,
         caller_channel_zone caller_channel_zone_id,
         caller_zone caller_zone_id,
         known_direction_zone known_direction_zone_id,
-        add_ref_options build_out_param_channel)
+        add_ref_options build_out_param_channel,
+        uint64_t& reference_count)
     {
         current_service_tracker tracker(this);
         current_caller_manager cc(caller_zone_id);
@@ -802,7 +814,7 @@ namespace rpc
                 }
 #endif
                 return destination->add_ref(
-                    protocol_version, {0}, destination_zone_id, object_id, {0}, caller_zone_id, known_direction_zone_id, build_out_param_channel);
+                    protocol_version, {0}, destination_zone_id, object_id, {0}, caller_zone_id, known_direction_zone_id, build_out_param_channel, reference_count);
             }
             else if (build_channel)
             {
@@ -893,6 +905,7 @@ namespace rpc
                                 }
 #endif
 
+                                uint64_t temp_ref_count;
                                 auto ret = destination->add_ref(protocol_version,
                                     {0},
                                     destination_zone_id,
@@ -900,11 +913,17 @@ namespace rpc
                                     {0},
                                     caller_zone_id,
                                     known_direction_zone_id,
-                                    build_out_param_channel);
+                                    build_out_param_channel,
+                                    temp_ref_count);
                                 destination->release_external_ref(); // perhaps this could be optimised
-                                if (ret == std::numeric_limits<uint64_t>::max())
+                                if (ret != rpc::error::OK())
                                 {
+                                    reference_count = 0;
                                     return ret;
+                                }
+                                else
+                                {
+                                    reference_count = temp_ref_count;
                                 }
                                 break;
                             }
@@ -924,6 +943,7 @@ namespace rpc
                                     add_ref_options::build_destination_route);
                             }
 #endif
+                            uint64_t temp_ref_count;
                             destination->add_ref(protocol_version,
                                 {0},
                                 destination_zone_id,
@@ -931,7 +951,8 @@ namespace rpc
                                 zone_id_.as_caller_channel(),
                                 caller_zone_id,
                                 known_direction_zone_id,
-                                add_ref_options::build_destination_route);
+                                add_ref_options::build_destination_route,
+                                temp_ref_count);
                         }
                         // back fill the ref count to the caller
                         if (!!(build_out_param_channel & add_ref_options::build_caller_route))
@@ -948,6 +969,7 @@ namespace rpc
                             }
 #endif
 
+                            uint64_t temp_ref_count;
                             caller->add_ref(protocol_version,
                                 zone_id_.as_destination_channel(),
                                 destination_zone_id,
@@ -955,7 +977,8 @@ namespace rpc
                                 caller_channel_zone_id,
                                 caller_zone_id,
                                 known_direction_zone_id,
-                                add_ref_options::build_caller_route);
+                                add_ref_options::build_caller_route,
+                                temp_ref_count);
                         }
                     } while (false);
                 }
@@ -1016,7 +1039,8 @@ namespace rpc
                     caller_channel_zone_id,
                     caller_zone_id,
                     known_direction_zone_id,
-                    build_out_param_channel);
+                    build_out_param_channel,
+                    reference_count);
             }
         }
         else
@@ -1028,7 +1052,8 @@ namespace rpc
             else
 #endif
             {
-                return std::numeric_limits<uint64_t>::max();
+                reference_count = 0;
+                return rpc::error::INCOMPATIBLE_SERVICE();
             }
 
             // find the caller
@@ -1062,12 +1087,14 @@ namespace rpc
                         zone_id_, destination_zone_id, {0}, caller_zone_id, object_id, add_ref_options::build_caller_route);
                 }
 #endif
+                uint64_t temp_ref_count;
                 caller->add_ref(
-                    protocol_version, {0}, destination_zone_id, object_id, {}, caller_zone_id, known_direction_zone_id, add_ref_options::build_caller_route);
+                    protocol_version, {0}, destination_zone_id, object_id, {}, caller_zone_id, known_direction_zone_id, add_ref_options::build_caller_route, temp_ref_count);
             }
             if (object_id == dummy_object_id)
             {
-                return 0;
+                reference_count = 0;
+                return rpc::error::OK();
             }
 
             rpc::weak_ptr<object_stub> weak_stub = get_object(object_id);
@@ -1075,9 +1102,11 @@ namespace rpc
             if (!stub)
             {
                 RPC_ASSERT(false);
-                return std::numeric_limits<uint64_t>::max();
+                reference_count = 0;
+                return rpc::error::OBJECT_NOT_FOUND();
             }
-            return stub->add_ref();
+            reference_count = stub->add_ref();
+            return rpc::error::OK();
         }
     }
 
@@ -1156,8 +1185,9 @@ namespace rpc
         }
     }
 
-    uint64_t service::release(
-        uint64_t protocol_version, destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id)
+    int service::release(
+        uint64_t protocol_version, destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id,
+        uint64_t& reference_count)
     {
         current_service_tracker tracker(this);
         current_caller_manager cc(caller_zone_id);
@@ -1178,19 +1208,25 @@ namespace rpc
                 RPC_ERROR("service::release other_zone is null destination_zone={}, caller_zone={}",
                     std::to_string(destination_zone_id), std::to_string(caller_zone_id));
                 RPC_ASSERT(false);
-                return std::numeric_limits<uint64_t>::max();
+                reference_count = 0;
+                return rpc::error::ZONE_NOT_FOUND();
             }
 #ifdef USE_RPC_TELEMETRY
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
                 telemetry_service->on_service_release(
                     zone_id_, other_zone->get_destination_channel_zone_id(), destination_zone_id, object_id, caller_zone_id);
 #endif
-            auto ret = other_zone->sp_release(object_id);
-            if (ret != std::numeric_limits<uint64_t>::max())
+            auto ret = other_zone->sp_release(object_id, reference_count);
+            if (ret == error::OK())
             {
                 cleanup_service_proxy(other_zone);
+                return rpc::error::OK();
             }
-            return ret;
+            else
+            {
+                reference_count = 0;
+                return rpc::error::OBJECT_NOT_FOUND();
+            }
         }
         else
         {
@@ -1205,7 +1241,8 @@ namespace rpc
             else
 #endif
             {
-                return std::numeric_limits<uint64_t>::max();
+                reference_count = 0;
+                return rpc::error::INCOMPATIBLE_SERVICE();
             }
 
             bool reset_stub = false;
@@ -1221,7 +1258,8 @@ namespace rpc
                     if (item == stubs.end())
                     {
                         RPC_ASSERT(false);
-                        return std::numeric_limits<uint64_t>::max();
+                        reference_count = 0;
+                        return rpc::error::OBJECT_NOT_FOUND();
                     }
 
                     stub = item->second.lock();
@@ -1230,7 +1268,8 @@ namespace rpc
                 if (!stub)
                 {
                     RPC_ASSERT(false);
-                    return std::numeric_limits<uint64_t>::max();
+                    reference_count = 0;
+                    return rpc::error::OBJECT_NOT_FOUND();
                 }
                 // this guy needs to live outside of the mutex or deadlocks may happen
                 count = stub->release();
@@ -1252,7 +1291,8 @@ namespace rpc
                             else
                             {
                                 RPC_ASSERT(false);
-                                return std::numeric_limits<uint64_t>::max();
+                                reference_count = 0;
+                                return rpc::error::OBJECT_NOT_FOUND();
                             }
                         }
                     }
@@ -1264,7 +1304,8 @@ namespace rpc
             if (reset_stub)
                 stub->reset();
 
-            return count;
+            reference_count = count;
+            return rpc::error::OK();
         }
     }
 

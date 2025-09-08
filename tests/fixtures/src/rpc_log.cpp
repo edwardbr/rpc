@@ -83,14 +83,15 @@ extern "C"
         int ret = root_service->try_cast(protocol_version, {zone_id}, {object_id}, {interface_id});
         return ret;
     }
-    uint64_t add_ref_host(uint64_t protocol_version, // version of the rpc call protocol
+    int add_ref_host(uint64_t protocol_version, // version of the rpc call protocol
         uint64_t destination_channel_zone_id,
         uint64_t destination_zone_id,
         uint64_t object_id,
         uint64_t caller_channel_zone_id,
         uint64_t caller_zone_id,
         uint64_t known_direction_zone_id,
-        char build_out_param_channel)
+        char build_out_param_channel,
+        uint64_t* reference_count)
     {
         auto root_service = current_host_service.lock();
         if (!root_service)
@@ -105,12 +106,14 @@ extern "C"
             {caller_channel_zone_id},
             {caller_zone_id},
             {known_direction_zone_id}, // known_direction_zone - using 0 for unknown
-            static_cast<rpc::add_ref_options>(build_out_param_channel));
+            static_cast<rpc::add_ref_options>(build_out_param_channel),
+            *reference_count);
     }
-    uint64_t release_host(uint64_t protocol_version, // version of the rpc call protocol
+    int release_host(uint64_t protocol_version, // version of the rpc call protocol
         uint64_t zone_id,
         uint64_t object_id,
-        uint64_t caller_zone_id)
+        uint64_t caller_zone_id,
+        uint64_t* reference_count)
     {
         auto root_service = current_host_service.lock();
         if (!root_service)
@@ -118,7 +121,7 @@ extern "C"
             RPC_ERROR("Transport error - no root service in release_host");
             return rpc::error::TRANSPORT_ERROR();
         }
-        return root_service->release(protocol_version, {zone_id}, {object_id}, {caller_zone_id});
+        return root_service->release(protocol_version, {zone_id}, {object_id}, {caller_zone_id}, *reference_count);
     }
 
     void rpc_log(int level, const char* str, size_t sz)

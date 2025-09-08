@@ -467,8 +467,8 @@ namespace rpc
             return rpc::error::INCOMPATIBLE_SERVICE();
         }
 
-        [[nodiscard]] uint64_t sp_add_ref(
-            object object_id, caller_channel_zone caller_channel_zone_id, add_ref_options build_out_param_channel, known_direction_zone known_direction_zone_id)
+        [[nodiscard]] int sp_add_ref(
+            object object_id, caller_channel_zone caller_channel_zone_id, add_ref_options build_out_param_channel, known_direction_zone known_direction_zone_id, uint64_t& ref_count)
         {
 #ifdef USE_RPC_TELEMETRY
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
@@ -484,17 +484,19 @@ namespace rpc
 
             auto original_version = version_.load();
             auto version = original_version;
+            auto ret = error::OK(); 
             while (version)
             {
-                auto ret = add_ref(version,
+                ret = add_ref(version,
                     destination_channel_zone_,
                     destination_zone_id_,
                     object_id,
                     caller_channel_zone_id,
                     caller_zone_id_,
                     known_direction_zone_id,
-                    build_out_param_channel);
-                if (ret != std::numeric_limits<uint64_t>::max())
+                    build_out_param_channel,
+                    ref_count);
+                if (ret != rpc::error::INVALID_VERSION())
                 {
                     if (original_version != version)
                     {
@@ -505,10 +507,10 @@ namespace rpc
                 version--;
             }
             RPC_ERROR("Incompatible service version in sp_add_ref");
-            return rpc::error::INCOMPATIBLE_SERVICE();
+            return ret;
         }
 
-        uint64_t sp_release(object object_id)
+        int sp_release(object object_id, uint64_t& ref_count)
         {
 #ifdef USE_RPC_TELEMETRY
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
@@ -522,8 +524,8 @@ namespace rpc
             auto version = original_version;
             while (version)
             {
-                auto ret = release(version, destination_zone_id_, object_id, caller_zone_id_);
-                if (ret != std::numeric_limits<uint64_t>::max())
+                auto ret = release(version, destination_zone_id_, object_id, caller_zone_id_, ref_count);
+                if (ret != rpc::error::INVALID_VERSION())
                 {
                     if (original_version != version)
                     {
@@ -534,7 +536,7 @@ namespace rpc
                 version--;
             }
             RPC_ERROR("Incompatible service version in sp_release");
-            return rpc::error::INCOMPATIBLE_SERVICE();
+            return error::INVALID_VERSION();
         }
 
         void on_object_proxy_released(object object_id, int inherited_reference_count)
@@ -581,8 +583,9 @@ namespace rpc
 #endif
 
             // Handle normal reference release
-            auto ret = release(version_.load(), destination_zone_id_, object_id, caller_zone_id);
-            if (ret == std::numeric_limits<uint64_t>::max())
+            uint64_t ref_count = 0;
+            auto ret = release(version_.load(), destination_zone_id_, object_id, caller_zone_id, ref_count);
+            if (ret != rpc::error::OK())
             {
                 RPC_ERROR("on_object_proxy_released release failed");
                 RPC_ASSERT(false);
@@ -596,8 +599,8 @@ namespace rpc
                 RPC_DEBUG("Releasing inherited reference {}/{} for object {}",
                           (i + 1), inherited_reference_count, object_id.get_val());
 
-                auto ret = release(version_.load(), destination_zone_id_, object_id, caller_zone_id);
-                if (ret == std::numeric_limits<uint64_t>::max())
+                auto ret = release(version_.load(), destination_zone_id_, object_id, caller_zone_id, ref_count);
+                if (ret != rpc::error::OK())
                 {
                     RPC_ERROR("on_object_proxy_released release failed");
                     RPC_ASSERT(false);
@@ -710,9 +713,9 @@ namespace rpc
                     telemetry_service->message(rpc::i_telemetry_service::level_enum::info, "get_or_create_object_proxy calling sp_add_ref with normal options for new object_proxy");
                 }
 #endif
-
-                auto ret = sp_add_ref(object_id, {0}, rpc::add_ref_options::normal, known_direction_zone_id);
-                if (ret == std::numeric_limits<uint64_t>::max())
+                uint64_t ref_count = 0;
+                auto ret = sp_add_ref(object_id, {0}, rpc::add_ref_options::normal, known_direction_zone_id, ref_count);
+                if (ret != error::OK())
                 {
                     RPC_ERROR("sp_add_ref failed");
                     RPC_ASSERT(false);
@@ -731,8 +734,9 @@ namespace rpc
                 // as this is an out parameter the callee will be doing an add ref if the object proxy is already
                 // found we can do a release
                 RPC_ASSERT(!new_proxy_added);
-                auto ret = sp_release(object_id);
-                if (ret != std::numeric_limits<uint64_t>::max())
+                uint64_t ref_count = 0;
+                auto ret = sp_release(object_id, ref_count);
+                if (ret == error::OK())
                 {
                     // This is now safe because self_ref keeps us alive
                     release_external_ref();
