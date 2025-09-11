@@ -94,7 +94,7 @@ namespace
         crash_config.max_stack_frames = 64;
         crash_config.max_threads = 50;
         crash_config.save_crash_dump = true;
-        crash_config.crash_dump_path = "/tmp";
+        crash_config.crash_dump_path = "./build/crash";
 
         // Set up custom crash analysis callback
         crash_handler::CrashHandler::SetAnalysisCallback(
@@ -1493,22 +1493,24 @@ TYPED_TEST(remote_type_test, test_y_topology_and_return_new_prong_object)
 TYPED_TEST(remote_type_test, test_y_topology_and_cache_and_retrieve_prong_object)
 {
     /*
-     * similar to previous but zone 5 to cache the obect from 7 then host retrieves it
+     * Test for cached object retrieval from autonomous zones that creates Y-topology routing problems.
+     * Similar to previous test but Zone 5 caches the object from Zone 7, then host retrieves it.
      * 
-     * Extended Deep Y-Topology:
+     * Extended Deep Y-Topology Pattern:
      * Zone 1 (root) → Zone 2 → Zone 3 → Zone 4 → Zone 5 (deep factory)
-     * Zone 5 autonomously creates → Zone 6 → Zone 7 (unknown to all ancestors)
+     * Zone 5 autonomously creates Zone 6 → Zone 7 via Zone 3 (unknown to all ancestors)
      * 
      * This creates deeper routing isolation where:
-     * - Zone 1 and 2 have no knowledge of Zone 6 or Zone 7  
-     * - Zone 5 get Zone 3, to greate Zones 6 and 7
+     * - Zone 1 and Zone 2 have no knowledge of Zone 6 or Zone 7  
+     * - Zone 5 gets Zone 3 to create Zones 6 and 7 autonomously
      * - Forces system to rely on known_direction_zone hint for routing
      * 
      * Bug Trigger Pattern:
-     * 1. Zone 7 creates object
-     * 2. Zone 5 passes Zone 7 object up through multiple intermediate zones
-     * 3. Zone 1 eventually receives Zone 7 object but has no routing path
-     * 4. Should trigger RPC_ASSERT(false) when known_direction_zone=0
+     * 1. Zone 7 object gets created in autonomous fork
+     * 2. Zone 5 caches Zone 7 object locally
+     * 3. Host retrieves cached object, triggering cross-zone routing
+     * 4. System must route to Zone 7 but Zone 1 has no direct path
+     * 5. Without known_direction_zone fix: routing failure or infinite recursion
      */
     
     auto& lib = this->get_lib();
@@ -1550,21 +1552,26 @@ TYPED_TEST(remote_type_test, test_y_topology_and_cache_and_retrieve_prong_object
 TYPED_TEST(remote_type_test, test_y_topology_and_set_host_with_prong_object)
 {
     /*
-     * similar to previous but zone 5 to cache the obect from 7 then in a separate call zone 5 supplies to zone 1
+     * CRITICAL TEST: Host registry with objects from autonomous zones - triggers stack overflow.
+     * Similar to previous but Zone 5 caches the object from Zone 7, then in a separate call 
+     * Zone 5 supplies it to Zone 1 via host registry.
      * 
-     * Extended Deep Y-Topology:
+     * Extended Deep Y-Topology Pattern:
      * Zone 1 (root) → Zone 2 → Zone 3 → Zone 4 → Zone 5 (deep factory)
-     * Zone 5 autonomously creates → Zone 6 → Zone 7 (unknown to all ancestors)
+     * Zone 5 autonomously creates Zone 6 → Zone 7 via Zone 3 (unknown to all ancestors)
      * 
-     * This creates deeper routing isolation where:
-     * - Zone 1 and 2 have no knowledge of Zone 6 or Zone 7  
-     * - Zone 5 get Zone 3, to greate Zones 6 and 7
-     * - Zone 5 caches zone 7
-     * - in a separate call zone 5 then sets the cached object in zone 1
+     * This creates the most critical routing isolation scenario:
+     * - Zone 1 and Zone 2 have no knowledge of Zone 6 or Zone 7  
+     * - Zone 5 gets Zone 3 to create Zones 6 and 7 autonomously
+     * - Zone 5 caches Zone 7 object locally
+     * - In a separate call, Zone 5 sets the cached object in Zone 1's host registry
+     * - Zone 1 later accesses object through host registry lookup
      * - Forces system to rely on known_direction_zone hint for routing
      * 
-     * Bug Trigger Pattern:
-     * the service proxy has no idea where to find zone 7 if known_direction_zone is not set and goes into a recursive loop and runs out of stack
+     * Bug Trigger Pattern - STACK OVERFLOW:
+     * When known_direction_zone is disabled (set to 0), the service proxy has no idea 
+     * where to find Zone 7 and goes into infinite recursive loop until stack overflow.
+     * This is the most severe manifestation of the Y-topology routing bug.
      */
     
     auto& lib = this->get_lib();

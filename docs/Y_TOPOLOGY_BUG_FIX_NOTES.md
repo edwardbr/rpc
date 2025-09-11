@@ -99,57 +99,64 @@ When direct routing fails, the system uses the `known_direction_zone_id` hint to
 
 ## Test Cases
 
-### Original Complex Test: test_y_topology_unknown_zone_path_routing_fix
+### Current Working Tests
 
-The original test created a complete 7-zone Y-topology but was overly complex for demonstrating the core bug.
+The Y-topology bug fix is validated by three comprehensive test cases that demonstrate different aspects of the routing problem:
 
-### Minimal Test: test_minimal_y_topology_routing_failure  
+#### 1. `test_y_topology_and_return_new_prong_object`
 
-This simplified test captures the essence of the bug with just 4 zones:
+**Pattern**: Direct object return from autonomous zones
+- Zone 1 → Zone 2 → Zone 3 (factory) → Zone 4 → Zone 5 (deep zone)
+- Zone 5 autonomously asks Zone 3 to create Zone 6 → Zone 7 (second prong)
+- Zone 1 remains unaware of Zones 6 and 7
+- Zone 5 gets object from Zone 7 and passes it back through the chain
 
-1. **Minimal Y-Topology**:
-   - Zone 1 (root) → Zone 2 → Zone 3 (factory)
-   - Zone 3 autonomously creates Zone 4 (unknown to Zone 1)
+**Critical Aspect**: Tests the basic Y-topology routing where deep zones create forks at earlier points in the hierarchy.
 
-2. **Bug Trigger**:
-   - Zone 4 creates an object  
-   - Zone 3 passes the Zone 4 object to Zone 1
-   - Zone 1 attempts `add_ref` on the Zone 4 object
+#### 2. `test_y_topology_and_cache_and_retrieve_prong_object`
 
-3. **The Critical Issue**:
-   - **With `known_direction_zone=0`**: Zone 1 cannot find a route to Zone 4, causing infinite recursion in `add_ref`
-   - **With `known_direction_zone` working**: Zone 1 uses the routing hint to establish the service proxy chain
+**Pattern**: Cached object retrieval from autonomous zones
+- Zone 1 → Zone 2 → Zone 3 → Zone 4 → Zone 5 (deep factory)
+- Zone 5 autonomously creates Zone 6 → Zone 7 via Zone 3
+- Zone 5 caches Zone 7 object locally
+- Host retrieves cached object, triggering routing through unknown zones
 
-### Why the Minimal Test is Better
+**Critical Aspect**: Tests object caching and retrieval patterns that break routing knowledge across zone boundaries.
 
-1. **Fewer Zones**: Only 4 zones instead of 7, making it easier to debug and understand
-2. **Direct Bug Reproduction**: Triggers the exact same infinite recursion seen in the fuzz test  
-3. **Clear Failure Point**: The crash happens immediately when Zone 1 tries to `add_ref` the Zone 4 object
-4. **Simpler Topology**: Eliminates unnecessary intermediate zones that don't contribute to the bug
+#### 3. `test_y_topology_and_set_host_with_prong_object`
 
-### Critical Implementation Details
+**Pattern**: Host registry with objects from autonomous zones  
+- Zone 1 → Zone 2 → Zone 3 → Zone 4 → Zone 5 (deep factory)
+- Zone 5 autonomously creates Zone 6 → Zone 7 via Zone 3
+- Zone 5 caches Zone 7 object and sets it in host registry
+- Zone 1 accesses object through host registry lookup
 
-The test uses `create_fork_and_return_object` method which:
-- Runs in Zone 5 (deep nested zone)
-- Takes a Zone 3 factory reference
-- Autonomously creates Zone 7 through Zone 3 (Zone 1 not involved)
-- Returns an object from Zone 7
-- Ensures Zone 1 remains unaware of Zone 7's existence
+**Critical Aspect**: **This is the most critical test** - it triggers infinite recursion when `known_direction_zone` is disabled because the service proxy cannot find Zone 7 and goes into a recursive loop until stack overflow.
+
+### Key Implementation Details
+
+All tests use the `create_y_topology_fork` method which implements the true Y-topology pattern:
 
 ```cpp
-error_code create_fork_and_return_object(rpc::shared_ptr<yyy::i_example> zone_factory, 
-                                        rpc::shared_ptr<xxx::i_foo>& object_from_forked_zone)
+error_code create_y_topology_fork(rpc::shared_ptr<yyy::i_example> factory_zone, 
+                                  const std::vector<uint64_t>& fork_zone_ids)
 {
-    // Zone 5 asks Zone 3 (factory) to create Zone 7
-    // Zone 1 (root) is NOT involved in this creation
-    rpc::shared_ptr<yyy::i_example> forked_zone;
-    auto err = zone_factory->create_example_in_subordinate_zone(forked_zone, host, zone_id_.get_val() + 1000);
+    // CRITICAL Y-TOPOLOGY PATTERN:
+    // This zone (e.g. Zone 5) asks an earlier zone in the hierarchy (e.g. Zone 3) 
+    // to create autonomous zones. Zone 3 creates the new zones but Zone 1 (root) 
+    // and other zones in the original chain are NOT notified.
     
-    // Create object in Zone 7 and return it
-    err = forked_zone->create_foo(object_from_forked_zone);
-    return rpc::error::OK();
+    // Ask the factory zone to create autonomous zones via create_fork_and_return_object
+    return factory_zone->cache_object_from_autonomous_zone(fork_zone_ids);
 }
 ```
+
+### Why These Tests Are Comprehensive
+
+1. **True Y-Topology**: Creates actual fork where one prong creates another prong at an earlier hierarchy point
+2. **Routing Isolation**: Ensures root zone has no knowledge of autonomous zones
+3. **Multiple Patterns**: Tests different ways objects from unknown zones get passed back to root
+4. **Stack Overflow Reproduction**: `test_y_topology_and_set_host_with_prong_object` specifically reproduces the infinite recursion crash
 
 ## Benefits of the Fix
 
@@ -197,6 +204,9 @@ The Y-topology bug fix successfully addresses a critical issue in complex zone h
 
 This solution maintains the system's distributed architecture while enabling robust object lifecycle management across complex, autonomously-created zone topologies.
 
-The fix has been thoroughly tested with the `test_y_topology_unknown_zone_path_routing_fix` test case and confirmed to resolve the issue without breaking existing functionality.
+The fix has been thoroughly tested with three comprehensive test cases:
+- `test_y_topology_and_return_new_prong_object`
+- `test_y_topology_and_cache_and_retrieve_prong_object` 
+- `test_y_topology_and_set_host_with_prong_object`
 
-read the notes in test_y_topology_and_cache_and_retrieve_prong_object and test_y_topology_and_set_host_with_prong_object as they test other scenarios that have been fixed.
+These tests validate that the routing fix works correctly across different patterns of autonomous zone creation and object passing, ensuring the system handles complex Y-topology scenarios without breaking existing functionality.
