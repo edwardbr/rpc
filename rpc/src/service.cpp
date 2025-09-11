@@ -220,6 +220,18 @@ namespace rpc
                 }
                 
                 // now get and lock the opposite direction
+                // note this is to address a bug found whereby we have a Y shaped graph whereby one prong creates a fork below it to form another prong
+                // this new prong is then ordered to pass back to the first prong an object.
+                // this object is then passed back to the root node which is unaware of the existence of the second prong.
+                // this code below forces the creation of a service proxy back to the sender of the call so that the root object can do an add_ref 
+                // hinting that the path of the object is somewhere along this path
+                // this is a very unique situation, and indicates that perhaps the creation of two service proxies should be a feature of add ref and 
+                // these pairs should support each others existence by perhaps some form of channel object.                
+                // tests that fail when this is not done:
+                //  test_y_topology_and_return_new_prong_object 
+                //  test_y_topology_and_cache_and_retrieve_prong_object 
+                //  test_y_topology_and_set_host_with_prong_object will fail without this
+                
                 if (auto found = other_zones.find({caller_zone_id.as_destination(), destination_zone_id.as_caller()}); found != other_zones.end())
                 {
                     opposite_direction_proxy = found->second.lock();
@@ -645,7 +657,6 @@ namespace rpc
                 {
                     // unexpected code path
                     RPC_ASSERT(false);
-                    // caller = get_parent();
                 }
                 RPC_ASSERT(caller);
             }
@@ -756,6 +767,8 @@ namespace rpc
         add_ref_options build_out_param_channel,
         uint64_t& reference_count)
     {
+        // note if known_direction_zone_id is always 0 test_y_topology_and_set_host_with_prong_object will fail.
+        // known_direction_zone_id.id = 0;
         current_service_tracker tracker(this);
         current_caller_manager cc(caller_zone_id);
 
@@ -842,20 +855,25 @@ namespace rpc
                                 destination = tmp->clone_for_zone(destination_zone_id, caller_zone_id);
                             }
                             else
-                            {
-                                // get the parent to route it
-                                RPC_ASSERT(get_parent() != nullptr);
-                                destination = get_parent()->clone_for_zone(destination_zone_id, caller_zone_id);
+                            {                   
+                                // with the Y bug fix we now never get here as the destination is always valid             
+                                RPC_ASSERT(false);
+                                return error::ZONE_NOT_FOUND();
+                                // // get the parent to route it
+                                // RPC_ASSERT(get_parent() != nullptr);
+                                // destination = get_parent()->clone_for_zone(destination_zone_id, caller_zone_id);
                             }
                             inner_add_zone_proxy(destination);
                             has_called_inner_add_zone_proxy = true;
                         }
 
+                        // detect if the caller is this zone, if so dont try and find a service proxy for it
                         if (caller_zone_id == zone_id_.as_caller())
+                        {
                             build_out_param_channel
                                 = build_out_param_channel ^ add_ref_options::build_caller_route; // strip out this bit
-
-                        if (!!(build_out_param_channel & add_ref_options::build_caller_route))
+                        }
+                        else
                         {
                             // connect the remote sender to the destinaton
                             found = other_zones.lower_bound({{caller_channel}, {0}});
@@ -865,13 +883,17 @@ namespace rpc
                             }
                             else
                             {
-                                caller = get_parent();
+                                // with the Y bug fix we now never get here as the destination is always valid             
+                                RPC_ASSERT(false);
+                                return error::ZONE_NOT_FOUND();
+                                
+                                // caller = get_parent();
 
-                                if (!caller)
-                                {
-                                    RPC_ERROR("get_parent() returned: nullptr - THIS IS A PROBLEM!");
-                                    RPC_ASSERT(caller);
-                                }
+                                // if (!caller)
+                                // {
+                                //     RPC_ERROR("get_parent() returned: nullptr - THIS IS A PROBLEM!");
+                                //     RPC_ASSERT(caller);
+                                // }
                             }
                         }
                     }
@@ -905,7 +927,6 @@ namespace rpc
                                 }
 #endif
 
-                                uint64_t temp_ref_count;
                                 auto ret = destination->add_ref(protocol_version,
                                     {0},
                                     destination_zone_id,
@@ -914,16 +935,12 @@ namespace rpc
                                     caller_zone_id,
                                     known_direction_zone_id,
                                     build_out_param_channel,
-                                    temp_ref_count);
+                                    reference_count);
                                 destination->release_external_ref(); // perhaps this could be optimised
                                 if (ret != rpc::error::OK())
                                 {
                                     reference_count = 0;
                                     return ret;
-                                }
-                                else
-                                {
-                                    reference_count = temp_ref_count;
                                 }
                                 break;
                             }
@@ -1010,15 +1027,15 @@ namespace rpc
                         }
                         else if(auto found = other_zones.lower_bound({known_direction_zone_id.as_destination(), {0}}); found != other_zones.end())
                         {
+// note that this is to support the Y shaped topology problem that the send function has the other half of this solution
+// the known_direction_zone_id is a hint explaining where the path of the object is if there is no clear route otherwise
                             auto tmp = found->second.lock();
                             RPC_ASSERT(tmp != nullptr);
                             other_zone = tmp->clone_for_zone(destination_zone_id, caller_zone_id);
                         }
                         else
                         {
-                            auto parent = get_parent();
-                            RPC_ASSERT(parent);
-                            other_zone = parent->clone_for_zone(destination_zone_id, caller_zone_id);
+                            RPC_ASSERT(false);
                         }
                         inner_add_zone_proxy(other_zone);
                     }
