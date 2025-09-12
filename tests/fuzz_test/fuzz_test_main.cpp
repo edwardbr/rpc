@@ -1292,7 +1292,13 @@ void run_autonomous_instruction_test(int test_cycle, int instruction_count, uint
     auto now = std::chrono::system_clock::now();
     auto time_t_val = std::chrono::system_clock::to_time_t(now);
     std::stringstream timestamp_ss;
-    timestamp_ss << std::put_time(std::localtime(&time_t_val), "%Y-%m-%d %H:%M:%S");
+    struct tm tm_buf;
+#ifdef _WIN32
+    localtime_s(&tm_buf, &time_t_val);
+#else
+    localtime_r(&time_t_val, &tm_buf);
+#endif
+    timestamp_ss << std::put_time(&tm_buf, "%Y-%m-%d %H:%M:%S");
     scenario_config.timestamp = timestamp_ss.str();
 
     // Initialize global RNG with the scenario seed

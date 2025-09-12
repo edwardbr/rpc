@@ -31,9 +31,9 @@ if(RPC_STANDALONE)
   add_subdirectory(idlparser)
 
   message("spdlog this is used in tests only and does not need to be installed for other users")
-  set(SPDLOG_FMT_EXTERNAL
+  set(SPDLOG_FMT_EXTERNAL_HO
     ON
-    CACHE BOOL "external fmt" FORCE)
+    CACHE BOOL "external fmt header-only" FORCE)
   set(SPDLOG_NO_EXCEPTIONS
     ON
     CACHE BOOL "no exceptions" FORCE)

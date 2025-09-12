@@ -89,7 +89,13 @@ void thread_local_circular_buffer::dump_to_file(const std::string& filename) con
                 std::chrono::duration_cast<std::chrono::system_clock::duration>(
                     entry.timestamp - std::chrono::high_resolution_clock::now()));
             
-            file << "[" << std::put_time(std::localtime(&time_t), "%H:%M:%S") << "] ";
+            struct tm tm_buf;
+#ifdef _WIN32
+            localtime_s(&tm_buf, &time_t);
+#else
+            localtime_r(&time_t, &tm_buf);
+#endif
+            file << "[" << std::put_time(&tm_buf, "%H:%M:%S") << "] ";
             file << "Level " << entry.level << ": " << entry.message;
             if (entry.file && entry.function) {
                 file << " (" << entry.file << ":" << entry.line << " in " << entry.function << ")";
@@ -156,7 +162,13 @@ void thread_local_logger_manager::dump_all_buffers_with_enhanced_stacktrace(cons
     auto now = std::chrono::system_clock::now();
     auto time_t = std::chrono::system_clock::to_time_t(now);
     std::stringstream ss;
-    ss << std::put_time(std::localtime(&time_t), "%Y%m%d_%H%M%S");
+    struct tm tm_buf;
+#ifdef _WIN32
+    localtime_s(&tm_buf, &time_t);
+#else
+    localtime_r(&time_t, &tm_buf);
+#endif
+    ss << std::put_time(&tm_buf, "%Y%m%d_%H%M%S");
     std::string timestamp = ss.str();
     
     // Create main crash report
