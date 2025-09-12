@@ -68,7 +68,7 @@ void initialize_global_rng(uint64_t seed = 0)
     {
         RPC_INFO("Using deterministic seed: {}", seed);
     }
-    g_global_rng.seed(seed);
+    g_global_rng.seed((unsigned int)seed);
     std::srand(static_cast<unsigned int>(seed)); // Also seed C-style rand() for compatibility
     g_global_rng_initialized = true;
 }
@@ -634,7 +634,8 @@ public:
         if (target_node)
         {
             node_type type;
-            int id, conn, obj_held;
+            uint64_t id;
+            int conn, obj_held;
             target_node->get_node_status(type, id, conn, obj_held);
             target_id = id;
         }
@@ -758,7 +759,8 @@ public:
                             if (target_sibling)
                             {
                                 node_type type;
-                                int id, conn, obj_held;
+                                uint64_t id;
+                                int conn, obj_held;
                                 target_sibling->get_node_status(type, id, conn, obj_held);
                                 if (static_cast<uint64_t>(id) == node_id_)
                                 {
@@ -793,7 +795,7 @@ public:
         return rpc::error::OK();
     }
 
-    int get_node_status(node_type& current_type, int& current_id, int& connections_count, int& objects_held) override
+    int get_node_status(node_type& current_type, uint64_t& current_id, int& connections_count, int& objects_held) override
     {
         current_type = node_type_;
         current_id = node_id_;
@@ -1080,7 +1082,8 @@ public:
             if (autonomous_node)
             {
                 node_type type;
-                int id, conn, obj_held;
+                uint64_t id;
+                int conn, obj_held;
                 if (autonomous_node->get_node_status(type, id, conn, obj_held) == rpc::error::OK())
                 {
                     RPC_INFO("[GARBAGE_COLLECTOR] Object: AUTONOMOUS_NODE id={} type={} connections={} objects_held={}",
@@ -1380,7 +1383,9 @@ void run_autonomous_instruction_test(int test_cycle, int instruction_count, uint
 
                     uint64_t runner_id = 0;
                     node_type type;
-                    int id, conn, obj_held;
+                    uint64_t id;
+                    int conn, obj_held;
+
                     runner_node->get_node_status(type, id, conn, obj_held);
                     runner_id = id;
 

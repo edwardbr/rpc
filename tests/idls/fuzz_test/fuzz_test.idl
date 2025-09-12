@@ -134,7 +134,7 @@ namespace fuzz_test
         int receive_object(rpc::shared_ptr<i_shared_object> object, uint64_t sender_node_id);
         
         [description="Get node status"]
-        int get_node_status([out] node_type& current_type, [out] int& current_id, [out] int& connections_count, [out] int& objects_held);
+        int get_node_status([out] node_type& current_type, [out] uint64_t& current_id, [out] int& connections_count, [out] int& objects_held);
         
         [description="Create child node in own sub-zone and cache it locally"]
         int create_child_node(node_type child_type, uint64_t child_zone_id, bool cache_locally, [out] rpc::shared_ptr<i_autonomous_node>& child_node);
