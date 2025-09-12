@@ -5,6 +5,10 @@
 
 #pragma once
 
+// Crash handler is only available on POSIX systems (Linux, macOS, etc.)
+// Windows support would require different implementation using Windows API
+#ifndef _WIN32
+
 #include <atomic>
 #include <csignal>
 #include <functional>
@@ -17,7 +21,7 @@ namespace crash_handler
 {
     /**
      * Comprehensive crash handling system with multi-threaded stack trace support
-     * 
+     *
      * Features:
      * - Multi-threaded stack trace collection
      * - Symbol resolution with addr2line integration
@@ -34,7 +38,7 @@ namespace crash_handler
         struct Config
         {
             Config() = default;
-            
+
             bool enable_multithreaded_traces = true;
             bool enable_symbol_resolution = true;
             bool enable_threading_debug_info = true;
@@ -81,7 +85,7 @@ namespace crash_handler
         static crash_handler* instance_;
         static Config config_;
         static crash_analysis_callback analysis_callback_;
-        
+
         // Signal handling
         static struct sigaction old_sigsegv_handler_;
         static struct sigaction old_sigabrt_handler_;
@@ -94,7 +98,7 @@ namespace crash_handler
          * Initialize the crash handler with given configuration
          */
         static bool initialize(const Config& config);
-        
+
         /**
          * Initialize the crash handler with default configuration
          */
@@ -159,3 +163,5 @@ namespace crash_handler
     };
 
 } // namespace crash_handler
+
+#endif // _WIN32

@@ -85,7 +85,9 @@ namespace
                 enable_multithreaded_tests = true;
         }
 
+#ifndef _WIN32
         // Initialize comprehensive crash handler with multi-threaded support
+        // (Only available on POSIX systems - Windows not supported)
         crash_handler::crash_handler::Config crash_config;
         crash_config.enable_multithreaded_traces = true;
         crash_config.enable_symbol_resolution = true;
@@ -135,6 +137,9 @@ namespace
         std::cout << "[Main] - Threading debug integration: ENABLED" << std::endl;
         std::cout << "[Main] - Pattern detection: ENABLED" << std::endl;
         std::cout << "[Main] - Crash dumps will be saved to: " << crash_config.crash_dump_path << std::endl;
+#else
+        std::cout << "[Main] Crash handler not available on Windows" << std::endl;
+#endif
 
         int ret = 0;
         try {
@@ -152,7 +157,9 @@ namespace
         }
 
         // Cleanup crash handler
+#ifndef _WIN32
         crash_handler::crash_handler::shutdown();
+#endif
         std::cout << "[Main] test shutdown complete" << std::endl;
 
         return ret;

@@ -4,6 +4,9 @@
  */
 
 #include "crash_handler.h"
+
+// Crash handler implementation only available on POSIX systems
+#ifndef _WIN32
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -699,3 +702,5 @@ namespace crash_handler
     }
 
 } // namespace crash_handler
+
+#endif // _WIN32
