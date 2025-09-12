@@ -1,5 +1,5 @@
 /*
- *   Copyright (c) 2024 Edward Boggis-Rolfe
+ *   Copyright (c) 2025 Edward Boggis-Rolfe
  *   All rights reserved.
  */
 #pragma once
@@ -97,7 +97,6 @@ namespace rpc
 
         mutable std::mutex zone_control;
         std::map<zone_route, rpc::weak_ptr<service_proxy>> other_zones;
-        std::list<std::shared_ptr<service_logger>> service_loggers;
 
         rpc::shared_ptr<casting_interface> get_castable_interface(object object_id, interface_ordinal interface_id);
 
@@ -111,11 +110,16 @@ namespace rpc
             const shared_ptr<T>& iface);
 
         void inner_add_zone_proxy(const rpc::shared_ptr<service_proxy>& service_proxy);
+        void cleanup_service_proxy(const rpc::shared_ptr<service_proxy>& other_zone);
 
         friend proxy_base;
         friend i_interface_stub;
         friend current_service_tracker;
 
+    protected:
+        struct child_service_tag {};
+        explicit service(const char* name, zone zone_id, child_service_tag);
+        
     public:
         explicit service(const char* name, zone zone_id);
         virtual ~service();
@@ -138,7 +142,11 @@ namespace rpc
         void set_zone_id(zone zone_id) { zone_id_ = zone_id; }
         virtual destination_zone get_parent_zone_id() const { return {0}; }
         virtual rpc::shared_ptr<rpc::service_proxy> get_parent() const { return nullptr; }
-        virtual void set_parent_proxy(const rpc::shared_ptr<rpc::service_proxy>&) { RPC_ASSERT(false); };
+        virtual bool set_parent_proxy(const rpc::shared_ptr<rpc::service_proxy>&) 
+        { 
+            RPC_ASSERT(false); 
+            return false;
+        }
 
         // passed by value implementing an implicit lock on the life time of ptr
         object get_object_id(shared_ptr<casting_interface> ptr) const;
@@ -173,17 +181,20 @@ namespace rpc
             destination_zone destination_zone_id,
             object object_id,
             interface_ordinal interface_id) override;
-        uint64_t add_ref(uint64_t protocol_version,
+        int add_ref(uint64_t protocol_version,
             destination_channel_zone destination_channel_zone_id,
             destination_zone destination_zone_id,
             object object_id,
             caller_channel_zone caller_channel_zone_id,
             caller_zone caller_zone_id,
-            add_ref_options build_out_param_channel) override;
-        uint64_t release(uint64_t protocol_version,
+            known_direction_zone known_direction_zone_id,
+            add_ref_options build_out_param_channel,
+            uint64_t& reference_count) override;
+        int release(uint64_t protocol_version,
             destination_zone destination_zone_id,
             object object_id,
-            caller_zone caller_zone_id) override;
+            caller_zone caller_zone_id,
+            uint64_t& reference_count) override;
 
         uint64_t release_local_stub(const rpc::shared_ptr<rpc::object_stub>& stub);
 
@@ -207,6 +218,8 @@ namespace rpc
 
         void clean_up_on_failed_connection(const rpc::shared_ptr<service_proxy>& destination_zone,
             rpc::shared_ptr<rpc::casting_interface> input_interface);
+            
+        // int decrement_reference_count(const rpc::shared_ptr<service_proxy>& proxy, int ref_count);
 
         template<class proxy_class, class in_param_type, class out_param_type, typename... Args>
         int connect_to_zone(const char* name,
@@ -285,8 +298,6 @@ namespace rpc
             std::shared_ptr<std::function<rpc::shared_ptr<rpc::i_interface_stub>(const rpc::shared_ptr<rpc::i_interface_stub>&)>>
                 factory);
 
-        // note this is not thread safe and should only be used on setup
-        void add_service_logger(const std::shared_ptr<service_logger>& logger) { service_loggers.push_back(logger); }
         friend service_proxy;
     };
 
@@ -307,20 +318,16 @@ namespace rpc
     {
         // the enclave needs to hold a hard lock to a root object that represents a runtime
         // the enclave service lifetime is managed by the transport functions
+        std::mutex parent_protect;
         rpc::shared_ptr<rpc::service_proxy> parent_service_proxy_;
         destination_zone parent_zone_id_;
 
     public:
-        explicit child_service(const char* name, zone zone_id, destination_zone parent_zone_id)
-            : service(name, zone_id)
-            , parent_zone_id_(parent_zone_id)
-        {
-        }
-
+        explicit child_service(const char* name, zone zone_id, destination_zone parent_zone_id);
         virtual ~child_service();
 
         rpc::shared_ptr<rpc::service_proxy> get_parent() const override { return parent_service_proxy_; }
-        void set_parent_proxy(const rpc::shared_ptr<rpc::service_proxy>& parent_service_proxy) override;
+        bool set_parent_proxy(const rpc::shared_ptr<rpc::service_proxy>& parent_service_proxy) override;
 
         destination_zone get_parent_zone_id() const override { return parent_zone_id_; }
 
@@ -339,11 +346,18 @@ namespace rpc
             auto child_svc = rpc::shared_ptr<rpc::child_service>(new rpc::child_service(name, zone_id, parent_zone_id));
 
             // link the child to the parent
-            auto parent_service_proxy = SERVICE_PROXY::create(name, parent_zone_id, child_svc, args...);
+            auto parent_service_proxy = SERVICE_PROXY::create("parent", parent_zone_id, child_svc, args...);
             if (!parent_service_proxy)
+            {
+                RPC_ERROR("Unable to create service proxy in create_child_service");
                 return rpc::error::UNABLE_TO_CREATE_SERVICE_PROXY();
+            }
             child_svc->add_zone_proxy(parent_service_proxy);
-            child_svc->set_parent_proxy(parent_service_proxy);
+            if(!child_svc->set_parent_proxy(parent_service_proxy))
+            {
+                RPC_ERROR("Unable to create set_parent_proxy in create_child_service"); 
+                return rpc::error::UNABLE_TO_CREATE_SERVICE_PROXY();
+            }
             parent_service_proxy->set_parent_channel(true);
 
             rpc::shared_ptr<PARENT_INTERFACE> parent_ptr;

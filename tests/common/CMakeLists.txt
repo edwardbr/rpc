@@ -21,15 +21,12 @@ if(${BUILD_ENCLAVE})
   target_compile_options(common_enclave PRIVATE ${ENCLAVE_COMPILE_OPTIONS} ${WARN_BASELINE})
   target_link_options(common_enclave PRIVATE ${ENCLAVE_LINK_OPTIONS})
 
-  if(USE_RPC_TELEMETRY)
-    set(TELEMETRY_ENCLAVE_EDL rpc_telemetry_edl_header_enclave)
-  endif()
-
   target_link_libraries(
     common_enclave
     PRIVATE rpc_enclave
             marshal_test_edl_enclave
-            ${TELEMETRY_ENCLAVE_EDL}
+            ${RPC_TELEMETRY_ENCLAVE_EDL}
+            ${RPC_ENCLAVE_FMT_LIB}
             example_idl_enclave
             yas_common)
 
@@ -57,6 +54,7 @@ if(BUILD_ENCLAVE)
             marshal_test_edl_host
             rpc_telemetry_edl_header_host
             example_idl_host
+            ${RPC_HOST_FMT_LIB}
             yas_common)
 
   set_property(TARGET common_host PROPERTY COMPILE_PDB_NAME common_host)

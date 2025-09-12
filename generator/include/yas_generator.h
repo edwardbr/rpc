@@ -1,7 +1,5 @@
 
-namespace rpc_generator
-{
-    namespace yas_generator
+namespace yas_generator
     {
         // entry point
         void write_files(bool from_host,
@@ -13,4 +11,3 @@ namespace rpc_generator
             const std::vector<std::string>& rethrow_exceptions,
             const std::vector<std::string>& additional_stub_headers);
     }
-}

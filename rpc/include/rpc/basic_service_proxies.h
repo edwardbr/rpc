@@ -1,5 +1,5 @@
 /*
- *   Copyright (c) 2024 Edward Boggis-Rolfe
+ *   Copyright (c) 2025 Edward Boggis-Rolfe
  *   All rights reserved.
  */
 #pragma once
@@ -7,6 +7,7 @@
 #include <rpc/types.h>
 #include <rpc/proxy.h>
 #include <rpc/error_codes.h>
+#include <rpc/member_ptr.h>
 #ifdef USE_RPC_TELEMETRY
 #include <rpc/telemetry/i_telemetry_service.h>
 #endif
@@ -80,13 +81,15 @@ namespace rpc
         {
             return parent_service_.lock()->try_cast(protocol_version, destination_zone_id, object_id, interface_id);
         }
-        uint64_t add_ref(uint64_t protocol_version,
+        int add_ref(uint64_t protocol_version,
             destination_channel_zone destination_channel_zone_id,
             destination_zone destination_zone_id,
             object object_id,
             caller_channel_zone caller_channel_zone_id,
             caller_zone caller_zone_id,
-            add_ref_options build_out_param_channel) override
+            known_direction_zone known_direction_zone_id,
+            add_ref_options build_out_param_channel,
+            uint64_t& reference_count) override
         {
             RPC_ASSERT(((std::uint8_t)build_out_param_channel & (std::uint8_t)rpc::add_ref_options::build_caller_route)
                        || destination_channel_zone_id == 0
@@ -98,15 +101,17 @@ namespace rpc
                 object_id,
                 caller_channel_zone_id,
                 caller_zone_id,
-                build_out_param_channel);
+                known_direction_zone_id,
+                build_out_param_channel,
+                reference_count);
 
-            // auto svc = rpc::static_pointer_cast<child_service>(get_operating_zone_service());
             return ret;
         }
-        uint64_t release(
-            uint64_t protocol_version, destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id) override
+        int release(
+            uint64_t protocol_version, destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id,
+            uint64_t& reference_count) override
         {
-            auto ret = parent_service_.lock()->release(protocol_version, destination_zone_id, object_id, caller_zone_id);
+            auto ret = parent_service_.lock()->release(protocol_version, destination_zone_id, object_id, caller_zone_id, reference_count);
             return ret;
         }
 
@@ -119,7 +124,7 @@ namespace rpc
     // this is an equivelent to an host looking at its enclave
     template<class CHILD_PTR_TYPE, class PARENT_PTR_TYPE> class local_child_service_proxy : public service_proxy
     {
-        rpc::shared_ptr<child_service> child_service_;
+        rpc::member_ptr<child_service> child_service_;
 
         typedef std::function<int(
             const rpc::shared_ptr<PARENT_PTR_TYPE>&, rpc::shared_ptr<CHILD_PTR_TYPE>&, const rpc::shared_ptr<child_service>&)>
@@ -133,6 +138,9 @@ namespace rpc
             : service_proxy(name, destination_zone_id, parent_svc)
             , fn_(fn)
         {
+            // This proxy is for a child service, so hold a strong reference to the parent service
+            // to prevent premature parent destruction until after child cleanup
+            set_parent_service_reference(parent_svc);
         }
         local_child_service_proxy(const local_child_service_proxy& other) = default;
 
@@ -151,14 +159,22 @@ namespace rpc
         int connect(rpc::interface_descriptor input_descr, rpc::interface_descriptor& output_descr) override
         {
             // local_child_service_proxy nests a local_service_proxy back to the parent service
-            return rpc::child_service::create_child_zone<rpc::local_service_proxy>(get_name().c_str(),
+            rpc::shared_ptr<rpc::child_service> new_child_service;
+            auto result = rpc::child_service::create_child_zone<rpc::local_service_proxy>(get_name().c_str(),
                 get_destination_zone_id().as_zone(),
                 get_zone_id().as_destination(),
                 input_descr,
                 output_descr,
                 fn_,
-                child_service_,
+                new_child_service,
                 get_operating_zone_service());
+
+            if (result == rpc::error::OK())
+            {
+                child_service_ = rpc::member_ptr<rpc::child_service>(new_child_service);
+            }
+
+            return result;
         }
 
         int send(uint64_t protocol_version,
@@ -174,7 +190,11 @@ namespace rpc
             const char* in_buf_,
             std::vector<char>& out_buf_) override
         {
-            return child_service_->send(protocol_version,
+            auto child_service = child_service_.get_nullable();
+            RPC_ASSERT(child_service);
+            if (!child_service)
+                return rpc::error::ZONE_NOT_INITIALISED();
+            return child_service->send(protocol_version,
                 encoding,
                 tag,
                 caller_channel_zone_id,
@@ -192,29 +212,50 @@ namespace rpc
             object object_id,
             interface_ordinal interface_id) override
         {
-            return child_service_->try_cast(protocol_version, destination_zone_id, object_id, interface_id);
+            auto child_service = child_service_.get_nullable();
+            RPC_ASSERT(child_service);
+            if (!child_service)
+                return rpc::error::ZONE_NOT_INITIALISED();
+            return child_service->try_cast(protocol_version, destination_zone_id, object_id, interface_id);
         }
-        uint64_t add_ref(uint64_t protocol_version,
+        int add_ref(uint64_t protocol_version,
             destination_channel_zone destination_channel_zone_id,
             destination_zone destination_zone_id,
             object object_id,
             caller_channel_zone caller_channel_zone_id,
             caller_zone caller_zone_id,
-            add_ref_options build_out_param_channel) override
+            known_direction_zone known_direction_zone_id,
+            add_ref_options build_out_param_channel,
+            uint64_t& reference_count) override
         {
-            auto ret = child_service_->add_ref(protocol_version,
+            auto child_service = child_service_.get_nullable();
+            RPC_ASSERT(child_service);
+            if (!child_service) {
+                reference_count = 0;
+                return rpc::error::ZONE_NOT_INITIALISED();
+            }
+            auto ret = child_service->add_ref(protocol_version,
                 destination_channel_zone_id,
                 destination_zone_id,
                 object_id,
                 caller_channel_zone_id,
                 caller_zone_id,
-                build_out_param_channel);
+                known_direction_zone_id,
+                build_out_param_channel,
+                reference_count);
             return ret;
         }
-        uint64_t release(
-            uint64_t protocol_version, destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id) override
+        int release(
+            uint64_t protocol_version, destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id,
+            uint64_t& reference_count) override
         {
-            auto ret = child_service_->release(protocol_version, destination_zone_id, object_id, caller_zone_id);
+            auto child_service = child_service_.get_nullable();
+            RPC_ASSERT(child_service);
+            if (!child_service) {
+                reference_count = 0;
+                return rpc::error::ZONE_NOT_INITIALISED();
+            }
+            auto ret = child_service->release(protocol_version, destination_zone_id, object_id, caller_zone_id, reference_count);
             return ret;
         }
 

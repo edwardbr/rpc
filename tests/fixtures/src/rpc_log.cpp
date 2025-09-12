@@ -2,11 +2,11 @@
 #include <iostream>
 #include <chrono>
 
-#include <spdlog/spdlog.h>
+#include "rpc_global_logger.h"
 
 #include <rpc/service.h>
 #ifdef USE_RPC_TELEMETRY
-#include <rpc/telemetry/host_telemetry_service.h>
+#include <rpc/telemetry/i_telemetry_service.h>
 #include <rpc/telemetry/telemetry_handler.h>
 #endif
 
@@ -38,6 +38,7 @@ extern "C"
         if (!root_service)
         {
             retry_buf.data.clear();
+            RPC_ERROR("Transport error - no root service in call_host");
             return rpc::error::TRANSPORT_ERROR();
         }
         if (retry_buf.data.empty())
@@ -76,22 +77,26 @@ extern "C"
         auto root_service = current_host_service.lock();
         if (!root_service)
         {
+            RPC_ERROR("Transport error - no root service in try_cast_host");
             return rpc::error::TRANSPORT_ERROR();
         }
         int ret = root_service->try_cast(protocol_version, {zone_id}, {object_id}, {interface_id});
         return ret;
     }
-    uint64_t add_ref_host(uint64_t protocol_version, // version of the rpc call protocol
+    int add_ref_host(uint64_t protocol_version, // version of the rpc call protocol
         uint64_t destination_channel_zone_id,
         uint64_t destination_zone_id,
         uint64_t object_id,
         uint64_t caller_channel_zone_id,
         uint64_t caller_zone_id,
-        char build_out_param_channel)
+        uint64_t known_direction_zone_id,
+        char build_out_param_channel,
+        uint64_t* reference_count)
     {
         auto root_service = current_host_service.lock();
         if (!root_service)
         {
+            RPC_ERROR("Transport error - no root service in add_ref_host");
             return rpc::error::TRANSPORT_ERROR();
         }
         return root_service->add_ref(protocol_version,
@@ -100,25 +105,52 @@ extern "C"
             {object_id},
             {caller_channel_zone_id},
             {caller_zone_id},
-            static_cast<rpc::add_ref_options>(build_out_param_channel));
+            {known_direction_zone_id}, // known_direction_zone - using 0 for unknown
+            static_cast<rpc::add_ref_options>(build_out_param_channel),
+            *reference_count);
     }
-    uint64_t release_host(uint64_t protocol_version, // version of the rpc call protocol
+    int release_host(uint64_t protocol_version, // version of the rpc call protocol
         uint64_t zone_id,
         uint64_t object_id,
-        uint64_t caller_zone_id)
+        uint64_t caller_zone_id,
+        uint64_t* reference_count)
     {
         auto root_service = current_host_service.lock();
         if (!root_service)
         {
+            RPC_ERROR("Transport error - no root service in release_host");
             return rpc::error::TRANSPORT_ERROR();
         }
-        return root_service->release(protocol_version, {zone_id}, {object_id}, {caller_zone_id});
+        return root_service->release(protocol_version, {zone_id}, {object_id}, {caller_zone_id}, *reference_count);
     }
 
-    void rpc_log(const char* str, size_t sz)
+    void rpc_log(int level, const char* str, size_t sz)
     {
 #ifdef USE_RPC_LOGGING
-        spdlog::info(std::string(str, sz));
+        std::string message(str, sz);
+        switch (level) {
+            case 0:
+                rpc_global_logger::debug(message);
+                break;
+            case 1:
+                rpc_global_logger::trace(message);
+                break;
+            case 2:
+                rpc_global_logger::info(message);
+                break;
+            case 3:
+                rpc_global_logger::warn(message);
+                break;
+            case 4:
+                rpc_global_logger::error(message);
+                break;
+            case 5:
+                rpc_global_logger::critical(message);
+                break;
+            default:
+                rpc_global_logger::info(message);
+                break;
+        }
 #endif
     }
 

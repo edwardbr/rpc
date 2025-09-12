@@ -24,10 +24,8 @@ if(USE_RPC_TELEMETRY)
     if(ENABLE_CLANG_TIDY)
       set_target_properties(rpc_telemetry_enclave PROPERTIES CXX_CLANG_TIDY "${CLANG_TIDY_COMMAND}")
     endif()
-    if(USE_RPC_TELEMETRY)
-      set(TELEMETRY_ENCLAVE_EDL rpc_telemetry_edl_header_enclave)
-    endif()
-    target_link_libraries(rpc_telemetry_enclave PRIVATE ${TELEMETRY_ENCLAVE_EDL} yas_common rpc::rpc_enclave)
+
+    target_link_libraries(rpc_telemetry_enclave PRIVATE rpc_telemetry_edl_header_enclave yas_common rpc::rpc_enclave ${RPC_ENCLAVE_FMT_LIB})
 
     set_property(TARGET rpc_telemetry_enclave PROPERTY COMPILE_PDB_NAME rpc_telemetry_enclave)
 
@@ -38,14 +36,14 @@ endif()
 if(${BUILD_HOST})
 
   message("rpc_telemetry_host")
-  add_library(rpc_telemetry_host STATIC src/host_telemetry_service.cpp src/telemetry_handler.cpp)
+  add_library(rpc_telemetry_host STATIC src/sequence_diagram_telemetry_service.cpp src/console_telemetry_service.cpp src/telemetry_handler.cpp src/telemetry_service_factory.cpp)
 
   target_include_directories(rpc_telemetry_host PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>")
   target_compile_options(rpc_telemetry_host PRIVATE ${HOST_COMPILE_OPTIONS} ${WARN_OK})
   target_link_options(rpc_telemetry_host PRIVATE ${HOST_LINK_OPTIONS})
   target_link_directories(rpc_telemetry_host PUBLIC ${SGX_LIBRARY_PATH})
   target_compile_definitions(rpc_telemetry_host PRIVATE ${HOST_DEFINES})
-  target_link_libraries(rpc_telemetry_host PRIVATE rpc::rpc_host fmt::fmt yas_common spdlog::spdlog)
+  target_link_libraries(rpc_telemetry_host PRIVATE rpc::rpc_host fmt::fmt-header-only yas_common spdlog::spdlog ${RPC_HOST_FMT_LIB})
 
   add_library(rpc::rpc_telemetry_host ALIAS rpc_telemetry_host)
   set_property(TARGET rpc_telemetry_host PROPERTY COMPILE_PDB_NAME rpc_telemetry_host)

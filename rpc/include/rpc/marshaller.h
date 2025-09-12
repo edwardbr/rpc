@@ -1,5 +1,5 @@
 /*
- *   Copyright (c) 2024 Edward Boggis-Rolfe
+ *   Copyright (c) 2025 Edward Boggis-Rolfe
  *   All rights reserved.
  */
 #pragma once
@@ -71,84 +71,21 @@ namespace rpc
         virtual int try_cast(
             uint64_t protocol_version, destination_zone destination_zone_id, object object_id, interface_ordinal interface_id)
             = 0;
-        virtual uint64_t add_ref(uint64_t protocol_version,
+        virtual int add_ref(uint64_t protocol_version,
             destination_channel_zone destination_channel_zone_id,
             destination_zone destination_zone_id,
             object object_id,
             caller_channel_zone caller_channel_zone_id,
             caller_zone caller_zone_id,
-            add_ref_options build_out_param_channel)
+            known_direction_zone known_direction_zone_id,
+            add_ref_options build_out_param_channel,
+            uint64_t& reference_count)
             = 0;
-        virtual uint64_t release(
-            uint64_t protocol_version, destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id)
+        virtual int release(
+            uint64_t protocol_version, destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id,
+            uint64_t& reference_count)
             = 0;
     };
-
-    // this class is responsible for (de)coding and logging of data streams
-    /*class method_data_processor
-    {
-        //to provide a linked list of  processors
-        const shared_ptr<method_data_processor> next_;
-        //these are filters to make the processor ignore certain methods
-        caller_channel_zone caller_channel_zone_id_;
-        caller_zone caller_zone_id_;
-        destination_zone destination_zone_id_;
-        object object_id_;
-        interface_ordinal interface_id_;
-        method method_id_;
-    protected:
-
-    bool should_process(
-        caller_channel_zone caller_channel_zone_id
-        , caller_zone caller_zone_id
-        , destination_zone destination_zone_id
-        , object object_id
-        , interface_ordinal interface_id
-        , method method_id
-    )
-    {
-        if(caller_channel_zone_id_ != caller_channel_zone{0} && caller_channel_zone_id_ != caller_channel_zone_id)
-            return false;
-        if(caller_zone_id_ != caller_zone{0} && caller_zone_id_ != caller_zone_id)
-            return false;
-        if(destination_zone_id_ != destination_zone{0} && destination_zone_id_ != destination_zone_id)
-            return false;
-        if(object_id_ != object{0} && object_id_ != object_id)
-            return false;
-        if(interface_id_ != interface_ordinal{0} && interface_id_ != interface_id)
-            return false;
-        if(method_id_ != method{0} && method_id_ != method_id)
-            return false;
-        return true;
-    }
-
-    public:
-        method_data_processor(
-            const shared_ptr<method_data_processor>& next
-            , caller_channel_zone caller_channel_zone_id
-            , caller_zone caller_zone_id
-            , destination_zone destination_zone_id
-            , object object_id
-            , interface_ordinal interface_id
-            , method method_id) :
-            next_(next)
-            , caller_channel_zone_id_(caller_channel_zone_id)
-            , caller_zone_id_(caller_zone_id)
-            , destination_zone_id_(destination_zone_id)
-            , object_id_(object_id)
-            , interface_id_(interface_id)
-            , method_id_(method_id)
-            {}
-
-        //called by service proxies
-        virtual int send(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, destination_zone
-    destination_zone_id, object object_id, interface_ordinal interface_id, method method_id, size_t in_size_, const
-    char* in_buf_, std::vector<char>& out_buf_) = 0;
-        //called by services
-        virtual int receive(caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, destination_zone
-    destination_zone_id, object object_id, interface_ordinal interface_id, method method_id, size_t in_size_, const
-    char* in_buf_, std::vector<char>& out_buf_) = 0;
-    };*/
 
     struct interface_descriptor
     {

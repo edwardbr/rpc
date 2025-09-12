@@ -1,0 +1,200 @@
+/*
+ * Copyright (c) 2025 Edward Boggis-Rolfe
+ * All rights reserved.
+ */
+
+// Independent Fuzz Test IDL for RPC++ Zone Graph Testing
+// Tests rpc::shared_ptr passing between zones in complex topologies
+
+namespace fuzz_test
+{
+    // Simple data struct (not shared via rpc::shared_ptr)
+    struct shared_data
+    {
+        int id;
+        std::string name;
+        int value;
+    };
+
+    // Node types for different roles in the zone graph
+    enum node_type
+    {
+        FACTORY_NODE,
+        CACHE_NODE, 
+        WORKER_NODE,
+        ROOT_NODE
+    };
+
+    // Simple instruction for autonomous node execution
+    struct instruction
+    {
+        int instruction_id;
+        std::string operation;  // "create", "store", "retrieve", "process", "place"
+        int target_value;
+    };
+
+    // Cleanup interface - must be implemented by all RPC objects
+    [description="Cleanup interface for garbage collection"]
+    interface i_cleanup
+    {
+        [description="Cleanup resources and transfer ownership to garbage collector"]
+        int cleanup(rpc::shared_ptr<i_garbage_collector> collector);
+    };
+
+    // Garbage collector interface
+    [description="Garbage collector interface for managing object cleanup"]
+    interface i_garbage_collector
+    {
+        [description="Collect an object for garbage collection"]
+        int collect(rpc::shared_ptr<i_cleanup> obj);
+        
+        [description="Get count of collected objects"]
+        int get_collected_count([out] int& count);
+    };
+
+    // Data object interface - this will be shared via rpc::shared_ptr
+    [description="Data object interface for sharing between zones"]
+    interface i_shared_object
+    {
+        [description="Simple test function"]
+        int test_function(int input_value);
+        
+        [description="Get object statistics"]
+        int get_stats([out] int& count);
+        
+        [description="Set object value"]
+        int set_value(int new_value);
+        
+        [description="Get object value"]
+        int get_value([out] int& value);
+    };
+
+    // Factory interface - creates shared objects
+    [description="Factory interface for creating shared objects"]
+    interface i_fuzz_factory
+    {
+        [description="Create a new shared object"]
+        int create_shared_object(int id, std::string name, int initial_value, [out] rpc::shared_ptr<i_shared_object>& created_object);
+        
+        [description="Place a newly created object in another object to test input params"]
+        int place_shared_object(rpc::shared_ptr<i_shared_object> new_object, rpc::shared_ptr<i_shared_object> target_object);
+        
+        [description="Get factory statistics"]
+        int get_factory_stats([out] int& total_created, [out] int& current_refs);
+    };
+
+    // Cache interface - stores and retrieves shared objects  
+    [description="Cache interface for storing shared objects"]
+    interface i_fuzz_cache
+    {
+        [description="Store shared object in cache"]
+        int store_object(int cache_key, rpc::shared_ptr<i_shared_object> object);
+        
+        [description="Retrieve shared object from cache"]
+        int retrieve_object(int cache_key, [out] rpc::shared_ptr<i_shared_object>& object);
+        
+        [description="Check if object exists in cache"]
+        int has_object(int cache_key, [out] bool& exists);
+        
+        [description="Get cache size"]
+        int get_cache_size([out] int& size);
+    };
+
+    // Worker interface - processes shared objects
+    [description="Worker interface for processing shared objects"]
+    interface i_fuzz_worker
+    {
+        [description="Process a shared object (modify its value)"]
+        int process_object(rpc::shared_ptr<i_shared_object> object, int increment);
+        
+        [description="Get worker statistics"]
+        int get_worker_stats([out] int& objects_processed, [out] int& total_increments);
+    };
+
+    // Autonomous node interface - executes instructions and manages shared objects
+    [description="Autonomous node interface for executing instructions with shared objects"]
+    interface i_autonomous_node
+    {
+        [description="Set node type and initialize"]
+        int initialize_node(node_type type, uint64_t node_id);
+        
+        [description="run a script"]
+        int run_script(rpc::shared_ptr<i_autonomous_node> target_node, int instruction_count);
+        
+        [description="Execute instruction with shared object"]
+        int execute_instruction(instruction instruction, rpc::shared_ptr<i_shared_object> input_object, [out] rpc::shared_ptr<i_shared_object>& output_object);
+        
+        [description="Connect to another node (for graph topology)"]
+        int connect_to_node(rpc::shared_ptr<i_autonomous_node> target_node);
+        
+        [description="Pass shared object to connected node"]
+        int pass_object_to_connected(int connection_index, rpc::shared_ptr<i_shared_object> object);
+        
+        [description="Receive shared object from another node"]
+        int receive_object(rpc::shared_ptr<i_shared_object> object, uint64_t sender_node_id);
+        
+        [description="Get node status"]
+        int get_node_status([out] node_type& current_type, [out] uint64_t& current_id, [out] int& connections_count, [out] int& objects_held);
+        
+        [description="Create child node in own sub-zone and cache it locally"]
+        int create_child_node(node_type child_type, uint64_t child_zone_id, bool cache_locally, [out] rpc::shared_ptr<i_autonomous_node>& child_node);
+        
+        [description="Request another node to create a child and return proxy (no caching at creator)"]
+        int request_child_creation(rpc::shared_ptr<i_autonomous_node> target_parent, node_type child_type, uint64_t child_zone_id, [out] rpc::shared_ptr<i_autonomous_node>& child_proxy);
+        
+        [description="Get count of cached child nodes"]
+        int get_cached_children_count([out] int& count);
+        
+        [description="Get cached child node by index"]
+        int get_cached_child_by_index(int index, [out] rpc::shared_ptr<i_autonomous_node>& child);
+        
+        [description="Get parent node reference (if this is a child node)"]
+        int get_parent_node([out] rpc::shared_ptr<i_autonomous_node>& parent);
+        
+        [description="Set parent node reference when created as child"]
+        int set_parent_node(rpc::shared_ptr<i_autonomous_node> parent);
+    };
+
+    // Main controller interface - orchestrates the fuzz test
+    [description="Main controller interface for orchestrating fuzz tests"]
+    interface i_fuzz_controller
+    {
+        [description="Create zone with specific node type"]
+        int create_zone_with_node(node_type type, uint64_t zone_id, [out] rpc::shared_ptr<i_autonomous_node>& created_node);
+        
+        [description="Create pitchfork topology connection"]
+        int create_pitchfork_connection(rpc::shared_ptr<i_autonomous_node> root, rpc::shared_ptr<i_autonomous_node> left_branch, rpc::shared_ptr<i_autonomous_node> right_branch);
+        
+        [description="Execute fuzz test iteration"]
+        int execute_fuzz_iteration(int iteration_id, int num_objects_to_create, int num_operations);
+        
+        [description="Get overall test statistics"]
+        int get_test_stats([out] int& total_zones_created, [out] int& total_objects_created, [out] int& total_operations, [out] int& total_ref_count_changes);
+        
+        [description="Cleanup test resources"]
+        int cleanup_test_resources();
+    };
+
+    // Test scenario replay structures
+    [description="Runner-target pair for scenario replay"]
+    struct runner_target_pair
+    {
+        uint64_t runner_id;
+        uint64_t target_id;
+    };
+
+    [description="Test scenario configuration for replay system"]
+    struct test_scenario_config
+    {
+        std::string status;
+        int test_cycle;
+        uint64_t random_seed;
+        std::string timestamp;
+        int runners_count;
+        int instruction_count;  // Number of instructions per runner
+        std::vector<runner_target_pair> runner_target_pairs;
+        std::vector<uint64_t> zone_sequence;
+        std::string error_message;  // Optional, only for failures
+        std::string reproduction_command;  // Optional, only for failures
+    };
+}

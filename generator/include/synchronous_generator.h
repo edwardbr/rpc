@@ -1,11 +1,9 @@
 /*
- *   Copyright (c) 2024 Edward Boggis-Rolfe
+ *   Copyright (c) 2025 Edward Boggis-Rolfe
  *   All rights reserved.
  */
 
-namespace rpc_generator
-{
-    namespace synchronous_generator
+namespace synchronous_generator
     {
         // entry point
         void write_files(std::string module_name,
@@ -24,4 +22,3 @@ namespace rpc_generator
             const std::vector<std::string>& rethrow_exceptions,
             const std::vector<std::string>& additional_stub_headers);
     }
-}

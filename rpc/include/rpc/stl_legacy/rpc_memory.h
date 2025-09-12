@@ -29,7 +29,7 @@
 #include "rpc/logger.h"
 
 #ifdef DUMP_REF_COUNT
-    #define LOG(str, sz) LOG_STR(str, sz)
+    #define LOG(str, sz) RPC_TRACE("{}", std::string(str, sz))
 #else
     #define LOG(str, sz)
 #endif

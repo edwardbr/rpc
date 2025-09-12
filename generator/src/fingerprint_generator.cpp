@@ -1,5 +1,5 @@
 /*
- *   Copyright (c) 2024 Edward Boggis-Rolfe
+ *   Copyright (c) 2025 Edward Boggis-Rolfe
  *   All rights reserved.
  */
 #include "fingerprint_generator.h"
@@ -170,34 +170,6 @@ namespace fingerprint
         std::string status_attr = "status";
 
         std::string seed;
-        for (auto& item : cls.get_attributes())
-        {
-            {
-                auto tmp = item.substr(0, strlen(rpc_attribute_types::use_legacy_empty_template_struct_id_attr));
-                if (tmp == rpc_attribute_types::use_legacy_empty_template_struct_id_attr
-                    && item[strlen(rpc_attribute_types::use_legacy_empty_template_struct_id_attr)] == '=')
-                {
-                    continue;
-                }
-            }
-
-            {
-                auto tmp = item.substr(0, strlen(rpc_attribute_types::use_template_param_in_id_attr));
-                if (tmp == rpc_attribute_types::use_template_param_in_id_attr
-                    && item[strlen(rpc_attribute_types::use_template_param_in_id_attr)] == '=')
-                {
-                    continue;
-                }
-            }
-
-            {
-                auto tmp = item.substr(0, status_attr.size());
-                if (tmp == status_attr && item[status_attr.size()] == '=')
-                {
-                    continue;
-                }
-            }
-        }
         if (cls.get_entity_type() == entity_type::INTERFACE || cls.get_entity_type() == entity_type::LIBRARY)
         {
             auto* owner = cls.get_owner();
@@ -216,30 +188,42 @@ namespace fingerprint
             for (auto& func : cls.get_functions())
             {
                 seed += "[";
-                for (auto& item : func->get_attributes())
+                for (auto& item : func->get_data())
                 {
                     // this keyword should not contaminate the interface fingerprint, so that we can deprecate a method
                     // and warn developers that this method is for the chop unfortunately for legacy reasons
                     // "deprecated" does contaminate the fingerprint we need to flush through all prior interface
                     // versions before we can rehabilitate this as "deprecated"
-                    if (item == rpc_attribute_types::deprecated_function)
+                    if (item.first == rpc_attribute_types::deprecated_function)
                         continue;
 
                     // this is to deal with the issue that a deprecated function attribute contaminated the fingerprint
                     // making it impossible to change without changing the interface id which when deprecating a feature
                     // should not do
-                    if (item == rpc_attribute_types::fingerprint_contaminating_deprecated_function)
+                    if (item.first == rpc_attribute_types::fingerprint_contaminating_deprecated_function)
                     {
                         seed += "deprecated";
                         continue;
                     }
 
                     // to handle some idl parser yuckiness
-                    if (item == attribute_types::tolerate_struct_or_enum)
+                    if (item.first == attribute_types::tolerate_struct_or_enum)
                     {
                         continue;
                     }
-                    seed += item;
+
+                    // not interested in contaminating the seed with the description, happy to debate this descision
+                    if (item.first == attribute_types::description)
+                    {
+                        continue;
+                    }
+
+                    seed += item.first;
+                    if (!item.second.empty())
+                    {
+                        seed += "=";
+                        seed += item.second;
+                    }
                 }
                 seed += "]";
 
@@ -271,9 +255,14 @@ namespace fingerprint
                 for (auto& param : func->get_parameters())
                 {
                     seed += "[";
-                    for (auto& item : param.get_attributes())
+                    for (auto& item : param)
                     {
-                        seed += item;
+                        seed += item.first;
+                        if (!item.second.empty())
+                        {
+                            seed += "=";
+                            seed += item.second;
+                        }
                     }
                     seed += "]";
 
@@ -310,7 +299,7 @@ namespace fingerprint
         else if (cls.get_entity_type() == entity_type::STRUCT)
         {
             if (cls.get_is_template()
-                && cls.get_attribute_value(rpc_attribute_types::use_legacy_empty_template_struct_id_attr) == "true")
+                && cls.get_value(rpc_attribute_types::use_legacy_empty_template_struct_id_attr) == "true")
             {
                 // this is a bad bug that needs to be preserved for legacy template structures
                 std::ignore = cls;
@@ -318,8 +307,7 @@ namespace fingerprint
             else
             {
                 // template classes cannot know what type they are until the template parameters are specified
-                if (cls.get_is_template()
-                    && cls.get_attribute_value(rpc_attribute_types::use_template_param_in_id_attr) != "false")
+                if (cls.get_is_template() && cls.get_value(rpc_attribute_types::use_template_param_in_id_attr) != "false")
                 {
                     seed += "template<";
                     bool first_pass = true;

@@ -1,5 +1,5 @@
 /*
- *   Copyright (c) 2024 Edward Boggis-Rolfe
+ *   Copyright (c) 2025 Edward Boggis-Rolfe
  *   All rights reserved.
  */
 #include "stdio.h"
@@ -27,7 +27,7 @@
 using namespace marshalled_tests;
 
 #ifdef USE_RPC_TELEMETRY
-TELEMETRY_SERVICE_MANAGER
+std::shared_ptr<rpc::i_telemetry_service> telemetry_service_;
 #endif
 
 rpc::shared_ptr<rpc::child_service> rpc_server;
@@ -43,7 +43,7 @@ int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t host_id, uint64_t 
     }
 
 #ifdef USE_RPC_TELEMETRY
-    CREATE_TELEMETRY_SERVICE(rpc::enclave_telemetry_service)
+    rpc::enclave_telemetry_service::create(telemetry_service_);
 #endif
 
     auto ret = rpc::child_service::create_child_zone<rpc::host_service_proxy, yyy::i_host, yyy::i_example>(
@@ -95,18 +95,21 @@ int call_enclave(uint64_t protocol_version, // version of the rpc call protocol
 {
     if (protocol_version > rpc::get_version())
     {
+        RPC_ERROR("Invalid version in call_enclave");
         return rpc::error::INVALID_VERSION();
     }
     // a retry cache using enclave_retry_buffer as thread local storage, leaky if the client does not retry with more
     // memory
     if (!enclave_retry_buffer)
     {
+        RPC_ERROR("Invalid data - null enclave_retry_buffer");
         return rpc::error::INVALID_DATA();
     }
 
     auto*& retry_buf = *reinterpret_cast<rpc::retry_buffer**>(enclave_retry_buffer);
     if (retry_buf && !sgx_is_within_enclave(retry_buf, sizeof(rpc::retry_buffer*)))
     {
+        RPC_ERROR("Security error - retry_buf not within enclave");
         return rpc::error::SECURITY_ERROR();
     }
 
@@ -157,40 +160,50 @@ int try_cast_enclave(uint64_t protocol_version, uint64_t zone_id, uint64_t objec
 {
     if (protocol_version > rpc::get_version())
     {
+        RPC_ERROR("Invalid version in try_cast_enclave");
         return rpc::error::INVALID_VERSION();
     }
     int ret = rpc_server->try_cast(protocol_version, {zone_id}, {object_id}, {interface_id});
     return ret;
 }
 
-uint64_t add_ref_enclave(uint64_t protocol_version,
+int add_ref_enclave(uint64_t protocol_version,
     uint64_t destination_channel_zone_id,
     uint64_t destination_zone_id,
     uint64_t object_id,
     uint64_t caller_channel_zone_id,
     uint64_t caller_zone_id,
-    char build_out_param_channel)
+    uint64_t known_direction_zone_id,
+    char build_out_param_channel,
+    uint64_t* reference_count)
 {
     if (protocol_version > rpc::get_version())
     {
-        return std::numeric_limits<uint64_t>::max();
+        *reference_count = 0;
+        return rpc::error::INCOMPATIBLE_SERVICE();
     }
-    return rpc_server->add_ref(protocol_version,
+    
+    auto err_code = rpc_server->add_ref(protocol_version,
         {destination_channel_zone_id},
         {destination_zone_id},
         {object_id},
         {caller_channel_zone_id},
         {caller_zone_id},
-        static_cast<rpc::add_ref_options>(build_out_param_channel));
+        {known_direction_zone_id},
+        static_cast<rpc::add_ref_options>(build_out_param_channel),
+        *reference_count);
+    return err_code;
 }
 
-uint64_t release_enclave(uint64_t protocol_version, uint64_t zone_id, uint64_t object_id, uint64_t caller_zone_id)
+int release_enclave(uint64_t protocol_version, uint64_t zone_id, uint64_t object_id, uint64_t caller_zone_id, uint64_t* reference_count)
 {
     if (protocol_version > rpc::get_version())
     {
-        return std::numeric_limits<uint64_t>::max();
+        *reference_count = 0;
+        return rpc::error::INCOMPATIBLE_SERVICE();
     }
-    return rpc_server->release(protocol_version, {zone_id}, {object_id}, {caller_zone_id});
+    auto err_code = rpc_server->release(protocol_version, {zone_id}, {object_id}, {caller_zone_id}, *reference_count);
+    return err_code;
 }
 
 extern "C"

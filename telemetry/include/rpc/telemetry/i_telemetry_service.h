@@ -4,6 +4,14 @@
 #include <rpc/types.h>
 #include <rpc/marshaller.h>
 
+#ifndef _IN_ENCLAVE
+#include <filesystem>
+#endif
+
+#if defined(USE_THREAD_LOCAL_LOGGING) && !defined(_IN_ENCLAVE)
+#include <rpc/thread_local_logger.h>
+#endif
+
 // copied from spdlog
 #define I_TELEMETRY_LEVEL_DEBUG 0
 #define I_TELEMETRY_LEVEL_TRACE 1
@@ -31,7 +39,7 @@ namespace rpc
         };
         virtual ~i_telemetry_service() = default;
 
-        virtual void on_service_creation(const char* name, zone zone_id) const = 0;
+        virtual void on_service_creation(const char* name, rpc::zone zone_id, rpc::destination_zone parent_zone_id) const = 0;
         virtual void on_service_deletion(zone zone_id) const = 0;
         virtual void on_service_try_cast(zone zone_id,
             destination_zone destination_zone_id,
@@ -54,8 +62,17 @@ namespace rpc
             caller_zone caller_zone_id) const
             = 0;
 
-        virtual void on_service_proxy_creation(
-            const char* name, zone zone_id, destination_zone destination_zone_id, caller_zone caller_zone_id) const
+        virtual void on_service_proxy_creation(const char* service_name,
+            const char* service_proxy_name,
+            zone zone_id,
+            destination_zone destination_zone_id,
+            caller_zone caller_zone_id) const
+            = 0;
+        virtual void on_cloned_service_proxy_creation(const char* service_name,
+            const char* service_proxy_name,
+            rpc::zone zone_id,
+            rpc::destination_zone destination_zone_id,
+            rpc::caller_zone caller_zone_id) const
             = 0;
         virtual void on_service_proxy_deletion(
             zone zone_id, destination_zone destination_zone_id, caller_zone caller_zone_id) const
@@ -138,18 +155,26 @@ namespace rpc
         virtual void message(level_enum level, const char* message) const = 0;
     };
 
+#if defined(USE_THREAD_LOCAL_LOGGING) && !defined(_IN_ENCLAVE)
+    // Helper function to log telemetry messages to circular buffers
+    inline void telemetry_to_thread_local_buffer(i_telemetry_service::level_enum level, const std::string& message) {
+        // Map telemetry levels to RPC logging levels
+        int rpc_level = static_cast<int>(level);
+        rpc::thread_local_log(rpc_level, "[TELEMETRY] " + message, __FILE__, __LINE__, __FUNCTION__);
+    }
+#endif
+
     // dont use this class directly use the macro below so that it can be conditionally compiled out
     class telemetry_service_manager
     {
         static inline std::shared_ptr<i_telemetry_service> telemetry_service_ = nullptr;
 
     public:
-        template<class TELEMETRY_SERVICE, typename... Args> bool create(Args&&... args)
-        {
-            if (telemetry_service_)
-                return false;
-            return TELEMETRY_SERVICE::create(telemetry_service_, std::forward<Args>(args)...);
-        }
+#ifdef _IN_ENCLAVE
+        bool create();
+#else
+        bool create(const std::string& test_suite_name, const std::string& name, const std::filesystem::path& directory);
+#endif
 
         static std::shared_ptr<i_telemetry_service> get() { return telemetry_service_; }
 
@@ -158,13 +183,10 @@ namespace rpc
         static void reset() { telemetry_service_.reset(); }
     };
 }
-
 #ifdef USE_RPC_TELEMETRY
 #define TELEMETRY_SERVICE_MANAGER rpc::telemetry_service_manager telemetry_service_manager_;
-#define CREATE_TELEMETRY_SERVICE(type, ...) telemetry_service_manager_.create<type>(__VA_ARGS__);
 #define RESET_TELEMETRY_SERVICE rpc::telemetry_service_manager::reset();
 #else
 #define TELEMETRY_SERVICE_MANAGER
-#define CREATE_TELEMETRY_SERVICE(...)
 #define RESET_TELEMETRY_SERVICE
 #endif

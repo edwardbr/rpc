@@ -2,7 +2,7 @@
 #include "cpp_parser.h"
 #include "writer.h"
 
-namespace rpc_generator
+namespace interface_declaration_generator
 {
     void build_scoped_name(const class_entity* entity, std::string& name);
 
