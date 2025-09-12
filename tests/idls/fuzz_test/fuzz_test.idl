@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2025 Edward Boggis-Rolfe
+ * All rights reserved.
+ */
+
 // Independent Fuzz Test IDL for RPC++ Zone Graph Testing
 // Tests rpc::shared_ptr passing between zones in complex topologies
 

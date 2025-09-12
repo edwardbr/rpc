@@ -1,3 +1,8 @@
+#[[
+   Copyright (c) 2025 Edward Boggis-Rolfe
+   All rights reserved.
+]]
+
 # formatted using cmake-format
 cmake_minimum_required(VERSION 3.24)
 

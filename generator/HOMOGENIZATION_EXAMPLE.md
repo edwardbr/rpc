@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2025 Edward Boggis-Rolfe
+All rights reserved.
+-->
+
 # Generator Homogenization: Before vs After
 
 ## Problem: Duplicate Parameter Analysis Logic

@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2025 Edward Boggis-Rolfe
+All rights reserved.
+-->
+
 # Advanced Multi-Threaded Crash Handler Implementation
 
 **Date**: 2024-08-24  

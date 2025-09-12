@@ -1,3 +1,8 @@
+#[[
+   Copyright (c) 2025 Edward Boggis-Rolfe
+   All rights reserved.
+]]
+
 # RPC Shared Pointer Fuzz Test CMakeLists.txt
 cmake_minimum_required(VERSION 3.24)
 

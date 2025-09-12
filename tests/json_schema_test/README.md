@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2025 Edward Boggis-Rolfe
+All rights reserved.
+-->
+
 # JSON Schema Generation Tests
 
 This directory contains tests and examples for the JSON schema generation capabilities in the RPC system.

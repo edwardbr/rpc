@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2025 Edward Boggis-Rolfe
+All rights reserved.
+-->
+
 # Fuzz Test Development Notes
 
 ## Overview

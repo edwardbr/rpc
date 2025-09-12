@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2025 Edward Boggis-Rolfe
+All rights reserved.
+-->
+
 # RPC++ Codebase Analysis for Claude Code
 
 ## Overview
@@ -261,7 +266,7 @@ Set `DEBUG_RPC_GEN=ON` in CMake to enable generator debugging output.
 - Network transport implementations
 - Enhanced JSON schema features (improved output schemas, additional format support)
 
-## Recent Major Update: Hierarchical Zone Graph Testing (September 2024)
+## Major Update: Hierarchical Zone Graph Testing (September 2024)
 
 **Location**: `/tests/fuzz_test/fuzz_test_main.cpp`
 

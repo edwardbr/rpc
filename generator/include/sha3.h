@@ -1,7 +1,3 @@
-/*
- *   Copyright (c) 2024 Edward Boggis-Rolfe
- *   All rights reserved.
- */
 #ifndef SHA3_H
 #define SHA3_H
 

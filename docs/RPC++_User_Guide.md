@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2025 Edward Boggis-Rolfe
+All rights reserved.
+-->
+
 # RPC++ User Guide
 
 **A Modern C++ Remote Procedure Call Library**
@@ -275,7 +280,7 @@ rpc::telemetry_service_manager::set(telemetry);
 
 ## Logging Framework
 
-Separate from telemetry, RPC++ provides a dedicated logging system optimized for performance and enclave compatibility. **Recently refactored in 2024** to use modern fmt::format-based structured logging with improved performance and developer experience.
+Separate from telemetry, RPC++ provides a dedicated logging system optimized for performance and enclave compatibility. **Refactored in September 2024** to use modern fmt::format-based structured logging with improved performance and developer experience.
 
 ### Logger Interface
 
@@ -299,7 +304,7 @@ Separate from telemetry, RPC++ provides a dedicated logging system optimized for
 #define RPC_CRITICAL(format_str, ...) // Level 5 - Critical failures
 ```
 
-### Recent Logging Refactoring (2024)
+### Logging System Refactoring (2024)
 
 **Migration from Legacy Macros:**
 The logging system was completely refactored to eliminate the old `LOG_STR` and `LOG_CSTR` macros in favor of modern, structured logging:
@@ -349,7 +354,7 @@ RPC_INFO("Processing request {}", id);
 
 ## Thread-Local Logging and Enhanced Crash Diagnostics
 
-**NEW FEATURE (September 2024)**: RPC++ now includes a sophisticated thread-local logging system specifically designed for diagnosing multithreaded issues and crashes. This system provides comprehensive diagnostic information when threading bugs occur, making it significantly easier to identify and resolve complex race conditions and multithreaded problems.
+**FEATURE (Added September 2024)**: RPC++ includes a sophisticated thread-local logging system specifically designed for diagnosing multithreaded issues and crashes. This system provides comprehensive diagnostic information when threading bugs occur, making it significantly easier to identify and resolve complex race conditions and multithreaded problems.
 
 ### Overview
 

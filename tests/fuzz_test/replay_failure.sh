@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Copyright (c) 2025 Edward Boggis-Rolfe
+# All rights reserved.
+
 # RPC++ Fuzz Test Replay Helper Script
 # Usage: ./replay_failure.sh [failure_file.json] [output_directory]
 

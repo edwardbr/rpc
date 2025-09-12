@@ -1,3 +1,8 @@
+<!--
+Copyright (c) 2025 Edward Boggis-Rolfe
+All rights reserved.
+-->
+
 # Testing JSON Schema Generation with example.idl
 
 This document shows how to test the actual JSON schema code generation using the decorated `example.idl` file.

@@ -1,5 +1,5 @@
 /*
- *   Copyright (c) 2024 Edward Boggis-Rolfe
+ *   Copyright (c) 2025 Edward Boggis-Rolfe
  *   All rights reserved.
  */
 #include "rpc/proxy.h"

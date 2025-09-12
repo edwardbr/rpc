@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Copyright (c) 2025 Edward Boggis-Rolfe
+# All rights reserved.
+
 # RPC++ Multithreaded Stress Test Script
 # Comprehensive testing for race conditions, deadlocks, and service lifecycle issues
 # Usage: ./stress_test_multithreaded.sh [OPTIONS]
