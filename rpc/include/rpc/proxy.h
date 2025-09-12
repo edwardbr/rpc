@@ -30,7 +30,7 @@ namespace rpc
     class object_proxy;
     template<class T> class proxy_impl;
 
-    // non virtual class to allow for type erasure
+    // Base class for interface proxies with virtual destructor for proper inheritance
     class proxy_base
     {
         rpc::member_ptr<object_proxy> object_proxy_;
@@ -93,7 +93,7 @@ namespace rpc
         rpc::member_ptr<service_proxy> service_proxy_;
         std::unordered_map<interface_ordinal, rpc::weak_ptr<proxy_base>> proxy_map;
         std::mutex insert_control_;
-        std::atomic<int> inherited_reference_count_{0}; // Track inherited references from race conditions
+        std::atomic<int> inherited_reference_count_{0}; // Track inherited references from race conditions during destruction and their continued presence in the service other_zones collection
 
         object_proxy(object object_id, rpc::shared_ptr<service_proxy> service_proxy);
 
@@ -107,7 +107,7 @@ namespace rpc
     public:
         virtual ~object_proxy();
 
-        // Called when this object_proxy inherits a reference from a racing destroyed proxy
+        // Called when this object_proxy inherits a reference from a race condition during the destruction of a proxy but the service other_zones collection still has a record of it
         void inherit_extra_reference() { inherited_reference_count_++; }
 
         rpc::shared_ptr<service_proxy> get_service_proxy() const { return service_proxy_.get_nullable(); }
@@ -593,9 +593,19 @@ namespace rpc
             }
             inner_release_external_ref();
 
+            // int local_ref_count = 0;
+            // ret = current_service->decrement_reference_count(shared_from_this(), local_ref_count);
+            // if (ret != rpc::error::OK())
+            // {
+            //     RPC_ERROR("on_object_proxy_released release failed");
+            //     RPC_ASSERT(false);
+            //     return;
+            // }
+
             // Handle inherited references from race conditions
             for (int i = 0; i < inherited_reference_count; i++)
             {
+                // RPC_ASSERT(local_ref_count);
                 RPC_DEBUG("Releasing inherited reference {}/{} for object {}",
                           (i + 1), inherited_reference_count, object_id.get_val());
 
@@ -607,6 +617,13 @@ namespace rpc
                     return;
                 }
                 inner_release_external_ref();
+                // ret = current_service->decrement_reference_count(shared_from_this(), local_ref_count);
+                // if (ret != rpc::error::OK())
+                // {
+                //     RPC_ERROR("on_object_proxy_released release failed");
+                //     RPC_ASSERT(false);
+                //     return;
+                // }
             }
         }
 

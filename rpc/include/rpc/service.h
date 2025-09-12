@@ -218,6 +218,8 @@ namespace rpc
 
         void clean_up_on_failed_connection(const rpc::shared_ptr<service_proxy>& destination_zone,
             rpc::shared_ptr<rpc::casting_interface> input_interface);
+            
+        // int decrement_reference_count(const rpc::shared_ptr<service_proxy>& proxy, int ref_count);
 
         template<class proxy_class, class in_param_type, class out_param_type, typename... Args>
         int connect_to_zone(const char* name,

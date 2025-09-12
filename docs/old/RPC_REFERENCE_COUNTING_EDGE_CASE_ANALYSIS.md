@@ -271,7 +271,7 @@ The code comments mention a proposed "snail trail" solution for the Line 870+ pa
 
 ### Helper Infrastructure
 
-- `ComplexTopologyNodes` struct - Topology node management
+- `complex_topology_nodes` struct - Topology node management
 - `build_complex_topology()` template function - Automated topology construction
 
 ---

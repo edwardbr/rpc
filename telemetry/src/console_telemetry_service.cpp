@@ -678,6 +678,11 @@ namespace rpc
 
     void console_telemetry_service::message(level_enum level, const char* message) const
     {
+#if defined(USE_THREAD_LOCAL_LOGGING) && !defined(_IN_ENCLAVE)
+        // Also log to thread-local circular buffer for debugging
+        rpc::telemetry_to_thread_local_buffer(level, message);
+#endif
+
         const char* level_str;
         switch (level)
         {

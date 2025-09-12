@@ -27,7 +27,7 @@ The original crash handling in `test_host.cpp` was basic and limited:
 ```cpp
 namespace crash_handler
 {
-    class CrashHandler
+    class crash_handler
     {
         // Singleton pattern with static methods
         // Thread-safe crash analysis
@@ -134,7 +134,7 @@ std::string ResolveSymbolWithAddr2Line(void* address)
 
 #### RPC-Specific Pattern Detection
 ```cpp
-std::vector<std::string> DetectCrashPatterns(const CrashReport& report)
+std::vector<std::string> DetectCrashPatterns(const crash_report& report)
 {
     // Analyze stack traces for known patterns:
     // - "on_object_proxy_released" → Proxy cleanup crash
@@ -160,7 +160,7 @@ std::string CollectThreadingDebugInfo()
 
 #### Comprehensive Report Structure
 ```cpp
-struct CrashReport
+struct crash_report
 {
     int signal_number;                              // Signal that caused crash
     std::string signal_name;                        // Human-readable signal name
@@ -175,7 +175,7 @@ struct CrashReport
 
 #### Automatic Crash Dump Generation
 ```cpp
-void SaveCrashDump(const CrashReport& report)
+void SaveCrashDump(const crash_report& report)
 {
     // Generate filename: /tmp/crash_[pid]_[timestamp].txt
     // Write complete crash report to file
@@ -213,22 +213,22 @@ static void HandleCrash(int signal, siginfo_t* info, void* context)
 ```cpp
 extern "C" int main(int argc, char* argv[])
 {
-    // Initialize crash handler with full configuration
-    crash_handler::CrashHandler::Config crash_config;
+    // initialize crash handler with full configuration
+    crash_handler::crash_handler::Config crash_config;
     crash_config.enable_multithreaded_traces = true;
     crash_config.enable_symbol_resolution = true;
     crash_config.enable_threading_debug_info = true;
     crash_config.save_crash_dump = true;
     
     // Set up custom analysis callback
-    crash_handler::CrashHandler::SetAnalysisCallback([](const auto& report) {
+    crash_handler::crash_handler::set_analysis_callback([](const auto& report) {
         // Custom RPC-specific crash analysis
         // Threading bug detection
         // Performance impact analysis
     });
     
-    // Initialize and run tests
-    crash_handler::CrashHandler::Initialize(crash_config);
+    // initialize and run tests
+    crash_handler::crash_handler::initialize(crash_config);
     
     try {
         // Run application
@@ -239,7 +239,7 @@ extern "C" int main(int argc, char* argv[])
     }
     
     // Clean shutdown
-    crash_handler::CrashHandler::Shutdown();
+    crash_handler::crash_handler::shutdown();
 }
 ```
 
@@ -257,9 +257,9 @@ host::host(rpc::zone zone_id) : zone_id_(zone_id)
 error_code host::look_up_app(const std::string& app_name, rpc::shared_ptr<yyy::i_example>& app)
 {
     // Use crash handler's global counters
-    crash_handler::CrashHandler::IncrementLookupEnter();
+    crash_handler::crash_handler::increment_lookup_enter();
     // ... application logic ...
-    crash_handler::CrashHandler::IncrementLookupExit();
+    crash_handler::crash_handler::increment_lookup_exit();
 }
 ```
 
@@ -309,8 +309,8 @@ WARNING: Active RPC calls detected during crash!
 
 ### 1. Custom Analysis Callbacks
 ```cpp
-crash_handler::CrashHandler::SetAnalysisCallback(
-    [](const crash_handler::CrashHandler::CrashReport& report) {
+crash_handler::crash_handler::set_analysis_callback(
+    [](const crash_handler::crash_handler::crash_report& report) {
         // Application-specific crash analysis
         // Performance impact assessment  
         // Threading bug classification
@@ -402,17 +402,17 @@ save_crash_dump              → Automatic crash dump files
 ### Enable Crash Handler
 ```cpp
 // In main function:
-crash_handler::CrashHandler::Config config;
+crash_handler::crash_handler::Config config;
 config.enable_multithreaded_traces = true;
 config.enable_symbol_resolution = true;
 config.save_crash_dump = true;
 
-crash_handler::CrashHandler::Initialize(config);
+crash_handler::crash_handler::initialize(config);
 ```
 
 ### Custom Analysis
 ```cpp
-crash_handler::CrashHandler::SetAnalysisCallback(
+crash_handler::crash_handler::set_analysis_callback(
     [](const auto& report) {
         // Custom crash analysis logic
         // Integration with logging systems

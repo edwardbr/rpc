@@ -4,7 +4,16 @@
 #include <rpc/error_codes.h>
 #include <rpc/logger.h>
 
-#ifdef RPC_HANG_ON_FAILED_ASSERT
+#if defined(USE_THREAD_LOCAL_LOGGING) && !defined(_IN_ENCLAVE)
+#include <rpc/thread_local_logger.h>
+// Enhanced RPC_ASSERT with thread-local buffer dumping
+#define RPC_ASSERT(x)                                                                                                  \
+    if (!(x))                                                                                                          \
+    {                                                                                                                  \
+        rpc::thread_local_dump_on_assert("RPC_ASSERT failed: " #x, __FILE__, __LINE__);                              \
+        std::abort();                                                                                                  \
+    }
+#elif defined(RPC_HANG_ON_FAILED_ASSERT)
 #ifdef _IN_ENCLAVE
 #include <sgx_error.h>
 extern "C"

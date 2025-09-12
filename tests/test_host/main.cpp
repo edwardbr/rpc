@@ -86,7 +86,7 @@ namespace
         }
 
         // Initialize comprehensive crash handler with multi-threaded support
-        crash_handler::CrashHandler::Config crash_config;
+        crash_handler::crash_handler::Config crash_config;
         crash_config.enable_multithreaded_traces = true;
         crash_config.enable_symbol_resolution = true;
         crash_config.enable_threading_debug_info = true;
@@ -97,8 +97,8 @@ namespace
         crash_config.crash_dump_path = "./build/crash";
 
         // Set up custom crash analysis callback
-        crash_handler::CrashHandler::SetAnalysisCallback(
-            [](const crash_handler::CrashHandler::CrashReport& report) {
+        crash_handler::crash_handler::set_analysis_callback(
+            [](const crash_handler::crash_handler::crash_report& report) {
                 std::cout << "\n=== CUSTOM CRASH ANALYSIS ===" << std::endl;
                 std::cout << "Crash occurred at: " << std::chrono::duration_cast<std::chrono::seconds>(
                     report.crash_time.time_since_epoch()).count() << std::endl;
@@ -124,7 +124,7 @@ namespace
             }
         );
 
-        if (!crash_handler::CrashHandler::Initialize(crash_config)) {
+        if (!crash_handler::crash_handler::initialize(crash_config)) {
             std::cerr << "Failed to initialize crash handler" << std::endl;
             return 1;
         }
@@ -152,7 +152,7 @@ namespace
         }
 
         // Cleanup crash handler
-        crash_handler::CrashHandler::Shutdown();
+        crash_handler::crash_handler::shutdown();
         std::cout << "[Main] test shutdown complete" << std::endl;
 
         return ret;
@@ -166,8 +166,8 @@ template<class T> class type_test : public testing::Test
 public:
     T& get_lib() { return lib_; }
 
-    void SetUp() override { this->lib_.SetUp(); }
-    void TearDown() override { this->lib_.TearDown(); }
+    void SetUp() override { this->lib_.set_up(); }
+    void TearDown() override { this->lib_.tear_down(); }
 };
 
 using local_implementations = ::testing::Types<in_memory_setup<false>,
@@ -965,7 +965,7 @@ TYPED_TEST(remote_type_test, check_unknown_zone_reference_path)
 }
 
 // Helper structure to hold the complex topology
-struct ComplexTopologyNodes {
+struct complex_topology_nodes {
     // Root hierarchy
     rpc::shared_ptr<yyy::i_example> child_1;
     rpc::shared_ptr<yyy::i_example> child_2;
@@ -1010,8 +1010,8 @@ struct ComplexTopologyNodes {
 
 // Helper function to build the complex topology
 template<class T>
-ComplexTopologyNodes build_complex_topology(T& test_instance) {
-    ComplexTopologyNodes nodes;
+complex_topology_nodes build_complex_topology(T& test_instance) {
+    complex_topology_nodes nodes;
     auto& lib = test_instance.get_lib();
 
     // Build the root hierarchy

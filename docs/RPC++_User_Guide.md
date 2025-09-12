@@ -14,11 +14,12 @@
 4. [Code Generators and Language Support](#code-generators-and-language-support)
 5. [Telemetry System](#telemetry-system)
 6. [Logging Framework](#logging-framework)
-7. [Multithreading and Coroutines](#multithreading-and-coroutines)
-8. [Service Proxies and Transport Abstraction](#service-proxies-and-transport-abstraction)
-9. [The i_marshaller Interface](#the-i_marshaller-interface)
-10. [Getting Started](#getting-started)
-11. [Architecture Overview](#architecture-overview)
+7. [Thread-Local Logging and Enhanced Crash Diagnostics](#thread-local-logging-and-enhanced-crash-diagnostics)
+8. [Multithreading and Coroutines](#multithreading-and-coroutines)
+9. [Service Proxies and Transport Abstraction](#service-proxies-and-transport-abstraction)
+10. [The i_marshaller Interface](#the-i_marshaller-interface)
+11. [Getting Started](#getting-started)
+12. [Architecture Overview](#architecture-overview)
 
 ---
 
@@ -343,6 +344,327 @@ RPC_INFO("Processing request {}", id);
 - Thread-safe buffer management
 - Async logging support for high-throughput scenarios
 - Atomic reference counting in member_ptr logging
+
+---
+
+## Thread-Local Logging and Enhanced Crash Diagnostics
+
+**NEW FEATURE (September 2024)**: RPC++ now includes a sophisticated thread-local logging system specifically designed for diagnosing multithreaded issues and crashes. This system provides comprehensive diagnostic information when threading bugs occur, making it significantly easier to identify and resolve complex race conditions and multithreaded problems.
+
+### Overview
+
+The thread-local logging system addresses a common challenge in multithreaded debugging: when standard telemetry and logging are enabled, they can mask threading issues by altering timing and synchronization behavior. The new system solves this by:
+
+1. **Per-Thread Circular Buffers**: Each thread maintains its own independent circular buffer of log messages
+2. **Frozen Buffer Dumps**: When crashes occur, all buffers are immediately frozen and dumped to disk
+3. **Enhanced Stack Traces**: Crash handler provides detailed function names, file locations, and line numbers
+4. **Test Context Integration**: Automatically identifies which specific test was running when crashes occur
+
+### Configuration and Setup
+
+#### CMake Configuration
+
+The thread-local logging system is controlled by the `USE_THREAD_LOCAL_LOGGING` CMake option:
+
+```cmake
+# Enable thread-local logging (host-only, disabled in enclaves)
+set(USE_THREAD_LOCAL_LOGGING ON)
+```
+
+#### CMake Presets
+
+A dedicated preset is available for multithreaded debugging:
+
+```bash
+# Configure with thread-local logging enabled
+cmake --preset Debug_multithreaded
+
+# Build and run tests
+cmake --build build --target rpc_test
+./build/output/debug/rpc_test -m  # Enable multithreaded tests
+```
+
+The `Debug_multithreaded` preset automatically enables:
+- `USE_THREAD_LOCAL_LOGGING=ON` - Thread-local circular buffer logging
+- `USE_RPC_TELEMETRY=ON` - Standard telemetry system
+- `USE_CONSOLE_TELEMETRY=ON` - Console-based telemetry output
+
+### System Architecture
+
+#### Core Components
+
+**1. thread_local_logger_config**: Configuration for circular buffer logging
+```cpp
+struct thread_local_logger_config {
+    size_t buffer_size = 10000;                    // Messages per thread
+    size_t max_message_size = 4096;               // Maximum message size  
+    std::string dump_directory = "/tmp/rpc_debug_dumps";
+};
+```
+
+**2. thread_local_circular_buffer**: Per-thread message storage
+```cpp
+class thread_local_circular_buffer {
+public:
+    void add_entry(int level, const std::string& message, 
+                   const char* file, int line, const char* function);
+    void freeze();                    // Prevent further writes
+    void dump_to_file(const std::string& filename) const;
+};
+```
+
+**3. thread_local_logger_manager**: Global coordination and dumping
+```cpp
+class thread_local_logger_manager {
+public:
+    static thread_local_logger_manager& get_instance();
+    
+    thread_local_circular_buffer* get_thread_buffer();
+    void freeze_all_buffers();
+    void dump_all_buffers_with_stacktrace(const std::string& assert_message, 
+                                          const char* file, int line);
+};
+```
+
+#### Logging Integration
+
+The system seamlessly integrates with existing RPC++ logging macros:
+
+```cpp
+// Standard logging macros automatically use thread-local buffers when enabled
+RPC_DEBUG("Processing zone {} request", zone_id);
+RPC_ERROR("Failed to create proxy for object {}", object_id);
+RPC_CRITICAL("Reference counting inconsistency detected");
+```
+
+**Backend Selection**: The system automatically chooses the appropriate logging backend:
+
+```cpp
+// Conditional compilation determines backend
+#if defined(USE_THREAD_LOCAL_LOGGING) && !defined(_IN_ENCLAVE)
+    #define RPC_LOG_BACKEND(level, message) rpc::thread_local_log(level, message, __FILE__, __LINE__, __FUNCTION__)
+#elif defined(USE_RPC_LOGGING) 
+    #define RPC_LOG_BACKEND(level, message) rpc_log(level, (message).c_str(), (message).length())
+#else
+    #define RPC_LOG_BACKEND(level, message) do { (void)(level); (void)(message); } while(0)
+#endif
+```
+
+### Enhanced Crash Handler Integration
+
+#### Automatic Buffer Dumping
+
+When any signal occurs (SIGSEGV, SIGABRT, etc.), the crash handler automatically:
+
+1. **Freezes All Buffers**: Prevents any further logging to preserve crash state
+2. **Dumps Comprehensive Diagnostics**: Creates detailed crash reports with per-thread message histories
+3. **Provides Stack Traces**: Enhanced symbol resolution with function names and line numbers
+4. **Identifies Test Context**: Shows exactly which gtest test was running
+
+#### Enhanced Stack Traces
+
+The crash handler now provides detailed symbolic information:
+
+```
+Thread 1/50 - PID: 403006 (rpc_test) [D]
+   0: 0x00005600ed472fdf crash_handler::crash_handler::collect_stack_trace(int) at crash_handler.cpp:237
+   1: 0x00005600ed473208 crash_handler::crash_handler::collect_all_thread_stacks(int, int) at crash_handler.cpp:256  
+   2: 0x00005600ed451e5d rpc::service::send(...) at service.cpp:250
+   3: 0x00005600ed228381 rpc::local_service_proxy::send(...) at basic_service_proxies.h:64
+```
+
+**Features**:
+- **Function Names**: Full C++ namespaces and function signatures  
+- **Source Locations**: File names and exact line numbers
+- **Address Information**: Memory addresses for additional debugging
+- **Symbol Demangling**: Readable C++ function names
+
+#### Test Integration
+
+Crash reports automatically identify the running test:
+
+```
+CRASH DETECTED! Signal: 11 (SIGSEGV (Segmentation fault))
+Current Test: remote_type_test/1.multithreaded_bounce_baz_between_two_interfaces
+Thread-Local Logs: Check /tmp/rpc_debug_dumps/ for per-thread message history
+```
+
+### Diagnostic Output
+
+#### Crash Report Structure
+
+When a crash occurs, the system generates:
+
+**1. Console Output**:
+```
+=== DUMPING THREAD-LOCAL CIRCULAR BUFFERS ===
+*** RPC_ASSERT FAILURE ***
+Assert: CRASH SIGNAL: SIGSEGV (Segmentation fault)
+Diagnostic files created in: /tmp/rpc_debug_dumps
+Main report: /tmp/rpc_debug_dumps/crash_report_20250911_171731.txt
+Thread buffers: 101 threads dumped
+=== END THREAD-LOCAL BUFFER DUMP ===
+```
+
+**2. Main Crash Report** (`crash_report_*.txt`):
+```
+RPC++ ASSERT FAILURE DIAGNOSTIC REPORT
+=====================================
+
+Timestamp: 20250911_171731
+Assert Message: CRASH SIGNAL: SIGSEGV (Segmentation fault)  
+Location: /path/to/crash_handler.cpp:112
+Thread Count: 101
+
+=== THREAD BUFFER FILES ===
+Thread 0 (ID: 139677126338240): /tmp/rpc_debug_dumps/thread_0_*.log
+Thread 1 (ID: 139677688387264): /tmp/rpc_debug_dumps/thread_1_*.log
+...
+```
+
+**3. Per-Thread Log Files** (`thread_*_*.log`):
+```
+Thread ID: 139673317918400
+Total entries written: 75
+Buffer size: 10000
+Buffer frozen: true
+
+=== LOG ENTRIES ===
+
+[17:17:31] Level 0: get_or_create_object_proxy service zone: 1 destination_zone=2, caller_zone=1, object_id = 100 
+           (/home/edward/projects/rpc2/rpc/include/rpc/proxy.h:670 in get_or_create_object_proxy)
+[17:17:31] Level 0: inner_add_zone_proxy service zone: 1 destination_zone=97, caller_zone=1 
+           (/home/edward/projects/rpc2/rpc/src/service.cpp:1338 in inner_add_zone_proxy)
+[17:17:31] Level 2: callback 22 
+           (/home/edward/projects/rpc2/tests/common/include/common/foo_impl.h:55 in callback)
+```
+
+### Usage Examples
+
+#### Basic Usage
+
+```cpp
+#include <rpc/thread_local_logger.h>
+#include <rpc/logger.h>
+
+int main() {
+    // Configure the logger
+    rpc::thread_local_logger_config config;
+    config.buffer_size = 5000;
+    config.dump_directory = "/custom/debug/path";
+    
+    auto& manager = rpc::thread_local_logger_manager::get_instance();
+    manager.configure(config);
+    
+    // Normal logging - automatically uses thread-local buffers
+    RPC_INFO("Starting multithreaded operations");
+    
+    // Create threads that perform RPC operations
+    std::vector<std::thread> workers;
+    for (int i = 0; i < 10; ++i) {
+        workers.emplace_back([i]() {
+            RPC_DEBUG("Worker {} starting", i);
+            // ... perform RPC operations ...
+            RPC_DEBUG("Worker {} completed", i);
+        });
+    }
+    
+    for (auto& worker : workers) {
+        worker.join();
+    }
+    
+    return 0;
+}
+```
+
+#### Manual Diagnostic Dumping
+
+```cpp
+// Manually trigger diagnostic dump (useful for testing)
+rpc::thread_local_dump_on_assert("Manual diagnostic dump", __FILE__, __LINE__);
+```
+
+### Debugging Workflow
+
+#### 1. Enable Thread-Local Logging
+```bash
+cmake --preset Debug_multithreaded
+cmake --build build --target rpc_test
+```
+
+#### 2. Run Multithreaded Tests
+```bash
+./build/output/debug/rpc_test -m  # Enable multithreaded tests
+```
+
+#### 3. Analyze Crash Output
+When crashes occur:
+1. **Check console output** for immediate crash context
+2. **Review main crash report** for thread overview
+3. **Examine per-thread logs** for detailed operation histories
+4. **Correlate timestamps** across threads to understand interaction patterns
+
+#### 4. Common Analysis Patterns
+
+**Timeline Reconstruction**:
+- Compare timestamps across multiple thread logs
+- Identify the sequence of operations leading to the crash
+- Look for timing-dependent race conditions
+
+**Resource Management Issues**:
+- Search for `add_ref` and `release` operations
+- Verify proper reference counting patterns  
+- Check for proxy creation/cleanup imbalances
+
+**Zone Communication Problems**:
+- Track inter-zone calls and routing operations
+- Identify zone proxy creation and cleanup patterns
+- Look for destination/caller zone mismatches
+
+### Performance Considerations
+
+#### Memory Usage
+- **Per-thread overhead**: ~40KB per thread (10,000 messages × ~4KB each)
+- **Total system impact**: Scales linearly with thread count
+- **Configurable limits**: Adjust `buffer_size` based on available memory
+
+#### Performance Impact
+- **Minimal runtime overhead**: Atomic operations for thread-safe logging
+- **Zero impact when disabled**: Compile-time elimination with `USE_THREAD_LOCAL_LOGGING=OFF`
+- **Frozen state efficiency**: No performance impact after crash (buffers frozen)
+
+#### Best Practices
+
+**1. Configure Appropriate Buffer Sizes**:
+```cpp
+// For high-volume logging scenarios
+config.buffer_size = 50000;  // More messages per thread
+
+// For memory-constrained environments  
+config.buffer_size = 1000;   // Fewer messages per thread
+```
+
+**2. Selective Enabling**:
+- Enable only for debugging multithreaded issues
+- Disable in production builds for optimal performance
+- Use preset configurations for consistent setups
+
+**3. Log Analysis Tools**:
+- Use grep/awk to correlate timestamps across thread logs
+- Search for specific operation patterns (e.g., "add_ref", "service::send")
+- Create scripts to visualize thread interaction timelines
+
+### Security Considerations
+
+#### Enclave Compatibility
+- **Disabled in enclaves**: `!defined(_IN_ENCLAVE)` condition prevents activation
+- **Host-only feature**: Thread-local logging only works in trusted host environments
+- **Secure by design**: No sensitive data exposed through logging paths
+
+#### File System Access
+- **Configurable dump directory**: Choose appropriate secure locations
+- **File permissions**: Diagnostic files created with standard user permissions
+- **Temporary data**: Consider using tmpfs for sensitive debugging scenarios
 
 ---
 

@@ -39,7 +39,7 @@ public:
     rpc::shared_ptr<yyy::i_host> get_local_host_ptr() { return local_host_ptr_.lock(); }
     bool get_use_host_in_child() const { return use_host_in_child_; }
 
-    virtual void SetUp()
+    virtual void set_up()
     {
         zone_gen = &zone_gen_;
         auto test_info = ::testing::UnitTest::GetInstance()->current_test_info();
@@ -52,7 +52,7 @@ public:
         i_example_ptr_ = rpc::shared_ptr<yyy::i_example>(new marshalled_tests::example(nullptr, use_host_in_child_ ? i_host_ptr_ : nullptr));
     }
 
-    virtual void TearDown()
+    virtual void tear_down()
     {
         i_host_ptr_ = nullptr;
         i_example_ptr_ = nullptr;

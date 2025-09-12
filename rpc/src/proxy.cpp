@@ -45,7 +45,7 @@ namespace rpc
         }
 #endif
 
-        // Handle inherited references from race conditions by passing the count to on_object_proxy_released
+        // Handle additional references inherited from concurrent proxy destruction
         int inherited_count = inherited_reference_count_.load();
 #ifdef USE_RPC_LOGGING
         if (inherited_count > 0)

@@ -45,7 +45,7 @@ public:
     rpc::shared_ptr<yyy::i_host> get_host() const { return i_host_ptr_; }
     bool get_use_host_in_child() const { return use_host_in_child_; }
 
-    virtual void SetUp()
+    virtual void set_up()
     {
         zone_gen = &zone_gen_;
         auto test_info = ::testing::UnitTest::GetInstance()->current_test_info();
@@ -71,7 +71,7 @@ public:
         ASSERT_ERROR_CODE(err_code);
     }
 
-    virtual void TearDown()
+    virtual void tear_down()
     {
         i_example_ptr_ = nullptr;
         i_host_ptr_ = nullptr;

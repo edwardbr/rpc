@@ -68,6 +68,11 @@ add_library(
   src/error_codes.cpp
   src/version.cpp)
 
+# Conditionally add thread-local logger implementation
+if(USE_THREAD_LOCAL_LOGGING)
+  target_sources(rpc_host PRIVATE src/thread_local_logger.cpp)
+endif()
+
 target_compile_definitions(rpc_host PRIVATE ${HOST_DEFINES})
 
 target_include_directories(

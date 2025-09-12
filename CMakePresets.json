@@ -26,8 +26,9 @@
         "SGX_HW": "OFF",
         "SGX_MODE": "debug",
         "USE_RPC_LOGGING": "OFF",
-        "USE_RPC_TELEMETRY": "ON",
-        "USE_CONSOLE_TELEMETRY": "ON"
+        "USE_RPC_TELEMETRY": "OFF",
+        "USE_CONSOLE_TELEMETRY": "OFF",
+        "USE_THREAD_LOCAL_LOGGING": "OFF"
         // "LIBCORO_BUILD_EXAMPLES": "ON",
         // "LIBCORO_BUILD_TESTS": "ON",
         // "LIBCORO_FEATURE_NETWORKING": "ON",
@@ -42,6 +43,28 @@
       "cacheVariables": {
         "BUILD_TYPE": "debug",
         "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "Debug_multithreaded",
+      "inherits": "Base",
+      "cacheVariables": {
+        "BUILD_TYPE": "debug",
+        "CMAKE_BUILD_TYPE": "Debug",
+        "USE_RPC_TELEMETRY": "ON",
+        "USE_THREAD_LOCAL_LOGGING": "ON",
+        "USE_CONSOLE_TELEMETRY": "ON"
+      }
+    },
+    {
+      "name": "Debug_multithreaded_hang",
+      "inherits": "Base",
+      "cacheVariables": {
+        "BUILD_TYPE": "debug",
+        "CMAKE_BUILD_TYPE": "Debug",
+        // "USE_RPC_TELEMETRY": "ON",
+        // "USE_THREAD_LOCAL_LOGGING": "ON",
+        "RPC_HANG_ON_FAILED_ASSERT": "OFF"
       }
     },
     {
