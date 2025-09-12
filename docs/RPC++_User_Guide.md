@@ -455,20 +455,38 @@ RPC_CRITICAL("Reference counting inconsistency detected");
 #endif
 ```
 
-### Enhanced Crash Handler Integration
+### Advanced Crash Handler System
 
-#### Automatic Buffer Dumping
+RPC++ includes a production-grade crash handler system with comprehensive multi-threaded debugging capabilities.
 
-When any signal occurs (SIGSEGV, SIGABRT, etc.), the crash handler automatically:
+#### Core Architecture
 
-1. **Freezes All Buffers**: Prevents any further logging to preserve crash state
-2. **Dumps Comprehensive Diagnostics**: Creates detailed crash reports with per-thread message histories
-3. **Provides Stack Traces**: Enhanced symbol resolution with function names and line numbers
-4. **Identifies Test Context**: Shows exactly which gtest test was running
+The crash handler provides:
+
+1. **Multi-Threaded Stack Trace Collection**: Collects stack traces from all threads during crashes
+2. **Advanced Symbol Resolution**: Uses both `backtrace_symbols` and `addr2line` for maximum symbol information
+3. **Pattern Detection**: Recognizes RPC-specific crash patterns and threading issues
+4. **Crash Dump Generation**: Automatically saves detailed crash reports to disk
+5. **Signal Safety**: Handles multiple signal types (SIGSEGV, SIGABRT, SIGFPE, etc.)
+
+#### Configuration
+
+```cpp
+crash_handler::crash_handler::Config config;
+config.enable_multithreaded_traces = true;   // Thread enumeration
+config.enable_symbol_resolution = true;      // addr2line integration  
+config.enable_threading_debug_info = true;   // RPC debug stats
+config.enable_pattern_detection = true;      // Crash pattern analysis
+config.max_stack_frames = 64;                // Stack depth limit
+config.save_crash_dump = true;               // Automatic dump files
+config.crash_dump_path = "/tmp";             // Dump location
+
+crash_handler::crash_handler::initialize(config);
+```
 
 #### Enhanced Stack Traces
 
-The crash handler now provides detailed symbolic information:
+The crash handler provides detailed symbolic information:
 
 ```
 Thread 1/50 - PID: 403006 (rpc_test) [D]
@@ -483,6 +501,37 @@ Thread 1/50 - PID: 403006 (rpc_test) [D]
 - **Source Locations**: File names and exact line numbers
 - **Address Information**: Memory addresses for additional debugging
 - **Symbol Demangling**: Readable C++ function names
+
+#### Automatic Buffer Dumping
+
+When any signal occurs (SIGSEGV, SIGABRT, etc.), the crash handler automatically:
+
+1. **Freezes All Buffers**: Prevents any further logging to preserve crash state
+2. **Dumps Comprehensive Diagnostics**: Creates detailed crash reports with per-thread message histories
+3. **Provides Stack Traces**: Enhanced symbol resolution with function names and line numbers
+4. **Identifies Test Context**: Shows exactly which gtest test was running
+
+#### RPC-Specific Pattern Detection
+
+The system recognizes common RPC crash patterns:
+
+- **"on_object_proxy_released"**: Proxy cleanup crashes
+- **"unable to find object"**: Object lifecycle issues
+- **"remove_zone_proxy"**: Zone management race conditions
+- **"threading_debug"**: Threading debug assertions
+- **"mutex"/"lock"**: Synchronization crashes
+
+#### Custom Analysis Callbacks
+
+```cpp
+crash_handler::crash_handler::set_analysis_callback(
+    [](const auto& report) {
+        // Custom RPC-specific crash analysis
+        // Integration with logging systems
+        // Automated bug reporting
+    }
+);
+```
 
 #### Test Integration
 

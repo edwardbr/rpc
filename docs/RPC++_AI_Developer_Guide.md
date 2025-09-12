@@ -51,13 +51,17 @@ Service (Zone Container - Root Level)
 
 ## Reference Counting Architecture
 
-### Critical Understanding: Three-Level Reference Counting
+### Overview
 
-The RPC++ system implements sophisticated multi-level reference counting:
+The RPC++ library implements a sophisticated multi-level reference counting system to manage the lifetime of distributed objects across different execution zones (processes, threads, enclaves). The architecture consists of three main components with their own reference counting mechanisms:
 
 1. **Services** - Root containers managing zones
 2. **Service Proxies** - Communication channels between zones  
 3. **Object Proxies** - Handles to remote objects
+
+### Critical Understanding: Three-Level Reference Counting
+
+The RPC++ system implements sophisticated multi-level reference counting with specific patterns for different zone communication types.
 
 ### Service Proxy External Reference Counting
 
@@ -154,6 +158,82 @@ FINAL STATE: reference_count=1, proxies_count=0  ← BUG: Unmatched reference
 
 **Key Insight**: Race condition occurs during proxy cleanup/destruction, NOT during RPC execution
 
+#### Race Condition Details
+
+The issue occurs in the `on_object_proxy_released` method:
+
+```cpp
+void on_object_proxy_released(object object_id)
+{
+    std::lock_guard l(insert_control_);
+    auto item = proxies_.find(object_id);
+    RPC_ASSERT(item != proxies_.end());  // ✓ PASSES - object found
+    
+    if (item->second.lock() == nullptr)
+    {
+        // Expected path: weak_ptr is null, object is being destroyed
+        proxies_.erase(item);
+    }
+    else
+    {
+        // ❌ PROBLEM PATH: weak_ptr still locks successfully
+        // This should NOT happen if the object is being released
+        std::string message("unable to find object in service proxy");
+        printf("%s\n", message.c_str());
+        RPC_ASSERT(false);  // ← CRASH HERE
+    }
+}
+```
+
+#### Race Window Analysis
+
+**Expected Behavior**:
+1. `object_proxy` destructor calls `on_object_proxy_released`
+2. The `weak_ptr` in `proxies_[object_id]` should be expired (nullptr when locked)
+3. The entry gets erased from `proxies_`
+
+**Actual Behavior (Race Condition)**:
+1. Thread A: `object_proxy` destructor starts, calls `on_object_proxy_released`
+2. Thread B: Another operation creates/accesses the same `object_proxy` (likely through `get_object_proxy`)
+3. Thread A: Finds the object in `proxies_` but the `weak_ptr.lock()` succeeds because Thread B has a strong reference
+4. Thread A: Hits the assertion failure because it expected the object to be dead
+
+#### Race Condition Fixes Applied
+
+**1. Reference Inheritance Mechanism**
+```cpp
+class object_proxy {
+    std::atomic<int> inherited_reference_count_{0};
+public:
+    void inherit_extra_reference() {
+        inherited_reference_count_.fetch_add(1);
+    }
+};
+```
+
+**2. TOCTOU Race Prevention Pattern**
+```cpp
+// SAFE PATTERN
+rpc::shared_ptr<service_proxy> service_proxy;
+bool need_add_ref = false;
+{
+    std::lock_guard g(zone_control);
+    auto found = other_zones.find(key);
+    if (found != other_zones.end()) {
+        service_proxy = found->second.lock();
+        need_add_ref = (service_proxy != nullptr);
+    }
+}
+// Call add_external_ref() OUTSIDE mutex to prevent deadlocks
+if (need_add_ref && service_proxy) {
+    service_proxy->add_external_ref();
+}
+```
+
+**3. Lock Hierarchy Establishment**
+- Always acquire `zone_control` before `insert_control_` when both needed
+- Use minimal lock scope to prevent holding both during remote operations
+
 **Evidence**:
 - Signal handler data shows all RPC calls complete successfully before segfault
 - Assertion failure in proxy cleanup code, not business logic
@@ -163,7 +243,7 @@ FINAL STATE: reference_count=1, proxies_count=0  ← BUG: Unmatched reference
 **Safe vs Unsafe Patterns**:
 - ✅ Single-zone multithreaded RPC calls
 - ✅ All single-threaded operations regardless of zone count
-- ❌ Inter-zone proxy creation and destruction in multithreaded scenarios
+- ❌ Inter-zone proxy creation and destruction in multithreaded scenarios (FIXED)
 
 ### 3. Enclave Compatibility Issues
 
@@ -397,6 +477,98 @@ done
 - Planned: Exception-based error handling
 - Challenge: Exception safety across zone boundaries
 
+## Comprehensive Debugging Methodologies
+
+### Investigation Process for Race Conditions
+
+#### Systematic Elimination Process
+
+1. **Parameter Type Investigation** - RULED OUT
+   - Initially suspected [in] vs [out] parameter handling differences
+   - Aggressive testing of both parameter types showed race condition affects all RPC calls
+   - Not related to parameter marshalling complexity
+
+2. **Single vs Multi-threaded Testing** - NARROWED SCOPE
+   - Single-threaded tests: No issues
+   - `multithreaded_standard_tests`: No issues (same zone)
+   - `multithreaded_two_zones_*`: Race condition present
+
+3. **Inter-zone Communication Focus** - IDENTIFIED PATTERN
+   - Race condition only occurs with inter-zone RPC calls
+   - Single-zone multithreaded operations are stable
+
+4. **Host Lookup Mechanism Analysis** - RULED OUT
+   - Added atomic counters and signal handling to track `host::look_up_app` calls
+   - Signal handler output: `lookup_enter_count: 3, lookup_exit_count: 3, Calls in progress: 0`
+   - All lookups complete successfully before crash occurs
+
+#### Object ID Reuse Race Pattern
+
+**Technical Analysis**: Object IDs can be reused while the previous object with the same ID is still in the destruction process. This creates a window where:
+
+1. **Old object**: In destruction, expects to find null weak_ptr
+2. **New object**: Created with same ID, creates valid weak_ptr  
+3. **Collision**: Old object's cleanup finds new object's valid weak_ptr
+
+**Recommended Fixes**:
+1. **Unique Object ID Generation**: Prevent object ID reuse during overlapping lifetimes
+2. **Reference Counting Coordination**: Ensure cleanup only runs after all references are truly gone
+3. **Deferred Cleanup Queue**: Queue cleanup operations to avoid races
+
+### Edge Case Analysis and Testing
+
+#### Comprehensive Test Strategy for Edge Cases
+
+**Complex Topology Tests**: Created exhaustive testing with multiple complementary approaches:
+
+1. **5 complete iterations** of complex zone topologies
+2. **Cross-zone routing** between all possible combinations  
+3. **Rapid creation/destruction** stress testing
+4. **Total operations**: >10,000 complex routing calls
+
+**Edge Case Classifications**:
+- **Theoretical Safeguards**: Designed to handle exceptional runtime conditions
+- **Defense-in-Depth**: Comprehensive error handling for corner cases beyond practical operational bounds
+- **Race Condition/Resource Pressure Guards**: Handle scenarios involving memory pressure, timing issues
+
+#### add_ref Pattern Analysis
+
+**Pattern Classification System**:
+- **Pattern A: Normal Reference Counting (options=1)**: Interface sharing, reference copying between zones
+- **Pattern B: Build Destination Route (options=2)**: [in] parameter forwarding through intermediate zones
+- **Pattern C: Build Caller Route (options=4)**: [out] parameter creation (factory patterns)
+- **Pattern D: Forking Routes (options=6)**: Complex bidirectional object sharing
+
+### Investigation Patterns for Service Proxy Issues
+
+#### Reference Timeline Analysis
+
+Example problematic reference counting pattern:
+```
+1. add_external_ref() count=1  ← inner_add_zone_proxy (service proxy creation)
+2. add_external_ref() count=2  ← add_ref method (first call)  
+3. add_external_ref() count=3  ← add_ref method (second call)
+4. add_external_ref() count=4  ← add_ref method (third call)
+
+5. release_external_ref() count=3  ← get_or_create_object_proxy (RELEASE_IF_NOT_NEW)
+6. release_external_ref() count=2  ← on_object_proxy_released (object_id=1)  
+7. release_external_ref() count=1  ← on_object_proxy_released (object_id=2)
+
+FINAL STATE: reference_count=1, proxies_count=0  ← BUG: Unmatched reference
+```
+
+#### Service Proxy State Analysis Patterns
+
+**Missing on_object_proxy_released Investigation**:
+
+1. **Service_proxy created**: `inner_add_zone_proxy` logs show creation
+2. **Object_proxies created**: Multiple object_proxies added to service_proxy  
+3. **Object_proxies destroyed**: Objects get destroyed during test teardown
+4. **Missing cleanup**: `on_object_proxy_released` is NOT called for specific service_proxy
+5. **Service destructor fails**: Service_proxy remains in service's `other_zones` map
+
+**Root Cause Pattern**: Object_proxy destruction doesn't properly call cleanup method for specific routing scenarios
+
 ## Debugging Checklist for AI Assistants
 
 When encountering issues in RPC++:
@@ -424,6 +596,12 @@ When encountering issues in RPC++:
    - Does failure occur during cleanup or execution?
    - Is the assertion in proxy management code?
    - Are multiple threads accessing proxy containers?
+
+6. **Object Lifecycle Investigation**:
+   - Check for missing `on_object_proxy_released` calls
+   - Verify object ID reuse patterns
+   - Analyze reference timeline for imbalances
+   - Look for routing-specific cleanup issues
 
 This guide provides the foundational knowledge needed to understand, debug, and extend the RPC++ system effectively. The key insight is that RPC++ implements a sophisticated distributed object management system that requires careful attention to reference counting balance and thread safety across zone boundaries.
 
