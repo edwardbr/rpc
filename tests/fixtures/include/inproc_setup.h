@@ -1,5 +1,5 @@
 /*
- *   Copyright (c) 2024 Edward Boggis-Rolfe
+ *   Copyright (c) 2025 Edward Boggis-Rolfe
  *   All rights reserved.
  */
 
@@ -13,7 +13,7 @@
 #include <common/tests.h>
 
 #ifdef USE_RPC_TELEMETRY
-#include <rpc/telemetry/host_telemetry_service.h>
+#include <rpc/telemetry/i_telemetry_service.h>
 #endif
 
 template<bool UseHostInChild, bool RunStandardTests, bool CreateNewZoneThenCreateSubordinatedZone> class inproc_setup
@@ -157,6 +157,8 @@ public:
         CoroTearDown();        
 #endif        
         root_service_ = nullptr;
+        current_host_service.reset();
+        test_service_logger::reset_logger();
         zone_gen = nullptr;
 #ifdef USE_RPC_TELEMETRY
         RESET_TELEMETRY_SERVICE

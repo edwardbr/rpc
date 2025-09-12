@@ -1,3 +1,8 @@
+#[[
+   Copyright (c) 2025 Edward Boggis-Rolfe
+   All rights reserved.
+]]
+
 # formatted using cmake-format
 cmake_minimum_required(VERSION 3.24)
 
@@ -37,6 +42,7 @@ if(NOT DEPENDENCIES_LOADED)
   option(FORCE_DEBUG_INFORMATION "force inclusion of debug information" ON)
 
   option(USE_RPC_LOGGING "turn on rpc logging" OFF)
+  option(USE_THREAD_LOCAL_LOGGING "turn on thread-local circular buffer logging for debugging" OFF)
   option(RPC_HANG_ON_FAILED_ASSERT "hang on failed assert" OFF)
   option(USE_RPC_TELEMETRY "turn on rpc telemetry" OFF)
   option(USE_CONSOLE_TELEMETRY "turn on rpc telemetry" OFF)  
@@ -151,6 +157,12 @@ if(NOT DEPENDENCIES_LOADED)
     set(USE_RPC_LOGGING_FLAG)
   endif()
 
+  if(USE_THREAD_LOCAL_LOGGING)
+    set(USE_THREAD_LOCAL_LOGGING_FLAG USE_THREAD_LOCAL_LOGGING)
+  else()
+    set(USE_THREAD_LOCAL_LOGGING_FLAG)
+  endif()
+
   if(RPC_HANG_ON_FAILED_ASSERT)
     set(RPC_HANG_ON_FAILED_ASSERT_FLAG RPC_HANG_ON_FAILED_ASSERT)
   else()
@@ -175,8 +187,23 @@ if(NOT DEPENDENCIES_LOADED)
     set(USE_RPC_TELEMETRY_RAII_LOGGING_FLAG)
   endif()
 
+  set(RPC_ENCLAVE_FMT_LIB)
+  set(RPC_HOST_FMT_LIB)
+  if(USE_RPC_LOGGING)
+    set(RPC_HOST_FMT_LIB fmt::fmt-header-only)
+  endif()
+  if(USE_THREAD_LOCAL_LOGGING)
+    set(RPC_HOST_FMT_LIB fmt::fmt-header-only)
+  endif()
+
   if(BUILD_ENCLAVE)
     set(BUILD_ENCLAVE_FLAG BUILD_ENCLAVE)
+    if(USE_RPC_LOGGING)
+      set(RPC_ENCLAVE_FMT_LIB fmt::fmt-header-only)
+    endif()
+    if(USE_THREAD_LOCAL_LOGGING)
+      set(RPC_ENCLAVE_FMT_LIB fmt::fmt-header-only)
+    endif()
   else()
     set(BUILD_ENCLAVE_FLAG)
   endif()
@@ -201,6 +228,7 @@ if(NOT DEPENDENCIES_LOADED)
       NOMINMAX
       _SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS
       ${USE_RPC_LOGGING_FLAG}
+      ${USE_THREAD_LOCAL_LOGGING_FLAG}
       ${BUILD_ENCLAVE_FLAG}
       ${BUILD_COROUTINE_FLAG}
       ${RPC_HANG_ON_FAILED_ASSERT_FLAG}

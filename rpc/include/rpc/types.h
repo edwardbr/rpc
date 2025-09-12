@@ -1,5 +1,5 @@
 /*
- *   Copyright (c) 2024 Edward Boggis-Rolfe
+ *   Copyright (c) 2025 Edward Boggis-Rolfe
  *   All rights reserved.
  */
 #pragma once
@@ -59,13 +59,18 @@ namespace rpc
     //a zone that channels calls from a caller
     struct CallerChannelZoneId{};
 
+    // the zone that made the add_ref request (provides authoritative routing context)
+    struct KnownDirectionZoneId
+    {
+    };
+
     struct zone;
     struct destination_zone;
     struct destination_channel_zone;
     struct operating_zone;
     struct caller_zone;
     struct caller_channel_zone;
-    struct caller_channel_zone;
+    struct known_direction_zone;
 
 
     struct zone : public type_id<ZoneId>
@@ -109,6 +114,7 @@ namespace rpc
         type_id<CallerChannelZoneId> as_caller_channel() const {return {id};}   
         type_id<DestinationZoneId> as_destination() const {return {id};}     //this one is wierd, its for cloning service proxies
         type_id<DestinationChannelZoneId> as_destination_channel() const {return {id};}   
+        type_id<KnownDirectionZoneId> as_known_direction_channel() const { return {id}; }
     };
 
     //the zone that initiated the call
@@ -121,6 +127,27 @@ namespace rpc
         type_id<DestinationChannelZoneId> as_destination_channel() const {return {id};}  
     };
 
+    // the zone that made the add_ref request (provides authoritative routing context)
+    struct known_direction_zone : public type_id<KnownDirectionZoneId>
+    {
+        known_direction_zone() = default;
+        known_direction_zone(const type_id<KnownDirectionZoneId>& other)
+            : type_id<KnownDirectionZoneId>(other)
+        {
+        }
+        
+        // Construct from any zone type
+        known_direction_zone(const zone& zone_id) : type_id<KnownDirectionZoneId>(zone_id.id) {}
+        known_direction_zone(const destination_zone& zone_id) : type_id<KnownDirectionZoneId>(zone_id.id) {}
+        known_direction_zone(const caller_zone& zone_id) : type_id<KnownDirectionZoneId>(zone_id.id) {}
+
+        // Indicates this requester has first-hand knowledge of the reference origin
+        bool is_authoritative() const { return id != 0; }
+        
+        // Convert to other zone types for routing purposes  
+        type_id<DestinationZoneId> as_destination() const { return {id}; }
+        type_id<ZoneId> as_zone() const { return {id}; }
+    };
 
     //an id for objects unique to each zone
     struct ObjectId{};
@@ -153,7 +180,7 @@ namespace rpc
         method id;
         uint64_t tag;
         bool marshalls_interfaces;
-        std::string mcp_description;
+        std::string description;
         std::string in_json_schema;
         std::string out_json_schema;
     };
@@ -217,8 +244,12 @@ struct std::hash<rpc::caller_channel_zone>
     }
 };
 
-template<>
-struct std::hash<rpc::interface_ordinal> 
+template<> struct std::hash<rpc::known_direction_zone>
+{
+    auto operator()(const rpc::known_direction_zone& item) const noexcept { return (std::size_t)item.id; }
+};
+
+template<> struct std::hash<rpc::interface_ordinal>
 {
     auto operator() (const rpc::interface_ordinal& item) const noexcept 
     {

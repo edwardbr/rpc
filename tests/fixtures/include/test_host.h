@@ -1,5 +1,5 @@
 /*
- *   Copyright (c) 2024 Edward Boggis-Rolfe
+ *   Copyright (c) 2025 Edward Boggis-Rolfe
  *   All rights reserved.
  */
 
@@ -21,7 +21,7 @@
 #include "test_globals.h"
 
 #ifdef USE_RPC_TELEMETRY
-#include <rpc/telemetry/host_telemetry_service.h>
+#include <rpc/telemetry/i_telemetry_service.h>
 #endif
 
 class host : public yyy::i_host, public rpc::enable_shared_from_this<host>

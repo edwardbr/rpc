@@ -11,11 +11,6 @@ message("marshal_test_enclave")
 
 if(${BUILD_ENCLAVE})
 
-  if(USE_RPC_TELEMETRY)
-    set(TELEMETRY_ENCLAVE_EDL rpc_telemetry_edl_header_enclave)
-    set(RPC_TELEMETRY_ENCLAVE rpc_telemetry_enclave)
-  endif()
-
   add_enclave_library(
     marshal_test_enclave
     SRCS marshal_test_enclave.cpp
@@ -23,8 +18,8 @@ if(${BUILD_ENCLAVE})
     TRUSTED_LIBS
       rpc_enclave
       marshal_test_edl_enclave
-      ${RPC_TELEMETRY_ENCLAVE}
-      ${TELEMETRY_ENCLAVE_EDL}
+      ${RPC_ENCLAVE_TELEMETRY}
+      ${RPC_TELEMETRY_ENCLAVE_EDL}
       common_enclave
       example_import_idl_enclave
       example_idl_enclave

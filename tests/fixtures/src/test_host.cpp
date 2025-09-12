@@ -1,5 +1,5 @@
 /*
- *   Copyright (c) 2024 Edward Boggis-Rolfe
+ *   Copyright (c) 2025 Edward Boggis-Rolfe
  *   All rights reserved.
  */
 
@@ -34,6 +34,7 @@ CORO_TASK(error_code) host::create_enclave(rpc::shared_ptr<yyy::i_example>& targ
 
     CO_RETURN err_code;
 #endif
+    RPC_ERROR("Incompatible service - enclave not built");
     CO_RETURN rpc::error::INCOMPATIBLE_SERVICE();
 };
 

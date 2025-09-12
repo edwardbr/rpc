@@ -1,5 +1,5 @@
 /*
- *   Copyright (c) 2024 Edward Boggis-Rolfe
+ *   Copyright (c) 2025 Edward Boggis-Rolfe
  *   All rights reserved.
  */
 
@@ -12,7 +12,7 @@
 #include <common/foo_impl.h>
 
 #ifdef USE_RPC_TELEMETRY
-#include <rpc/telemetry/host_telemetry_service.h>
+#include <rpc/telemetry/i_telemetry_service.h>
 #endif
 
 template<bool UseHostInChild> class in_memory_setup
@@ -56,7 +56,7 @@ public:
         CO_RETURN;
     }
 
-    virtual void SetUp()
+    virtual void set_up()
     {
 #ifdef BUILD_COROUTINE        
         io_scheduler_ = coro::io_scheduler::make_shared(
@@ -78,7 +78,7 @@ public:
             new marshalled_tests::example(nullptr, use_host_in_child_ ? i_host_ptr_ : nullptr));
     }
 
-    virtual void TearDown()
+    virtual void tear_down()
     {
         i_host_ptr_ = nullptr;
         i_example_ptr_ = nullptr;

@@ -1,9 +1,11 @@
 #[[
-   Copyright (c) 2024 Edward Boggis-Rolfe
+   Copyright (c) 2025 Edward Boggis-Rolfe
    All rights reserved.
 ]]
 
 cmake_minimum_required(VERSION 3.24)
+
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 
 project(
   rpc
@@ -36,6 +38,19 @@ if(RPC_STANDALONE)
 
   add_subdirectory(submodules)
 endif()
+
+if(USE_RPC_TELEMETRY)
+  set(RPC_ENCLAVE_TELEMETRY rpc::rpc_telemetry_enclave)
+  set(RPC_TELEMETRY_ENCLAVE_EDL rpc_telemetry_edl_header_enclave)
+  set(RPC_HOST_TELEMETRY rpc::rpc_telemetry_host)
+  set(RPC_TELEMETRY_INTERFACE rpc::rpc_telemetry_interface)
+else()
+  set(RPC_ENCLAVE_TELEMETRY)
+  set(RPC_TELEMETRY_ENCLAVE_EDL)
+  set(RPC_HOST_TELEMETRY)
+  set(RPC_TELEMETRY_INTERFACE)
+endif()
+
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 include(FindRPCGenerator)

@@ -30,20 +30,23 @@ enclave {
             uint64_t object_id,                                 // rpc object index
             uint64_t interface_id                               // interface to be called
         );
-        public uint64_t add_ref_enclave(
+        public int add_ref_enclave(
             uint64_t protocol_version,                          // version of the rpc call protocol
             uint64_t destination_channel_zone_id,               // the channel where the add ref should be going to
             uint64_t destination_zone_id,                       // zone where the call is going to
             uint64_t object_id,                                 // rpc object index
-            uint64_t caller_channel_zone_id,                    // last zone where the call came from
+            uint64_t caller_channel_zone_id,                    // last zone where the call came from may be different if build_out_param_channel == build_destination_route or build_caller_route
             uint64_t caller_zone_id,                            // the original zone where the call came from
-            char build_out_param_channel                        // an rpc add_ref_options flag
+            uint64_t known_direction_zone_id,                         // the last zone where the call came from,
+            char build_out_param_channel,                       // an rpc add_ref_options flag
+            [out] uint64_t* reference_count                     // reference count output
         );
-        public uint64_t release_enclave(
+        public int release_enclave(
             uint64_t protocol_version,                          // version of the rpc call protocol
             uint64_t destination_zone_id,                       // zone where the call is going to
             uint64_t object_id,                                 // rpc object index
-            uint64_t caller_zone_id                             // the original zone where the call came from
+            uint64_t caller_zone_id,                            // the original zone where the call came from
+            [out] uint64_t* reference_count                     // reference count output
         );
     };
 
@@ -74,25 +77,28 @@ enclave {
             );
 
         // for adding reference count
-        uint64_t add_ref_host(
+        int add_ref_host(
             uint64_t protocol_version,                          // version of the rpc call protocol
             uint64_t destination_channel_zone_id,               // the channel where the add ref should be going to
             uint64_t destination_zone_id,                       // zone where the call is going to
             uint64_t object_id,                                 // rpc object index
-            uint64_t caller_channel_zone_id,                    // last zone where the call came from
+            uint64_t caller_channel_zone_id,                    // last zone where the call came from may be different if build_out_param_channel == build_destination_route or build_caller_route
             uint64_t caller_zone_id,                            // the original zone where the call came from,
-            char build_out_param_channel                        // an rpc add_ref_options flag
+            uint64_t known_direction_zone_id,                         // the last zone where the call came from,
+            char build_out_param_channel,                       // an rpc add_ref_options flag
+            [out] uint64_t* reference_count                     // reference count output
             );
 
         // for decrementing reference counts
-        uint64_t release_host(
+        int release_host(
             uint64_t protocol_version,                          // version of the rpc call protocol
             uint64_t destination_zone_id,                       // zone where the call is going to
             uint64_t object_id,                                 // rpc object index
-            uint64_t caller_zone_id                             // the original zone where the call came from
+            uint64_t caller_zone_id,                            // the original zone where the call came from
+            [out] uint64_t* reference_count                     // reference count output
             );
 
-        void rpc_log([in, size=sz] const char* str, size_t sz);
+        void rpc_log(int level, [in, size=sz] const char* str, size_t sz);
         void hang();
     };
 };

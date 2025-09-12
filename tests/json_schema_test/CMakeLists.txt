@@ -3,16 +3,16 @@
    All rights reserved.
 ]]
 
-# MCP Integration Tests - consolidated into single test executable
+# JSON Schema Generation Tests - consolidated into single test executable
 
-# Single consolidated MCP metadata test
-add_executable(mcp_metadata_test mcp_metadata_test.cpp i_foo_schema_validation_test.cpp ../fixtures/src/rpc_log.cpp)
+# Single consolidated JSON schema metadata test
+add_executable(json_schema_metadata_test json_schema_metadata_test.cpp i_foo_schema_validation_test.cpp ../fixtures/src/rpc_log.cpp)
 
 # Add compile definitions like test_host
-target_compile_definitions(mcp_metadata_test PRIVATE ${HOST_DEFINES})
+target_compile_definitions(json_schema_metadata_test PRIVATE ${HOST_DEFINES})
 
 # Add include directories to match test_host structure
-target_include_directories(mcp_metadata_test
+target_include_directories(json_schema_metadata_test
     PUBLIC "$<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/generated/include>"
     "$<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/generated/src>"
     PRIVATE ${HOST_INCLUDES}
@@ -23,7 +23,7 @@ if(BUILD_ENCLAVE)
 endif()
 
 # Link with libraries similar to test_host
-target_link_libraries(mcp_metadata_test
+target_link_libraries(json_schema_metadata_test
     PUBLIC
     common_host
     example_idl_host
@@ -31,7 +31,7 @@ target_link_libraries(mcp_metadata_test
     example_shared_idl_host
     rpc::rpc_host
     yas_common
-    fmt::fmt
+    fmt::fmt-header-only
     GTest::gtest_main
     GTest::gmock_main
     spdlog::spdlog
@@ -43,17 +43,17 @@ target_link_libraries(mcp_metadata_test
 )
 
 # Add compile options and link options like test_host
-target_compile_options(mcp_metadata_test PRIVATE ${HOST_COMPILE_OPTIONS} ${WARN_OK})
-target_link_options(mcp_metadata_test PRIVATE ${HOST_LINK_EXE_OPTIONS})
-target_link_directories(mcp_metadata_test PUBLIC ${SGX_LIBRARY_PATH})
-set_property(TARGET mcp_metadata_test PROPERTY COMPILE_PDB_NAME mcp_metadata_test)
+target_compile_options(json_schema_metadata_test PRIVATE ${HOST_COMPILE_OPTIONS} ${WARN_OK})
+target_link_options(json_schema_metadata_test PRIVATE ${HOST_LINK_EXE_OPTIONS})
+target_link_directories(json_schema_metadata_test PUBLIC ${SGX_LIBRARY_PATH})
+set_property(TARGET json_schema_metadata_test PROPERTY COMPILE_PDB_NAME json_schema_metadata_test)
 
 if(ENABLE_CLANG_TIDY)
-    set_target_properties(mcp_metadata_test PROPERTIES CXX_CLANG_TIDY "${CLANG_TIDY_COMMAND}")
+    set_target_properties(json_schema_metadata_test PROPERTIES CXX_CLANG_TIDY "${CLANG_TIDY_COMMAND}")
 endif()
 
 # Add to tests if CTest is enabled - using gtest_discover_tests
 if(BUILD_TEST)
     include(GoogleTest)
-    gtest_discover_tests(mcp_metadata_test)
+    gtest_discover_tests(json_schema_metadata_test)
 endif()

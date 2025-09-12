@@ -31,12 +31,14 @@ target_link_libraries(
   test_fixtures
   yas_common
   rpc::rpc_host
+  yas_common
   args::args
-  fmt::fmt
+  fmt::fmt-header-only
   GTest::gtest_main
   GTest::gmock_main
   spdlog::spdlog
   libcoro
+  ${RPC_HOST_FMT_LIB}
   ${ENCLAVE_DEPENDANCIES}
   ${HOST_LIBRARIES})
 

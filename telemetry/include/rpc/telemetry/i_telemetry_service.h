@@ -8,6 +8,10 @@
 #include <filesystem>
 #endif
 
+#if defined(USE_THREAD_LOCAL_LOGGING) && !defined(_IN_ENCLAVE)
+#include <rpc/thread_local_logger.h>
+#endif
+
 // copied from spdlog
 #define I_TELEMETRY_LEVEL_DEBUG 0
 #define I_TELEMETRY_LEVEL_TRACE 1
@@ -35,7 +39,7 @@ namespace rpc
         };
         virtual ~i_telemetry_service() = default;
 
-        virtual void on_service_creation(const char* name, zone zone_id) const = 0;
+        virtual void on_service_creation(const char* name, rpc::zone zone_id, rpc::destination_zone parent_zone_id) const = 0;
         virtual void on_service_deletion(zone zone_id) const = 0;
         virtual void on_service_try_cast(zone zone_id,
             destination_zone destination_zone_id,
@@ -151,6 +155,15 @@ namespace rpc
         virtual void message(level_enum level, const char* message) const = 0;
     };
 
+#if defined(USE_THREAD_LOCAL_LOGGING) && !defined(_IN_ENCLAVE)
+    // Helper function to log telemetry messages to circular buffers
+    inline void telemetry_to_thread_local_buffer(i_telemetry_service::level_enum level, const std::string& message) {
+        // Map telemetry levels to RPC logging levels
+        int rpc_level = static_cast<int>(level);
+        rpc::thread_local_log(rpc_level, "[TELEMETRY] " + message, __FILE__, __LINE__, __FUNCTION__);
+    }
+#endif
+
     // dont use this class directly use the macro below so that it can be conditionally compiled out
     class telemetry_service_manager
     {
@@ -158,12 +171,7 @@ namespace rpc
 
     public:
 #ifdef _IN_ENCLAVE
-        bool create()
-        {
-            if (telemetry_service_)
-                return false;
-            return rpc::enclave_telemetry_service::create(telemetry_service_);
-        }
+        bool create();
 #else
         bool create(const std::string& test_suite_name, const std::string& name, const std::filesystem::path& directory);
 #endif

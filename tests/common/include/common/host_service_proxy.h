@@ -1,5 +1,5 @@
 /*
- *   Copyright (c) 2024 Edward Boggis-Rolfe
+ *   Copyright (c) 2025 Edward Boggis-Rolfe
  *   All rights reserved.
  */
 #pragma once
@@ -40,17 +40,20 @@ namespace rpc
             destination_zone destination_zone_id,
             object object_id,
             interface_ordinal interface_id) override;
-        uint64_t add_ref(uint64_t protocol_version,
+        int add_ref(uint64_t protocol_version,
             destination_channel_zone destination_channel_zone_id,
             destination_zone destination_zone_id,
             object object_id,
             caller_channel_zone caller_channel_zone_id,
             caller_zone caller_zone_id,
-            add_ref_options build_out_param_channel) override;
-        uint64_t release(uint64_t protocol_version,
+            known_direction_zone known_direction_zone_id,
+            add_ref_options build_out_param_channel,
+            uint64_t& reference_count) override;
+        int release(uint64_t protocol_version,
             destination_zone destination_zone_id,
             object object_id,
-            caller_zone caller_zone_id) override;
+            caller_zone caller_zone_id,
+            uint64_t& reference_count) override;
 
         friend rpc::child_service;
 

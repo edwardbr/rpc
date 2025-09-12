@@ -1,6 +1,10 @@
-#include <iostream>
 #include <thread>
 #include <chrono>
+
+#include <spdlog/spdlog.h>
+#include <spdlog/async.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
+
 #include <rpc/telemetry/console_telemetry_service.h>
 
 namespace rpc
@@ -9,33 +13,37 @@ namespace rpc
 
     console_telemetry_service::~console_telemetry_service()
     {
-        if (logger_) {
+        if (logger_)
+        {
             // Flush any pending async messages - this blocks until complete
             logger_->flush();
-            
+
             // Get reference to the thread pool before dropping logger
             auto tp = spdlog::thread_pool();
-            
+
             // Remove logger from spdlog registry to prevent conflicts
-            std::string logger_name = logger_->name();
-            spdlog::drop(logger_name);
-            
+            // std::string logger_name = logger_->name();
+            // spdlog::drop(logger_name);
+
             // Drop the logger reference to allow proper cleanup
             logger_.reset();
-            
+
             // Wait for thread pool to finish processing if it exists and has work
-            if (tp) {
+            if (tp)
+            {
                 // Wait for the queue to be empty - this is more deterministic than arbitrary sleep
                 constexpr int max_wait_ms = 100;
                 constexpr int check_interval_ms = 1;
-                
-                for (int waited = 0; waited < max_wait_ms; waited += check_interval_ms) {
-                    if (tp->queue_size() == 0) {
+
+                for (int waited = 0; waited < max_wait_ms; waited += check_interval_ms)
+                {
+                    if (tp->queue_size() == 0)
+                    {
                         break;
                     }
                     std::this_thread::sleep_for(std::chrono::milliseconds(check_interval_ms));
                 }
-                
+
                 // Small additional delay to ensure worker thread processes the empty queue check
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
             }
@@ -56,6 +64,7 @@ namespace rpc
 
     std::string console_telemetry_service::get_zone_name(uint64_t zone_id) const
     {
+        std::shared_lock<std::shared_mutex> lock(zone_names_mutex_);
         auto it = zone_names_.find(zone_id);
         if (it != zone_names_.end())
         {
@@ -105,16 +114,17 @@ namespace rpc
 
     void console_telemetry_service::init_logger() const
     {
-        if (!logger_)
+        /*if (!logger_)
         {
             try
             {
                 // Use unique logger name based on instance address to avoid conflicts
                 std::string logger_name = "console_telemetry_" + std::to_string(reinterpret_cast<uintptr_t>(this));
-                
+
                 // Try to get existing logger first
                 logger_ = spdlog::get(logger_name);
-                if (!logger_) {
+                if (!logger_)
+                {
                     // Create async logger using spdlog's async factory
                     logger_ = spdlog::stdout_color_mt<spdlog::async_factory>(logger_name);
                 }
@@ -125,24 +135,32 @@ namespace rpc
             }
             catch (...)
             {
-                try {
+                try
+                {
                     // Fallback to synchronous logging if async fails
-                    std::string fallback_name = "console_telemetry_sync_" + std::to_string(reinterpret_cast<uintptr_t>(this));
+                    std::string fallback_name
+                        = "console_telemetry_sync_" + std::to_string(reinterpret_cast<uintptr_t>(this));
                     logger_ = spdlog::get(fallback_name);
-                    if (!logger_) {
+                    if (!logger_)
+                    {
                         logger_ = spdlog::stdout_color_mt(fallback_name);
                     }
                     logger_->set_pattern("%v");
-                } catch (...) {
+                }
+                catch (...)
+                {
                     // Last resort - use default logger
                     logger_ = spdlog::default_logger();
                 }
             }
-        }
+        }*/
+
+        logger_ = spdlog::default_logger();
     }
 
     void console_telemetry_service::register_zone_name(uint64_t zone_id, const char* name, bool optional_replace) const
     {
+        std::unique_lock<std::shared_mutex> lock(zone_names_mutex_);
         auto it = zone_names_.find(zone_id);
         if (it != zone_names_.end())
         {
@@ -175,11 +193,115 @@ namespace rpc
         return true;
     }
 
-    void console_telemetry_service::on_service_creation(const char* name, rpc::zone zone_id) const
+    void console_telemetry_service::on_service_creation(
+        const char* name, rpc::zone zone_id, rpc::destination_zone parent_zone_id) const
     {
         register_zone_name(zone_id.id, name, false);
         init_logger();
-        logger_->info("{}{} service_creation{}", get_zone_color(zone_id.id), get_zone_name(zone_id.id), reset_color());
+        if (parent_zone_id.id == 0)
+            logger_->info("{}{} service_creation{}", get_zone_color(zone_id.id), get_zone_name(zone_id.id), reset_color());
+        else
+            logger_->info("{}{} child_zone_creation: parent={}{}",
+                get_zone_color(zone_id.id),
+                get_zone_name(zone_id.id),
+                get_zone_name(parent_zone_id.get_val()),
+                reset_color());
+
+        // Track the parent-child relationship
+        {
+            std::unique_lock<std::shared_mutex> lock(zone_children_mutex_);
+            zone_children_[parent_zone_id.get_val()].insert(zone_id.id);
+        }
+        {
+            std::unique_lock<std::shared_mutex> lock(zone_parents_mutex_);
+            zone_parents_[zone_id.id] = parent_zone_id.get_val();
+        }
+        // Print topology diagram after each service creation
+        print_topology_diagram();
+    }
+
+    void console_telemetry_service::print_topology_diagram() const
+    {
+        init_logger();
+        logger_->info("{}=== TOPOLOGY DIAGRAM ==={}", get_level_color(level_enum::info), reset_color());
+
+        std::shared_lock<std::shared_mutex> names_lock(zone_names_mutex_);
+        if (zone_names_.empty())
+        {
+            logger_->info("{}No zones registered yet{}", get_level_color(level_enum::info), reset_color());
+            return;
+        }
+
+        // Find root zones (zones with no parent)
+        std::set<uint64_t> root_zones;
+        {
+            std::shared_lock<std::shared_mutex> parents_lock(zone_parents_mutex_);
+            for (const auto& zone_pair : zone_names_)
+            {
+                uint64_t zone_id = zone_pair.first;
+                if (zone_parents_.find(zone_id) == zone_parents_.end() || zone_parents_.at(zone_id) == 0)
+                {
+                    root_zones.insert(zone_id);
+                }
+            }
+        }
+
+        if (root_zones.empty())
+        {
+            // No parent-child relationships tracked yet, show flat list
+            logger_->info("{}Active Zones (no hierarchy tracked yet):{}", get_level_color(level_enum::info), reset_color());
+            for (const auto& zone_pair : zone_names_)
+            {
+                uint64_t zone_id = zone_pair.first;
+                const std::string& zone_name = zone_pair.second;
+                logger_->info("{}  Zone {}: {}{}", get_zone_color(zone_id), zone_id, zone_name, reset_color());
+            }
+        }
+        else
+        {
+            // Show hierarchical structure
+            logger_->info("{}Zone Hierarchy:{}", get_level_color(level_enum::info), reset_color());
+            for (uint64_t root_zone : root_zones)
+            {
+                print_zone_tree(root_zone, 0);
+            }
+        }
+
+        logger_->info("{}========================={}", get_level_color(level_enum::info), reset_color());
+    }
+
+    void console_telemetry_service::print_zone_tree(uint64_t zone_id, int depth) const
+    {
+        std::string indent(depth * 2, ' ');
+        std::string branch = (depth > 0) ? "├─ " : "";
+
+        std::string zone_name;
+        {
+            std::shared_lock<std::shared_mutex> names_lock(zone_names_mutex_);
+            auto zone_name_it = zone_names_.find(zone_id);
+            zone_name = (zone_name_it != zone_names_.end()) ? zone_name_it->second : "unknown";
+        }
+
+        logger_->info("{}{}{}{}Zone {}: {} {}{}",
+            get_level_color(level_enum::info),
+            indent,
+            branch,
+            reset_color(),
+            get_zone_color(zone_id),
+            zone_id,
+            zone_name,
+            reset_color());
+
+        // Print children
+        std::shared_lock<std::shared_mutex> children_lock(zone_children_mutex_);
+        auto children_it = zone_children_.find(zone_id);
+        if (children_it != zone_children_.end())
+        {
+            for (uint64_t child_zone : children_it->second)
+            {
+                print_zone_tree(child_zone, depth + 1);
+            }
+        }
     }
 
     void console_telemetry_service::on_service_deletion(rpc::zone zone_id) const
@@ -556,6 +678,11 @@ namespace rpc
 
     void console_telemetry_service::message(level_enum level, const char* message) const
     {
+#if defined(USE_THREAD_LOCAL_LOGGING) && !defined(_IN_ENCLAVE)
+        // Also log to thread-local circular buffer for debugging
+        rpc::telemetry_to_thread_local_buffer(level, message);
+#endif
+
         const char* level_str;
         switch (level)
         {

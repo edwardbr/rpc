@@ -8,6 +8,9 @@ add_library(test_fixtures STATIC
     src/test_host.cpp
     src/test_globals.cpp
     src/rpc_log.cpp
+    src/rpc_global_logger.cpp
+    src/crash_handler.cpp
+    include/crash_handler.h
 )
 
 # Add compile definitions
@@ -34,11 +37,12 @@ target_link_libraries(test_fixtures
     example_shared_idl_host
     rpc::rpc_host
     yas_common
-    fmt::fmt
+    fmt::fmt-header-only
     spdlog::spdlog
     GTest::gtest
     GTest::gmock
     ${HOST_LIBRARIES}
+    ${RPC_HOST_FMT_LIB}
     ${ENCLAVE_DEPENDENCIES}
 )
 

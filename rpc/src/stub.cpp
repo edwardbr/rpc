@@ -1,5 +1,5 @@
 /*
- *   Copyright (c) 2024 Edward Boggis-Rolfe
+ *   Copyright (c) 2025 Edward Boggis-Rolfe
  *   All rights reserved.
  */
 #include "rpc/stub.h"
@@ -74,6 +74,7 @@ namespace rpc
         {
             CO_RETURN CO_AWAIT stub->call(protocol_version, enc, caller_channel_zone_id, caller_zone_id, method_id, in_size_, in_buf_, out_buf_);
         }        
+        RPC_ERROR("Invalid interface ID in stub call");
         CO_RETURN rpc::error::INVALID_INTERFACE_ID();
     }
 

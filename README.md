@@ -80,10 +80,20 @@ There are different CMake options specified in the root CMakeLists.txt:
   option(USE_RPC_TELEMETRY_RAII_LOGGING "turn on the logging of the addref release and try cast activity of the services, proxies and stubs" OFF)
  ```
 
-From the command line:
+**Note**: For current build configurations, see `CMakePresets.json` which provides preconfigured builds including `Debug`, `Debug_multithreaded`, `Debug_SGX`, `Release`, etc.
+
+From the command line (traditional approach):
+```bash
 mkdir build
 cd build
 cmake ..
+```
+
+Or using presets (recommended):
+```bash
+cmake --preset Debug
+cmake --build build --target rpc
+```
 
 If you are using VSCode add the CMake Tools extension, you will then see targets on the bar at the bottom to compile code for different targets.
 
@@ -103,7 +113,7 @@ Also for viewing idl files more easily install the "Microsoft MIDL and Mozilla W
 Currently tested on Compilers:
  * Clang 10+
  * GCC 9.4
- * Visual Studio 2017
+ * Visual Studio 2017 or later
 
 Though strongly suggest upgrading to the latest version of these compilers
 

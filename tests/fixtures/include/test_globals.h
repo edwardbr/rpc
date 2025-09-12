@@ -1,5 +1,5 @@
 /*
- *   Copyright (c) 2024 Edward Boggis-Rolfe
+ *   Copyright (c) 2025 Edward Boggis-Rolfe
  *   All rights reserved.
  */
 
@@ -10,7 +10,7 @@
 #include <rpc/service.h>
 
 #ifdef USE_RPC_TELEMETRY
-#include <rpc/telemetry/host_telemetry_service.h>
+#include <rpc/telemetry/i_telemetry_service.h>
 // Declare the global telemetry service manager that's defined in main.cpp
 extern rpc::telemetry_service_manager telemetry_service_manager_;
 #endif

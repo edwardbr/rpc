@@ -6,7 +6,7 @@ enclave {
 
     untrusted
     {
-        void on_service_creation_host([in, string] const char* name, uint64_t zone_id);
+        void on_service_creation_host([in, string] const char* name, uint64_t zone_id, uint64_t parent_zone_id);
         void on_service_deletion_host(uint64_t zone_id);
         void on_service_try_cast_host(uint64_t zone_id, uint64_t destination_zone_id, uint64_t caller_zone_id, uint64_t object_id, uint64_t interface_id);
         void on_service_add_ref_host(uint64_t zone_id, uint64_t destination_channel_zone_id, uint64_t destination_zone_id, uint64_t object_id, uint64_t caller_channel_zone_id, uint64_t caller_zone_id, uint64_t options);

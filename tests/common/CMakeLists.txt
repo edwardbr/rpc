@@ -30,15 +30,12 @@ if(${BUILD_ENCLAVE})
   target_compile_options(common_enclave PRIVATE ${ENCLAVE_COMPILE_OPTIONS} ${WARN_BASELINE})
   target_link_options(common_enclave PRIVATE ${ENCLAVE_LINK_OPTIONS})
 
-  if(USE_RPC_TELEMETRY)
-    set(TELEMETRY_ENCLAVE_EDL rpc_telemetry_edl_header_enclave)
-  endif()
-
   target_link_libraries(
     common_enclave
     PRIVATE rpc_enclave
             marshal_test_edl_enclave
-            ${TELEMETRY_ENCLAVE_EDL}
+            ${RPC_TELEMETRY_ENCLAVE_EDL}
+            ${RPC_ENCLAVE_FMT_LIB}
             example_idl_enclave
             yas_common)
 
@@ -72,6 +69,7 @@ target_link_libraries(
   PRIVATE rpc::rpc_host
           ${ADDITIONAL_TARGET}          
           example_idl_host
+          ${RPC_HOST_FMT_LIB}
           tcp_idl_host
           spsc_idl_host
           yas_common)

@@ -40,6 +40,21 @@ namespace yyy
 
         [description="Gets the current host instance"] error_code get_host([out] rpc::shared_ptr<i_host>& app);
         [description="Sets the current host instance"] error_code set_host([in] const rpc::shared_ptr<i_host>& app);
+        
+        [description="Autonomously creates a fork of zones through a zone factory and returns object from specified zone"]
+        error_code create_fork_and_return_object([in] rpc::shared_ptr<i_example> zone_factory, [in] const std::vector<uint64_t>& fork_zone_ids, [out] rpc::shared_ptr<yyy::i_example>& object_from_forked_zone);
+        
+        [description="Creates autonomous zone and caches object from it for later retrieval by unaware zones"]
+        error_code cache_object_from_autonomous_zone([in] const std::vector<uint64_t>& zone_ids);
+        
+        [description="Creates Y-topology fork by having current zone ask specified factory zone to create autonomous zones"]
+        error_code create_y_topology_fork([in] rpc::shared_ptr<i_example> factory_zone, [in] const std::vector<uint64_t>& fork_zone_ids);
+        
+        [description="Retrieves cached object from autonomous zone (triggers routing failure for unaware zones)"]  
+        error_code retrieve_cached_autonomous_object([out] rpc::shared_ptr<yyy::i_example>& cached_object);
+        
+        [description="Retrieves cached object from autonomous zone (triggers routing failure for unaware zones)"]  
+        error_code give_host_cached_object();
     };
 
     interface i_host

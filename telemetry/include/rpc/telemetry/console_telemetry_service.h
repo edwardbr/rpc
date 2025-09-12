@@ -3,12 +3,16 @@
 #include <string>
 #include <filesystem>
 #include <unordered_map>
+#include <set>
 #include <memory>
-#include <spdlog/spdlog.h>
-#include <spdlog/async.h>
-#include <spdlog/sinks/stdout_color_sinks.h>
+#include <shared_mutex>
 #include <rpc/types.h>
 #include <rpc/telemetry/i_telemetry_service.h>
+
+namespace spdlog
+{
+    class logger;    
+}
 
 namespace rpc
 {
@@ -16,6 +20,16 @@ namespace rpc
     {
         mutable std::unordered_map<uint64_t, std::string> zone_names_;
         mutable std::shared_ptr<spdlog::logger> logger_;
+        // Track zone relationships: zone_id -> set of child zones
+        mutable std::unordered_map<uint64_t, std::set<uint64_t>> zone_children_;
+        // Track zone relationships: zone_id -> parent zone (0 if root)
+        mutable std::unordered_map<uint64_t, uint64_t> zone_parents_;
+        
+        // Thread safety: shared_mutex allows multiple concurrent readers with exclusive writers
+        mutable std::shared_mutex zone_names_mutex_;
+        mutable std::shared_mutex zone_children_mutex_;
+        mutable std::shared_mutex zone_parents_mutex_;
+        
         static constexpr size_t ASYNC_QUEUE_SIZE = 8192;
 
         std::string get_zone_name(uint64_t zone_id) const;
@@ -24,6 +38,8 @@ namespace rpc
         std::string reset_color() const;
         void register_zone_name(uint64_t zone_id, const char* name, bool optional_replace) const;
         void init_logger() const;
+        void print_topology_diagram() const;
+        void print_zone_tree(uint64_t zone_id, int depth) const;
 
     public:
         static bool create(std::shared_ptr<rpc::i_telemetry_service>& service,
@@ -36,7 +52,7 @@ namespace rpc
         console_telemetry_service(const console_telemetry_service&) = delete;
         console_telemetry_service& operator=(const console_telemetry_service&) = delete;
 
-        void on_service_creation(const char* name, rpc::zone zone_id) const override;
+        void on_service_creation(const char* name, rpc::zone zone_id, rpc::destination_zone parent_zone_id) const override;
         void on_service_deletion(rpc::zone zone_id) const override;
         void on_service_try_cast(rpc::zone zone_id,
             rpc::destination_zone destination_zone_id,

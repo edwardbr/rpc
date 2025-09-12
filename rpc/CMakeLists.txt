@@ -15,16 +15,6 @@ cmake_minimum_required(VERSION 3.24)
 
 add_subdirectory(interfaces)
 
-if(USE_RPC_TELEMETRY)
-  set(ENCLAVE_TELEMETRY_SERVICE rpc::rpc_telemetry_enclave)
-  set(HOST_TELEMETRY_SERVICE rpc::rpc_telemetry_host)
-  set(TELEMETRY_INTERFACE rpc::rpc_telemetry_interface)
-else()
-  set(ENCLAVE_TELEMETRY_SERVICE)
-  set(HOST_TELEMETRY_SERVICE)
-  set(TELEMETRY_INTERFACE)
-endif()
-
 if(BUILD_ENCLAVE)
   add_library(
     rpc_enclave
@@ -51,7 +41,7 @@ if(BUILD_ENCLAVE)
     PRIVATE ${ENCLAVE_LIBCXX_INCLUDES})
   target_link_libraries(
     rpc_enclave
-    PUBLIC ${TELEMETRY_INTERFACE} ${ENCLAVE_TELEMETRY_SERVICE} rpc_types_idl_enclave
+    PUBLIC ${RPC_TELEMETRY_INTERFACE} ${RPC_ENCLAVE_TELEMETRY} ${RPC_ENCLAVE_FMT_LIB} rpc_types_idl_enclave
     PRIVATE yas_common)
   target_link_options(rpc_enclave PRIVATE ${ENCLAVE_LINK_OPTIONS})
 
@@ -80,6 +70,11 @@ add_library(
   src/error_codes.cpp
   src/version.cpp)
 
+# Conditionally add thread-local logger implementation
+if(USE_THREAD_LOCAL_LOGGING)
+  target_sources(rpc_host PRIVATE src/thread_local_logger.cpp)
+endif()
+
 target_compile_definitions(rpc_host PRIVATE ${HOST_DEFINES})
 
 target_include_directories(
@@ -89,10 +84,10 @@ target_include_directories(
 
 target_link_libraries(
   rpc_host
-  PUBLIC ${TELEMETRY_INTERFACE} ${HOST_TELEMETRY_SERVICE}
+  PUBLIC ${RPC_TELEMETRY_INTERFACE} ${RPC_HOST_TELEMETRY}
   libcoro
   rpc_types_idl_host
-  PRIVATE yas_common ${HOST_LIBRARIES})
+  PRIVATE yas_common ${HOST_LIBRARIES} ${RPC_HOST_FMT_LIB})
 
 target_compile_options(rpc_host PRIVATE ${HOST_COMPILE_OPTIONS} ${WARN_OK})
 target_link_options(rpc_host PRIVATE ${HOST_LINK_EXE_OPTIONS})

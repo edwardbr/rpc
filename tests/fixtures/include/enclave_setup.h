@@ -1,5 +1,5 @@
 /*
- *   Copyright (c) 2024 Edward Boggis-Rolfe
+ *   Copyright (c) 2025 Edward Boggis-Rolfe
  *   All rights reserved.
  */
 
@@ -15,7 +15,7 @@
 #include <common/tests.h>
 
 #ifdef USE_RPC_TELEMETRY
-#include <rpc/telemetry/host_telemetry_service.h>
+#include <rpc/telemetry/i_telemetry_service.h>
 #endif
 
 template<bool UseHostInChild, bool RunStandardTests, bool CreateNewZoneThenCreateSubordinatedZone> class enclave_setup
@@ -42,14 +42,15 @@ public:
     rpc::shared_ptr<yyy::i_host> get_host() const { return i_host_ptr_; }
     bool get_use_host_in_child() const { return use_host_in_child_; }
 
-    virtual void SetUp()
+    virtual void set_up()
     {
         zone_gen = &zone_gen_;
         auto test_info = ::testing::UnitTest::GetInstance()->current_test_info();
 #ifdef USE_RPC_TELEMETRY
         if (enable_telemetry_server)
         {
-            telemetry_service_manager_.create(test_info->test_suite_name(), test_info->name(), "../../rpc_test_diagram/");
+            telemetry_service_manager_.create(
+                test_info->test_suite_name(), test_info->name(), "../../rpc_test_diagram/");
         }
 #endif
         root_service_ = rpc::make_shared<rpc::service>("host", rpc::zone{++zone_gen_});
@@ -68,11 +69,13 @@ public:
         ASSERT_ERROR_CODE(err_code);
     }
 
-    virtual void TearDown()
+    virtual void tear_down()
     {
         i_example_ptr_ = nullptr;
         i_host_ptr_ = nullptr;
         root_service_ = nullptr;
+        current_host_service.reset();
+        test_service_logger::reset_logger();
         zone_gen = nullptr;
 #ifdef USE_RPC_TELEMETRY
         RESET_TELEMETRY_SERVICE
