@@ -130,13 +130,8 @@ namespace rpc::spsc
             // we register the receive listener before we do the send
             result_listener res_payload;
             {
-                std::string msg("call_peer started ");
-                msg += std::to_string(service_->get_zone_id().get_val());
-                msg += std::string(" sequence_number = ");
-                msg += std::to_string(sequence_number);
-                msg += std::string(" id = ");
-                msg += std::to_string(rpc::id<SendPayload>::get(rpc::get_version()));
-                LOG_CSTR(msg.c_str());
+                RPC_DEBUG("call_peer started zone: {} sequence_number: {} id: {}", 
+                         service_->get_zone_id().get_val(), sequence_number, rpc::id<SendPayload>::get(rpc::get_version()));
                 std::scoped_lock lock(pending_transmits_mtx_);
                 auto [it, success] = pending_transmits_.try_emplace(sequence_number, &res_payload);
                 assert(success);
@@ -146,35 +141,25 @@ namespace rpc::spsc
                 protocol_version, message_direction::send, std::move(sendPayload), sequence_number);
             if (err != rpc::error::OK())
             {
-                LOG_CSTR("failed call_peer send_payload send");
+                RPC_ERROR("failed call_peer send_payload send");
                 std::scoped_lock lock(pending_transmits_mtx_);
-                std::string msg("call_peer failed ");
-                msg += std::to_string(service_->get_zone_id().get_val());
-                msg += std::string(" sequence_number = ");
-                msg += std::to_string(sequence_number);
-                msg += std::string(" id = ");
-                msg += std::to_string(rpc::id<SendPayload>::get(rpc::get_version()));
-                LOG_CSTR(msg.c_str());
+                RPC_ERROR("call_peer failed zone: {} sequence_number: {} id: {}", 
+                         service_->get_zone_id().get_val(), sequence_number, rpc::id<SendPayload>::get(rpc::get_version()));
                 pending_transmits_.erase(sequence_number);
                 CO_RETURN err;
             }
 
             co_await res_payload.event; // now wait for the reply
 
-            std::string msg("call_peer succeeded ");
-            msg += std::to_string(service_->get_zone_id().get_val());
-            msg += std::string(" sequence_number = ");
-            msg += std::to_string(sequence_number);
-            msg += std::string(" id = ");
-            msg += std::to_string(rpc::id<SendPayload>::get(rpc::get_version()));
-            LOG_CSTR(msg.c_str());
+            RPC_DEBUG("call_peer succeeded zone: {} sequence_number: {} id: {}", 
+                     service_->get_zone_id().get_val(), sequence_number, rpc::id<SendPayload>::get(rpc::get_version()));
 
             assert(res_payload.payload.payload_fingerprint == rpc::id<ReceivePayload>::get(res_payload.prefix.version));
 
             auto str_err = rpc::from_yas_compressed_binary(rpc::span(res_payload.payload.payload), receivePayload);
             if (!str_err.empty())
             {
-                LOG_CSTR("failed call_peer send_payload from_yas_compressed_binary");
+                RPC_ERROR("failed call_peer send_payload from_yas_compressed_binary");
                 CO_RETURN rpc::error::TRANSPORT_ERROR();
             }
 

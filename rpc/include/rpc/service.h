@@ -22,6 +22,7 @@
 #include <rpc/remote_pointer.h>
 #include <rpc/casting_interface.h>
 #include <rpc/marshaller.h>
+#include <rpc/coroutine_support.h>
 #ifdef USE_RPC_TELEMETRY
 #include <rpc/telemetry/i_telemetry_service.h>
 #endif
@@ -131,13 +132,14 @@ namespace rpc
 
     protected:
         struct child_service_tag {};
-        explicit service(const char* name, zone zone_id, child_service_tag);
         
     public:
 #ifdef BUILD_COROUTINE
-        explicit service(const char* name, zone zone_id, const std::shared_ptr<coro::io_scheduler>& v);
+        explicit service(const char* name, zone zone_id, const std::shared_ptr<coro::io_scheduler>& scheduler);
+        explicit service(const char* name, zone zone_id, const std::shared_ptr<coro::io_scheduler>& scheduler, child_service_tag);
 #else
         explicit service(const char* name, zone zone_id);
+        explicit service(const char* name, zone zone_id, child_service_tag);
 #endif
         virtual ~service();
 
@@ -454,7 +456,7 @@ namespace rpc
             if(!child_svc->set_parent_proxy(parent_service_proxy))
             {
                 RPC_ERROR("Unable to create set_parent_proxy in create_child_service"); 
-                return rpc::error::UNABLE_TO_CREATE_SERVICE_PROXY();
+                CO_RETURN rpc::error::UNABLE_TO_CREATE_SERVICE_PROXY();
             }
             parent_service_proxy->set_parent_channel(true);
 

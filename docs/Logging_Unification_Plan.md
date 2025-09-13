@@ -18,7 +18,6 @@ This document outlines a comprehensive plan to unify the fractured logging exper
 ### 1. **Fractured Logging Experience**
 - `rpc_global_logger.cpp` uses `printf()` instead of spdlog (lines 103-128)
 - `console_telemetry_service.cpp` properly uses spdlog but with inconsistent patterns
-- `test_service_logger.cpp` uses `std::ostringstream` + `rpc_global_logger::info()`
 - `rpc_log.cpp` contains `std::cerr` usage (line 156)
 
 ### 2. **Missing Logical Thread ID Support**

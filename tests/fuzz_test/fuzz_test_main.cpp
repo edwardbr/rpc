@@ -127,46 +127,46 @@ public:
     {
     }
 
-    int test_function(int input_value) override
+    CORO_TASK(int) test_function(int input_value) override
     {
         RPC_INFO("[SHARED_OBJECT id={}] test_function(input_value={})", id_, input_value);
         test_count_++;
-        return input_value * 2 + test_count_;
+        CO_RETURN input_value * 2 + test_count_;
     }
 
-    int get_stats(int& count) override
+    CORO_TASK(int) get_stats(int& count) override
     {
         count = test_count_;
         RPC_INFO("[SHARED_OBJECT id={}] get_stats() -> count={}", id_, count);
-        return rpc::error::OK();
+        CO_RETURN rpc::error::OK();
     }
 
-    int set_value(int new_value) override
+    CORO_TASK(int) set_value(int new_value) override
     {
         RPC_INFO("[SHARED_OBJECT id={}] set_value(new_value={}) old_value={}", id_, new_value, value_);
         value_ = new_value;
-        return rpc::error::OK();
+        CO_RETURN rpc::error::OK();
     }
 
-    int get_value(int& value) override
+    CORO_TASK(int) get_value(int& value) override
     {
         value = value_;
         RPC_INFO("[SHARED_OBJECT id={}] get_value() -> value={}", id_, value);
-        return rpc::error::OK();
+        CO_RETURN rpc::error::OK();
     }
 
     // i_cleanup implementation
-    int cleanup(rpc::shared_ptr<i_garbage_collector> collector) override
+    CORO_TASK(int) cleanup(rpc::shared_ptr<i_garbage_collector> collector) override
     {
         RPC_INFO("[SHARED_OBJECT id={} name={}] cleanup() called, already_cleaned={}", id_, name_, cleanup_called_);
         if (cleanup_called_)
         {
-            return rpc::error::OK(); // Already cleaned up
+            CO_RETURN rpc::error::OK(); // Already cleaned up
         }
         cleanup_called_ = true;
 
         RPC_INFO("[SHARED_OBJECT id={} name={}] cleanup completed", id_, name_);
-        return rpc::error::OK();
+        CO_RETURN rpc::error::OK();
     }
 };
 
@@ -194,7 +194,7 @@ public:
     {
     }
 
-    int create_shared_object(
+    CORO_TASK(int) create_shared_object(
         int id, std::string name, int initial_value, rpc::shared_ptr<i_shared_object>& created_object) override
     {
         RPC_INFO("[FACTORY] create_shared_object(id={}, name={}, initial_value={})", id, name, initial_value);
@@ -204,22 +204,22 @@ public:
             created_object = rpc::static_pointer_cast<i_shared_object>(obj);
             objects_created_++;
             RPC_INFO("[FACTORY] create_shared_object completed, total_created={}", objects_created_);
-            return rpc::error::OK();
+            CO_RETURN rpc::error::OK();
         }
         catch (...)
         {
             RPC_INFO("[FACTORY] create_shared_object failed with exception");
-            return rpc::error::OUT_OF_MEMORY();
+            CO_RETURN rpc::error::OUT_OF_MEMORY();
         }
     }
 
-    int place_shared_object(rpc::shared_ptr<i_shared_object> new_object, rpc::shared_ptr<i_shared_object> target_object) override
+    CORO_TASK(int) place_shared_object(rpc::shared_ptr<i_shared_object> new_object, rpc::shared_ptr<i_shared_object> target_object) override
     {
         RPC_INFO("[FACTORY] place_shared_object() called");
         if (!new_object || !target_object)
         {
             RPC_INFO("[FACTORY] place_shared_object failed: null objects");
-            return rpc::error::INVALID_DATA();
+            CO_RETURN rpc::error::INVALID_DATA();
         }
 
         int new_value = 0, target_value = 0;
@@ -228,29 +228,29 @@ public:
         target_object->set_value(new_value + target_value);
 
         RPC_INFO("[FACTORY] place_shared_object completed with combined value {}", new_value + target_value);
-        return rpc::error::OK();
+        CO_RETURN rpc::error::OK();
     }
 
-    int get_factory_stats(int& total_created, int& current_refs) override
+    CORO_TASK(int) get_factory_stats(int& total_created, int& current_refs) override
     {
         total_created = objects_created_;
         current_refs = 0; // Simplified
         RPC_INFO("[FACTORY] get_factory_stats() -> total_created={}, current_refs={}", total_created, current_refs);
-        return rpc::error::OK();
+        CO_RETURN rpc::error::OK();
     }
 
     // i_cleanup implementation
-    int cleanup(rpc::shared_ptr<i_garbage_collector> collector) override
+    CORO_TASK(int) cleanup(rpc::shared_ptr<i_garbage_collector> collector) override
     {
         RPC_INFO("[FACTORY] cleanup() called, already_cleaned={}, objects_created={}", cleanup_called_, objects_created_);
         if (cleanup_called_)
         {
-            return rpc::error::OK(); // Already cleaned up
+            CO_RETURN rpc::error::OK(); // Already cleaned up
         }
         cleanup_called_ = true;
 
         RPC_INFO("[FACTORY] cleanup completed (created {} objects)", objects_created_);
-        return rpc::error::OK();
+        CO_RETURN rpc::error::OK();
     }
 };
 
@@ -277,21 +277,21 @@ public:
     {
     }
 
-    int store_object(int cache_key, rpc::shared_ptr<i_shared_object> object) override
+    CORO_TASK(int) store_object(int cache_key, rpc::shared_ptr<i_shared_object> object) override
     {
         RPC_INFO("[CACHE] store_object(cache_key={})", cache_key);
         if (!object)
         {
             RPC_INFO("[CACHE] store_object failed: null object");
-            return rpc::error::INVALID_DATA();
+            CO_RETURN rpc::error::INVALID_DATA();
         }
 
         cache_storage_[cache_key] = object;
         RPC_INFO("[CACHE] store_object completed, cache_size={}", cache_storage_.size());
-        return rpc::error::OK();
+        CO_RETURN rpc::error::OK();
     }
 
-    int retrieve_object(int cache_key, rpc::shared_ptr<i_shared_object>& object) override
+    CORO_TASK(int) retrieve_object(int cache_key, rpc::shared_ptr<i_shared_object>& object) override
     {
         RPC_INFO("[CACHE] retrieve_object(cache_key={})", cache_key);
         auto it = cache_storage_.find(cache_key);
@@ -299,35 +299,35 @@ public:
         {
             object = it->second;
             RPC_INFO("[CACHE] retrieve_object found object");
-            return rpc::error::OK();
+            CO_RETURN rpc::error::OK();
         }
 
         object.reset();
         RPC_INFO("[CACHE] retrieve_object not found");
-        return rpc::error::OBJECT_NOT_FOUND();
+        CO_RETURN rpc::error::OBJECT_NOT_FOUND();
     }
 
-    int has_object(int cache_key, bool& exists) override
+    CORO_TASK(int) has_object(int cache_key, bool& exists) override
     {
         exists = cache_storage_.find(cache_key) != cache_storage_.end();
         RPC_INFO("[CACHE] has_object(cache_key={}) -> exists={}", cache_key, exists);
-        return rpc::error::OK();
+        CO_RETURN rpc::error::OK();
     }
 
-    int get_cache_size(int& size) override
+    CORO_TASK(int) get_cache_size(int& size) override
     {
         size = static_cast<int>(cache_storage_.size());
         RPC_INFO("[CACHE] get_cache_size() -> size={}", size);
-        return rpc::error::OK();
+        CO_RETURN rpc::error::OK();
     }
 
     // i_cleanup implementation
-    int cleanup(rpc::shared_ptr<i_garbage_collector> collector) override
+    CORO_TASK(int) cleanup(rpc::shared_ptr<i_garbage_collector> collector) override
     {
         RPC_INFO("[CACHE] cleanup() called, already_cleaned={}, cache_size={}", cleanup_called_, cache_storage_.size());
         if (cleanup_called_)
         {
-            return rpc::error::OK(); // Already cleaned up
+            CO_RETURN rpc::error::OK(); // Already cleaned up
         }
         cleanup_called_ = true;
 
@@ -335,7 +335,7 @@ public:
         for (auto& pair : cache_storage_)
         {
             RPC_INFO("[CACHE] cleaning cached object with key={}", pair.first);
-            auto cleanup_obj = rpc::dynamic_pointer_cast<i_cleanup>(pair.second);
+            auto cleanup_obj = CO_AWAIT rpc::dynamic_pointer_cast<i_cleanup>(pair.second);
             if (cleanup_obj)
             {
                 cleanup_obj->cleanup(collector);
@@ -347,7 +347,7 @@ public:
         cache_storage_.clear();
 
         RPC_INFO("[CACHE] cleanup completed");
-        return rpc::error::OK();
+        CO_RETURN rpc::error::OK();
     }
 };
 
@@ -377,17 +377,17 @@ public:
     {
     }
 
-    int process_object(rpc::shared_ptr<i_shared_object> object, int increment) override
+    CORO_TASK(int) process_object(rpc::shared_ptr<i_shared_object> object, int increment) override
     {
         RPC_INFO("[WORKER] process_object(increment={})", increment);
         if (!object)
         {
             RPC_INFO("[WORKER] process_object failed: null object");
-            return rpc::error::INVALID_DATA();
+            CO_RETURN rpc::error::INVALID_DATA();
         }
 
         int current_value;
-        auto get_result = object->get_value(current_value);
+        auto get_result = CO_AWAIT object->get_value(current_value);
         if (get_result == rpc::error::OK())
         {
             auto set_result = object->set_value(current_value + increment);
@@ -398,37 +398,37 @@ public:
                 RPC_INFO("[WORKER] process_object completed, new value: {}, processed_count={}",
                     current_value + increment,
                     objects_processed_);
-                return rpc::error::OK();
+                CO_RETURN rpc::error::OK();
             }
         }
 
         RPC_INFO("[WORKER] process_object failed during value operations");
-        return rpc::error::INVALID_DATA();
+        CO_RETURN rpc::error::INVALID_DATA();
     }
 
-    int get_worker_stats(int& objects_processed, int& total_increments) override
+    CORO_TASK(int) get_worker_stats(int& objects_processed, int& total_increments) override
     {
         objects_processed = objects_processed_;
         total_increments = total_increments_;
         RPC_INFO("[WORKER] get_worker_stats() -> objects_processed={}, total_increments={}",
             objects_processed,
             total_increments);
-        return rpc::error::OK();
+        CO_RETURN rpc::error::OK();
     }
 
     // i_cleanup implementation
-    int cleanup(rpc::shared_ptr<i_garbage_collector> collector) override
+    CORO_TASK(int) cleanup(rpc::shared_ptr<i_garbage_collector> collector) override
     {
         RPC_INFO(
             "[WORKER] cleanup() called, already_cleaned={}, objects_processed={}", cleanup_called_, objects_processed_);
         if (cleanup_called_)
         {
-            return rpc::error::OK(); // Already cleaned up
+            CO_RETURN rpc::error::OK(); // Already cleaned up
         }
         cleanup_called_ = true;
 
         RPC_INFO("[WORKER] cleanup completed (processed {} objects)", objects_processed_);
-        return rpc::error::OK();
+        CO_RETURN rpc::error::OK();
     }
 };
 
@@ -513,7 +513,7 @@ private:
             {
                 fuzz_test_idl_register_stubs(child_service_ptr);
                 new_cache = rpc::make_shared<cache_impl>();
-                return rpc::error::OK();
+                CO_RETURN rpc::error::OK();
             });
     }
 
@@ -613,21 +613,21 @@ public:
     {
     }
 
-    int initialize_node(node_type type, uint64_t node_id) override
+    CORO_TASK(int) initialize_node(node_type type, uint64_t node_id) override
     {
         RPC_INFO("[NODE {}] initialize_node(type={}, node_id={})", node_id_, static_cast<int>(type), node_id);
         node_type_ = type;
         node_id_ = node_id;
         RPC_INFO("[NODE {}] initialize_node completed", node_id_);
-        return rpc::error::OK();
+        CO_RETURN rpc::error::OK();
     }
 
-    int run_script(rpc::shared_ptr<i_autonomous_node> target_node, int instruction_count) override
+    CORO_TASK(int) run_script(rpc::shared_ptr<i_autonomous_node> target_node, int instruction_count) override
     {
         if (!target_node)
         {
             RPC_INFO("Node {} cannot run script: no target specified.", node_id_);
-            return rpc::error::INVALID_DATA();
+            CO_RETURN rpc::error::INVALID_DATA();
         }
 
         uint64_t target_id = 0;
@@ -670,16 +670,16 @@ public:
                 }
             }
         }
-        return rpc::error::OK();
+        CO_RETURN rpc::error::OK();
     }
 
-    int execute_instruction(instruction instruction,
+    CORO_TASK(int) execute_instruction(instruction instruction,
         rpc::shared_ptr<i_shared_object> input_object,
         rpc::shared_ptr<i_shared_object>& output_object) override
     {
         if (g_instruction_counter >= 50)
         {
-            return rpc::error::OK(); // Stop execution gracefully
+            CO_RETURN rpc::error::OK(); // Stop execution gracefully
         }
         g_instruction_counter++;
         RPC_INFO("Node {} executing: {} (val={}) [Count={}]",
@@ -776,26 +776,26 @@ public:
             else
             {
                 RPC_WARNING("Node {} unknown instruction: {}", node_id_, instruction.operation);
-                return rpc::error::INVALID_DATA();
+                CO_RETURN rpc::error::INVALID_DATA();
             }
-            return rpc::error::OK();
+            CO_RETURN rpc::error::OK();
         }
         catch (...)
         {
             spdlog::error("Node {} exception executing instruction", node_id_);
-            return rpc::error::EXCEPTION();
+            CO_RETURN rpc::error::EXCEPTION();
         }
     }
 
-    int receive_object(rpc::shared_ptr<i_shared_object> object, uint64_t sender_node_id) override
+    CORO_TASK(int) receive_object(rpc::shared_ptr<i_shared_object> object, uint64_t sender_node_id) override
     {
         RPC_INFO("[NODE {}] receive_object from sender_node_id={}", node_id_, sender_node_id);
         signals_received_++;
         RPC_INFO("[NODE {}] receive_object completed, total signals: {}", node_id_, signals_received_);
-        return rpc::error::OK();
+        CO_RETURN rpc::error::OK();
     }
 
-    int get_node_status(node_type& current_type, uint64_t& current_id, int& connections_count, int& objects_held) override
+    CORO_TASK(int) get_node_status(node_type& current_type, uint64_t& current_id, int& connections_count, int& objects_held) override
     {
         current_type = node_type_;
         current_id = node_id_;
@@ -807,10 +807,10 @@ public:
             current_id,
             connections_count,
             objects_held);
-        return rpc::error::OK();
+        CO_RETURN rpc::error::OK();
     }
 
-    int create_child_node(
+    CORO_TASK(int) create_child_node(
         node_type child_type, uint64_t child_zone_id, bool cache_locally, rpc::shared_ptr<i_autonomous_node>& child_node) override
     {
         RPC_INFO("[NODE {}] create_child_node(child_type={}, child_zone_id={}, cache_locally={})",
@@ -824,7 +824,7 @@ public:
             if (!current_service)
             {
                 spdlog::error("[NODE {}] create_child_node failed: ZONE_NOT_INITIALISED", node_id_);
-                return rpc::error::ZONE_NOT_INITIALISED();
+                CO_RETURN rpc::error::ZONE_NOT_INITIALISED();
             }
 
             std::string child_zone_name = "child_" + std::to_string(node_id_) + "_" + std::to_string(child_zone_id);
@@ -847,70 +847,70 @@ public:
                         new_child->initialize_node(child_type, child_zone_id);
                         new_child->set_parent_node(parent);
                         RPC_INFO("[NODE {}] setup callback for child zone {} completed", node_id_, child_zone_id);
-                        return rpc::error::OK();
+                        CO_RETURN rpc::error::OK();
                     });
             RPC_INFO("[NODE {}] create_child_node result={}", node_id_, result);
-            return result;
+            CO_RETURN result;
         }
         catch (const std::exception& e)
         {
             spdlog::error("[NODE {}] Exception in child creation: {}", node_id_, e.what());
-            return rpc::error::EXCEPTION();
+            CO_RETURN rpc::error::EXCEPTION();
         }
     }
 
-    int get_cached_children_count(int& count) override
+    CORO_TASK(int) get_cached_children_count(int& count) override
     {
         count = static_cast<int>(child_nodes_.size());
         RPC_INFO("[NODE {}] get_cached_children_count() -> count={}", node_id_, count);
-        return rpc::error::OK();
+        CO_RETURN rpc::error::OK();
     }
 
-    int get_cached_child_by_index(int index, rpc::shared_ptr<i_autonomous_node>& child) override
+    CORO_TASK(int) get_cached_child_by_index(int index, rpc::shared_ptr<i_autonomous_node>& child) override
     {
         RPC_INFO("[NODE {}] get_cached_child_by_index(index={}), children_size={}", node_id_, index, child_nodes_.size());
         if (index < 0 || index >= child_nodes_.size())
         {
             child.reset();
             RPC_INFO("[NODE {}] get_cached_child_by_index failed: invalid index", node_id_);
-            return rpc::error::INVALID_DATA();
+            CO_RETURN rpc::error::INVALID_DATA();
         }
         child = child_nodes_[index];
         RPC_INFO("[NODE {}] get_cached_child_by_index completed", node_id_);
-        return rpc::error::OK();
+        CO_RETURN rpc::error::OK();
     }
 
-    int get_parent_node(rpc::shared_ptr<i_autonomous_node>& parent) override
+    CORO_TASK(int) get_parent_node(rpc::shared_ptr<i_autonomous_node>& parent) override
     {
         parent = parent_node_;
         RPC_INFO("[NODE {}] get_parent_node() -> parent={}", node_id_, (parent ? "exists" : "null"));
-        return rpc::error::OK();
+        CO_RETURN rpc::error::OK();
     }
 
-    int set_parent_node(rpc::shared_ptr<i_autonomous_node> parent) override
+    CORO_TASK(int) set_parent_node(rpc::shared_ptr<i_autonomous_node> parent) override
     {
         RPC_INFO("[NODE {}] set_parent_node(parent={})", node_id_, (parent ? "exists" : "null"));
         parent_node_ = parent;
         RPC_INFO("[NODE {}] set_parent_node completed", node_id_);
-        return rpc::error::OK();
+        CO_RETURN rpc::error::OK();
     }
 
     // Unused legacy methods
-    int connect_to_node(rpc::shared_ptr<i_autonomous_node> target_node) override { return rpc::error::OK(); }
-    int pass_object_to_connected(int connection_index, rpc::shared_ptr<i_shared_object> object) override
+    CORO_TASK(int) connect_to_node(rpc::shared_ptr<i_autonomous_node> target_node) override { CO_RETURN rpc::error::OK(); }
+    CORO_TASK(int) pass_object_to_connected(int connection_index, rpc::shared_ptr<i_shared_object> object) override
     {
-        return rpc::error::OK();
+        CO_RETURN rpc::error::OK();
     }
-    int request_child_creation(rpc::shared_ptr<i_autonomous_node> target_parent,
+    CORO_TASK(int) request_child_creation(rpc::shared_ptr<i_autonomous_node> target_parent,
         node_type child_type,
         uint64_t child_zone_id,
         rpc::shared_ptr<i_autonomous_node>& child_proxy) override
     {
-        return rpc::error::OK();
+        CO_RETURN rpc::error::OK();
     }
 
     // i_cleanup implementation
-    int cleanup(rpc::shared_ptr<i_garbage_collector> collector) override
+    CORO_TASK(int) cleanup(rpc::shared_ptr<i_garbage_collector> collector) override
     {
         RPC_INFO("[NODE {}] cleanup() called, already_cleaned={}, child_nodes_size={}, created_objects_size={}",
             node_id_,
@@ -920,7 +920,7 @@ public:
         if (cleanup_called_)
         {
             RPC_INFO("[NODE {}] cleanup already called, returning", node_id_);
-            return rpc::error::OK(); // Already cleaned up
+            CO_RETURN rpc::error::OK(); // Already cleaned up
         }
         cleanup_called_ = true;
 
@@ -1004,7 +1004,7 @@ public:
         parent_node_.reset(); // Don't cleanup parent, just clear reference
 
         RPC_INFO("[NODE {}] cleanup completed successfully", node_id_);
-        return rpc::error::OK();
+        CO_RETURN rpc::error::OK();
     }
 };
 
@@ -1025,25 +1025,25 @@ private:
 public:
     garbage_collector_impl() = default;
 
-    int collect(rpc::shared_ptr<i_cleanup> obj) override
+    CORO_TASK(int) collect(rpc::shared_ptr<i_cleanup> obj) override
     {
         RPC_INFO("[GARBAGE_COLLECTOR] collect() called");
         if (!obj)
         {
             RPC_INFO("[GARBAGE_COLLECTOR] collect failed: null object");
-            return rpc::error::INVALID_DATA();
+            CO_RETURN rpc::error::INVALID_DATA();
         }
 
         collected_objects_.insert(obj);
         RPC_INFO("[GARBAGE_COLLECTOR] collected object (total: {})", collected_objects_.size());
-        return rpc::error::OK();
+        CO_RETURN rpc::error::OK();
     }
 
-    int get_collected_count(int& count) override
+    CORO_TASK(int) get_collected_count(int& count) override
     {
         count = static_cast<int>(collected_objects_.size());
         RPC_INFO("[GARBAGE_COLLECTOR] get_collected_count() -> count={}", count);
-        return rpc::error::OK();
+        CO_RETURN rpc::error::OK();
     }
 
     // Clear all collected objects - this releases them for destruction
@@ -1336,8 +1336,7 @@ void run_autonomous_instruction_test(int test_cycle, int instruction_count, uint
                 {
                     fuzz_test_idl_register_stubs(child_service_ptr);
                     new_node = rpc::make_shared<autonomous_node_impl>(node_type::ROOT_NODE, zone_id);
-                    new_node->initialize_node(node_type::ROOT_NODE, zone_id);
-                    return rpc::error::OK();
+                    CO_RETURN CO_AWAIT new_node->initialize_node(node_type::ROOT_NODE, zone_id);
                 });
 
             if (!root_node)

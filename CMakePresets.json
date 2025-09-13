@@ -7,13 +7,13 @@
       "binaryDir": "build",
       "generator": "Ninja",
       "cacheVariables": {
-        "BUILD_COROUTINE": "ON",
+        "BUILD_COROUTINE": "OFF",
         "BUILD_ENCLAVE": "OFF",
         "BUILD_HOST": "ON",
         "BUILD_TEST": "ON",
-        "c-ares_DIR": "/home/edward/projects/rpc/submodules/c-ares",
+        "c-ares_DIR": "/home/edward/projects/rpc2/submodules/c-ares",
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-        "CMAKE_INSTALL_PREFIX": "/home/edward/projects/rpc/submodules/c-ares",
+        "CMAKE_INSTALL_PREFIX": "/home/edward/projects/rpc2/submodules/c-ares",
         "CMAKE_RULE_MESSAGES": "OFF",
         "CMAKE_VERBOSE_MAKEFILE": "OFF",
         "DEBUG_HOST_THREAD": "OFF",
@@ -43,6 +43,15 @@
       "name": "Debug",
       "inherits": "Base",
       "cacheVariables": {
+        "BUILD_TYPE": "debug",
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "Debug_with_coroutines",
+      "inherits": "Base",
+      "cacheVariables": {
+        "BUILD_COROUTINE": "ON",
         "BUILD_TYPE": "debug",
         "CMAKE_BUILD_TYPE": "Debug"
       }

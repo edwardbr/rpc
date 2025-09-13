@@ -101,7 +101,7 @@ public:
         CO_RETURN true;
     }
 
-    virtual void SetUp()
+    virtual void set_up()
     {
         has_stopped_ = false;
         io_scheduler_ = coro::io_scheduler::make_shared(
@@ -143,7 +143,7 @@ public:
         CO_RETURN;
     }
 
-    virtual void TearDown()
+    virtual void tear_down()
     {
         io_scheduler_->schedule(CoroTearDown());
         while (has_stopped_ == false)

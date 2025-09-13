@@ -116,8 +116,10 @@ namespace rpc
         }
 
         CORO_TASK(int)
-        release(
-            uint64_t protocol_version, destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id,
+        release(uint64_t protocol_version,
+            destination_zone destination_zone_id,
+            object object_id,
+            caller_zone caller_zone_id,
             uint64_t& reference_count) override
         {
             auto ret = CO_AWAIT parent_service_.lock()->release(
@@ -236,7 +238,7 @@ namespace rpc
                 CO_RETURN rpc::error::ZONE_NOT_INITIALISED();
             CO_RETURN CO_AWAIT child_service->try_cast(protocol_version, destination_zone_id, object_id, interface_id);
         }
-        int add_ref(uint64_t protocol_version,
+        CORO_TASK(int) add_ref(uint64_t protocol_version,
             destination_channel_zone destination_channel_zone_id,
             destination_zone destination_zone_id,
             object object_id,
@@ -248,9 +250,10 @@ namespace rpc
         {
             auto child_service = child_service_.get_nullable();
             RPC_ASSERT(child_service);
-            if (!child_service) {
+            if (!child_service)
+            {
                 reference_count = 0;
-                return rpc::error::ZONE_NOT_INITIALISED();
+                CO_RETURN rpc::error::ZONE_NOT_INITIALISED();
             }
             auto ret = CO_AWAIT child_service->add_ref(protocol_version,
                 destination_channel_zone_id,
@@ -263,11 +266,22 @@ namespace rpc
                 reference_count);
             CO_RETURN ret;
         }
-        CORO_TASK(int) release(
-            uint64_t protocol_version, destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id,
+        CORO_TASK(int)
+        release(uint64_t protocol_version,
+            destination_zone destination_zone_id,
+            object object_id,
+            caller_zone caller_zone_id,
             uint64_t& reference_count) override
         {
-            auto ret = CO_AWAIT child_service_->release(protocol_version, destination_zone_id, object_id, caller_zone_id);
+            auto child_service = child_service_.get_nullable();
+            RPC_ASSERT(child_service);
+            if (!child_service)
+            {
+                reference_count = 0;
+                CO_RETURN rpc::error::ZONE_NOT_INITIALISED();
+            }
+
+            auto ret = CO_AWAIT child_service->release(protocol_version, destination_zone_id, object_id, caller_zone_id, reference_count);
             CO_RETURN ret;
         }
 

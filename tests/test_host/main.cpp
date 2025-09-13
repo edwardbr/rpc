@@ -201,9 +201,16 @@ template<class T> class type_test : public testing::Test
 
 public:
     T& get_lib() { return lib_; }
+    const T& get_lib() const { return lib_; }
 
-    void SetUp() override { this->lib_.set_up(); }
-    void TearDown() override { this->lib_.tear_down(); }
+    void SetUp() override 
+    { 
+        this->lib_.set_up();
+    }
+    void TearDown() override 
+    { 
+        this->lib_.tear_down();
+    }
 };
 
 using local_implementations = ::testing::Types<in_memory_setup<false>,
@@ -249,6 +256,40 @@ using local_implementations = ::testing::Types<in_memory_setup<false>,
 #endif
     >;
 TYPED_TEST_SUITE(type_test, local_implementations);
+
+// Template helper for GTEST + coroutine integration
+#define CORO_TYPED_TEST(test_suite, test_name, coro_function) \
+    TYPED_TEST(test_suite, test_name) \
+    { \
+        bool is_ready = false; \
+        auto& lib = this->get_lib(); \
+        _Pragma("GCC diagnostic push") \
+        _Pragma("GCC diagnostic ignored \"-Wunused-variable\"") \
+        __attribute__((unused)) auto& context = *this; \
+        _Pragma("GCC diagnostic pop") \
+        (void)context; \
+        coro_function(is_ready, lib, *this); \
+    }
+
+#define CORO_TYPED_TEST_WITH_SCHEDULER(test_suite, test_name, coro_function) \
+    TYPED_TEST(test_suite, test_name) \
+    { \
+        bool is_ready = false; \
+        auto& lib = this->get_lib(); \
+        const auto& context = *this; \
+        (void)context; \
+    _Pragma("GCC diagnostic push") \
+    _Pragma("GCC diagnostic ignored \"-Wunused-variable\"") \
+    __attribute__((unused)) auto& ctx_ref = context; \
+    _Pragma("GCC diagnostic pop") \
+        (void)ctx_ref; \
+        lib.get_scheduler()->schedule(coro_function(is_ready, lib, context)); \
+        while (!is_ready) \
+        { \
+            lib.get_scheduler()->process_events(std::chrono::milliseconds(1)); \
+        } \
+        ASSERT_EQ(lib.error_has_occured(), false); \
+    }
 
 TYPED_TEST(type_test, initialisation_test) { }
 
@@ -386,7 +427,7 @@ template<class T> CORO_TASK(void) coro_remote_standard_tests(bool& is_ready, T& 
     auto ret = CO_AWAIT lib.get_example()->create_foo(i_foo_ptr);
     if (ret != rpc::error::OK())
     {
-        LOG_CSTR("failed create_foo");
+        RPC_ERROR("failed create_foo");
         CO_RETURN;
     }
     CO_AWAIT standard_tests(*i_foo_ptr, lib.get_has_enclave());
@@ -564,14 +605,15 @@ CORO_TASK(void)
 coro_create_new_zone_releasing_host_then_running_on_other_enclave(
     bool& is_ready, T& lib, const rpc::shared_ptr<yyy::i_host>& host)
 {
-    GTEST_SKIP() << "for later";
+    // GTEST_SKIP() << "for later";  // Skip not supported in coroutines, returning early
+    CO_RETURN;
     auto example_relay_ptr = CO_AWAIT lib.create_new_zone();
     rpc::shared_ptr<xxx::i_foo> i_foo_relay_ptr;
     CO_AWAIT example_relay_ptr->create_foo(i_foo_relay_ptr);
-    // CO_AWAIT standard_tests(*i_foo_relay_ptr, true);
+    // SYNC_WAIT standard_tests(*i_foo_relay_ptr, true);
     
     // rpc::shared_ptr<yyy::i_host> host_copy;
-    // CO_AWAIT example_relay_ptr->get_host(host_copy);
+    // SYNC_WAIT example_relay_ptr->get_host(host_copy);
             
     // {
     //     auto example_o = rpc::casting_interface::get_object_id(*example_relay_ptr);
@@ -1039,11 +1081,12 @@ TYPED_TEST(remote_type_test, create_new_zone_releasing_host_then_running_on_othe
     // ASSERT_EQ(input, output);
 // }
 
-TYPED_TEST(remote_type_test, check_deeply_nested_zone_reference_counting_fork_scenario)
+template<class T> CORO_TASK(void) coro_check_deeply_nested_zone_reference_counting_fork_scenario(bool& is_ready, T& lib)
 {
-    auto& lib = this->get_lib();
-    if (!lib.get_use_host_in_child())
-        return;
+    if (!lib.get_use_host_in_child()) {
+        is_ready = true;
+        CO_RETURN;
+    }
 
     // Create a complex branching topology to test untested path on line 792
     // This tests scenario where dest_channel == caller_channel && build_channel
@@ -1060,67 +1103,86 @@ TYPED_TEST(remote_type_test, check_deeply_nested_zone_reference_counting_fork_sc
 
     // Create the initial hierarchy
     rpc::shared_ptr<yyy::i_example> level2_left;
-    ASSERT_EQ(lib.get_example()->create_example_in_subordinate_zone(level2_left, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    CORO_VOID_ASSERT_EQ(CO_AWAIT lib.get_example()->create_example_in_subordinate_zone(level2_left, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
 
-    rpc::shared_ptr<yyy::i_example> level2_right;  
-    ASSERT_EQ(lib.get_example()->create_example_in_subordinate_zone(level2_right, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    rpc::shared_ptr<yyy::i_example> level2_right;
+    CORO_VOID_ASSERT_EQ(CO_AWAIT lib.get_example()->create_example_in_subordinate_zone(level2_right, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
 
     rpc::shared_ptr<yyy::i_example> level4_left;
-    ASSERT_EQ(level2_left->create_example_in_subordinate_zone(level4_left, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    CORO_VOID_ASSERT_EQ(CO_AWAIT level2_left->create_example_in_subordinate_zone(level4_left, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
 
     rpc::shared_ptr<yyy::i_example> level5_shared;
-    ASSERT_EQ(level2_left->create_example_in_subordinate_zone(level5_shared, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    CORO_VOID_ASSERT_EQ(CO_AWAIT level2_left->create_example_in_subordinate_zone(level5_shared, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
 
     rpc::shared_ptr<yyy::i_example> level8_isolated;
-    ASSERT_EQ(level2_right->create_example_in_subordinate_zone(level8_isolated, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    CORO_VOID_ASSERT_EQ(CO_AWAIT level2_right->create_example_in_subordinate_zone(level8_isolated, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
 
     // Create deeply nested child zones
     rpc::shared_ptr<yyy::i_example> level6_deep;
-    ASSERT_EQ(level4_left->create_example_in_subordinate_zone(level6_deep, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    CORO_VOID_ASSERT_EQ(CO_AWAIT level4_left->create_example_in_subordinate_zone(level6_deep, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
 
     rpc::shared_ptr<yyy::i_example> level7_deep;
-    ASSERT_EQ(level5_shared->create_example_in_subordinate_zone(level7_deep, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    CORO_VOID_ASSERT_EQ(CO_AWAIT level5_shared->create_example_in_subordinate_zone(level7_deep, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
 
     // Create objects in different zones
     rpc::shared_ptr<xxx::i_baz> baz_from_level6;
-    level6_deep->create_baz(baz_from_level6);
+    CORO_VOID_ASSERT_EQ(CO_AWAIT level6_deep->create_baz(baz_from_level6), rpc::error::OK());
 
-    rpc::shared_ptr<xxx::i_baz> baz_from_level7;  
-    level7_deep->create_baz(baz_from_level7);
+    rpc::shared_ptr<xxx::i_baz> baz_from_level7;
+    CORO_VOID_ASSERT_EQ(CO_AWAIT level7_deep->create_baz(baz_from_level7), rpc::error::OK());
 
     rpc::shared_ptr<xxx::i_baz> baz_from_level8;
-    level8_isolated->create_baz(baz_from_level8);
+    CORO_VOID_ASSERT_EQ(CO_AWAIT level8_isolated->create_baz(baz_from_level8), rpc::error::OK());
 
     // Test complex routing scenarios that should trigger the untested path
     // Pass interface from level6 to level8 via level2_right - this should create
     // a scenario where the channels converge (dest_channel == caller_channel)
     rpc::shared_ptr<xxx::i_baz> output;
-    
+
     // This routing should exercise the fork logic in service::add_ref line 792
-    ASSERT_EQ(level8_isolated->send_interface_back(baz_from_level6, output), rpc::error::OK());
-    ASSERT_EQ(baz_from_level6, output);
+    CORO_VOID_ASSERT_EQ(CO_AWAIT level8_isolated->send_interface_back(baz_from_level6, output), rpc::error::OK());
+    CORO_VOID_ASSERT_EQ(baz_from_level6, output);
 
     // Cross-branch routing from level7 to level8
-    ASSERT_EQ(level8_isolated->send_interface_back(baz_from_level7, output), rpc::error::OK()); 
-    ASSERT_EQ(baz_from_level7, output);
+    CORO_VOID_ASSERT_EQ(CO_AWAIT level8_isolated->send_interface_back(baz_from_level7, output), rpc::error::OK());
+    CORO_VOID_ASSERT_EQ(baz_from_level7, output);
 
     // Test reverse routing that might expose the second untested path
-    ASSERT_EQ(level6_deep->send_interface_back(baz_from_level8, output), rpc::error::OK());
-    ASSERT_EQ(baz_from_level8, output);
+    CORO_VOID_ASSERT_EQ(CO_AWAIT level6_deep->send_interface_back(baz_from_level8, output), rpc::error::OK());
+    CORO_VOID_ASSERT_EQ(baz_from_level8, output);
+
+    is_ready = true;
 }
 
-TYPED_TEST(remote_type_test, check_unknown_zone_reference_path)  
+TYPED_TEST(remote_type_test, check_deeply_nested_zone_reference_counting_fork_scenario)
 {
+    bool is_ready = false;
     auto& lib = this->get_lib();
-    if (!lib.get_use_host_in_child())
-        return;
+#ifdef BUILD_COROUTINE
+    lib.get_scheduler()->schedule(coro_check_deeply_nested_zone_reference_counting_fork_scenario(is_ready, lib));
+    while (!is_ready)
+    {
+        lib.get_scheduler()->process_events(std::chrono::milliseconds(1));
+    }
+#else
+    coro_check_deeply_nested_zone_reference_counting_fork_scenario(is_ready, lib);
+#endif
+    ASSERT_EQ(lib.error_has_occured(), false);
+}
+
+template<class T> CORO_TASK(void) coro_check_unknown_zone_reference_path(bool& is_ready, T& lib)
+{
+    if (!lib.get_use_host_in_child()) {
+        is_ready = true;
+        CO_RETURN;
+    }
 
     // Create a topology designed to trigger the untested path on line 870
     // This tests scenario where a zone doesn't know about the caller zone
     //
     // Target topology:
     //   *A3    *B3
-    //    |      |   
+    //    |      |
     //   *A2    *B2
     //    |      |
     //   *A1    *B1
@@ -1129,50 +1191,68 @@ TYPED_TEST(remote_type_test, check_unknown_zone_reference_path)
 
     // Create two separate branch hierarchies
     rpc::shared_ptr<yyy::i_example> branchA_level1;
-    ASSERT_EQ(lib.get_example()->create_example_in_subordinate_zone(branchA_level1, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    CORO_VOID_ASSERT_EQ(CO_AWAIT lib.get_example()->create_example_in_subordinate_zone(branchA_level1, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
 
-    rpc::shared_ptr<yyy::i_example> branchB_level1; 
-    ASSERT_EQ(lib.get_example()->create_example_in_subordinate_zone(branchB_level1, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    rpc::shared_ptr<yyy::i_example> branchB_level1;
+    CORO_VOID_ASSERT_EQ(CO_AWAIT lib.get_example()->create_example_in_subordinate_zone(branchB_level1, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
 
     // Extend each branch deeper
     rpc::shared_ptr<yyy::i_example> branchA_level2;
-    ASSERT_EQ(branchA_level1->create_example_in_subordinate_zone(branchA_level2, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    CORO_VOID_ASSERT_EQ(CO_AWAIT branchA_level1->create_example_in_subordinate_zone(branchA_level2, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
 
     rpc::shared_ptr<yyy::i_example> branchA_level3;
-    ASSERT_EQ(branchA_level2->create_example_in_subordinate_zone(branchA_level3, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    CORO_VOID_ASSERT_EQ(CO_AWAIT branchA_level2->create_example_in_subordinate_zone(branchA_level3, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
 
     rpc::shared_ptr<yyy::i_example> branchB_level2;
-    ASSERT_EQ(branchB_level1->create_example_in_subordinate_zone(branchB_level2, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    CORO_VOID_ASSERT_EQ(CO_AWAIT branchB_level1->create_example_in_subordinate_zone(branchB_level2, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
 
     rpc::shared_ptr<yyy::i_example> branchB_level3;
-    ASSERT_EQ(branchB_level2->create_example_in_subordinate_zone(branchB_level3, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    CORO_VOID_ASSERT_EQ(CO_AWAIT branchB_level2->create_example_in_subordinate_zone(branchB_level3, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
 
-    // Create objects in the deepest zones  
+    // Create objects in the deepest zones
     rpc::shared_ptr<xxx::i_baz> baz_from_branchA;
-    branchA_level3->create_baz(baz_from_branchA);
+    CORO_VOID_ASSERT_EQ(CO_AWAIT branchA_level3->create_baz(baz_from_branchA), rpc::error::OK());
 
     rpc::shared_ptr<xxx::i_baz> baz_from_branchB;
-    branchB_level3->create_baz(baz_from_branchB);
+    CORO_VOID_ASSERT_EQ(CO_AWAIT branchB_level3->create_baz(baz_from_branchB), rpc::error::OK());
 
     // This cross-branch communication should trigger the unknown zone path
-    // when branchB_level3 tries to route back to branchA_level3 but doesn't 
+    // when branchB_level3 tries to route back to branchA_level3 but doesn't
     // know about branchA's hierarchy
     rpc::shared_ptr<xxx::i_baz> output;
-    
+
     // This should exercise the unknown caller zone logic on line 870
-    ASSERT_EQ(branchB_level3->send_interface_back(baz_from_branchA, output), rpc::error::OK());
-    ASSERT_EQ(baz_from_branchA, output);
+    CORO_VOID_ASSERT_EQ(CO_AWAIT branchB_level3->send_interface_back(baz_from_branchA, output), rpc::error::OK());
+    CORO_VOID_ASSERT_EQ(baz_from_branchA, output);
 
     // Reverse direction
-    ASSERT_EQ(branchA_level3->send_interface_back(baz_from_branchB, output), rpc::error::OK());
-    ASSERT_EQ(baz_from_branchB, output);
+    CORO_VOID_ASSERT_EQ(CO_AWAIT branchA_level3->send_interface_back(baz_from_branchB, output), rpc::error::OK());
+    CORO_VOID_ASSERT_EQ(baz_from_branchB, output);
 
-    // Test intermediate level cross-communication  
-    ASSERT_EQ(branchB_level2->send_interface_back(baz_from_branchA, output), rpc::error::OK());
-    ASSERT_EQ(baz_from_branchA, output);
+    // Test intermediate level cross-communication
+    CORO_VOID_ASSERT_EQ(CO_AWAIT branchB_level2->send_interface_back(baz_from_branchA, output), rpc::error::OK());
+    CORO_VOID_ASSERT_EQ(baz_from_branchA, output);
 
-    ASSERT_EQ(branchA_level2->send_interface_back(baz_from_branchB, output), rpc::error::OK());
-    ASSERT_EQ(baz_from_branchB, output);
+    CORO_VOID_ASSERT_EQ(CO_AWAIT branchA_level2->send_interface_back(baz_from_branchB, output), rpc::error::OK());
+    CORO_VOID_ASSERT_EQ(baz_from_branchB, output);
+
+    is_ready = true;
+}
+
+TYPED_TEST(remote_type_test, check_unknown_zone_reference_path)
+{
+    bool is_ready = false;
+    auto& lib = this->get_lib();
+#ifdef BUILD_COROUTINE
+    lib.get_scheduler()->schedule(coro_check_unknown_zone_reference_path(is_ready, lib));
+    while (!is_ready)
+    {
+        lib.get_scheduler()->process_events(std::chrono::milliseconds(1));
+    }
+#else
+    coro_check_unknown_zone_reference_path(is_ready, lib);
+#endif
+    ASSERT_EQ(lib.error_has_occured(), false);
 }
 
 // Helper structure to hold the complex topology
@@ -1221,287 +1301,310 @@ struct complex_topology_nodes {
 
 // Helper function to build the complex topology
 template<class T>
-complex_topology_nodes build_complex_topology(T& test_instance) {
+CORO_TASK(complex_topology_nodes) build_complex_topology(const T& test_instance) {
     complex_topology_nodes nodes;
-    auto& lib = test_instance.get_lib();
+    auto& lib = const_cast<T&>(test_instance).get_lib();
 
     // Build the root hierarchy
-    EXPECT_EQ(lib.get_example()->create_example_in_subordinate_zone(nodes.child_1, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
-    EXPECT_EQ(nodes.child_1->create_example_in_subordinate_zone(nodes.child_2, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
-    EXPECT_EQ(nodes.child_2->create_example_in_subordinate_zone(nodes.child_3, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    EXPECT_EQ(CO_AWAIT lib.get_example()->create_example_in_subordinate_zone(nodes.child_1, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    EXPECT_EQ(CO_AWAIT nodes.child_1->create_example_in_subordinate_zone(nodes.child_2, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    EXPECT_EQ(CO_AWAIT nodes.child_2->create_example_in_subordinate_zone(nodes.child_3, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
 
     // Build branch 1 grandchild hierarchy
-    EXPECT_EQ(nodes.child_3->create_example_in_subordinate_zone(nodes.grandchild_1_1, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
-    EXPECT_EQ(nodes.grandchild_1_1->create_example_in_subordinate_zone(nodes.grandchild_1_2, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
-    EXPECT_EQ(nodes.grandchild_1_2->create_example_in_subordinate_zone(nodes.grandchild_1_3, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
-    EXPECT_EQ(nodes.grandchild_1_3->create_example_in_subordinate_zone(nodes.grandchild_1_4, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    EXPECT_EQ(CO_AWAIT nodes.child_3->create_example_in_subordinate_zone(nodes.grandchild_1_1, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    EXPECT_EQ(CO_AWAIT nodes.grandchild_1_1->create_example_in_subordinate_zone(nodes.grandchild_1_2, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    EXPECT_EQ(CO_AWAIT nodes.grandchild_1_2->create_example_in_subordinate_zone(nodes.grandchild_1_3, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    EXPECT_EQ(CO_AWAIT nodes.grandchild_1_3->create_example_in_subordinate_zone(nodes.grandchild_1_4, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
 
     // Build branch 2 grandchild hierarchy  
-    EXPECT_EQ(nodes.child_3->create_example_in_subordinate_zone(nodes.grandchild_2_1, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
-    EXPECT_EQ(nodes.grandchild_2_1->create_example_in_subordinate_zone(nodes.grandchild_2_2, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
-    EXPECT_EQ(nodes.grandchild_2_2->create_example_in_subordinate_zone(nodes.grandchild_2_3, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
-    EXPECT_EQ(nodes.grandchild_2_3->create_example_in_subordinate_zone(nodes.grandchild_2_4, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    EXPECT_EQ(CO_AWAIT nodes.child_3->create_example_in_subordinate_zone(nodes.grandchild_2_1, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    EXPECT_EQ(CO_AWAIT nodes.grandchild_2_1->create_example_in_subordinate_zone(nodes.grandchild_2_2, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    EXPECT_EQ(CO_AWAIT nodes.grandchild_2_2->create_example_in_subordinate_zone(nodes.grandchild_2_3, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    EXPECT_EQ(CO_AWAIT nodes.grandchild_2_3->create_example_in_subordinate_zone(nodes.grandchild_2_4, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
 
     // Build branch 1, sub-branch 1 great-grandchild hierarchy
-    EXPECT_EQ(nodes.grandchild_1_4->create_example_in_subordinate_zone(nodes.great_grandchild_1_1_1, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
-    EXPECT_EQ(nodes.great_grandchild_1_1_1->create_example_in_subordinate_zone(nodes.great_grandchild_1_1_2, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
-    EXPECT_EQ(nodes.great_grandchild_1_1_2->create_example_in_subordinate_zone(nodes.great_grandchild_1_1_3, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
-    EXPECT_EQ(nodes.great_grandchild_1_1_3->create_example_in_subordinate_zone(nodes.great_grandchild_1_1_4, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    EXPECT_EQ(CO_AWAIT nodes.grandchild_1_4->create_example_in_subordinate_zone(nodes.great_grandchild_1_1_1, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    EXPECT_EQ(CO_AWAIT nodes.great_grandchild_1_1_1->create_example_in_subordinate_zone(nodes.great_grandchild_1_1_2, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    EXPECT_EQ(CO_AWAIT nodes.great_grandchild_1_1_2->create_example_in_subordinate_zone(nodes.great_grandchild_1_1_3, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    EXPECT_EQ(CO_AWAIT nodes.great_grandchild_1_1_3->create_example_in_subordinate_zone(nodes.great_grandchild_1_1_4, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
 
     // Build branch 1, sub-branch 2 great-grandchild hierarchy
-    EXPECT_EQ(nodes.grandchild_1_4->create_example_in_subordinate_zone(nodes.great_grandchild_1_2_1, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
-    EXPECT_EQ(nodes.great_grandchild_1_2_1->create_example_in_subordinate_zone(nodes.great_grandchild_1_2_2, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
-    EXPECT_EQ(nodes.great_grandchild_1_2_2->create_example_in_subordinate_zone(nodes.great_grandchild_1_2_3, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
-    EXPECT_EQ(nodes.great_grandchild_1_2_3->create_example_in_subordinate_zone(nodes.great_grandchild_1_2_4, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
-
+    EXPECT_EQ(CO_AWAIT nodes.grandchild_1_4->create_example_in_subordinate_zone(nodes.great_grandchild_1_2_1, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    EXPECT_EQ(CO_AWAIT nodes.great_grandchild_1_2_1->create_example_in_subordinate_zone(nodes.great_grandchild_1_2_2, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    EXPECT_EQ(CO_AWAIT nodes.great_grandchild_1_2_2->create_example_in_subordinate_zone(nodes.great_grandchild_1_2_3, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    EXPECT_EQ(CO_AWAIT nodes.great_grandchild_1_2_3->create_example_in_subordinate_zone(nodes.great_grandchild_1_2_4, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
     // Build branch 2, sub-branch 1 great-grandchild hierarchy
-    EXPECT_EQ(nodes.grandchild_2_4->create_example_in_subordinate_zone(nodes.great_grandchild_2_1_1, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
-    EXPECT_EQ(nodes.great_grandchild_2_1_1->create_example_in_subordinate_zone(nodes.great_grandchild_2_1_2, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
-    EXPECT_EQ(nodes.great_grandchild_2_1_2->create_example_in_subordinate_zone(nodes.great_grandchild_2_1_3, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
-    EXPECT_EQ(nodes.great_grandchild_2_1_3->create_example_in_subordinate_zone(nodes.great_grandchild_2_1_4, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    EXPECT_EQ(CO_AWAIT nodes.grandchild_2_4->create_example_in_subordinate_zone(nodes.great_grandchild_2_1_1, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    EXPECT_EQ(CO_AWAIT nodes.great_grandchild_2_1_1->create_example_in_subordinate_zone(nodes.great_grandchild_2_1_2, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    EXPECT_EQ(CO_AWAIT nodes.great_grandchild_2_1_2->create_example_in_subordinate_zone(nodes.great_grandchild_2_1_3, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    EXPECT_EQ(CO_AWAIT nodes.great_grandchild_2_1_3->create_example_in_subordinate_zone(nodes.great_grandchild_2_1_4, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
 
     // Build branch 2, sub-branch 2 great-grandchild hierarchy
-    EXPECT_EQ(nodes.grandchild_2_4->create_example_in_subordinate_zone(nodes.great_grandchild_2_2_1, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
-    EXPECT_EQ(nodes.great_grandchild_2_2_1->create_example_in_subordinate_zone(nodes.great_grandchild_2_2_2, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
-    EXPECT_EQ(nodes.great_grandchild_2_2_2->create_example_in_subordinate_zone(nodes.great_grandchild_2_2_3, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
-    EXPECT_EQ(nodes.great_grandchild_2_2_3->create_example_in_subordinate_zone(nodes.great_grandchild_2_2_4, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    EXPECT_EQ(CO_AWAIT nodes.grandchild_2_4->create_example_in_subordinate_zone(nodes.great_grandchild_2_2_1, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    EXPECT_EQ(CO_AWAIT nodes.great_grandchild_2_2_1->create_example_in_subordinate_zone(nodes.great_grandchild_2_2_2, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    EXPECT_EQ(CO_AWAIT nodes.great_grandchild_2_2_2->create_example_in_subordinate_zone(nodes.great_grandchild_2_2_3, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    EXPECT_EQ(CO_AWAIT nodes.great_grandchild_2_2_3->create_example_in_subordinate_zone(nodes.great_grandchild_2_2_4, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
 
-    return nodes;
+    CO_RETURN nodes;
 }
 
-TYPED_TEST(remote_type_test, complex_topology_cross_branch_routing_trap_1)
-{
-    auto& lib = this->get_lib();
-    if (!lib.get_use_host_in_child())
-        return;
+template<class T> CORO_TASK(void) coro_complex_topology_cross_branch_routing_trap_1(bool& is_ready, T& lib, const auto& context) {
+    if (!lib.get_use_host_in_child()) {
+        is_ready = true;
+        CO_RETURN;
+    }
 
     // Test 1: Cross-branch routing between deepest nodes without any prior communication
     // This should stress the unknown zone reference path at line 870
     // Strategy: Create object in great_grandchild_1_1_4, route it to great_grandchild_2_2_4
     // These two nodes are in completely separate sub-branches with no established routes
 
-    auto nodes = build_complex_topology(*this);
+    auto nodes = CO_AWAIT build_complex_topology(context);
 
     // Create test objects in the deepest nodes of different branches
     rpc::shared_ptr<xxx::i_baz> baz_from_1_1_4;
-    nodes.great_grandchild_1_1_4->create_baz(baz_from_1_1_4);
+    CORO_VOID_ASSERT_EQ(CO_AWAIT nodes.great_grandchild_1_1_4->create_baz(baz_from_1_1_4), rpc::error::OK());
 
     // Critical test: Route from great_grandchild_2_2_4 to great_grandchild_1_1_4
-    // This requires routing across: 2_2_4 -> 2_2_3 -> 2_2_2 -> 2_2_1 -> grandchild_2_4 -> 
-    // grandchild_2_3 -> grandchild_2_2 -> grandchild_2_1 -> child_3 -> grandchild_1_1 -> 
-    // grandchild_1_2 -> grandchild_1_3 -> grandchild_1_4 -> great_grandchild_1_1_1 -> 
+    // This requires routing across: 2_2_4 -> 2_2_3 -> 2_2_2 -> 2_2_1 -> grandchild_2_4 ->
+    // grandchild_2_3 -> grandchild_2_2 -> grandchild_2_1 -> child_3 -> grandchild_1_1 ->
+    // grandchild_1_2 -> grandchild_1_3 -> grandchild_1_4 -> great_grandchild_1_1_1 ->
     // great_grandchild_1_1_2 -> great_grandchild_1_1_3 -> great_grandchild_1_1_4
     // This should trigger unknown zone reference logic
     rpc::shared_ptr<xxx::i_baz> output;
-    ASSERT_EQ(nodes.great_grandchild_2_2_4->send_interface_back(baz_from_1_1_4, output), rpc::error::OK());
-    ASSERT_EQ(baz_from_1_1_4, output);
+    CORO_VOID_ASSERT_EQ(CO_AWAIT nodes.great_grandchild_2_2_4->send_interface_back(baz_from_1_1_4, output), rpc::error::OK());
+    CORO_VOID_ASSERT_EQ(baz_from_1_1_4, output);
+
+    is_ready = true;
 }
 
-TYPED_TEST(remote_type_test, complex_topology_intermediate_channel_collision_trap_2)
-{
-    auto& lib = this->get_lib();
-    if (!lib.get_use_host_in_child())
-        return;
+CORO_TYPED_TEST_WITH_SCHEDULER(remote_type_test, complex_topology_cross_branch_routing_trap_1, coro_complex_topology_cross_branch_routing_trap_1)
+
+template<class T> CORO_TASK(void) coro_complex_topology_intermediate_channel_collision_trap_2(bool& is_ready, T& lib, const auto& context) {
+    if (!lib.get_use_host_in_child()) {
+        is_ready = true;
+        CO_RETURN;
+    }
 
     // Test 2: Create scenario where dest_channel == caller_channel && build_channel
     // This should target the untested path at line 792
     // Strategy: Create routing scenario where channels converge at an intermediate node
 
-    auto nodes = build_complex_topology(*this);
+    auto nodes = CO_AWAIT build_complex_topology(context);
 
     // Create objects at strategic points to force channel convergence
     rpc::shared_ptr<xxx::i_baz> baz_from_1_2_3;
-    nodes.great_grandchild_1_2_3->create_baz(baz_from_1_2_3);
+    CORO_VOID_ASSERT_EQ(CO_AWAIT nodes.great_grandchild_1_2_3->create_baz(baz_from_1_2_3), rpc::error::OK());
 
     rpc::shared_ptr<xxx::i_baz> baz_from_2_1_3;
-    nodes.great_grandchild_2_1_3->create_baz(baz_from_2_1_3);
+    CORO_VOID_ASSERT_EQ(CO_AWAIT nodes.great_grandchild_2_1_3->create_baz(baz_from_2_1_3), rpc::error::OK());
 
     // Route through grandchild_1_4 which is a convergence point for both sub-branches
     // This might create a scenario where routing channels collide
     rpc::shared_ptr<xxx::i_baz> output;
-    ASSERT_EQ(nodes.great_grandchild_1_1_2->send_interface_back(baz_from_2_1_3, output), rpc::error::OK());
-    ASSERT_EQ(baz_from_2_1_3, output);
+    CORO_VOID_ASSERT_EQ(CO_AWAIT nodes.great_grandchild_1_1_2->send_interface_back(baz_from_2_1_3, output), rpc::error::OK());
+    CORO_VOID_ASSERT_EQ(baz_from_2_1_3, output);
 
-    ASSERT_EQ(nodes.great_grandchild_2_1_2->send_interface_back(baz_from_1_2_3, output), rpc::error::OK());
-    ASSERT_EQ(baz_from_1_2_3, output);
+    CORO_VOID_ASSERT_EQ(CO_AWAIT nodes.great_grandchild_2_1_2->send_interface_back(baz_from_1_2_3, output), rpc::error::OK());
+    CORO_VOID_ASSERT_EQ(baz_from_1_2_3, output);
+
+    is_ready = true;
 }
 
-TYPED_TEST(remote_type_test, complex_topology_deep_nesting_parent_fallback_trap_3)
-{
-    auto& lib = this->get_lib();
-    if (!lib.get_use_host_in_child())
-        return;
+CORO_TYPED_TEST_WITH_SCHEDULER(remote_type_test, complex_topology_intermediate_channel_collision_trap_2, coro_complex_topology_intermediate_channel_collision_trap_2)
+
+template<class T> CORO_TASK(void) coro_complex_topology_deep_nesting_parent_fallback_trap_3(bool& is_ready, T& lib, const auto& context) {
+    if (!lib.get_use_host_in_child()) {
+        is_ready = true;
+        CO_RETURN;
+    }
 
     // Test 3: Deep nesting with parent fallback failure
     // Force scenarios where get_parent() fallback should fail
     // Strategy: Create routing from the deepest possible nodes
 
-    auto nodes = build_complex_topology(*this);
+    auto nodes = CO_AWAIT build_complex_topology(context);
 
     // Create objects at maximum depth
     rpc::shared_ptr<xxx::i_baz> baz_1_1_4;
-    nodes.great_grandchild_1_1_4->create_baz(baz_1_1_4);
+    CORO_VOID_ASSERT_EQ(CO_AWAIT nodes.great_grandchild_1_1_4->create_baz(baz_1_1_4), rpc::error::OK());
 
-    rpc::shared_ptr<xxx::i_baz> baz_1_2_4;  
-    nodes.great_grandchild_1_2_4->create_baz(baz_1_2_4);
+    rpc::shared_ptr<xxx::i_baz> baz_1_2_4;
+    CORO_VOID_ASSERT_EQ(CO_AWAIT nodes.great_grandchild_1_2_4->create_baz(baz_1_2_4), rpc::error::OK());
 
     rpc::shared_ptr<xxx::i_baz> baz_2_1_4;
-    nodes.great_grandchild_2_1_4->create_baz(baz_2_1_4);
+    CORO_VOID_ASSERT_EQ(CO_AWAIT nodes.great_grandchild_2_1_4->create_baz(baz_2_1_4), rpc::error::OK());
 
     rpc::shared_ptr<xxx::i_baz> baz_2_2_4;
-    nodes.great_grandchild_2_2_4->create_baz(baz_2_2_4);
+    CORO_VOID_ASSERT_EQ(CO_AWAIT nodes.great_grandchild_2_2_4->create_baz(baz_2_2_4), rpc::error::OK());
 
     // Cross-routing between all deepest nodes - maximum challenge for parent lookups
     rpc::shared_ptr<xxx::i_baz> output;
-    
-    ASSERT_EQ(nodes.great_grandchild_1_1_4->send_interface_back(baz_2_2_4, output), rpc::error::OK());
-    ASSERT_EQ(baz_2_2_4, output);
 
-    ASSERT_EQ(nodes.great_grandchild_1_2_4->send_interface_back(baz_2_1_4, output), rpc::error::OK());
-    ASSERT_EQ(baz_2_1_4, output);
+    CORO_VOID_ASSERT_EQ(CO_AWAIT nodes.great_grandchild_1_1_4->send_interface_back(baz_2_2_4, output), rpc::error::OK());
+    CORO_VOID_ASSERT_EQ(baz_2_2_4, output);
 
-    ASSERT_EQ(nodes.great_grandchild_2_1_4->send_interface_back(baz_1_2_4, output), rpc::error::OK());
-    ASSERT_EQ(baz_1_2_4, output);
+    CORO_VOID_ASSERT_EQ(CO_AWAIT nodes.great_grandchild_1_2_4->send_interface_back(baz_2_1_4, output), rpc::error::OK());
+    CORO_VOID_ASSERT_EQ(baz_2_1_4, output);
 
-    ASSERT_EQ(nodes.great_grandchild_2_2_4->send_interface_back(baz_1_1_4, output), rpc::error::OK());
-    ASSERT_EQ(baz_1_1_4, output);
+    CORO_VOID_ASSERT_EQ(CO_AWAIT nodes.great_grandchild_2_1_4->send_interface_back(baz_1_2_4, output), rpc::error::OK());
+    CORO_VOID_ASSERT_EQ(baz_1_2_4, output);
+
+    CORO_VOID_ASSERT_EQ(CO_AWAIT nodes.great_grandchild_2_2_4->send_interface_back(baz_1_1_4, output), rpc::error::OK());
+    CORO_VOID_ASSERT_EQ(baz_1_1_4, output);
+
+    is_ready = true;
 }
 
-TYPED_TEST(remote_type_test, complex_topology_service_proxy_cache_bypass_trap_4)
-{
-    auto& lib = this->get_lib();
-    if (!lib.get_use_host_in_child())
-        return;
+CORO_TYPED_TEST_WITH_SCHEDULER(remote_type_test, complex_topology_deep_nesting_parent_fallback_trap_3, coro_complex_topology_deep_nesting_parent_fallback_trap_3)
+
+template<class T> CORO_TASK(void) coro_complex_topology_service_proxy_cache_bypass_trap_4(bool& is_ready, T& lib, const auto& context) {
+    if (!lib.get_use_host_in_child()) {
+        is_ready = true;
+        CO_RETURN;
+    }
 
     // Test 4: Service proxy cache bypass scenarios
     // Create routing patterns that might bypass established service proxy caches
     // Strategy: Interleave operations to confuse the caching mechanism
 
-    auto nodes = build_complex_topology(*this);
+    auto nodes = CO_AWAIT build_complex_topology(context);
 
     // Create objects at various levels
     rpc::shared_ptr<xxx::i_baz> baz_child3;
-    nodes.child_3->create_baz(baz_child3);
+    CORO_VOID_ASSERT_EQ(CO_AWAIT nodes.child_3->create_baz(baz_child3), rpc::error::OK());
 
     rpc::shared_ptr<xxx::i_baz> baz_gc_1_2;
-    nodes.grandchild_1_2->create_baz(baz_gc_1_2);
+    CORO_VOID_ASSERT_EQ(CO_AWAIT nodes.grandchild_1_2->create_baz(baz_gc_1_2), rpc::error::OK());
 
     rpc::shared_ptr<xxx::i_baz> baz_gc_2_3;
-    nodes.grandchild_2_3->create_baz(baz_gc_2_3);
+    CORO_VOID_ASSERT_EQ(CO_AWAIT nodes.grandchild_2_3->create_baz(baz_gc_2_3), rpc::error::OK());
 
     rpc::shared_ptr<xxx::i_baz> baz_ggc_1_1_2;
-    nodes.great_grandchild_1_1_2->create_baz(baz_ggc_1_1_2);
+    CORO_VOID_ASSERT_EQ(CO_AWAIT nodes.great_grandchild_1_1_2->create_baz(baz_ggc_1_1_2), rpc::error::OK());
 
     rpc::shared_ptr<xxx::i_baz> baz_ggc_2_2_3;
-    nodes.great_grandchild_2_2_3->create_baz(baz_ggc_2_2_3);
+    CORO_VOID_ASSERT_EQ(CO_AWAIT nodes.great_grandchild_2_2_3->create_baz(baz_ggc_2_2_3), rpc::error::OK());
 
     // Interleaved routing to stress proxy caching
     rpc::shared_ptr<xxx::i_baz> output;
-    
-    // Route from deep to shallow
-    ASSERT_EQ(nodes.great_grandchild_1_1_2->send_interface_back(baz_child3, output), rpc::error::OK());
-    ASSERT_EQ(baz_child3, output);
 
-    // Route from shallow to deep  
-    ASSERT_EQ(nodes.child_3->send_interface_back(baz_ggc_2_2_3, output), rpc::error::OK());
-    ASSERT_EQ(baz_ggc_2_2_3, output);
+    // Route from deep to shallow
+    CORO_VOID_ASSERT_EQ(CO_AWAIT nodes.great_grandchild_1_1_2->send_interface_back(baz_child3, output), rpc::error::OK());
+    CORO_VOID_ASSERT_EQ(baz_child3, output);
+
+    // Route from shallow to deep
+    CORO_VOID_ASSERT_EQ(CO_AWAIT nodes.child_3->send_interface_back(baz_ggc_2_2_3, output), rpc::error::OK());
+    CORO_VOID_ASSERT_EQ(baz_ggc_2_2_3, output);
 
     // Route cross-branch at intermediate levels
-    ASSERT_EQ(nodes.grandchild_1_2->send_interface_back(baz_gc_2_3, output), rpc::error::OK());
-    ASSERT_EQ(baz_gc_2_3, output);
+    CORO_VOID_ASSERT_EQ(CO_AWAIT nodes.grandchild_1_2->send_interface_back(baz_gc_2_3, output), rpc::error::OK());
+    CORO_VOID_ASSERT_EQ(baz_gc_2_3, output);
 
     // Route from intermediate to deep cross-branch
-    ASSERT_EQ(nodes.grandchild_2_3->send_interface_back(baz_ggc_1_1_2, output), rpc::error::OK());
-    ASSERT_EQ(baz_ggc_1_1_2, output);
+    CORO_VOID_ASSERT_EQ(CO_AWAIT nodes.grandchild_2_3->send_interface_back(baz_ggc_1_1_2, output), rpc::error::OK());
+    CORO_VOID_ASSERT_EQ(baz_ggc_1_1_2, output);
 
     // Final deep-to-intermediate cross routing
-    ASSERT_EQ(nodes.great_grandchild_2_2_3->send_interface_back(baz_gc_1_2, output), rpc::error::OK());
-    ASSERT_EQ(baz_gc_1_2, output);
+    CORO_VOID_ASSERT_EQ(CO_AWAIT nodes.great_grandchild_2_2_3->send_interface_back(baz_gc_1_2, output), rpc::error::OK());
+    CORO_VOID_ASSERT_EQ(baz_gc_1_2, output);
+
+    is_ready = true;
 }
 
-TYPED_TEST(remote_type_test, complex_topology_multiple_convergence_points_trap_5)
-{
-    auto& lib = this->get_lib();
-    if (!lib.get_use_host_in_child())
-        return;
+CORO_TYPED_TEST_WITH_SCHEDULER(remote_type_test, complex_topology_service_proxy_cache_bypass_trap_4, coro_complex_topology_service_proxy_cache_bypass_trap_4)
+
+template<class T> CORO_TASK(void) coro_complex_topology_multiple_convergence_points_trap_5(bool& is_ready, T& lib, const auto& context) {
+    if (!lib.get_use_host_in_child()) {
+        is_ready = true;
+        CO_RETURN;
+    }
 
     // Test 5: Multiple convergence points - stress test for channel collision
     // Create scenarios with multiple potential convergence points that could trigger line 792
     // Strategy: Route through multiple convergence points simultaneously
 
-    auto nodes = build_complex_topology(*this);
+    auto nodes = CO_AWAIT build_complex_topology(context);
 
     // Create objects at convergence points
     rpc::shared_ptr<xxx::i_baz> baz_convergence_child3;
-    nodes.child_3->create_baz(baz_convergence_child3);
+    CORO_VOID_ASSERT_EQ(CO_AWAIT nodes.child_3->create_baz(baz_convergence_child3), rpc::error::OK());
 
-    rpc::shared_ptr<xxx::i_baz> baz_convergence_gc14; 
-    nodes.grandchild_1_4->create_baz(baz_convergence_gc14);
+    rpc::shared_ptr<xxx::i_baz> baz_convergence_gc14;
+    CORO_VOID_ASSERT_EQ(CO_AWAIT nodes.grandchild_1_4->create_baz(baz_convergence_gc14), rpc::error::OK());
 
     rpc::shared_ptr<xxx::i_baz> baz_convergence_gc24;
-    nodes.grandchild_2_4->create_baz(baz_convergence_gc24);
+    CORO_VOID_ASSERT_EQ(CO_AWAIT nodes.grandchild_2_4->create_baz(baz_convergence_gc24), rpc::error::OK());
 
     // Route through all convergence points - should stress channel management
     rpc::shared_ptr<xxx::i_baz> output;
 
     // Route from one convergence point to another via deep branches
-    ASSERT_EQ(nodes.great_grandchild_1_1_1->send_interface_back(baz_convergence_gc24, output), rpc::error::OK());
-    ASSERT_EQ(baz_convergence_gc24, output);
+    CORO_VOID_ASSERT_EQ(CO_AWAIT nodes.great_grandchild_1_1_1->send_interface_back(baz_convergence_gc24, output), rpc::error::OK());
+    CORO_VOID_ASSERT_EQ(baz_convergence_gc24, output);
 
-    ASSERT_EQ(nodes.great_grandchild_2_1_1->send_interface_back(baz_convergence_gc14, output), rpc::error::OK());
-    ASSERT_EQ(baz_convergence_gc14, output);
+    CORO_VOID_ASSERT_EQ(CO_AWAIT nodes.great_grandchild_2_1_1->send_interface_back(baz_convergence_gc14, output), rpc::error::OK());
+    CORO_VOID_ASSERT_EQ(baz_convergence_gc14, output);
 
-    ASSERT_EQ(nodes.great_grandchild_1_2_1->send_interface_back(baz_convergence_child3, output), rpc::error::OK());
-    ASSERT_EQ(baz_convergence_child3, output);
+    CORO_VOID_ASSERT_EQ(CO_AWAIT nodes.great_grandchild_1_2_1->send_interface_back(baz_convergence_child3, output), rpc::error::OK());
+    CORO_VOID_ASSERT_EQ(baz_convergence_child3, output);
 
-    ASSERT_EQ(nodes.great_grandchild_2_2_1->send_interface_back(baz_convergence_child3, output), rpc::error::OK());
-    ASSERT_EQ(baz_convergence_child3, output);
+    CORO_VOID_ASSERT_EQ(CO_AWAIT nodes.great_grandchild_2_2_1->send_interface_back(baz_convergence_child3, output), rpc::error::OK());
+    CORO_VOID_ASSERT_EQ(baz_convergence_child3, output);
+
+    is_ready = true;
 }
 
-TYPED_TEST(remote_type_test, check_interface_routing_with_out_params)
-{
-    auto& lib = this->get_lib();
-    if (!lib.get_use_host_in_child())
-        return;
+CORO_TYPED_TEST_WITH_SCHEDULER(remote_type_test, complex_topology_multiple_convergence_points_trap_5, coro_complex_topology_multiple_convergence_points_trap_5)
+
+template<class T> CORO_TASK(void) coro_check_interface_routing_with_out_params(bool& is_ready, T& lib, const auto& context) {
+    if (!lib.get_use_host_in_child()) {
+        is_ready = true;
+        CO_RETURN;
+    }
 
     // Test the add_ref_options behavior with receive_interface (out-parameter)
     // This specifically tests the routing logic in prepare_out_param
-    
+
     // Create multi-level hierarchy
     rpc::shared_ptr<yyy::i_example> level2;
-    ASSERT_EQ(lib.get_example()->create_example_in_subordinate_zone(level2, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    CORO_VOID_ASSERT_EQ(CO_AWAIT lib.get_example()->create_example_in_subordinate_zone(level2, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
 
     rpc::shared_ptr<yyy::i_example> level3;
-    ASSERT_EQ(level2->create_example_in_subordinate_zone(level3, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    CORO_VOID_ASSERT_EQ(CO_AWAIT level2->create_example_in_subordinate_zone(level3, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
 
     rpc::shared_ptr<yyy::i_example> level4;
-    ASSERT_EQ(level3->create_example_in_subordinate_zone(level4, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    CORO_VOID_ASSERT_EQ(CO_AWAIT level3->create_example_in_subordinate_zone(level4, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
 
     // Create a parallel branch to test cross-routing
     rpc::shared_ptr<yyy::i_example> parallel_branch;
-    ASSERT_EQ(level2->create_example_in_subordinate_zone(parallel_branch, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    CORO_VOID_ASSERT_EQ(CO_AWAIT level2->create_example_in_subordinate_zone(parallel_branch, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
 
     // Test receive_interface calls that should exercise different add_ref_options paths
     rpc::shared_ptr<xxx::i_foo> received_interface;
 
     // This should test build_destination_route | build_caller_route scenario
-    ASSERT_EQ(level4->receive_interface(received_interface), rpc::error::OK());
-    ASSERT_NE(received_interface, nullptr);
+    CORO_VOID_ASSERT_EQ(CO_AWAIT level4->receive_interface(received_interface), rpc::error::OK());
+    CORO_VOID_ASSERT_NE(received_interface, nullptr);
 
     // Cross-zone receive that should test complex routing
-    ASSERT_EQ(parallel_branch->receive_interface(received_interface), rpc::error::OK());
-    ASSERT_NE(received_interface, nullptr);
+    CORO_VOID_ASSERT_EQ(CO_AWAIT parallel_branch->receive_interface(received_interface), rpc::error::OK());
+    CORO_VOID_ASSERT_NE(received_interface, nullptr);
 
     // Test give_interface with complex routing
     rpc::shared_ptr<xxx::i_baz> test_baz;
-    level4->create_baz(test_baz);
+    CORO_VOID_ASSERT_EQ(CO_AWAIT level4->create_baz(test_baz), rpc::error::OK());
 
     // This give_interface call should test in-parameter routing
-    ASSERT_EQ(parallel_branch->give_interface(test_baz), rpc::error::OK());
+    CORO_VOID_ASSERT_EQ(CO_AWAIT parallel_branch->give_interface(test_baz), rpc::error::OK());
 
     // Test from root level to deeply nested
-    ASSERT_EQ(lib.get_example()->give_interface(test_baz), rpc::error::OK());
+    CORO_VOID_ASSERT_EQ(CO_AWAIT lib.get_example()->give_interface(test_baz), rpc::error::OK());
+
+    is_ready = true;
 }
+
+CORO_TYPED_TEST_WITH_SCHEDULER(remote_type_test, check_interface_routing_with_out_params, coro_check_interface_routing_with_out_params)
 
 
 // template <class T>
@@ -1631,13 +1734,13 @@ TYPED_TEST(remote_type_test, check_interface_routing_with_out_params)
 // }
 // #endif
 
-TYPED_TEST(type_test_with_host, create_subordinate_zone)
-{
-    rpc::shared_ptr<yyy::i_example> target;
-    ASSERT_EQ(this->get_lib().get_example()->create_example_in_subordinate_zone(
-                  target, this->get_lib().get_local_host_ptr(), ++(*zone_gen)),
-        rpc::error::OK());
-}
+// TYPED_TEST(type_test_with_host, create_subordinate_zone) // TODO: Missing test suite definition
+// {
+//     rpc::shared_ptr<yyy::i_example> target;
+//     ASSERT_EQ(this->get_lib().get_example()->create_example_in_subordinate_zone(
+//                   target, this->get_lib().get_local_host_ptr(), ++(*zone_gen)),
+//         rpc::error::OK());
+// }
 
 // TYPED_TEST(type_test_with_host, create_subordinate_zone_and_set_in_host)
 // {
@@ -1646,18 +1749,18 @@ TYPED_TEST(type_test_with_host, create_subordinate_zone)
 //     lib.get_host()->look_up_app("foo", target); lib.get_host()->unload_app("foo"); target->set_host(nullptr);
 // }
 
-TYPED_TEST(remote_type_test, test_y_topology_and_return_new_prong_object)
+template<class T> CORO_TASK(void) coro_test_y_topology_and_return_new_prong_object(bool& is_ready, T& lib)
 {
     /*
      * Test for the Y-shaped topology bug described in service.cpp line 222-229:
-     * 
+     *
      * This test creates the complete Y-topology scenario:
      * Zone 1 (root) → Zone 2 → Zone 3 (first prong, factory) → Zone 4 → Zone 5 (deep zone)
      *                         └─ Zone 6 (fork created by Zone 5) → Zone 7 (unknown to Zone 1)
-     * 
+     *
      * Sequence:
      * - Zone 1 (root) creates Zone 2, which creates Zone 3 (first prong factory)
-     * - Zone 3 creates Zone 4, which creates Zone 5 (deep zone, 5 zones deep from root)  
+     * - Zone 3 creates Zone 4, which creates Zone 5 (deep zone, 5 zones deep from root)
      * - Zone 5 AUTONOMOUSLY asks Zone 3 to create Zone 6 → Zone 7 (second prong)
      * - Zone 1 never knows about Zones 6 or 7 (critical for bug reproduction)
      * - Zone 5 gets an object from Zone 7 and passes it to Zone 1
@@ -1665,50 +1768,65 @@ TYPED_TEST(remote_type_test, test_y_topology_and_return_new_prong_object)
      * - The fix: known_direction_zone parameter + reverse proxy creation
      */
     
-    auto& lib = this->get_lib();
-    
     // Create the first prong of the Y: Zone 1 → Zone 2 → Zone 3 (factory)
     rpc::shared_ptr<yyy::i_example> zone2;
-    ASSERT_EQ(lib.get_example()->create_example_in_subordinate_zone(zone2, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
-    ASSERT_NE(zone2, nullptr);
-    
+    CORO_VOID_ASSERT_EQ(CO_AWAIT lib.get_example()->create_example_in_subordinate_zone(zone2, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    CORO_VOID_ASSERT_NE(zone2, nullptr);
+
     rpc::shared_ptr<yyy::i_example> zone3_factory;
-    ASSERT_EQ(zone2->create_example_in_subordinate_zone(zone3_factory, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
-    ASSERT_NE(zone3_factory, nullptr);
-    
+    CORO_VOID_ASSERT_EQ(CO_AWAIT zone2->create_example_in_subordinate_zone(zone3_factory, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    CORO_VOID_ASSERT_NE(zone3_factory, nullptr);
+
     // Continue the first prong: Zone 3 → Zone 4 → Zone 5 (deep zone)
     rpc::shared_ptr<yyy::i_example> zone4;
-    ASSERT_EQ(zone3_factory->create_example_in_subordinate_zone(zone4, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
-    ASSERT_NE(zone4, nullptr);
-    
+    CORO_VOID_ASSERT_EQ(CO_AWAIT zone3_factory->create_example_in_subordinate_zone(zone4, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    CORO_VOID_ASSERT_NE(zone4, nullptr);
+
     rpc::shared_ptr<yyy::i_example> zone5_deep_service;
-    ASSERT_EQ(zone4->create_example_in_subordinate_zone(zone5_deep_service, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
-    ASSERT_NE(zone5_deep_service, nullptr);
-    
+    CORO_VOID_ASSERT_EQ(CO_AWAIT zone4->create_example_in_subordinate_zone(zone5_deep_service, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    CORO_VOID_ASSERT_NE(zone5_deep_service, nullptr);
+
     // THE CRITICAL TEST: Zone 5 autonomously creates the second prong through Zone 3 factory
     // Zone 1 (root) is NOT involved in this call, so it remains unaware of Zone 6 and Zone 7
     // This creates: Zone 3 → Zone 6 → Zone 7 (the fork that Zone 1 doesn't know about)
     std::vector<uint64_t> fork_zone_ids = {++(*zone_gen), ++(*zone_gen)}; // Zone 6, Zone 7
     rpc::shared_ptr<yyy::i_example> object_from_unknown_zone;
-    ASSERT_EQ(zone5_deep_service->create_fork_and_return_object(zone3_factory, fork_zone_ids, object_from_unknown_zone), rpc::error::OK());
-    ASSERT_NE(object_from_unknown_zone, nullptr);
+    CORO_VOID_ASSERT_EQ(CO_AWAIT zone5_deep_service->create_fork_and_return_object(zone3_factory, fork_zone_ids, object_from_unknown_zone), rpc::error::OK());
+    CORO_VOID_ASSERT_NE(object_from_unknown_zone, nullptr);
+
+    is_ready = true;
 }
 
-TYPED_TEST(remote_type_test, test_y_topology_and_cache_and_retrieve_prong_object)
+TYPED_TEST(remote_type_test, test_y_topology_and_return_new_prong_object)
 {
+    bool is_ready = false;
+    auto& lib = this->get_lib();
+#ifdef BUILD_COROUTINE
+    lib.get_scheduler()->schedule(coro_test_y_topology_and_return_new_prong_object(is_ready, lib));
+    while (!is_ready)
+    {
+        lib.get_scheduler()->process_events(std::chrono::milliseconds(1));
+    }
+#else
+    coro_test_y_topology_and_return_new_prong_object(is_ready, lib);
+#endif
+    ASSERT_EQ(lib.error_has_occured(), false);
+}
+
+template<class T> CORO_TASK(void) coro_test_y_topology_and_cache_and_retrieve_prong_object(bool& is_ready, T& lib, const auto& context) {
     /*
      * Test for cached object retrieval from autonomous zones that creates Y-topology routing problems.
      * Similar to previous test but Zone 5 caches the object from Zone 7, then host retrieves it.
-     * 
+     *
      * Extended Deep Y-Topology Pattern:
      * Zone 1 (root) → Zone 2 → Zone 3 → Zone 4 → Zone 5 (deep factory)
      * Zone 5 autonomously creates Zone 6 → Zone 7 via Zone 3 (unknown to all ancestors)
-     * 
+     *
      * This creates deeper routing isolation where:
-     * - Zone 1 and Zone 2 have no knowledge of Zone 6 or Zone 7  
+     * - Zone 1 and Zone 2 have no knowledge of Zone 6 or Zone 7
      * - Zone 5 gets Zone 3 to create Zones 6 and 7 autonomously
      * - Forces system to rely on known_direction_zone hint for routing
-     * 
+     *
      * Bug Trigger Pattern:
      * 1. Zone 7 object gets created in autonomous fork
      * 2. Zone 5 caches Zone 7 object locally
@@ -1716,106 +1834,175 @@ TYPED_TEST(remote_type_test, test_y_topology_and_cache_and_retrieve_prong_object
      * 4. System must route to Zone 7 but Zone 1 has no direct path
      * 5. Without known_direction_zone fix: routing failure or infinite recursion
      */
-    
-    auto& lib = this->get_lib();
-    
+
     // Create Deep Chain: Zone 1 → Zone 2 → Zone 3 → Zone 4 → Zone 5 (deep factory)
     rpc::shared_ptr<yyy::i_example> zone2;
-    ASSERT_EQ(lib.get_example()->create_example_in_subordinate_zone(zone2, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
-    ASSERT_NE(zone2, nullptr);
-    
+    CORO_VOID_ASSERT_EQ(CO_AWAIT lib.get_example()->create_example_in_subordinate_zone(zone2, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    CORO_VOID_ASSERT_NE(zone2, nullptr);
+
     rpc::shared_ptr<yyy::i_example> zone3;
-    ASSERT_EQ(zone2->create_example_in_subordinate_zone(zone3, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
-    ASSERT_NE(zone3, nullptr);
-    
+    CORO_VOID_ASSERT_EQ(CO_AWAIT zone2->create_example_in_subordinate_zone(zone3, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    CORO_VOID_ASSERT_NE(zone3, nullptr);
+
     rpc::shared_ptr<yyy::i_example> zone4;
-    ASSERT_EQ(zone3->create_example_in_subordinate_zone(zone4, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
-    ASSERT_NE(zone4, nullptr);
-    
+    CORO_VOID_ASSERT_EQ(CO_AWAIT zone3->create_example_in_subordinate_zone(zone4, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    CORO_VOID_ASSERT_NE(zone4, nullptr);
+
     rpc::shared_ptr<yyy::i_example> zone5_deep_factory;
-    ASSERT_EQ(zone4->create_example_in_subordinate_zone(zone5_deep_factory, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
-    ASSERT_NE(zone5_deep_factory, nullptr);
-    
+    CORO_VOID_ASSERT_EQ(CO_AWAIT zone4->create_example_in_subordinate_zone(zone5_deep_factory, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    CORO_VOID_ASSERT_NE(zone5_deep_factory, nullptr);
+
     // STEP 1: Zone 5 autonomously creates longer fork: Zone 5 → Zone 6 → Zone 7
     // This creates maximum isolation - no ancestor zones know about this branch
     std::vector<uint64_t> deep_autonomous_zones = {++(*zone_gen), ++(*zone_gen)}; // Zone 6, then Zone 7
-    
+
     RPC_INFO("Zone 5 autonomously creating deep fork (Zone 6 → Zone 7) and caching object from Zone 7...");
-    ASSERT_EQ(zone5_deep_factory->create_y_topology_fork(zone3, deep_autonomous_zones), rpc::error::OK());
-    
+    CORO_VOID_ASSERT_EQ(CO_AWAIT zone5_deep_factory->create_y_topology_fork(zone3, deep_autonomous_zones), rpc::error::OK());
+
     // STEP 2: Zone 5 retrieves Zone 7 object to begin the long journey back to Zone 1
     rpc::shared_ptr<yyy::i_example> zone7_object;
-    
+
     RPC_INFO("Zone 5 retrieving Zone 7 object to pass up the chain...");
-    ASSERT_EQ(zone5_deep_factory->retrieve_cached_autonomous_object(zone7_object), rpc::error::OK());
-    ASSERT_NE(zone7_object, nullptr);
-    
+    CORO_VOID_ASSERT_EQ(CO_AWAIT zone5_deep_factory->retrieve_cached_autonomous_object(zone7_object), rpc::error::OK());
+    CORO_VOID_ASSERT_NE(zone7_object, nullptr);
+
     RPC_INFO("Test completed - Zone 1 successfully worked with Zone 7 object from deep autonomous fork");
+
+    is_ready = true;
 }
 
-TYPED_TEST(remote_type_test, test_y_topology_and_set_host_with_prong_object)
+CORO_TYPED_TEST_WITH_SCHEDULER(remote_type_test, test_y_topology_and_cache_and_retrieve_prong_object, coro_test_y_topology_and_cache_and_retrieve_prong_object)
+
+template<class T>
+CORO_TASK(void) coro_test_y_topology_and_set_host_with_prong_object(bool& is_ready, T& lib, const auto& context)
 {
     /*
      * CRITICAL TEST: Host registry with objects from autonomous zones - triggers stack overflow.
-     * Similar to previous but Zone 5 caches the object from Zone 7, then in a separate call 
+     * Similar to previous but Zone 5 caches the object from Zone 7, then in a separate call
      * Zone 5 supplies it to Zone 1 via host registry.
-     * 
+     *
      * Extended Deep Y-Topology Pattern:
      * Zone 1 (root) → Zone 2 → Zone 3 → Zone 4 → Zone 5 (deep factory)
      * Zone 5 autonomously creates Zone 6 → Zone 7 via Zone 3 (unknown to all ancestors)
-     * 
+     *
      * This creates the most critical routing isolation scenario:
-     * - Zone 1 and Zone 2 have no knowledge of Zone 6 or Zone 7  
+     * - Zone 1 and Zone 2 have no knowledge of Zone 6 or Zone 7
      * - Zone 5 gets Zone 3 to create Zones 6 and 7 autonomously
      * - Zone 5 caches Zone 7 object locally
      * - In a separate call, Zone 5 sets the cached object in Zone 1's host registry
      * - Zone 1 later accesses object through host registry lookup
      * - Forces system to rely on known_direction_zone hint for routing
-     * 
+     *
      * Bug Trigger Pattern - STACK OVERFLOW:
-     * When known_direction_zone is disabled (set to 0), the service proxy has no idea 
+     * When known_direction_zone is disabled (set to 0), the service proxy has no idea
      * where to find Zone 7 and goes into infinite recursive loop until stack overflow.
      * This is the most severe manifestation of the Y-topology routing bug.
      */
-    
-    auto& lib = this->get_lib();
-    
+
     // Create Deep Chain: Zone 1 → Zone 2 → Zone 3 → Zone 4 → Zone 5 (deep factory)
     rpc::shared_ptr<yyy::i_example> zone2;
-    ASSERT_EQ(lib.get_example()->create_example_in_subordinate_zone(zone2, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
-    ASSERT_NE(zone2, nullptr);
-    
+    CORO_VOID_ASSERT_EQ(CO_AWAIT lib.get_example()->create_example_in_subordinate_zone(zone2, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    CORO_VOID_ASSERT_NE(zone2, nullptr);
+
     rpc::shared_ptr<yyy::i_example> zone3;
-    ASSERT_EQ(zone2->create_example_in_subordinate_zone(zone3, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
-    ASSERT_NE(zone3, nullptr);
-    
+    CORO_VOID_ASSERT_EQ(CO_AWAIT zone2->create_example_in_subordinate_zone(zone3, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    CORO_VOID_ASSERT_NE(zone3, nullptr);
+
     rpc::shared_ptr<yyy::i_example> zone4;
-    ASSERT_EQ(zone3->create_example_in_subordinate_zone(zone4, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
-    ASSERT_NE(zone4, nullptr);
-    
+    CORO_VOID_ASSERT_EQ(CO_AWAIT zone3->create_example_in_subordinate_zone(zone4, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    CORO_VOID_ASSERT_NE(zone4, nullptr);
+
     rpc::shared_ptr<yyy::i_example> zone5_deep_factory;
-    ASSERT_EQ(zone4->create_example_in_subordinate_zone(zone5_deep_factory, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
-    ASSERT_NE(zone5_deep_factory, nullptr);
-    
+    CORO_VOID_ASSERT_EQ(CO_AWAIT zone4->create_example_in_subordinate_zone(zone5_deep_factory, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK());
+    CORO_VOID_ASSERT_NE(zone5_deep_factory, nullptr);
+
     // STEP 1: Zone 5 autonomously creates longer fork: Zone 5 → Zone 6 → Zone 7
     // This creates maximum isolation - no ancestor zones know about this branch
     std::vector<uint64_t> deep_autonomous_zones = {++(*zone_gen), ++(*zone_gen)}; // Zone 6, then Zone 7
-    
+
     RPC_INFO("Zone 5 autonomously creating deep fork (Zone 6 → Zone 7) and caching object from Zone 7...");
-    ASSERT_EQ(zone5_deep_factory->create_y_topology_fork(zone3, deep_autonomous_zones), rpc::error::OK());
-    
+    CORO_VOID_ASSERT_EQ((CO_AWAIT zone5_deep_factory->create_y_topology_fork(zone3, deep_autonomous_zones)), rpc::error::OK());
+
     RPC_INFO("Zone 5 retrieving Zone 7 object to pass up the chain...");
-    ASSERT_EQ(zone5_deep_factory->give_host_cached_object(), rpc::error::OK());
-    
+    CORO_VOID_ASSERT_EQ((CO_AWAIT zone5_deep_factory->give_host_cached_object()), rpc::error::OK());
+
     rpc::shared_ptr<yyy::i_example> zone7_object;
-    lib.get_local_host_ptr()->look_up_app("foo", zone7_object);
-    ASSERT_NE(zone7_object, nullptr);
-    
+    CO_AWAIT lib.get_local_host_ptr()->look_up_app("foo", zone7_object);
+    CORO_VOID_ASSERT_NE(zone7_object, nullptr);
+
     // clean up the test or we will get non empty service errors
-    lib.get_local_host_ptr()->set_app("foo", nullptr);
-    
+    CO_AWAIT lib.get_local_host_ptr()->set_app("foo", nullptr);
+
+    RPC_INFO("Test completed - Zone 1 successfully worked with Zone 7 object from deep autonomous fork");
+    is_ready = true;
+}
+
+CORO_TYPED_TEST_WITH_SCHEDULER(remote_type_test, test_y_topology_and_set_host_with_prong_object, coro_test_y_topology_and_set_host_with_prong_object)
+
+// OLD VERSION - commented out after conversion to coroutine pattern
+/*
+TYPED_TEST(remote_type_test, test_y_topology_and_set_host_with_prong_object)
+{
+    // CRITICAL TEST: Host registry with objects from autonomous zones - triggers stack overflow.
+    // Similar to previous but Zone 5 caches the object from Zone 7, then in a separate call
+    // Zone 5 supplies it to Zone 1 via host registry.
+    //
+    // Extended Deep Y-Topology Pattern:
+    // Zone 1 (root) → Zone 2 → Zone 3 → Zone 4 → Zone 5 (deep factory)
+    // Zone 5 autonomously creates Zone 6 → Zone 7 via Zone 3 (unknown to all ancestors)
+    //
+    // This creates the most critical routing isolation scenario:
+    // - Zone 1 and Zone 2 have no knowledge of Zone 6 or Zone 7
+    // - Zone 5 gets Zone 3 to create Zones 6 and 7 autonomously
+    // - Zone 5 caches Zone 7 object locally
+    // - In a separate call, Zone 5 sets the cached object in Zone 1's host registry
+    // - Zone 1 later accesses object through host registry lookup
+    // - Forces system to rely on known_direction_zone hint for routing
+    //
+    // Bug Trigger Pattern - STACK OVERFLOW:
+    // When known_direction_zone is disabled (set to 0), the service proxy has no idea
+    // where to find Zone 7 and goes into infinite recursive loop until stack overflow.
+    // This is the most severe manifestation of the Y-topology routing bug.
+
+    auto& lib = this->get_lib();
+
+    // Create Deep Chain: Zone 1 → Zone 2 → Zone 3 → Zone 4 → Zone 5 (deep factory)
+    rpc::shared_ptr<yyy::i_example> zone2;
+    ASSERT_EQ(SYNC_WAIT(lib.get_example()->create_example_in_subordinate_zone(zone2, lib.get_local_host_ptr(), ++(*zone_gen))), rpc::error::OK());
+    ASSERT_NE(zone2, nullptr);
+
+    rpc::shared_ptr<yyy::i_example> zone3;
+    ASSERT_EQ(SYNC_WAIT(zone2->create_example_in_subordinate_zone(zone3, lib.get_local_host_ptr(), ++(*zone_gen))), rpc::error::OK());
+    ASSERT_NE(zone3, nullptr);
+
+    rpc::shared_ptr<yyy::i_example> zone4;
+    ASSERT_EQ(SYNC_WAIT(zone3->create_example_in_subordinate_zone(zone4, lib.get_local_host_ptr(), ++(*zone_gen))), rpc::error::OK());
+    ASSERT_NE(zone4, nullptr);
+
+    rpc::shared_ptr<yyy::i_example> zone5_deep_factory;
+    ASSERT_EQ(SYNC_WAIT(zone4->create_example_in_subordinate_zone(zone5_deep_factory, lib.get_local_host_ptr(), ++(*zone_gen))), rpc::error::OK());
+    ASSERT_NE(zone5_deep_factory, nullptr);
+
+    // STEP 1: Zone 5 autonomously creates longer fork: Zone 5 → Zone 6 → Zone 7
+    // This creates maximum isolation - no ancestor zones know about this branch
+    std::vector<uint64_t> deep_autonomous_zones = {++(*zone_gen), ++(*zone_gen)}; // Zone 6, then Zone 7
+
+    RPC_INFO("Zone 5 autonomously creating deep fork (Zone 6 → Zone 7) and caching object from Zone 7...");
+    ASSERT_EQ(SYNC_WAIT(zone5_deep_factory->create_y_topology_fork(zone3, deep_autonomous_zones)), rpc::error::OK());
+
+    RPC_INFO("Zone 5 retrieving Zone 7 object to pass up the chain...");
+    ASSERT_EQ(SYNC_WAIT(zone5_deep_factory->give_host_cached_object()), rpc::error::OK());
+
+    rpc::shared_ptr<yyy::i_example> zone7_object;
+    SYNC_WAIT(lib.get_local_host_ptr()->look_up_app("foo", zone7_object));
+    ASSERT_NE(zone7_object, nullptr);
+
+    // clean up the test or we will get non empty service errors
+    SYNC_WAIT(lib.get_local_host_ptr()->set_app("foo", nullptr));
+
     RPC_INFO("Test completed - Zone 1 successfully worked with Zone 7 object from deep autonomous fork");
 }
+*/
 
 static_assert(rpc::id<std::string>::get(rpc::VERSION_2) == rpc::STD_STRING_ID);
 

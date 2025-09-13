@@ -43,7 +43,7 @@ TODO...
 
 ## Feature pipelines
 
-This initial version uses synchronous calls only, however on the pipeline it is planned to work with coroutines.
+This implementation now supports both **synchronous calls** and **asynchronous coroutines** (C++20), with the mode controlled at build time by the `BUILD_COROUTINE` macro.
 This solution currently only supports error codes, exception based error handling is to be implemented at some date.
 
 Currently it has adaptors for
@@ -118,3 +118,225 @@ Currently tested on Compilers:
 Though strongly suggest upgrading to the latest version of these compilers
 
 SHA3 Credit to: https://github.com/brainhub/SHA3IUF
+
+## Coroutines Support
+
+RPC++ provides comprehensive support for C++20 coroutines, allowing you to write asynchronous RPC code that looks and feels like synchronous code while providing the performance benefits of non-blocking I/O.
+
+### Build Configuration
+
+Coroutine support is controlled by the `BUILD_COROUTINE` CMake option and can be enabled at build time:
+
+```bash
+# Enable coroutines using preset
+cmake --preset Debug_with_coroutines
+cmake --build build
+
+# Or manually enable
+cmake -DBUILD_COROUTINE=ON ..
+cmake --build build
+```
+
+When `BUILD_COROUTINE=ON`:
+- All RPC functions return `coro::task<T>` instead of `T`
+- Functions use `co_await` for asynchronous operations
+- Functions use `co_return` instead of `return`
+- Services require a `coro::io_scheduler` for execution
+
+When `BUILD_COROUTINE=OFF`:
+- Functions work synchronously as traditional blocking calls
+- No coroutine dependencies required
+- Simpler deployment for scenarios where async isn't needed
+
+### Programming Model
+
+#### Coroutine-Enabled Functions
+
+With coroutines enabled, RPC functions become asynchronous:
+
+```cpp
+// IDL Definition (same for both modes)
+interface ICalculator {
+    error_code add(int a, int b, [out] int result);
+    error_code multiply_async(double x, double y, [out] double result);
+}
+
+// Implementation with coroutines
+class calculator_impl : public ICalculator {
+public:
+    // Returns coro::task<int> when BUILD_COROUTINE=ON
+    // Returns int when BUILD_COROUTINE=OFF  
+    CORO_TASK(int) add(int a, int b, int& result) override {
+        // Simulate async work
+        CO_AWAIT some_async_operation();
+        result = a + b;
+        CO_RETURN rpc::error::OK();
+    }
+    
+    CORO_TASK(int) multiply_async(double x, double y, double& result) override {
+        // Can await other RPC calls
+        int temp_result;
+        auto ret = CO_AWAIT other_service->calculate_base(x, y, temp_result);
+        if (ret != rpc::error::OK()) {
+            CO_RETURN ret;
+        }
+        result = temp_result * 2.0;
+        CO_RETURN rpc::error::OK();
+    }
+};
+```
+
+#### Calling Coroutine Functions
+
+```cpp
+// Client code calling RPC functions
+auto calc = get_calculator_proxy();
+
+// Coroutine mode - functions must be awaited
+CORO_TASK(void) do_calculation() {
+    int result;
+    auto ret = CO_AWAIT calc->add(5, 3, result);
+    if (ret == rpc::error::OK()) {
+        std::cout << "Result: " << result << std::endl;
+    }
+    CO_RETURN;
+}
+
+// Non-coroutine mode - direct function calls
+void do_calculation_sync() {
+    int result;
+    auto ret = calc->add(5, 3, result);  // Direct call, no await
+    if (ret == rpc::error::OK()) {
+        std::cout << "Result: " << result << std::endl;
+    }
+}
+```
+
+### Service Setup
+
+#### Coroutine-Enabled Services
+
+When building with coroutines, services require an I/O scheduler:
+
+```cpp
+#ifdef BUILD_COROUTINE
+#include <coro/io_scheduler.hpp>
+
+// Create scheduler for async operations
+auto scheduler = std::make_shared<coro::io_scheduler>();
+
+// Create service with scheduler
+auto service = std::make_shared<rpc::service>("MyService", zone_id, scheduler);
+
+// Schedule coroutine work
+service->schedule([]() -> coro::task<void> {
+    // Async work here
+    co_await some_async_task();
+    co_return;
+});
+
+#else
+// Simple synchronous service
+auto service = std::make_shared<rpc::service>("MyService", zone_id);
+#endif
+```
+
+### Coroutine Macros
+
+RPC++ provides macros that adapt based on the build configuration:
+
+| Macro | Coroutine Mode | Non-Coroutine Mode |
+|-------|----------------|-------------------|
+| `CORO_TASK(T)` | `coro::task<T>` | `T` |
+| `CO_AWAIT expr` | `co_await expr` | `expr` |  
+| `CO_RETURN val` | `co_return val` | `return val` |
+| `SYNC_WAIT(task)` | `coro::sync_wait(task)` | `task` |
+
+This allows the same code to compile in both modes:
+
+```cpp
+CORO_TASK(int) my_function() {
+    auto result = CO_AWAIT async_operation();
+    CO_RETURN process_result(result);
+}
+```
+
+### Error Handling
+
+Error handling works consistently in both modes:
+
+```cpp
+CORO_TASK(int) handle_errors() {
+    int result;
+    auto ret = CO_AWAIT risky_operation(result);
+    
+    // Check error codes as usual
+    if (ret != rpc::error::OK()) {
+        RPC_ERROR("Operation failed with code: {}", ret);
+        CO_RETURN ret;  // Propagate error
+    }
+    
+    CO_RETURN rpc::error::OK();
+}
+```
+
+### Performance Considerations
+
+#### Benefits of Coroutines
+- **Non-blocking I/O**: Threads aren't blocked waiting for network/disk operations
+- **High Concurrency**: Handle thousands of concurrent operations efficiently  
+- **Resource Efficiency**: Lower memory overhead compared to thread-per-request models
+- **Scalability**: Better performance under high load
+
+#### When to Use Each Mode
+- **Use Coroutines (`BUILD_COROUTINE=ON`) when**:
+  - Building high-throughput services
+  - Network/remote RPC calls are common
+  - You need to handle many concurrent requests
+  - I/O latency is a bottleneck
+
+- **Use Synchronous (`BUILD_COROUTINE=OFF`) when**:
+  - Simple in-process or local communication
+  - Embedded/resource-constrained environments
+  - Simpler debugging and deployment requirements
+  - C++20 coroutines not available
+
+### Migration Strategy
+
+The dual-mode design allows gradual migration:
+
+1. **Start Synchronous**: Begin development with `BUILD_COROUTINE=OFF`
+2. **Test Both Modes**: Ensure code compiles and works in both configurations
+3. **Performance Test**: Benchmark both modes under your workload
+4. **Deploy Appropriately**: Choose mode based on deployment requirements
+
+### Advanced Usage
+
+#### Custom Schedulers
+
+```cpp
+// Custom scheduler with thread pool
+class custom_scheduler : public coro::io_scheduler {
+    // Custom implementation
+};
+
+auto scheduler = std::make_shared<custom_scheduler>();
+auto service = std::make_shared<rpc::service>("MyService", zone_id, scheduler);
+```
+
+#### Mixed Async/Sync Operations
+
+```cpp
+CORO_TASK(int) mixed_operations() {
+    // Fast local operation - no await needed
+    auto local_result = fast_local_calc();
+    
+    // Slow remote operation - await it
+    int remote_result;
+    auto ret = CO_AWAIT slow_remote_call(remote_result);
+    
+    CO_RETURN combine_results(local_result, remote_result);
+}
+```
+
+This coroutine support provides the foundation for building high-performance, scalable RPC applications while maintaining the flexibility to deploy in simpler synchronous environments when appropriate.

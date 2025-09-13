@@ -128,7 +128,7 @@ namespace rpc::tcp
                 }
                 if (marshal_status.first != coro::net::send_status::ok)
                 {
-                    LOG_CSTR("failed to send data to peer");
+                    RPC_ERROR("failed to send data to peer");
                     failed = true;
 
                     break;
@@ -156,13 +156,13 @@ namespace rpc::tcp
                 }
                 if (pstatus == coro::poll_status::error)
                 {
-                    LOG_CSTR("failed pstatus == coro::poll_status::error");
+                    RPC_ERROR("failed pstatus == coro::poll_status::error");
                     break;
                 }
 
                 if (pstatus == coro::poll_status::closed)
                 {
-                    LOG_CSTR("failed pstatus == coro::poll_status::closed");
+                    RPC_ERROR("failed pstatus == coro::poll_status::closed");
                     break;
                 }
 
@@ -189,7 +189,7 @@ namespace rpc::tcp
                             auto str_err = rpc::from_yas_binary(rpc::span(buf), prefix);
                             if (!str_err.empty())
                             {
-                                LOG_CSTR("failed invalid prefix");
+                                RPC_ERROR("failed invalid prefix");
                                 break;
                             }
                             assert(prefix.direction);
@@ -202,13 +202,13 @@ namespace rpc::tcp
                             auto str_err = rpc::from_yas_binary(rpc::span(buf), payload);
                             if (!str_err.empty())
                             {
-                                LOG_CSTR("failed bad payload format");
+                                RPC_ERROR("failed bad payload format");
                                 break;
                             }
                             auto ret = co_await incoming_message_handler(std::move(prefix), std::move(payload));
                             if (ret != rpc::error::OK())
                             {
-                                LOG_CSTR("failed incoming_message_handler");
+                                RPC_ERROR("failed incoming_message_handler");
                                 break;
                             }
                         }
@@ -216,7 +216,7 @@ namespace rpc::tcp
                 }
                 else
                 {
-                    LOG_CSTR("failed invalid received message");
+                    RPC_ERROR("failed invalid received message");
                     break;
                 }
             }
@@ -243,7 +243,7 @@ namespace rpc::tcp
         auto str_err = rpc::from_yas_compressed_binary(rpc::span(payload.payload), request);
         if (!str_err.empty())
         {
-            LOG_CSTR("failed from_yas_compressed_binary call_send");
+            RPC_ERROR("failed from_yas_compressed_binary call_send");
             kill_connection();
             CO_RETURN;
         }
@@ -264,7 +264,7 @@ namespace rpc::tcp
 
         if (ret != rpc::error::OK())
         {
-            LOG_CSTR("failed send");
+            RPC_ERROR("failed send");
         }
 
         if (prefix.direction == message_direction::one_way)
@@ -276,7 +276,7 @@ namespace rpc::tcp
             prefix.sequence_number);
         if (err != rpc::error::OK())
         {
-            LOG_CSTR("failed send_payload");
+            RPC_ERROR("failed send_payload");
             kill_connection();
             CO_RETURN;
         }
@@ -288,13 +288,13 @@ namespace rpc::tcp
     CORO_TASK(void)
     channel_manager::stub_handle_try_cast(envelope_prefix prefix, envelope_payload payload)
     {
-        LOG_CSTR("try_cast request");
+        RPC_DEBUG("try_cast request");
 
         tcp::try_cast_send request;
         auto str_err = rpc::from_yas_compressed_binary(rpc::span(payload.payload), request);
         if (!str_err.empty())
         {
-            LOG_CSTR("failed try_cast_send from_yas_compressed_binary");
+            RPC_ERROR("failed try_cast_send from_yas_compressed_binary");
             kill_connection();
             CO_RETURN;
         }
@@ -304,18 +304,18 @@ namespace rpc::tcp
             prefix.version, {request.destination_zone_id}, {request.object_id}, {request.interface_id});
         if (ret != rpc::error::OK())
         {
-            LOG_CSTR("failed try_cast");
+            RPC_ERROR("failed try_cast");
         }
 
         auto err = CO_AWAIT send_payload(
             prefix.version, message_direction::receive, tcp::try_cast_receive{.err_code = ret}, prefix.sequence_number);
         if (err != rpc::error::OK())
         {
-            LOG_CSTR("failed try_cast_send send_payload");
+            RPC_ERROR("failed try_cast_send send_payload");
             kill_connection();
             CO_RETURN;
         }
-        LOG_CSTR("try_cast request complete");
+        RPC_DEBUG("try_cast request complete");
         CO_RETURN;
     }
 
@@ -328,32 +328,35 @@ namespace rpc::tcp
         auto str_err = rpc::from_yas_compressed_binary(rpc::span(payload.payload), request);
         if (!str_err.empty())
         {
-            LOG_CSTR("failed addref_send from_yas_compressed_binary");
+            RPC_ERROR("failed addref_send from_yas_compressed_binary");
             kill_connection();
             CO_RETURN;
         }
 
         std::vector<char> out_buf;
+        uint64_t ref_count = 0;
         auto ret = co_await service_->add_ref(prefix.version,
             {request.destination_channel_zone_id},
             {request.destination_zone_id},
             {request.object_id},
             {request.caller_channel_zone_id},
             {request.caller_zone_id},
-            (rpc::add_ref_options)request.build_out_param_channel);
+            {request.destination_zone_id}, // known_direction_zone - using destination_zone as default
+            (rpc::add_ref_options)request.build_out_param_channel,
+            ref_count);
 
-        if (ret == std::numeric_limits<uint64_t>::max())
+        if (ret != rpc::error::OK())
         {
-            LOG_CSTR("failed add_ref");
+            RPC_ERROR("failed add_ref");
         }
 
         auto err = CO_AWAIT send_payload(prefix.version,
             message_direction::receive,
-            tcp::addref_receive{.ref_count = ret, .err_code = rpc::error::OK()},
+            tcp::addref_receive{.ref_count = ref_count, .err_code = ret},
             prefix.sequence_number);
         if (err != rpc::error::OK())
         {
-            LOG_CSTR("failed addref_send send_payload");
+            RPC_ERROR("failed addref_send send_payload");
             kill_connection();
             CO_RETURN;
         }
@@ -369,27 +372,28 @@ namespace rpc::tcp
         auto str_err = rpc::from_yas_compressed_binary(rpc::span(payload.payload), request);
         if (!str_err.empty())
         {
-            LOG_CSTR("failed release_send from_yas_compressed_binary");
+            RPC_ERROR("failed release_send from_yas_compressed_binary");
             kill_connection();
             CO_RETURN;
         }
 
         std::vector<char> out_buf;
+        uint64_t ref_count = 0;
         auto ret = co_await service_->release(
-            prefix.version, {request.destination_zone_id}, {request.object_id}, {request.caller_zone_id});
+            prefix.version, {request.destination_zone_id}, {request.object_id}, {request.caller_zone_id}, ref_count);
 
-        if (ret == std::numeric_limits<uint64_t>::max())
+        if (ret != rpc::error::OK())
         {
-            LOG_CSTR("failed release");
+            RPC_ERROR("failed release");
         }
 
         auto err = CO_AWAIT send_payload(prefix.version,
             message_direction::receive,
-            tcp::release_receive{.ref_count = ret, .err_code = rpc::error::OK()},
+            tcp::release_receive{.ref_count = ref_count, .err_code = ret},
             prefix.sequence_number);
         if (err != rpc::error::OK())
         {
-            LOG_CSTR("failed release_send send_payload");
+            RPC_ERROR("failed release_send send_payload");
             kill_connection();
             CO_RETURN;
         }
@@ -427,7 +431,7 @@ namespace rpc::tcp
 
                 if (pstatus == coro::poll_status::timeout)
                 {
-                    LOG_CSTR("failed read timeout");
+                    RPC_ERROR("failed read timeout");
 
                     // a timeout has occurred
                     co_return rpc::error::SERVICE_PROXY_LOST_CONNECTION();
@@ -435,14 +439,14 @@ namespace rpc::tcp
 
                 if (pstatus == coro::poll_status::error)
                 {
-                    LOG_CSTR("failed read error");
+                    RPC_ERROR("failed read error");
                     // errno;
                     co_return rpc::error::SERVICE_PROXY_LOST_CONNECTION();
                 }
 
                 if (pstatus == coro::poll_status::closed)
                 {
-                    LOG_CSTR("failed read closed");
+                    RPC_ERROR("failed read closed");
                     // connection closed by peer
                     co_return rpc::error::SERVICE_PROXY_LOST_CONNECTION();
                 }
@@ -451,7 +455,7 @@ namespace rpc::tcp
             }
 
             // connection closed by peer
-            LOG_CSTR("failed read connection closed by peer");
+            RPC_ERROR("failed read connection closed by peer");
             co_return rpc::error::SERVICE_PROXY_LOST_CONNECTION();
         } while (true);
         co_return rpc::error::OK();
@@ -466,14 +470,14 @@ namespace rpc::tcp
         int err = CO_AWAIT read(buf);
         if (err != rpc::error::OK())
         {
-            LOG_CSTR("failed receive_prefix read");
+            RPC_ERROR("failed receive_prefix read");
             CO_RETURN err;
         }
 
         auto str_err = rpc::from_yas_binary(rpc::span(buf), prefix);
         if (!str_err.empty())
         {
-            LOG_CSTR("failed receive_prefix from_yas_binary");
+            RPC_ERROR("failed receive_prefix from_yas_binary");
             co_return rpc::error::TRANSPORT_ERROR();
         }
         assert(prefix.direction);
@@ -495,7 +499,7 @@ namespace rpc::tcp
             int err = CO_AWAIT receive_prefix(prefix);
             if (err != rpc::error::OK())
             {
-                LOG_CSTR("failed receive_anonymous_payload receive_prefix");
+                RPC_ERROR("failed receive_anonymous_payload receive_prefix");
                 co_return err;
             }
 
@@ -503,14 +507,14 @@ namespace rpc::tcp
             err = CO_AWAIT read(buf);
             if (err != rpc::error::OK())
             {
-                LOG_CSTR("failed receive_anonymous_payload read");
+                RPC_ERROR("failed receive_anonymous_payload read");
                 co_return err;
             }
 
             auto str_err = rpc::from_yas_binary(rpc::span(buf), payload);
             if (!str_err.empty())
             {
-                LOG_CSTR("failed receive_anonymous_payload from_yas_binary");
+                RPC_ERROR("failed receive_anonymous_payload from_yas_binary");
                 co_return rpc::error::TRANSPORT_ERROR();
             }
 
@@ -534,7 +538,7 @@ namespace rpc::tcp
                 auto [it, success] = pending_transmits_.try_emplace(sequence_number, &res_payload);
                 if (!success)
                 {
-                    LOG_CSTR("failed receive_anonymous_payload try_emplace");
+                    RPC_ERROR("failed receive_anonymous_payload try_emplace");
                 }
             }
             co_await res_payload.event; // now wait for the reply

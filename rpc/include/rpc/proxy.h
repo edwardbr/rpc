@@ -74,7 +74,7 @@ namespace rpc
         virtual void* get_address() const override
         {
             RPC_ASSERT(false);
-            return (T*)object_proxy_.get();
+            return (T*)get_object_proxy().get();
         }
         rpc::proxy_base* query_proxy_base() const override
         {
@@ -531,7 +531,7 @@ namespace rpc
             CO_RETURN error::INVALID_VERSION();
         }
 
-        CORO_TASK(void) on_object_proxy_released(object object_id, int inherited_reference_count)
+        void on_object_proxy_released(object object_id, int inherited_reference_count)
         {
             RPC_DEBUG("on_object_proxy_released service zone: {} destination_zone={}, caller_zone={}, object_id = {}",
                       zone_id_.id, destination_zone_id_.get_val(), caller_zone_id_.get_val(), object_id.id);
@@ -541,6 +541,14 @@ namespace rpc
 
             auto caller_zone_id = get_zone_id().as_caller();
             RPC_ASSERT(caller_zone_id == get_caller_zone_id());
+
+#ifdef USE_RPC_TELEMETRY
+            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            {
+                telemetry_service->on_service_proxy_release(
+                    get_zone_id(), destination_zone_id_, destination_channel_zone_, caller_zone_id, object_id);
+            }
+#endif
 
             // Handle proxy map cleanup - use only insert_control_ to avoid deadlocks
             {
@@ -566,22 +574,51 @@ namespace rpc
                 }
             }
 
-#ifdef USE_RPC_TELEMETRY
-            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            // Schedule the coroutine work asynchronously
+#ifdef BUILD_COROUTINE
+            auto self = shared_from_this();
+            auto coro_task = [self, object_id, inherited_reference_count]() -> CORO_TASK(void)
             {
-                telemetry_service->on_service_proxy_release(
-                    get_zone_id(), destination_zone_id_, destination_channel_zone_, caller_zone_id, object_id);
-            }
-#endif
+                auto caller_zone_id = self->get_zone_id().as_caller();
+                
+                // Handle normal reference release
+                uint64_t ref_count = 0;
+                auto ret = CO_AWAIT self->release(self->version_.load(), self->destination_zone_id_, object_id, caller_zone_id, ref_count);
+                if (ret != rpc::error::OK())
+                {
+                    RPC_ERROR("on_object_proxy_released release failed");
+                    RPC_ASSERT(false);
+                    CO_RETURN;
+                }
+                self->inner_release_external_ref();
 
-            // Handle normal reference release
+                // Handle inherited references from race conditions
+                for (int i = 0; i < inherited_reference_count; i++)
+                {
+                    RPC_DEBUG("Releasing inherited reference {}/{} for object {}",
+                              (i + 1), inherited_reference_count, object_id.get_val());
+
+                    auto ret = CO_AWAIT self->release(self->version_.load(), self->destination_zone_id_, object_id, caller_zone_id, ref_count);
+                    if (ret != rpc::error::OK())
+                    {
+                        RPC_ERROR("on_object_proxy_released release failed");
+                        RPC_ASSERT(false);
+                        CO_RETURN;
+                    }
+                    self->inner_release_external_ref();
+                }
+                CO_RETURN;
+            };
+            current_service->schedule(coro_task());
+#else
+            // Non-coroutine version - handle synchronously
             uint64_t ref_count = 0;
-            auto ret = CO_AWAIT release(version_.load(), destination_zone_id_, object_id, caller_zone_id, ref_count);
+            auto ret = release(version_.load(), destination_zone_id_, object_id, caller_zone_id, ref_count);
             if (ret != rpc::error::OK())
             {
                 RPC_ERROR("on_object_proxy_released release failed");
                 RPC_ASSERT(false);
-                CO_RETURN;
+                return;
             }
             inner_release_external_ref();
 
@@ -597,7 +634,6 @@ namespace rpc
             // Handle inherited references from race conditions
             for (int i = 0; i < inherited_reference_count; i++)
             {
-                // RPC_ASSERT(local_ref_count);
                 RPC_DEBUG("Releasing inherited reference {}/{} for object {}",
                           (i + 1), inherited_reference_count, object_id.get_val());
 
@@ -606,7 +642,7 @@ namespace rpc
                 {
                     RPC_ERROR("on_object_proxy_released release failed");
                     RPC_ASSERT(false);
-                    CO_RETURN;
+                    return;
                 }
                 inner_release_external_ref();
                 // ret = current_service->decrement_reference_count(shared_from_this(), local_ref_count);
@@ -617,7 +653,7 @@ namespace rpc
                 //     return;
                 // }
             }
-            CO_RETURN;
+#endif
         }
 
         std::unordered_map<object, rpc::weak_ptr<object_proxy>> get_proxies() { return proxies_; }
@@ -674,7 +710,7 @@ namespace rpc
             RELEASE_IF_NOT_NEW,
         };
 
-        rpc::shared_ptr<object_proxy> get_or_create_object_proxy(
+        CORO_TASK(rpc::shared_ptr<object_proxy>) get_or_create_object_proxy(
             object object_id, object_proxy_creation_rule rule, bool new_proxy_added, known_direction_zone known_direction_zone_id)
         {
             RPC_DEBUG("get_or_create_object_proxy service zone: {} destination_zone={}, caller_zone={}, object_id = {}",
@@ -724,12 +760,12 @@ namespace rpc
                 }
 #endif
                 uint64_t ref_count = 0;
-                auto ret = sp_add_ref(object_id, {0}, rpc::add_ref_options::normal, known_direction_zone_id, ref_count);
+                auto ret = CO_AWAIT sp_add_ref(object_id, {0}, rpc::add_ref_options::normal, known_direction_zone_id, ref_count);
                 if (ret != error::OK())
                 {
                     RPC_ERROR("sp_add_ref failed");
                     RPC_ASSERT(false);
-                    return nullptr;
+                    CO_RETURN nullptr;
                 }
                 if (!new_proxy_added)
                 {
@@ -745,7 +781,7 @@ namespace rpc
                 // found we can do a release
                 RPC_ASSERT(!new_proxy_added);
                 uint64_t ref_count = 0;
-                auto ret = sp_release(object_id, ref_count);
+                auto ret = CO_AWAIT sp_release(object_id, ref_count);
                 if (ret == error::OK())
                 {
                     // This is now safe because self_ref keeps us alive
@@ -758,7 +794,7 @@ namespace rpc
             }
 
             // self_ref goes out of scope here, allowing normal destruction if needed
-            return op;
+            CO_RETURN op;
         }
 
         friend service;
@@ -772,11 +808,6 @@ namespace rpc
         uint64_t protocol_version, const rpc::shared_ptr<T>& iface, rpc::shared_ptr<rpc::object_stub>& stub)
     {
         if (!iface)
-            CO_RETURN interface_descriptor();
-
-        auto object_proxy = object_proxy_.get_nullable();
-        RPC_ASSERT(object_proxy);
-        if (!object_proxy)
             CO_RETURN interface_descriptor();
 
         auto object_proxy = object_proxy_.get_nullable();
@@ -836,7 +867,7 @@ namespace rpc
                 CO_RETURN rpc::error::OBJECT_NOT_FOUND();
             }
 
-            rpc::shared_ptr<object_proxy> op = service_proxy->get_or_create_object_proxy(
+            rpc::shared_ptr<object_proxy> op = CO_AWAIT service_proxy->get_or_create_object_proxy(
                 encap.object_id, service_proxy::object_proxy_creation_rule::ADD_REF_IF_NEW, new_proxy_added, caller_zone_id.as_known_direction_channel());
             RPC_ASSERT(op != nullptr);
             if (!op)
@@ -859,11 +890,6 @@ namespace rpc
     {
         if (!iface)
             CO_RETURN{{0}, {0}};
-
-        auto object_proxy = object_proxy_.get_nullable();
-        RPC_ASSERT(object_proxy);
-        if (!object_proxy)
-            CO_RETURN {{0}, {0}};
 
         auto object_proxy = object_proxy_.get_nullable();
         RPC_ASSERT(object_proxy);
@@ -944,7 +970,7 @@ namespace rpc
                 new_proxy_added);
         }
 
-        rpc::shared_ptr<object_proxy> op = service_proxy->get_or_create_object_proxy(
+        rpc::shared_ptr<object_proxy> op = CO_AWAIT service_proxy->get_or_create_object_proxy(
             encap.object_id, service_proxy::object_proxy_creation_rule::RELEASE_IF_NOT_NEW, false, {});
         if (!op)
         {
@@ -1015,12 +1041,12 @@ namespace rpc
         if (serv->get_parent_zone_id() == service_proxy->get_destination_zone_id())
             service_proxy->add_external_ref();
 
-        rpc::shared_ptr<object_proxy> op = service_proxy->get_or_create_object_proxy(
+        rpc::shared_ptr<object_proxy> op = CO_AWAIT service_proxy->get_or_create_object_proxy(
             encap.object_id, service_proxy::object_proxy_creation_rule::DO_NOTHING, false, {});
         if (!op)
         {
             RPC_ERROR("Object not found in demarshall_interface_proxy");
-            return rpc::error::OBJECT_NOT_FOUND();
+            CO_RETURN rpc::error::OBJECT_NOT_FOUND();
         }
         RPC_ASSERT(op != nullptr);
         CO_RETURN CO_AWAIT op->query_interface(val, false);

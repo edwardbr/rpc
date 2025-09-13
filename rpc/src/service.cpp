@@ -41,6 +41,26 @@ namespace rpc
         return {count};
     }
 
+#ifdef BUILD_COROUTINE
+    service::service(const char* name, zone zone_id, const std::shared_ptr<coro::io_scheduler>& scheduler)
+        : zone_id_(zone_id)
+        , name_(name)
+        , io_scheduler_(scheduler)
+    {
+#ifdef USE_RPC_TELEMETRY
+        if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            telemetry_service->on_service_creation(name, zone_id);
+#endif
+    }
+    service::service(const char* name, zone zone_id, const std::shared_ptr<coro::io_scheduler>& scheduler, child_service_tag)
+        : zone_id_(zone_id)
+        , name_(name)
+        , io_scheduler_(scheduler)
+    {
+        // No telemetry call for child services
+    }
+
+#else
     service::service(const char* name, zone zone_id)
         : zone_id_(zone_id)
         , name_(name)
@@ -50,25 +70,13 @@ namespace rpc
             telemetry_service->on_service_creation(name, zone_id, destination_zone{0});
 #endif
     }
-
-#ifdef BUILD_COROUTINE
-    service::service(const char* name, zone zone_id, const std::shared_ptr<coro::io_scheduler>& io_scheduler)
-        : zone_id_(zone_id)
-        , name_(name)
-        , io_scheduler_(io_scheduler)
-    {
-#ifdef USE_RPC_TELEMETRY
-        if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
-            telemetry_service->on_service_creation(name, zone_id);
-#endif
-    }
-#else
     service::service(const char* name, zone zone_id, child_service_tag)
         : zone_id_(zone_id)
         , name_(name)
     {
         // No telemetry call for child services
     }
+
 #endif
 
     service::~service()
@@ -234,15 +242,15 @@ namespace rpc
                     other_zone = found->second.lock();
                 }
 
-                // now get and lock the opposite direction (NOTE there is a race condition that will be addressed in the coroutine changes coming later)
-                // note this is to address a bug found whereby we have a Y shaped graph whereby one prong creates a fork
-                // below it to form another prong this new prong is then ordered to pass back to the first prong an
-                // object. this object is then passed back to the root node which is unaware of the existence of the
-                // second prong. this code below forces the creation of a service proxy back to the sender of the call
-                // so that the root object can do an add_ref hinting that the path of the object is somewhere along this
-                // path this is a very unique situation, and indicates that perhaps the creation of two service proxies
-                // should be a feature of add ref and these pairs should support each others existence by perhaps some
-                // form of channel object. tests that fail when this is not done:
+                // now get and lock the opposite direction (NOTE there is a race condition that will be addressed in the
+                // coroutine changes coming later) note this is to address a bug found whereby we have a Y shaped graph
+                // whereby one prong creates a fork below it to form another prong this new prong is then ordered to
+                // pass back to the first prong an object. this object is then passed back to the root node which is
+                // unaware of the existence of the second prong. this code below forces the creation of a service proxy
+                // back to the sender of the call so that the root object can do an add_ref hinting that the path of the
+                // object is somewhere along this path this is a very unique situation, and indicates that perhaps the
+                // creation of two service proxies should be a feature of add ref and these pairs should support each
+                // others existence by perhaps some form of channel object. tests that fail when this is not done:
                 //  test_y_topology_and_return_new_prong_object
                 //  test_y_topology_and_cache_and_retrieve_prong_object
                 //  test_y_topology_and_set_host_with_prong_object will fail without this
@@ -258,7 +266,7 @@ namespace rpc
                             std::to_string(caller_zone_id.as_destination()),
                             std::to_string(destination_zone_id.as_caller()));
                         RPC_ASSERT(opposite_direction_proxy);
-                        return rpc::error::ZONE_NOT_FOUND();
+                        CO_RETURN rpc::error::ZONE_NOT_FOUND();
                     }
                     opposite_direction_proxy->add_external_ref();
                 }
@@ -290,7 +298,7 @@ namespace rpc
                             std::to_string(found->first.dest),
                             std::to_string(found->first.source));
                         RPC_ASSERT(temp);
-                        return rpc::error::OBJECT_NOT_FOUND();
+                        CO_RETURN rpc::error::OBJECT_NOT_FOUND();
                     }
                     opposite_direction_proxy
                         = temp->clone_for_zone(caller_zone_id.as_destination(), destination_zone_id.as_caller());
@@ -303,7 +311,7 @@ namespace rpc
                         std::to_string(zone_id_),
                         std::to_string(destination_zone_id),
                         std::to_string(caller_zone_id));
-                    return rpc::error::ZONE_NOT_FOUND();
+                    CO_RETURN rpc::error::ZONE_NOT_FOUND();
                 }
             }
 
@@ -377,7 +385,7 @@ namespace rpc
         rpc::proxy_base* base,
         rpc::shared_ptr<service_proxy>& destination_zone)
     {
-        auto object_proxy = base->object_proxy_;
+        auto object_proxy = base->get_object_proxy();
         auto object_service_proxy = object_proxy->get_service_proxy();
         RPC_ASSERT(object_service_proxy->zone_id_ == zone_id_);
         auto destination_zone_id = object_service_proxy->get_destination_zone_id();
@@ -434,10 +442,10 @@ namespace rpc
             known_direction_zone(zone_id_),
             rpc::add_ref_options::build_destination_route,
             temp_ref_count);
-        if (temp_ref_count < 0)
-            std::ignore = count; // do some checks here
-        
-        RPC_ASSERT(err != error::OK);
+        if (temp_ref_count == 0)
+            std::ignore = temp_ref_count; // do some checks here
+
+        RPC_ASSERT(err == error::OK());
 
         CO_RETURN{object_id, destination_zone_id};
     }
@@ -448,7 +456,7 @@ namespace rpc
         caller_zone caller_zone_id,
         rpc::proxy_base* base)
     {
-        auto object_proxy = base->object_proxy_;
+        auto object_proxy = base->get_object_proxy();
         auto object_service_proxy = object_proxy->get_service_proxy();
         RPC_ASSERT(object_service_proxy->zone_id_ == zone_id_);
         auto destination_zone_id = object_service_proxy->get_destination_zone_id();
@@ -491,7 +499,7 @@ namespace rpc
                 known_direction_zone(zone_id_),
                 rpc::add_ref_options::build_caller_route | rpc::add_ref_options::build_destination_route,
                 temp_ref_count);
-            RPC_ASSERT(err != error::OK);
+            RPC_ASSERT(err == error::OK());
             std::ignore = temp_ref_count;
         }
         else
@@ -544,7 +552,7 @@ namespace rpc
                                 std::to_string(caller_zone_id.as_destination()),
                                 std::to_string(0));
                             RPC_ASSERT(alternative_caller_service_proxy);
-                            return {};
+                            CO_RETURN {};
                         }
 
                         // now make a copy of the original as we need it back
@@ -573,7 +581,7 @@ namespace rpc
                 {
                     // caller service_proxy was destroyed - this is a race condition
                     RPC_ERROR("caller service_proxy was destroyed during lookup");
-                    return {}; // Return empty interface descriptor to indicate failure
+                    CO_RETURN {}; // Return empty interface descriptor to indicate failure
                 }
             }
 
@@ -581,13 +589,13 @@ namespace rpc
             if (!caller)
             {
                 RPC_ERROR("Failed to obtain valid caller service_proxy");
-                return {};
+                CO_RETURN {};
             }
 
             // Call add_external_ref() outside the mutex to prevent race with service_proxy destruction
-            if (need_add_ref && destination_zone)
+            if (need_add_ref && destination_service_proxy)
             {
-                destination_zone->add_external_ref();
+                destination_service_proxy->add_external_ref();
             }
 
 #ifdef USE_RPC_TELEMETRY
@@ -600,10 +608,11 @@ namespace rpc
 
             // the fork is here so we need to add ref the destination normally with caller info
             // note the caller_channel_zone_id is is this zones id as the caller came from a route via this node
-            if (destination_zone)
+            int refcount = 0;
+            if (destination_service_proxy)
             {
                 uint64_t temp_ref_count;
-                auto refcount = CO_AWAIT destination_service_proxy->add_ref(protocol_version,
+                refcount = CO_AWAIT destination_service_proxy->add_ref(protocol_version,
                     {0},
                     destination_zone_id,
                     object_id,
@@ -616,7 +625,7 @@ namespace rpc
             else
             {
                 RPC_ERROR("destination_zone service_proxy was destroyed during operation");
-                return {};
+                CO_RETURN {};
             }
             std::ignore = refcount;
 
@@ -634,7 +643,7 @@ namespace rpc
 
             // note the caller_channel_zone_id is 0 as the caller came from this route
             uint64_t temp_ref_count;
-            auto errno = CO_AWAIT caller->add_ref(protocol_version,
+            auto err_code = CO_AWAIT caller->add_ref(protocol_version,
                 zone_id_.as_destination_channel(),
                 destination_zone_id,
                 object_id,
@@ -643,8 +652,8 @@ namespace rpc
                 known_direction_zone(zone_id_),
                 rpc::add_ref_options::build_caller_route,
                 temp_ref_count);
-            std::ignore = refcount;
-            RPC_ASSERT(errno == error::OK())
+            std::ignore = err_code;
+            RPC_ASSERT(err_code == error::OK());
         }
 
         CO_RETURN{object_id, destination_zone_id};
@@ -749,7 +758,7 @@ namespace rpc
                 known_direction_zone(zone_id_),
                 rpc::add_ref_options::build_caller_route,
                 temp_ref_count);
-            std::ignore = refcount;
+            std::ignore = err;
         }
         CO_RETURN{stub->get_id(), zone_id_.as_destination()};
     }
@@ -880,7 +889,7 @@ namespace rpc
                             caller_zone_id.id,
                             destination_zone_id.id);
                         RPC_ASSERT(false);
-                        return rpc::error::OBJECT_NOT_FOUND();
+                        CO_RETURN rpc::error::OBJECT_NOT_FOUND();
                     }
 
                     destination = found->second.lock();
@@ -891,7 +900,7 @@ namespace rpc
                             std::to_string(dest_channel),
                             std::to_string(0));
                         RPC_ASSERT(destination);
-                        return rpc::error::OBJECT_NOT_FOUND();
+                        CO_RETURN rpc::error::OBJECT_NOT_FOUND();
                     }
                 }
 
@@ -941,7 +950,7 @@ namespace rpc
                                         std::to_string(dest_channel),
                                         std::to_string(0));
                                     RPC_ASSERT(tmp);
-                                    return rpc::error::OBJECT_NOT_FOUND();
+                                    CO_RETURN rpc::error::OBJECT_NOT_FOUND();
                                 }
                                 destination = tmp->clone_for_zone(destination_zone_id, caller_zone_id);
                             }
@@ -949,7 +958,7 @@ namespace rpc
                             {
                                 // with the Y bug fix we should not get here under normal operation as the destination is always valid
                                 RPC_ASSERT(false);
-                                return error::ZONE_NOT_FOUND();
+                                CO_RETURN error::ZONE_NOT_FOUND();
                                 // // get the parent to route it
                                 // RPC_ASSERT(get_parent() != nullptr);
                                 // destination = get_parent()->clone_for_zone(destination_zone_id, caller_zone_id);
@@ -978,14 +987,14 @@ namespace rpc
                                         std::to_string(caller_channel),
                                         std::to_string(0));
                                     RPC_ASSERT(caller);
-                                    return rpc::error::OBJECT_NOT_FOUND();
+                                    CO_RETURN rpc::error::OBJECT_NOT_FOUND();
                                 }
                             }
                             else
                             {
                                 // with the Y bug fix we should not get here under normal operation as the destination is always valid
                                 RPC_ASSERT(false);
-                                return error::ZONE_NOT_FOUND();
+                                CO_RETURN error::ZONE_NOT_FOUND();
 
                                 // caller = get_parent();
 
@@ -1097,7 +1106,7 @@ namespace rpc
                                 known_direction_zone_id,
                                 add_ref_options::build_caller_route,
                                 temp_ref_count);
-                            std::ignore = ret;
+                            std::ignore = err;
                         }
                     } while (false);
                 }
@@ -1179,7 +1188,7 @@ namespace rpc
                         else
                         {
                             RPC_ASSERT(false);
-                            return rpc::error::OBJECT_NOT_FOUND();
+                            CO_RETURN rpc::error::OBJECT_NOT_FOUND();
                         }
                         if (!tmp)
                         {
@@ -1188,7 +1197,7 @@ namespace rpc
                                 std::to_string(caller_channel_zone_id.as_destination()),
                                 std::to_string(0));
                             RPC_ASSERT(tmp);
-                            return rpc::error::OBJECT_NOT_FOUND();
+                            CO_RETURN rpc::error::OBJECT_NOT_FOUND();
                         }
                         other_zone = tmp->clone_for_zone(destination_zone_id, caller_zone_id);
                         inner_add_zone_proxy(other_zone);
@@ -1246,14 +1255,14 @@ namespace rpc
                                 std::to_string(caller_zone_id),
                                 std::to_string(0));
                             RPC_ASSERT(caller);
-                            return rpc::error::OBJECT_NOT_FOUND();
+                            CO_RETURN rpc::error::OBJECT_NOT_FOUND();
                         }
                     }
                     else
                     {
                         RPC_ERROR("Unable to build add_ref_options::build_caller_route");
                         RPC_ASSERT(false);
-                        return rpc::error::OBJECT_NOT_FOUND();
+                        CO_RETURN rpc::error::OBJECT_NOT_FOUND();
                     }
                 }
 #ifdef USE_RPC_TELEMETRY
@@ -1273,7 +1282,7 @@ namespace rpc
                     known_direction_zone_id,
                     add_ref_options::build_caller_route,
                     temp_ref_count);
-                std::ignore = refcount;
+                std::ignore = err;
             }
             if (object_id == dummy_object_id)
             {
@@ -1290,7 +1299,7 @@ namespace rpc
                 CO_RETURN rpc::error::OBJECT_NOT_FOUND();
             }
             reference_count = stub->add_ref();
-            return rpc::error::OK();
+            CO_RETURN rpc::error::OK();
         }
     }
 
@@ -1380,8 +1389,8 @@ namespace rpc
         }
     }
 
-     CORO_TASK(int)
-        service::release(uint64_t protocol_version,
+    CORO_TASK(int)
+    service::release(uint64_t protocol_version,
         destination_zone destination_zone_id,
         object object_id,
         caller_zone caller_zone_id,
@@ -1673,16 +1682,6 @@ namespace rpc
         if (!interface_stub)
             return nullptr;
         return interface_stub->get_castable_interface();
-    }
-
-    child_service::child_service(const char* name, zone zone_id, destination_zone parent_zone_id)
-        : service(name, zone_id, child_service_tag{})
-        , parent_zone_id_(parent_zone_id)
-    {
-#ifdef USE_RPC_TELEMETRY
-        if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
-            telemetry_service->on_service_creation(name, zone_id, parent_zone_id);
-#endif
     }
 
     child_service::~child_service()

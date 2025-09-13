@@ -54,7 +54,7 @@ namespace rpc
         }
 #endif
 
-        service_proxy_->on_object_proxy_released(object_id_);
+        service_proxy->on_object_proxy_released(object_id_, inherited_count);
         service_proxy_ = nullptr;
     }
     
@@ -71,7 +71,7 @@ namespace rpc
         auto service_proxy = service_proxy_.get_nullable();
         RPC_ASSERT(service_proxy);
         if (!service_proxy)
-            return rpc::error::ZONE_NOT_INITIALISED();
+            CO_RETURN rpc::error::ZONE_NOT_INITIALISED();
         CO_RETURN CO_AWAIT service_proxy->send_from_this_zone(
             protocol_version,
             encoding,
@@ -90,7 +90,7 @@ namespace rpc
         auto service_proxy = service_proxy_.get_nullable();
         RPC_ASSERT(service_proxy);
         if (!service_proxy)
-            return rpc::error::ZONE_NOT_INITIALISED();
+            CO_RETURN rpc::error::ZONE_NOT_INITIALISED();
         CO_RETURN CO_AWAIT service_proxy->send_from_this_zone(
             encoding::enc_default,
             tag,
@@ -107,7 +107,7 @@ namespace rpc
         auto service_proxy = service_proxy_.get_nullable();
         RPC_ASSERT(service_proxy);
         if (!service_proxy)
-            return rpc::error::ZONE_NOT_INITIALISED();
+            CO_RETURN rpc::error::ZONE_NOT_INITIALISED();
         CO_RETURN CO_AWAIT service_proxy->sp_try_cast(service_proxy->get_destination_zone_id(), object_id_, id_getter);
     }
 

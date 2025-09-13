@@ -82,13 +82,8 @@ namespace rpc::spsc
                 {
                     std::scoped_lock lock(pending_transmits_mtx_);
                     auto it = pending_transmits_.find(prefix.sequence_number);
-                    std::string msg("pending_transmits_ ");
-                    msg += std::to_string(service_->get_zone_id().get_val());
-                    msg += std::string(" sequence_number = ");
-                    msg += std::to_string(prefix.sequence_number);
-                    msg += std::string(" id = ");
-                    msg += std::to_string(payload.payload_fingerprint);
-                    LOG_CSTR(msg.c_str());
+                    RPC_DEBUG("pending_transmits_ zone: {} sequence_number: {} id: {}", 
+                             service_->get_zone_id().get_val(), prefix.sequence_number, payload.payload_fingerprint);
                     assert(it != pending_transmits_.end());
                     result = it->second;
                     pending_transmits_.erase(it);
@@ -234,7 +229,7 @@ namespace rpc::spsc
                         auto str_err = rpc::from_yas_binary(rpc::span(prefix_buf), prefix);
                         if(!str_err.empty())
                         {
-                            LOG_CSTR("failed invalid prefix");
+                            RPC_ERROR("failed invalid prefix");
                             break;
                         }
                         assert(prefix.direction);
@@ -273,13 +268,13 @@ namespace rpc::spsc
                         auto str_err = rpc::from_yas_binary(rpc::span(buf), payload);
                         if(!str_err.empty())
                         {
-                            LOG_CSTR("failed bad payload format");
+                            RPC_ERROR("failed bad payload format");
                             break;
                         }
                         auto ret = co_await incoming_message_handler(std::move(prefix), std::move(payload));
                         if(ret != rpc::error::OK())
                         {
-                            LOG_CSTR("failed incoming_message_handler");
+                            RPC_ERROR("failed incoming_message_handler");
                             break;
                         }
                         receiving_prefix = true;
@@ -308,7 +303,7 @@ namespace rpc::spsc
     // do a try cast
     CORO_TASK(void) channel_manager::stub_handle_send(envelope_prefix prefix, envelope_payload payload)
     {
-        LOG_CSTR("send request");
+        RPC_DEBUG("send request");
 
         assert(prefix.direction == message_direction::send || prefix.direction == message_direction::one_way);
         
@@ -319,7 +314,7 @@ namespace rpc::spsc
                                             prefix.sequence_number);
             if(err != rpc::error::OK())
             {
-                LOG_CSTR("failed send_payload");
+                RPC_ERROR("failed send_payload");
                 kill_connection();
                 CO_RETURN;
             }
@@ -329,7 +324,7 @@ namespace rpc::spsc
         auto str_err = rpc::from_yas_compressed_binary(rpc::span(payload.payload), request);
         if(!str_err.empty())
         {
-            LOG_CSTR("failed from_yas_compressed_binary call_send");
+            RPC_ERROR("failed from_yas_compressed_binary call_send");
             kill_connection();
             CO_RETURN;
         }
@@ -342,7 +337,7 @@ namespace rpc::spsc
 
         if(ret != rpc::error::OK())
         {
-            LOG_CSTR("failed send");
+            RPC_ERROR("failed send");
         }
 
         if(prefix.direction == message_direction::one_way)
@@ -353,11 +348,11 @@ namespace rpc::spsc
                                          prefix.sequence_number);
         if(err != rpc::error::OK())
         {
-            LOG_CSTR("failed send_payload");
+            RPC_ERROR("failed send_payload");
             kill_connection();
             CO_RETURN;
         }
-        // LOG_CSTR("send request complete");
+        // RPC_DEBUG("send request complete");
         CO_RETURN;
     }
 
@@ -365,13 +360,13 @@ namespace rpc::spsc
     CORO_TASK(void)
     channel_manager::stub_handle_try_cast(envelope_prefix prefix, envelope_payload payload)
     {
-        LOG_CSTR("try_cast request");
+        RPC_DEBUG("try_cast request");
 
         try_cast_send request;
         auto str_err = rpc::from_yas_compressed_binary(rpc::span(payload.payload), request);
         if(!str_err.empty())
         {
-            LOG_CSTR("failed try_cast_send from_yas_compressed_binary");
+            RPC_ERROR("failed try_cast_send from_yas_compressed_binary");
             kill_connection();
             CO_RETURN;
         }
@@ -381,105 +376,107 @@ namespace rpc::spsc
                                                {request.interface_id});
         if(ret != rpc::error::OK())
         {
-            LOG_CSTR("failed try_cast");
+            RPC_ERROR("failed try_cast");
         }
 
         auto err = CO_AWAIT send_payload(prefix.version, message_direction::receive,
                                          try_cast_receive {.err_code = ret}, prefix.sequence_number);
         if(err != rpc::error::OK())
         {
-            LOG_CSTR("failed try_cast_send send_payload");
+            RPC_ERROR("failed try_cast_send send_payload");
             kill_connection();
             CO_RETURN;
         }
-        LOG_CSTR("try_cast request complete");
+        RPC_DEBUG("try_cast request complete");
         CO_RETURN;
     }
 
     // do an add_ref
     CORO_TASK(void) channel_manager::stub_handle_add_ref(envelope_prefix prefix, envelope_payload payload)
     {
-        LOG_CSTR("add_ref request");
+        RPC_DEBUG("add_ref request");
 
         addref_send request;
         auto str_err = rpc::from_yas_compressed_binary(rpc::span(payload.payload), request);
         if(!str_err.empty())
         {
-            LOG_CSTR("failed addref_send from_yas_compressed_binary");
+            RPC_ERROR("failed addref_send from_yas_compressed_binary");
             kill_connection();
             CO_RETURN;
         }
 
         std::vector<char> out_buf;
+        uint64_t ref_count = 0;
         auto ret = co_await service_->add_ref(prefix.version, {request.destination_channel_zone_id},
                                               {request.destination_zone_id}, {request.object_id},
                                               {request.caller_channel_zone_id}, {request.caller_zone_id},
-                                              (rpc::add_ref_options)request.build_out_param_channel);
+                                              {request.destination_zone_id}, // known_direction_zone
+                                              (rpc::add_ref_options)request.build_out_param_channel,
+                                              ref_count);
 
-        if(ret == std::numeric_limits<uint64_t>::max())
+        if(ret != rpc::error::OK())
         {
-            LOG_CSTR("failed add_ref");
+            RPC_ERROR("failed add_ref");
         }
 
         auto err = CO_AWAIT send_payload(prefix.version, message_direction::receive,
-                                         addref_receive {.ref_count = ret, .err_code = rpc::error::OK()},
+                                         addref_receive {.ref_count = ref_count, .err_code = ret},
                                          prefix.sequence_number);
         if(err != rpc::error::OK())
         {
-            LOG_CSTR("failed addref_send send_payload");
+            RPC_ERROR("failed addref_send send_payload");
             kill_connection();
             CO_RETURN;
         }
-        // LOG_CSTR("add_ref request complete");
+        // RPC_DEBUG("add_ref request complete");
         CO_RETURN;
     }
 
     // do a release
     CORO_TASK(void) channel_manager::stub_handle_release(envelope_prefix prefix, envelope_payload payload)
     {
-        LOG_CSTR("release request");
+        RPC_DEBUG("release request");
         release_send request;
         auto str_err = rpc::from_yas_compressed_binary(rpc::span(payload.payload), request);
         if(!str_err.empty())
         {
-            LOG_CSTR("failed release_send from_yas_compressed_binary");
+            RPC_ERROR("failed release_send from_yas_compressed_binary");
             kill_connection();
             CO_RETURN;
         }
 
         std::vector<char> out_buf;
+        uint64_t ref_count = 0;
         auto ret = co_await service_->release(prefix.version, {request.destination_zone_id}, {request.object_id},
-                                              {request.caller_zone_id});
+                                              {request.caller_zone_id}, ref_count);
 
-        if(ret == std::numeric_limits<uint64_t>::max())
+        if(ret != rpc::error::OK())
         {
-            LOG_CSTR("failed release");
+            RPC_ERROR("failed release");
         }
 
         auto err = CO_AWAIT send_payload(prefix.version, message_direction::receive,
-                                         release_receive {.ref_count = ret, .err_code = rpc::error::OK()},
+                                         release_receive {.ref_count = ref_count, .err_code = ret},
                                          prefix.sequence_number);
         if(err != rpc::error::OK())
         {
-            LOG_CSTR("failed release_send send_payload");
+            RPC_ERROR("failed release_send send_payload");
             kill_connection();
             CO_RETURN;
         }
-        // LOG_CSTR("release request complete");
+        // RPC_DEBUG("release request complete");
         CO_RETURN;
     }
 
     CORO_TASK(void) channel_manager::create_stub(envelope_prefix prefix, envelope_payload payload)
     {
-        std::string msg("run_client init_client_channel_send ");
-        msg += std::to_string(service_->get_zone_id().get_val());
-        LOG_CSTR(msg.c_str());
+        RPC_DEBUG("run_client init_client_channel_send zone: {}", service_->get_zone_id().get_val());
 
         init_client_channel_send request;
         auto err = rpc::from_yas_compressed_binary(rpc::span(payload.payload), request);
         if(!err.empty())
         {
-            LOG_CSTR("failed run_client init_client_channel_send");
+            RPC_ERROR("failed run_client init_client_channel_send");
             CO_RETURN;
         }
         rpc::interface_descriptor input_descr {{request.caller_object_id}, {request.caller_zone_id}};
@@ -490,8 +487,7 @@ namespace rpc::spsc
         if(ret != rpc::error::OK())
         {
             // report error
-            auto randonmumber = "failed to connect to zone " + std::to_string(ret) + " \n";
-            LOG_STR(randonmumber.c_str(), randonmumber.size());
+            RPC_ERROR("failed to connect to zone {}", ret);
             CO_RETURN;
         }
 

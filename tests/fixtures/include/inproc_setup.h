@@ -114,7 +114,7 @@ public:
         CO_RETURN true;
     }
 
-    virtual void SetUp()
+    virtual void set_up()
     {
 #ifdef BUILD_COROUTINE
         io_scheduler_ = coro::io_scheduler::make_shared(
@@ -146,7 +146,7 @@ public:
         CO_RETURN;
     }
 
-    virtual void TearDown()
+    virtual void tear_down()
     {
 #ifdef BUILD_COROUTINE        
         io_scheduler_->schedule(CoroTearDown());
@@ -158,7 +158,6 @@ public:
 #endif        
         root_service_ = nullptr;
         current_host_service.reset();
-        test_service_logger::reset_logger();
         zone_gen = nullptr;
 #ifdef USE_RPC_TELEMETRY
         RESET_TELEMETRY_SERVICE

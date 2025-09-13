@@ -29,7 +29,7 @@ namespace rpc
         auto base = iface.query_proxy_base();
         if (!base)
             return nullptr;
-        return base->object_proxy_;
+        return base->get_object_proxy();
     }
 
     object casting_interface::get_object_id(const casting_interface& iface)

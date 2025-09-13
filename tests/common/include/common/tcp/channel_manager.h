@@ -90,7 +90,7 @@ namespace rpc::tcp
             int err = CO_AWAIT receive_anonymous_payload(prefix, payload, sequence_number);
             if (err != rpc::error::OK())
             {
-                LOG_CSTR("failed receive_payload receive_anonymous_payload");
+                RPC_ERROR("failed receive_payload receive_anonymous_payload");
                 co_return err;
             }
 
@@ -99,7 +99,7 @@ namespace rpc::tcp
             auto str_err = rpc::from_yas_compressed_binary(rpc::span(payload.payload), receivePayload);
             if (!str_err.empty())
             {
-                LOG_CSTR("failed receive_payload from_yas_compressed_binary");
+                RPC_ERROR("failed receive_payload from_yas_compressed_binary");
                 co_return rpc::error::TRANSPORT_ERROR();
             }
 
@@ -178,14 +178,14 @@ namespace rpc::tcp
                 auto status = co_await client_.poll(coro::poll_op::write, timeout_);
                 if (status != coro::poll_status::event)
                 {
-                    LOG_CSTR("failed immediate_send_payload prefix");
+                    RPC_ERROR("failed immediate_send_payload prefix");
                     CO_RETURN rpc::error::TRANSPORT_ERROR();
                 }
                 marshal_status = client_.send(std::span{(const char*)buf.data(), buf.size()});
             }
             if (marshal_status.first != coro::net::send_status::ok)
             {
-                LOG_CSTR("failed immediate_send_payload prefix send");
+                RPC_ERROR("failed immediate_send_payload prefix send");
                 CO_RETURN rpc::error::TRANSPORT_ERROR();
             }
 
@@ -240,7 +240,7 @@ namespace rpc::tcp
                 protocol_version, message_direction::send, std::move(sendPayload), sequence_number);
             if (err != rpc::error::OK())
             {
-                LOG_CSTR("failed call_peer send_payload send");
+                RPC_ERROR("failed call_peer send_payload send");
                 std::scoped_lock lock(pending_transmits_mtx_);
                 pending_transmits_.erase(sequence_number);
                 co_return err;
@@ -253,7 +253,7 @@ namespace rpc::tcp
             auto str_err = rpc::from_yas_compressed_binary(rpc::span(res_payload.payload.payload), receivePayload);
             if (!str_err.empty())
             {
-                LOG_CSTR("failed call_peer send_payload from_yas_compressed_binary");
+                RPC_ERROR("failed call_peer send_payload from_yas_compressed_binary");
                 co_return rpc::error::TRANSPORT_ERROR();
             }
 

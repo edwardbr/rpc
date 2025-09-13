@@ -63,7 +63,7 @@ namespace rpc::tcp
             int err = CO_AWAIT worker_release->channel_manager_->receive_anonymous_payload(prefix, payload, 0);
             if (err != rpc::error::OK())
             {
-                LOG_CSTR("failed run_client receive_anonymous_payload");
+                RPC_ERROR("failed run_client receive_anonymous_payload");
                 CO_RETURN;
             }
 
@@ -77,7 +77,7 @@ namespace rpc::tcp
                 auto err = rpc::from_yas_compressed_binary(rpc::span(payload.payload), request);
                 if (!err.empty())
                 {
-                    LOG_CSTR("failed run_client init_client_channel_send");
+                    RPC_ERROR("failed run_client init_client_channel_send");
                     CO_RETURN;
                 }
 
@@ -96,9 +96,8 @@ namespace rpc::tcp
                             worker_release);
                     if (ret != rpc::error::OK())
                     {
-                        // report error
-                        auto randonmumber = "failed to connect to zone " + std::to_string(ret) + " \n";
-                        LOG_STR(randonmumber.c_str(), randonmumber.size());
+                        // report error  
+                        RPC_ERROR("failed to connect to zone {}", ret);
                         CO_RETURN;
                     }
 
@@ -121,8 +120,7 @@ namespace rpc::tcp
             else
             {
                 // dodgy request
-                auto randonmumber = "invalid fingerprint " + std::to_string(payload.payload_fingerprint) + " \n";
-                LOG_STR(randonmumber.c_str(), randonmumber.size());
+                RPC_ERROR("invalid fingerprint {}", payload.payload_fingerprint);
                 CO_RETURN;
             }
         }
@@ -148,7 +146,7 @@ namespace rpc::tcp
                 }
                 if (poll_status != coro::poll_status::event)
                 {
-                    LOG_CSTR("failed run_listener poll_status");
+                    RPC_ERROR("failed run_listener poll_status");
                     break; // Handle error, see poll_status for detailed error states.
                 }
 
@@ -158,7 +156,7 @@ namespace rpc::tcp
                 // Verify the incoming connection was accepted correctly.
                 if (!client.socket().is_valid())
                 {
-                    LOG_CSTR("failed run_listener client is_valid");
+                    RPC_ERROR("failed run_listener client is_valid");
                     break; // Handle error.
                 }
 

@@ -101,7 +101,7 @@ namespace rpc::spsc
 
         if (!channel_manager_->pump_send_and_receive())
         {
-            LOG_CSTR("unable to pump_send_and_receive proxy");
+            RPC_ERROR("unable to pump_send_and_receive proxy");
             CO_RETURN rpc::error::SERVICE_PROXY_LOST_CONNECTION();
         }
 
@@ -115,13 +115,13 @@ namespace rpc::spsc
                 init_receive);
             if (ret != rpc::error::OK())
             {
-                LOG_CSTR("channel_manager->call_peer");
+                RPC_ERROR("channel_manager->call_peer");
                 CO_RETURN ret;
             }
 
             if (init_receive.err_code != rpc::error::OK())
             {
-                LOG_CSTR("init_client_channel_send failed");
+                RPC_ERROR("init_client_channel_send failed");
                 CO_RETURN init_receive.err_code;
             }
 
@@ -152,13 +152,13 @@ namespace rpc::spsc
 
         if (destination_zone_id != get_destination_zone_id())
         {
-            LOG_CSTR("failed service_proxy::send ZONE_NOT_SUPPORTED");
+            RPC_ERROR("failed service_proxy::send ZONE_NOT_SUPPORTED");
             CO_RETURN rpc::error::ZONE_NOT_SUPPORTED();
         }
 
         if (!channel_manager_)
         {
-            LOG_CSTR("failed service_proxy::send SERVICE_PROXY_LOST_CONNECTION");
+            RPC_ERROR("failed service_proxy::send SERVICE_PROXY_LOST_CONNECTION");
             CO_RETURN rpc::error::SERVICE_PROXY_LOST_CONNECTION();
         }
 
@@ -176,7 +176,7 @@ namespace rpc::spsc
             call_receive);
         if (ret != rpc::error::OK())
         {
-            LOG_CSTR("failed service_proxy::send call_send");
+            RPC_ERROR("failed service_proxy::send call_send");
             CO_RETURN ret;
         }
 
@@ -199,7 +199,7 @@ namespace rpc::spsc
 
         if (!channel_manager_)
         {
-            LOG_CSTR("failed try_cast SERVICE_PROXY_LOST_CONNECTION");
+            RPC_ERROR("failed try_cast SERVICE_PROXY_LOST_CONNECTION");
             CO_RETURN rpc::error::SERVICE_PROXY_LOST_CONNECTION();
         }
 
@@ -213,7 +213,7 @@ namespace rpc::spsc
             try_cast_receive);
         if (ret != rpc::error::OK())
         {
-            LOG_CSTR("failed try_cast call_peer");
+            RPC_ERROR("failed try_cast call_peer");
             CO_RETURN ret;
         }
 
@@ -224,14 +224,16 @@ namespace rpc::spsc
         CO_RETURN try_cast_receive.err_code;
     }
 
-    CORO_TASK(uint64_t)
+    CORO_TASK(int)
     service_proxy::add_ref(uint64_t protocol_version,
         destination_channel_zone destination_channel_zone_id,
         destination_zone destination_zone_id,
         object object_id,
         caller_channel_zone caller_channel_zone_id,
         caller_zone caller_zone_id,
-        rpc::add_ref_options build_out_param_channel)
+        known_direction_zone known_direction_zone_id,
+        rpc::add_ref_options build_out_param_channel,
+        uint64_t& reference_count)
     {
         // auto msg = std::string("add_ref ");
         // msg += std::to_string(get_zone_id().get_val());
@@ -252,7 +254,7 @@ namespace rpc::spsc
 
         if (!channel_manager_)
         {
-            LOG_CSTR("failed add_ref SERVICE_PROXY_LOST_CONNECTION");
+            RPC_ERROR("failed add_ref SERVICE_PROXY_LOST_CONNECTION");
             CO_RETURN rpc::error::SERVICE_PROXY_LOST_CONNECTION();
         }
 
@@ -267,13 +269,13 @@ namespace rpc::spsc
             response_data);
         if (ret != rpc::error::OK())
         {
-            LOG_CSTR("failed add_ref addref_send");
+            RPC_ERROR("failed add_ref addref_send");
             CO_RETURN ret;
         }
 
         if (response_data.err_code != rpc::error::OK())
         {
-            LOG_CSTR("failed addref_receive.err_code failed");
+            RPC_ERROR("failed addref_receive.err_code failed");
 #ifdef USE_RPC_TELEMETRY
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             {
@@ -282,28 +284,27 @@ namespace rpc::spsc
             }
 #endif
             RPC_ASSERT(false);
-            CO_RETURN add_ref_failed_val;
+            CO_RETURN response_data.err_code;
         }
         // msg = std::string("add_ref complete ");
         // msg += std::to_string(get_zone_id().get_val());
         // LOG_CSTR(msg.c_str());
 
-        CO_RETURN response_data.ref_count;
+        reference_count = response_data.ref_count;
+        CO_RETURN rpc::error::OK();
     }
 
-    CORO_TASK(uint64_t)
+    CORO_TASK(int)
     service_proxy::release(
-        uint64_t protocol_version, destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id)
+        uint64_t protocol_version, destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id, uint64_t& reference_count)
     {
         constexpr auto add_ref_failed_val = std::numeric_limits<uint64_t>::max();
 
-        auto msg = std::string("release ");
-        msg += std::to_string(get_zone_id().get_val());
-        LOG_CSTR(msg.c_str());
+        RPC_DEBUG("release zone: {}", get_zone_id().get_val());
 
         if (!channel_manager_)
         {
-            LOG_CSTR("failed release SERVICE_PROXY_LOST_CONNECTION");
+            RPC_ERROR("failed release SERVICE_PROXY_LOST_CONNECTION");
             CO_RETURN rpc::error::SERVICE_PROXY_LOST_CONNECTION();
         }
 
@@ -317,13 +318,13 @@ namespace rpc::spsc
             response_data);
         if (ret != rpc::error::OK())
         {
-            LOG_CSTR("failed release release_send");
+            RPC_ERROR("failed release release_send");
             CO_RETURN ret;
         }
 
         if (response_data.err_code != rpc::error::OK())
         {
-            LOG_CSTR("failed response_data.err_code failed");
+            RPC_ERROR("failed response_data.err_code failed");
 #ifdef USE_RPC_TELEMETRY
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             {
@@ -332,14 +333,13 @@ namespace rpc::spsc
             }
 #endif
             RPC_ASSERT(false);
-            CO_RETURN add_ref_failed_val;
+            CO_RETURN response_data.err_code;
         }
 
-        msg = std::string("release complete ");
-        msg += std::to_string(get_zone_id().get_val());
-        LOG_CSTR(msg.c_str());
+        RPC_DEBUG("release complete zone: {}", get_zone_id().get_val());
 
-        CO_RETURN response_data.ref_count;
+        reference_count = response_data.ref_count;
+        CO_RETURN rpc::error::OK();
     }
 }
 #endif
