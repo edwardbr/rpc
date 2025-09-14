@@ -31,7 +31,7 @@ namespace rpc::spsc
     // this method sends queued requests to other peers and receives responses notifying the proxy when complete
     bool channel_manager::pump_send_and_receive()
     {
-        RPC_DEBUG("pump_send_and_receive {} fd = {}", service_->get_zone_id().get_val(), client_.socket().native_handle());
+        RPC_DEBUG("pump_send_and_receive {}", service_->get_zone_id().get_val());
 
         auto foo = [this](envelope_prefix prefix, envelope_payload payload) -> coro::task<int>
         {

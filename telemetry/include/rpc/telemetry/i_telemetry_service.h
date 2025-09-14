@@ -184,9 +184,7 @@ namespace rpc
     };
 }
 #ifdef USE_RPC_TELEMETRY
-#define TELEMETRY_SERVICE_MANAGER rpc::telemetry_service_manager telemetry_service_manager_;
 #define RESET_TELEMETRY_SERVICE rpc::telemetry_service_manager::reset();
 #else
-#define TELEMETRY_SERVICE_MANAGER
 #define RESET_TELEMETRY_SERVICE
 #endif

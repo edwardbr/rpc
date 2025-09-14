@@ -84,10 +84,6 @@ using namespace marshalled_tests;
 
 #include "test_globals.h"
 
-// Global variables (defined here and declared in headers)
-#ifdef USE_RPC_TELEMETRY
-TELEMETRY_SERVICE_MANAGER
-#endif
 bool enable_multithreaded_tests = false;
 
 // This line tests that we can define tests in an unnamed namespace.
@@ -369,22 +365,30 @@ typedef Types<
     remote_implementations;
 TYPED_TEST_SUITE(remote_type_test, remote_implementations);
 
-template<class T> CORO_TASK(bool) coro_remote_standard_tests(T& lib)
+CORO_TASK(bool) coro_remote_standard_tests(rpc::shared_ptr<yyy::i_example> example, bool has_enclave)
 {
     rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
-    auto ret = CO_AWAIT lib.get_example()->create_foo(i_foo_ptr);
+    auto ret = CO_AWAIT example->create_foo(i_foo_ptr);
     if (ret != rpc::error::OK())
     {
         RPC_ERROR("failed create_foo");
         CO_RETURN false;
     }
-    CO_AWAIT standard_tests(*i_foo_ptr, lib.get_has_enclave());
+    if (!i_foo_ptr)
+    {
+        RPC_ERROR("create_foo returned OK but i_foo_ptr is null");
+        CO_RETURN false;
+    }
+    CO_AWAIT standard_tests(*i_foo_ptr, has_enclave);
     CO_RETURN true;
 }
 
 TYPED_TEST(remote_type_test, remote_standard_tests) {
-    run_coro_test(*this, [](auto& lib) {
-        return coro_remote_standard_tests<TypeParam>(lib);
+    auto& lib = this->get_lib();
+    auto root_service = lib.get_root_service();
+    run_coro_test(*this, [example = lib.get_example(), has_enclave = lib.get_has_enclave()](auto& lib) {
+        (void)lib; // lib not used in coro_remote_standard_tests
+        return coro_remote_standard_tests(example, has_enclave);
     });
 }
 

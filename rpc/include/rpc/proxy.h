@@ -531,6 +531,42 @@ namespace rpc
             CO_RETURN error::INVALID_VERSION();
         }
 
+        CORO_TASK(void) cleanup_after_object(rpc::shared_ptr<service_proxy> self, object object_id, int inherited_reference_count)
+        {
+            // self is needed to keep the service proxy alive in the async destruction of the service_proxy
+
+            auto caller_zone_id = get_zone_id().as_caller();
+            
+            // Handle normal reference release
+            uint64_t ref_count = 0;
+            auto ret = CO_AWAIT release(version_.load(), destination_zone_id_, object_id, caller_zone_id, ref_count);
+            if (ret != rpc::error::OK())
+            {
+                RPC_ERROR("on_object_proxy_released release failed");
+                RPC_ASSERT(false);
+                CO_RETURN;
+            }
+            inner_release_external_ref();
+
+            // Handle inherited references from race conditions
+            for (int i = 0; i < inherited_reference_count; i++)
+            {
+                RPC_DEBUG("Releasing inherited reference {}/{} for object {}",
+                            (i + 1), inherited_reference_count, object_id.get_val());
+
+                auto ret = CO_AWAIT release(version_.load(), destination_zone_id_, object_id, caller_zone_id, ref_count);
+                if (ret != rpc::error::OK())
+                {
+                    RPC_ERROR("on_object_proxy_released release failed");
+                    RPC_ASSERT(false);
+                    CO_RETURN;
+                }
+                inner_release_external_ref();
+            }
+            self = nullptr;//just so it does not get optimised out
+            CO_RETURN;
+        }
+
         void on_object_proxy_released(object object_id, int inherited_reference_count)
         {
             RPC_DEBUG("on_object_proxy_released service zone: {} destination_zone={}, caller_zone={}, object_id = {}",
@@ -576,83 +612,9 @@ namespace rpc
 
             // Schedule the coroutine work asynchronously
 #ifdef BUILD_COROUTINE
-            auto self = shared_from_this();
-            auto coro_task = [self, object_id, inherited_reference_count]() -> CORO_TASK(void)
-            {
-                auto caller_zone_id = self->get_zone_id().as_caller();
-                
-                // Handle normal reference release
-                uint64_t ref_count = 0;
-                auto ret = CO_AWAIT self->release(self->version_.load(), self->destination_zone_id_, object_id, caller_zone_id, ref_count);
-                if (ret != rpc::error::OK())
-                {
-                    RPC_ERROR("on_object_proxy_released release failed");
-                    RPC_ASSERT(false);
-                    CO_RETURN;
-                }
-                self->inner_release_external_ref();
-
-                // Handle inherited references from race conditions
-                for (int i = 0; i < inherited_reference_count; i++)
-                {
-                    RPC_DEBUG("Releasing inherited reference {}/{} for object {}",
-                              (i + 1), inherited_reference_count, object_id.get_val());
-
-                    auto ret = CO_AWAIT self->release(self->version_.load(), self->destination_zone_id_, object_id, caller_zone_id, ref_count);
-                    if (ret != rpc::error::OK())
-                    {
-                        RPC_ERROR("on_object_proxy_released release failed");
-                        RPC_ASSERT(false);
-                        CO_RETURN;
-                    }
-                    self->inner_release_external_ref();
-                }
-                CO_RETURN;
-            };
-            current_service->schedule(coro_task());
+            current_service->schedule(cleanup_after_object(shared_from_this(), object_id, inherited_reference_count));
 #else
-            // Non-coroutine version - handle synchronously
-            uint64_t ref_count = 0;
-            auto ret = release(version_.load(), destination_zone_id_, object_id, caller_zone_id, ref_count);
-            if (ret != rpc::error::OK())
-            {
-                RPC_ERROR("on_object_proxy_released release failed");
-                RPC_ASSERT(false);
-                return;
-            }
-            inner_release_external_ref();
-
-            // int local_ref_count = 0;
-            // ret = current_service->decrement_reference_count(shared_from_this(), local_ref_count);
-            // if (ret != rpc::error::OK())
-            // {
-            //     RPC_ERROR("on_object_proxy_released release failed");
-            //     RPC_ASSERT(false);
-            //     CO_RETURN;
-            // }
-
-            // Handle inherited references from race conditions
-            for (int i = 0; i < inherited_reference_count; i++)
-            {
-                RPC_DEBUG("Releasing inherited reference {}/{} for object {}",
-                          (i + 1), inherited_reference_count, object_id.get_val());
-
-                auto ret = release(version_.load(), destination_zone_id_, object_id, caller_zone_id, ref_count);
-                if (ret != rpc::error::OK())
-                {
-                    RPC_ERROR("on_object_proxy_released release failed");
-                    RPC_ASSERT(false);
-                    return;
-                }
-                inner_release_external_ref();
-                // ret = current_service->decrement_reference_count(shared_from_this(), local_ref_count);
-                // if (ret != rpc::error::OK())
-                // {
-                //     RPC_ERROR("on_object_proxy_released release failed");
-                //     RPC_ASSERT(false);
-                //     return;
-                // }
-            }
+            cleanup_after_object(shared_from_this(), object_id, inherited_reference_count);
 #endif
         }
 
@@ -725,7 +687,6 @@ namespace rpc
                 std::lock_guard l(insert_control_);
 
                 // Capture strong reference to self while in critical section
-                self_ref = shared_from_this();
 
                 auto item = proxies_.find(object_id);
                 if (item != proxies_.end())
@@ -736,7 +697,7 @@ namespace rpc
                 if (!op)
                 {
                     // Either no entry exists, or the weak_ptr is expired - create new object_proxy
-                    op = rpc::shared_ptr<object_proxy>(new object_proxy(object_id, self_ref));
+                    op = rpc::shared_ptr<object_proxy>(new object_proxy(object_id, shared_from_this()));
 #ifdef USE_RPC_TELEMETRY
                     if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
                     {

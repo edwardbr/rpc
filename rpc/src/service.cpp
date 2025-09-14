@@ -49,7 +49,7 @@ namespace rpc
     {
 #ifdef USE_RPC_TELEMETRY
         if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
-            telemetry_service->on_service_creation(name, zone_id);
+            telemetry_service->on_service_creation(name, zone_id, destination_zone{0});
 #endif
     }
     service::service(const char* name, zone zone_id, const std::shared_ptr<coro::io_scheduler>& scheduler, child_service_tag)
