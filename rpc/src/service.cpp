@@ -1152,7 +1152,7 @@ namespace rpc
                     caller_copy = nullptr;
                 }*/
 
-                CO_RETURN 1;
+                CO_RETURN error::OK();
             }
             else
             {

@@ -31,11 +31,7 @@ namespace rpc::spsc
     // this method sends queued requests to other peers and receives responses notifying the proxy when complete
     bool channel_manager::pump_send_and_receive()
     {
-        // std::string msg("pump_send_and_receive ");
-        // msg += std::to_string(service_->get_zone_id().get_val());
-        // msg += " fd = ";
-        // msg += std::to_string(client_.socket().native_handle());
-        // LOG_CSTR(msg.c_str());
+        RPC_DEBUG("pump_send_and_receive {} fd = {}", service_->get_zone_id().get_val(), client_.socket().native_handle());
 
         auto foo = [this](envelope_prefix prefix, envelope_payload payload) -> coro::task<int>
         {
@@ -92,13 +88,10 @@ namespace rpc::spsc
                 result->prefix = std::move(prefix);
                 result->payload = std::move(payload);
 
-                // std::string msg("pump_send_and_receive prefix.sequence_number ");
-                // msg += std::to_string(service_->get_zone_id().get_val());
-                // msg += "\n prefix = ";
-                // msg += rpc::to_yas_json<std::string>(prefix);
-                // msg += "\n payload = ";
-                // msg += rpc::to_yas_json<std::string>(result->payload);
-                // LOG_CSTR(msg.c_str());
+                RPC_DEBUG("pump_send_and_receive prefix.sequence_number {}\n prefix = {}\n payload = {}",
+                         service_->get_zone_id().get_val(),
+                         rpc::to_yas_json<std::string>(prefix),
+                         rpc::to_yas_json<std::string>(result->payload));
 
                 result->error_code = rpc::error::OK();
                 result->event.set();
@@ -410,7 +403,7 @@ namespace rpc::spsc
         auto ret = co_await service_->add_ref(prefix.version, {request.destination_channel_zone_id},
                                               {request.destination_zone_id}, {request.object_id},
                                               {request.caller_channel_zone_id}, {request.caller_zone_id},
-                                              {request.destination_zone_id}, // known_direction_zone
+                                              {request.known_direction_zone_id},
                                               (rpc::add_ref_options)request.build_out_param_channel,
                                               ref_count);
 

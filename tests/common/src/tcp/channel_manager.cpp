@@ -235,7 +235,7 @@ namespace rpc::tcp
     // do a try cast
     CORO_TASK(void) channel_manager::stub_handle_send(envelope_prefix prefix, envelope_payload payload)
     {
-        // LOG_CSTR("send request");
+        RPC_DEBUG("send request");
 
         assert(prefix.direction == message_direction::send || prefix.direction == message_direction::one_way);
 
@@ -280,7 +280,7 @@ namespace rpc::tcp
             kill_connection();
             CO_RETURN;
         }
-        // LOG_CSTR("send request complete");
+        RPC_DEBUG("send request complete");
         CO_RETURN;
     }
 
@@ -322,7 +322,7 @@ namespace rpc::tcp
     // do an add_ref
     CORO_TASK(void) channel_manager::stub_handle_add_ref(envelope_prefix prefix, envelope_payload payload)
     {
-        // LOG_CSTR("add_ref request");
+        RPC_DEBUG("add_ref request");
 
         tcp::addref_send request;
         auto str_err = rpc::from_yas_compressed_binary(rpc::span(payload.payload), request);
@@ -341,7 +341,7 @@ namespace rpc::tcp
             {request.object_id},
             {request.caller_channel_zone_id},
             {request.caller_zone_id},
-            {request.destination_zone_id}, // known_direction_zone - using destination_zone as default
+            {request.known_direction_zone_id},
             (rpc::add_ref_options)request.build_out_param_channel,
             ref_count);
 
@@ -360,14 +360,14 @@ namespace rpc::tcp
             kill_connection();
             CO_RETURN;
         }
-        // LOG_CSTR("add_ref request complete");
+        RPC_DEBUG("add_ref request complete");
         CO_RETURN;
     }
 
     // do a release
     CORO_TASK(void) channel_manager::stub_handle_release(envelope_prefix prefix, envelope_payload payload)
     {
-        // LOG_CSTR("release request");
+        RPC_DEBUG("release request");
         tcp::release_send request;
         auto str_err = rpc::from_yas_compressed_binary(rpc::span(payload.payload), request);
         if (!str_err.empty())
@@ -397,7 +397,7 @@ namespace rpc::tcp
             kill_connection();
             CO_RETURN;
         }
-        // LOG_CSTR("release request complete");
+        RPC_DEBUG("release request complete");
         CO_RETURN;
     }
 
@@ -482,10 +482,7 @@ namespace rpc::tcp
         }
         assert(prefix.direction);
 
-        // std::string msg("received prefix ");
-        // msg += "\n prefix = ";
-        // msg += rpc::to_yas_json<std::string>(prefix);
-        // LOG_CSTR(msg.c_str());
+        RPC_DEBUG("received prefix\n prefix = {}", rpc::to_yas_json<std::string>(prefix));
 
         co_return rpc::error::OK();
     }
@@ -518,19 +515,13 @@ namespace rpc::tcp
                 co_return rpc::error::TRANSPORT_ERROR();
             }
 
-            // std::string msg("receive_anonymous_payload seq = 0 ");
-            // msg += std::to_string(service_->get_zone_id().get_val());
-            // msg += "\n payload = ";
-            // msg += rpc::to_yas_json<std::string>(payload);
-            // LOG_CSTR(msg.c_str());
+            RPC_DEBUG("receive_anonymous_payload seq = 0 {}\n payload = {}",
+                     service_->get_zone_id().get_val(), rpc::to_yas_json<std::string>(payload));
         }
         else
         {
-            // std::string msg("receive_anonymous_payload seq != 0 ");
-            // msg += std::to_string(service_->get_zone_id().get_val());
-            // msg += " sequence_number = ";
-            // msg += std::to_string(prefix.sequence_number);
-            // LOG_CSTR(msg.c_str());
+            RPC_DEBUG("receive_anonymous_payload seq != 0 {} sequence_number = {}",
+                     service_->get_zone_id().get_val(), prefix.sequence_number);
 
             result_listener res_payload;
             {

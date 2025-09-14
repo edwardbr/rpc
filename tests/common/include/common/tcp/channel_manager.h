@@ -81,9 +81,7 @@ namespace rpc::tcp
         CORO_TASK(int)
         receive_payload(ReceivePayload& receivePayload, uint64_t sequence_number)
         {
-            // std::string msg("receive_payload ");
-            // msg += std::to_string(service_->get_zone_id().get_val());
-            // LOG_CSTR(msg.c_str());
+            RPC_DEBUG("receive_payload {}", service_->get_zone_id().get_val());
 
             envelope_prefix prefix;
             envelope_payload payload;
@@ -103,13 +101,10 @@ namespace rpc::tcp
                 co_return rpc::error::TRANSPORT_ERROR();
             }
 
-            // msg = std::string("receive_payload complete ");
-            // msg += std::to_string(service_->get_zone_id().get_val());
-            // msg += std::string("\nprefix = ");
-            // msg += rpc::to_yas_json<std::string>(prefix);
-            // msg += std::string("\npayload = ");
-            // msg += rpc::to_yas_json<std::string>(payload);
-            // LOG_CSTR(msg.c_str());
+            RPC_DEBUG("receive_payload complete {}\nprefix = {}\npayload = {}",
+                     service_->get_zone_id().get_val(),
+                     rpc::to_yas_json<std::string>(prefix),
+                     rpc::to_yas_json<std::string>(payload));
 
             co_return rpc::error::OK();
         }
@@ -132,13 +127,10 @@ namespace rpc::tcp
                 .sequence_number = sequence_number,
                 .payload_size = payload.size()};
 
-            // std::string msg("send_payload ");
-            // msg += std::to_string(service_->get_zone_id().get_val());
-            // msg += std::string("\nprefix = ");
-            // msg += rpc::to_yas_json<std::string>(prefix);
-            // msg += std::string("\npayload = ");
-            // msg += rpc::to_yas_json<std::string>(payload_envelope);
-            // LOG_CSTR(msg.c_str());
+            RPC_DEBUG("send_payload {}\nprefix = {}\npayload = {}",
+                     service_->get_zone_id().get_val(),
+                     rpc::to_yas_json<std::string>(prefix),
+                     rpc::to_yas_json<std::string>(payload_envelope));
 
             send_queue_.push(rpc::to_yas_binary(prefix));
             send_queue_.push(payload);
@@ -163,13 +155,10 @@ namespace rpc::tcp
                 .sequence_number = sequence_number,
                 .payload_size = payload.size()};
 
-            // std::string msg("immediate_send_payload ");
-            // msg += std::to_string(service_->get_zone_id().get_val());
-            // msg = std::string("\nprefix = ");
-            // msg += rpc::to_yas_json<std::string>(prefix);
-            // msg += std::string("\npayload = ");
-            // msg += rpc::to_yas_json<std::string>(payload);
-            // LOG_CSTR(msg.c_str());
+            RPC_DEBUG("immediate_send_payload {}\nprefix = {}\npayload = {}",
+                     service_->get_zone_id().get_val(),
+                     rpc::to_yas_json<std::string>(prefix),
+                     rpc::to_yas_json<std::string>(payload));
 
             std::vector<uint8_t> buf = rpc::to_yas_binary(prefix);
             auto marshal_status = client_.send(std::span{(const char*)buf.data(), buf.size()});
@@ -195,11 +184,9 @@ namespace rpc::tcp
                 auto status = co_await client_.poll(coro::poll_op::write, timeout_);
                 if (status != coro::poll_status::event)
                 {
-                    // std::string msg("client_.poll failed ");
-                    // msg += std::to_string(service_->get_zone_id().get_val());
-                    // msg += " fd = ";
-                    // msg += std::to_string(client_.socket().native_handle());
-                    // LOG_CSTR(msg.c_str());
+                    RPC_ERROR("client_.poll failed {} fd = {}",
+                             service_->get_zone_id().get_val(),
+                             client_.socket().native_handle());
 
                     CO_RETURN rpc::error::TRANSPORT_ERROR();
                 }
@@ -208,11 +195,9 @@ namespace rpc::tcp
             }
             if (marshal_status.first != coro::net::send_status::ok)
             {
-                // std::string msg("client_.send failed ");
-                // msg += std::to_string(service_->get_zone_id().get_val());
-                // msg += " fd = ";
-                // msg += std::to_string(client_.socket().native_handle());
-                // LOG_CSTR(msg.c_str());
+                RPC_ERROR("client_.send failed {} fd = {}",
+                         service_->get_zone_id().get_val(),
+                         client_.socket().native_handle());
 
                 CO_RETURN rpc::error::TRANSPORT_ERROR();
             }

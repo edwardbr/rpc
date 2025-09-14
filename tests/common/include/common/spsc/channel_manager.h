@@ -102,13 +102,10 @@ namespace rpc::spsc
                 .sequence_number = sequence_number,
                 .payload_size = payload.size()};
 
-            // std::string msg("send_payload ");
-            // msg += std::to_string(service_->get_zone_id().get_val());
-            // msg += std::string("\nprefix = ");
-            // msg += rpc::to_yas_json<std::string>(prefix);
-            // msg += std::string("\npayload = ");
-            // msg += rpc::to_yas_json<std::string>(payload_envelope);
-            // LOG_CSTR(msg.c_str());
+            RPC_DEBUG("send_payload {}\nprefix = {}\npayload = {}",
+                     service_->get_zone_id().get_val(),
+                     rpc::to_yas_json<std::string>(prefix),
+                     rpc::to_yas_json<std::string>(payload_envelope));
 
             send_queue_.push(rpc::to_yas_binary(prefix));
             send_queue_.push(payload);

@@ -49,7 +49,7 @@ namespace marshalled_tests
                 telemetry_service->on_impl_deletion((uint64_t)this, zone_id_);
 #endif
         }
-        CORO_TASK(int) callback(int val) override
+        CORO_TASK(error_code) callback(int val) override
         {
             std::ignore = val;
             RPC_INFO("callback {}", val);
@@ -376,7 +376,7 @@ namespace marshalled_tests
             std::ignore = val;
             CO_RETURN rpc::error::OK();
         }
-        CORO_TASK(int) callback(int val) override
+        CORO_TASK(error_code) callback(int val) override
         {
             std::ignore = val;
             RPC_INFO("callback {}", val);
@@ -467,7 +467,7 @@ namespace marshalled_tests
                     target,
                     [](const rpc::shared_ptr<yyy::i_host>& host,
                         rpc::shared_ptr<yyy::i_example>& new_example,
-                        const rpc::shared_ptr<rpc::child_service>& child_service_ptr) -> CORO_TASK(int)
+                        const rpc::shared_ptr<rpc::child_service>& child_service_ptr) -> CORO_TASK(error_code)
                     {
                         example_import_idl_register_stubs(child_service_ptr);
                         example_shared_idl_register_stubs(child_service_ptr);

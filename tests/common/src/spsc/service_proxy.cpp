@@ -66,11 +66,7 @@ namespace rpc::spsc
     {
         RPC_ASSERT(svc);
 
-        // std::string msg("attach_remote this service ");
-        // msg += std::to_string(svc->get_zone_id().get_val());
-        // msg += " to ";
-        // msg += std::to_string(destination_zone_id.get_val());
-        // LOG_CSTR(msg.c_str());
+        RPC_DEBUG("attach_remote this service {} to {}", svc->get_zone_id().get_val(), destination_zone_id.get_val());
 
         auto ret = rpc::shared_ptr<service_proxy>(new service_proxy(
             name, destination_zone_id, svc, channel, std::chrono::milliseconds(0), send_spsc_queue, receive_spsc_queue));
@@ -81,9 +77,7 @@ namespace rpc::spsc
     CORO_TASK(int)
     service_proxy::connect(rpc::interface_descriptor input_descr, rpc::interface_descriptor& output_descr)
     {
-        // std::string msg("connect ");
-        // msg += std::to_string(get_zone_id().get_val());
-        // LOG_CSTR(msg.c_str());
+        RPC_DEBUG("connect {}", get_zone_id().get_val());
 
         auto service = get_operating_zone_service();
         assert(channel_manager_ == nullptr);
@@ -146,9 +140,7 @@ namespace rpc::spsc
         const char* in_buf_,
         std::vector<char>& out_buf_)
     {
-        // std::string msg("send ");
-        // msg += std::to_string(get_zone_id().get_val());
-        // LOG_CSTR(msg.c_str());
+        RPC_DEBUG("send {}", get_zone_id().get_val());
 
         if (destination_zone_id != get_destination_zone_id())
         {
@@ -182,9 +174,7 @@ namespace rpc::spsc
 
         out_buf_.swap(call_receive.payload);
 
-        // msg = "send complete ";
-        // msg += std::to_string(get_zone_id().get_val());
-        // LOG_CSTR(msg.c_str());
+        RPC_DEBUG("send complete {}", get_zone_id().get_val());
 
         CO_RETURN call_receive.err_code;
     }
@@ -193,9 +183,7 @@ namespace rpc::spsc
     service_proxy::try_cast(
         uint64_t protocol_version, destination_zone destination_zone_id, object object_id, interface_ordinal interface_id)
     {
-        // std::string msg("try_cast ");
-        // msg += std::to_string(get_zone_id().get_val());
-        // LOG_CSTR(msg.c_str());
+        RPC_DEBUG("try_cast {}", get_zone_id().get_val());
 
         if (!channel_manager_)
         {
@@ -217,9 +205,7 @@ namespace rpc::spsc
             CO_RETURN ret;
         }
 
-        // msg = std::string("try_cast complete ");
-        // msg += std::to_string(get_zone_id().get_val());
-        // LOG_CSTR(msg.c_str());
+        RPC_DEBUG("try_cast complete {}", get_zone_id().get_val());
 
         CO_RETURN try_cast_receive.err_code;
     }
@@ -235,9 +221,7 @@ namespace rpc::spsc
         rpc::add_ref_options build_out_param_channel,
         uint64_t& reference_count)
     {
-        // auto msg = std::string("add_ref ");
-        // msg += std::to_string(get_zone_id().get_val());
-        // LOG_CSTR(msg.c_str());
+        RPC_DEBUG("add_ref {}", get_zone_id().get_val());
 
 #ifdef USE_RPC_TELEMETRY
         if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
@@ -250,8 +234,6 @@ namespace rpc::spsc
                 build_out_param_channel);
         }
 #endif
-        constexpr auto add_ref_failed_val = std::numeric_limits<uint64_t>::max();
-
         if (!channel_manager_)
         {
             RPC_ERROR("failed add_ref SERVICE_PROXY_LOST_CONNECTION");
@@ -265,6 +247,7 @@ namespace rpc::spsc
                 .object_id = object_id.get_val(),
                 .caller_channel_zone_id = caller_channel_zone_id.get_val(),
                 .caller_zone_id = caller_zone_id.get_val(),
+                .known_direction_zone_id = known_direction_zone_id.get_val(),
                 .build_out_param_channel = (add_ref_options)build_out_param_channel},
             response_data);
         if (ret != rpc::error::OK())
@@ -273,6 +256,7 @@ namespace rpc::spsc
             CO_RETURN ret;
         }
 
+        reference_count = response_data.ref_count;
         if (response_data.err_code != rpc::error::OK())
         {
             RPC_ERROR("failed addref_receive.err_code failed");
@@ -286,11 +270,8 @@ namespace rpc::spsc
             RPC_ASSERT(false);
             CO_RETURN response_data.err_code;
         }
-        // msg = std::string("add_ref complete ");
-        // msg += std::to_string(get_zone_id().get_val());
-        // LOG_CSTR(msg.c_str());
+        RPC_DEBUG("add_ref complete {}", get_zone_id().get_val());
 
-        reference_count = response_data.ref_count;
         CO_RETURN rpc::error::OK();
     }
 
@@ -298,8 +279,6 @@ namespace rpc::spsc
     service_proxy::release(
         uint64_t protocol_version, destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id, uint64_t& reference_count)
     {
-        constexpr auto add_ref_failed_val = std::numeric_limits<uint64_t>::max();
-
         RPC_DEBUG("release zone: {}", get_zone_id().get_val());
 
         if (!channel_manager_)

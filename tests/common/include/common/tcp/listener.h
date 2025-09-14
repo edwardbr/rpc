@@ -69,9 +69,7 @@ namespace rpc::tcp
 
             if (payload.payload_fingerprint == rpc::id<tcp::init_client_channel_send>::get(prefix.version))
             {
-                // std::string msg("run_client init_client_channel_send ");
-                // msg += std::to_string(service->get_zone_id().get_val());
-                // LOG_CSTR(msg.c_str());
+                RPC_DEBUG("run_client init_client_channel_send {}", service->get_zone_id().get_val());
 
                 tcp::init_client_channel_send request;
                 auto err = rpc::from_yas_compressed_binary(rpc::span(payload.payload), request);
@@ -101,9 +99,7 @@ namespace rpc::tcp
                         CO_RETURN;
                     }
 
-                    // msg = "run_client init_server_channel_response ";
-                    // msg += std::to_string(service->get_zone_id().get_val());
-                    // LOG_CSTR(msg.c_str());
+                    RPC_DEBUG("run_client init_server_channel_response {}", service->get_zone_id().get_val());
 
                     err = CO_AWAIT worker_release->channel_manager_->immediate_send_payload(prefix.version,
                         message_direction::receive,

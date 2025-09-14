@@ -26,4 +26,6 @@ if(BUILD_ENCLAVE)
 endif()
 
 # Add fuzz test subdirectory
-add_subdirectory(fuzz_test)
+if(NOT BUILD_COROUTINE)
+  add_subdirectory(fuzz_test)
+endif()

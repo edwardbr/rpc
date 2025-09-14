@@ -158,6 +158,7 @@ public:
     // i_cleanup implementation
     CORO_TASK(int) cleanup(rpc::shared_ptr<i_garbage_collector> collector) override
     {
+        std::ignore = collector;
         RPC_INFO("[SHARED_OBJECT id={} name={}] cleanup() called, already_cleaned={}", id_, name_, cleanup_called_);
         if (cleanup_called_)
         {
@@ -242,6 +243,7 @@ public:
     // i_cleanup implementation
     CORO_TASK(int) cleanup(rpc::shared_ptr<i_garbage_collector> collector) override
     {
+        std::ignore = collector;
         RPC_INFO("[FACTORY] cleanup() called, already_cleaned={}, objects_created={}", cleanup_called_, objects_created_);
         if (cleanup_called_)
         {
@@ -419,6 +421,7 @@ public:
     // i_cleanup implementation
     CORO_TASK(int) cleanup(rpc::shared_ptr<i_garbage_collector> collector) override
     {
+        std::ignore = collector;
         RPC_INFO(
             "[WORKER] cleanup() called, already_cleaned={}, objects_processed={}", cleanup_called_, objects_processed_);
         if (cleanup_called_)
@@ -630,7 +633,7 @@ public:
             CO_RETURN rpc::error::INVALID_DATA();
         }
 
-        uint64_t target_id = 0;
+        [[maybe_unused]] uint64_t target_id = 0;
         if (target_node)
         {
             node_type type;
@@ -789,6 +792,8 @@ public:
 
     CORO_TASK(int) receive_object(rpc::shared_ptr<i_shared_object> object, uint64_t sender_node_id) override
     {
+        std::ignore = object;
+        std::ignore = sender_node_id;
         RPC_INFO("[NODE {}] receive_object from sender_node_id={}", node_id_, sender_node_id);
         signals_received_++;
         RPC_INFO("[NODE {}] receive_object completed, total signals: {}", node_id_, signals_received_);
@@ -813,6 +818,8 @@ public:
     CORO_TASK(int) create_child_node(
         node_type child_type, uint64_t child_zone_id, bool cache_locally, rpc::shared_ptr<i_autonomous_node>& child_node) override
     {
+        std::ignore = cache_locally;
+        std::ignore = child_node;
         RPC_INFO("[NODE {}] create_child_node(child_type={}, child_zone_id={}, cache_locally={})",
             node_id_,
             static_cast<int>(child_type),
@@ -868,8 +875,9 @@ public:
 
     CORO_TASK(int) get_cached_child_by_index(int index, rpc::shared_ptr<i_autonomous_node>& child) override
     {
+        std::ignore = child;
         RPC_INFO("[NODE {}] get_cached_child_by_index(index={}), children_size={}", node_id_, index, child_nodes_.size());
-        if (index < 0 || index >= child_nodes_.size())
+        if (index < 0 || static_cast<size_t>(index) >= child_nodes_.size())
         {
             child.reset();
             RPC_INFO("[NODE {}] get_cached_child_by_index failed: invalid index", node_id_);
@@ -896,15 +904,15 @@ public:
     }
 
     // Unused legacy methods
-    CORO_TASK(int) connect_to_node(rpc::shared_ptr<i_autonomous_node> target_node) override { CO_RETURN rpc::error::OK(); }
-    CORO_TASK(int) pass_object_to_connected(int connection_index, rpc::shared_ptr<i_shared_object> object) override
+    CORO_TASK(int) connect_to_node([[maybe_unused]] rpc::shared_ptr<i_autonomous_node> target_node) override { CO_RETURN rpc::error::OK(); }
+    CORO_TASK(int) pass_object_to_connected([[maybe_unused]] int connection_index, [[maybe_unused]] rpc::shared_ptr<i_shared_object> object) override
     {
         CO_RETURN rpc::error::OK();
     }
-    CORO_TASK(int) request_child_creation(rpc::shared_ptr<i_autonomous_node> target_parent,
-        node_type child_type,
-        uint64_t child_zone_id,
-        rpc::shared_ptr<i_autonomous_node>& child_proxy) override
+    CORO_TASK(int) request_child_creation([[maybe_unused]] rpc::shared_ptr<i_autonomous_node> target_parent,
+        [[maybe_unused]] node_type child_type,
+        [[maybe_unused]] uint64_t child_zone_id,
+        [[maybe_unused]] rpc::shared_ptr<i_autonomous_node>& child_proxy) override
     {
         CO_RETURN rpc::error::OK();
     }
@@ -1073,9 +1081,9 @@ public:
             }
 
             auto op = proxy->get_object_proxy();
-            auto object_id = op->get_object_id();
-            auto zone_id = op->get_service_proxy()->get_zone_id();
-            RPC_INFO("[GARBAGE_COLLECTOR] Object zone id: {} object_id: {}", object_id.id, zone_id.id);
+            [[maybe_unused]] auto object_id = op->get_object_id();
+            [[maybe_unused]] auto zone_id = op->get_service_proxy()->get_zone_id();
+            RPC_INFO("[GARBAGE_COLLECTOR] Object zone id: {} object_id: {}", zone_id.id, object_id.id);
 
             // Try to cast to interface types to get more information
             auto autonomous_node = rpc::dynamic_pointer_cast<i_autonomous_node>(obj);
@@ -1632,7 +1640,7 @@ void dump_test_scenario(const test_scenario_config& config, const std::string& s
     try
     {
         // Use YAS JSON serialization
-        auto json_data = rpc::to_yas_json<test_scenario_config, std::string>(config_copy);
+        auto json_data = rpc::to_yas_json<std::string>(config_copy);
 
         std::ofstream file(filename.str());
         if (!file.is_open())
@@ -1671,7 +1679,7 @@ void dump_failure_scenario(const test_scenario_config& config, const std::string
     try
     {
         // Use YAS JSON serialization
-        auto json_data = rpc::to_yas_json<test_scenario_config, std::string>(config_copy);
+        auto json_data = rpc::to_yas_json<std::string>(config_copy);
 
         std::ofstream file(filename.str());
         if (!file.is_open())

@@ -309,6 +309,77 @@ Zone 2 fuzz_root
 
 This demonstrates RPC++ can handle complex distributed zone topologies where zones act as autonomous entities creating and managing their own sub-hierarchies.
 
+## Test System Refactoring: Template-Based Coroutine Testing (December 2024)
+
+**Location**: `/tests/test_host/main.cpp`
+
+**Objective**: Convert macro-based TYPED_TEST coroutines to template-based implementations for improved debugging capability and cleaner function signatures.
+
+**Major Changes**:
+- **Macro Elimination**: Replaced `CORO_TYPED_TEST_WITH_SCHEDULER` and `CORO_TYPED_TEST` macros with template-based `run_coro_test` dispatcher
+- **Universal Template Dispatcher**: Created single `run_coro_test` function handling both coroutine and non-coroutine builds
+- **Return Type Standardization**: All test coroutines now return `CORO_TASK(bool)` instead of `CORO_TASK(void)`
+- **Assertion Modernization**: Replaced `RPC_ASSERT` with `CORO_ASSERT_EQ`/`CORO_ASSERT_NE` in coroutines
+- **Parameter Cleanup**: Removed unnecessary `bool& is_ready` parameters from coroutine function signatures
+
+**Key Technical Implementation**:
+```cpp
+// Universal template-based coroutine test dispatcher
+template<typename TestFixture, typename CoroFunc, typename... Args>
+void run_coro_test(TestFixture& test_fixture, CoroFunc&& coro_function, Args&&... args) {
+    auto& lib = test_fixture.get_lib();
+#ifdef BUILD_COROUTINE
+    bool is_ready = false;
+    auto wrapper_task = [&]() -> coro::task<bool> {
+        auto result = CO_AWAIT coro_function(lib, std::forward<Args>(args)...);
+        is_ready = true;  // Set when coroutine completes
+        CO_RETURN result;
+    }();
+    lib.get_scheduler()->schedule(lib.check_for_error(std::move(wrapper_task)));
+    while (!is_ready) {
+        lib.get_scheduler()->process_events(std::chrono::milliseconds(1));
+    }
+#else
+    coro_function(lib, std::forward<Args>(args)...);
+#endif
+    ASSERT_EQ(lib.error_has_occured(), false);
+}
+```
+
+**Usage Pattern**:
+```cpp
+// OLD STYLE (macros - removed)
+CORO_TYPED_TEST_WITH_SCHEDULER(remote_type_test, test_name, is_ready, lib) {
+    // test implementation
+}
+
+// NEW STYLE (templates - current)
+template<class T> CORO_TASK(bool) coro_test_name(T& lib) {
+    // test implementation
+    CO_RETURN true;
+}
+
+TYPED_TEST(remote_type_test, test_name) {
+    run_coro_test(*this, [](auto& lib) {
+        return coro_test_name<TypeParam>(lib);
+    });
+}
+```
+
+**Benefits Achieved**:
+- **Debug Capability**: Template functions can be debugged with standard debuggers (macros cannot)
+- **Cleaner Signatures**: Removed unnecessary `bool& is_ready` parameters from all coroutine functions
+- **Type Safety**: Better template argument deduction and compile-time error messages
+- **Code Consistency**: Unified testing approach across all coroutine tests
+- **Maintenance**: Single point of control for coroutine test execution logic
+
+**Files Affected**:
+- `/tests/test_host/main.cpp` - Complete refactoring of all TYPED_TEST coroutine implementations
+- 50+ coroutine test functions converted to template-based approach
+- All `run_coro_test` lambda calls updated to remove `bool& is_ready` parameter
+
+This refactoring enables proper debugging of complex coroutine test scenarios while maintaining backward compatibility and improving code maintainability.
+
 ---
 
 This codebase represents a mature RPC system with recent enhancements for JSON schema generation, improved IDL attribute handling, and comprehensive hierarchical zone testing. The build system is well-integrated and the code generation pipeline is robust and extensible.

@@ -258,8 +258,6 @@ namespace rpc::tcp
                 build_out_param_channel);
         }
 #endif
-        constexpr auto add_ref_failed_val = std::numeric_limits<uint64_t>::max();
-
         if (!connection_)
         {
             RPC_ERROR("failed add_ref SERVICE_PROXY_LOST_CONNECTION");
@@ -273,6 +271,7 @@ namespace rpc::tcp
                 .object_id = object_id.get_val(),
                 .caller_channel_zone_id = caller_channel_zone_id.get_val(),
                 .caller_zone_id = caller_zone_id.get_val(),
+                .known_direction_zone_id = known_direction_zone_id.get_val(),
                 .build_out_param_channel = (tcp::add_ref_options)build_out_param_channel},
             response);
         if (ret != rpc::error::OK())
@@ -281,6 +280,7 @@ namespace rpc::tcp
             CO_RETURN ret;
         }
 
+        reference_count = response.ref_count;
         if (response.err_code != rpc::error::OK())
         {
             RPC_ERROR("failed response.err_code failed");
@@ -298,7 +298,6 @@ namespace rpc::tcp
         // msg += std::to_string(get_zone_id().get_val());
         // RPC_ERROR(msg.c_str());
 
-        reference_count = response.ref_count;
         CO_RETURN rpc::error::OK();
     }
 
@@ -306,8 +305,6 @@ namespace rpc::tcp
     service_proxy::release(
         uint64_t protocol_version, destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id, uint64_t& reference_count)
     {
-        constexpr auto add_ref_failed_val = std::numeric_limits<uint64_t>::max();
-
         RPC_ERROR("release zone: {}", get_zone_id().get_val());
 
         if (!connection_)
