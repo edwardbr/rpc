@@ -82,10 +82,14 @@ target_include_directories(
   PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>" "$<INSTALL_INTERFACE:include/rpc>"
   PRIVATE ${HOST_INCLUDES})
 
+if(BUILD_COROUTINE)
+  set(CORO_RUNTIME libcoro)
+endif()
+
 target_link_libraries(
   rpc_host
   PUBLIC ${RPC_TELEMETRY_INTERFACE} ${RPC_HOST_TELEMETRY}
-  libcoro
+  ${CORO_RUNTIME}
   rpc_types_idl_host
   PRIVATE yas_common ${HOST_LIBRARIES} ${RPC_HOST_FMT_LIB})
 

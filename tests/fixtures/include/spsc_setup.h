@@ -105,7 +105,7 @@ public:
             handler);
         channel->pump_send_and_receive(); // get the receiver pump going
 
-        rpc::shared_ptr<yyy::i_host> hst(new host(root_service_->get_zone_id()));
+        rpc::shared_ptr<yyy::i_host> hst(new host());
         local_host_ptr_ = hst; // assign to weak ptr
 
         auto ret = CO_AWAIT root_service_->connect_to_zone<rpc::spsc::service_proxy>("main child",

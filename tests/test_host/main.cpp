@@ -82,21 +82,13 @@ using testing::Types;
 
 using namespace marshalled_tests;
 
-// Global variables (defined here and declared in headers)
-#ifdef _WIN32 // windows
-std::string enclave_path = "./marshal_test_enclave.signed.dll";
-#else // Linux
-std::string enclave_path = "./libmarshal_test_enclave.signed.so";
-#endif
+#include "test_globals.h"
 
+// Global variables (defined here and declared in headers)
 #ifdef USE_RPC_TELEMETRY
 TELEMETRY_SERVICE_MANAGER
 #endif
-bool enable_telemetry_server = false;
 bool enable_multithreaded_tests = false;
-
-rpc::weak_ptr<rpc::service> current_host_service;
-std::atomic<uint64_t>* zone_gen = nullptr;
 
 // This line tests that we can define tests in an unnamed namespace.
 namespace
@@ -288,13 +280,7 @@ template<class T> CORO_TASK(bool) coro_standard_tests(T& lib)
 {
     auto root_service = lib.get_root_service();
 
-    rpc::zone zone_id;
-    if (root_service)
-        zone_id = root_service->get_zone_id();
-    else
-        zone_id = {0};
-
-    foo f(zone_id);
+    foo f;
 
     CO_AWAIT standard_tests(f, lib.get_has_enclave());
     CO_RETURN !lib.error_has_occured();
@@ -308,12 +294,7 @@ TYPED_TEST(type_test, standard_tests) {
 
 CORO_TASK(bool) dyanmic_cast_tests(rpc::shared_ptr<rpc::service> root_service)
 {
-    rpc::zone zone_id;
-    if (root_service)
-        zone_id = root_service->get_zone_id();
-    else
-        zone_id = {0};
-    auto f = rpc::shared_ptr<xxx::i_foo>(new foo(zone_id));
+    auto f = rpc::shared_ptr<xxx::i_foo>(new foo());
 
     rpc::shared_ptr<xxx::i_baz> baz;
     CORO_ASSERT_EQ(CO_AWAIT f->create_baz_interface(baz), 0);
@@ -454,22 +435,16 @@ TYPED_TEST(remote_type_test, remote_standard_tests) {
 //     }
 // }
 
-template<class T> CORO_TASK(bool) coro_remote_tests(T& lib, rpc::zone zone_id)
+template<class T> CORO_TASK(bool) coro_remote_tests(T& lib)
 {
-    CO_AWAIT remote_tests(lib.get_use_host_in_child(), lib.get_example(), zone_id);
+    CO_AWAIT remote_tests(lib.get_use_host_in_child(), lib.get_example());
     CO_RETURN true;
 }
 
 TYPED_TEST(remote_type_test, remote_tests) {
     auto& lib = this->get_lib();
-    auto root_service = lib.get_root_service();
-    rpc::zone zone_id;
-    if (root_service)
-        zone_id = root_service->get_zone_id();
-    else
-        zone_id = {0};
-    run_coro_test(*this, [zone_id](auto& lib) {
-        return coro_remote_tests<TypeParam>(lib, zone_id);
+    run_coro_test(*this, [](auto& lib) {
+        return coro_remote_tests<TypeParam>(lib);
     });
 }
 
@@ -538,68 +513,6 @@ TYPED_TEST(remote_type_test, create_new_zone) {
 //     }
 // }
 
-template<class T>
-CORO_TASK(bool)
-coro_create_new_zone_releasing_host_then_running_on_other_enclave(
-    T& lib, const rpc::shared_ptr<yyy::i_host>& host)
-{
-    // GTEST_SKIP() << "for later";  // Skip not supported in coroutines, returning early
-    CO_RETURN false;
-    auto example_relay_ptr = CO_AWAIT lib.create_new_zone();
-    rpc::shared_ptr<xxx::i_foo> i_foo_relay_ptr;
-    CO_AWAIT example_relay_ptr->create_foo(i_foo_relay_ptr);
-    // SYNC_WAIT standard_tests(*i_foo_relay_ptr, true);
-    
-    // rpc::shared_ptr<yyy::i_host> host_copy;
-    // SYNC_WAIT example_relay_ptr->get_host(host_copy);
-            
-    // {
-    //     auto example_o = rpc::casting_interface::get_object_id(*example_relay_ptr);
-    //     auto foo_o = rpc::casting_interface::get_object_id(*i_foo_relay_ptr);
-    //     auto host_o = rpc::casting_interface::get_object_id(*host_copy);
-    //     auto example_z = rpc::casting_interface::get_destination_zone(*example_relay_ptr);
-    //     auto foo_z = rpc::casting_interface::get_destination_zone(*i_foo_relay_ptr);
-    //     auto host_z = rpc::casting_interface::get_destination_zone(*host_copy);
-    //     yyy::i_host* p_host = host_copy.get();
-    //     p_host = p_host;
-    //     foo_o = foo_o;
-    //     example_o = example_o;
-    //     host_o = host_o;
-    //     foo_z = foo_z;
-    //     example_z = example_z;
-    //     host_z = host_z;
-    // }
-
-    // rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
-    // ASSERT_EQ(lib.get_example()->create_foo(i_foo_ptr), 0);
-    example_relay_ptr = nullptr;
-    i_foo_relay_ptr = nullptr;
-
-    // standard_tests(*i_foo_ptr, true);
-
-#ifdef BUILD_COROUTINE
-    bool local_is_ready = false;
-    auto success = lib.get_root_service()->schedule(
-        [&local_is_ready]() -> CORO_TASK(void)
-        {
-            local_is_ready = true;
-            CO_RETURN;
-        }());
-#endif        
-}
-
-TYPED_TEST(remote_type_test, create_new_zone_releasing_host_then_running_on_other_enclave) {
-    auto& lib = this->get_lib();
-    auto root_service = lib.get_root_service();
-    rpc::shared_ptr<yyy::i_host> host;
-    run_coro_test(*this, [&host](auto& lib) {
-        return coro_create_new_zone_releasing_host_then_running_on_other_enclave<TypeParam>(lib, host);
-    });
-#ifdef BUILD_COROUTINE
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    lib.get_scheduler()->process_events(std::chrono::milliseconds(1));
-#endif
-}
 
 // TYPED_TEST(remote_type_test, multithreaded_create_new_zone_releasing_host_then_running_on_other_enclave)
 // {
@@ -625,38 +538,54 @@ TYPED_TEST(remote_type_test, create_new_zone_releasing_host_then_running_on_othe
 //     }
 // }
 
-// TYPED_TEST(remote_type_test, dyanmic_cast_tests)
-// {
-//     rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
-//     ASSERT_EQ(lib.get_example()->create_foo(i_foo_ptr), 0);
+template<class T> CORO_TASK(bool) coro_remote_dyanmic_cast_tests(T& lib)
+{
+    rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
+    CORO_ASSERT_EQ(CO_AWAIT lib.get_example()->create_foo(i_foo_ptr), 0);
 
-//     rpc::shared_ptr<xxx::i_baz> baz;
-//     i_foo_ptr->create_baz_interface(baz);
-//     i_foo_ptr->call_baz_interface(nullptr); // feed in a nullptr
-//     i_foo_ptr->call_baz_interface(baz);     // feed back to the implementation
+    rpc::shared_ptr<xxx::i_baz> baz;
+    CORO_ASSERT_EQ(CO_AWAIT i_foo_ptr->create_baz_interface(baz), 0);
+    CORO_ASSERT_EQ(CO_AWAIT i_foo_ptr->call_baz_interface(nullptr), 0); // feed in a nullptr
+    CORO_ASSERT_EQ(CO_AWAIT i_foo_ptr->call_baz_interface(baz), 0);     // feed back to the implementation
 
-//     auto x = rpc::dynamic_pointer_cast<xxx::i_baz>(baz);
-//     ASSERT_NE(x, nullptr);
-//     auto y = rpc::dynamic_pointer_cast<xxx::i_bar>(baz);
-//     ASSERT_NE(y, nullptr);
-//     y->do_something_else(1);
-//     auto z = rpc::dynamic_pointer_cast<xxx::i_foo>(baz);
-//     ASSERT_EQ(z, nullptr);
-// }
+    auto x = CO_AWAIT rpc::dynamic_pointer_cast<xxx::i_baz>(baz);
+    CORO_ASSERT_NE(x, nullptr);
+    auto y = CO_AWAIT rpc::dynamic_pointer_cast<xxx::i_bar>(baz);
+    CORO_ASSERT_NE(y, nullptr);
+    CO_AWAIT y->do_something_else(1);
+    auto z = CO_AWAIT rpc::dynamic_pointer_cast<xxx::i_foo>(baz);
+    CORO_ASSERT_EQ(z, nullptr);
+    CO_RETURN true;
+}
 
-// TYPED_TEST(remote_type_test, bounce_baz_between_two_interfaces)
-// {
-//     rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
-//     ASSERT_EQ(lib.get_example()->create_foo(i_foo_ptr), 0);
+TYPED_TEST(remote_type_test, dyanmic_cast_tests)
+{
+    run_coro_test(*this, [](auto& lib) {
+        return coro_remote_dyanmic_cast_tests<TypeParam>(lib);
+    });
+}
 
-//     rpc::shared_ptr<xxx::i_foo> i_foo_relay_ptr;
-//     auto example_relay_ptr = lib.create_new_zone();
-//     example_relay_ptr->create_foo(i_foo_relay_ptr);
+template<class T> CORO_TASK(bool) coro_bounce_baz_between_two_interfaces(T& lib)
+{
+    rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
+    CORO_ASSERT_EQ(CO_AWAIT lib.get_example()->create_foo(i_foo_ptr), 0);
 
-//     rpc::shared_ptr<xxx::i_baz> baz;
-//     i_foo_ptr->create_baz_interface(baz);
-//     i_foo_relay_ptr->call_baz_interface(baz);
-// }
+    rpc::shared_ptr<xxx::i_foo> i_foo_relay_ptr;
+    auto example_relay_ptr = CO_AWAIT lib.create_new_zone();
+    CORO_ASSERT_EQ(CO_AWAIT example_relay_ptr->create_foo(i_foo_relay_ptr), 0);
+
+    rpc::shared_ptr<xxx::i_baz> baz;
+    CORO_ASSERT_EQ(CO_AWAIT i_foo_ptr->create_baz_interface(baz), 0);
+    CORO_ASSERT_EQ(CO_AWAIT i_foo_relay_ptr->call_baz_interface(baz), 0);
+    CO_RETURN true;
+}
+
+TYPED_TEST(remote_type_test, bounce_baz_between_two_interfaces)
+{
+    run_coro_test(*this, [](auto& lib) {
+        return coro_bounce_baz_between_two_interfaces<TypeParam>(lib);
+    });
+}
 
 // TYPED_TEST(remote_type_test, multithreaded_bounce_baz_between_two_interfaces)
 // {
@@ -688,120 +617,164 @@ TYPED_TEST(remote_type_test, create_new_zone_releasing_host_then_running_on_othe
 //     }
 // }
 
-// // check for null
-// TYPED_TEST(remote_type_test, check_for_null_interface)
-// {
-//     rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
-//     ASSERT_EQ(lib.get_example()->create_foo(i_foo_ptr), 0);
-//     rpc::shared_ptr<xxx::i_baz> c;
-//     i_foo_ptr->get_interface(c);
-//     RPC_ASSERT(c == nullptr);
-// }
+template<class T> CORO_TASK(bool) coro_check_for_null_interface(T& lib)
+{
+    rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
+    CORO_ASSERT_EQ(CO_AWAIT lib.get_example()->create_foo(i_foo_ptr), 0);
+    rpc::shared_ptr<xxx::i_baz> c;
+    CORO_ASSERT_EQ(CO_AWAIT i_foo_ptr->get_interface(c), 0);
+    CORO_ASSERT_EQ(c, nullptr);
+    CO_RETURN true;
+}
 
-// TYPED_TEST(remote_type_test, check_for_multiple_sets)
-// {
-//     if(!lib.get_use_host_in_child())
-//         return;
+// check for null
+TYPED_TEST(remote_type_test, check_for_null_interface)
+{
+    run_coro_test(*this, [](auto& lib) {
+        return coro_check_for_null_interface<TypeParam>(lib);
+    });
+}
 
-//     rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
-//     ASSERT_EQ(lib.get_example()->create_foo(i_foo_ptr), 0);
+template<class T> CORO_TASK(bool) coro_check_for_multiple_sets(T& lib)
+{
+    if(!lib.get_use_host_in_child())
+        CO_RETURN true;
 
-//     auto zone_id = casting_interface::get_zone_id(*i_foo_ptr);
+    rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
+    CORO_ASSERT_EQ(CO_AWAIT lib.get_example()->create_foo(i_foo_ptr), 0);
 
-//     auto b = rpc::make_shared<marshalled_tests::baz>(zone_id);
-//     // set
-//     i_foo_ptr->set_interface(b);
-//     // reset
-//     i_foo_ptr->set_interface(nullptr);
-//     // set
-//     i_foo_ptr->set_interface(b);
-//     // reset
-//     i_foo_ptr->set_interface(nullptr);
-// }
+    auto b = rpc::make_shared<marshalled_tests::baz>();
+    // set
+    CORO_ASSERT_EQ(CO_AWAIT i_foo_ptr->set_interface(b), 0);
+    // reset
+    CORO_ASSERT_EQ(CO_AWAIT i_foo_ptr->set_interface(nullptr), 0);
+    // set
+    CORO_ASSERT_EQ(CO_AWAIT i_foo_ptr->set_interface(b), 0);
+    // reset
+    CORO_ASSERT_EQ(CO_AWAIT i_foo_ptr->set_interface(nullptr), 0);
+    CO_RETURN true;
+}
 
-// TYPED_TEST(remote_type_test, check_for_interface_storage)
-// {
-//     if(!lib.get_use_host_in_child())
-//         return;
+TYPED_TEST(remote_type_test, check_for_multiple_sets)
+{
+    run_coro_test(*this, [](auto& lib) {
+        return coro_check_for_multiple_sets<TypeParam>(lib);
+    });
+}
 
-//     rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
-//     ASSERT_EQ(lib.get_example()->create_foo(i_foo_ptr), 0);
+template<class T> CORO_TASK(bool) coro_check_for_interface_storage(T& lib)
+{
+    if(!lib.get_use_host_in_child())
+        CO_RETURN true;
 
-//     rpc::shared_ptr<xxx::i_baz> c;
-//     auto zone_id = casting_interface::get_zone_id(i_foo_ptr);
+    rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
+    CORO_ASSERT_EQ(CO_AWAIT lib.get_example()->create_foo(i_foo_ptr), 0);
 
-//     auto b = rpc::make_shared<marshalled_tests::baz>(zone_id);
-//     i_foo_ptr->set_interface(b);
-//     i_foo_ptr->get_interface(c);
-//     i_foo_ptr->set_interface(nullptr);
-//     RPC_ASSERT(b == c);
-// }
+    rpc::shared_ptr<xxx::i_baz> c;
+    auto b = rpc::make_shared<marshalled_tests::baz>();
+    CORO_ASSERT_EQ(CO_AWAIT i_foo_ptr->set_interface(b), 0);
+    CORO_ASSERT_EQ(CO_AWAIT i_foo_ptr->get_interface(c), 0);
+    CORO_ASSERT_EQ(CO_AWAIT i_foo_ptr->set_interface(nullptr), 0);
+    CORO_ASSERT_EQ(b, c);
+    CO_RETURN true;
+}
 
-// TYPED_TEST(remote_type_test, check_for_set_multiple_inheritance)
-// {
-//     if(!lib.get_use_host_in_child())
-//         return;
-//     auto proxy = lib.get_example()->query_proxy_base();
-//     auto ret = lib.get_example()->give_interface(
-//         rpc::shared_ptr<xxx::i_baz>(new multiple_inheritance(casting_interface::get_zone_id(proxy->get_object_proxy())));
-//     RPC_ASSERT(ret == rpc::error::OK());
-// }
+TYPED_TEST(remote_type_test, check_for_interface_storage)
+{
+    run_coro_test(*this, [](auto& lib) {
+        return coro_check_for_interface_storage<TypeParam>(lib);
+    });
+}
 
-// #ifdef BUILD_ENCLAVE
-// TYPED_TEST(remote_type_test, host_test)
-// {
-//     auto root_service = lib.get_root_service();
-//     rpc::zone zone_id;
-//     if(root_service)
-//         zone_id = root_service->get_zone_id();
-//     else
-//         zone_id = {0};
-//     auto h = rpc::make_shared<host>(zone_id);
+template<class T> CORO_TASK(bool) coro_check_for_set_multiple_inheritance(T& lib)
+{
+    if(!lib.get_use_host_in_child())
+        CO_RETURN true;
+    auto ret = CO_AWAIT lib.get_example()->give_interface(
+        rpc::shared_ptr<xxx::i_baz>(new multiple_inheritance()));
+    CORO_ASSERT_EQ(ret, rpc::error::OK());
+    CO_RETURN true;
+}
 
-//     rpc::shared_ptr<yyy::i_example> target;
-//     rpc::shared_ptr<yyy::i_example> target2;
-//     h->create_enclave(target);
-//     ASSERT_NE(target, nullptr);
+TYPED_TEST(remote_type_test, check_for_set_multiple_inheritance)
+{
+    run_coro_test(*this, [](auto& lib) {
+        return coro_check_for_set_multiple_inheritance<TypeParam>(lib);
+    });
+}
 
-//     ASSERT_EQ(h->set_app("target", target), rpc::error::OK());
-//     ASSERT_EQ(h->look_up_app("target", target2), rpc::error::OK());
-//     ASSERT_EQ(h->unload_app("target"), rpc::error::OK());
-//     target = nullptr;
-//     target2 = nullptr;
+#ifdef BUILD_ENCLAVE
+template<class T> CORO_TASK(bool) coro_host_test(T& lib)
+{
+    auto root_service = lib.get_root_service();
+    auto h = rpc::make_shared<host>();
 
-// }
+    rpc::shared_ptr<yyy::i_example> target;
+    rpc::shared_ptr<yyy::i_example> target2;
+    CORO_ASSERT_EQ(CO_AWAIT h->create_enclave(target), 0);
+    CORO_ASSERT_NE(target, nullptr);
 
-// TYPED_TEST(remote_type_test, check_for_call_enclave_zone)
-// {
-//     if(!lib.get_use_host_in_child())
-//         return;
+    CORO_ASSERT_EQ(CO_AWAIT h->set_app("target", target), rpc::error::OK());
+    CORO_ASSERT_EQ(CO_AWAIT h->look_up_app("target", target2), rpc::error::OK());
+    CORO_ASSERT_EQ(CO_AWAIT h->unload_app("target"), rpc::error::OK());
+    target = nullptr;
+    target2 = nullptr;
+    CO_RETURN true;
+}
 
-//     auto root_service = lib.get_root_service();
-//     rpc::zone zone_id;
-//     if(root_service)
-//         zone_id = root_service->get_zone_id();
-//     else
-//         zone_id = {0};
+TYPED_TEST(remote_type_test, host_test)
+{
+    run_coro_test(*this, [](auto& lib) {
+        return coro_host_test<TypeParam>(lib);
+    });
+}
 
-//     auto h = rpc::make_shared<host>(zone_id);
-//     auto ret = lib.get_example()->call_create_enclave_val(h);
-//     RPC_ASSERT(ret == rpc::error::OK());
-// }
-// #endif
+template<class T> CORO_TASK(bool) coro_check_for_call_enclave_zone(T& lib)
+{
+    if(!lib.get_use_host_in_child())
+        CO_RETURN true;
 
-// TYPED_TEST(remote_type_test, check_sub_subordinate)
-// {
-//     auto& lib = lib;
-//     if(!lib.get_use_host_in_child())
-//         return;
+    auto root_service = lib.get_root_service();
+    rpc::zone zone_id;
+    if(root_service)
+        zone_id = root_service->get_zone_id();
+    else
+        zone_id = {0};
 
-//     rpc::shared_ptr<yyy::i_example> new_zone;
-//     ASSERT_EQ(lib.get_example()->create_example_in_subordinate_zone(new_zone, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK()); //second level
+    auto h = rpc::make_shared<host>();
+    auto ret = CO_AWAIT lib.get_example()->call_create_enclave_val(h);
+    CORO_ASSERT_EQ(ret, rpc::error::OK());
+    CO_RETURN true;
+}
 
-//     rpc::shared_ptr<yyy::i_example> new_new_zone;
-//     ASSERT_EQ(new_zone->create_example_in_subordinate_zone(new_new_zone, lib.get_local_host_ptr(), ++(*zone_gen)),
-//     rpc::error::OK()); //third level
-// }
+TYPED_TEST(remote_type_test, check_for_call_enclave_zone)
+{
+    run_coro_test(*this, [](auto& lib) {
+        return coro_check_for_call_enclave_zone<TypeParam>(lib);
+    });
+}
+#endif
+
+template<class T> CORO_TASK(bool) coro_check_sub_subordinate(T& lib)
+{
+    if(!lib.get_use_host_in_child())
+        CO_RETURN true;
+
+    rpc::shared_ptr<yyy::i_example> new_zone;
+    CORO_ASSERT_EQ(CO_AWAIT lib.get_example()->create_example_in_subordinate_zone(new_zone, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK()); //second level
+
+    rpc::shared_ptr<yyy::i_example> new_new_zone;
+    CORO_ASSERT_EQ(CO_AWAIT new_zone->create_example_in_subordinate_zone(new_new_zone, lib.get_local_host_ptr(), ++(*zone_gen)),
+    rpc::error::OK()); //third level
+    CO_RETURN true;
+}
+
+TYPED_TEST(remote_type_test, check_sub_subordinate)
+{
+    run_coro_test(*this, [](auto& lib) {
+        return coro_check_sub_subordinate<TypeParam>(lib);
+    });
+}
 
 // TYPED_TEST(remote_type_test, multithreaded_check_sub_subordinate)
 // {
@@ -832,45 +805,53 @@ TYPED_TEST(remote_type_test, create_new_zone_releasing_host_then_running_on_othe
 //     }
 // }
 
-// TYPED_TEST(remote_type_test, send_interface_back)
-// {
-//     auto& lib = lib;
-//     if(!lib.get_use_host_in_child())
-//         return;
+template<class T> CORO_TASK(bool) coro_send_interface_back(T& lib)
+{
+    if(!lib.get_use_host_in_child())
+        CO_RETURN true;
 
-//     rpc::shared_ptr<xxx::i_baz> output;
+    rpc::shared_ptr<xxx::i_baz> output;
 
-//     rpc::shared_ptr<yyy::i_example> new_zone;
-//     //lib.i_example_ptr_ //first level
-//     ASSERT_EQ(lib.get_example()->create_example_in_subordinate_zone(new_zone, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK()); //second level
+    rpc::shared_ptr<yyy::i_example> new_zone;
+    //lib.i_example_ptr_ //first level
+    CORO_ASSERT_EQ(CO_AWAIT lib.get_example()->create_example_in_subordinate_zone(new_zone, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK()); //second level
 
-//     rpc::shared_ptr<xxx::i_baz> new_baz;
-//     new_zone->create_baz(new_baz);
+    rpc::shared_ptr<xxx::i_baz> new_baz;
+    CORO_ASSERT_EQ(CO_AWAIT new_zone->create_baz(new_baz), 0);
 
-//     ASSERT_EQ(lib.get_example()->send_interface_back(new_baz, output), rpc::error::OK());
-//     ASSERT_EQ(new_baz, output);
-// }
+    CORO_ASSERT_EQ(CO_AWAIT lib.get_example()->send_interface_back(new_baz, output), rpc::error::OK());
+    CORO_ASSERT_EQ(new_baz, output);
+    CO_RETURN true;
+}
 
-// TYPED_TEST(remote_type_test, two_zones_get_one_to_lookup_other)
-// {
-//     auto root_service = lib.get_root_service();
+TYPED_TEST(remote_type_test, send_interface_back)
+{
+    run_coro_test(*this, [](auto& lib) {
+        return coro_send_interface_back<TypeParam>(lib);
+    });
+}
 
-//     rpc::zone zone_id;
-//     if(root_service)
-//         zone_id = root_service->get_zone_id();
-//     else
-//         zone_id = {0};
-//     auto h = lib.get_local_host_ptr();
-//     auto ex = lib.get_example();
+template<class T> CORO_TASK(bool) coro_two_zones_get_one_to_lookup_other(T& lib)
+{
+    auto h = lib.get_local_host_ptr();
+    auto ex = lib.get_example();
 
-//     auto enclaveb = lib.create_new_zone();
-//     enclaveb->set_host(h);
-//     ASSERT_EQ(h->set_app("enclaveb", enclaveb), rpc::error::OK());
+    auto enclaveb = CO_AWAIT lib.create_new_zone();
+    CORO_ASSERT_EQ(CO_AWAIT enclaveb->set_host(h), 0);
+    CORO_ASSERT_EQ(CO_AWAIT h->set_app("enclaveb", enclaveb), rpc::error::OK());
 
-//     ex->call_host_look_up_app_not_return("enclaveb", false);
+    CORO_ASSERT_EQ(CO_AWAIT ex->call_host_look_up_app_not_return("enclaveb", false), 0);
 
-//     enclaveb->set_host(nullptr);
-// }
+    CORO_ASSERT_EQ(CO_AWAIT enclaveb->set_host(nullptr), 0);
+    CO_RETURN true;
+}
+
+TYPED_TEST(remote_type_test, two_zones_get_one_to_lookup_other)
+{
+    run_coro_test(*this, [](auto& lib) {
+        return coro_two_zones_get_one_to_lookup_other<TypeParam>(lib);
+    });
+}
 // TYPED_TEST(remote_type_test, multithreaded_two_zones_get_one_to_lookup_other)
 // {
 //     if(!enable_multithreaded_tests || lib.is_enclave_setup())
@@ -881,12 +862,7 @@ TYPED_TEST(remote_type_test, create_new_zone_releasing_host_then_running_on_othe
 
 //     auto root_service = lib.get_root_service();
 
-//     rpc::zone zone_id;
-//     if(root_service)
-//         zone_id = root_service->get_zone_id();
-//     else
-//         zone_id = {0};
-//     auto h = rpc::make_shared<host>(zone_id);
+//     auto h = rpc::make_shared<host>();
 
 //     auto enclavea = lib.create_new_zone();
 //     enclavea->set_host(h);
@@ -912,105 +888,111 @@ TYPED_TEST(remote_type_test, create_new_zone_releasing_host_then_running_on_othe
 //     enclaveb->set_host(nullptr);
 // }
 
-// TYPED_TEST(remote_type_test, check_identity)
-// {
-//     auto& lib = lib;
-//     if(!lib.get_use_host_in_child())
-//         return;
+template<class T> CORO_TASK(bool) coro_check_identity(T& lib)
+{
+    if(!lib.get_use_host_in_child())
+        CO_RETURN true;
 
-//     rpc::shared_ptr<xxx::i_baz> output;
+    rpc::shared_ptr<xxx::i_baz> output;
 
-//     rpc::shared_ptr<yyy::i_example> new_zone;
-//     //lib.i_example_ptr_ //first level
-//     ASSERT_EQ(lib.get_example()->create_example_in_subordinate_zone(new_zone, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK()); //second level
+    rpc::shared_ptr<yyy::i_example> new_zone;
+    //lib.i_example_ptr_ //first level
+    CORO_ASSERT_EQ(CO_AWAIT lib.get_example()->create_example_in_subordinate_zone(new_zone, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK()); //second level
 
-//     rpc::shared_ptr<yyy::i_example> new_new_zone;
-//     ASSERT_EQ(new_zone->create_example_in_subordinate_zone(new_new_zone, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK()); //third level
+    rpc::shared_ptr<yyy::i_example> new_new_zone;
+    CORO_ASSERT_EQ(CO_AWAIT new_zone->create_example_in_subordinate_zone(new_new_zone, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK()); //third level
 
-//     auto new_zone_fork = lib.create_new_zone();//second level
+    auto new_zone_fork = CO_AWAIT lib.create_new_zone();//second level
 
-//     rpc::shared_ptr<xxx::i_baz> new_baz;
-//     new_zone->create_baz(new_baz);
+    rpc::shared_ptr<xxx::i_baz> new_baz;
+    CORO_ASSERT_EQ(CO_AWAIT new_zone->create_baz(new_baz), 0);
 
-//     rpc::shared_ptr<xxx::i_baz> new_new_baz;
-//     new_new_zone->create_baz(new_new_baz);
+    rpc::shared_ptr<xxx::i_baz> new_new_baz;
+    CORO_ASSERT_EQ(CO_AWAIT new_new_zone->create_baz(new_new_baz), 0);
 
-//     rpc::shared_ptr<xxx::i_baz> new_baz_fork;
-//     new_zone_fork->create_baz(new_baz_fork);
+    rpc::shared_ptr<xxx::i_baz> new_baz_fork;
+    CORO_ASSERT_EQ(CO_AWAIT new_zone_fork->create_baz(new_baz_fork), 0);
 
-//     // topology looks like this now flinging bazes around these nodes to ensure that the identity of bazes is the same
-//     // *4                           #
-//     //  \                           #
-//     //   *3                         #
-//     //    \                         #
-//     //     *2  *5                   #
-//     //      \ /                     #
-//     //       1                      #
+    // topology looks like this now flinging bazes around these nodes to ensure that the identity of bazes is the same
+    // *4                           #
+    //  \                           #
+    //   *3                         #
+    //    \                         #
+    //     *2  *5                   #
+    //      \ /                     #
+    //       1                      #
 
-//     auto proxy = lib.get_example()->query_proxy_base();
-//     auto base_baz = rpc::shared_ptr<xxx::i_baz>(new
-//     baz(casting_interface::get_zone_id(*proxy)); auto input = base_baz;
+    auto base_baz = rpc::shared_ptr<xxx::i_baz>(new baz());
+    auto input = base_baz;
 
-//     ASSERT_EQ(lib.get_example()->send_interface_back(input, output), rpc::error::OK());
-//     ASSERT_EQ(input, output);
+    CORO_ASSERT_EQ(CO_AWAIT lib.get_example()->send_interface_back(input, output), rpc::error::OK());
+    CORO_ASSERT_EQ(input, output);
 
-//     ASSERT_EQ(new_zone->send_interface_back(input, output), rpc::error::OK());
-//     ASSERT_EQ(input, output);
+    CORO_ASSERT_EQ(CO_AWAIT new_zone->send_interface_back(input, output), rpc::error::OK());
+    CORO_ASSERT_EQ(input, output);
 
-//     ASSERT_EQ(new_new_zone->send_interface_back(input, output), rpc::error::OK());
-//     ASSERT_EQ(input, output);
+    CORO_ASSERT_EQ(CO_AWAIT new_new_zone->send_interface_back(input, output), rpc::error::OK());
+    CORO_ASSERT_EQ(input, output);
 
-//     input = new_baz;
+    input = new_baz;
 
-//     ASSERT_EQ(lib.get_example()->send_interface_back(input, output), rpc::error::OK());
-//     ASSERT_EQ(input, output);
+    CORO_ASSERT_EQ(CO_AWAIT lib.get_example()->send_interface_back(input, output), rpc::error::OK());
+    CORO_ASSERT_EQ(input, output);
 
-//     ASSERT_EQ(new_zone->send_interface_back(input, output), rpc::error::OK());
-//     ASSERT_EQ(input, output);
+    CORO_ASSERT_EQ(CO_AWAIT new_zone->send_interface_back(input, output), rpc::error::OK());
+    CORO_ASSERT_EQ(input, output);
 
-//     ASSERT_EQ(new_new_zone->send_interface_back(input, output), rpc::error::OK());
-//     ASSERT_EQ(input, output);
+    CORO_ASSERT_EQ(CO_AWAIT new_new_zone->send_interface_back(input, output), rpc::error::OK());
+    CORO_ASSERT_EQ(input, output);
 
-//     input = new_new_baz;
+    input = new_new_baz;
 
-//     ASSERT_EQ(lib.get_example()->send_interface_back(input, output), rpc::error::OK());
-//     ASSERT_EQ(input, output);
+    CORO_ASSERT_EQ(CO_AWAIT lib.get_example()->send_interface_back(input, output), rpc::error::OK());
+    CORO_ASSERT_EQ(input, output);
 
-//     ASSERT_EQ(new_zone->send_interface_back(input, output), rpc::error::OK());
-//     ASSERT_EQ(input, output);
+    CORO_ASSERT_EQ(CO_AWAIT new_zone->send_interface_back(input, output), rpc::error::OK());
+    CORO_ASSERT_EQ(input, output);
 
-//     ASSERT_EQ(new_new_zone->send_interface_back(input, output), rpc::error::OK());
-//     ASSERT_EQ(input, output);
+    CORO_ASSERT_EQ(CO_AWAIT new_new_zone->send_interface_back(input, output), rpc::error::OK());
+    CORO_ASSERT_EQ(input, output);
 
-//     input = new_baz_fork;
+    input = new_baz_fork;
 
-//     // *z2   *i5                 #
-//     //  \  /                     #
-//     //   h1                      #
+    // *z2   *i5                 #
+    //  \  /                     #
+    //   h1                      #
 
-//     ASSERT_EQ(lib.get_example()->send_interface_back(input, output), rpc::error::OK());
-//     ASSERT_EQ(input, output);
+    CORO_ASSERT_EQ(CO_AWAIT lib.get_example()->send_interface_back(input, output), rpc::error::OK());
+    CORO_ASSERT_EQ(input, output);
 
-//     // *z3                       #
-//     //  \                        #
-//     //   *2   *i5                #
-//     //    \ /                    #
-//     //     h1                    #
+    // *z3                       #
+    //  \                        #
+    //   *2   *i5                #
+    //    \ /                    #
+    //     h1                    #
 
-//     ASSERT_EQ(new_zone->send_interface_back(input, output), rpc::error::OK());
-//     ASSERT_EQ(input, output);
+    CORO_ASSERT_EQ(CO_AWAIT new_zone->send_interface_back(input, output), rpc::error::OK());
+    CORO_ASSERT_EQ(input, output);
 
-//     // *z4                          #
-//     //  \                           #
-//     //   *3                         #
-//     //    \                         #
-//     //     *2  *i5                  #
-//     //      \ /                     #
-//     //       h1                     #
+    // *z4                          #
+    //  \                           #
+    //   *3                         #
+    //    \                         #
+    //     *2  *i5                  #
+    //      \ /                     #
+    //       h1                     #
 
-    // ASSERT_EQ(new_new_zone->send_interface_back(input, output), rpc::error::OK());
-    // ASSERT_EQ(input, output);
-// }
+    CORO_ASSERT_EQ(CO_AWAIT new_new_zone->send_interface_back(input, output), rpc::error::OK());
+    CORO_ASSERT_EQ(input, output);
+    CO_RETURN true;
+}
+
+TYPED_TEST(remote_type_test, check_identity)
+{
+    run_coro_test(*this, [](auto& lib) {
+        return coro_check_identity<TypeParam>(lib);
+    });
+}
 
 template<class T> CORO_TASK(bool) coro_check_deeply_nested_zone_reference_counting_fork_scenario(T& lib)
 {
@@ -1534,147 +1516,239 @@ TYPED_TEST(remote_type_test, check_interface_routing_with_out_params) {
 }
 
 
-// template <class T>
-// class type_test_with_host :
-//     public type_test<T>
-// {
+template <class T>
+class type_test_with_host :
+    public type_test<T>
+{
 
-// };
+};
 
-// typedef Types<
-//     inproc_setup<true, false, false>,
-//     inproc_setup<true, false, true>,
-//     inproc_setup<true, true, false>,
-//     inproc_setup<true, true, true>
+typedef Types<
+    inproc_setup<true, false, false>,
+    inproc_setup<true, false, true>,
+    inproc_setup<true, true, false>,
+    inproc_setup<true, true, true>
 
-// #ifdef BUILD_ENCLAVE
-//     ,
-//     enclave_setup<true, false, false>,
-//     enclave_setup<true, false, true>,
-//     enclave_setup<true, true, false>,
-//     enclave_setup<true, true, true>
-// #endif
-//     > type_test_with_host_implementations;
-// TYPED_TEST_SUITE(type_test_with_host, type_test_with_host_implementations);
+#ifdef BUILD_ENCLAVE
+    ,
+    enclave_setup<true, false, false>,
+    enclave_setup<true, false, true>,
+    enclave_setup<true, true, false>,
+    enclave_setup<true, true, true>
+#endif
+    > type_test_with_host_implementations;
+TYPED_TEST_SUITE(type_test_with_host, type_test_with_host_implementations);
 
-// #ifdef BUILD_ENCLAVE
-// TYPED_TEST(type_test_with_host, call_host_create_enclave_and_throw_away)
-// {
-//     bool run_standard_tests = false;
-//     ASSERT_EQ(lib.get_example()->call_host_create_enclave_and_throw_away(run_standard_tests), rpc::error::OK());
-// }
+#ifdef BUILD_ENCLAVE
+template<class T> CORO_TASK(bool) coro_call_host_create_enclave_and_throw_away(T& lib)
+{
+    bool run_standard_tests = false;
+    CORO_ASSERT_EQ(CO_AWAIT lib.get_example()->call_host_create_enclave_and_throw_away(run_standard_tests), rpc::error::OK());
+    CO_RETURN true;
+}
 
-// TYPED_TEST(type_test_with_host, call_host_create_enclave)
-// {
-//     bool run_standard_tests = false;
-//     rpc::shared_ptr<yyy::i_example> target;
+TYPED_TEST(type_test_with_host, call_host_create_enclave_and_throw_away)
+{
+    run_coro_test(*this, [](auto& lib) {
+        return coro_call_host_create_enclave_and_throw_away<TypeParam>(lib);
+    });
+}
 
-//     ASSERT_EQ(lib.get_example()->call_host_create_enclave(target, run_standard_tests), rpc::error::OK());
-//     ASSERT_NE(target, nullptr);
-// }
-// #endif
+template<class T> CORO_TASK(bool) coro_call_host_create_enclave(T& lib)
+{
+    bool run_standard_tests = false;
+    rpc::shared_ptr<yyy::i_example> target;
 
-// TYPED_TEST(type_test_with_host, look_up_app_and_return_with_nothing)
-// {
-//     bool run_standard_tests = false;
-//     rpc::shared_ptr<yyy::i_example> target;
+    CORO_ASSERT_EQ(CO_AWAIT lib.get_example()->call_host_create_enclave(target, run_standard_tests), rpc::error::OK());
+    CORO_ASSERT_NE(target, nullptr);
+    CO_RETURN true;
+}
 
-//     ASSERT_EQ(lib.get_example()->call_host_look_up_app("target", target, run_standard_tests), rpc::error::OK());
-//     ASSERT_EQ(target, nullptr);
-// }
+TYPED_TEST(type_test_with_host, call_host_create_enclave)
+{
+    run_coro_test(*this, [](auto& lib) {
+        return coro_call_host_create_enclave<TypeParam>(lib);
+    });
+}
+#endif
 
-// TYPED_TEST(type_test_with_host, call_host_unload_app_not_there)
-// {
-//     ASSERT_EQ(lib.get_example()->call_host_unload_app("target"), rpc::error::OK());
-// }
+template<class T> CORO_TASK(bool) coro_look_up_app_and_return_with_nothing(T& lib)
+{
+    bool run_standard_tests = false;
+    rpc::shared_ptr<yyy::i_example> target;
 
-// #ifdef BUILD_ENCLAVE
-// TYPED_TEST(type_test_with_host, call_host_look_up_app_unload_app)
-// {
-//     bool run_standard_tests = false;
-//     rpc::shared_ptr<yyy::i_example> target;
+    CORO_ASSERT_EQ(CO_AWAIT lib.get_example()->call_host_look_up_app("target", target, run_standard_tests), rpc::error::OK());
+    CORO_ASSERT_EQ(target, nullptr);
+    CO_RETURN true;
+}
 
-//     ASSERT_EQ(lib.get_example()->call_host_create_enclave(target, run_standard_tests), rpc::error::OK());
-//     ASSERT_NE(target, nullptr);
+TYPED_TEST(type_test_with_host, look_up_app_and_return_with_nothing)
+{
+    run_coro_test(*this, [](auto& lib) {
+        return coro_look_up_app_and_return_with_nothing<TypeParam>(lib);
+    });
+}
 
-//     ASSERT_EQ(lib.get_example()->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
-//     ASSERT_EQ(lib.get_example()->call_host_unload_app("target"), rpc::error::OK());
-//     target = nullptr;
-// }
+template<class T> CORO_TASK(bool) coro_call_host_unload_app_not_there(T& lib)
+{
+    CORO_ASSERT_EQ(CO_AWAIT lib.get_example()->call_host_unload_app("target"), rpc::error::OK());
+    CO_RETURN true;
+}
 
-// TYPED_TEST(type_test_with_host, call_host_look_up_app_not_return)
-// {
-//     bool run_standard_tests = false;
-//     rpc::shared_ptr<yyy::i_example> target;
+TYPED_TEST(type_test_with_host, call_host_unload_app_not_there)
+{
+    run_coro_test(*this, [](auto& lib) {
+        return coro_call_host_unload_app_not_there<TypeParam>(lib);
+    });
+}
 
-//     ASSERT_EQ(lib.get_example()->call_host_create_enclave(target, run_standard_tests), rpc::error::OK());
-//     ASSERT_NE(target, nullptr);
+#ifdef BUILD_ENCLAVE
+template<class T> CORO_TASK(bool) coro_call_host_look_up_app_unload_app(T& lib)
+{
+    bool run_standard_tests = false;
+    rpc::shared_ptr<yyy::i_example> target;
 
-//     ASSERT_EQ(lib.get_example()->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
-//     ASSERT_EQ(lib.get_example()->call_host_look_up_app_not_return("target", run_standard_tests), rpc::error::OK());
-//     ASSERT_EQ(lib.get_example()->call_host_unload_app("target"), rpc::error::OK());
-//     target = nullptr;
-// }
+    CORO_ASSERT_EQ(CO_AWAIT lib.get_example()->call_host_create_enclave(target, run_standard_tests), rpc::error::OK());
+    CORO_ASSERT_NE(target, nullptr);
 
-// TYPED_TEST(type_test_with_host, create_store_fetch_delete)
-// {
-//     bool run_standard_tests = false;
-//     rpc::shared_ptr<yyy::i_example> target;
-//     rpc::shared_ptr<yyy::i_example> target2;
+    CORO_ASSERT_EQ(CO_AWAIT lib.get_example()->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
+    CORO_ASSERT_EQ(CO_AWAIT lib.get_example()->call_host_unload_app("target"), rpc::error::OK());
+    target = nullptr;
+    CO_RETURN true;
+}
 
-//     ASSERT_EQ(lib.get_example()->call_host_create_enclave(target, run_standard_tests), rpc::error::OK());
-//     ASSERT_NE(target, nullptr);
+TYPED_TEST(type_test_with_host, call_host_look_up_app_unload_app)
+{
+    run_coro_test(*this, [](auto& lib) {
+        return coro_call_host_look_up_app_unload_app<TypeParam>(lib);
+    });
+}
 
-//     ASSERT_EQ(lib.get_example()->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
-//     ASSERT_EQ(lib.get_example()->call_host_look_up_app("target", target2, run_standard_tests), rpc::error::OK());
-//     ASSERT_EQ(lib.get_example()->call_host_unload_app("target"), rpc::error::OK());
-//     ASSERT_EQ(target, target2);
-//     target = nullptr;
-//     target2 = nullptr;
-// }
+template<class T> CORO_TASK(bool) coro_call_host_look_up_app_not_return(T& lib)
+{
+    bool run_standard_tests = false;
+    rpc::shared_ptr<yyy::i_example> target;
 
-// TYPED_TEST(type_test_with_host, create_store_not_return_delete)
-// {
-//     bool run_standard_tests = false;
-//     rpc::shared_ptr<yyy::i_example> target;
+    CORO_ASSERT_EQ(CO_AWAIT lib.get_example()->call_host_create_enclave(target, run_standard_tests), rpc::error::OK());
+    CORO_ASSERT_NE(target, nullptr);
 
-//     ASSERT_EQ(lib.get_example()->call_host_create_enclave(target, run_standard_tests), rpc::error::OK());
-//     ASSERT_NE(target, nullptr);
+    CORO_ASSERT_EQ(CO_AWAIT lib.get_example()->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
+    CORO_ASSERT_EQ(CO_AWAIT lib.get_example()->call_host_look_up_app_not_return("target", run_standard_tests), rpc::error::OK());
+    CORO_ASSERT_EQ(CO_AWAIT lib.get_example()->call_host_unload_app("target"), rpc::error::OK());
+    target = nullptr;
+    CO_RETURN true;
+}
 
-//     ASSERT_EQ(lib.get_example()->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
-//     ASSERT_EQ(lib.get_example()->call_host_look_up_app_not_return_and_delete("target", run_standard_tests),
-//     rpc::error::OK()); target = nullptr;
-// }
+TYPED_TEST(type_test_with_host, call_host_look_up_app_not_return)
+{
+    run_coro_test(*this, [](auto& lib) {
+        return coro_call_host_look_up_app_not_return<TypeParam>(lib);
+    });
+}
 
-// TYPED_TEST(type_test_with_host, create_store_delete)
-// {
-//     bool run_standard_tests = false;
-//     rpc::shared_ptr<yyy::i_example> target;
-//     rpc::shared_ptr<yyy::i_example> target2;
+template<class T> CORO_TASK(bool) coro_create_store_fetch_delete(T& lib)
+{
+    bool run_standard_tests = false;
+    rpc::shared_ptr<yyy::i_example> target;
+    rpc::shared_ptr<yyy::i_example> target2;
 
-//     ASSERT_EQ(lib.get_example()->call_host_create_enclave(target, run_standard_tests), rpc::error::OK());
-//     ASSERT_NE(target, nullptr);
+    CORO_ASSERT_EQ(CO_AWAIT lib.get_example()->call_host_create_enclave(target, run_standard_tests), rpc::error::OK());
+    CORO_ASSERT_NE(target, nullptr);
 
-//     ASSERT_EQ(lib.get_example()->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
-//     ASSERT_EQ(lib.get_example()->call_host_look_up_app_and_delete("target", target2, run_standard_tests),
-//     rpc::error::OK()); ASSERT_EQ(target, target2); target = nullptr; target2 = nullptr;
-// }
-// #endif
+    CORO_ASSERT_EQ(CO_AWAIT lib.get_example()->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
+    CORO_ASSERT_EQ(CO_AWAIT lib.get_example()->call_host_look_up_app("target", target2, run_standard_tests), rpc::error::OK());
+    CORO_ASSERT_EQ(CO_AWAIT lib.get_example()->call_host_unload_app("target"), rpc::error::OK());
+    CORO_ASSERT_EQ(target, target2);
+    target = nullptr;
+    target2 = nullptr;
+    CO_RETURN true;
+}
 
-// TYPED_TEST(type_test_with_host, create_subordinate_zone) // TODO: Missing test suite definition
-// {
-//     rpc::shared_ptr<yyy::i_example> target;
-//     ASSERT_EQ(this->get_lib().get_example()->create_example_in_subordinate_zone(
-//                   target, this->get_lib().get_local_host_ptr(), ++(*zone_gen)),
-//         rpc::error::OK());
-// }
+TYPED_TEST(type_test_with_host, create_store_fetch_delete)
+{
+    run_coro_test(*this, [](auto& lib) {
+        return coro_create_store_fetch_delete<TypeParam>(lib);
+    });
+}
 
-// TYPED_TEST(type_test_with_host, create_subordinate_zone_and_set_in_host)
-// {
-//     ASSERT_EQ(lib.get_example()->create_example_in_subordinate_zone_and_set_in_host(++(*zone_gen), "foo",
-//     lib.get_local_host_ptr()), rpc::error::OK()); rpc::shared_ptr<yyy::i_example> target;
-//     lib.get_host()->look_up_app("foo", target); lib.get_host()->unload_app("foo"); target->set_host(nullptr);
-// }
+template<class T> CORO_TASK(bool) coro_create_store_not_return_delete(T& lib)
+{
+    bool run_standard_tests = false;
+    rpc::shared_ptr<yyy::i_example> target;
+
+    CORO_ASSERT_EQ(CO_AWAIT lib.get_example()->call_host_create_enclave(target, run_standard_tests), rpc::error::OK());
+    CORO_ASSERT_NE(target, nullptr);
+
+    CORO_ASSERT_EQ(CO_AWAIT lib.get_example()->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
+    CORO_ASSERT_EQ(CO_AWAIT lib.get_example()->call_host_look_up_app_not_return_and_delete("target", run_standard_tests), rpc::error::OK());
+    target = nullptr;
+    CO_RETURN true;
+}
+
+TYPED_TEST(type_test_with_host, create_store_not_return_delete)
+{
+    run_coro_test(*this, [](auto& lib) {
+        return coro_create_store_not_return_delete<TypeParam>(lib);
+    });
+}
+
+template<class T> CORO_TASK(bool) coro_create_store_delete(T& lib)
+{
+    bool run_standard_tests = false;
+    rpc::shared_ptr<yyy::i_example> target;
+    rpc::shared_ptr<yyy::i_example> target2;
+
+    CORO_ASSERT_EQ(CO_AWAIT lib.get_example()->call_host_create_enclave(target, run_standard_tests), rpc::error::OK());
+    CORO_ASSERT_NE(target, nullptr);
+
+    CORO_ASSERT_EQ(CO_AWAIT lib.get_example()->call_host_set_app("target", target, run_standard_tests), rpc::error::OK());
+    CORO_ASSERT_EQ(CO_AWAIT lib.get_example()->call_host_look_up_app_and_delete("target", target2, run_standard_tests), rpc::error::OK());
+    CORO_ASSERT_EQ(target, target2);
+    target = nullptr;
+    target2 = nullptr;
+    CO_RETURN true;
+}
+
+TYPED_TEST(type_test_with_host, create_store_delete)
+{
+    run_coro_test(*this, [](auto& lib) {
+        return coro_create_store_delete<TypeParam>(lib);
+    });
+}
+#endif
+
+template<class T> CORO_TASK(bool) coro_create_subordinate_zone(T& lib)
+{
+    rpc::shared_ptr<yyy::i_example> target;
+    CORO_ASSERT_EQ(CO_AWAIT lib.get_example()->create_example_in_subordinate_zone(
+                  target, lib.get_local_host_ptr(), ++(*zone_gen)),
+        rpc::error::OK());
+    CO_RETURN true;
+}
+
+TYPED_TEST(type_test_with_host, create_subordinate_zone) // TODO: Missing test suite definition
+{
+    run_coro_test(*this, [](auto& lib) {
+        return coro_create_subordinate_zone<TypeParam>(lib);
+    });
+}
+
+template<class T> CORO_TASK(bool) coro_create_subordinate_zone_and_set_in_host(T& lib)
+{
+    CORO_ASSERT_EQ(CO_AWAIT lib.get_example()->create_example_in_subordinate_zone_and_set_in_host(++(*zone_gen), "foo", lib.get_local_host_ptr()), rpc::error::OK());
+    rpc::shared_ptr<yyy::i_example> target;
+    CO_AWAIT lib.get_host()->look_up_app("foo", target);
+    CO_AWAIT lib.get_host()->unload_app("foo");
+    CO_AWAIT target->set_host(nullptr);
+    CO_RETURN true;
+}
+
+TYPED_TEST(type_test_with_host, create_subordinate_zone_and_set_in_host)
+{
+    run_coro_test(*this, [](auto& lib) {
+        return coro_create_subordinate_zone_and_set_in_host<TypeParam>(lib);
+    });
+}
 
 template<class T> CORO_TASK(bool) coro_test_y_topology_and_return_new_prong_object(T& lib)
 {
@@ -1863,71 +1937,6 @@ TYPED_TEST(remote_type_test, test_y_topology_and_set_host_with_prong_object) {
         return coro_test_y_topology_and_set_host_with_prong_object<TypeParam>(lib, context);
     }, *this);
 }
-
-// OLD VERSION - commented out after conversion to coroutine pattern
-/*
-TYPED_TEST(remote_type_test, test_y_topology_and_set_host_with_prong_object)
-{
-    // CRITICAL TEST: Host registry with objects from autonomous zones - triggers stack overflow.
-    // Similar to previous but Zone 5 caches the object from Zone 7, then in a separate call
-    // Zone 5 supplies it to Zone 1 via host registry.
-    //
-    // Extended Deep Y-Topology Pattern:
-    // Zone 1 (root) → Zone 2 → Zone 3 → Zone 4 → Zone 5 (deep factory)
-    // Zone 5 autonomously creates Zone 6 → Zone 7 via Zone 3 (unknown to all ancestors)
-    //
-    // This creates the most critical routing isolation scenario:
-    // - Zone 1 and Zone 2 have no knowledge of Zone 6 or Zone 7
-    // - Zone 5 gets Zone 3 to create Zones 6 and 7 autonomously
-    // - Zone 5 caches Zone 7 object locally
-    // - In a separate call, Zone 5 sets the cached object in Zone 1's host registry
-    // - Zone 1 later accesses object through host registry lookup
-    // - Forces system to rely on known_direction_zone hint for routing
-    //
-    // Bug Trigger Pattern - STACK OVERFLOW:
-    // When known_direction_zone is disabled (set to 0), the service proxy has no idea
-    // where to find Zone 7 and goes into infinite recursive loop until stack overflow.
-    // This is the most severe manifestation of the Y-topology routing bug.
-
-    auto& lib = this->get_lib();
-
-    // Create Deep Chain: Zone 1 → Zone 2 → Zone 3 → Zone 4 → Zone 5 (deep factory)
-    rpc::shared_ptr<yyy::i_example> zone2;
-    ASSERT_EQ(SYNC_WAIT(lib.get_example()->create_example_in_subordinate_zone(zone2, lib.get_local_host_ptr(), ++(*zone_gen))), rpc::error::OK());
-    ASSERT_NE(zone2, nullptr);
-
-    rpc::shared_ptr<yyy::i_example> zone3;
-    ASSERT_EQ(SYNC_WAIT(zone2->create_example_in_subordinate_zone(zone3, lib.get_local_host_ptr(), ++(*zone_gen))), rpc::error::OK());
-    ASSERT_NE(zone3, nullptr);
-
-    rpc::shared_ptr<yyy::i_example> zone4;
-    ASSERT_EQ(SYNC_WAIT(zone3->create_example_in_subordinate_zone(zone4, lib.get_local_host_ptr(), ++(*zone_gen))), rpc::error::OK());
-    ASSERT_NE(zone4, nullptr);
-
-    rpc::shared_ptr<yyy::i_example> zone5_deep_factory;
-    ASSERT_EQ(SYNC_WAIT(zone4->create_example_in_subordinate_zone(zone5_deep_factory, lib.get_local_host_ptr(), ++(*zone_gen))), rpc::error::OK());
-    ASSERT_NE(zone5_deep_factory, nullptr);
-
-    // STEP 1: Zone 5 autonomously creates longer fork: Zone 5 → Zone 6 → Zone 7
-    // This creates maximum isolation - no ancestor zones know about this branch
-    std::vector<uint64_t> deep_autonomous_zones = {++(*zone_gen), ++(*zone_gen)}; // Zone 6, then Zone 7
-
-    RPC_INFO("Zone 5 autonomously creating deep fork (Zone 6 → Zone 7) and caching object from Zone 7...");
-    ASSERT_EQ(SYNC_WAIT(zone5_deep_factory->create_y_topology_fork(zone3, deep_autonomous_zones)), rpc::error::OK());
-
-    RPC_INFO("Zone 5 retrieving Zone 7 object to pass up the chain...");
-    ASSERT_EQ(SYNC_WAIT(zone5_deep_factory->give_host_cached_object()), rpc::error::OK());
-
-    rpc::shared_ptr<yyy::i_example> zone7_object;
-    SYNC_WAIT(lib.get_local_host_ptr()->look_up_app("foo", zone7_object));
-    ASSERT_NE(zone7_object, nullptr);
-
-    // clean up the test or we will get non empty service errors
-    SYNC_WAIT(lib.get_local_host_ptr()->set_app("foo", nullptr));
-
-    RPC_INFO("Test completed - Zone 1 successfully worked with Zone 7 object from deep autonomous fork");
-}
-*/
 
 static_assert(rpc::id<std::string>::get(rpc::VERSION_2) == rpc::STD_STRING_ID);
 

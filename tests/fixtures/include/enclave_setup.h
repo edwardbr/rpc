@@ -30,6 +30,7 @@ template<bool UseHostInChild, bool RunStandardTests, bool CreateNewZoneThenCreat
     bool run_standard_tests_ = RunStandardTests;
 
     std::atomic<uint64_t> zone_gen_ = 0;
+    bool error_has_occured_ = false;
 
 public:
     virtual ~enclave_setup() = default;
@@ -41,6 +42,18 @@ public:
     rpc::shared_ptr<yyy::i_example> get_example() const { return i_example_ptr_; }
     rpc::shared_ptr<yyy::i_host> get_host() const { return i_host_ptr_; }
     bool get_use_host_in_child() const { return use_host_in_child_; }
+    
+    bool error_has_occured() const { return error_has_occured_; }
+
+    CORO_TASK(void) check_for_error(CORO_TASK(bool) task)
+    {
+        auto ret = CO_AWAIT task;
+        if (!ret)
+        {
+            error_has_occured_ = true;
+        }
+        CO_RETURN;
+    }
 
     virtual void set_up()
     {
@@ -59,14 +72,14 @@ public:
         example_idl_register_stubs(root_service_);
         current_host_service = root_service_;
 
-        i_host_ptr_ = rpc::shared_ptr<yyy::i_host>(new host(root_service_->get_zone_id()));
+        i_host_ptr_ = rpc::shared_ptr<yyy::i_host>(new host());
         local_host_ptr_ = i_host_ptr_;
 
         auto new_zone_id = ++(*zone_gen);
         auto err_code = root_service_->connect_to_zone<rpc::enclave_service_proxy>(
             "main child", {new_zone_id}, use_host_in_child_ ? i_host_ptr_ : nullptr, i_example_ptr_, enclave_path);
 
-        ASSERT_ERROR_CODE(err_code);
+        RPC_ASSERT(err_code == rpc::error::OK());
     }
 
     virtual void tear_down()

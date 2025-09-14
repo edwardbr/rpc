@@ -72,7 +72,7 @@ public:
             telemetry_service_manager_.create(test_info->test_suite_name(), test_info->name(), "../../rpc_test_diagram/");
 #endif
 
-        i_host_ptr_ = rpc::shared_ptr<yyy::i_host>(new host({++zone_gen_}));
+        i_host_ptr_ = rpc::shared_ptr<yyy::i_host>(new host());
         local_host_ptr_ = i_host_ptr_;
         i_example_ptr_ = rpc::shared_ptr<yyy::i_example>(
             new marshalled_tests::example(nullptr, use_host_in_child_ ? i_host_ptr_ : nullptr));

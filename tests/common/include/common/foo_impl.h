@@ -21,7 +21,6 @@ namespace marshalled_tests
 {
     class baz : public xxx::i_baz, public xxx::i_bar
     {
-        rpc::zone zone_id_;
         void* get_address() const override { return (void*)this; }
         const rpc::casting_interface* query_interface(rpc::interface_ordinal interface_id) const override
         {
@@ -33,12 +32,11 @@ namespace marshalled_tests
         }
 
     public:
-        baz(rpc::zone zone_id)
-            : zone_id_(zone_id)
+        baz()
         {
 #ifdef USE_RPC_TELEMETRY
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
-                telemetry_service->on_impl_creation("baz", (uint64_t)this, zone_id_);
+                telemetry_service->on_impl_creation("baz", (uint64_t)this, rpc::service::get_current_service()->get_zone_id());
 #endif
         }
 
@@ -46,7 +44,7 @@ namespace marshalled_tests
         {
 #ifdef USE_RPC_TELEMETRY
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
-                telemetry_service->on_impl_deletion((uint64_t)this, zone_id_);
+                telemetry_service->on_impl_deletion((uint64_t)this, rpc::service::get_current_service()->get_zone_id());
 #endif
         }
         CORO_TASK(error_code) callback(int val) override
@@ -71,7 +69,6 @@ namespace marshalled_tests
 
     class foo : public xxx::i_foo
     {
-        rpc::zone zone_id_;
         void* get_address() const override { return (void*)this; }
         const rpc::casting_interface* query_interface(rpc::interface_ordinal interface_id) const override
         {
@@ -83,19 +80,18 @@ namespace marshalled_tests
         rpc::member_ptr<xxx::i_baz> cached_;
 
     public:
-        foo(rpc::zone zone_id)
-            : zone_id_(zone_id)
+        foo()
         {
 #ifdef USE_RPC_TELEMETRY
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
-                telemetry_service->on_impl_creation("foo", (uint64_t)this, zone_id_);
+                telemetry_service->on_impl_creation("foo", (uint64_t)this, rpc::service::get_current_service()->get_zone_id());
 #endif
         }
         virtual ~foo()
         {
 #ifdef USE_RPC_TELEMETRY
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
-                telemetry_service->on_impl_deletion((uint64_t)this, zone_id_);
+                telemetry_service->on_impl_deletion((uint64_t)this, rpc::service::get_current_service()->get_zone_id());
 #endif
         }
         CORO_TASK(error_code) do_something_in_val(int val) override
@@ -268,7 +264,7 @@ namespace marshalled_tests
 
         CORO_TASK(error_code) receive_interface(rpc::shared_ptr<i_foo>& val) override
         {
-            val = rpc::shared_ptr<xxx::i_foo>(new foo(zone_id_));
+            val = rpc::shared_ptr<xxx::i_foo>(new foo());
             auto val1 = CO_AWAIT rpc::dynamic_pointer_cast<xxx::i_bar>(val);
             CO_RETURN rpc::error::OK();
         }
@@ -308,7 +304,7 @@ namespace marshalled_tests
 
         CORO_TASK(error_code) create_baz_interface(rpc::shared_ptr<xxx::i_baz>& val) override
         {
-            val = rpc::shared_ptr<xxx::i_baz>(new baz(zone_id_));
+            val = rpc::shared_ptr<xxx::i_baz>(new baz());
             CO_RETURN rpc::error::OK();
         }
 
@@ -342,8 +338,6 @@ namespace marshalled_tests
 
     class multiple_inheritance : public xxx::i_bar, public xxx::i_baz
     {
-        rpc::zone zone_id_;
-
         void* get_address() const override { return (void*)this; }
         const rpc::casting_interface* query_interface(rpc::interface_ordinal interface_id) const override
         {
@@ -355,19 +349,18 @@ namespace marshalled_tests
         }
 
     public:
-        multiple_inheritance(rpc::zone zone_id)
-            : zone_id_(zone_id)
+        multiple_inheritance()
         {
 #ifdef USE_RPC_TELEMETRY
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
-                telemetry_service->on_impl_creation("multiple_inheritance", (uint64_t)this, zone_id_);
+                telemetry_service->on_impl_creation("multiple_inheritance", (uint64_t)this, rpc::service::get_current_service()->get_zone_id());
 #endif
         }
         virtual ~multiple_inheritance()
         {
 #ifdef USE_RPC_TELEMETRY
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
-                telemetry_service->on_impl_deletion((uint64_t)this, zone_id_);
+                telemetry_service->on_impl_deletion((uint64_t)this, rpc::service::get_current_service()->get_zone_id());
 #endif
         }
 
@@ -393,7 +386,6 @@ namespace marshalled_tests
     {
         rpc::member_ptr<yyy::i_host> host_;
         rpc::weak_ptr<rpc::service> this_service_;
-        rpc::zone zone_id_;
 
         void* get_address() const override { return (void*)this; }
         const rpc::casting_interface* query_interface(rpc::interface_ordinal interface_id) const override
@@ -407,20 +399,17 @@ namespace marshalled_tests
         example(rpc::shared_ptr<rpc::service> this_service, rpc::shared_ptr<yyy::i_host> host)
             : host_(host)
             , this_service_(this_service)
-            , zone_id_(0)
         {
-            if (this_service)
-                zone_id_ = this_service->get_zone_id();
 #ifdef USE_RPC_TELEMETRY
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
-                telemetry_service->on_impl_creation("example", (uint64_t)this, zone_id_);
+                telemetry_service->on_impl_creation("example", (uint64_t)this, rpc::service::get_current_service()->get_zone_id());
 #endif
         }
         virtual ~example()
         {
 #ifdef USE_RPC_TELEMETRY
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
-                telemetry_service->on_impl_deletion((uint64_t)this, zone_id_);
+                telemetry_service->on_impl_deletion((uint64_t)this, rpc::service::get_current_service()->get_zone_id());
 #endif
         }
 
@@ -437,19 +426,19 @@ namespace marshalled_tests
 
         CORO_TASK(error_code) create_multiple_inheritance(rpc::shared_ptr<xxx::i_baz>& target) override
         {
-            target = rpc::shared_ptr<xxx::i_baz>(new multiple_inheritance(zone_id_));
+            target = rpc::shared_ptr<xxx::i_baz>(new multiple_inheritance());
             CO_RETURN rpc::error::OK();
         }
 
         CORO_TASK(error_code) create_foo(rpc::shared_ptr<xxx::i_foo>& target) override
         {
-            target = rpc::shared_ptr<xxx::i_foo>(new foo(zone_id_));
+            target = rpc::shared_ptr<xxx::i_foo>(new foo());
             CO_RETURN rpc::error::OK();
         }
 
         CORO_TASK(error_code) create_baz(rpc::shared_ptr<xxx::i_baz>& target) override
         {
-            target = rpc::shared_ptr<xxx::i_baz>(new baz(zone_id_));
+            target = rpc::shared_ptr<xxx::i_baz>(new baz());
             CO_RETURN rpc::error::OK();
         }
 
@@ -756,7 +745,7 @@ namespace marshalled_tests
 
         CORO_TASK(error_code) receive_interface(rpc::shared_ptr<xxx::i_foo>& val) override
         {
-            val = rpc::shared_ptr<xxx::i_foo>(new foo(zone_id_));
+            val = rpc::shared_ptr<xxx::i_foo>(new foo());
             auto val1 = CO_AWAIT rpc::dynamic_pointer_cast<xxx::i_bar>(val);
             CO_RETURN rpc::error::OK();
         }
@@ -783,7 +772,7 @@ namespace marshalled_tests
             // This method runs in the current zone and autonomously creates a chain of zones through the factory
             // The zone_factory is a reference to an intermediate zone that can create new zones
             // fork_zone_ids specifies the chain of zones to create and which zone to get the object from
-            RPC_INFO("example::create_fork_and_return_object - Zone {} creating fork chain through zone factory", zone_id_.get_val());
+            RPC_INFO("example::create_fork_and_return_object - Zone {} creating fork chain through zone factory", rpc::service::get_current_service()->get_zone_id().get_val());
             
             if (fork_zone_ids.empty()) {
                 RPC_ERROR("fork_zone_ids cannot be empty");
@@ -848,7 +837,7 @@ namespace marshalled_tests
     public:
         CORO_TASK(error_code) cache_object_from_autonomous_zone(const std::vector<uint64_t>& zone_ids) override
         {
-            RPC_INFO("example::cache_object_from_autonomous_zone - Zone {} autonomously creating and caching object from unknown zone", zone_id_.get_val());
+            RPC_INFO("example::cache_object_from_autonomous_zone - Zone {} autonomously creating and caching object from unknown zone", rpc::service::get_current_service()->get_zone_id().get_val());
             
             if (zone_ids.empty()) {
                 RPC_ERROR("zone_ids cannot be empty");
@@ -872,13 +861,13 @@ namespace marshalled_tests
             // Cache the object locally
             cached_autonomous_object_ = autonomous_object;
             
-            RPC_INFO("Successfully cached object from autonomous zone {} in zone {}", zone_ids.back(), zone_id_.get_val());
+            RPC_INFO("Successfully cached object from autonomous zone {} in zone {}", zone_ids.back(), rpc::service::get_current_service()->get_zone_id().get_val());
             CO_RETURN rpc::error::OK();
         }
         
         CORO_TASK(error_code) create_y_topology_fork(rpc::shared_ptr<yyy::i_example> factory_zone, const std::vector<uint64_t>& fork_zone_ids) override
         {
-            RPC_INFO("example::create_y_topology_fork - Zone {} creating Y-topology fork via factory zone", zone_id_.get_val());
+            RPC_INFO("example::create_y_topology_fork - Zone {} creating Y-topology fork via factory zone", rpc::service::get_current_service()->get_zone_id().get_val());
             
             if (fork_zone_ids.empty()) {
                 RPC_ERROR("fork_zone_ids cannot be empty");
@@ -897,7 +886,7 @@ namespace marshalled_tests
             // This creates the true Y-topology where one prong creates a fork at an earlier point.
             
             RPC_INFO("Zone {} asking factory zone to create autonomous fork with {} zones", 
-                     zone_id_.get_val(), fork_zone_ids.size());
+                     rpc::service::get_current_service()->get_zone_id().get_val(), fork_zone_ids.size());
                      
             rpc::shared_ptr<yyy::i_example> object_from_forked_zone;
             auto err = CO_AWAIT create_fork_and_return_object(factory_zone, fork_zone_ids, object_from_forked_zone);
@@ -909,22 +898,22 @@ namespace marshalled_tests
             // Cache it locally so we can later pass it to zones that have no route to the fork
             cached_autonomous_object_ = object_from_forked_zone;
             
-            RPC_INFO("Successfully created Y-topology fork - Zone {} now has object from factory's autonomous zones", zone_id_.get_val());
+            RPC_INFO("Successfully created Y-topology fork - Zone {} now has object from factory's autonomous zones", rpc::service::get_current_service()->get_zone_id().get_val());
             CO_RETURN rpc::error::OK();
         }
         
         CORO_TASK(error_code) retrieve_cached_autonomous_object(rpc::shared_ptr<yyy::i_example>& cached_object) override
         {
-            RPC_INFO("example::retrieve_cached_autonomous_object - Zone {} retrieving cached autonomous object", zone_id_.get_val());
+            RPC_INFO("example::retrieve_cached_autonomous_object - Zone {} retrieving cached autonomous object", rpc::service::get_current_service()->get_zone_id().get_val());
             
             if (!cached_autonomous_object_) {
-                RPC_ERROR("No cached autonomous object available in zone {}", zone_id_.get_val());
+                RPC_ERROR("No cached autonomous object available in zone {}", rpc::service::get_current_service()->get_zone_id().get_val());
                 CO_RETURN rpc::error::ZONE_NOT_FOUND();
             }
             
             cached_object = cached_autonomous_object_;
             
-            RPC_INFO("Successfully retrieved cached autonomous object in zone {}", zone_id_.get_val());
+            RPC_INFO("Successfully retrieved cached autonomous object in zone {}", rpc::service::get_current_service()->get_zone_id().get_val());
             
             // CRITICAL: This is where the routing bug should trigger
             // When this cached object (from an unknown autonomous zone) gets passed
@@ -936,17 +925,17 @@ namespace marshalled_tests
         
         CORO_TASK(error_code) give_host_cached_object()
         {
-            RPC_INFO("example::give_host_cached_object - Zone {} giving host cached autonomous object", zone_id_.get_val());
+            RPC_INFO("example::give_host_cached_object - Zone {} giving host cached autonomous object", rpc::service::get_current_service()->get_zone_id().get_val());
             
             if (!cached_autonomous_object_) {
-                RPC_ERROR("No cached autonomous object available in zone {}", zone_id_.get_val());
+                RPC_ERROR("No cached autonomous object available in zone {}", rpc::service::get_current_service()->get_zone_id().get_val());
                 CO_RETURN rpc::error::ZONE_NOT_FOUND();
             }
             
             auto host = host_.get_nullable();
             if(!host)
             {
-                RPC_ERROR("No cached host object available in zone {}", zone_id_.get_val());
+                RPC_ERROR("No cached host object available in zone {}", rpc::service::get_current_service()->get_zone_id().get_val());
                 CO_RETURN rpc::error::OBJECT_NOT_FOUND();
             }
             auto err = CO_AWAIT host->set_app("foo", cached_autonomous_object_);
@@ -955,7 +944,7 @@ namespace marshalled_tests
                 CO_RETURN err;
             }
             
-            RPC_INFO("Successfully retrieved cached autonomous object in zone {}", zone_id_.get_val());
+            RPC_INFO("Successfully retrieved cached autonomous object in zone {}", rpc::service::get_current_service()->get_zone_id().get_val());
             
             // CRITICAL: This is where the routing bug should trigger
             // When this cached object (from an unknown autonomous zone) gets passed

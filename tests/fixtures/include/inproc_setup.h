@@ -83,7 +83,7 @@ public:
         example_idl_register_stubs(root_service_);
         current_host_service = root_service_;
 
-        rpc::shared_ptr<yyy::i_host> hst(new host(root_service_->get_zone_id()));
+        rpc::shared_ptr<yyy::i_host> hst(new host());
         local_host_ptr_ = hst; // assign to weak ptr
 
         auto new_zone_id = ++(zone_gen_);

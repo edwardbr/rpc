@@ -43,6 +43,7 @@
       "name": "Debug",
       "inherits": "Base",
       "cacheVariables": {
+        "BUILD_COROUTINE": "OFF",
         "BUILD_TYPE": "debug",
         "CMAKE_BUILD_TYPE": "Debug"
       }
@@ -60,6 +61,7 @@
       "name": "Debug_multithreaded",
       "inherits": "Base",
       "cacheVariables": {
+        "BUILD_COROUTINE": "OFF",
         "BUILD_TYPE": "debug",
         "CMAKE_BUILD_TYPE": "Debug",
         "USE_RPC_TELEMETRY": "ON",
@@ -71,6 +73,7 @@
       "name": "Debug_multithreaded_hang",
       "inherits": "Base",
       "cacheVariables": {
+        "BUILD_COROUTINE": "OFF",
         "BUILD_TYPE": "debug",
         "CMAKE_BUILD_TYPE": "Debug",
         // "USE_RPC_TELEMETRY": "ON",
@@ -82,22 +85,29 @@
       "name": "Debug_SGX",
       "inherits": "Debug",
       "cacheVariables": {
+        "BUILD_COROUTINE": "OFF",
         "BUILD_ENCLAVE": "ON",
-        "SGX_HW": "ON"
+        "SGX_HW": "ON",
+        "CMAKE_BUILD_TYPE": "Debug"
       }
     },
     {
       "name": "Debug_SGX_Sim",
       "inherits": "Debug",
       "cacheVariables": {
-        "BUILD_ENCLAVE": "ON"
+        "BUILD_COROUTINE": "OFF",
+        "BUILD_ENCLAVE": "ON",
+        "SGX_HW": "OFF",
+        "CMAKE_BUILD_TYPE": "Debug"
       }
     },
     {
       "name": "Release",
       "inherits": "Base",
       "cacheVariables": {
+        "BUILD_COROUTINE": "OFF",
         "BUILD_TYPE": "release",
+        "SGX_HW": "OFF",
         "CMAKE_BUILD_TYPE": "Release"
       }
     },
@@ -105,6 +115,7 @@
       "name": "Release_SGX",
       "inherits": "Release",
       "cacheVariables": {
+        "BUILD_COROUTINE": "OFF",
         "BUILD_ENCLAVE": "ON",
         "SGX_HW": "ON",
         "SGX_MODE": "release"

@@ -6,12 +6,11 @@
 #include "test_host.h"
 #include <rpc/error_codes.h>
 
-host::host(rpc::zone zone_id)
-    : zone_id_(zone_id)
+host::host()
 {
 #ifdef USE_RPC_TELEMETRY
     if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
-        telemetry_service->on_impl_creation("host", (uint64_t)this, zone_id_);
+        telemetry_service->on_impl_creation("host", (uint64_t)this, rpc::service::get_current_service()->get_zone_id());
 #endif
 }
 
@@ -19,7 +18,7 @@ host::~host()
 {
 #ifdef USE_RPC_TELEMETRY
     if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
-        telemetry_service->on_impl_deletion((uint64_t)this, zone_id_);
+        telemetry_service->on_impl_deletion((uint64_t)this, rpc::service::get_current_service()->get_zone_id());
 #endif
 }
 

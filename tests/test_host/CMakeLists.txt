@@ -4,10 +4,6 @@
 ]]
 cmake_minimum_required(VERSION 3.24)
 
-if(BUILD_COROUTINE)
-  set(COROUTINE_LIBS libcoro)
-endif()
-
 add_executable(rpc_test main.cpp ${COROUTINE_TESTS})
 
 target_compile_definitions(rpc_test PRIVATE ${HOST_DEFINES})
@@ -28,7 +24,9 @@ target_link_libraries(
   example_idl_host
   example_import_idl_host
   example_shared_idl_host
+  -Wl,--whole-archive
   test_fixtures
+  -Wl,--no-whole-archive
   yas_common
   rpc::rpc_host
   yas_common
@@ -37,7 +35,7 @@ target_link_libraries(
   GTest::gtest_main
   GTest::gmock_main
   spdlog::spdlog
-  libcoro
+  ${CORO_RUNTIME}
   ${RPC_HOST_FMT_LIB}
   ${ENCLAVE_DEPENDANCIES}
   ${HOST_LIBRARIES})

@@ -173,7 +173,7 @@ namespace marshalled_tests
         CO_RETURN true;
     }
 
-    CORO_TASK(bool) remote_tests(bool use_host_in_child, rpc::shared_ptr<yyy::i_example> example_ptr, rpc::zone zone_id)
+    CORO_TASK(bool) remote_tests(bool use_host_in_child, rpc::shared_ptr<yyy::i_example> example_ptr)
     {
         int val = 0;
         CO_AWAIT example_ptr->add(1, 2, val);
@@ -202,7 +202,7 @@ namespace marshalled_tests
 
             if (use_host_in_child)
             {
-                rpc::shared_ptr<xxx::i_baz> b(new baz(zone_id));
+                rpc::shared_ptr<xxx::i_baz> b(new baz());
                 err_code = CO_AWAIT foo->call_baz_interface(b);
             }
 

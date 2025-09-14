@@ -26,8 +26,6 @@
 
 class host : public yyy::i_host, public rpc::enable_shared_from_this<host>
 {
-    rpc::zone zone_id_;
-
     // perhaps this should be an unsorted list but map is easier to debug for now
     std::map<std::string, rpc::shared_ptr<yyy::i_example>> cached_apps_;
     std::mutex cached_apps_mux_;
@@ -41,7 +39,7 @@ class host : public yyy::i_host, public rpc::enable_shared_from_this<host>
     }
 
 public:
-    host(rpc::zone zone_id);
+    host();
     virtual ~host();
     CORO_TASK(error_code) create_enclave(rpc::shared_ptr<yyy::i_example>& target) override;
     CORO_TASK(error_code) look_up_app(const std::string& app_name, rpc::shared_ptr<yyy::i_example>& app) override;
