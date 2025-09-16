@@ -201,11 +201,11 @@ namespace rpc
                     auto op = proxy.second.lock();
                     if (op)
                     {
-                        RPC_WARNING("has object_proxy {}", std::to_string(op->get_object_id()));
+                        RPC_WARNING(" has object_proxy {}", std::to_string(op->get_object_id()));
                     }
                     else
                     {
-                        RPC_WARNING("has null object_proxy");
+                        RPC_WARNING(" has null object_proxy");
                     }
                     success = false;
                 }
@@ -334,12 +334,10 @@ namespace rpc
         }
         else
         {
-            if (protocol_version == rpc::VERSION_2)
-                ;
-            else
+            if (protocol_version < rpc::LOWEST_SUPPORTED_VERSION || protocol_version > rpc::HIGHEST_SUPPORTED_VERSION)
             {
-                RPC_ERROR("Incompatible service version in send");
-                CO_RETURN rpc::error::INCOMPATIBLE_SERVICE();
+                RPC_ERROR("Unsupported service version {} in send", protocol_version);
+                CO_RETURN rpc::error::INVALID_VERSION();
             }
             rpc::weak_ptr<object_stub> weak_stub = get_object(object_id);
             auto stub = weak_stub.lock();
@@ -812,12 +810,10 @@ namespace rpc
         }
         else
         {
-            if (protocol_version == rpc::VERSION_2)
-                ;
-            else
+            if (protocol_version < rpc::LOWEST_SUPPORTED_VERSION || protocol_version > rpc::HIGHEST_SUPPORTED_VERSION)
             {
-                RPC_ERROR("Incompatible service version in try_cast");
-                CO_RETURN rpc::error::INCOMPATIBLE_SERVICE();
+                RPC_ERROR("Unsupported service version {} in try_cast", protocol_version);
+                CO_RETURN rpc::error::INVALID_VERSION();
             }
             rpc::weak_ptr<object_stub> weak_stub = get_object(object_id);
             auto stub = weak_stub.lock();
@@ -1226,12 +1222,11 @@ namespace rpc
         else
         {
             // service has the implementation
-            if (protocol_version == rpc::VERSION_2)
-                ;
-            else
+            if (protocol_version < rpc::LOWEST_SUPPORTED_VERSION || protocol_version > rpc::HIGHEST_SUPPORTED_VERSION)
             {
                 reference_count = 0;
-                CO_RETURN rpc::error::INCOMPATIBLE_SERVICE();
+                RPC_ERROR("Unsupported service version {} in add_ref", protocol_version);
+                CO_RETURN rpc::error::INVALID_VERSION();
             }
 
             // find the caller
@@ -1442,12 +1437,11 @@ namespace rpc
                 telemetry_service->on_service_release(zone_id_, {0}, destination_zone_id, object_id, caller_zone_id);
 #endif
 
-            if (protocol_version == rpc::VERSION_2)
-                ;
-            else
+            if (protocol_version < rpc::LOWEST_SUPPORTED_VERSION || protocol_version > rpc::HIGHEST_SUPPORTED_VERSION)
             {
                 reference_count = 0;
-                CO_RETURN rpc::error::INCOMPATIBLE_SERVICE();
+                RPC_ERROR("Unsupported service version {} in release", protocol_version);
+                CO_RETURN rpc::error::INVALID_VERSION();
             }
 
             bool reset_stub = false;

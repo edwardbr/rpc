@@ -10,10 +10,12 @@ namespace rpc
     // /!\ actually switched to uint64_t for consistency with other parts of the code that were using that
     std::uint64_t get_version()
     {
-#ifdef RPC_V2
+#if defined(RPC_V3)
+        return VERSION_3;
+#elif defined(RPC_V2)
         return VERSION_2;
 #else
-        static_assert(false);
+        static_assert(!sizeof(std::uint64_t), "No RPC protocol versions available");
         return 0;
 #endif
     }

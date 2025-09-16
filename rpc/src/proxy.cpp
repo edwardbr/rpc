@@ -83,25 +83,6 @@ namespace rpc
             in_buf_, 
             out_buf_);
     }
-
-    CORO_TASK(int) object_proxy::send(uint64_t tag, std::function<interface_ordinal (uint64_t)> id_getter, method method_id, size_t in_size_, const char* in_buf_,
-                                  std::vector<char>& out_buf_)
-    {
-        auto service_proxy = service_proxy_.get_nullable();
-        RPC_ASSERT(service_proxy);
-        if (!service_proxy)
-            CO_RETURN rpc::error::ZONE_NOT_INITIALISED();
-        CO_RETURN CO_AWAIT service_proxy->send_from_this_zone(
-            encoding::enc_default,
-            tag,
-            object_id_, 
-            id_getter, 
-            method_id, 
-            in_size_, 
-            in_buf_, 
-            out_buf_);
-    }
-
     CORO_TASK(int) object_proxy::try_cast(std::function<interface_ordinal (uint64_t)> id_getter)
     {
         auto service_proxy = service_proxy_.get_nullable();

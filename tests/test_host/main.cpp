@@ -54,7 +54,7 @@
 #include "crash_handler.h"
 
 // This list should be kept sorted.
-using testing::_;
+using testing:: _;
 using testing::Action;
 using testing::ActionInterface;
 using testing::Assign;
@@ -254,13 +254,13 @@ void run_coro_test(TestFixture& test_fixture, CoroFunc&& coro_function, Args&&..
 #ifdef BUILD_COROUTINE
     bool is_ready = false;
     // Create a lambda that calls the coroutine function and sets is_ready when done
-    auto wrapper_task = [&]() -> coro::task<bool> {
+    auto wrapper_function = [&]() -> CORO_TASK(bool) {
         auto result = CO_AWAIT coro_function(lib, std::forward<Args>(args)...);
         is_ready = true;  // Set is_ready when coroutine completes
         CO_RETURN result;
-    }();
+    };
 
-    lib.get_scheduler()->schedule(lib.check_for_error(std::move(wrapper_task)));
+    lib.get_scheduler()->schedule(lib.check_for_error(wrapper_function()));
     while (!is_ready) {
         lib.get_scheduler()->process_events(std::chrono::milliseconds(1));
     }
@@ -365,10 +365,10 @@ typedef Types<
     remote_implementations;
 TYPED_TEST_SUITE(remote_type_test, remote_implementations);
 
-CORO_TASK(bool) coro_remote_standard_tests(rpc::shared_ptr<yyy::i_example> example, bool has_enclave)
+template<class T> CORO_TASK(bool) coro_remote_standard_tests(T& lib)
 {
     rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
-    auto ret = CO_AWAIT example->create_foo(i_foo_ptr);
+    auto ret = CO_AWAIT lib.get_example()->create_foo(i_foo_ptr);
     if (ret != rpc::error::OK())
     {
         RPC_ERROR("failed create_foo");
@@ -379,16 +379,13 @@ CORO_TASK(bool) coro_remote_standard_tests(rpc::shared_ptr<yyy::i_example> examp
         RPC_ERROR("create_foo returned OK but i_foo_ptr is null");
         CO_RETURN false;
     }
-    CO_AWAIT standard_tests(*i_foo_ptr, has_enclave);
+    CO_AWAIT standard_tests(*i_foo_ptr, lib.get_has_enclave());
     CO_RETURN true;
 }
 
 TYPED_TEST(remote_type_test, remote_standard_tests) {
-    auto& lib = this->get_lib();
-    auto root_service = lib.get_root_service();
-    run_coro_test(*this, [example = lib.get_example(), has_enclave = lib.get_has_enclave()](auto& lib) {
-        (void)lib; // lib not used in coro_remote_standard_tests
-        return coro_remote_standard_tests(example, has_enclave);
+    run_coro_test(*this, [](auto& lib) {
+        return coro_remote_standard_tests<TypeParam>(lib);
     });
 }
 
@@ -406,7 +403,7 @@ TYPED_TEST(remote_type_test, remote_standard_tests) {
 //     std::vector<std::thread> threads(lib.is_enclave_setup() ? 3 : 100);
 //     for(auto& thread_target : threads)
 //     {
-//         thread_target = std::thread([&](){
+//         thread_target = std::thread([&](){ 
 //             standard_tests(*i_foo_ptr, true);
 //         });
 //     }
@@ -427,7 +424,7 @@ TYPED_TEST(remote_type_test, remote_standard_tests) {
 //     std::vector<std::thread> threads(lib.is_enclave_setup() ? 3 : 100);
 //     for(auto& thread_target : threads)
 //     {
-//         thread_target = std::thread([&](){
+//         thread_target = std::thread([&](){ 
 //             rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
 //             ASSERT_EQ(lib.get_example()->create_foo(i_foo_ptr), 0);
 //             standard_tests(*i_foo_ptr, true);
@@ -469,7 +466,7 @@ TYPED_TEST(remote_type_test, remote_tests) {
 //     std::vector<std::thread> threads(lib.is_enclave_setup() ? 3 : 100);
 //     for(auto& thread_target : threads)
 //     {
-//         thread_target = std::thread([&](){
+//         thread_target = std::thread([&](){ 
 //             remote_tests(lib.get_use_host_in_child(), lib.get_example(), zone_id);
 //         });
 //     }
@@ -506,7 +503,7 @@ TYPED_TEST(remote_type_test, create_new_zone) {
 //     std::vector<std::thread> threads(lib.is_enclave_setup() ? 3 : 100);
 //     for(auto& thread_target : threads)
 //     {
-//         thread_target = std::thread([&](){
+//         thread_target = std::thread([&](){ 
 //             auto example_relay_ptr = lib.create_new_zone();
 //             example_relay_ptr->set_host(nullptr);
 //         });
@@ -529,7 +526,7 @@ TYPED_TEST(remote_type_test, create_new_zone) {
 //     std::vector<std::thread> threads(lib.is_enclave_setup() ? 3 : 100);
 //     for(auto& thread_target : threads)
 //     {
-//         thread_target = std::thread([&](){
+//         thread_target = std::thread([&](){ 
 //             rpc::shared_ptr<xxx::i_foo> i_foo_relay_ptr;
 //             auto example_relay_ptr = lib.create_new_zone();
 //             example_relay_ptr->create_foo(i_foo_relay_ptr);
@@ -602,7 +599,7 @@ TYPED_TEST(remote_type_test, bounce_baz_between_two_interfaces)
 //     std::vector<std::thread> threads(lib.is_enclave_setup() ? 3 : 100);
 //     for(auto& thread_target : threads)
 //     {
-//         thread_target = std::thread([&](){
+//         thread_target = std::thread([&](){ 
 //             rpc::shared_ptr<xxx::i_foo> i_foo_ptr;
 //             ASSERT_EQ(lib.get_example()->create_foo(i_foo_ptr), 0);
 
@@ -794,7 +791,7 @@ TYPED_TEST(remote_type_test, check_sub_subordinate)
 //     std::vector<std::thread> threads(lib.is_enclave_setup() ? 3 : 100);
 //     for(auto& thread_target : threads)
 //     {
-//         thread_target = std::thread([&](){
+//         thread_target = std::thread([&](){ 
 //             rpc::shared_ptr<yyy::i_example> new_zone;
 //             ASSERT_EQ(lib.get_example()->create_example_in_subordinate_zone(new_zone, lib.get_local_host_ptr(), ++(*zone_gen)), rpc::error::OK()); //second level
 
@@ -880,7 +877,7 @@ TYPED_TEST(remote_type_test, two_zones_get_one_to_lookup_other)
 //     std::array<std::thread, thread_size> threads;
 //     for(auto& thread : threads)
 //     {
-//         thread = std::thread([&](){
+//         thread = std::thread([&](){ 
 //             enclavea->call_host_look_up_app_not_return("enclaveb", true);
 //         });
 //     }

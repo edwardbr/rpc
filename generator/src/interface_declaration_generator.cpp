@@ -11,6 +11,17 @@
 
 namespace interface_declaration_generator
 {
+    struct protocol_version_descriptor
+    {
+        const char* macro;
+        const char* symbol;
+        uint64_t value;
+    };
+
+    constexpr protocol_version_descriptor protocol_versions[] = {
+        {"RPC_V3", "rpc::VERSION_3", 3},
+        {"RPC_V2", "rpc::VERSION_2", 2},
+    };
     enum print_type
     {
         PROXY_PARAM_IN,
@@ -652,12 +663,15 @@ namespace interface_declaration_generator
         header("public:");
         header("static rpc::interface_ordinal get_id(uint64_t rpc_version)");
         header("{{");
-        header("#ifdef RPC_V2");
-        header("if(rpc_version == rpc::VERSION_2)");
-        header("{{");
-        header("return {{{}ull}};", fingerprint::generate(m_ob, {}, &header));
-        header("}}");
-        header("#endif");
+        for (const auto& version : protocol_versions)
+        {
+            header("#ifdef {}", version.macro);
+            header("if(rpc_version >= {})", version.symbol);
+            header("{{");
+            header("return {{{}ull}};", fingerprint::generate(m_ob, {}, &header, version.value));
+            header("}}");
+            header("#endif");
+        }
         header("return {{0}};");
         header("}}");
         header("");
@@ -841,6 +855,9 @@ namespace interface_declaration_generator
                             {
                                 output("std::vector<char> __buffer;");
                                 output("auto __this = static_cast<subclass*>(this);");
+                                output("auto __rpc_sp = rpc::casting_interface::get_service_proxy(*__this);");
+                                output("auto __rpc_version = __rpc_sp ? __rpc_sp->get_remote_rpc_version() : rpc::get_version();");
+                                output("auto __rpc_encoding = __rpc_sp ? __rpc_sp->get_encoding() : rpc::encoding::enc_default;");
                                 output.print_tabs();
                                 output.raw("auto __err = proxy_serialiser<rpc::serialiser::yas, rpc::encoding>::{}(",
                                     function->get_name());
@@ -862,7 +879,7 @@ namespace interface_declaration_generator
                                     count++;
                                 }
 
-                                output.raw("__buffer, __this->get_encoding());\n");
+                                output.raw("__buffer, __rpc_encoding, __rpc_version);\n");
 
                                 std::string tag = function->get_value("tag");
                                 if (tag.empty())

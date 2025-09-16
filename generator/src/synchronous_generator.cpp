@@ -34,6 +34,18 @@ extern "C"
 namespace synchronous_generator
 {
 
+    struct protocol_version_descriptor
+    {
+        const char* macro;
+        const char* symbol;
+        uint64_t value;
+    };
+
+    constexpr protocol_version_descriptor protocol_versions[] = {
+        {"RPC_V3", "rpc::VERSION_3", 3},
+        {"RPC_V2", "rpc::VERSION_2", 2},
+    };
+
     enum print_type
     {
         PROXY_PREPARE_IN,
@@ -601,13 +613,16 @@ namespace synchronous_generator
 
             proxy("auto __rpc_op = casting_interface::get_object_proxy(*this);");
             proxy("auto __rpc_sp = __rpc_op->get_service_proxy();");
+            proxy("auto __rpc_encoding = __rpc_sp->get_encoding();");
+            proxy("auto __rpc_version = __rpc_sp->get_remote_rpc_version();");
+            proxy("const auto __rpc_min_version = std::max<std::uint64_t>(rpc::LOWEST_SUPPORTED_VERSION, 1);");
             proxy("#ifdef USE_RPC_TELEMETRY");
             proxy("if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)");
             proxy("{{");
             proxy("telemetry_service->on_interface_proxy_send(\"{0}::{1}\", "
                   "__rpc_sp->get_zone_id(), "
                   "__rpc_sp->get_destination_zone_id(), "
-                  "__rpc_op->get_object_id(), {{{0}_proxy::get_id(rpc::get_version())}}, {{{2}}});",
+                  "__rpc_op->get_object_id(), {{{0}_proxy::get_id(__rpc_version)}}, {{{2}}});",
                 interface_name,
                 function->get_name(),
                 function_count);
@@ -642,10 +657,9 @@ namespace synchronous_generator
                 }
             }
 
-            proxy("std::vector<char> __rpc_in_buf;");
-            proxy("auto __rpc_ret = rpc::error::OK();");
             proxy("std::vector<char> __rpc_out_buf(RPC_OUT_BUFFER_SIZE); //max size using short string optimisation");
-
+            proxy("auto __rpc_ret = rpc::error::OK();");
+            
             proxy("//PROXY_PREPARE_IN");
             uint64_t count = 1;
             for (auto& parameter : function->get_parameters())
@@ -670,7 +684,12 @@ namespace synchronous_generator
                     proxy(output);
                 }
                 count++;
-            }
+            }            
+            
+            proxy("while (__rpc_version >= __rpc_min_version)");
+            proxy("{{");
+            proxy("std::vector<char> __rpc_in_buf;");
+
             {
                 proxy.print_tabs();
                 proxy.raw("{}proxy_serialiser<rpc::serialiser::yas, rpc::encoding>::{}(",
@@ -708,7 +727,6 @@ namespace synchronous_generator
                     count++;
                 }
                 proxy.raw("__rpc_in_buf, __rpc_sp->get_encoding());\n");
-
                 stub.raw("in_buf_, in_size_, enc);\n");
                 stub("if(__rpc_ret != rpc::error::OK())");
                 stub("  CO_RETURN __rpc_ret;");
@@ -718,35 +736,39 @@ namespace synchronous_generator
             if (tag.empty())
                 tag = "0";
 
-            proxy("__rpc_ret = CO_AWAIT __rpc_op->send((uint64_t){}, {}::get_id, {{{}}}, __rpc_in_buf.size(), "
+            proxy("__rpc_ret = CO_AWAIT __rpc_op->send(__rpc_version, __rpc_encoding, (uint64_t){}, {}::get_id(__rpc_version), {{{}}}, __rpc_in_buf.size(), "
                   "__rpc_in_buf.data(), __rpc_out_buf);",
                 tag,
                 interface_name,
                 function_count);
 
+
+            proxy("if(__rpc_ret == rpc::error::INVALID_VERSION())");
+            proxy("{{");
+            proxy("if(__rpc_version == __rpc_min_version)");
+            proxy("{{");
+            proxy("__rpc_sp->update_remote_rpc_version(__rpc_version);");
+            proxy("__rpc_out_buf.clear();");
+            proxy("CO_RETURN __rpc_ret;");
+            proxy("}}");
+            proxy("--__rpc_version;");
+            proxy("__rpc_sp->update_remote_rpc_version(__rpc_version);");
+            proxy("__rpc_out_buf = std::vector<char>(RPC_OUT_BUFFER_SIZE);");
+            proxy("continue;");
+            proxy("}}");
+
             proxy("if(__rpc_ret >= rpc::error::MIN() && __rpc_ret <= rpc::error::MAX())");
             proxy("{{");
-            proxy("//if you fall into this rabbit hole ensure that you have added any error offsets compatible "
-                  "with your error code system to the rpc library");
+            proxy("//if you fall into this rabbit hole ensure that you have added any error offsets compatible with your error code system to the rpc library");
             proxy("//this is only here to handle rpc generated errors and not application errors");
             proxy("//clean up any input stubs, this code has to assume that the destination is behaving correctly");
             proxy("RPC_ERROR(\"failed in {}\");", function->get_name());
-            {
-                uint64_t count = 1;
-                for (auto& parameter : function->get_parameters())
-                {
-                    std::string output;
-                    {
-                        if (!do_in_param(
-                                PROXY_CLEAN_IN, from_host, m_ob, parameter.get_name(), parameter.get_type(), parameter, count, output))
-                            continue;
-
-                        proxy(output);
-                    }
-                    count++;
-                }
-            }
+            proxy("__rpc_out_buf.clear();");
             proxy("CO_RETURN __rpc_ret;");
+            proxy("}}");
+
+            proxy("__rpc_sp->update_remote_rpc_version(__rpc_version);");
+            proxy("break;");
             proxy("}}");
 
             stub("//STUB_PARAM_WRAP");
@@ -1083,7 +1105,7 @@ namespace synchronous_generator
         proxy("telemetry_service->on_interface_proxy_creation(\"{0}\", "
               "__rpc_sp->get_zone_id(), "
               "__rpc_sp->get_destination_zone_id(), __rpc_op->get_object_id(), "
-              "{{{0}_proxy::get_id(rpc::get_version())}});",
+              "{{{0}_proxy::get_id(__rpc_version)}});",
             interface_name);
         proxy("}}");
         proxy("#endif");
@@ -1101,7 +1123,7 @@ namespace synchronous_generator
         proxy("telemetry_service->on_interface_proxy_deletion("
               "__rpc_sp->get_zone_id(), "
               "__rpc_sp->get_destination_zone_id(), __rpc_op->get_object_id(), "
-              "{{{0}_proxy::get_id(rpc::get_version())}});",
+              "{{{0}_proxy::get_id(__rpc_version)}});",
             interface_name);
         proxy("}}");
         proxy("#endif");
@@ -1184,7 +1206,7 @@ namespace synchronous_generator
         stub("auto ci = original->get_castable_interface();");
         stub("{{");
         stub("auto* tmp = const_cast<::{0}*>(static_cast<const "
-             "::{0}*>(ci->query_interface(::{0}::get_id(rpc::VERSION_2))));",
+             "::{0}*>(ci->query_interface(::{0}::get_id(rpc::get_version()))));",
             ns);
         stub("if(tmp != nullptr)");
         stub("{{");
@@ -1354,51 +1376,54 @@ namespace synchronous_generator
         header("public:");
         header("static constexpr uint64_t get(uint64_t rpc_version)");
         header("{{");
-        header("#ifdef RPC_V2");
-        header("if(rpc_version == rpc::VERSION_2)");
-        header("{{");
-        header("auto id = {}ull;", fingerprint::generate(m_ob, {}, &header));
         auto val = m_ob.get_value(rpc_attribute_types::use_template_param_in_id_attr);
-        if (val != "false")
+        for (const auto& version : protocol_versions)
         {
-            for (const auto& param : m_ob.get_template_params())
+            header("#ifdef {}", version.macro);
+            header("if(rpc_version >= {})", version.symbol);
+            header("{{");
+            header("auto id = {}ull;", fingerprint::generate(m_ob, {}, &header, version.value));
+            if (val != "false")
             {
-                template_deduction deduction;
-                m_ob.deduct_template_type(param, deduction);
-                if (deduction.type == template_deduction_type::CLASS || deduction.type == template_deduction_type::TYPENAME)
+                for (const auto& param : m_ob.get_template_params())
                 {
-                    header("id ^= rpc::id<{}>::get(rpc::VERSION_2);", param.get_name());
-                    header("id = (id << 1)|(id >> (sizeof(id) - 1));//rotl");
-                }
-                else if (deduction.identified_type)
-                {
-                    if (deduction.identified_type->get_entity_type() == entity_type::ENUM)
+                    template_deduction deduction;
+                    m_ob.deduct_template_type(param, deduction);
+                    if (deduction.type == template_deduction_type::CLASS || deduction.type == template_deduction_type::TYPENAME)
                     {
-                        header("id ^= static_cast<uint64_t>({});", param.get_name());
+                        header("id ^= rpc::id<{}>::get({});", param.get_name(), version.symbol);
                         header("id = (id << 1)|(id >> (sizeof(id) - 1));//rotl");
-                        break;
                     }
-                    else if (param.get_name() == "size_t")
+                    else if (deduction.identified_type)
                     {
-                        header("id ^= static_cast<uint64_t>({});", param.get_name());
-                        header("id = (id << 1)|(id >> (sizeof(id) - 1));//rotl");
-                        break;
+                        if (deduction.identified_type->get_entity_type() == entity_type::ENUM)
+                        {
+                            header("id ^= static_cast<uint64_t>({});", param.get_name());
+                            header("id = (id << 1)|(id >> (sizeof(id) - 1));//rotl");
+                            break;
+                        }
+                        else if (param.get_name() == "size_t")
+                        {
+                            header("id ^= static_cast<uint64_t>({});", param.get_name());
+                            header("id = (id << 1)|(id >> (sizeof(id) - 1));//rotl");
+                            break;
+                        }
+                        else
+                        {
+                            header("static_assert(!\"not supported\"));//rotl");
+                        }
                     }
                     else
                     {
-                        header("static_assert(!\"not supported\"));//rotl");
+                        header("id ^= static_cast<uint64_t>({});", param.get_name());
+                        header("id = (id << 1)|(id >> (sizeof(id) - 1));//rotl");
                     }
                 }
-                else
-                {
-                    header("id ^= static_cast<uint64_t>({});", param.get_name());
-                    header("id = (id << 1)|(id >> (sizeof(id) - 1));//rotl");
-                }
             }
+            header("return id;");
+            header("}}");
+            header("#endif");
         }
-        header("return id;");
-        header("}}");
-        header("#endif");
         header("return 0;");
         header("}}");
         header("}};");

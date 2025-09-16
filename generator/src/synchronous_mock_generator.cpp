@@ -19,6 +19,17 @@
 
 namespace synchronous_mock_generator
 {
+    struct protocol_version_descriptor
+    {
+        const char* macro;
+        const char* symbol;
+        uint64_t value;
+    };
+
+    constexpr protocol_version_descriptor protocol_versions[] = {
+        {"RPC_V3", "rpc::VERSION_3", 3},
+        {"RPC_V2", "rpc::VERSION_2", 2},
+    };
 
     void write_interface(const class_entity& m_ob, writer& header)
     {
@@ -45,10 +56,15 @@ namespace synchronous_mock_generator
         header("public:");
         header("const rpc::casting_interface* query_interface(rpc::interface_ordinal interface_id) const override ");
         header("{{");
-        header("if({0}::get_id(rpc::VERSION_2) == interface_id)", interface_name);
-        header("{{");
-        header("return static_cast<const {0}*>(this); ", interface_name);
-        header("}}");
+        for (const auto& version : protocol_versions)
+        {
+            header("#ifdef {}", version.macro);
+            header("if({0}::get_id({1}) == interface_id)", interface_name, version.symbol);
+            header("{{");
+            header("return static_cast<const {0}*>(this); ", interface_name);
+            header("}}");
+            header("#endif");
+        }
         header("return nullptr;");
         header("}}");
 

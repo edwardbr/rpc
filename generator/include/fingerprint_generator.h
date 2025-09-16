@@ -9,5 +9,8 @@
 
 namespace fingerprint
 {
-    uint64_t generate(const class_entity& cls, std::vector<const class_entity*> entity_stack, writer* comment);
+    uint64_t generate(const class_entity& cls,
+        std::vector<const class_entity*> entity_stack,
+        writer* comment,
+        uint64_t rpc_version);
 }

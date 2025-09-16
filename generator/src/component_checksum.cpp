@@ -22,6 +22,8 @@ extern "C"
 
 namespace component_checksum
 {
+    constexpr uint64_t latest_protocol_version = 3;
+
     std::string get_namespace(const class_entity* entity)
     {
         if (!entity || entity->get_name().empty())
@@ -57,7 +59,7 @@ namespace component_checksum
         std::filesystem::create_directories(file.parent_path());
 
         std::ofstream out(file);
-        out << fingerprint::generate(m_ob, {}, nullptr);
+        out << fingerprint::generate(m_ob, {}, nullptr, latest_protocol_version);
     };
 
     void write_struct(const class_entity& m_ob, std::filesystem::path& output_path)
@@ -76,7 +78,7 @@ namespace component_checksum
         std::filesystem::create_directories(file.parent_path());
 
         std::ofstream out(file);
-        out << fingerprint::generate(m_ob, {}, nullptr);
+        out << fingerprint::generate(m_ob, {}, nullptr, latest_protocol_version);
     };
 
     // entry point

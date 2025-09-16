@@ -125,13 +125,6 @@ namespace rpc
             const char* in_buf_,
             std::vector<char>& out_buf_);
 
-        [[nodiscard]] CORO_TASK(int) send(uint64_t tag,
-            std::function<interface_ordinal(uint64_t)> id_getter,
-            method method_id,
-            size_t in_size_,
-            const char* in_buf_,
-            std::vector<char>& out_buf_);
-
         size_t get_proxy_count()
         {
             std::lock_guard guard(insert_control_);
@@ -263,7 +256,6 @@ namespace rpc
         }
 
         // not thread safe
-        void set_remote_rpc_version(uint64_t version) { version_ = version; }
         bool is_parent_channel() const { return is_parent_channel_; }
         void set_parent_channel(bool val)
         {
@@ -314,6 +306,12 @@ namespace rpc
         std::string get_name() const { return name_; }
 
         uint64_t get_remote_rpc_version() const { return version_.load(); }
+        void update_remote_rpc_version(uint64_t version)
+        {
+            const auto min_version = std::max<std::uint64_t>(rpc::LOWEST_SUPPORTED_VERSION, 1);
+            const auto max_version = rpc::HIGHEST_SUPPORTED_VERSION;
+            version_.store(std::clamp(version, min_version, max_version));
+        }
         bool is_unused() const { return lifetime_lock_count_ == 0; }
 
         encoding get_encoding() const { return enc_; }
@@ -389,6 +387,23 @@ namespace rpc
             const char* in_buf_,
             std::vector<char>& out_buf_)
         {
+            const auto min_version = std::max<std::uint64_t>(rpc::LOWEST_SUPPORTED_VERSION, 1);
+            const auto max_version = rpc::HIGHEST_SUPPORTED_VERSION;
+            if (protocol_version < min_version || protocol_version > max_version)
+            {
+                CO_RETURN rpc::error::INVALID_VERSION();
+            }
+
+            auto current_version = version_.load();
+            if (protocol_version > current_version)
+            {
+                CO_RETURN rpc::error::INVALID_VERSION();
+            }
+            if (protocol_version < current_version)
+            {
+                version_.store(protocol_version);
+            }
+
             return send(protocol_version,
                 encoding,
                 tag,
@@ -403,38 +418,14 @@ namespace rpc
                 out_buf_);
         }
 
-        [[nodiscard]] CORO_TASK(int) send_from_this_zone(encoding enc,
-            uint64_t tag,
-            object object_id,
-            std::function<interface_ordinal(uint64_t)> id_getter,
-            method method_id,
-            size_t in_size_,
-            const char* in_buf_,
-            std::vector<char>& out_buf_)
-        {
-            // force a lowest common denominator
-            if (enc != encoding::enc_default && enc != encoding::yas_binary && enc != encoding::yas_compressed_binary
-                && enc != encoding::yas_json)
-            {
-                CO_RETURN error::INCOMPATIBLE_SERIALISATION();
-            }
-
-            auto version = version_.load();
-            auto ret = CO_AWAIT send_from_this_zone(
-                version, enc_, tag, object_id, id_getter(version), method_id, in_size_, in_buf_, out_buf_);
-            if (ret == rpc::error::INVALID_VERSION())
-            {
-                version_.compare_exchange_strong(version, version - 1);
-            }
-            CO_RETURN ret;
-        }
-
         [[nodiscard]] CORO_TASK(int) sp_try_cast(
             destination_zone destination_zone_id, object object_id, std::function<interface_ordinal(uint64_t)> id_getter)
         {
             auto original_version = version_.load();
             auto version = original_version;
-            while (version)
+            const auto min_version = rpc::LOWEST_SUPPORTED_VERSION ? rpc::LOWEST_SUPPORTED_VERSION : 1;
+            int last_error = rpc::error::INVALID_VERSION();
+            while (version >= min_version)
             {
                 auto if_id = id_getter(version);
 #ifdef USE_RPC_TELEMETRY
@@ -445,7 +436,7 @@ namespace rpc
                 }
 #endif
                 auto ret = CO_AWAIT try_cast(version, destination_zone_id, object_id, if_id);
-                if (ret != rpc::error::INVALID_VERSION())
+                if (ret != rpc::error::INVALID_VERSION() && ret != rpc::error::INCOMPATIBLE_SERVICE())
                 {
                     if (original_version != version)
                     {
@@ -453,10 +444,15 @@ namespace rpc
                     }
                     CO_RETURN ret;
                 }
+                last_error = ret;
+                if (version == min_version)
+                {
+                    break;
+                }
                 version--;
             }
             RPC_ERROR("Incompatible service version in connect");
-            CO_RETURN rpc::error::INCOMPATIBLE_SERVICE();
+            CO_RETURN last_error;
         }
 
         [[nodiscard]] CORO_TASK(int) sp_add_ref(
@@ -476,10 +472,11 @@ namespace rpc
 
             auto original_version = version_.load();
             auto version = original_version;
-            auto ret = error::OK(); 
-            while (version)
+            const auto min_version = rpc::LOWEST_SUPPORTED_VERSION ? rpc::LOWEST_SUPPORTED_VERSION : 1;
+            int last_error = rpc::error::INVALID_VERSION();
+            while (version >= min_version)
             {
-                auto ret = CO_AWAIT add_ref(version,
+                auto attempt = CO_AWAIT add_ref(version,
                     destination_channel_zone_,
                     destination_zone_id_,
                     object_id,
@@ -488,18 +485,23 @@ namespace rpc
                     known_direction_zone_id,
                     build_out_param_channel,
                     ref_count);
-                if (ret != rpc::error::INVALID_VERSION())
+                if (attempt != rpc::error::INVALID_VERSION() && attempt != rpc::error::INCOMPATIBLE_SERVICE())
                 {
                     if (original_version != version)
                     {
                         version_.compare_exchange_strong(original_version, version);
                     }
-                    CO_RETURN ret;
+                    CO_RETURN attempt;
+                }
+                last_error = attempt;
+                if (version == min_version)
+                {
+                    break;
                 }
                 version--;
             }
             RPC_ERROR("Incompatible service version in sp_add_ref");
-            CO_RETURN ret;
+            CO_RETURN last_error;
         }
 
         CORO_TASK(int) sp_release(object object_id, uint64_t& ref_count)
@@ -514,10 +516,12 @@ namespace rpc
 
             auto original_version = version_.load();
             auto version = original_version;
-            while (version)
+            const auto min_version = rpc::LOWEST_SUPPORTED_VERSION ? rpc::LOWEST_SUPPORTED_VERSION : 1;
+            int last_error = rpc::error::INVALID_VERSION();
+            while (version >= min_version)
             {
                 auto ret = CO_AWAIT release(version, destination_zone_id_, object_id, caller_zone_id_, ref_count);
-                if (ret != rpc::error::INVALID_VERSION())
+                if (ret != rpc::error::INVALID_VERSION() && ret != rpc::error::INCOMPATIBLE_SERVICE())
                 {
                     if (original_version != version)
                     {
@@ -525,15 +529,22 @@ namespace rpc
                     }
                     CO_RETURN ret;
                 }
+                last_error = ret;
+                if (version == min_version)
+                {
+                    break;
+                }
                 version--;
             }
             RPC_ERROR("Incompatible service version in sp_release");
-            CO_RETURN error::INVALID_VERSION();
+            CO_RETURN last_error;
         }
 
-        CORO_TASK(void) cleanup_after_object(rpc::shared_ptr<service_proxy> self, object object_id, int inherited_reference_count)
+        CORO_TASK(void) cleanup_after_object(rpc::shared_ptr<rpc::service> svc, rpc::shared_ptr<service_proxy> self, object object_id, int inherited_reference_count)
         {
             // self is needed to keep the service proxy alive in the async destruction of the service_proxy
+            RPC_DEBUG("cleanup_after_object service zone: {} destination_zone={}, caller_zone={}, object_id = {}",
+                      get_zone_id().id, destination_zone_id_.get_val(), caller_zone_id_.get_val(), object_id.get_val());
 
             auto caller_zone_id = get_zone_id().as_caller();
             
@@ -542,7 +553,7 @@ namespace rpc
             auto ret = CO_AWAIT release(version_.load(), destination_zone_id_, object_id, caller_zone_id, ref_count);
             if (ret != rpc::error::OK())
             {
-                RPC_ERROR("on_object_proxy_released release failed");
+                RPC_ERROR("cleanup_after_object release failed");
                 RPC_ASSERT(false);
                 CO_RETURN;
             }
@@ -557,13 +568,14 @@ namespace rpc
                 auto ret = CO_AWAIT release(version_.load(), destination_zone_id_, object_id, caller_zone_id, ref_count);
                 if (ret != rpc::error::OK())
                 {
-                    RPC_ERROR("on_object_proxy_released release failed");
+                    RPC_ERROR("cleanup_after_object release failed");
                     RPC_ASSERT(false);
                     CO_RETURN;
                 }
                 inner_release_external_ref();
             }
-            self = nullptr;//just so it does not get optimised out
+            self = nullptr; // just so it does not get optimised out
+            svc = nullptr;  // this needs to hang around a bit longer than the service proxy
             CO_RETURN;
         }
 
@@ -612,9 +624,9 @@ namespace rpc
 
             // Schedule the coroutine work asynchronously
 #ifdef BUILD_COROUTINE
-            current_service->schedule(cleanup_after_object(shared_from_this(), object_id, inherited_reference_count));
+            current_service->schedule(cleanup_after_object(current_service, shared_from_this(), object_id, inherited_reference_count));
 #else
-            cleanup_after_object(shared_from_this(), object_id, inherited_reference_count);
+            cleanup_after_object(current_service, shared_from_this(), object_id, inherited_reference_count);
 #endif
         }
 

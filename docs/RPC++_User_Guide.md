@@ -30,11 +30,12 @@ All rights reserved.
 
 ## Introduction
 
-RPC++ is a modern C++ Remote Procedure Call library designed for type-safe communication across different execution contexts including in-process calls, inter-process communication, remote machines, embedded devices, and secure enclaves (SGX). 
+RPC++ is a modern C++ Remote Procedure Call library designed for type-safe communication across different execution contexts including in-process calls, inter-process communication, remote machines, embedded devices, and secure enclaves (SGX). While the primary implementation targets C++, the architecture is intentionally structured so that the IDL and `i_marshaller` contract can describe types and wire behavior for future language ecosystems.
 
 **Key Features:**
 - **Pure C++ Experience**: Native C++ type support with automatic code generation
 - **Transport Agnostic**: Works across processes, threads, memory arenas, enclaves, and networks
+- **Serialization Format Agnostic**: Unified RPC layer across YAS JSON and binary encodings with pluggable alternatives
 - **Type Safe**: Full C++ type system integration with compile-time verification
 - **High Performance**: Zero-copy serialization where possible
 - **Modern Design**: C++17 features, coroutine support (planned), and extensive telemetry
@@ -78,17 +79,17 @@ namespace calculator {
     [description="Mathematical calculator interface"]
     interface i_calculator {
         [description="Adds two integers and returns the result"]
-        error_code add(int a, int b, [out, by_value] int& result);
+        error_code add(int a, int b, [out] int& result);
         
         [description="Computes complex number multiplication"]
         error_code multiply_complex(
             const complex_number& a, 
             const complex_number& b, 
-            [out, by_value] complex_number& result
+            [out] complex_number& result
         );
         
         [description="Gets the calculation history"]
-        error_code get_history([out, by_value] std::vector<std::string>& operations);
+        error_code get_history([out] std::vector<std::string>& operations);
     };
 }
 ```
@@ -105,8 +106,8 @@ namespace calculator {
 **Parameter Attributes:**
 - **`[in]`**: Input parameter (default)
 - **`[out]`**: Output parameter  
-- **`[by_value]`**: Pass by value (required for out parameters)
-- **`[by_ref]`**: Pass by reference (default for in parameters)
+
+*Legacy note: `[by_value]` and `[by_ref]` are deprecated and retained in the parser solely for backward compatibility; avoid them in new IDL files.*
 
 **Interface Attributes:**
 - **`[description="text"]`**: Human-readable descriptions for JSON schema generation
@@ -123,7 +124,7 @@ The primary code generator (`synchronous_generator.cpp`) reads IDL files and pro
 1. **Header Files** (`.h`):
    - Pure virtual base classes for interfaces
    - Structure definitions
-   - Function metadata with MCP integration
+   - Function metadata for runtime extraction (e.g., MCP consumers)
    - Type serialization support
 
 2. **Proxy Implementation** (`.cpp`):
@@ -166,15 +167,12 @@ namespace calculator {
 The generator architecture is designed for extensibility:
 
 **Other Serialization Formats:**
-- **Current**: YAS (Yet Another Serialization) library
-- **Planned**: Protocol Buffers, MessagePack, Apache Avro
-- **Custom**: Plugin architecture for proprietary formats
+- **Current**: YAS (Yet Another Serialization) library providing JSON and binary encodings
+- **Planned**: Protocol Buffers, FlatBuffers, BSON, CBOR
+- **Custom**: Plugin architecture for proprietary formats so long as they map onto the generic marshalling contracts
 
 **Other Programming Languages:**
-- **Python**: Generate Python binding code with ctypes/pybind11
-- **JavaScript/TypeScript**: Generate web-compatible RPC clients
-- **Rust**: Generate safe Rust bindings
-- **Go**: Generate Go client libraries
+- Future language support can be added by generating bindings from the shared IDL and by supplying an `i_marshaller` implementation that adheres to the established type and wire protocol specifications.
 
 **Implementation Pattern:**
 ```cpp
@@ -1052,6 +1050,8 @@ public:
 
 The `i_marshaller` interface is the core abstraction that enables RPC++ to work across different transport mechanisms and execution contexts.
 
+It standardises protocol negotiation across multiple wire versions and serialization formats. RPC++ currently defaults to protocol version 3 while automatically falling back to version 2 for legacy destinations. YAS JSON and binary encodings ship out of the box, with the interface ready to accept additional formats as they are developed. Any runtime written in another language must present an `i_marshaller` implementation so that it can participate in the same inter-zonal communication contracts as the C++ runtime.
+
 ### Interface Definition
 
 ```cpp
@@ -1098,8 +1098,8 @@ public:
 **Purpose**: The primary function for executing remote procedure calls.
 
 **Parameters Explained:**
-- **`protocol_version`**: Version compatibility check for wire protocol
-- **`encoding`**: Serialization format (YAS binary, JSON, etc.)  
+- **`protocol_version`**: Version compatibility negotiation (defaults to 3, falls back to 2 when peers require it)
+- **`encoding`**: Serialization format negotiated between endpoints (YAS binary, YAS JSON, or future plugins)  
 - **`tag`**: Unique identifier for call correlation and debugging
 - **Zone Parameters**: Complex routing information for multi-hop calls
 - **`object_id`**: Target object instance identifier
@@ -1264,7 +1264,7 @@ namespace hello {
     [description="Simple greeting service"]
     interface i_greeter {
         [description="Returns a personalized greeting"]
-        error_code greet(const std::string& name, [out, by_value] std::string& greeting);
+        error_code greet(const std::string& name, [out] std::string& greeting);
     };
 }
 ```
