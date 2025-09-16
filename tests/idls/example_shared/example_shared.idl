@@ -7,7 +7,7 @@ typedef int error_code;
 
 namespace xxx
 {
-    [status=example,description=R"__(Creates an example instance in a subordinate zone
+    [status=production,description=R"__(Creates an example instance in a subordinate zone
         abd we can do funky shit like this)__"]
     struct something_complicated
     {
@@ -17,19 +17,21 @@ namespace xxx
         std::string string_val;
     };
 
-    [status=example]
+    [status=production]
     struct something_more_complicated
     {
         std::vector<something_complicated> vector_val;
         std::map<std::string, something_complicated> map_val;
     };
 
+    [status=production]
     template<typename T>
     struct typed_payload
     {
         std::array<uint8_t, sizeof(T)> payload;
     };
 
+    [status=production]
     interface i_foo
     {
         static std::string foo = "hello";
@@ -77,11 +79,13 @@ namespace xxx
         error_code exception_test();
     };
 
+    [status=production]
     interface i_bar
     {
         error_code do_something_else(int val);
     };
 
+    [status=production]
     interface i_baz
     {
         error_code callback(int val);
@@ -91,6 +95,7 @@ namespace xxx
     // some template tests with attributes
 
     // bog standard
+    [status=production]
     template<class T>
     struct test_template
     {
@@ -99,7 +104,7 @@ namespace xxx
     };
 
     // don't include the template parameters when generating the constexpr value
-    [buggy_template_param_in_id=false]
+    [status=production,buggy_template_param_in_id=false]
     template<class T>
     struct test_template_without_params_in_id
     {
@@ -107,7 +112,7 @@ namespace xxx
     };
 
     // maintain a bug for backward compatibility, use an empty seed for template types seed will be 7410425521722818471ull or 0x66D71EBFF8C6FFA7
-    [buggy_empty_template_struct_id=true]
+    [status=production,buggy_empty_template_struct_id=true]
     template<class T>
     struct test_template_use_legacy_empty_template_struct_id
     {
@@ -115,7 +120,7 @@ namespace xxx
     };
 
     // use both dodgy flags
-    [buggy_template_param_in_id=false,buggy_empty_template_struct_id=true]
+    [status=production,buggy_template_param_in_id=false,buggy_empty_template_struct_id=true]
     template<class T>
     struct test_template_use_old
     {
@@ -123,6 +128,7 @@ namespace xxx
     };
 
     // interfaces use existing logic for now
+    [status=production]
     interface i_interface_with_templates
     {
         error_code one(test_template<int> val);
@@ -131,17 +137,20 @@ namespace xxx
         error_code four(test_template_use_old<int> val);
     };
 
+    [status=production]
     struct type_determinant
     {
         static constexpr int x = 3;
     };
 
+    [status=deprecated]
     template<class T>
     struct type_determinant_test
     {
         std::array<uint8_t, T::x> y;
     };
 
+    [status=development]
     template<class T>
     struct test_template
     {

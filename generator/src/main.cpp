@@ -215,7 +215,7 @@ int main(const int argc, char* argv[])
 
         // do the generation of the checksums, in a directory that matches the main header one
         auto checksums_path
-            = std::filesystem::path(output_path) / "check_sums" / std::filesystem::path(header_path).parent_path();
+            = std::filesystem::path(output_path) / "check_sums";
         std::filesystem::create_directories(checksums_path);
         component_checksum::write_namespace(*objects, checksums_path);
 

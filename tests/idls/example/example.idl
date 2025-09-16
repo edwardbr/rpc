@@ -8,7 +8,7 @@
 
 namespace yyy
 {
-    [status=example]
+    [status=production]
     interface i_example
     {
         [description=R"__(Adds two integers and 
@@ -57,6 +57,7 @@ namespace yyy
         error_code give_host_cached_object();
     };
 
+    [status=production]
     interface i_host
     {
         [description="Creates a new enclave instance"] error_code create_enclave([out] rpc::shared_ptr<i_example>& target);
