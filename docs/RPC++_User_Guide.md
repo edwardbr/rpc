@@ -14,44 +14,37 @@ All rights reserved.
 ## Table of Contents
 
 1. [Introduction](#introduction)
-2. [What are Remote Procedure Calls?](#what-are-remote-procedure-calls)
-3. [Interface Definition Language (IDL)](#interface-definition-language-idl)
-4. [Code Generators and Language Support](#code-generators-and-language-support)
-5. [Telemetry System](#telemetry-system)
-6. [Logging Framework](#logging-framework)
-7. [Thread-Local Logging and Enhanced Crash Diagnostics](#thread-local-logging-and-enhanced-crash-diagnostics)
-8. [Multithreading and Coroutines](#multithreading-and-coroutines)
-9. [Service Proxies and Transport Abstraction](#service-proxies-and-transport-abstraction)
-10. [The i_marshaller Interface](#the-i_marshaller-interface)
-11. [Backward Compatibility and Wire Protocol Evolution](#backward-compatibility-and-wire-protocol-evolution)
-12. [Getting Started](#getting-started)
-13. [Architecture Overview](#architecture-overview)
+2. [Getting Started](#getting-started)
+3. [Execution Modes: Blocking vs Coroutines](#execution-modes-blocking-vs-coroutines)
+4. [Interface Definition Language (IDL)](#interface-definition-language-idl)
+5. [Architecture Overview](#architecture-overview)
+6. [Error Code System](#error-code-system)
+7. [Wire Protocol and Backward Compatibility](#wire-protocol-and-backward-compatibility)
+8. [Transport Layer](#transport-layer)
+9. [Build System and Configuration](#build-system-and-configuration)
+10. [Logging and Telemetry](#logging-and-telemetry)
+11. [Advanced Features](#advanced-features)
+12. [Best Practices](#best-practices)
 
 ---
 
 ## Introduction
 
-RPC++ is a modern C++ Remote Procedure Call library designed for type-safe communication across different execution contexts including in-process calls, inter-process communication, remote machines, embedded devices, and secure enclaves (SGX). While the primary implementation targets C++, the architecture is intentionally structured so that the IDL and `i_marshaller` contract can describe types and wire behavior for future language ecosystems.
+RPC++ is a modern C++ Remote Procedure Call library designed for type-safe communication across different execution contexts including in-process calls, inter-process communication, remote machines, embedded devices, and secure enclaves (SGX). The architecture supports multiple programming languages through IDL-based code generation and standardized wire protocols.
 
-**Key Features:**
-- **Pure C++ Experience**: Native C++ type support with automatic code generation
+### Key Features
+
+- **Type-Safe**: Full C++ type system integration with compile-time verification
 - **Transport Agnostic**: Works across processes, threads, memory arenas, enclaves, and networks
-- **Serialization Format Agnostic**: Unified RPC layer across YAS JSON and binary encodings with pluggable alternatives
-- **Type Safe**: Full C++ type system integration with compile-time verification
-- **High Performance**: Zero-copy serialization where possible
-- **Modern Design**: C++17 features, coroutine support (planned), and extensive telemetry
+- **High Performance**: Zero-copy serialization with optimized data paths
+- **Bi-Modal Execution**: Same code runs in both blocking and coroutine modes (see [Execution Modes](#execution-modes-blocking-vs-coroutines))
+- **Modern C++**: C++17 features with optional coroutine support
+- **Production Ready**: Comprehensive telemetry, logging, and error handling
+- **Backward Compatible**: Automatic protocol version negotiation and interface fingerprinting
 
-The library treats transport protocols and programming APIs as separate concerns, allowing developers to focus on business logic rather than communication details.
-
----
-
-## What are Remote Procedure Calls?
+### What are Remote Procedure Calls?
 
 Remote Procedure Calls (RPC) enable applications to communicate with each other without getting entangled in underlying communication protocols. You can easily create APIs accessible from different machines, processes, arenas, or embedded devices without worrying about serialization.
-
-### How RPC Works
-
-RPC calls are function calls that appear to run locally but are actually serialized and sent to a different location where parameters are unpacked and the function is executed. Return values are sent back similarly, making the caller potentially unaware that the call was made remotely.
 
 **The RPC Flow:**
 1. **Caller** → calls function through a **Proxy** (same signature as implementation)
@@ -60,1185 +53,662 @@ RPC calls are function calls that appear to run locally but are actually seriali
 4. **Stub** → calls actual function on caller's behalf
 5. **Return** → results flow back through the same path
 
-### Interface Definition Language (IDL)
-
-Functions are defined in Interface Definition Language files (`.idl`) that describe:
-- **Interfaces**: Pure abstract virtual base classes in C++
-- **Structures**: Data types with C++ STL support
-- **Namespaces**: Organizational boundaries
-- **Attributes**: Metadata including JSON schema descriptions
-
-**Example IDL File:**
-```idl
-namespace calculator {
-    
-    struct complex_number {
-        double real;
-        double imaginary;
-    };
-    
-    [description="Mathematical calculator interface"]
-    interface i_calculator {
-        [description="Adds two integers and returns the result"]
-        error_code add(int a, int b, [out] int& result);
-        
-        [description="Computes complex number multiplication"]
-        error_code multiply_complex(
-            const complex_number& a, 
-            const complex_number& b, 
-            [out] complex_number& result
-        );
-        
-        [description="Gets the calculation history"]
-        error_code get_history([out] std::vector<std::string>& operations);
-    };
-}
-```
-
-### IDL Syntax and Features
-
-**Supported Types:**
-- **Basic Types**: `int`, `uint64_t`, `double`, `bool`, `std::string`
-- **STL Containers**: `std::vector<T>`, `std::map<K,V>`, `std::set<T>`, `std::array<T,N>`
-- **Smart Types**: `std::optional<T>`, `std::variant<T1,T2,...>`
-- **Custom Structures**: User-defined POD types
-- **Interface References**: `rpc::shared_ptr<interface_type>`
-
-**Parameter Attributes:**
-- **`[in]`**: Input parameter (default)
-- **`[out]`**: Output parameter  
-
-*Legacy note: `[by_value]` and `[by_ref]` are deprecated and retained in the parser solely for backward compatibility; avoid them in new IDL files.*
-
-**Interface Attributes:**
-- **`[description="text"]`**: Human-readable descriptions for JSON schema generation
-- **`[deprecated]`**: Mark interfaces/functions as deprecated
 
 ---
 
-## Code Generators and Language Support
+## Getting Started
 
-### The Synchronous Generator
+### Prerequisites
 
-The primary code generator (`synchronous_generator.cpp`) reads IDL files and produces:
+- **C++ Compiler**: Clang 10+, GCC 9.4+, or Visual Studio 2017+
+- **CMake**: Version 3.24 or higher
+- **Build System**: Ninja (recommended) or Make
 
-1. **Header Files** (`.h`):
-   - Pure virtual base classes for interfaces
-   - Structure definitions
-   - Function metadata for runtime extraction (e.g., MCP consumers)
-   - Type serialization support
+### Quick Start
 
-2. **Proxy Implementation** (`.cpp`):
-   - Client-side proxy classes that marshal calls
-   - Error handling with enclave-compatible logging
-   - JSON schema generation for metadata support
-   - Template parameter resolution for complex types
+1. **Clone and Configure:**
+```bash
+git clone <rpc-repository>
+cd rpc2
+cmake --preset Debug
+```
 
-3. **Stub Implementation** (`.cpp`):
-   - Server-side stub classes that unmarshal calls
-   - Automatic interface routing
-   - Type-safe parameter handling
+2. **Build Core Library:**
+```bash
+cmake --build build --target rpc
+```
 
-**Generated Code Example:**
-```cpp
-// Generated from calculator.idl
+3. **Run Tests:**
+```bash
+cmake --build build --target rpc_test
+./build/tests/test_host/rpc_test
+```
+
+### Basic Example
+
+**calculator.idl:**
+```idl
 namespace calculator {
-    
-    class i_calculator_proxy : public rpc::proxy_impl<i_calculator> {
-    public:
-        error_code add(int a, int b, int& result) override {
-            // Automatic marshalling, transport, and error handling
-            // ...
-        }
-    };
-    
-    // JSON Schema Integration - automatically generated
-    std::vector<rpc::function_info> i_calculator::get_function_info() {
-        return {
-            {"calculator.i_calculator.add", "add", {1}, 0, false, 
-             "Adds two integers and returns the result",
-             R"({"type":"object","properties":{"a":{"type":"integer"},"b":{"type":"integer"}}})"}
+    [inline] namespace v1 {
+        [status=production]
+        interface i_calculator {
+            int add(int a, int b, [out] int& result);
+            int subtract(int a, int b, [out] int& result);
         };
     }
 }
 ```
 
-### Extensibility to Other Languages and Formats
-
-The generator architecture is designed for extensibility:
-
-**Other Serialization Formats:**
-- **Current**: YAS (Yet Another Serialization) library providing JSON and binary encodings
-- **Planned**: Protocol Buffers, FlatBuffers, BSON, CBOR
-- **Custom**: Plugin architecture for proprietary formats so long as they map onto the generic marshalling contracts
-
-**Other Programming Languages:**
-- Future language support can be added by generating bindings from the shared IDL and by supplying an `i_marshaller` implementation that adheres to the established type and wire protocol specifications.
-
-**Implementation Pattern:**
+**Generated usage:**
 ```cpp
-class custom_generator : public base_generator {
-public:
-    void generate_language_binding(const interface& iface) {
-        // Language-specific code generation
-        output_file_ << generate_client_stub(iface);
-        output_file_ << generate_serialization(iface);
+#include "generated/calculator/calculator.h"
+
+// Create root service
+auto root_service = rpc::make_shared<rpc::service>("root", rpc::zone{1});
+
+// Create child zone with calculator implementation
+rpc::shared_ptr<calculator::v1::i_calculator> calc_proxy;
+auto error = CO_AWAIT root_service->connect_to_zone<rpc::local_child_service_proxy<calculator::v1::i_calculator, calculator::v1::i_calculator>>(
+    "calculator_zone",
+    rpc::zone{2},
+    rpc::shared_ptr<calculator::v1::i_calculator>(),
+    calc_proxy,
+    [](const rpc::shared_ptr<calculator::v1::i_calculator>& input,
+       rpc::shared_ptr<calculator::v1::i_calculator>& output,
+       const rpc::shared_ptr<rpc::service>& child_service) -> int
+    {
+        // Register generated stubs in child zone
+        calculator_v1_idl_register_stubs(child_service);
+
+        // Create implementation in child zone
+        output = rpc::make_shared<calculator_impl>();
+        return rpc::error::OK();
+    });
+
+// Use the proxy
+if (error == rpc::error::OK()) {
+    int result;
+    auto calc_error = CO_AWAIT calc_proxy->add(5, 3, result);
+    if (calc_error == rpc::error::OK()) {
+        std::cout << "5 + 3 = " << result << std::endl;
     }
-    
-    void generate_serialization_format(const structure& struct_def) {
-        // Custom serialization protocol
+}
+
+// Implementation class
+class calculator_impl : public calculator::v1::i_calculator {
+    // Required for remote dynamic casting (needed for clang/gcc, not MSVC)
+    void* get_address() const override { return (void*)this; }
+
+    // Required for casting to different vtables in derived classes
+    const rpc::casting_interface* query_interface(rpc::interface_ordinal interface_id) const override {
+        if (rpc::match<calculator::v1::i_calculator>(interface_id))
+            return static_cast<const calculator::v1::i_calculator*>(this);
+        return nullptr;
+    }
+
+public:
+    int add(int a, int b, int& result) override {
+        result = a + b;
+        return rpc::error::OK();
+    }
+
+    int subtract(int a, int b, int& result) override {
+        result = a - b;
+        return rpc::error::OK();
     }
 };
 ```
 
 ---
 
-## Telemetry System
+## Execution Modes: Blocking vs Coroutines
 
-RPC++ includes a comprehensive telemetry system for monitoring distributed RPC operations across complex topologies.
+RPC++ is designed to run the **same code** in both blocking and coroutine modes with minimal changes. This is achieved through conditional macros that adapt to the build configuration:
 
-### Core Telemetry Interfaces
-
-**i_telemetry_service** - Base interface for all telemetry implementations:
-```cpp
-class i_telemetry_service {
-public:
-    // Service lifecycle tracking
-    virtual void on_service_creation(const char* name, rpc::zone zone_id, rpc::destination_zone parent_zone_id) = 0;
-    virtual void on_service_deletion(rpc::zone zone_id) = 0;
-    
-    // RPC operation monitoring  
-    virtual void on_service_try_cast(rpc::zone zone_id, rpc::destination_zone destination_zone_id, /* ... */) = 0;
-    virtual void on_service_add_ref(/* reference counting parameters */) = 0;
-    virtual void on_service_release(/* release parameters */) = 0;
-    
-    // Interface proxy lifecycle
-    virtual void on_interface_proxy_creation(const char* interface_name, /* ... */) = 0;
-    virtual void on_interface_proxy_send(const char* method_name, /* ... */) = 0;
-    virtual void on_interface_proxy_deletion(/* ... */) = 0;
-    
-    // Custom events and debugging
-    virtual void message(level level, const char* msg) = 0;
-};
-```
-
-### Telemetry Implementations
-
-**1. Console Telemetry Service**
-- Real-time visualization of zone hierarchies and communication
-- Color-coded output for different zones
-- Topology diagrams showing parent-child relationships
-- Thread-safe async logging with spdlog integration
-
-**2. Host Telemetry Service**
-- File-based logging for persistent monitoring
-- Performance metrics and timing information
-- Statistical analysis of RPC patterns
-- Integration with external monitoring systems
-
-**3. Enclave Telemetry Service**
-- SGX-compatible telemetry for secure enclaves
-- Minimal overhead operation
-- Secure logging through untrusted proxy
-
-### Telemetry Features
-
-**Zone Topology Visualization:**
-```
-=== TOPOLOGY DIAGRAM ===
-Zone Hierarchy:
-  Zone 1: host_service 
-  ├─ Zone 2: main_child_service 
-     ├─ Zone 3: example_service 
-     └─ Zone 4: worker_service
-=========================
-```
-
-**Real-time Communication Tracking:**
-- Inter-zone call monitoring with timing
-- Reference counting operation tracking  
-- Interface proxy lifecycle management
-- Custom event logging with structured data
-
-### Configuration and Usage
+### Blocking Mode (`BUILD_COROUTINE=OFF`)
 
 ```cpp
-// Enable comprehensive telemetry
-#define USE_RPC_TELEMETRY
-#define USE_RPC_TELEMETRY_RAII_LOGGING  // Detailed proxy lifecycle
+// Macros resolve to blocking equivalents
+auto error = CO_AWAIT service->connect_to_zone<...>(...);
+// Becomes: auto error = service->connect_to_zone<...>(...);
 
-// Initialize telemetry service
-auto telemetry = std::make_shared<rpc::console_telemetry_service>();
-rpc::telemetry_service_manager::set(telemetry);
+CORO_TASK(int) my_function() { ... }
+// Becomes: int my_function() { ... }
 
-// Automatic integration with RPC operations
-// Telemetry calls are inserted automatically by code generation
+CO_RETURN result;
+// Becomes: return result;
 ```
 
----
-
-## Logging Framework
-
-Separate from telemetry, RPC++ provides a dedicated logging system optimized for performance and enclave compatibility. **Refactored in September 2024** to use modern fmt::format-based structured logging with improved performance and developer experience.
-
-### Logger Interface
-
-**Enclave-Compatible Design:**
-```cpp
-// Modern logging with fmt::format support
-#ifdef _IN_ENCLAVE
-    // SGX-safe logging functions
-    extern "C" sgx_status_t rpc_log(int level, const char* str, size_t sz);
-#else 
-    // Standard logging functions
-    extern "C" void rpc_log(int level, const char* str, size_t sz);
-#endif
-
-// New structured logging macros with levels (2024 refactoring)
-#define RPC_DEBUG(format_str, ...)    // Level 0 - Debug information
-#define RPC_TRACE(format_str, ...)    // Level 1 - Detailed tracing
-#define RPC_INFO(format_str, ...)     // Level 2 - General information  
-#define RPC_WARNING(format_str, ...)  // Level 3 - Warning conditions
-#define RPC_ERROR(format_str, ...)    // Level 4 - Error conditions
-#define RPC_CRITICAL(format_str, ...) // Level 5 - Critical failures
-```
-
-### Logging System Refactoring (2024)
-
-**Migration from Legacy Macros:**
-The logging system was completely refactored to eliminate the old `LOG_STR` and `LOG_CSTR` macros in favor of modern, structured logging:
+### Coroutine Mode (`BUILD_COROUTINE=ON`)
 
 ```cpp
-// OLD STYLE (deprecated and removed)
-std::string msg = "Processing request " + std::to_string(id);
-LOG_CSTR(msg.c_str());
+// Macros resolve to coroutine equivalents
+auto error = CO_AWAIT service->connect_to_zone<...>(...);
+// Becomes: auto error = co_await service->connect_to_zone<...>(...);
 
-// NEW STYLE (current)
-RPC_INFO("Processing request {}", id);
+CORO_TASK(int) my_function() { ... }
+// Becomes: coro::task<int> my_function() { ... }
+
+CO_RETURN result;
+// Becomes: co_return result;
 ```
 
-**Key Improvements:**
-- **fmt::format Integration**: Direct use of fmt::format for efficient string formatting
-- **Eliminated Temporary Strings**: Removed unnecessary string concatenation and temporary variables
-- **Structured Logging**: Consistent format string patterns with type-safe parameter substitution
-- **Level-based Categorization**: All log calls now properly categorized by severity
-- **Generator Code Cleanup**: Fixed code generators to eliminate temporaries in generated code
+### Benefits of Bi-Modal Design
 
-**Performance Benefits:**
-- **Zero String Copying**: Direct formatting eliminates intermediate string objects
-- **Compile-time Format Validation**: fmt::format provides compile-time format string checking
-- **Reduced Memory Allocations**: Fewer temporary objects means better memory efficiency
-- **Better Code Generation**: Generators now produce cleaner, more efficient logging code
+1. **Easy Testing and Debugging**: Unit tests run in blocking mode with standard debugger support
+2. **Production Performance**: Coroutine mode provides async/await performance benefits
+3. **Code Reuse**: Same application code works in both modes
+4. **Gradual Migration**: Switch between modes by changing build configuration
+5. **Transport Flexibility**: Some transports require coroutines (TCP, SPSC), others work in both modes
 
-### Logging Capabilities
+### Usage Pattern
 
-**Performance Optimized:**
-- Zero-overhead when disabled (`USE_RPC_LOGGING=OFF`)
-- Minimal string formatting overhead with fmt::format
-- Direct C-style logging for maximum performance
-- Eliminated unnecessary temporary string variables
+```cpp
+// This code works in both blocking and coroutine modes
+CORO_TASK(int) setup_calculator_service() {
+    auto root_service = rpc::make_shared<rpc::service>("root", rpc::zone{1});
 
-**Multi-Environment Support:**
-- Host applications: Full featured logging with fmt::format
-- SGX Enclaves: Secure, restricted logging with format validation
-- Embedded systems: Minimal footprint logging with optional fmt support
+    // CRITICAL: Keep output interface alive to prevent zone destruction
+    rpc::shared_ptr<i_calculator> calc;
 
-**Thread Safety:**
-- Lock-free logging paths where possible
-- Thread-safe buffer management
-- Async logging support for high-throughput scenarios
-- Atomic reference counting in member_ptr logging
+    auto error = CO_AWAIT root_service->connect_to_zone<rpc::local_child_service_proxy<i_calculator, i_calculator>>(
+        "calc_zone",                           // Zone name
+        rpc::zone{2},                         // Zone ID
+        rpc::shared_ptr<i_calculator>(),      // Input interface (passed TO the zone)
+        calc,                                 // Output interface (passed FROM the zone)
+        setup_callback);                      // Setup callback
 
----
+    if (error != rpc::error::OK()) {
+        CO_RETURN error;
+    }
 
-## Thread-Local Logging and Enhanced Crash Diagnostics
+    int result;
+    error = CO_AWAIT calc->add(10, 20, result);
+    CO_RETURN error;
 
-**FEATURE (Added September 2024)**: RPC++ includes a sophisticated thread-local logging system specifically designed for diagnosing multithreaded issues and crashes. This system provides comprehensive diagnostic information when threading bugs occur, making it significantly easier to identify and resolve complex race conditions and multithreaded problems.
-
-### Overview
-
-The thread-local logging system addresses a common challenge in multithreaded debugging: when standard telemetry and logging are enabled, they can mask threading issues by altering timing and synchronization behavior. The new system solves this by:
-
-1. **Per-Thread Circular Buffers**: Each thread maintains its own independent circular buffer of log messages
-2. **Frozen Buffer Dumps**: When crashes occur, all buffers are immediately frozen and dumped to disk
-3. **Enhanced Stack Traces**: Crash handler provides detailed function names, file locations, and line numbers
-4. **Test Context Integration**: Automatically identifies which specific test was running when crashes occur
-
-### Configuration and Setup
-
-#### CMake Configuration
-
-The thread-local logging system is controlled by the `USE_THREAD_LOCAL_LOGGING` CMake option:
-
-```cmake
-# Enable thread-local logging (host-only, disabled in enclaves)
-set(USE_THREAD_LOCAL_LOGGING ON)
+    // Zone stays alive as long as 'calc' is held
+    // Zone destroys itself via RAII when no shared_ptrs remain
+}
 ```
 
-#### CMake Presets
+### Zone Lifecycle Management
 
-A dedicated preset is available for multithreaded debugging:
+**Critical RAII Behavior**: Zones destroy themselves automatically when no `rpc::shared_ptr` objects referencing them remain alive. At least one of the following must be held:
+
+- **Input interface** (3rd parameter): Interface passed TO the zone
+- **Output interface** (4th parameter): Interface passed FROM the zone
+- **Any other** `rpc::shared_ptr` to objects within the zone
+
+```cpp
+// DANGER: Zone will destroy itself immediately
+{
+    rpc::shared_ptr<i_calculator> temp_calc;
+    auto error = CO_AWAIT service->connect_to_zone<...>(..., temp_calc, ...);
+    // temp_calc goes out of scope - zone destroys itself!
+}
+
+// SAFE: Keep interface alive to maintain zone
+rpc::shared_ptr<i_calculator> persistent_calc;
+auto error = CO_AWAIT service->connect_to_zone<...>(..., persistent_calc, ...);
+// Zone stays alive as long as persistent_calc is held
+```
+
+### Build Configuration
 
 ```bash
-# Configure with thread-local logging enabled
-cmake --preset Debug_multithreaded
+# For unit testing and debugging (blocking mode)
+cmake --preset Debug -DBUILD_COROUTINE=OFF
 
-# Build and run tests
-cmake --build build --target rpc_test
-./build/output/debug/rpc_test -m  # Enable multithreaded tests
+# For production deployment (coroutine mode)
+cmake --preset Debug -DBUILD_COROUTINE=ON
 ```
 
-The `Debug_multithreaded` preset automatically enables:
-- `USE_THREAD_LOCAL_LOGGING=ON` - Thread-local circular buffer logging
-- `USE_RPC_TELEMETRY=ON` - Standard telemetry system
-- `USE_CONSOLE_TELEMETRY=ON` - Console-based telemetry output
+---
 
-### System Architecture
+## Interface Definition Language (IDL)
 
-#### Core Components
+The IDL system defines interfaces, data structures, and metadata that drive code generation and wire protocol compatibility.
 
-**1. thread_local_logger_config**: Configuration for circular buffer logging
-```cpp
-struct thread_local_logger_config {
-    size_t buffer_size = 10000;                    // Messages per thread
-    size_t max_message_size = 4096;               // Maximum message size  
-    std::string dump_directory = "/tmp/rpc_debug_dumps";
+### Core Syntax
+
+**Namespaces:**
+```idl
+namespace company {
+    [inline] namespace service_name {
+        [inline] namespace v1 {
+            // Interface definitions here
+        }
+    }
+}
+```
+
+**Interfaces:**
+```idl
+[status=production, description="Calculator service interface"]
+interface i_calculator {
+    [description="Adds two integers"]
+    int add(int a, int b, [out] int& result);
+
+    [deprecated]  // Marks method as deprecated (fingerprint-safe)
+    int legacy_add(int a, int b, [out] int& result);
 };
 ```
 
-**2. thread_local_circular_buffer**: Per-thread message storage
-```cpp
-class thread_local_circular_buffer {
-public:
-    void add_entry(int level, const std::string& message, 
-                   const char* file, int line, const char* function);
-    void freeze();                    // Prevent further writes
-    void dump_to_file(const std::string& filename) const;
+**Data Structures:**
+```idl
+[status=production]
+struct calculation_request {
+    double operand_a;
+    double operand_b;
+    std::string operation;
+    int precision = 2;  // Default values supported
 };
 ```
 
-**3. thread_local_logger_manager**: Global coordination and dumping
+### Supported Types
+
+- **Primitives**: `int`, `double`, `bool`, `std::string`
+- **Containers**: `std::vector<T>`, `std::map<K,V>`, `std::array<T,N>`
+- **Optionals**: `std::optional<T>`, `std::variant<T...>`
+- **RPC Types**: `rpc::shared_ptr<interface>` for object passing
+- **Custom Types**: User-defined structs and classes
+
+### Parameter Attributes
+
+- **`[in]`**: Input parameter (default for value types)
+- **`[out]`**: Output parameter (must be reference)
+
+### Interface Lifecycle Attributes
+
+- **`[status=development]`**: Interface under development (fingerprint changes allowed)
+- **`[status=production]`**: Stable interface (fingerprint locked by CI/CD)
+- **`[status=deprecated]`**: Legacy interface (fingerprint preserved)
+
+---
+
+## Architecture Overview
+
+### Core Components
+
 ```cpp
-class thread_local_logger_manager {
-public:
-    static thread_local_logger_manager& get_instance();
-    
-    thread_local_circular_buffer* get_thread_buffer();
-    void freeze_all_buffers();
-    void dump_all_buffers_with_stacktrace(const std::string& assert_message, 
-                                          const char* file, int line);
-};
+// High-level architecture
+┌─────────────────┐    ┌─────────────────┐
+│   Application   │    │   Application   │
+│     (Client)    │    │    (Server)     │
+├─────────────────┤    ├─────────────────┤
+│  Generated      │    │  Generated      │
+│  Proxy          │◄──►│  Stub           │
+├─────────────────┤    ├─────────────────┤
+│  Service Proxy  │    │  Service Proxy  │
+│  (Transport)    │    │  (Transport)    │
+├─────────────────┤    ├─────────────────┤
+│  i_marshaller   │    │  i_marshaller   │
+│  (Protocol)     │    │  (Protocol)     │
+└─────────────────┘    └─────────────────┘
 ```
 
-#### Logging Integration
+### Service Architecture
 
-The system seamlessly integrates with existing RPC++ logging macros:
+**Service Proxy Types:**
+- **In-Memory**: Direct function calls within the same process
+- **SGX Enclave**: Secure communication with SGX enclaves
+- **TCP**: Network communication (coroutine builds only)
+- **SPSC**: Single producer/single consumer inter-process communication
+- **Arena**: Communication between different memory arenas
+
+### Zone Management and Proxy Creation
+
+RPC++ uses a **zone-based architecture** where each service instance operates in its own zone. Zones communicate through **service proxies** created using three main APIs:
+
+#### 1. Service Instantiation
+
+The root service is instantiated directly:
 
 ```cpp
-// Standard logging macros automatically use thread-local buffers when enabled
-RPC_DEBUG("Processing zone {} request", zone_id);
-RPC_ERROR("Failed to create proxy for object {}", object_id);
-RPC_CRITICAL("Reference counting inconsistency detected");
-```
+// Create root service (only service class instantiated directly)
+auto root_service = rpc::make_shared<rpc::service>("root_service", rpc::zone{1});
 
-**Backend Selection**: The system automatically chooses the appropriate logging backend:
-
-```cpp
-// Conditional compilation determines backend
-#if defined(USE_THREAD_LOCAL_LOGGING) && !defined(_IN_ENCLAVE)
-    #define RPC_LOG_BACKEND(level, message) rpc::thread_local_log(level, message, __FILE__, __LINE__, __FUNCTION__)
-#elif defined(USE_RPC_LOGGING) 
-    #define RPC_LOG_BACKEND(level, message) rpc_log(level, (message).c_str(), (message).length())
-#else
-    #define RPC_LOG_BACKEND(level, message) do { (void)(level); (void)(message); } while(0)
+// With coroutine support
+#ifdef BUILD_COROUTINE
+auto root_service = rpc::make_shared<rpc::service>("root_service", rpc::zone{1}, io_scheduler);
 #endif
 ```
 
-### Advanced Crash Handler System
+#### 2. connect_to_zone - Child Zone Creation
 
-RPC++ includes a production-grade crash handler system with comprehensive multi-threaded debugging capabilities.
-
-#### Core Architecture
-
-The crash handler provides:
-
-1. **Multi-Threaded Stack Trace Collection**: Collects stack traces from all threads during crashes
-2. **Advanced Symbol Resolution**: Uses both `backtrace_symbols` and `addr2line` for maximum symbol information
-3. **Pattern Detection**: Recognizes RPC-specific crash patterns and threading issues
-4. **Crash Dump Generation**: Automatically saves detailed crash reports to disk
-5. **Signal Safety**: Handles multiple signal types (SIGSEGV, SIGABRT, SIGFPE, etc.)
-
-#### Configuration
+Creates child zones that inherit from the calling service:
 
 ```cpp
-crash_handler::crash_handler::Config config;
-config.enable_multithreaded_traces = true;   // Thread enumeration
-config.enable_symbol_resolution = true;      // addr2line integration  
-config.enable_threading_debug_info = true;   // RPC debug stats
-config.enable_pattern_detection = true;      // Crash pattern analysis
-config.max_stack_frames = 64;                // Stack depth limit
-config.save_crash_dump = true;               // Automatic dump files
-config.crash_dump_path = "/tmp";             // Dump location
+// Create child zone with local service proxy
+rpc::shared_ptr<i_calculator> child_calc;
+auto error = CO_AWAIT root_service->connect_to_zone<rpc::local_child_service_proxy<i_calculator, i_calculator>>(
+    "calc_zone",                    // Zone name
+    rpc::zone{2},                   // Child zone ID
+    rpc::shared_ptr<i_calculator>(), // Input interface (nullptr = no input)
+    child_calc,                     // Output interface
+    [](const rpc::shared_ptr<i_calculator>& input,
+       rpc::shared_ptr<i_calculator>& output,
+       const rpc::shared_ptr<rpc::service>& child_service) -> int
+    {
+        // Register stubs in child zone
+        calculator_idl_register_stubs(child_service);
 
-crash_handler::crash_handler::initialize(config);
+        // Create implementation in child zone
+        output = rpc::make_shared<calculator_impl>();
+        return rpc::error::OK();
+    });
 ```
 
-#### Enhanced Stack Traces
+#### 3. attach_remote_zone - Peer Zone Connection
 
-The crash handler provides detailed symbolic information:
-
-```
-Thread 1/50 - PID: 403006 (rpc_test) [D]
-   0: 0x00005600ed472fdf crash_handler::crash_handler::collect_stack_trace(int) at crash_handler.cpp:237
-   1: 0x00005600ed473208 crash_handler::crash_handler::collect_all_thread_stacks(int, int) at crash_handler.cpp:256  
-   2: 0x00005600ed451e5d rpc::service::send(...) at service.cpp:250
-   3: 0x00005600ed228381 rpc::local_service_proxy::send(...) at basic_service_proxies.h:64
-```
-
-**Features**:
-- **Function Names**: Full C++ namespaces and function signatures  
-- **Source Locations**: File names and exact line numbers
-- **Address Information**: Memory addresses for additional debugging
-- **Symbol Demangling**: Readable C++ function names
-
-#### Automatic Buffer Dumping
-
-When any signal occurs (SIGSEGV, SIGABRT, etc.), the crash handler automatically:
-
-1. **Freezes All Buffers**: Prevents any further logging to preserve crash state
-2. **Dumps Comprehensive Diagnostics**: Creates detailed crash reports with per-thread message histories
-3. **Provides Stack Traces**: Enhanced symbol resolution with function names and line numbers
-4. **Identifies Test Context**: Shows exactly which gtest test was running
-
-#### RPC-Specific Pattern Detection
-
-The system recognizes common RPC crash patterns:
-
-- **"on_object_proxy_released"**: Proxy cleanup crashes
-- **"unable to find object"**: Object lifecycle issues
-- **"remove_zone_proxy"**: Zone management race conditions
-- **"threading_debug"**: Threading debug assertions
-- **"mutex"/"lock"**: Synchronization crashes
-
-#### Custom Analysis Callbacks
+Connects to peer zones that are not children of the local service:
 
 ```cpp
-crash_handler::crash_handler::set_analysis_callback(
-    [](const auto& report) {
-        // Custom RPC-specific crash analysis
-        // Integration with logging systems
-        // Automated bug reporting
-    }
-);
+// Attach to remote peer zone
+rpc::shared_ptr<i_remote_service> remote_service;
+rpc::interface_descriptor output_desc;
+auto error = CO_AWAIT service->attach_remote_zone<rpc::spsc::service_proxy, i_host, i_remote_service>(
+    "remote_zone",
+    input_descriptor,       // Interface descriptor from peer
+    output_desc,           // Interface descriptor to send back
+    [](const rpc::shared_ptr<i_host>& host,
+       rpc::shared_ptr<i_remote_service>& remote,
+       const rpc::shared_ptr<rpc::service>& service) -> CORO_TASK(int)
+    {
+        // Create local implementation that can use remote host
+        remote = rpc::make_shared<remote_service_impl>(host);
+        CO_RETURN rpc::error::OK();
+    },
+    transport_args...);
 ```
 
-#### Test Integration
+#### 4. create_child_zone - Static Child Creation
 
-Crash reports automatically identify the running test:
-
-```
-CRASH DETECTED! Signal: 11 (SIGSEGV (Segmentation fault))
-Current Test: remote_type_test/1.multithreaded_bounce_baz_between_two_interfaces
-Thread-Local Logs: Check /tmp/rpc_debug_dumps/ for per-thread message history
-```
-
-### Diagnostic Output
-
-#### Crash Report Structure
-
-When a crash occurs, the system generates:
-
-**1. Console Output**:
-```
-=== DUMPING THREAD-LOCAL CIRCULAR BUFFERS ===
-*** RPC_ASSERT FAILURE ***
-Assert: CRASH SIGNAL: SIGSEGV (Segmentation fault)
-Diagnostic files created in: /tmp/rpc_debug_dumps
-Main report: /tmp/rpc_debug_dumps/crash_report_20250911_171731.txt
-Thread buffers: 101 threads dumped
-=== END THREAD-LOCAL BUFFER DUMP ===
-```
-
-**2. Main Crash Report** (`crash_report_*.txt`):
-```
-RPC++ ASSERT FAILURE DIAGNOSTIC REPORT
-=====================================
-
-Timestamp: 20250911_171731
-Assert Message: CRASH SIGNAL: SIGSEGV (Segmentation fault)  
-Location: /path/to/crash_handler.cpp:112
-Thread Count: 101
-
-=== THREAD BUFFER FILES ===
-Thread 0 (ID: 139677126338240): /tmp/rpc_debug_dumps/thread_0_*.log
-Thread 1 (ID: 139677688387264): /tmp/rpc_debug_dumps/thread_1_*.log
-...
-```
-
-**3. Per-Thread Log Files** (`thread_*_*.log`):
-```
-Thread ID: 139673317918400
-Total entries written: 75
-Buffer size: 10000
-Buffer frozen: true
-
-=== LOG ENTRIES ===
-
-[17:17:31] Level 0: get_or_create_object_proxy service zone: 1 destination_zone=2, caller_zone=1, object_id = 100 
-           (/home/edward/projects/rpc2/rpc/include/rpc/proxy.h:670 in get_or_create_object_proxy)
-[17:17:31] Level 0: inner_add_zone_proxy service zone: 1 destination_zone=97, caller_zone=1 
-           (/home/edward/projects/rpc2/rpc/src/service.cpp:1338 in inner_add_zone_proxy)
-[17:17:31] Level 2: callback 22 
-           (/home/edward/projects/rpc2/tests/common/include/common/foo_impl.h:55 in callback)
-```
-
-### Usage Examples
-
-#### Basic Usage
+Static method for creating child zones from within child services:
 
 ```cpp
-#include <rpc/thread_local_logger.h>
-#include <rpc/logger.h>
+// Used within child service implementations
+rpc::shared_ptr<rpc::child_service> new_child;
+auto error = CO_AWAIT rpc::child_service::create_child_zone<rpc::host_service_proxy, i_host, i_example>(
+    "enclave_zone",
+    rpc::zone{3},
+    parent_zone_id,
+    input_descriptor,
+    output_descriptor,
+    setup_callback,
+#ifdef BUILD_COROUTINE
+    io_scheduler,
+#endif
+    new_child,
+    transport_args...);
+```
 
-int main() {
-    // Configure the logger
-    rpc::thread_local_logger_config config;
-    config.buffer_size = 5000;
-    config.dump_directory = "/custom/debug/path";
-    
-    auto& manager = rpc::thread_local_logger_manager::get_instance();
-    manager.configure(config);
-    
-    // Normal logging - automatically uses thread-local buffers
-    RPC_INFO("Starting multithreaded operations");
-    
-    // Create threads that perform RPC operations
-    std::vector<std::thread> workers;
-    for (int i = 0; i < 10; ++i) {
-        workers.emplace_back([i]() {
-            RPC_DEBUG("Worker {} starting", i);
-            // ... perform RPC operations ...
-            RPC_DEBUG("Worker {} completed", i);
-        });
+### Available Service Proxy Types
+
+**1. local_child_service_proxy<PARENT_INTERFACE, CHILD_INTERFACE>**
+- Direct function calls within the same process
+- Parent-child relationship with automatic cleanup
+
+**2. enclave_service_proxy**
+- Secure communication with SGX enclaves
+- Hardware-enforced security boundaries
+
+**3. host_service_proxy**
+- Communication from enclave to untrusted host
+- Used within enclave implementations
+
+**4. spsc::service_proxy** (Coroutine builds only)
+- Single producer/single consumer inter-process communication
+- High-performance shared memory transport
+
+**5. tcp::service_proxy** (Coroutine builds only)
+- Network communication over TCP
+- Proof of concept implementation
+
+### Object Lifecycle Management
+
+Objects are automatically managed across zones using `rpc::shared_ptr<interface>`:
+
+```cpp
+// Objects created in one zone
+rpc::shared_ptr<i_business_object> obj;
+factory->create_object(obj);
+
+// Automatically marshalled when passed to other zones
+worker->process_object(obj);  // add_ref/release handled automatically
+```
+
+**Reference Counting:**
+- Automatic add_ref/release across zone boundaries
+- Bidirectional reference tracking for cleanup
+- Race condition detection and handling
+
+---
+
+## Error Code System
+
+RPC++ implements a flexible error code system designed for seamless integration with legacy applications. The system allows error codes to be offset to prevent conflicts with existing application error codes.
+
+### Design Principles
+
+**Legacy Application Integration**: RPC++ error codes can be offset to coexist with existing error code systems without conflicts:
+
+```cpp
+// Configure RPC++ error codes to avoid conflicts
+rpc::error::set_offset_val(10000);           // Base offset
+rpc::error::set_offset_val_is_negative(false); // Positive offset direction
+rpc::error::set_OK_val(0);                   // Success value (typically 0)
+```
+
+**RPC-Internal Usage**: RPC error codes are reserved for internal RPC++ operations and should only be used by applications for **inspection purposes**, not as application error codes.
+
+### Core Error Codes
+
+RPC++ defines specific error codes for different failure scenarios:
+
+```cpp
+// Critical errors
+rpc::error::OK()                        // Success (configurable)
+rpc::error::OUT_OF_MEMORY()            // Memory allocation failure
+rpc::error::SECURITY_ERROR()           // Security/permission issues
+rpc::error::TRANSPORT_ERROR()          // Transport layer failure
+
+// Protocol errors
+rpc::error::INVALID_METHOD_ID()        // Method not found
+rpc::error::INVALID_INTERFACE_ID()     // Interface not implemented
+rpc::error::INVALID_CAST()             // Type casting failure
+rpc::error::INVALID_VERSION()          // Protocol version mismatch
+
+// Zone management errors
+rpc::error::ZONE_NOT_SUPPORTED()       // Zone type not supported
+rpc::error::ZONE_NOT_INITIALISED()     // Zone not ready
+rpc::error::ZONE_NOT_FOUND()           // Zone lookup failure
+rpc::error::OBJECT_NOT_FOUND()         // Object reference invalid
+
+// Serialization errors
+rpc::error::PROXY_DESERIALISATION_ERROR()  // Client-side decode failure
+rpc::error::STUB_DESERIALISATION_ERROR()   // Server-side decode failure
+rpc::error::INCOMPATIBLE_SERIALISATION()   // Format not supported
+
+// Connection errors
+rpc::error::SERVICE_PROXY_LOST_CONNECTION() // Transport disconnected
+rpc::error::CALL_CANCELLED()               // Operation cancelled
+```
+
+### Offset Configuration
+
+The error code system supports flexible offsetting for legacy integration:
+
+**Positive Offset Mode**:
+```cpp
+rpc::error::set_offset_val(50000);
+rpc::error::set_offset_val_is_negative(false);
+// Results in: OK=0, OUT_OF_MEMORY=50001, SECURITY_ERROR=50002, etc.
+```
+
+**Negative Offset Mode**:
+```cpp
+rpc::error::set_offset_val(-10000);
+rpc::error::set_offset_val_is_negative(true);
+// Results in: OK=0, OUT_OF_MEMORY=-10001, SECURITY_ERROR=-10002, etc.
+```
+
+### Usage Guidelines
+
+**For Application Code**:
+```cpp
+// CORRECT: Inspect RPC error codes
+auto error = CO_AWAIT service->connect_to_zone<...>(...);
+if (error == rpc::error::OK()) {
+    // Success
+} else if (error == rpc::error::ZONE_NOT_FOUND()) {
+    // Handle specific RPC error
+    RPC_ERROR("Zone connection failed: {}", rpc::error::to_string(error));
+} else {
+    // Handle other RPC errors
+    RPC_ERROR("RPC operation failed: {}", rpc::error::to_string(error));
+}
+
+// INCORRECT: Don't use RPC error codes as application error codes
+int my_application_function() {
+    if (some_condition) {
+        return rpc::error::INVALID_DATA(); // DON'T DO THIS
     }
-    
-    for (auto& worker : workers) {
-        worker.join();
-    }
-    
     return 0;
 }
 ```
 
-#### Manual Diagnostic Dumping
+**For IDL Interface Design**:
+```cpp
+// Use application-specific error codes in IDL interfaces
+typedef int error_code;  // Application-defined error codes
+
+[status=production]
+interface i_calculator {
+    error_code add(int a, int b, [out] int& result);           // Returns app error codes
+    error_code divide(int a, int b, [out] double& result);     // Returns app error codes
+};
+```
+
+### Error String Conversion
 
 ```cpp
-// Manually trigger diagnostic dump (useful for testing)
-rpc::thread_local_dump_on_assert("Manual diagnostic dump", __FILE__, __LINE__);
+// Convert error codes to human-readable strings
+int error = CO_AWAIT some_rpc_operation();
+if (error != rpc::error::OK()) {
+    const char* error_str = rpc::error::to_string(error);
+    RPC_ERROR("Operation failed: {}", error_str);
+}
 ```
 
-### Debugging Workflow
-
-#### 1. Enable Thread-Local Logging
-```bash
-cmake --preset Debug_multithreaded
-cmake --build build --target rpc_test
-```
-
-#### 2. Run Multithreaded Tests
-```bash
-./build/output/debug/rpc_test -m  # Enable multithreaded tests
-```
-
-#### 3. Analyze Crash Output
-When crashes occur:
-1. **Check console output** for immediate crash context
-2. **Review main crash report** for thread overview
-3. **Examine per-thread logs** for detailed operation histories
-4. **Correlate timestamps** across threads to understand interaction patterns
-
-#### 4. Common Analysis Patterns
-
-**Timeline Reconstruction**:
-- Compare timestamps across multiple thread logs
-- Identify the sequence of operations leading to the crash
-- Look for timing-dependent race conditions
-
-**Resource Management Issues**:
-- Search for `add_ref` and `release` operations
-- Verify proper reference counting patterns  
-- Check for proxy creation/cleanup imbalances
-
-**Zone Communication Problems**:
-- Track inter-zone calls and routing operations
-- Identify zone proxy creation and cleanup patterns
-- Look for destination/caller zone mismatches
-
-### Performance Considerations
-
-#### Memory Usage
-- **Per-thread overhead**: ~40KB per thread (10,000 messages × ~4KB each)
-- **Total system impact**: Scales linearly with thread count
-- **Configurable limits**: Adjust `buffer_size` based on available memory
-
-#### Performance Impact
-- **Minimal runtime overhead**: Atomic operations for thread-safe logging
-- **Zero impact when disabled**: Compile-time elimination with `USE_THREAD_LOCAL_LOGGING=OFF`
-- **Frozen state efficiency**: No performance impact after crash (buffers frozen)
-
-#### Best Practices
-
-**1. Configure Appropriate Buffer Sizes**:
-```cpp
-// For high-volume logging scenarios
-config.buffer_size = 50000;  // More messages per thread
-
-// For memory-constrained environments  
-config.buffer_size = 1000;   // Fewer messages per thread
-```
-
-**2. Selective Enabling**:
-- Enable only for debugging multithreaded issues
-- Disable in production builds for optimal performance
-- Use preset configurations for consistent setups
-
-**3. Log Analysis Tools**:
-- Use grep/awk to correlate timestamps across thread logs
-- Search for specific operation patterns (e.g., "add_ref", "service::send")
-- Create scripts to visualize thread interaction timelines
-
-### Security Considerations
-
-#### Enclave Compatibility
-- **Disabled in enclaves**: `!defined(_IN_ENCLAVE)` condition prevents activation
-- **Host-only feature**: Thread-local logging only works in trusted host environments
-- **Secure by design**: No sensitive data exposed through logging paths
-
-#### File System Access
-- **Configurable dump directory**: Choose appropriate secure locations
-- **File permissions**: Diagnostic files created with standard user permissions
-- **Temporary data**: Consider using tmpfs for sensitive debugging scenarios
-
----
-
-## Multithreading and Coroutines
-
-### Current Multithreading Support
-
-RPC++ is designed as a **fully multithreaded system** with comprehensive thread-safety mechanisms:
-
-**Thread-Safe Components:**
-- **Service Registration**: Atomic reference counting and mutex-protected data structures
-- **Proxy Management**: Thread-safe proxy creation, caching, and cleanup
-- **Object Lifecycle**: Reference counting with race condition detection
-- **Zone Communication**: Synchronized inter-zone call routing
-
-**Synchronization Primitives:**
-```cpp
-// Service-level synchronization
-std::recursive_mutex service_protect_; // Service state protection
-std::mutex insert_control_;            // Proxy insertion synchronization
-
-// Reference counting atomics
-std::atomic<int> lifetime_lock_count_;  // External reference tracking
-std::atomic<int> inherited_reference_count_; // Race condition handling
-```
-
-
-## Thread Safety and member_ptr
-
-RPC++ is designed to be thread-safe and supports concurrent access to RPC services from multiple threads. A key component of this thread safety is the `member_ptr` template class.
-
-### What is member_ptr?
-
-`member_ptr` is a thread-safe wrapper around `std::shared_ptr` and `rpc::shared_ptr` that guarantees pointer consistency in multithreaded environments. It prevents race conditions where a shared pointer could change between multiple accesses within the same function call.
-
-### The Problem
-
-In a multithreaded RPC environment, member variables that hold shared pointers could potentially be modified by other threads during function execution. For example:
+### Range Information
 
 ```cpp
-// PROBLEMATIC CODE - Race condition possible
-class MyService {
-    std::shared_ptr<SomeService> service_;
+// Get error code range for validation
+int min_error = rpc::error::MIN();  // Minimum RPC error code
+int max_error = rpc::error::MAX();  // Maximum RPC error code
+
+bool is_rpc_error = (error >= min_error && error <= max_error);
+```
+
+### Error Code Pass-Through and Translation
+
+**Application Error Code Pass-Through**: All non-RPC error codes from application functions are passed through unchanged to the caller:
+
+```cpp
+// Server implementation
+class calculator_impl : public calculator::v1::i_calculator {
 public:
-    void someMethod() {
-        if (service_) {                    // First access - service_ could be valid
-            service_->doSomething();       // Second access - service_ could be null if another thread cleared it
+    error_code divide(int a, int b, [out] double& result) override {
+        if (b == 0) {
+            return 1001;  // Application-specific error code
         }
+        result = static_cast<double>(a) / b;
+        return 0;  // Application success code
+    }
+};
+
+// Client receives exactly the same error codes
+auto error = CO_AWAIT calc->divide(10, 0, result);
+// error == 1001 (application error passed through unchanged)
+```
+
+**Multi-Application Error Translation**: When connecting applications with different error code ranges, the service proxy must translate errors to maintain compatibility:
+
+```cpp
+// Legacy App A uses error range: 0=success, 1000-1999=errors
+// Modern App B uses error range: 0=success, 2000-2999=errors
+// RPC uses offset range: 50000+
+
+class error_translating_service_proxy {
+    int translate_app_a_to_app_b(int app_a_error) {
+        if (app_a_error == 0) return 0;  // Success
+        if (app_a_error >= 1000 && app_a_error <= 1999) {
+            return 2000 + (app_a_error - 1000);  // Translate range
+        }
+        return app_a_error;  // Pass through unknown codes
+    }
+
+    int translate_rpc_errors(int rpc_error) {
+        // RPC errors need rebasing for App B's range
+        if (rpc_error >= rpc::error::MIN() && rpc_error <= rpc::error::MAX()) {
+            // Rebase RPC errors to App B's reserved RPC range (e.g., 3000+)
+            return 3000 + (rpc_error - rpc::error::MIN());
+        }
+        return rpc_error;
     }
 };
 ```
 
-### The Solution: member_ptr
+**Error Translation Scenarios**:
 
-`member_ptr` solves this by requiring a single access per function that caches the shared pointer value:
+1. **Direct Connection** (same error ranges):
+   ```cpp
+   // No translation needed - direct pass-through
+   Client App A ←→ RPC Layer ←→ Server App A
+   App codes: 0, 1001-1999     App codes: 0, 1001-1999
+   RPC codes: 50000+          RPC codes: 50000+
+   ```
 
+2. **Cross-Application Connection** (different error ranges):
+   ```cpp
+   // Translation required in service proxy
+   Client App A ←→ Translation Proxy ←→ Server App B
+   App codes: 0, 1000-1999    →    App codes: 0, 2000-2999
+   RPC codes: 50000+         →    RPC codes: 60000+
+   ```
+
+**Translation Implementation Pattern**:
 ```cpp
-// SAFE CODE - Guaranteed consistency
-class MyService {
-    rpc::member_ptr<SomeService> service_;
+// In custom service proxy implementation
+template<typename TargetProxy>
+class error_translating_proxy : public TargetProxy {
 public:
-    void someMethod() {
-        auto service = service_.get_nullable();  // Single access - cached for entire function
-        if (service) {                          // Use cached value
-            service->doSomething();             // Use same cached value - guaranteed consistent
+    error_code translated_method(int param, [out] int& result) override {
+        auto error = TargetProxy::translated_method(param, result);
+
+        // Translate application errors between ranges
+        if (is_source_app_error(error)) {
+            return translate_to_target_app_range(error);
         }
-    }
-};
-```
 
-### Key Features
+        // Rebase RPC errors for target application
+        if (is_rpc_error(error)) {
+            return rebase_rpc_error_for_target(error);
+        }
 
-- **Single Access Guarantee**: Each function should call `get_nullable()` only once and cache the result
-- **Thread Safety**: Multiple threads can safely access the same `member_ptr` without data races
-- **Consistency**: The cached shared_ptr remains valid throughout the function lifetime
-- **Performance**: Minimal overhead compared to raw shared_ptr usage
-- **Standard Interface**: Provides familiar `reset()` method and assignment operators
-
-### Available in Two Flavors
-
-```cpp
-namespace stdex {
-    template<typename T>
-    class member_ptr;  // Wraps std::shared_ptr<T>
-}
-
-namespace rpc {
-    template<typename T> 
-    class member_ptr;   // Wraps rpc::shared_ptr<T>
-}
-```
-
-### Usage Patterns
-
-**Correct Usage:**
-```cpp
-void MyClass::processRequest() {
-    auto service = service_.get_nullable();  // Cache once
-    if (service) {
-        service->method1();                  // Use cached value
-        service->method2();                  // Use same cached value
-    }
-}
-```
-
-**Incorrect Usage:**
-```cpp
-void MyClass::processRequest() {
-    if (service_.get_nullable()) {           // First call
-        service_.get_nullable()->method();   // Second call - could be different!
-    }
-}
-```
-
-### Reset and Assignment
-
-```cpp
-// Reset to null
-service_.reset();
-
-// Assignment from shared_ptr
-service_ = rpc::member_ptr<ServiceType>(my_shared_ptr);
-
-// Direct assignment (also supported)
-service_ = my_shared_ptr;
-```
-
-This design ensures that RPC++ services remain robust and thread-safe even under heavy concurrent load, preventing subtle race conditions that could cause crashes or undefined behavior.
-
-
-**Threading Debug System:**
-- Comprehensive crash handler with multi-threaded stack trace collection
-- Threading bug detection and pattern analysis
-- Reference counting validation and leak detection
-- Real-time thread state monitoring
-
-### Coroutine Support (Planned)
-
-**Async/Await Pattern:**
-```cpp
-// Planned coroutine interface
-rpc::task<int> calculator_service::add_async(int a, int b) {
-    // Asynchronous RPC call
-    auto result = co_await remote_calculator->add(a, b);
-    co_return result;
-}
-
-// Usage
-auto task = calculator->add_async(5, 3);
-int result = co_await task;
-```
-
-**Benefits of Coroutine Integration:**
-- **Non-blocking I/O**: Efficient handling of remote calls
-- **Scalability**: Support for thousands of concurrent operations
-- **Composability**: Easy chaining of async operations
-- **Exception Safety**: Proper cleanup on coroutine cancellation
-
-### Thread Safety Best Practices
-
-**Reference Counting Patterns:**
-```cpp
-// RAII-based reference management
-class scoped_service_proxy_ref {
-    rpc::shared_ptr<service_proxy> proxy_;
-public:
-    scoped_service_proxy_ref(rpc::shared_ptr<service_proxy> p) : proxy_(p) {
-        if (proxy_) proxy_->add_external_ref();
-    }
-    ~scoped_service_proxy_ref() {
-        if (proxy_) proxy_->release_external_ref();
+        return error;  // Pass through unchanged
     }
 };
 ```
 
 ---
 
-## Service Proxies and Transport Abstraction
+## Wire Protocol and Backward Compatibility
 
-Service proxies provide the transport abstraction layer that enables RPC++ to work across different communication mechanisms.
+### Protocol Version Negotiation
 
-### Why Custom Service Proxies?
-
-Users are **strongly encouraged** to write custom service proxies to:
-
-1. **Attach Different Transports**:
-   - TCP/IP networking
-   - Named pipes
-   - Shared memory
-   - Message queues
-   - Custom protocols
-
-2. **Implement Security Subsystems**:
-   - Authentication and authorization
-   - Encryption and secure channels
-   - Certificate validation
-   - Access control policies
-
-3. **Add Custom Features**:
-   - Compression and decompression
-   - Request routing and load balancing
-   - Circuit breakers and retry logic
-   - Custom serialization formats
-
-### Service Proxy Architecture
-
-**Base Class Interface:**
-```cpp
-class service_proxy : public i_marshaller {
-protected:
-    destination_zone destination_zone_id_;
-    zone caller_zone_id_;
-    
-public:
-    // Core marshalling interface
-    virtual int send(uint64_t protocol_version, encoding enc, uint64_t tag,
-                    caller_channel_zone caller_channel_zone_id,
-                    caller_zone caller_zone_id, destination_zone destination_zone_id,
-                    object object_id, interface_ordinal interface_id, method method_id,
-                    size_t data_in_sz, const char* data_in, 
-                    std::vector<char>& data_out) = 0;
-    
-    // Reference counting for distributed objects
-    virtual uint64_t add_ref(uint64_t protocol_version, /* ... */) = 0;
-    virtual uint64_t release(uint64_t protocol_version, /* ... */) = 0;
-    virtual int try_cast(uint64_t protocol_version, /* ... */) = 0;
-    
-    // Lifecycle management
-    virtual void add_external_ref() = 0;
-    virtual int release_external_ref() = 0;
-};
-```
-
-### Built-in Service Proxy Types
-
-**1. In-Memory Service Proxy**
-- Direct function calls within the same process
-- Zero serialization overhead
-- Immediate execution
-
-**2. Arena Service Proxy** 
-- Communication between different memory arenas
-- Memory management isolation
-- Fault tolerance boundaries
-
-**3. SGX Enclave Service Proxy**
-- Secure communication with SGX enclaves
-- Hardware-enforced security boundaries
-- Attestation and secure channel establishment
-
-**4. Host Service Proxy**
-- Communication from enclave to untrusted host
-- Careful data validation and sanitization
-- Security policy enforcement
-
-### Custom Transport Implementation Example
-
-```cpp
-class tcp_service_proxy : public service_proxy {
-private:
-    std::string remote_host_;
-    uint16_t remote_port_;
-    std::unique_ptr<tcp_connection> connection_;
-    
-public:
-    tcp_service_proxy(const std::string& host, uint16_t port) 
-        : remote_host_(host), remote_port_(port) {
-        connection_ = std::make_unique<tcp_connection>(host, port);
-    }
-    
-    int send(uint64_t protocol_version, encoding enc, uint64_t tag,
-             caller_channel_zone caller_channel_zone_id,
-             caller_zone caller_zone_id, destination_zone destination_zone_id,
-             object object_id, interface_ordinal interface_id, method method_id,
-             size_t data_in_sz, const char* data_in,
-             std::vector<char>& data_out) override {
-        
-        // 1. Serialize RPC header
-        rpc_header header{protocol_version, enc, tag, /* ... */};
-        
-        // 2. Send header + payload over TCP
-        connection_->send(reinterpret_cast<char*>(&header), sizeof(header));
-        connection_->send(data_in, data_in_sz);
-        
-        // 3. Receive response
-        rpc_response_header response;
-        connection_->receive(reinterpret_cast<char*>(&response), sizeof(response));
-        
-        data_out.resize(response.payload_size);
-        connection_->receive(data_out.data(), response.payload_size);
-        
-        return response.error_code;
-    }
-    
-    // Implement reference counting, try_cast, etc.
-};
-```
-
-### Security Integration Example
-
-```cpp
-class authenticated_service_proxy : public service_proxy {
-private:
-    std::shared_ptr<authentication_service> auth_;
-    std::string session_token_;
-    
-public:
-    int send(/* parameters */) override {
-        // 1. Validate session token
-        if (!auth_->validate_token(session_token_)) {
-            return rpc::error::AUTHENTICATION_FAILED();
-        }
-        
-        // 2. Apply authorization policies
-        if (!auth_->authorize_call(interface_id, method_id, session_token_)) {
-            return rpc::error::AUTHORIZATION_FAILED();
-        }
-        
-        // 3. Encrypt payload
-        auto encrypted_data = encrypt_payload(data_in, data_in_sz);
-        
-        // 4. Forward to underlying transport
-        return underlying_proxy_->send(/* encrypted parameters */);
-    }
-};
-```
-
----
-
-## The i_marshaller Interface
-
-The `i_marshaller` interface is the core abstraction that enables RPC++ to work across different transport mechanisms and execution contexts.
-
-It standardises protocol negotiation across multiple wire versions and serialization formats. RPC++ currently defaults to protocol version 3 while automatically falling back to version 2 for legacy destinations. YAS JSON and binary encodings ship out of the box, with the interface ready to accept additional formats as they are developed. Any runtime written in another language must present an `i_marshaller` implementation so that it can participate in the same inter-zonal communication contracts as the C++ runtime.
-
-### Interface Definition
-
-```cpp
-class i_marshaller {
-public:
-    virtual ~i_marshaller() = default;
-    
-    // Core RPC call marshalling
-    virtual int send(uint64_t protocol_version, encoding enc, uint64_t tag,
-                    caller_channel_zone caller_channel_zone_id,
-                    caller_zone caller_zone_id, 
-                    destination_zone destination_zone_id,
-                    object object_id, 
-                    interface_ordinal interface_id, 
-                    method method_id,
-                    size_t data_in_sz, const char* data_in,
-                    std::vector<char>& data_out) = 0;
-    
-    // Distributed object lifecycle management
-    virtual int try_cast(uint64_t protocol_version,
-                        destination_zone destination_zone_id,
-                        object object_id,
-                        interface_ordinal interface_id) = 0;
-    
-    virtual uint64_t add_ref(uint64_t protocol_version,
-                           destination_channel_zone destination_channel_zone_id,
-                           destination_zone destination_zone_id,
-                           object object_id,
-                           caller_channel_zone caller_channel_zone_id,
-                           caller_zone caller_zone_id,
-                           add_ref_options options) = 0;
-    
-    virtual uint64_t release(uint64_t protocol_version,
-                           destination_zone destination_zone_id,
-                           object object_id,
-                           caller_zone caller_zone_id) = 0;
-};
-```
-
-### Function-by-Function Analysis
-
-#### 1. send() - Core RPC Call Marshalling
-
-**Purpose**: The primary function for executing remote procedure calls.
-
-**Parameters Explained:**
-- **`protocol_version`**: Version compatibility negotiation (defaults to 3, falls back to 2 when peers require it)
-- **`encoding`**: Serialization format negotiated between endpoints (YAS binary, YAS JSON, or future plugins)  
-- **`tag`**: Unique identifier for call correlation and debugging
-- **Zone Parameters**: Complex routing information for multi-hop calls
-- **`object_id`**: Target object instance identifier
-- **`interface_id`**: Interface type identifier for polymorphic dispatch
-- **`method_id`**: Specific method within the interface
-- **`data_in/data_out`**: Serialized parameter data
-
-**Use Cases:**
-```cpp
-// Direct function call marshalling
-int result = send(RPC_VERSION_1, encoding::YAS_BINARY, generate_tag(),
-                 caller_channel, caller_zone, destination_zone,
-                 object_42, i_calculator_id, add_method_id,
-                 serialized_params.size(), serialized_params.data(),
-                 response_buffer);
-```
-
-#### 2. try_cast() - Interface Type Checking
-
-**Purpose**: Determine if a remote object supports a specific interface (similar to `dynamic_cast`).
-
-**Implementation Pattern:**
-```cpp
-// Check if remote object supports i_calculator interface
-int cast_result = try_cast(RPC_VERSION_1, destination_zone, object_id, i_calculator_id);
-if (cast_result == rpc::error::OK()) {
-    // Object supports interface, safe to call calculator methods
-    auto calculator = create_interface_proxy<i_calculator>(object_id);
-}
-```
-
-**Error Cases:**
-- `rpc::error::INTERFACE_NOT_SUPPORTED()` - Object doesn't implement interface
-- `rpc::error::OBJECT_NOT_FOUND()` - Object no longer exists
-- `rpc::error::TRANSPORT_ERROR()` - Communication failure
-
-#### 3. add_ref() - Complex Reference Counting
-
-**Purpose**: The most sophisticated function in the interface, managing distributed object lifetimes across complex zone topologies.
-
-**The add_ref_options System:**
-```cpp
-enum add_ref_options {
-    normal = 1,                    // Standard reference counting
-    build_destination_route = 2,   // Unidirectional add_ref to destination
-    build_caller_route = 4         // Unidirectional add_ref to caller (reverse)
-};
-```
-
-**Complex Routing Scenarios:**
-
-**Scenario 1: Direct Reference** (`options = normal`)
-```
-Zone A → Zone B
-```
-Simple increment of reference count on target object.
-
-**Scenario 2: Destination Route Building** (`options = build_destination_route`)
-```
-Zone A → Zone B → Zone C
-```
-Establishes forward routing path for future calls from A to C via B.
-
-**Scenario 3: Caller Route Building** (`options = build_caller_route`)  
-```
-Zone C ← Zone B ← Zone A
-```
-Establishes reverse routing path for callbacks from C back to A via B.
-
-**Scenario 4: Bidirectional Route Building** (`options = build_destination_route | build_caller_route`)
-```
-Zone A ↔ Zone B ↔ Zone C
-```
-Establishes routing in both directions for complex interface passing scenarios.
-
-**Channel vs Zone Distinction:**
-- **`destination_zone_id`**: Final target zone containing the object
-- **`destination_channel_zone_id`**: Next hop in routing chain (may be different)
-- **`caller_zone_id`**: Original zone making the reference
-- **`caller_channel_zone_id`**: Previous hop in routing chain
-
-**Edge Case Handling:**
-The implementation includes two critical untested paths:
-
-1. **Line 792 Path**: When `dest_channel == caller_channel && build_channel` - occurs when zone is "passing the buck" to another zone
-2. **Line 870 Path**: When building caller route but caller zone is unknown - uses `get_parent()` fallback
-
-#### 4. release() - Reference Cleanup
-
-**Purpose**: Decrement reference count and clean up resources when objects are no longer needed.
-
-**Implementation Considerations:**
-```cpp
-// Standard release pattern
-uint64_t remaining_refs = release(RPC_VERSION_1, destination_zone, object_id, caller_zone);
-if (remaining_refs == 0) {
-    // Object has been destroyed on remote side
-    // Local proxy should be cleaned up
-}
-```
-
-**Synchronization with add_ref():**
-Every `add_ref()` call must be balanced with a corresponding `release()` call to prevent resource leaks. The reference counting system tracks this automatically but requires careful implementation in custom service proxies.
-
-### Implementation Best Practices
-
-**1. Error Handling:**
-```cpp
-int send_result = send(/* parameters */);
-if (send_result != rpc::error::OK()) {
-    // Handle transport errors, timeouts, serialization failures
-    RPC_ERROR("RPC call failed with error: {}", send_result);
-    return send_result;
-}
-```
-
-**2. Reference Counting Balance:**
-```cpp
-// Always balance add_ref with release
-auto ref_count = add_ref(/* parameters */);
-// ... use object ...
-auto remaining = release(/* parameters */);
-```
-
-**3. Protocol Version Handling:**
-```cpp
-if (protocol_version > MAX_SUPPORTED_VERSION) {
-    return rpc::error::VERSION_NOT_SUPPORTED();
-}
-```
-
-### Backward Compatibility and Wire Protocol Evolution
-
-The `i_marshaller` interface is designed with **backward compatibility** as a core principle, ensuring that different versions of RPC++ implementations can communicate seamlessly across time and system boundaries.
-
-#### Protocol Version Negotiation
-
-RPC++ implements **automatic protocol version negotiation** that gracefully handles version mismatches:
+RPC++ implements automatic protocol version negotiation that gracefully handles version mismatches:
 
 ```cpp
 // Current implementation (v2.2.0)
@@ -1257,25 +727,22 @@ if (result == rpc::error::INVALID_VERSION()) {
 - **Version 2** (Deprecated): Stable baseline supported indefinitely
 - **Version 1** (Removed): An early proof of concept implementation with many issues that needed to be fixed
 
-#### Interface Fingerprinting and Known Direction
+### Interface Fingerprinting
 
-The wire protocol includes **interface fingerprinting** to ensure type safety across version boundaries:
+The wire protocol includes interface fingerprinting to ensure type safety across version boundaries:
 
-**Fingerprint Generation:**
 ```cpp
 // Interface signature includes all method signatures
 // Ensures compile-time compatibility checking
 uint64_t interface_id = generate_interface_fingerprint(i_calculator::methods);
+```
 
-**Backward Compatibility Benefits:**
-1. **Type Safety**: Interface changes detected at runtime
-2. **Performance**: Known directions avoid repeated negotiation
-3. **Migration**: Gradual rollout of new versions possible
-4. **Debugging**: Version mismatches clearly reported in logs
+**Fingerprint Protection Logic:**
+1. **Development Status**: Fingerprint changes permitted - interfaces can evolve freely
+2. **Production Status**: Fingerprint **LOCKED** - any interface changes rejected by CI/CD
+3. **Deprecated Status**: Fingerprint preserved - no changes allowed but usage discouraged
 
-#### Serialization Format Evolution
-
-The system supports **multiple serialization formats** with automatic format detection:
+### Serialization Formats
 
 **Current Supported Formats:**
 ```cpp
@@ -1286,311 +753,13 @@ enum class encoding {
 };
 ```
 
-**Format Negotiation:**
+**Format Features:**
 - **Content Detection**: Automatic format detection from wire data
 - **Performance Optimization**: Binary preferred, JSON fallback
 - **Debugging Support**: JSON format for wire-level inspection
 - **Custom Formats**: Plugin architecture for domain-specific serialization
 
-#### Wire Protocol Stability Guarantees
-
-**Guaranteed Stable:**
-1. **Core Message Structure**: Header format locked across versions
-2. **Error Code Values**: Error enumeration values never change
-3. **Basic Data Types**: int, string, bool wire representation fixed
-4. **Reference Counting**: add_ref/release semantics preserved
-
-**Evolution-Friendly:**
-1. **Optional Fields**: New parameters added as optional with defaults
-2. **Method Extensions**: Interface methods can be added (fingerprint changes)
-3. **Encoding Extensions**: New serialization formats added transparently
-4. **Zone Routing**: Enhanced routing preserves basic connectivity
-
-**Production Considerations:**
-- **Version Monitoring**: Track protocol versions in telemetry
-- **Graceful Degradation**: Design interfaces to work across versions
-- **Testing Strategy**: Validate mixed-version deployments
-- **Documentation**: Maintain version compatibility matrices
-
-#### Interface Design Best Practices
-
-**Single Responsibility Principle**
-
-Following the **Single Responsibility Principle** is **HIGHLY RECOMMENDED** recommended for maintaining backward compatibility and system stability:
-
-```cpp
-// ❌ BAD: Monolithic interface with mixed responsibilities
-interface i_user_management {
-    // User data operations
-    int get_user_profile(int user_id, [out] user_profile& profile);
-    int update_user_email(int user_id, string new_email);
-
-    // Authentication operations
-    int authenticate_user(string username, string password, [out] auth_token& token);
-    int validate_session(auth_token token, [out] bool& is_valid);
-
-    // Billing operations
-    int process_payment(int user_id, payment_info payment, [out] transaction_id& txn);
-    int get_billing_history(int user_id, [out] std::vector<transaction>& history);
-
-    // Analytics operations
-    int log_user_event(int user_id, event_data event);
-    int generate_usage_report(int user_id, [out] usage_stats& stats);
-};
-```
-
-**Problems with monolithic interfaces:**
-- **Frequent version updates** when any feature area changes
-- **Complex fingerprint evolution** affecting unrelated functionality
-- **Difficult testing** and **tight coupling** between unrelated features
-- **Large deployment impact** for small feature changes
-
-```cpp
-// ✅ GOOD: Focused interfaces with single responsibility
-namespace user_management {
-    [inline] namespace v1 {
-        interface i_user_profile {
-            int get_user_profile(int user_id, [out] user_profile& profile);
-            int update_user_email(int user_id, string new_email);
-            int update_user_preferences(int user_id, user_preferences prefs);
-        };
-    }
-}
-
-namespace authentication {
-    [inline] namespace v1 {
-        interface i_auth_service {
-            int authenticate_user(string username, string password, [out] auth_token& token);
-            int validate_session(auth_token token, [out] bool& is_valid);
-            int refresh_token(auth_token old_token, [out] auth_token& new_token);
-        };
-    }
-}
-
-namespace billing {
-    [inline] namespace v2 {  // Note: evolved to v2 independently
-        interface i_payment_processor {
-            int process_payment(int user_id, payment_info payment, [out] transaction_id& txn);
-            int refund_payment(transaction_id txn, [out] refund_id& refund);
-        };
-
-        interface i_billing_history {
-            int get_billing_history(int user_id, [out] std::vector<transaction>& history);
-            int export_tax_documents(int user_id, tax_year year, [out] document& doc);
-        };
-    }
-}
-```
-
-**Versioned Namespaces: HIGHLY RECOMMENDED**
-
-**ALL types and interfaces should be placed in versioned namespaces:**
-
-```cpp
-// ✅ CORRECT: Versioned namespace pattern
-namespace calculator {
-    [inline] namespace v1 {
-        struct calculation_request {
-            double operand_a;
-            double operand_b;
-            string operation;  // "add", "subtract", "multiply", "divide"
-        };
-
-        interface i_basic_calculator {
-            int calculate(calculation_request request, [out] double& result);
-            int get_last_result([out] double& result);
-        };
-    }
-}
-
-namespace calculator {
-    [inline] namespace v2 {
-        // Enhanced request structure with precision
-        struct calculation_request {
-            double operand_a;
-            double operand_b;
-            string operation;
-            int precision = 2;  // New field with default
-        };
-
-        // New advanced interface
-        interface i_scientific_calculator {
-            int calculate(calculation_request request, [out] double& result);
-            int calculate_advanced(string expression, [out] double& result);
-            int get_calculation_history([out] std::vector<calculation_request>& history);
-        };
-
-        // v1 interface still available for backward compatibility
-        using i_basic_calculator = calculator::v1::i_basic_calculator;
-    }
-}
-```
-
-**Benefits of versioned namespaces:**
-1. **Independent Evolution**: Each domain evolves at its own pace
-2. **Clear Migration Paths**: Explicit version boundaries
-3. **Reduced Coupling**: Changes in one area don't affect others
-4. **Simplified Testing**: Version-specific test suites
-5. **Gradual Rollouts**: Deploy new versions incrementally
-
-**Namespace Organization Strategy:**
-```cpp
-// Domain-based versioned namespace hierarchy
-namespace company {
-    namespace user_service {
-        [inline] namespace v1 { /* user management interfaces */ }
-    }
-    namespace auth_service {
-        [inline] namespace v2 { /* authentication interfaces */ }
-    }
-    namespace billing_service {
-        [inline] namespace v1 { /* billing interfaces */ }
-    }
-    namespace analytics_service {
-        [inline] namespace v3 { /* analytics interfaces */ }
-    }
-
-    // Cross-cutting concerns in shared namespaces
-    namespace common {
-        [inline] namespace v1 {
-            struct error_info { /* shared error types */ }
-            struct audit_log { /* shared audit types */ }
-        }
-    }
-}
-```
-
-**Graceful Deprecation with [deprecated] Attribute**
-
-The `[deprecated]` attribute provides a **fingerprint-safe** way to signal that interfaces or functions should no longer be used:
-
-```cpp
-namespace user_service {
-    [inline] namespace v1 {
-        interface i_user_profile {
-            int get_user_profile(int user_id, [out] user_profile& profile);
-
-            // Deprecated method - triggers compiler warnings but maintains fingerprint
-            [deprecated]
-            int change_email(int user_id, string new_email);
-
-            int update_user_email(int user_id, string new_email);
-        };
-
-        // Deprecated interface - entire interface marked for replacement
-        [deprecated]
-        interface i_legacy_user_manager {
-            int get_user_data(int user_id, [out] string& data);
-            int set_user_data(int user_id, string data);
-        };
-    }
-}
-```
-
-**Key Benefits of [deprecated] Attribute:**
-- **Fingerprint Preservation**: Interface fingerprint remains unchanged
-- **Compile-Time Warnings**: Developers get immediate feedback about deprecated usage
-- **Gradual Migration**: Existing code continues to work while encouraging updates
-- **Documentation**: Migration guidance provided through code comments alongside the attribute
-
-**Deprecation Best Practices:**
-```cpp
-// Mark deprecated methods - migration guidance provided in comments
-[deprecated]
-int simple_calculate(double a, double b, [out] double& result);  // Use calculate_with_precision() instead
-
-// Mark deprecated interfaces with clear documentation
-[deprecated]
-interface i_old_billing_api {  // Migrate to billing::v2::i_billing_service
-    /* ... */
-};
-
-// Deprecated methods within active interfaces
-interface i_user_service {
-    int get_user_profile(int user_id, [out] user_profile& profile);
-
-    [deprecated]
-    int update_user_email(int user_id, string email);  // Use update_contact_info() instead
-
-    int update_contact_info(int user_id, contact_info info);
-};
-```
-
-**Interface Evolution Workflow:**
-1. **Start with v1**: Begin with minimal, focused interface
-2. **Monitor usage**: Track which methods are actually used
-3. **Add [deprecated] markers**: Mark obsolete methods before creating v2
-4. **Plan v2 carefully**: Group related changes into cohesive versions
-5. **Maintain v1**: Keep previous versions stable during migration
-6. **Remove deprecated**: Clean up deprecated methods in subsequent major versions
-
-**Deprecation Timeline Example:**
-```cpp
-// Phase 1: Mark as deprecated (v2.1)
-namespace calculator {
-    [inline] namespace v1 {
-        interface i_calculator {
-            [deprecated]  // Use v2::calculate_with_metadata() for better error reporting
-            int calculate(double a, double b, string op, [out] double& result);
-        };
-    }
-}
-
-// Phase 2: Provide new API (v2.1)
-namespace calculator {
-    [inline] namespace v2 {
-        interface i_calculator {
-            int calculate_with_metadata(calculation_request req, [out] calculation_result& result);
-        };
-    }
-}
-
-// Phase 3: Remove deprecated methods (v3.0 - 6 months later)
-namespace calculator {
-    [inline] namespace v3 {
-        // Old deprecated methods completely removed
-        // Only modern API available
-        interface i_calculator {
-            int calculate_advanced(calculation_request req, [out] calculation_result& result);
-        };
-    }
-}
-```
-
-This approach ensures that **interface fingerprints change less frequently**, **deployments are more predictable**, and **system maintenance is significantly easier** over the long term.
-
-#### Fingerprint-Based Deployment Protection
-
-RPC++ includes a **sophisticated fingerprint tracking system** that prevents accidental interface changes in production environments:
-
-**Status-Based Interface Lifecycle:**
-```cpp
-namespace calculator {
-    [inline] namespace v1 {
-        // Development phase - fingerprint changes allowed
-        [status=development]
-        interface i_calculator_dev {
-            int basic_add(int a, int b, [out] int& result);
-        };
-
-        // Production phase - fingerprint locked
-        [status=production]
-        interface i_calculator {
-            int add(int a, int b, [out] int& result);
-            int subtract(int a, int b, [out] int& result);
-        };
-
-        // Deprecated but fingerprint preserved
-        [status=deprecated]
-        interface i_old_calculator {
-            [deprecated]
-            int legacy_add(int a, int b, [out] int& result);
-        };
-    }
-}
-```
-
-**Fingerprint Generation Process:**
+### Deployment Protection
 
 During code generation, RPC++ creates a `check_sums/` directory structure organized by interface status:
 
@@ -1605,45 +774,382 @@ build/generated/check_sums/
     └── calculator__v1__i_old_calculator      # SHA3 hash: (preserved)
 ```
 
-**Fingerprint Protection Logic:**
-1. **Development Status**: Fingerprint changes permitted - interfaces can evolve freely
-2. **Production Status**: Fingerprint **LOCKED** - any interface changes rejected by CI/CD
-3. **Deprecated Status**: Fingerprint preserved - no changes allowed but usage discouraged
-
-**Continuous Deployment Integration:**
+**CI/CD Integration:**
 ```bash
 # Example CI/CD pipeline check
-#!/bin/bash
-echo "Checking interface fingerprint stability..."
-
-# Compare generated fingerprints with committed fingerprints
 for status_dir in production deprecated; do
     for fingerprint_file in build/generated/check_sums/$status_dir/*; do
-        if [ -f "committed_fingerprints/$status_dir/$(basename $fingerprint_file)" ]; then
-            if ! diff -q "$fingerprint_file" "committed_fingerprints/$status_dir/$(basename $fingerprint_file)"; then
-                echo "ERROR: Production interface fingerprint changed!"
-                echo "Interface: $(basename $fingerprint_file)"
-                echo "This breaks backward compatibility and is not allowed."
-                exit 1
-            fi
+        if ! diff -q "$fingerprint_file" "committed_fingerprints/$status_dir/$(basename $fingerprint_file)"; then
+            echo "ERROR: Production interface fingerprint changed!"
+            exit 1
         fi
     done
 done
-
-echo "All production interfaces stable ✓"
 ```
 
-**Interface Naming Stability Requirements:**
+---
 
-Once an interface reaches **production status**, the following become **immutable**:
-- **Namespace name** (e.g., `calculator::v1`)
-- **Interface name** (e.g., `i_calculator`)
-- **Method signatures** (parameters, return types, attributes)
-- **Method names** and **parameter names**
+## Transport Layer
 
-**Safe Evolution Patterns:**
+### Transport Implementation Examples
+
+**1. Local Child Service (In-Process)**
 ```cpp
-// ✅ SAFE: Add new interface version
+// Direct function calls within the same process
+rpc::shared_ptr<i_calculator> calc;
+auto error = CO_AWAIT service->connect_to_zone<rpc::local_child_service_proxy<i_calculator, i_calculator>>(
+    "calculator_zone",
+    rpc::zone{2},
+    rpc::shared_ptr<i_calculator>(),
+    calc,
+    setup_callback);
+```
+
+**2. SGX Enclave Communication**
+```cpp
+// Communication with SGX enclaves (from test code)
+auto error = CO_AWAIT service->connect_to_zone<rpc::enclave_service_proxy>(
+    "secure_enclave",
+    rpc::zone{enclave_zone_id},
+    host_interface,
+    enclave_interface,
+    enclave_path);
+```
+
+**3. SPSC Inter-Process Communication** (Coroutine builds only)
+```cpp
+// High-performance shared memory communication
+auto error = CO_AWAIT service->connect_to_zone<rpc::spsc::service_proxy>(
+    "peer_process",
+    peer_zone_id.as_destination(),
+    host_interface,
+    remote_interface,
+    timeout_ms,
+    &send_queue,
+    &receive_queue);
+
+// Or attach to existing peer
+auto error = CO_AWAIT service->attach_remote_zone<rpc::spsc::service_proxy, i_host, i_remote>(
+    "remote_zone",
+    input_descriptor,
+    output_descriptor,
+    setup_callback,
+    connection_args...);
+```
+
+**4. TCP Network Communication** (Coroutine builds only)
+```cpp
+// Network communication over TCP
+auto error = CO_AWAIT service->connect_to_zone<rpc::tcp::service_proxy>(
+    "remote_host",
+    remote_zone_id,
+    local_interface,
+    remote_interface,
+    "192.168.1.100",
+    8080,
+    timeout_ms);
+```
+
+### The i_marshaller Interface
+
+The `i_marshaller` interface is the core abstraction that enables RPC++ to work across different transport mechanisms:
+
+```cpp
+class i_marshaller {
+public:
+    virtual ~i_marshaller() = default;
+
+    // Core RPC call marshalling
+    virtual int send(uint64_t protocol_version, encoding enc, uint64_t tag,
+                    caller_channel_zone caller_channel_zone_id,
+                    caller_zone caller_zone_id,
+                    destination_zone destination_zone_id,
+                    object object_id,
+                    interface_ordinal interface_id,
+                    method method_id,
+                    size_t data_in_sz, const char* data_in,
+                    std::vector<char>& data_out) = 0;
+
+    // Distributed object lifecycle management
+    virtual int try_cast(uint64_t protocol_version,
+                        destination_zone destination_zone_id,
+                        object object_id,
+                        interface_ordinal interface_id) = 0;
+
+    virtual uint64_t add_ref(uint64_t protocol_version,
+                           destination_channel_zone destination_channel_zone_id,
+                           destination_zone destination_zone_id,
+                           object object_id,
+                           caller_channel_zone caller_channel_zone_id,
+                           caller_zone caller_zone_id,
+                           add_ref_options options) = 0;
+
+    virtual uint64_t release(uint64_t protocol_version,
+                           destination_zone destination_zone_id,
+                           object object_id,
+                           caller_zone caller_zone_id) = 0;
+};
+```
+
+---
+
+## Build System and Configuration
+
+### CMake Presets
+
+Available build configurations:
+
+```bash
+# Standard configurations
+cmake --preset Debug          # Debug build with full features
+cmake --preset Release        # Optimized release build
+
+# SGX configurations
+cmake --preset Debug_SGX      # Debug build with SGX hardware support
+cmake --preset Debug_SGX_Sim  # Debug build with SGX simulation
+
+# Custom configuration
+cmake --preset Debug -DBUILD_COROUTINE=ON -DUSE_RPC_LOGGING=ON
+```
+
+### Key Build Options
+
+```cmake
+# Core features
+BUILD_COROUTINE=ON             # Enable coroutine support (TCP, SPSC transports)
+BUILD_ENCLAVE=ON               # Enable SGX enclave support
+BUILD_TEST=ON                  # Build test suite
+
+# Debugging and development
+USE_RPC_LOGGING=ON             # Enable comprehensive logging
+USE_THREAD_LOCAL_LOGGING=ON    # Enable thread-local diagnostic logging
+DEBUG_RPC_GEN=ON               # Debug code generation
+
+# Performance and optimization
+RPC_STANDALONE=ON              # Standalone build mode
+CMAKE_EXPORT_COMPILE_COMMANDS=ON  # Export compile commands for tooling
+```
+
+### Bi-Modal Macro Definitions
+
+The build system automatically defines macros that enable bi-modal execution:
+
+**When `BUILD_COROUTINE=OFF` (Blocking Mode):**
+```cpp
+#define CO_AWAIT          // Expands to nothing
+#define CO_RETURN return  // Standard return statement
+#define CORO_TASK(T) T    // Standard return type
+```
+
+**When `BUILD_COROUTINE=ON` (Coroutine Mode):**
+```cpp
+#define CO_AWAIT co_await           // Standard C++20 co_await
+#define CO_RETURN co_return         // Standard C++20 co_return
+#define CORO_TASK(T) coro::task<T>  // Coroutine task type
+```
+
+This allows the same source code to compile and run correctly in both modes without `#ifdef` conditionals in application code.
+
+### Code Generation
+
+IDL files are automatically processed during build:
+
+```bash
+# Generate code from IDL
+cmake --build build --target calculator_idl
+
+# Generated files structure
+build/generated/
+├── include/calculator/calculator.h           # Interface definitions
+├── src/calculator/calculator_proxy.cpp       # Client-side proxy
+├── src/calculator/calculator_stub.cpp        # Server-side stub
+├── src/calculator/yas/calculator.cpp         # Serialization code
+└── json_schema/calculator.json               # JSON schema metadata
+```
+
+---
+
+## Logging and Telemetry
+
+### Modern Logging System
+
+RPC++ uses a structured logging system based on fmt::format:
+
+```cpp
+// Available logging levels
+RPC_DEBUG("Detailed debugging information: {}", value);
+RPC_TRACE("Function entry/exit tracing: {}", function_name);
+RPC_INFO("General information: {}", status);
+RPC_WARNING("Warning condition: {}", warning_msg);
+RPC_ERROR("Error occurred: {}", error_code);
+RPC_CRITICAL("Critical failure: {}", failure_reason);
+```
+
+**Logging Features:**
+- **Zero-overhead when disabled** (`USE_RPC_LOGGING=OFF`)
+- **Compile-time format validation** with fmt::format
+- **Thread-safe** with minimal locking
+- **Multi-environment support**: Host, SGX enclaves, embedded systems
+
+### Thread-Local Diagnostic Logging
+
+For debugging complex multithreaded scenarios:
+
+```cpp
+// Enable thread-local logging
+cmake --preset Debug -DUSE_THREAD_LOCAL_LOGGING=ON
+
+// Automatic crash dumps
+// Each thread maintains a circular buffer of recent log entries
+// On crash, all thread buffers are dumped to /tmp/rpc_crash_dumps/
+```
+
+**Use Cases:**
+- Race condition debugging
+- Service lifecycle analysis
+- Cross-thread operation correlation
+- Performance profiling
+
+### Telemetry System
+
+Comprehensive telemetry for production monitoring:
+
+```cpp
+// Telemetry collection
+auto telemetry = service.get_telemetry();
+telemetry->record_call_duration(interface_id, method_id, duration_ms);
+telemetry->record_error(error_code, context);
+telemetry->record_zone_creation(zone_id, parent_zone_id);
+
+// Export telemetry data
+auto json_report = telemetry->export_json();
+auto metrics = telemetry->get_performance_metrics();
+```
+
+---
+
+## Advanced Features
+
+### Coroutine-Only Transports
+
+Some transport types are only available when `BUILD_COROUTINE=ON`:
+
+```cpp
+#ifdef BUILD_COROUTINE
+// TCP network transport (coroutine-only)
+auto error = CO_AWAIT service->connect_to_zone<rpc::tcp::service_proxy>(
+    "remote_host", remote_zone_id, local_interface, remote_interface,
+    "192.168.1.100", 8080, timeout_ms);
+
+// SPSC inter-process transport (coroutine-only)
+auto error = CO_AWAIT service->connect_to_zone<rpc::spsc::service_proxy>(
+    "peer_process", peer_zone_id, host_interface, remote_interface,
+    timeout_ms, &send_queue, &receive_queue);
+#endif
+
+// These transports work in both modes:
+// - local_child_service_proxy (in-process)
+// - enclave_service_proxy (SGX enclaves)
+// - host_service_proxy (enclave-to-host)
+```
+
+**Why Some Transports Require Coroutines:**
+- **TCP**: Async I/O operations for network communication
+- **SPSC**: Async queue operations for inter-process communication
+- **Performance**: Non-blocking I/O prevents thread starvation
+
+### SGX Enclave Integration
+
+Secure computation with Intel SGX:
+
+```cpp
+// Enclave configuration
+auto enclave_proxy = service.connect_to_enclave<i_secure_processor>(
+    "secure_enclave.signed.so",
+    SGX_DEBUG_FLAG,
+    launch_token
+);
+
+// Secure RPC calls
+secure_data input = prepare_sensitive_data();
+secure_result output;
+auto error = enclave_proxy->process_secure_data(input, output);
+```
+
+**Security Features:**
+- Automatic attestation and secure channel establishment
+- Memory protection for sensitive data
+- Secure serialization with validation
+
+### JSON Schema Generation
+
+Automatic API documentation and validation:
+
+```idl
+[description="Calculator service for mathematical operations"]
+interface i_calculator {
+    [description="Adds two integers and returns the result"]
+    error_code add(int a, int b, [out] int& result);
+}
+```
+
+Generated JSON schema:
+```json
+{
+  "interfaces": {
+    "i_calculator": {
+      "description": "Calculator service for mathematical operations",
+      "methods": {
+        "add": {
+          "description": "Adds two integers and returns the result",
+          "input_schema": { "properties": { "a": {"type": "integer"}, "b": {"type": "integer"} } },
+          "output_schema": { "properties": { "result": {"type": "integer"} } }
+        }
+      }
+    }
+  }
+}
+```
+
+---
+
+## Best Practices
+
+### Interface Design
+
+**Single Responsibility Principle** - **HIGHLY RECOMMENDED**
+
+```cpp
+// ❌ BAD: Monolithic interface with mixed responsibilities
+interface i_user_management {
+    // User data, authentication, billing, analytics mixed together
+};
+
+// ✅ GOOD: Focused interfaces with single responsibility
+namespace user_management {
+    [inline] namespace v1 {
+        interface i_user_profile {
+            int get_user_profile(int user_id, [out] user_profile& profile);
+            int update_user_email(int user_id, string new_email);
+        };
+    }
+}
+
+namespace authentication {
+    [inline] namespace v1 {
+        interface i_auth_service {
+            int authenticate_user(string username, string password, [out] auth_token& token);
+            int validate_session(auth_token token, [out] bool& is_valid);
+        };
+    }
+}
+```
+
+### Versioned Namespaces - **HIGHLY RECOMMENDED**
+
+**ALL types and interfaces should be placed in versioned namespaces:**
+
+```cpp
 namespace calculator {
     [inline] namespace v1 {
         [status=production]  // Locked - cannot change
@@ -1660,156 +1166,57 @@ namespace calculator {
         };
     }
 }
+```
 
-// ❌ UNSAFE: Modify production interface
-namespace calculator {
-    [inline] namespace v1 {
-        [status=production]
-        interface i_calculator {
-            int add(int a, int b, [out] int& result);
-            // int multiply(int a, int b, [out] int& result);  // ← CI/CD REJECTS THIS
-        };
-    }
+### Graceful Deprecation
+
+```cpp
+[deprecated]  // Triggers compiler warnings, preserves fingerprint
+int legacy_method(int param);  // Use new_method() instead
+```
+
+### Error Handling
+
+```cpp
+// Always check return codes
+auto error = proxy->method_call(params);
+if (error != rpc::error::OK()) {
+    RPC_ERROR("RPC call failed: {}", error);
+    return error;
+}
+
+// Use structured error information
+if (error == rpc::error::OBJECT_NOT_FOUND()) {
+    // Handle missing object
+} else if (error == rpc::error::TRANSPORT_ERROR()) {
+    // Handle network issues
 }
 ```
 
-**Fingerprint Composition:**
-The SHA3 fingerprint includes:
-- Complete interface hierarchy and namespace
-- All method signatures with parameter types and attributes
-- Template parameter information
-- Interface inheritance relationships
-- Status and attribute metadata
+### Performance Optimization
 
-**Development Workflow:**
+```cpp
+// Prefer by-value for small types
+int process_id(int id);
+
+// Use by-reference for large types
+int process_data([in] const large_data_structure& data);
+
+// Minimize RPC calls with batch operations
+int process_batch([in] const std::vector<item>& items,
+                  [out] std::vector<result>& results);
+```
+
+### Development Workflow
+
 1. **Prototype** with `[status=development]` - fingerprint tracking but changes allowed
 2. **Stabilize** interface design through testing and review
 3. **Promote** to `[status=production]` - fingerprint becomes immutable
 4. **Deploy** with CI/CD fingerprint validation
 5. **Evolve** by creating new versioned interfaces, not modifying existing ones
 
-This system ensures that **production deployments are never broken** by accidental interface changes while still allowing rapid development iteration.
-
-This backward compatibility design ensures that RPC++ systems can evolve continuously while maintaining **operational stability** across heterogeneous deployment environments.
+This ensures that **production deployments are never broken** by accidental interface changes while still allowing rapid development iteration.
 
 ---
 
-## Getting Started
-
-### Prerequisites
-
-- **C++ Compiler**: Clang 10+, GCC 9.4+, or Visual Studio 2017+
-- **CMake**: Version 3.24 or higher
-- **Build System**: Ninja (recommended) or Make
-
-### Basic Setup
-
-1. **Clone and Configure:**
-```bash
-git clone <rpc-repository>
-cd rpc2
-mkdir build
-cd build
-cmake .. -G Ninja
-```
-
-2. **Build the Library:**
-```bash
-cmake --build . --target rpc
-```
-
-3. **Create Your First IDL:**
-```idl
-// hello.idl
-namespace hello {
-    [description="Simple greeting service"]
-    interface i_greeter {
-        [description="Returns a personalized greeting"]
-        error_code greet(const std::string& name, [out] std::string& greeting);
-    };
-}
-```
-
-4. **Generate Code:**
-```bash
-cmake --build . --target hello_idl
-```
-
-5. **Implement Service:**
-```cpp
-#include "hello/hello.h"
-
-class greeter_impl : public hello::i_greeter {
-public:
-    error_code greet(const std::string& name, std::string& greeting) override {
-        greeting = "Hello, " + name + "!";
-        return rpc::error::OK();
-    }
-};
-```
-
-### CMake Integration
-
-```cmake
-# Add RPC++ to your project
-find_package(rpc REQUIRED)
-
-# Generate code from IDL
-RPCGenerate(
-    hello                    # Target name
-    hello.idl               # IDL file
-    HEADER hello/hello.h    # Generated header
-    PROXY hello/hello_proxy.cpp
-    STUB hello/hello_stub.cpp
-)
-
-# Link with generated code
-target_link_libraries(your_app PRIVATE rpc hello)
-```
-
----
-
-## Architecture Overview
-
-### High-Level System Design
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Application Layer                        │
-├─────────────────────────────────────────────────────────────────┤
-│  Interface Implementations  │  Generated Proxies & Stubs       │
-├─────────────────────────────────────────────────────────────────┤
-│                      RPC++ Core Library                        │  
-│  ├── Service Management    ├── Object Lifecycle               │
-│  ├── Reference Counting    ├── Zone Communication             │
-│  └── Interface Routing     └── Error Handling                 │
-├─────────────────────────────────────────────────────────────────┤
-│                     Service Proxy Layer                        │
-│  ├── In-Memory Proxy      ├── Network Proxy                   │
-│  ├── SGX Enclave Proxy    ├── Custom Transport Proxy          │
-│  └── Arena Proxy          └── Authentication & Security       │
-├─────────────────────────────────────────────────────────────────┤
-│                    Serialization Layer                         │
-│  ├── YAS Binary Format    ├── JSON Format                     │ 
-│  └── Custom Formats       └── Compression & Encryption        │
-├─────────────────────────────────────────────────────────────────┤
-│                      Transport Layer                           │
-│  ├── In-Process Calls     ├── TCP/IP Networking               │
-│  ├── Shared Memory        ├── Named Pipes                     │
-│  ├── SGX Enclaves         └── Custom Protocols                │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### Key Architectural Principles
-
-1. **Separation of Concerns**: Transport, serialization, and business logic are independent
-2. **Type Safety**: Full C++ type system integration with compile-time verification  
-3. **Performance**: Zero-copy paths and minimal overhead design
-4. **Extensibility**: Plugin architecture for custom transports and formats
-5. **Reliability**: Comprehensive error handling and reference counting
-6. **Security**: Built-in support for secure enclaves and authentication
-
----
-
-**RPC++ - Modern C++ Remote Procedure Calls**
-*Bringing distributed computing into the type-safe, high-performance world of modern C++*
+*This guide covers RPC++ version 2.2.0. For the latest updates and detailed API documentation, visit the project repository.*
