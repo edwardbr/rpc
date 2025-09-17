@@ -397,7 +397,7 @@ namespace rpc
                 version_.store(protocol_version);
             }
 
-            return send(protocol_version,
+            CO_RETURN CO_AWAIT send(protocol_version,
                 encoding,
                 tag,
                 get_zone_id().as_caller_channel(),
@@ -537,7 +537,7 @@ namespace rpc
         {
             // self is needed to keep the service proxy alive in the async destruction of the service_proxy
             RPC_DEBUG("cleanup_after_object service zone: {} destination_zone={}, caller_zone={}, object_id = {}",
-                      get_zone_id().id, destination_zone_id_.get_val(), caller_zone_id_.get_val(), object_id.get_val());
+                      get_zone_id().get_val(), destination_zone_id_.get_val(), caller_zone_id_.get_val(), object_id.get_val());
 
             auto caller_zone_id = get_zone_id().as_caller();
             
@@ -575,7 +575,7 @@ namespace rpc
         void on_object_proxy_released(object object_id, int inherited_reference_count)
         {
             RPC_DEBUG("on_object_proxy_released service zone: {} destination_zone={}, caller_zone={}, object_id = {}",
-                      zone_id_.id, destination_zone_id_.get_val(), caller_zone_id_.get_val(), object_id.id);
+                      get_zone_id().get_val(), destination_zone_id_.get_val(), caller_zone_id_.get_val(), object_id.get_val());
 
             // this keeps the underlying service alive while the service proxy is released
             auto current_service = get_operating_zone_service();
@@ -681,7 +681,7 @@ namespace rpc
             object object_id, object_proxy_creation_rule rule, bool new_proxy_added, known_direction_zone known_direction_zone_id)
         {
             RPC_DEBUG("get_or_create_object_proxy service zone: {} destination_zone={}, caller_zone={}, object_id = {}",
-                      zone_id_.id, destination_zone_id_.get_val(), caller_zone_id_.get_val(), object_id.id);
+                      zone_id_.get_val(), destination_zone_id_.get_val(), caller_zone_id_.get_val(), object_id.get_val());
 
             rpc::shared_ptr<object_proxy> op;
             bool is_new = false;

@@ -12,7 +12,7 @@
 
 // Include thread-local logging if enabled (host only, not in enclave)
 #if defined(USE_THREAD_LOCAL_LOGGING) && !defined(_IN_ENCLAVE)
-#include <rpc/thread_local_logger.h>
+#include <rpc/internal/thread_local_logger.h>
 #endif
 
 // Determine which logging backend to use

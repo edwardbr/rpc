@@ -629,7 +629,7 @@ namespace synchronous_generator
             proxy("telemetry_service->on_interface_proxy_send(\"{0}::{1}\", "
                   "__rpc_sp->get_zone_id(), "
                   "__rpc_sp->get_destination_zone_id(), "
-                  "__rpc_op->get_object_id(), {{{0}_proxy::get_id(__rpc_version)}}, {{{2}}});",
+                  "__rpc_op->get_object_id(), {{{0}_proxy::get_id(rpc::get_version())}}, {{{2}}});",
                 interface_name,
                 function->get_name(),
                 function_count);
@@ -1134,7 +1134,7 @@ namespace synchronous_generator
         proxy("telemetry_service->on_interface_proxy_creation(\"{0}\", "
               "__rpc_sp->get_zone_id(), "
               "__rpc_sp->get_destination_zone_id(), __rpc_op->get_object_id(), "
-              "{{{0}_proxy::get_id(__rpc_version)}});",
+              "{{{0}_proxy::get_id(rpc::get_version())}});",
             interface_name);
         proxy("}}");
         proxy("#endif");
@@ -1152,7 +1152,7 @@ namespace synchronous_generator
         proxy("telemetry_service->on_interface_proxy_deletion("
               "__rpc_sp->get_zone_id(), "
               "__rpc_sp->get_destination_zone_id(), __rpc_op->get_object_id(), "
-              "{{{0}_proxy::get_id(__rpc_version)}});",
+              "{{{0}_proxy::get_id(rpc::get_version())}});",
             interface_name);
         proxy("}}");
         proxy("#endif");

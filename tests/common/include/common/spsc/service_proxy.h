@@ -4,7 +4,8 @@
  */
 #pragma once
 
-#include <rpc/proxy.h>
+#include <rpc/rpc.h>
+
 #include <coro/coro.hpp>
 #include <coro/net/ip_address.hpp>
 

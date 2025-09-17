@@ -8,8 +8,8 @@
 #include <chrono>
 #include <unordered_map>
 
-#include <rpc/proxy.h>
-#include <rpc/service.h>
+#include <rpc/rpc.h>
+
 #include <coro/coro.hpp>
 #include <common/tcp/service_proxy.h>
 #include <common/tcp/channel_manager.h>

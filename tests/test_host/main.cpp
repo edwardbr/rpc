@@ -2050,7 +2050,7 @@ do_something_in_val(int val, const rpc::shared_ptr<rpc::object_proxy>& __rpc_op,
             __rpc_sp->get_zone_id(),
             __rpc_sp->get_destination_zone_id(),
             __rpc_op->get_object_id(),
-            {i_foo_proxy::get_id(__rpc_version)},
+            {xxx::i_foo::get_id(rpc::get_version())},
             {1});
     }
 #endif

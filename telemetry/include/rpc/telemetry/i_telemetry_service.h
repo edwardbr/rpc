@@ -5,14 +5,15 @@
 #pragma once
 
 #include <string>
-#include <rpc/rpc.h>
+#include <rpc/internal/types.h>
+#include <rpc/internal/marshaller.h>
 
 #ifndef _IN_ENCLAVE
 #include <filesystem>
 #endif
 
 #if defined(USE_THREAD_LOCAL_LOGGING) && !defined(_IN_ENCLAVE)
-#include <rpc/thread_local_logger.h>
+#include <rpc/internal/thread_local_logger.h>
 #endif
 
 // copied from spdlog
