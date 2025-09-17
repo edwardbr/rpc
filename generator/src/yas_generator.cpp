@@ -505,6 +505,9 @@ namespace yas_generator
             proxy("::yas::save<::yas::mem|::yas::binary|::yas::no_header>(::yas::vector_ostream(__buffer), "
                   "__yas_mapping);");
             proxy("break;");
+            proxy("default:");
+            proxy("return rpc::error::PROXY_DESERIALISATION_ERROR();");
+            proxy("break;");
             proxy("}}");
         }
         else

@@ -587,6 +587,14 @@ namespace synchronous_generator
 
             stub("case {}:", function_count);
             stub("{{");
+            stub("// Validate encoding format support");
+            stub("if (enc != rpc::encoding::yas_binary &&");
+            stub("    enc != rpc::encoding::yas_compressed_binary &&");
+            stub("    enc != rpc::encoding::yas_json &&");
+            stub("    enc != rpc::encoding::enc_default)");
+            stub("{{");
+            stub("    CO_RETURN rpc::error::INCOMPATIBLE_SERIALISATION();");
+            stub("}}");
 
             proxy.print_tabs();
             proxy.raw("virtual CORO_TASK({}) {}(", function->get_return_type(), function->get_name());
@@ -661,6 +669,11 @@ namespace synchronous_generator
             proxy("auto __rpc_ret = rpc::error::OK();");
             
             proxy("//PROXY_PREPARE_IN");
+    
+            proxy("if (__rpc_version < __rpc_min_version)");
+            proxy("{{");
+            proxy("CO_RETURN rpc::error::INVALID_VERSION();");
+            proxy("}}");
             uint64_t count = 1;
             for (auto& parameter : function->get_parameters())
             {
@@ -692,7 +705,7 @@ namespace synchronous_generator
 
             {
                 proxy.print_tabs();
-                proxy.raw("{}proxy_serialiser<rpc::serialiser::yas, rpc::encoding>::{}(",
+                proxy.raw("__rpc_ret = {}proxy_serialiser<rpc::serialiser::yas, rpc::encoding>::{}(",
                     scoped_namespace,
                     function->get_name());
                 stub.print_tabs();
@@ -727,6 +740,8 @@ namespace synchronous_generator
                     count++;
                 }
                 proxy.raw("__rpc_in_buf, __rpc_sp->get_encoding());\n");
+                proxy("if(__rpc_ret != rpc::error::OK())");
+                proxy("  CO_RETURN __rpc_ret;");
                 stub.raw("in_buf_, in_size_, enc);\n");
                 stub("if(__rpc_ret != rpc::error::OK())");
                 stub("  CO_RETURN __rpc_ret;");
@@ -747,7 +762,6 @@ namespace synchronous_generator
             proxy("{{");
             proxy("if(__rpc_version == __rpc_min_version)");
             proxy("{{");
-            proxy("__rpc_sp->update_remote_rpc_version(__rpc_version);");
             proxy("__rpc_out_buf.clear();");
             proxy("CO_RETURN __rpc_ret;");
             proxy("}}");
@@ -755,6 +769,23 @@ namespace synchronous_generator
             proxy("__rpc_sp->update_remote_rpc_version(__rpc_version);");
             proxy("__rpc_out_buf = std::vector<char>(RPC_OUT_BUFFER_SIZE);");
             proxy("continue;");
+            proxy("}}");
+
+            proxy("if(__rpc_ret == rpc::error::INCOMPATIBLE_SERIALISATION())");
+            proxy("{{");
+            proxy("// Try fallback to yas_json if current encoding is not supported");
+            proxy("if(__rpc_encoding != rpc::encoding::yas_json)");
+            proxy("{{");
+            proxy("__rpc_sp->set_encoding(rpc::encoding::yas_json);");
+            proxy("__rpc_encoding = rpc::encoding::yas_json;");
+            proxy("__rpc_out_buf = std::vector<char>(RPC_OUT_BUFFER_SIZE);");
+            proxy("continue;");
+            proxy("}}");
+            proxy("else");
+            proxy("{{");
+            proxy("// Already using yas_json, no more fallback options");
+            proxy("CO_RETURN __rpc_ret;");
+            proxy("}}");
             proxy("}}");
 
             proxy("if(__rpc_ret >= rpc::error::MIN() && __rpc_ret <= rpc::error::MAX())");
@@ -767,7 +798,6 @@ namespace synchronous_generator
             proxy("CO_RETURN __rpc_ret;");
             proxy("}}");
 
-            proxy("__rpc_sp->update_remote_rpc_version(__rpc_version);");
             proxy("break;");
             proxy("}}");
 

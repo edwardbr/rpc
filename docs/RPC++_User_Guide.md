@@ -313,10 +313,113 @@ struct calculation_request {
 - **RPC Types**: `rpc::shared_ptr<interface>` for object passing
 - **Custom Types**: User-defined structs and classes
 
+### RPC Type Limitations
+
+**`rpc::shared_ptr` Restriction**: Currently, `rpc::shared_ptr` objects cannot be embedded within structures or other data types. They can only be used as direct parameters in interface function signatures:
+
+```cpp
+// SUPPORTED: rpc::shared_ptr as interface function parameters
+[status=production]
+interface i_service_manager {
+    error_code register_service([in] rpc::shared_ptr<i_service> service);
+    error_code get_service([out] rpc::shared_ptr<i_service>& service);
+    error_code call_service([in] const rpc::shared_ptr<i_service>& service, int data);
+};
+
+// NOT SUPPORTED: rpc::shared_ptr embedded in structures
+struct service_info {
+    std::string name;
+    rpc::shared_ptr<i_service> service;  // ❌ NOT CURRENTLY SUPPORTED
+    int priority;
+};
+
+// WORKAROUND: Use separate parameters instead of embedding
+[status=production]
+interface i_service_manager {
+    error_code register_service_info([in] const std::string& name,
+                                   [in] rpc::shared_ptr<i_service> service,
+                                   [in] int priority);
+};
+```
+
+This limitation exists because `rpc::shared_ptr` requires special marshalling logic for distributed object lifecycle management that is currently only implemented at the interface parameter level.
+
 ### Parameter Attributes
 
 - **`[in]`**: Input parameter (default for value types)
 - **`[out]`**: Output parameter (must be reference)
+
+### Parameter Reference Types
+
+RPC++ supports various reference types for different parameter passing semantics:
+
+```cpp
+[status=production]
+interface i_data_processor {
+    // Value parameters (implicit [in])
+    error_code process_simple(int value, std::string data);
+
+    // Explicit [in] reference parameters
+    error_code process_by_ref([in] const std::string& data);
+
+    // Rvalue reference parameters for move semantics
+    error_code process_by_move([in] std::string&& data);
+    error_code process_complex_move([in] ComplexData&& data);
+
+    // Output reference parameters
+    error_code get_result([out] std::string& result);
+    error_code get_complex_result([out] ComplexData& result);
+
+    // Mixed parameter types
+    error_code process_mixed([in] const std::string& input,
+                           [in] std::vector<int>&& bulk_data,
+                           [out] ProcessResult& result);
+};
+```
+
+**Rvalue Reference Benefits**:
+- **Server-Side Efficiency**: Object is deserialized once in the stub and moved directly into application logic
+- **Zero-Copy Transfer**: Eliminates intermediate copying between stub and implementation
+- **Memory Optimization**: Reduces allocations by reusing deserialized objects
+- **Modern C++**: Leverages C++11+ move semantics in RPC calls
+
+**Performance Advantage in Stub**:
+```cpp
+// Server implementation receives moved object
+class data_processor_impl : public i_data_processor {
+public:
+    error_code process_by_move(std::string&& data) override {
+        // 'data' is moved directly from stub deserialization
+        // No additional copy - object built once in stub
+        stored_data_ = std::move(data);  // Efficient move
+        return process_internal();
+    }
+
+    error_code process_complex_move(ComplexData&& complex_data) override {
+        // Large object moved directly from wire format
+        // Stub deserializes once, moves to implementation
+        return complex_processor_.process(std::move(complex_data));
+    }
+
+private:
+    std::string stored_data_;
+    ComplexProcessor complex_processor_;
+};
+```
+
+**Usage Pattern**:
+```cpp
+// Client code can pass temporaries efficiently
+std::string large_data = generate_large_string();
+auto error = CO_AWAIT processor->process_by_move(std::move(large_data));
+
+// Or pass temporary objects directly
+auto error2 = CO_AWAIT processor->process_by_move(generate_temporary_string());
+
+// Complex objects with move constructors
+ComplexData complex = build_complex_data();
+auto error3 = CO_AWAIT processor->process_complex_move(std::move(complex));
+```
 
 ### Interface Lifecycle Attributes
 
@@ -633,32 +736,7 @@ auto error = CO_AWAIT calc->divide(10, 0, result);
 // error == 1001 (application error passed through unchanged)
 ```
 
-**Multi-Application Error Translation**: When connecting applications with different error code ranges, the service proxy must translate errors to maintain compatibility:
-
-```cpp
-// Legacy App A uses error range: 0=success, 1000-1999=errors
-// Modern App B uses error range: 0=success, 2000-2999=errors
-// RPC uses offset range: 50000+
-
-class error_translating_service_proxy {
-    int translate_app_a_to_app_b(int app_a_error) {
-        if (app_a_error == 0) return 0;  // Success
-        if (app_a_error >= 1000 && app_a_error <= 1999) {
-            return 2000 + (app_a_error - 1000);  // Translate range
-        }
-        return app_a_error;  // Pass through unknown codes
-    }
-
-    int translate_rpc_errors(int rpc_error) {
-        // RPC errors need rebasing for App B's range
-        if (rpc_error >= rpc::error::MIN() && rpc_error <= rpc::error::MAX()) {
-            // Rebase RPC errors to App B's reserved RPC range (e.g., 3000+)
-            return 3000 + (rpc_error - rpc::error::MIN());
-        }
-        return rpc_error;
-    }
-};
-```
+**Multi-Application Error Translation**: When connecting applications with different error code ranges, the service proxy must translate errors to maintain compatibility
 
 **Error Translation Scenarios**:
 
@@ -673,34 +751,10 @@ class error_translating_service_proxy {
 2. **Cross-Application Connection** (different error ranges):
    ```cpp
    // Translation required in service proxy
-   Client App A ←→ Translation Proxy ←→ Server App B
-   App codes: 0, 1000-1999    →    App codes: 0, 2000-2999
-   RPC codes: 50000+         →    RPC codes: 60000+
+   Client App A ←→ Connection to an app with a different error code system ←→ Server App B
+   App codes: 0, 1000-1999                                                 →  App codes: 0, 2000-2999
+   RPC codes: 50000+                                                       →  RPC codes: 60000+
    ```
-
-**Translation Implementation Pattern**:
-```cpp
-// In custom service proxy implementation
-template<typename TargetProxy>
-class error_translating_proxy : public TargetProxy {
-public:
-    error_code translated_method(int param, [out] int& result) override {
-        auto error = TargetProxy::translated_method(param, result);
-
-        // Translate application errors between ranges
-        if (is_source_app_error(error)) {
-            return translate_to_target_app_range(error);
-        }
-
-        // Rebase RPC errors for target application
-        if (is_rpc_error(error)) {
-            return rebase_rpc_error_for_target(error);
-        }
-
-        return error;  // Pass through unchanged
-    }
-};
-```
 
 ---
 
@@ -759,6 +813,90 @@ enum class encoding {
 - **Debugging Support**: JSON format for wire-level inspection
 - **Custom Formats**: Plugin architecture for domain-specific serialization
 
+### Format Negotiation and Automatic Fallback
+
+RPC++ implements **automatic format negotiation** where clients and servers can discover compatible serialization formats without manual configuration. When a stub encounters an unsupported encoding format, it automatically triggers fallback logic.
+
+**Supported Encoding Formats:**
+```cpp
+enum class encoding : uint64_t {
+    enc_default = 0,           // Maps to yas_binary
+    yas_binary = 1,            // High-performance binary format
+    yas_compressed_binary = 2, // Space-optimized binary format
+    yas_json = 8,              // Universal fallback format
+};
+```
+
+**Automatic Format Fallback Process:**
+
+1. **Initial Request**: Proxy sends RPC call with current encoding (e.g., `yas_compressed_binary`)
+2. **Format Validation**: Stub validates encoding support at method entry
+3. **Fallback Trigger**: If unsupported, stub returns `INCOMPATIBLE_SERIALISATION()` error
+4. **Automatic Retry**: Proxy detects error and retries with `yas_json` (universal format)
+5. **Success or Failure**: Either succeeds with fallback format or fails if `yas_json` unsupported
+
+**Example Scenario:**
+```cpp
+// Client using compressed binary format
+auto client_proxy = service->get_proxy<i_calculator>();
+client_proxy->set_encoding(rpc::encoding::yas_compressed_binary);
+
+// Server only supports basic formats (older implementation)
+// Automatic fallback sequence:
+// 1. Client → Server: yas_compressed_binary → INCOMPATIBLE_SERIALISATION
+// 2. Client → Server: yas_json (fallback) → SUCCESS
+```
+
+**Generated Code Behavior:**
+
+**Stub-Side Validation:**
+```cpp
+// Generated in every stub method
+if (enc != rpc::encoding::yas_binary &&
+    enc != rpc::encoding::yas_compressed_binary &&
+    enc != rpc::encoding::yas_json &&
+    enc != rpc::encoding::enc_default)
+{
+    CO_RETURN rpc::error::INCOMPATIBLE_SERIALISATION();
+}
+```
+
+**Proxy-Side Retry Logic:**
+```cpp
+// Generated in every proxy method
+if(__rpc_ret == rpc::error::INCOMPATIBLE_SERIALISATION())
+{
+    if(__rpc_encoding != rpc::encoding::yas_json)
+    {
+        __rpc_sp->set_encoding(rpc::encoding::yas_json);
+        __rpc_encoding = rpc::encoding::yas_json;
+        continue; // Retry with universal format
+    }
+    else
+    {
+        CO_RETURN __rpc_ret; // No more fallback options
+    }
+}
+```
+
+**Key Benefits:**
+- **Zero Configuration**: Applications work across different RPC++ versions automatically
+- **Performance Optimization**: Uses best available format, falls back when needed
+- **Deployment Safety**: Prevents serialization incompatibilities from breaking services
+- **Future Compatibility**: New formats can be added without breaking existing deployments
+
+**Combined Version and Format Negotiation:**
+```cpp
+// Automatic negotiation handles both version and format compatibility
+auto error = CO_AWAIT proxy->calculate(10, 20, result);
+// Internally handles:
+// - Version 3 → Version 2 fallback (if needed)
+// - yas_compressed_binary → yas_json fallback (if needed)
+// - Returns result or meaningful error
+```
+
+This dual negotiation ensures maximum compatibility across heterogeneous deployments with mixed RPC++ versions and encoding capabilities.
+
 ### Deployment Protection
 
 During code generation, RPC++ creates a `check_sums/` directory structure organized by interface status:
@@ -786,6 +924,88 @@ for status_dir in production deprecated; do
     done
 done
 ```
+
+### Template Type Fingerprinting Limitations
+
+**Template Fingerprinting Constraint**: Template types do not have fully formed fingerprints unless they are used in concrete form within the IDL. Abstract template definitions cannot generate stable fingerprints for interface compatibility checking.
+
+```cpp
+// INCOMPLETE FINGERPRINTING: Abstract template definition
+template<typename T>
+struct generic_container {
+    T data;
+    std::vector<T> items;
+};
+
+// Template interfaces also lack concrete fingerprints
+template<typename T>
+interface i_generic_processor {
+    error_code process(const generic_container<T>& input, [out] T& result);
+};
+```
+
+**Required: Concrete Template Instantiations**
+
+For proper fingerprinting, templates must be instantiated with specific concrete types in the IDL:
+
+```cpp
+// PROPER FINGERPRINTING: Concrete instantiations
+[status=production]
+struct string_container {
+    std::string data;
+    std::vector<std::string> items;
+};
+
+[status=production]
+struct int_container {
+    int data;
+    std::vector<int> items;
+};
+
+// Concrete interfaces with proper fingerprints
+[status=production]
+interface i_string_processor {
+    error_code process(const string_container& input, [out] std::string& result);
+};
+
+[status=production]
+interface i_int_processor {
+    error_code process(const int_container& input, [out] int& result);
+};
+```
+
+**Template Usage Patterns**:
+
+1. **Development Phase**: Use templates for rapid prototyping
+   ```cpp
+   // Template for development iteration
+   template<typename T>
+   struct dev_container { T value; };
+   ```
+
+2. **Production Phase**: Create concrete instantiations
+   ```cpp
+   // Concrete types for production deployment
+   [status=production]
+   struct user_data_container {
+       std::string user_id;
+       std::vector<std::string> permissions;
+   };
+
+   [status=production]
+   struct config_data_container {
+       int config_id;
+       std::vector<int> values;
+   };
+   ```
+
+**Fingerprinting Impact**:
+- **Abstract Templates**: Cannot participate in fingerprint-based compatibility checking
+- **Concrete Types**: Generate stable fingerprints for production interface validation
+- **Version Safety**: Only concrete instantiations provide interface fingerprint protection
+- **CI/CD Integration**: Fingerprint validation only works with concrete types
+
+This limitation ensures that interface compatibility checking operates on well-defined, concrete types rather than generic templates that could have varying behavior based on instantiation.
 
 ---
 
@@ -870,12 +1090,13 @@ public:
                     size_t data_in_sz, const char* data_in,
                     std::vector<char>& data_out) = 0;
 
-    // Distributed object lifecycle management
+    // Interface discovery mechanism
     virtual int try_cast(uint64_t protocol_version,
                         destination_zone destination_zone_id,
                         object object_id,
                         interface_ordinal interface_id) = 0;
 
+    // Distributed object lifecycle management
     virtual uint64_t add_ref(uint64_t protocol_version,
                            destination_channel_zone destination_channel_zone_id,
                            destination_zone destination_zone_id,
@@ -1216,6 +1437,218 @@ int process_batch([in] const std::vector<item>& items,
 5. **Evolve** by creating new versioned interfaces, not modifying existing ones
 
 This ensures that **production deployments are never broken** by accidental interface changes while still allowing rapid development iteration.
+
+## Format Negotiation and Automatic Fallback
+
+RPC++ provides automatic format negotiation and fallback mechanisms to ensure compatibility across different encoding formats and protocol versions. This system enables seamless communication between components that may support different serialization formats or RPC protocol versions.
+
+### Supported Encoding Formats
+
+RPC++ supports multiple encoding formats with an extensible architecture that allows for additional formats to be added:
+
+**Built-in Formats**:
+- **`rpc::encoding::enc_default`** - System default encoding
+- **`rpc::encoding::yas_binary`** - Binary YAS serialization (compact, fast)
+- **`rpc::encoding::yas_compressed_binary`** - Compressed binary YAS (smallest size)
+- **`rpc::encoding::yas_json`** - JSON-based YAS serialization (universal compatibility)
+
+**Extensible Architecture**: The encoding system is designed to support additional serialization formats such as:
+- **Protocol Buffers** - Can be added as `rpc::encoding::protobuf`
+- **MessagePack** - Can be added as `rpc::encoding::msgpack`
+- **Apache Avro** - Can be added as `rpc::encoding::avro`
+- **Custom Formats** - Application-specific serialization schemes
+
+The automatic fallback mechanism works with any encoding format, always falling back to `yas_json` as the universal compatibility layer when other formats are not supported by both endpoints.
+
+### Automatic Format Fallback Process
+
+When an RPC call is made, the system follows this automatic fallback sequence:
+
+1. **Initial Attempt**: Use the proxy's current encoding setting
+2. **Stub Validation**: The receiving stub validates if it supports the requested encoding
+3. **Incompatibility Detection**: If unsupported, stub returns `INCOMPATIBLE_SERIALISATION` error
+4. **Automatic Retry**: Proxy detects the error and retries with `yas_json` (universal format)
+5. **Success**: Call succeeds with the fallback encoding, proxy updates its encoding setting
+
+### Generated Code Behavior
+
+The RPC++ code generator creates automatic fallback logic in both proxy and stub code:
+
+**Stub-side Validation** (validates incoming encoding):
+```cpp
+// Example with built-in formats
+if (enc != rpc::encoding::yas_binary &&
+    enc != rpc::encoding::yas_compressed_binary &&
+    enc != rpc::encoding::yas_json &&
+    enc != rpc::encoding::enc_default)
+{
+    CO_RETURN rpc::error::INCOMPATIBLE_SERIALISATION();
+}
+
+// Example with extended formats (including Protocol Buffers)
+if (enc != rpc::encoding::yas_binary &&
+    enc != rpc::encoding::yas_compressed_binary &&
+    enc != rpc::encoding::yas_json &&
+    enc != rpc::encoding::protobuf &&
+    enc != rpc::encoding::enc_default)
+{
+    CO_RETURN rpc::error::INCOMPATIBLE_SERIALISATION();
+}
+```
+
+**Proxy-side Retry Logic** (automatic fallback):
+```cpp
+if(__rpc_ret == rpc::error::INCOMPATIBLE_SERIALISATION())
+{
+    if(__rpc_encoding != rpc::encoding::yas_json)
+    {
+        __rpc_sp->set_encoding(rpc::encoding::yas_json);
+        __rpc_encoding = rpc::encoding::yas_json;
+        continue; // Retry with universal format
+    }
+}
+```
+
+### Version Negotiation and Fallback
+
+RPC++ also provides automatic version negotiation for protocol compatibility:
+
+**Version Fallback Behavior**:
+- When an unsupported protocol version is encountered, the system automatically falls back to supported versions
+- **Discovery**: Unsupported versions (e.g., version 4, 1, 0) automatically fall back to the highest supported version (typically VERSION_3)
+- **Progressive Negotiation**: The system iterates through versions starting from the requested version down to the minimum supported version
+- **State Management**: Service proxy version state is automatically updated after successful negotiation
+
+**Version Negotiation Loop** (in generated proxy code):
+```cpp
+while (protocol_version >= __rpc_min_version)
+{
+    __rpc_ret = CO_AWAIT __rpc_op->send(protocol_version, /* ... */);
+
+    if (__rpc_ret == rpc::error::INVALID_VERSION())
+    {
+        if (protocol_version == __rpc_min_version)
+        {
+            CO_RETURN __rpc_ret; // No more versions to try
+        }
+        --protocol_version; // Try next lower version
+        __rpc_sp->update_remote_rpc_version(protocol_version);
+        continue;
+    }
+    break; // Success
+}
+```
+
+### Universal Fallback Guarantees
+
+- **`yas_json` encoding** works with all RPC++ implementations (universal compatibility)
+- **Combined fallback** handles both version and encoding issues simultaneously
+- **Graceful degradation** ensures calls succeed even with mismatched capabilities
+- **Transparent operation** - applications don't need to handle fallback logic manually
+
+### Testing Format and Version Fallback
+
+For testing fallback mechanisms, RPC++ provides direct proxy testing approaches:
+
+**Format Fallback Testing**:
+```cpp
+// Force invalid encoding to test fallback
+auto invalid_encoding = static_cast<rpc::encoding>(999);
+auto __rpc_op = rpc::casting_interface::get_object_proxy(*foo_proxy);
+auto error = CO_AWAIT do_something_in_val(test_value, __rpc_op,
+                                         rpc::VERSION_3, invalid_encoding);
+// Should succeed due to automatic fallback to yas_json
+```
+
+**Version Fallback Testing**:
+```cpp
+// Force unsupported version to test fallback
+auto error = CO_AWAIT do_something_in_val(test_value, __rpc_op,
+                                         4, rpc::encoding::yas_json);
+// Should succeed due to automatic version negotiation
+```
+
+### Benefits
+
+1. **Seamless Interoperability**: Different RPC++ versions can communicate automatically
+2. **Zero Configuration**: No manual encoding negotiation required
+3. **Performance Optimization**: Uses best available encoding, falls back when needed
+4. **Robust Deployment**: New deployments work with existing systems
+5. **Development Flexibility**: Test different encoding strategies without breaking compatibility
+
+### Adding New Encoding Formats
+
+The RPC++ encoding system is designed for extensibility. To add new formats like Protocol Buffers:
+
+1. **Extend the Encoding Enum**: Add new encoding types to `rpc::encoding`
+2. **Implement Serializers**: Create serialization/deserialization logic for the new format
+3. **Update Generated Code**: The code generator automatically includes new formats in validation logic
+4. **Maintain Fallback**: `yas_json` remains the universal fallback for maximum compatibility
+
+**Example Protocol Buffers Integration**:
+```cpp
+// New encoding type
+namespace rpc {
+    enum class encoding {
+        enc_default,
+        yas_binary,
+        yas_compressed_binary,
+        yas_json,
+        protobuf,          // New format
+        msgpack,           // Another new format
+        custom_format      // Application-specific
+    };
+}
+
+// Generated stub code automatically supports new formats
+if (enc != rpc::encoding::yas_binary &&
+    enc != rpc::encoding::yas_compressed_binary &&
+    enc != rpc::encoding::yas_json &&
+    enc != rpc::encoding::protobuf &&
+    enc != rpc::encoding::msgpack &&
+    enc != rpc::encoding::custom_format &&
+    enc != rpc::encoding::enc_default)
+{
+    CO_RETURN rpc::error::INCOMPATIBLE_SERIALISATION();
+}
+
+// Fallback logic works for any format
+if(__rpc_ret == rpc::error::INCOMPATIBLE_SERIALISATION())
+{
+    if(__rpc_encoding != rpc::encoding::yas_json)
+    {
+        __rpc_sp->set_encoding(rpc::encoding::yas_json);
+        __rpc_encoding = rpc::encoding::yas_json;
+        continue; // Retry with universal format
+    }
+}
+```
+
+**Benefits of Format Extensibility**:
+- **Performance Optimization**: Use Protocol Buffers for high-performance scenarios
+- **Ecosystem Integration**: Support industry-standard formats without breaking compatibility
+- **Gradual Migration**: Deploy new formats while maintaining compatibility with existing systems
+- **Custom Requirements**: Add application-specific serialization formats
+- **Zero Downtime Upgrades**: New formats work alongside existing deployments
+
+The automatic fallback system ensures that RPC++ applications maintain compatibility while allowing individual components to optimize for their specific requirements, whether using built-in formats or custom extensions like Protocol Buffers.
+
+### Service Proxy Data Handling Architecture
+
+**Opaque Data Principle**: Service proxies handle relayed data as **opaque blobs** when forwarding between zones. This architectural principle ensures that service proxies don't need to understand the complete structure of data they're relaying, allowing for layered protocols and transport abstractions.
+
+**Opaque Handling Benefits**:
+- **Transport Independence**: Proxies don't need to understand all protocol layers
+- **Layered Security**: Encrypted payloads remain encrypted during relay
+- **Protocol Evolution**: New transport layers can be added without breaking existing proxies
+- **Performance**: Avoids unnecessary serialization/deserialization in relay nodes
+- **Modularity**: Each proxy component has clear separation of concerns
+
+**Implementation Guidelines**:
+- Service proxies should treat relayed data as binary blobs
+- Each layer adds only its required headers/metadata
+- Avoid unpacking data not relevant to the current transport layer
+- Maintain protocol abstraction boundaries for future extensibility
 
 ---
 
