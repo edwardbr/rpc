@@ -1,20 +1,25 @@
+/*
+ *   Copyright (c) 2025 Edward Boggis-Rolfe
+ *   All rights reserved.
+ */
+
 #pragma once
 
 #include <string>
 #include <memory>
 #include <unordered_map>
 #include <mutex>
-#include <rpc/assert.h>
 #include <atomic>
 
-#include <rpc/types.h>
-#include <rpc/marshaller.h>
-#include <rpc/remote_pointer.h>
-#include <rpc/casting_interface.h>
+#include <rpc/internal/assert.h>
+#include <rpc/internal/types.h>
+#include <rpc/internal/marshaller.h>
+#include <rpc/internal/remote_pointer.h>
+#include <rpc/internal/casting_interface.h>
 #ifdef USE_RPC_TELEMETRY
 #include <rpc/telemetry/i_telemetry_service.h>
 #endif
-#include <rpc/service.h>
+#include <rpc/internal/service.h>
 
 namespace rpc
 {

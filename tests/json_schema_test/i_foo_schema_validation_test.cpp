@@ -1,20 +1,24 @@
-#include <gtest/gtest.h>
+/*
+ *   Copyright (c) 2025 Edward Boggis-Rolfe
+ *   All rights reserved.
+ */
+
+// Standard C++ headers
+#include <algorithm>
+#include <cstdint>
 #include <iostream>
+#include <map>
 #include <string>
 #include <vector>
-#include <cstdint>
-#include <map>
-#include <algorithm>
 
-// Conditional include for nlohmann/json if available
+// RPC headers
+#include <rpc/rpc.h>
+
+// Other headers
+#include <gtest/gtest.h>
 #include <nlohmann/json.hpp>
 #include <nlohmann/json-schema.hpp>
-
-// Generated IDL headers
 #include <example_shared/example_shared.h>
-#include <rpc/error_codes.h>
-
-// Include test setup classes and required headers (only what we need)
 #include "test_globals.h"
 
 // Helper function to create dummy data for different types

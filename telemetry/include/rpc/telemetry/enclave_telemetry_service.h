@@ -1,3 +1,7 @@
+/*
+ *   Copyright (c) 2025 Edward Boggis-Rolfe
+ *   All rights reserved.
+ */
 #pragma once
 
 #include <rpc/telemetry/i_telemetry_service.h>

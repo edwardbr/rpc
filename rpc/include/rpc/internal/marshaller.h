@@ -9,9 +9,7 @@
 #include <unordered_map>
 #include <mutex>
 
-#include <rpc/types.h>
-#include <rpc/serialiser.h>
-#include <rpc/error_codes.h>
+// types.h, error_codes.h, and serialiser.h are included by rpc.h
 
 namespace rpc
 {

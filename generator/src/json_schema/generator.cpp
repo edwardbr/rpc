@@ -1,3 +1,8 @@
+/*
+ *   Copyright (c) 2025 Edward Boggis-Rolfe
+ *   All rights reserved.
+ */
+
 #include "coreclasses.h" // Your parser API header
 #include "cpp_parser.h"  // Your parser API header
 #include "json_schema/generator.h"

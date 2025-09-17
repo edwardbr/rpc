@@ -1,6 +1,10 @@
+/*
+ *   Copyright (c) 2025 Edward Boggis-Rolfe
+ *   All rights reserved.
+ */
 #include <unordered_map>
 
-#include <rpc/basic_service_proxies.h>
+#include <rpc/service_proxies/basic_service_proxies.h>
 
 #ifdef _IN_ENCLAVE
 #include <rpc/telemetry/enclave_telemetry_service.h>

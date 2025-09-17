@@ -4,14 +4,11 @@
  */
 #pragma once
 
-#include <rpc/types.h>
-#include <rpc/proxy.h>
-#include <rpc/error_codes.h>
-#include <rpc/member_ptr.h>
+#include <rpc/rpc.h>
 #ifdef USE_RPC_TELEMETRY
 #include <rpc/telemetry/i_telemetry_service.h>
 #endif
-#include <rpc/service.h>
+// service.h is included by rpc.h
 
 namespace rpc
 {

@@ -1,3 +1,8 @@
+/*
+ *   Copyright (c) 2025 Edward Boggis-Rolfe
+ *   All rights reserved.
+ */
+
 #include "type_utils.h"
 #include "helpers.h"
 #include "attributes.h"

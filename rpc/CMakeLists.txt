@@ -15,23 +15,38 @@ cmake_minimum_required(VERSION 3.24)
 
 add_subdirectory(interfaces)
 
+if(USE_RPC_TELEMETRY)
+  set(RPC_ENCLAVE_TELEMETRY_SERVICE rpc::rpc_telemetry_enclave)
+  set(RPC_HOST_TELEMETRY_SERVICE rpc::rpc_telemetry_host)
+  set(RPC_TELEMETRY_INTERFACE rpc::rpc_telemetry_interface)
+else()
+  set(RPC_ENCLAVE_TELEMETRY_SERVICE)
+  set(RPC_HOST_TELEMETRY_SERVICE)
+  set(RPC_TELEMETRY_INTERFACE)
+endif()
+
 if(BUILD_ENCLAVE)
   add_library(
     rpc_enclave
-    include/rpc/marshaller.h
-    include/rpc/basic_service_proxies.h
-    include/rpc/marshaller.h
-    include/rpc/proxy.h
-    include/rpc/remote_pointer.h
-    include/rpc/service.h
-    include/rpc/stub.h
-    src/proxy.cpp
-    ${REMOTE_PTR_CPP}
+    include/rpc/internal/version.h
+    include/rpc/internal/assert.h
+    include/rpc/internal/error_codes.h
+    include/rpc/internal/types.h
+    include/rpc/internal/logger.h
+      include/rpc/internal/marshaller.h
+    include/rpc/internal/casting_interface.h
+    include/rpc/internal/service.h
+    include/rpc/internal/stub.h
+    include/rpc/internal/proxy.h
+    include/rpc/internal/serialiser.h
+    include/rpc/service_proxies/basic_service_proxies.h
     src/casting_interface.cpp
+    src/error_codes.cpp
+    src/proxy.cpp
     src/service.cpp
     src/stub.cpp
-    src/error_codes.cpp
-    src/version.cpp)
+    src/version.cpp
+    ${REMOTE_PTR_CPP})
 
   target_compile_definitions(rpc_enclave PRIVATE ${ENCLAVE_DEFINES})
   target_compile_options(rpc_enclave PRIVATE ${ENCLAVE_COMPILE_OPTIONS} ${WARN_OK})
@@ -41,7 +56,7 @@ if(BUILD_ENCLAVE)
     PRIVATE ${ENCLAVE_LIBCXX_INCLUDES})
   target_link_libraries(
     rpc_enclave
-    PUBLIC ${RPC_TELEMETRY_INTERFACE} ${RPC_ENCLAVE_TELEMETRY} ${RPC_ENCLAVE_FMT_LIB} rpc_types_idl_enclave
+    PUBLIC ${RPC_TELEMETRY_INTERFACE} ${RPC_ENCLAVE_TELEMETRY_SERVICE} ${RPC_ENCLAVE_FMT_LIB} rpc_types_idl_enclave
     PRIVATE yas_common)
   target_link_options(rpc_enclave PRIVATE ${ENCLAVE_LINK_OPTIONS})
 
@@ -55,20 +70,25 @@ endif()
 # ######################################################################################################################
 add_library(
   rpc_host
-  include/rpc/marshaller.h
-  include/rpc/basic_service_proxies.h
-  include/rpc/marshaller.h
-  include/rpc/proxy.h
-  include/rpc/remote_pointer.h
-  include/rpc/service.h
-  include/rpc/stub.h
-  src/proxy.cpp
-  ${REMOTE_PTR_CPP}
+  include/rpc/internal/version.h
+  include/rpc/internal/assert.h
+  include/rpc/internal/error_codes.h
+  include/rpc/internal/types.h
+  include/rpc/internal/logger.h
+  include/rpc/internal/marshaller.h
+  include/rpc/internal/casting_interface.h
+  include/rpc/internal/service.h
+  include/rpc/internal/stub.h
+  include/rpc/internal/proxy.h
+  include/rpc/internal/serialiser.h
+  include/rpc/service_proxies/basic_service_proxies.h
   src/casting_interface.cpp
+  src/error_codes.cpp
+  src/proxy.cpp
   src/service.cpp
   src/stub.cpp
-  src/error_codes.cpp
-  src/version.cpp)
+  src/version.cpp
+  ${REMOTE_PTR_CPP})
 
 # Conditionally add thread-local logger implementation
 if(USE_THREAD_LOCAL_LOGGING)
@@ -88,7 +108,7 @@ endif()
 
 target_link_libraries(
   rpc_host
-  PUBLIC ${RPC_TELEMETRY_INTERFACE} ${RPC_HOST_TELEMETRY}
+  PUBLIC ${RPC_TELEMETRY_INTERFACE} ${RPC_HOST_TELEMETRY_SERVICE} 
   ${CORO_RUNTIME}
   rpc_types_idl_host
   PRIVATE yas_common ${HOST_LIBRARIES} ${RPC_HOST_FMT_LIB})

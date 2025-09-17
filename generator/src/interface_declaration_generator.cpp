@@ -1,3 +1,8 @@
+/*
+ *   Copyright (c) 2025 Edward Boggis-Rolfe
+ *   All rights reserved.
+ */
+
 #include <sstream>
 #include <unordered_set>
 

@@ -1,7 +1,13 @@
+/*
+ *   Copyright (c) 2025 Edward Boggis-Rolfe
+ *   All rights reserved.
+ */
+
 #pragma once
 
 #include <mutex>
 #include <coro/coro.hpp>
+#include <rpc/rpc.h>
 
 #include <tcp/tcp.h>
 

@@ -1,3 +1,8 @@
+/*
+ *   Copyright (c) 2025 Edward Boggis-Rolfe
+ *   All rights reserved.
+ */
+
 #pragma once
 
 // standard attributes that are used by the idl parser, other attributes may be used by the generator

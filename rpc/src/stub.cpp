@@ -2,10 +2,7 @@
  *   Copyright (c) 2025 Edward Boggis-Rolfe
  *   All rights reserved.
  */
-#include "rpc/stub.h"
-#include "rpc/service.h"
-#include "rpc/version.h"
-#include "rpc/logger.h"
+#include <rpc/rpc.h>
 
 namespace rpc
 {

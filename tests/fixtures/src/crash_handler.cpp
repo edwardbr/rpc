@@ -7,31 +7,30 @@
 
 // Crash handler implementation only available on POSIX systems
 #ifndef _WIN32
-#include <iostream>
-#include <fstream>
-#include <sstream>
-#include <iomanip>
-#include <chrono>
-#include <execinfo.h>
-#include <unistd.h>
-#include <sys/types.h>
+
+// OS-specific headers
 #include <dirent.h>
-#include <cstring>
-#include <cstdlib>
 #include <dlfcn.h>
+#include <execinfo.h>
 #include <link.h>
-#include <gtest/gtest.h>
+#include <sys/types.h>
+#include <unistd.h>
+
+// Standard C++ headers
+#include <chrono>
+#include <cstdlib>
+#include <cstring>
 #include <cxxabi.h>
+#include <fstream>
+#include <iomanip>
+#include <iostream>
+#include <sstream>
 
-// Threading debug integration
-#ifdef RPC_THREADING_DEBUG
-#include <rpc/threading_debug.h>
-#endif
+// RPC headers
+#include <rpc/rpc.h>
 
-// Thread-local logging integration
-#if defined(USE_THREAD_LOCAL_LOGGING) && !defined(_IN_ENCLAVE)
-#include <rpc/thread_local_logger.h>
-#endif
+// Other headers
+#include <gtest/gtest.h>
 
 namespace crash_handler
 {

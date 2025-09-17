@@ -2,32 +2,31 @@
  *   Copyright (c) 2025 Edward Boggis-Rolfe
  *   All rights reserved.
  */
-#include <type_traits>
+
+// Standard C++ headers
 #include <algorithm>
+#include <filesystem>
+#include <sstream>
 #include <tuple>
 #include <type_traits>
-#include "coreclasses.h"
-#include "cpp_parser.h"
-#include "helpers.h"
 
-#include "attributes.h"
-#include "rpc_attributes.h"
-
+// Other headers
 extern "C"
 {
 #include "sha3.h"
 }
-#include <filesystem>
-#include <sstream>
-
-#include "writer.h"
-
-#include "interface_declaration_generator.h"
+#include "attributes.h"
+#include "coreclasses.h"
+#include "cpp_parser.h"
 #include "fingerprint_generator.h"
-#include "synchronous_generator.h"
-#include "json_schema/writer.h"
+#include "helpers.h"
+#include "interface_declaration_generator.h"
 #include "json_schema/generator.h"
 #include "json_schema/per_function_generator.h"
+#include "json_schema/writer.h"
+#include "rpc_attributes.h"
+#include "synchronous_generator.h"
+#include "writer.h"
 #include "type_utils.h"
 #include <map>
 
@@ -2058,13 +2057,7 @@ namespace synchronous_generator
 
         if (include_rpc_headers)
         {
-            header("#include <rpc/version.h>");
-            header("#include <rpc/marshaller.h>");
-            header("#include <rpc/serialiser.h>");
-            header("#include <rpc/service.h>");
-            header("#include <rpc/error_codes.h>");
-            header("#include <rpc/types.h>");
-            header("#include <rpc/casting_interface.h>");
+            header("#include <rpc/rpc.h>");
         }
 
         for (const auto& import : imports)
@@ -2087,16 +2080,13 @@ namespace synchronous_generator
         proxy("#include <yas/text_oarchive.hpp>");
         proxy("#include <yas/std_types.hpp>");
         proxy("#include <yas/count_streams.hpp>");
-        proxy("#include <rpc/proxy.h>");
-        proxy("#include <rpc/stub.h>");
-        proxy("#include <rpc/service.h>");
-        proxy("#include <rpc/logger.h>");  // For RPC_ERROR in error handling
+        proxy("#include <rpc/rpc.h>");
         proxy("#include \"{}\"", header_filename);
 
         proxy("");
 
         stub_header("#pragma once");
-        stub_header("#include <rpc/service.h>");
+        stub_header("#include <rpc/rpc.h>");
         stub_header("");
 
         stub("#include <yas/mem_streams.hpp>");
@@ -2104,8 +2094,7 @@ namespace synchronous_generator
         stub("#include <yas/binary_oarchive.hpp>");
         stub("#include <yas/count_streams.hpp>");
         stub("#include <yas/std_types.hpp>");
-        stub("#include <rpc/stub.h>");
-        stub("#include <rpc/proxy.h>");
+        stub("#include <rpc/rpc.h>");
         stub("#include \"{}\"", header_filename);
         // stub("#include \"{}\"", yas_header_filename);
         stub("#include \"{}\"", stub_header_filename);

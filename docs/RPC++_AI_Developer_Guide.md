@@ -752,7 +752,7 @@ HOST(1) → MAIN_CHILD(2) → SUB_CHILD(3) → DEEP_CHILD(4)
 **Files Modified**:
 - `rpc/src/service.cpp` - Fixed 9 add_ref calls (lines 383, 433, 542, 569, 670, 824, 943, 973, 996, 1051, 1099)
 - `rpc/include/rpc/proxy.h` - Fixed service_proxy add_ref call
-- `rpc/include/rpc/basic_service_proxies.h` - Updated 2 add_ref signatures and implementations
+- `rpc/include/rpc/service_proxies/basic_service_proxies.h` - Updated 2 add_ref signatures and implementations
 - `tests/fixtures/src/rpc_log.cpp` - Fixed test fixture add_ref call
 
 **Pattern**: All fixes use `known_direction_zone(zone_id_)` where `zone_id_` is the current service's zone ID.

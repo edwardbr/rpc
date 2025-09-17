@@ -1,8 +1,11 @@
+/*
+ *   Copyright (c) 2025 Edward Boggis-Rolfe
+ *   All rights reserved.
+ */
 #pragma once
 
 #include <string>
-#include <rpc/types.h>
-#include <rpc/marshaller.h>
+#include <rpc/rpc.h>
 
 #ifndef _IN_ENCLAVE
 #include <filesystem>

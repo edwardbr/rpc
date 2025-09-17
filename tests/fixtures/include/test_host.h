@@ -5,24 +5,25 @@
 
 #pragma once
 
-#include <map>
-#include <string>
-#include <mutex>
+// Standard C++ headers
 #include <atomic>
+#include <map>
+#include <mutex>
+#include <string>
 
+// RPC headers
+#include <rpc/rpc.h>
+#ifdef USE_RPC_TELEMETRY
+#include <rpc/telemetry/i_telemetry_service.h>
+#endif
+
+// Other headers
 #ifdef BUILD_ENCLAVE
 #include "untrusted/enclave_marshal_test_u.h"
 #include <common/enclave_service_proxy.h>
 #endif
-
 #include <example/example.h>
-#include <rpc/error_codes.h>
-#include <rpc/basic_service_proxies.h>
 #include "test_globals.h"
-
-#ifdef USE_RPC_TELEMETRY
-#include <rpc/telemetry/i_telemetry_service.h>
-#endif
 
 class host : public yyy::i_host, public rpc::enable_shared_from_this<host>
 {

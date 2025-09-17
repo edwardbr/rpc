@@ -1,3 +1,7 @@
+/*
+ *   Copyright (c) 2025 Edward Boggis-Rolfe
+ *   All rights reserved.
+ */
 #pragma once
 
 #include <string>
@@ -6,7 +10,7 @@
 #include <set>
 #include <memory>
 #include <shared_mutex>
-#include <rpc/types.h>
+// types.h is included via i_telemetry_service.h
 #include <rpc/telemetry/i_telemetry_service.h>
 
 namespace spdlog

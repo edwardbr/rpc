@@ -1,3 +1,8 @@
+/*
+ *   Copyright (c) 2025 Edward Boggis-Rolfe
+ *   All rights reserved.
+ */
+
 #pragma once
 
 #include <string>
@@ -10,8 +15,8 @@
 #include <yas/serialize.hpp>
 #include <yas/std_types.hpp>
 
-#include <rpc/types.h>
-#include <rpc/error_codes.h>
+#include <rpc/internal/types.h>
+#include <rpc/internal/error_codes.h>
 #include <rpc/rpc_types.h>
 
 namespace rpc

@@ -2,16 +2,16 @@
  *   Copyright (c) 2025 Edward Boggis-Rolfe
  *   All rights reserved.
  */
+
+// Standard C++ headers
 #include <algorithm>
 
+// RPC headers
+#include <rpc/rpc.h>
+
+// Other headers
 #include <yas/mem_streams.hpp>
 #include <yas/std_types.hpp>
-
-#include "rpc/service.h"
-#include "rpc/stub.h"
-#include "rpc/proxy.h"
-#include "rpc/version.h"
-#include "rpc/logger.h"
 
 namespace rpc
 {

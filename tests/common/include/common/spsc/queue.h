@@ -1,4 +1,7 @@
-// Copyright 2023 Secretarium Ltd <contact@secretarium.org>
+/*
+ *   Copyright (c) 2025 Edward Boggis-Rolfe
+ *   All rights reserved.
+ */
 
 #pragma once
 

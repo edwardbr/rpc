@@ -1,3 +1,7 @@
+/*
+ *   Copyright (c) 2025 Edward Boggis-Rolfe
+ *   All rights reserved.
+ */
 
 namespace yas_generator
     {

@@ -1,6 +1,10 @@
+/*
+ *   Copyright (c) 2025 Edward Boggis-Rolfe
+ *   All rights reserved.
+ */
 #include <unordered_map>
 
-#include <rpc/basic_service_proxies.h>
+#include <rpc/service_proxies/basic_service_proxies.h>
 
 #include <rpc/telemetry/i_telemetry_service.h>
 #include <rpc/telemetry/telemetry_handler.h>

@@ -5,9 +5,7 @@
 #pragma once
 
 #include <example/example.h>
-#include <rpc/error_codes.h>
-#include <rpc/logger.h>
-#include <rpc/coroutine_support.h>
+#include <rpc/rpc.h>
 #include "gtest/gtest.h"
 
 namespace marshalled_tests

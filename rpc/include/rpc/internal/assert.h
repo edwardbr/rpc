@@ -1,11 +1,16 @@
+/*
+ *   Copyright (c) 2025 Edward Boggis-Rolfe
+ *   All rights reserved.
+ */
+
 #pragma once
 
 #include <assert.h>
-#include <rpc/error_codes.h>
-#include <rpc/logger.h>
+#include <rpc/internal/error_codes.h>
+#include <rpc/internal/logger.h>
 
 #if defined(USE_THREAD_LOCAL_LOGGING) && !defined(_IN_ENCLAVE)
-#include <rpc/thread_local_logger.h>
+#include <rpc/internal/thread_local_logger.h>
 // Enhanced RPC_ASSERT with thread-local buffer dumping
 #define RPC_ASSERT(x)                                                                                                  \
     if (!(x))                                                                                                          \

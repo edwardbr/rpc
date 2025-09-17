@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "rpc/version.h"
+// version.h is included by rpc.h
 
 #include <cstddef>
 #include <cstdlib> // abort
@@ -26,10 +26,9 @@
 #include <string>
 #include <typeinfo>
 
-#include "rpc/logger.h"
-
-#include "rpc/coroutine_support.h"
-#include "rpc/casting_interface.h"
+#include "rpc/internal/logger.h"
+#include "rpc/internal/coroutine_support.h"
+#include "rpc/internal/casting_interface.h"
 
 #ifdef DUMP_REF_COUNT
     #define LOG(str, sz) RPC_TRACE("{}", std::string(str, sz))

@@ -1,3 +1,7 @@
+/*
+ *   Copyright (c) 2025 Edward Boggis-Rolfe
+ *   All rights reserved.
+ */
 #pragma once
 
 #include <unordered_map>
@@ -6,7 +10,7 @@
 #include <fstream>
 #include <filesystem>
 
-#include <rpc/types.h>
+// types.h is included via i_telemetry_service.h
 #include <rpc/telemetry/i_telemetry_service.h>
 
 namespace rpc

@@ -1,16 +1,23 @@
-#include <thread>
-#include <iostream>
+/*
+ *   Copyright (c) 2025 Edward Boggis-Rolfe
+ *   All rights reserved.
+ */
+
+// Standard C++ headers
 #include <chrono>
+#include <iostream>
+#include <thread>
 
-#include "rpc_global_logger.h"
-
-#include <rpc/service.h>
+// RPC headers
+#include <rpc/rpc.h>
 #ifdef USE_RPC_TELEMETRY
 #include <rpc/telemetry/i_telemetry_service.h>
 #include <rpc/telemetry/telemetry_handler.h>
 #endif
 
-#include "rpc/coroutine_support.h"
+// Other headers
+#include "rpc_global_logger.h"
+
 
 using namespace std::chrono_literals;
 

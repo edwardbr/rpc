@@ -2,8 +2,7 @@
  *   Copyright (c) 2025 Edward Boggis-Rolfe
  *   All rights reserved.
  */
-#include "rpc/proxy.h"
-#include "rpc/logger.h"
+#include <rpc/rpc.h>
 #include <cstdio>
 #include <limits>
 

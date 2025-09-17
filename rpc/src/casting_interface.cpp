@@ -1,5 +1,9 @@
-#include <rpc/casting_interface.h>
-#include <rpc/proxy.h>
+/*
+ *   Copyright (c) 2025 Edward Boggis-Rolfe
+ *   All rights reserved.
+ */
+
+#include <rpc/rpc.h>
 
 namespace rpc
 {

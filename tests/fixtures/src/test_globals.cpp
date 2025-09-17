@@ -4,7 +4,6 @@
  */
 
 #include "test_globals.h"
-#include <rpc/service.h>
 #include <string>
 
 // Global variable definitions

@@ -1,3 +1,8 @@
+/*
+ *   Copyright (c) 2025 Edward Boggis-Rolfe
+ *   All rights reserved.
+ */
+
 #include <common/spsc/channel_manager.h>
 #include <common/spsc/service_proxy.h>
 

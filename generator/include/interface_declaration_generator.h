@@ -1,3 +1,8 @@
+/*
+ *   Copyright (c) 2025 Edward Boggis-Rolfe
+ *   All rights reserved.
+ */
+
 #include "coreclasses.h"
 #include "cpp_parser.h"
 #include "writer.h"

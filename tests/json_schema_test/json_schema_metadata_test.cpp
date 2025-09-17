@@ -1,26 +1,29 @@
-#include <gtest/gtest.h>
+/*
+ *   Copyright (c) 2025 Edward Boggis-Rolfe
+ *   All rights reserved.
+ */
+
+// Standard C++ headers
+#include <algorithm>
+#include <cstdint>
 #include <iostream>
+#include <map>
 #include <string>
 #include <vector>
-#include <cstdint>
-#include <map>
-#include <algorithm>
 
-// Conditional include for nlohmann/json if available
+// RPC headers
+#include <rpc/rpc.h>
+
+// Other headers
+#include <gtest/gtest.h>
 #include <nlohmann/json.hpp>
 #include <nlohmann/json-schema.hpp>
-
-// Generated IDL headers
 #include <example/example.h>
-#include <rpc/error_codes.h>
-
-// Include test setup classes and required headers
+#include <common/foo_impl.h>
+#include <common/tests.h>
 #include "test_host.h"
 #include "inproc_setup.h"
 #include "test_globals.h"
-#include <common/foo_impl.h>
-#include <common/tests.h>
-#include <example/example.h>
 
 // Test using inproc_setup to call standard_tests for schema validation
 TEST(McpSchemaValidationTest, InprocSetupStandardTests)

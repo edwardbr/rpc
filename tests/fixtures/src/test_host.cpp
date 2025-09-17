@@ -4,7 +4,6 @@
  */
 
 #include "test_host.h"
-#include <rpc/error_codes.h>
 
 host::host()
 {

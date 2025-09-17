@@ -1,3 +1,7 @@
+/*
+ *   Copyright (c) 2025 Edward Boggis-Rolfe
+ *   All rights reserved.
+ */
 #include <filesystem>
 #include <algorithm>
 #include <thread>
@@ -8,8 +12,7 @@
 #include <fmt/os.h>
 
 #include <rpc/telemetry/sequence_diagram_telemetry_service.h>
-#include <rpc/assert.h>
-#include <rpc/service.h>
+#include <rpc/rpc.h>
 
 using namespace std::string_literals;
 

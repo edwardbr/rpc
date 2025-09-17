@@ -14,15 +14,14 @@
 #include <limits>
 #include <functional>
 
-#include <rpc/error_codes.h>
-#include <rpc/assert.h>
-#include <rpc/types.h>
-#include <rpc/version.h>
-#include <rpc/marshaller.h>
-#include <rpc/remote_pointer.h>
-#include <rpc/casting_interface.h>
-#include <rpc/marshaller.h>
-#include <rpc/coroutine_support.h>
+#include <rpc/internal/error_codes.h>
+#include <rpc/internal/assert.h>
+#include <rpc/internal/types.h>
+#include <rpc/internal/version.h>
+#include <rpc/internal/marshaller.h>
+#include <rpc/internal/remote_pointer.h>
+#include <rpc/internal/casting_interface.h>
+#include <rpc/internal/coroutine_support.h>
 #ifdef USE_RPC_TELEMETRY
 #include <rpc/telemetry/i_telemetry_service.h>
 #endif

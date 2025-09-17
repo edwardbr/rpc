@@ -6,38 +6,37 @@
 // Autonomous Instruction-Based Fuzz Test for RPC++ Zone Hierarchies
 // Tests autonomous nodes executing instruction sets independently to build specific graph topologies.
 
-#include <iostream>
-#include <vector>
-#include <memory>
-#include <random>
-#include <chrono>
-#include <thread>
-#include <cassert>
-#include <map>
-#include <numeric>
+// Standard C++ headers
 #include <algorithm>
-#include <fstream>
-#include <sstream>
+#include <cassert>
+#include <chrono>
 #include <filesystem>
+#include <fstream>
+#include <iostream>
+#include <map>
+#include <memory>
+#include <numeric>
+#include <random>
+#include <sstream>
+#include <thread>
+#include <vector>
+
+// RPC headers
+#include <rpc/rpc.h>
+#include "rpc/service_proxies/basic_service_proxies.h"
+#ifdef USE_RPC_TELEMETRY
+#include <rpc/telemetry/i_telemetry_service.h>
+#endif
+
+// Other headers
 #include <args.hxx>
-
-#include "rpc/version.h"
-#include "rpc/logger.h"
-#include "rpc/service.h"
-#include "rpc/serialiser.h"
-#include "rpc/error_codes.h"
-#include <yas/types/std/vector.hpp>
-#include <yas/types/std/string.hpp>
-#include "rpc/basic_service_proxies.h"
-
 #include <spdlog/spdlog.h>
-
-// Include our generated interfaces
+#include <yas/types/std/string.hpp>
+#include <yas/types/std/vector.hpp>
 #include "fuzz_test/fuzz_test.h"
 #include "fuzz_test/fuzz_test_stub.h"
 
 #ifdef USE_RPC_TELEMETRY
-#include <rpc/telemetry/i_telemetry_service.h>
 // Use extern declaration to reference the global telemetry service manager from test_fixtures
 extern rpc::telemetry_service_manager telemetry_service_manager_;
 #endif

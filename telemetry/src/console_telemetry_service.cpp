@@ -1,11 +1,18 @@
-#include <thread>
+/*
+ *   Copyright (c) 2025 Edward Boggis-Rolfe
+ *   All rights reserved.
+ */
+// Standard C++ headers
 #include <chrono>
+#include <thread>
 
-#include <spdlog/spdlog.h>
+// RPC headers
+#include <rpc/telemetry/console_telemetry_service.h>
+
+// Other headers
 #include <spdlog/async.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
-
-#include <rpc/telemetry/console_telemetry_service.h>
+#include <spdlog/spdlog.h>
 
 namespace rpc
 {

@@ -7,7 +7,7 @@
 
 #include <atomic>
 #include <string>
-#include <rpc/service.h>
+#include <rpc/rpc.h>
 
 #ifdef USE_RPC_TELEMETRY
 #include <rpc/telemetry/i_telemetry_service.h>

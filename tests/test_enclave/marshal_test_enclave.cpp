@@ -2,27 +2,28 @@
  *   Copyright (c) 2025 Edward Boggis-Rolfe
  *   All rights reserved.
  */
-#include "stdio.h"
-#include <string>
-#include <cstring>
-#include <cstdio>
 
+// OS-specific headers
 #include <sgx_trts.h>
-#include <trusted/enclave_marshal_test_t.h>
 
-#include <rpc/error_codes.h>
+// Standard C/C++ headers
+#include <cstdio>
+#include <cstring>
+#include <stdio.h>
+#include <string>
 
-#include <common/foo_impl.h>
-#include <common/host_service_proxy.h>
-
-#include <example/example.h>
-
-#include <rpc/remote_pointer.h>
-
+// RPC headers
+#include <rpc/rpc.h>
 #ifdef USE_RPC_TELEMETRY
 #include <rpc/telemetry/i_telemetry_service.h>
 #include <rpc/telemetry/enclave_telemetry_service.h>
 #endif
+
+// Other headers
+#include <trusted/enclave_marshal_test_t.h>
+#include <common/foo_impl.h>
+#include <common/host_service_proxy.h>
+#include <example/example.h>
 
 using namespace marshalled_tests;
 

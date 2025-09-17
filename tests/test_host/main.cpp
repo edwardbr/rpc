@@ -2,51 +2,35 @@
  *   Copyright (c) 2025 Edward Boggis-Rolfe
  *   All rights reserved.
  */
+
+// Standard C++ headers
 #include <iostream>
-#include <unordered_map>
 #include <string_view>
 #include <thread>
+#include <unordered_map>
 
-#include <common/foo_impl.h>
-#include <common/tests.h>
+// RPC headers
+#include <rpc/rpc.h>
 
-#include <rpc/coroutine_support.h>
-
+// Other headers
+#ifdef BUILD_COROUTINE
+#include <coro/io_scheduler.hpp>
+#endif
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-
+#include <common/foo_impl.h>
+#include <common/tests.h>
 #ifdef BUILD_COROUTINE
 #include "common/tcp/service_proxy.h"
 #include "common/tcp/listener.h"
-
 #include "common/spsc/service_proxy.h"
 #include "common/spsc/channel_manager.h"
-
-#include <coro/io_scheduler.hpp>
 #endif
-
 #include "rpc_global_logger.h"
-
-#ifdef BUILD_COROUTINE
-#include "common/tcp/service_proxy.h"
-#include "common/tcp/listener.h"
-
-#include "common/spsc/service_proxy.h"
-#include "common/spsc/channel_manager.h"
-
-#include <coro/io_scheduler.hpp>
-#endif
-
-#include "rpc_global_logger.h"
-#include <rpc/error_codes.h>
-#include <rpc/casting_interface.h>
-
-// Include extracted setup classes
 #include "test_host.h"
 #include "in_memory_setup.h"
 #include "inproc_setup.h"
 #include "enclave_setup.h"
-
 #ifdef BUILD_COROUTINE
 #include "tcp_setup.h"
 #include "spsc_setup.h"

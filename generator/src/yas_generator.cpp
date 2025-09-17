@@ -1,28 +1,30 @@
-#include <type_traits>
+/*
+ *   Copyright (c) 2025 Edward Boggis-Rolfe
+ *   All rights reserved.
+ */
+
+// Standard C++ headers
 #include <algorithm>
+#include <filesystem>
+#include <sstream>
 #include <tuple>
 #include <type_traits>
 #include <unordered_set>
 
-#include "coreclasses.h"
-#include "cpp_parser.h"
-#include "helpers.h"
-
-#include "attributes.h"
-
+// Other headers
 extern "C"
 {
 #include "sha3.h"
 }
-#include <filesystem>
-#include <sstream>
-
-#include "writer.h"
-
-#include "interface_declaration_generator.h"
+#include "attributes.h"
+#include "coreclasses.h"
+#include "cpp_parser.h"
 #include "fingerprint_generator.h"
-#include "yas_generator.h"
+#include "helpers.h"
+#include "interface_declaration_generator.h"
 #include "type_utils.h"
+#include "writer.h"
+#include "yas_generator.h"
 
 namespace yas_generator
 {
@@ -986,12 +988,7 @@ namespace yas_generator
         header("#include <yas/binary_oarchive.hpp>");
         header("#include <yas/serialize.hpp>");
         header("#include <yas/std_types.hpp>");
-        header("#include <rpc/proxy.h>");
-        header("#include <rpc/stub.h>");
-        header("#include <rpc/error_codes.h>");
-        header("#include <rpc/marshaller.h>");
-        header("#include <rpc/serialiser.h>");
-        header("#include <rpc/service.h>");
+        header("#include <rpc/rpc.h>");
         header("#include \"{}\"", header_filename);
         header("");
 

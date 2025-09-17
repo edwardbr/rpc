@@ -1,3 +1,8 @@
+/*
+ *   Copyright (c) 2025 Edward Boggis-Rolfe
+ *   All rights reserved.
+ */
+
 #include "json_schema/per_function_generator.h"
 #include "json_schema/writer.h"
 #include "type_utils.h"

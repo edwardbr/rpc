@@ -10,19 +10,12 @@
 #include <mutex>
 #include <atomic>
 
-#include <rpc/logger.h>
-#include <rpc/version.h>
-#include <rpc/types.h>
-#include <rpc/marshaller.h>
-#include <rpc/service.h>
-#include <rpc/remote_pointer.h>
-#include <rpc/member_ptr.h>
-#include <rpc/coroutine_support.h>
+// All dependencies are included by rpc.h
 
 #ifdef USE_RPC_TELEMETRY
 #include <rpc/telemetry/i_telemetry_service.h>
 #endif
-#include "rpc/stub.h"
+// stub.h is included by rpc.h
 
 namespace rpc
 {

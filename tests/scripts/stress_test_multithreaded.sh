@@ -13,7 +13,7 @@ set -e
 DEFAULT_ITERATIONS=50
 DEFAULT_TIMEOUT=30
 DEFAULT_REPEAT=1
-TEST_BINARY="./build/output/debug/rpc_test"
+TEST_BINARY="../../build/output/debug/rpc_test"
 LOG_DIR="/tmp/rpc_stress_tests"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 

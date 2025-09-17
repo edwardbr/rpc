@@ -4,8 +4,7 @@
  */
 #pragma once
 
-#include <rpc/types.h>
-#include <rpc/version.h>
+// types.h and version.h are included by rpc.h
 #include <string>
 #include <vector>
 #include <type_traits>

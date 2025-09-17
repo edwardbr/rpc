@@ -284,9 +284,7 @@ namespace synchronous_mock_generator
         header("#include <gtest/gtest-spi.h>");
         header("#include <gmock/gmock-matchers.h>");
 
-        header("#include <rpc/marshaller.h>");
-        header("#include <rpc/serialiser.h>");
-        header("#include <rpc/service.h>");
+        header("#include <rpc/rpc.h>");
 
         header("#include \"{}\"", header_filename);
 

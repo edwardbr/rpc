@@ -1,3 +1,7 @@
+/*
+ *   Copyright (c) 2025 Edward Boggis-Rolfe
+ *   All rights reserved.
+ */
 #include <rpc/telemetry/enclave_telemetry_service.h>
 #include <trusted/rpc_telemetry_t.h>
 

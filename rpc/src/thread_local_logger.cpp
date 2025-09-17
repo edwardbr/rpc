@@ -1,4 +1,8 @@
-#include <rpc/thread_local_logger.h>
+/*
+ *   Copyright (c) 2025 Edward Boggis-Rolfe
+ *   All rights reserved.
+ */
+#include <rpc/rpc.h>
 
 #if defined(USE_THREAD_LOCAL_LOGGING) && !defined(_IN_ENCLAVE)
 
