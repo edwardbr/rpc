@@ -7,10 +7,11 @@
 #include <thread>
 
 #ifdef BUILD_ENCLAVE
-#include "common/enclave_service_proxy.h"
-#include <rpc/logger.h>
 #include <sgx_urts.h>
 #include <sgx_capable.h>
+
+#include <rpc/rpc.h>
+#include "common/enclave_service_proxy.h"
 #include <untrusted/enclave_marshal_test_u.h>
 
 namespace rpc
@@ -49,7 +50,6 @@ namespace rpc
             
     CORO_TASK(int) enclave_service_proxy::connect(rpc::interface_descriptor input_descr, rpc::interface_descriptor& output_descr)
     {   
-        rpc::object output_object_id = {0};
         sgx_launch_token_t token = {0};
         int updated = 0;
         #ifdef _WIN32
@@ -70,13 +70,14 @@ namespace rpc
             return rpc::error::TRANSPORT_ERROR();
         }
         int err_code = error::OK();
+        uint64_t output_object_id = 0;
         status = marshal_test_init_enclave(
             eid_
             , &err_code
             , get_zone_id().get_val()
             , input_descr.object_id.get_val()
             , get_destination_zone_id().get_val()
-            , &(output_object_id.get_ref()));
+            , &output_object_id);
         if (status)
         {
 #ifdef USE_RPC_TELEMETRY
@@ -97,7 +98,7 @@ namespace rpc
         if (err_code)
             return err_code;
             
-        output_descr = {output_object_id, get_destination_zone_id()};
+        output_descr = {{output_object_id}, get_destination_zone_id()};
         return err_code;
     }   
 

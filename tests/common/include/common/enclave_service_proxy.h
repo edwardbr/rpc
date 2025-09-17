@@ -5,7 +5,7 @@
 #pragma once
 
 #include <sgx_urts.h>
-#include <rpc/proxy.h>
+#include <rpc/rpc.h>
 
 namespace rpc
 {
