@@ -15,7 +15,7 @@ namespace rpc::spsc
 {
     service_proxy::service_proxy(const char* name,
         destination_zone destination_zone_id,
-        const rpc::shared_ptr<service>& svc,
+        const std::shared_ptr<rpc::service>& svc,
         std::shared_ptr<rpc::spsc::channel_manager> channel,
         std::chrono::milliseconds timeout,
         queue_type* send_spsc_queue,
@@ -37,28 +37,28 @@ namespace rpc::spsc
 #endif
     }
 
-    rpc::shared_ptr<rpc::service_proxy> service_proxy::clone()
+    std::shared_ptr<rpc::service_proxy> service_proxy::clone()
     {
-        return rpc::shared_ptr<rpc::service_proxy>(new service_proxy(*this));
+        return std::shared_ptr<rpc::service_proxy>(new service_proxy(*this));
     }
 
-    rpc::shared_ptr<service_proxy> service_proxy::create(const char* name,
+    std::shared_ptr<rpc::service_proxy> service_proxy::create(const char* name,
         destination_zone destination_zone_id,
-        const rpc::shared_ptr<service>& svc,
+        const std::shared_ptr<rpc::service>& svc,
         std::chrono::milliseconds timeout,
         queue_type* send_spsc_queue,
         queue_type* receive_spsc_queue)
     {
         RPC_ASSERT(svc);
 
-        auto ret = rpc::shared_ptr<service_proxy>(
+        auto ret = std::shared_ptr<rpc::service_proxy>(
             new service_proxy(name, destination_zone_id, svc, nullptr, timeout, send_spsc_queue, receive_spsc_queue));
         return ret;
     }
 
-    CORO_TASK(rpc::shared_ptr<service_proxy>)
+    CORO_TASK(std::shared_ptr<rpc::service_proxy>)
     service_proxy::attach_remote(const char* name,
-        const rpc::shared_ptr<service>& svc,
+        const std::shared_ptr<rpc::service>& svc,
         destination_zone destination_zone_id,
         std::shared_ptr<rpc::spsc::channel_manager> channel,
         queue_type* send_spsc_queue,
@@ -68,7 +68,7 @@ namespace rpc::spsc
 
         RPC_DEBUG("attach_remote this service {} to {}", svc->get_zone_id().get_val(), destination_zone_id.get_val());
 
-        auto ret = rpc::shared_ptr<service_proxy>(new service_proxy(
+        auto ret = std::shared_ptr<rpc::service_proxy>(new service_proxy(
             name, destination_zone_id, svc, channel, std::chrono::milliseconds(0), send_spsc_queue, receive_spsc_queue));
 
         CO_RETURN ret;

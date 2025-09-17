@@ -8,7 +8,7 @@
 
 namespace rpc::spsc
 {
-    channel_manager::channel_manager(std::chrono::milliseconds timeout, rpc::shared_ptr<rpc::service> service,
+    channel_manager::channel_manager(std::chrono::milliseconds timeout, std::shared_ptr<rpc::service> service,
                         queue_type* send_spsc_queue,
                         queue_type* receive_spsc_queue,
                         connection_handler handler
@@ -22,7 +22,7 @@ namespace rpc::spsc
     
         
     std::shared_ptr<channel_manager> channel_manager::create(std::chrono::milliseconds timeout,
-                                                             rpc::shared_ptr<rpc::service> service,
+                                                             std::shared_ptr<rpc::service> service,
                                                              queue_type* send_spsc_queue,
                                                              queue_type* receive_spsc_queue,
                                                              channel_manager::connection_handler handler)

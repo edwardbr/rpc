@@ -214,7 +214,7 @@ public:
 **2. TOCTOU Race Prevention Pattern**
 ```cpp
 // SAFE PATTERN
-rpc::shared_ptr<service_proxy> service_proxy;
+std::shared_ptr<rpc::service_proxy> service_proxy;
 bool need_add_ref = false;
 {
     std::lock_guard g(zone_control);
@@ -271,9 +271,9 @@ RPC_ERROR("failed in {}", function_name);  // Instead of printf
 
 ```cpp
 class scoped_service_proxy_ref {
-    rpc::shared_ptr<service_proxy> proxy_;
+    std::shared_ptr<rpc::service_proxy> proxy_;
 public:
-    scoped_service_proxy_ref(rpc::shared_ptr<service_proxy> p) : proxy_(p) {
+    scoped_service_proxy_ref(std::shared_ptr<rpc::service_proxy> p) : proxy_(p) {
         if (proxy_) proxy_->add_external_ref();
     }
     ~scoped_service_proxy_ref() {
@@ -771,17 +771,36 @@ HOST(1) → MAIN_CHILD(2) → SUB_CHILD(3) → DEEP_CHILD(4)
 
 ## Threading Safety Improvements Completed
 
-### 1. Member Pointer Protection
+### 1. Member Pointer Protection & Smart Pointer Architecture
 **Issue**: Shared pointers changing in multithreaded situations
-**Solution**: Added `member_ptr` to do local copies rather than accessing members directly
+**Solution**: Added `member_ptr` and `stdex::member_ptr` to do local copies rather than accessing members directly
 **Status**: ✅ **COMPLETED**
+
+**Core Components Smart Pointer Migration (January 2025)**:
+- `rpc::service`, `rpc::service_proxy`, `rpc::object_proxy` now use `std::shared_ptr`
+- `stdex::member_ptr<T>` provides thread-safe stack copying for `std::shared_ptr<T>`
+- IDL-derived interfaces continue using `rpc::shared_ptr` for marshalling compatibility
+
 ```cpp
 // Before: Direct member access (unsafe)
 shared_ptr->member_access()
 
-// After: Local copy protection (thread-safe)  
-auto local_copy = member_ptr.get();
+// After: Local copy protection (thread-safe)
+auto local_copy = member_ptr.get();  // rpc::member_ptr for RPC interfaces
+auto std_copy = stdex_member_ptr.get_nullable();  // stdex::member_ptr for core components
 local_copy->member_access()
+```
+
+**Architecture Separation**:
+```cpp
+// Core components (std::shared_ptr)
+std::shared_ptr<rpc::service> service;
+std::shared_ptr<rpc::service_proxy> proxy;
+stdex::member_ptr<rpc::service_proxy> proxy_member;
+
+// IDL interfaces (rpc::shared_ptr)
+rpc::shared_ptr<i_example> example_interface;
+rpc::member_ptr<i_host> host_member;
 ```
 
 ### 2. TOCTOU Race Condition Fixes

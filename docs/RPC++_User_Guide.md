@@ -115,7 +115,7 @@ auto error = CO_AWAIT root_service->connect_to_zone<rpc::local_child_service_pro
     calc_proxy,
     [](const rpc::shared_ptr<calculator::v1::i_calculator>& input,
        rpc::shared_ptr<calculator::v1::i_calculator>& output,
-       const rpc::shared_ptr<rpc::service>& child_service) -> int
+       const std::shared_ptr<rpc::service>& child_service) -> int
     {
         // Register generated stubs in child zone
         calculator_v1_idl_register_stubs(child_service);
@@ -491,7 +491,7 @@ auto error = CO_AWAIT root_service->connect_to_zone<rpc::local_child_service_pro
     child_calc,                     // Output interface
     [](const rpc::shared_ptr<i_calculator>& input,
        rpc::shared_ptr<i_calculator>& output,
-       const rpc::shared_ptr<rpc::service>& child_service) -> int
+       const std::shared_ptr<rpc::service>& child_service) -> int
     {
         // Register stubs in child zone
         calculator_idl_register_stubs(child_service);
@@ -516,7 +516,7 @@ auto error = CO_AWAIT service->attach_remote_zone<rpc::spsc::service_proxy, i_ho
     output_desc,           // Interface descriptor to send back
     [](const rpc::shared_ptr<i_host>& host,
        rpc::shared_ptr<i_remote_service>& remote,
-       const rpc::shared_ptr<rpc::service>& service) -> CORO_TASK(int)
+       const std::shared_ptr<rpc::service>& service) -> CORO_TASK(int)
     {
         // Create local implementation that can use remote host
         remote = rpc::make_shared<remote_service_impl>(host);
@@ -531,7 +531,7 @@ Static method for creating child zones from within child services:
 
 ```cpp
 // Used within child service implementations
-rpc::shared_ptr<rpc::child_service> new_child;
+std::shared_ptr<rpc::child_service> new_child;
 auto error = CO_AWAIT rpc::child_service::create_child_zone<rpc::host_service_proxy, i_host, i_example>(
     "enclave_zone",
     rpc::zone{3},

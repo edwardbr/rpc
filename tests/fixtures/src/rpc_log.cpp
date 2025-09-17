@@ -21,7 +21,7 @@
 
 using namespace std::chrono_literals;
 
-extern rpc::weak_ptr<rpc::service> current_host_service;
+extern std::weak_ptr<rpc::service> current_host_service;
 
 // an ocall for logging the test
 extern "C"

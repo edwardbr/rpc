@@ -384,7 +384,7 @@ namespace marshalled_tests
     class example : public yyy::i_example, public rpc::enable_shared_from_this<example>
     {
         rpc::member_ptr<yyy::i_host> host_;
-        rpc::weak_ptr<rpc::service> this_service_;
+        std::weak_ptr<rpc::service> this_service_;
 
         void* get_address() const override { return (void*)this; }
         const rpc::casting_interface* query_interface(rpc::interface_ordinal interface_id) const override
@@ -395,7 +395,7 @@ namespace marshalled_tests
         }
 
     public:
-        example(rpc::shared_ptr<rpc::service> this_service, rpc::shared_ptr<yyy::i_host> host)
+        example(std::shared_ptr<rpc::service> this_service, rpc::shared_ptr<yyy::i_host> host)
             : host_(host)
             , this_service_(this_service)
         {
@@ -455,7 +455,7 @@ namespace marshalled_tests
                     target,
                     [](const rpc::shared_ptr<yyy::i_host>& host,
                         rpc::shared_ptr<yyy::i_example>& new_example,
-                        const rpc::shared_ptr<rpc::child_service>& child_service_ptr) -> CORO_TASK(error_code)
+                        const std::shared_ptr<rpc::child_service>& child_service_ptr) -> CORO_TASK(error_code)
                     {
                         example_import_idl_register_stubs(child_service_ptr);
                         example_shared_idl_register_stubs(child_service_ptr);

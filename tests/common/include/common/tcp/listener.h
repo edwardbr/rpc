@@ -27,7 +27,7 @@ namespace rpc::tcp
 
         using connection_handler = std::function<CORO_TASK(int)(const rpc::shared_ptr<CallerInterface>& caller_interface,
             rpc::shared_ptr<CalleeInterface>& callee_interface,
-            const rpc::shared_ptr<rpc::service>& child_service_ptr)>;
+            const std::shared_ptr<rpc::service>& child_service_ptr)>;
         connection_handler connection_handler_;
 
     public:
@@ -40,7 +40,7 @@ namespace rpc::tcp
         listener(const listener&) = delete;
 
         // This is to open a listening socket on for incoming tcp connection requests
-        bool start_listening(rpc::shared_ptr<rpc::service> service) { return service->schedule(run_listener(service)); }
+        bool start_listening(std::shared_ptr<rpc::service> service) { return service->schedule(run_listener(service)); }
 
         coro::task<void> stop_listening()
         {
@@ -49,7 +49,7 @@ namespace rpc::tcp
         }
 
     private:
-        coro::task<void> run_client(rpc::shared_ptr<rpc::service> service, coro::net::tcp::client client)
+        coro::task<void> run_client(std::shared_ptr<rpc::service> service, coro::net::tcp::client client)
         {
             assert(client.socket().is_valid());
 
@@ -121,7 +121,7 @@ namespace rpc::tcp
             }
         }
 
-        coro::task<void> run_listener(rpc::shared_ptr<rpc::service> service)
+        coro::task<void> run_listener(std::shared_ptr<rpc::service> service)
         {
             // Start by creating a tcp server, we'll do this before putting it into the scheduler so
             // it is immediately available for the client to connect since this will create a socket,

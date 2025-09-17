@@ -29,10 +29,10 @@ namespace rpc
         // this is only implemented by proxy_base
         virtual proxy_base* query_proxy_base() const { return nullptr; }
 
-        static shared_ptr<object_proxy> get_object_proxy(const casting_interface& iface);
+        static std::shared_ptr<rpc::object_proxy> get_object_proxy(const casting_interface& iface);
         static object get_object_id(const casting_interface& iface);
-        static shared_ptr<service_proxy> get_service_proxy(const casting_interface& iface);
-        static shared_ptr<service> get_service(const casting_interface& iface);
+        static std::shared_ptr<rpc::service_proxy> get_service_proxy(const casting_interface& iface);
+        static std::shared_ptr<rpc::service> get_service(const casting_interface& iface);
         static zone get_zone(const casting_interface& iface);
         static destination_zone get_destination_zone(const casting_interface& iface);
         static destination_channel_zone get_channel_zone(const casting_interface& iface);

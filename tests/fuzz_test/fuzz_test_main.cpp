@@ -485,7 +485,7 @@ private:
             local_factory_,
             [](const rpc::shared_ptr<i_fuzz_factory>&,
                 rpc::shared_ptr<i_fuzz_factory>& new_factory,
-                const rpc::shared_ptr<rpc::service>& child_service_ptr) -> int
+                const std::shared_ptr<rpc::service>& child_service_ptr) -> int
             {
                 fuzz_test_idl_register_stubs(child_service_ptr);
                 new_factory = rpc::make_shared<factory_impl>();
@@ -511,7 +511,7 @@ private:
             local_cache_,
             [](const rpc::shared_ptr<i_fuzz_cache>&,
                 rpc::shared_ptr<i_fuzz_cache>& new_cache,
-                const rpc::shared_ptr<rpc::service>& child_service_ptr) -> int
+                const std::shared_ptr<rpc::service>& child_service_ptr) -> int
             {
                 fuzz_test_idl_register_stubs(child_service_ptr);
                 new_cache = rpc::make_shared<cache_impl>();
@@ -537,7 +537,7 @@ private:
             local_worker_,
             [](const rpc::shared_ptr<i_fuzz_worker>&,
                 rpc::shared_ptr<i_fuzz_worker>& new_worker,
-                const rpc::shared_ptr<rpc::child_service>& child_service_ptr) -> int
+                const std::shared_ptr<rpc::child_service>& child_service_ptr) -> int
             {
                 fuzz_test_idl_register_stubs(child_service_ptr);
                 new_worker = rpc::make_shared<worker_impl>();
@@ -845,7 +845,7 @@ public:
                     child_node,
                     [=](const rpc::shared_ptr<i_autonomous_node>& parent,
                         rpc::shared_ptr<i_autonomous_node>& new_child,
-                        const rpc::shared_ptr<rpc::child_service>& child_service_ptr) -> int
+                        const std::shared_ptr<rpc::child_service>& child_service_ptr) -> int
                     {
                         RPC_INFO("[NODE {}] setup callback for child zone {} starting", node_id_, child_zone_id);
                         fuzz_test_idl_register_stubs(child_service_ptr);
@@ -1278,7 +1278,7 @@ void run_autonomous_instruction_test(int test_cycle, int instruction_count, uint
     g_instruction_counter = 0;
 
     // Create root service
-    auto root_service = rpc::make_shared<rpc::service>("AUTONOMOUS_ROOT", rpc::zone{++g_zone_id_counter});
+    auto root_service = std::make_shared<rpc::service>("AUTONOMOUS_ROOT", rpc::zone{++g_zone_id_counter});
     fuzz_test_idl_register_stubs(root_service);
 
     // Initialize test scenario configuration for replay system
@@ -1339,7 +1339,7 @@ void run_autonomous_instruction_test(int test_cycle, int instruction_count, uint
                 root_node,
                 [=](const rpc::shared_ptr<i_autonomous_node>&,
                     rpc::shared_ptr<i_autonomous_node>& new_node,
-                    const rpc::shared_ptr<rpc::child_service>& child_service_ptr) -> int
+                    const std::shared_ptr<rpc::child_service>& child_service_ptr) -> int
                 {
                     fuzz_test_idl_register_stubs(child_service_ptr);
                     new_node = rpc::make_shared<autonomous_node_impl>(node_type::ROOT_NODE, zone_id);

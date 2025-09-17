@@ -1123,7 +1123,7 @@ namespace synchronous_generator
 
         proxy("class {0}_proxy : public rpc::proxy_impl<{0}>", interface_name);
         proxy("{{");
-        proxy("{}_proxy(rpc::shared_ptr<rpc::object_proxy> object_proxy) : ", interface_name);
+        proxy("{}_proxy(std::shared_ptr<rpc::object_proxy> object_proxy) : ", interface_name);
         proxy("  rpc::proxy_impl<{}>(object_proxy)", interface_name);
         proxy("{{");
         proxy("#ifdef USE_RPC_TELEMETRY");
@@ -1157,7 +1157,7 @@ namespace synchronous_generator
         proxy("}}");
         proxy("#endif");
         proxy("}}");
-        proxy("[[nodiscard]] static rpc::shared_ptr<{}> create(const rpc::shared_ptr<rpc::object_proxy>& "
+        proxy("[[nodiscard]] static rpc::shared_ptr<{}> create(const std::shared_ptr<rpc::object_proxy>& "
               "object_proxy)",
             interface_name);
         proxy("{{");
@@ -2000,8 +2000,8 @@ namespace synchronous_generator
     void write_stub_factory_lookup(
         const std::string module_name, const class_entity& lib, std::string prefix, writer& stub_header, writer& stub)
     {
-        stub_header("void {}_register_stubs(const rpc::shared_ptr<rpc::service>& srv);", module_name);
-        stub("void {}_register_stubs(const rpc::shared_ptr<rpc::service>& srv)", module_name);
+        stub_header("void {}_register_stubs(const std::shared_ptr<rpc::service>& srv);", module_name);
+        stub("void {}_register_stubs(const std::shared_ptr<rpc::service>& srv)", module_name);
         stub("{{");
 
         std::set<std::string> done;

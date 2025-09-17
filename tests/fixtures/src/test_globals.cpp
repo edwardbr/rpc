@@ -7,7 +7,7 @@
 #include <string>
 
 // Global variable definitions
-rpc::weak_ptr<rpc::service> current_host_service;
+std::weak_ptr<rpc::service> current_host_service;
 std::atomic<uint64_t>* zone_gen = nullptr;
 bool enable_telemetry_server = true;
 

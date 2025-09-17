@@ -38,11 +38,14 @@ if(BUILD_ENCLAVE)
     include/rpc/internal/service.h
     include/rpc/internal/stub.h
     include/rpc/internal/proxy.h
+    include/rpc/internal/object_proxy.h
+    include/rpc/internal/service_proxy.h
     include/rpc/internal/serialiser.h
     include/rpc/service_proxies/basic_service_proxies.h
     src/casting_interface.cpp
     src/error_codes.cpp
-    src/proxy.cpp
+    src/object_proxy.cpp
+    src/service_proxy.cpp
     src/service.cpp
     src/stub.cpp
     src/version.cpp
@@ -80,11 +83,14 @@ add_library(
   include/rpc/internal/service.h
   include/rpc/internal/stub.h
   include/rpc/internal/proxy.h
+  include/rpc/internal/object_proxy.h
+  include/rpc/internal/service_proxy.h
   include/rpc/internal/serialiser.h
   include/rpc/service_proxies/basic_service_proxies.h
   src/casting_interface.cpp
   src/error_codes.cpp
-  src/proxy.cpp
+  src/object_proxy.cpp
+  src/service_proxy.cpp
   src/service.cpp
   src/stub.cpp
   src/version.cpp

@@ -14,15 +14,15 @@
 namespace rpc
 {
     host_service_proxy::host_service_proxy(
-        const char* name, destination_zone host_zone_id, const rpc::shared_ptr<rpc::child_service>& svc)
+        const char* name, destination_zone host_zone_id, const std::shared_ptr<rpc::child_service>& svc)
         : service_proxy(name, host_zone_id, svc)
     {
     }
 
-    rpc::shared_ptr<service_proxy> host_service_proxy::create(
-        const char* name, destination_zone host_zone_id, const rpc::shared_ptr<rpc::child_service>& svc)
+    std::shared_ptr<rpc::service_proxy> host_service_proxy::create(
+        const char* name, destination_zone host_zone_id, const std::shared_ptr<rpc::child_service>& svc)
     {
-        return rpc::shared_ptr<host_service_proxy>(new host_service_proxy(name, host_zone_id, svc));
+        return std::shared_ptr<host_service_proxy>(new host_service_proxy(name, host_zone_id, svc));
     }
 
     int host_service_proxy::send(uint64_t protocol_version,
@@ -178,7 +178,7 @@ namespace rpc
             return rpc::error::ZONE_NOT_FOUND();
         }
 
-        auto svc = rpc::static_pointer_cast<child_service>(get_operating_zone_service());
+        auto svc = std::static_pointer_cast<child_service>(get_operating_zone_service());
         return err_code;
     }
 

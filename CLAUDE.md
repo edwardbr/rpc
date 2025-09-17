@@ -445,8 +445,139 @@ auto error = CO_AWAIT do_something_in_val(test_value, __rpc_op,
 
 This testing framework provides developers with both comprehensive integration testing and direct validation of the automatic fallback mechanisms, ensuring robust compatibility across RPC++ deployments.
 
+## Smart Pointer Migration: Core Components to std::shared_ptr (January 2025)
+
+**Objective**: Migrate core RPC framework components from `rpc::shared_ptr` to `std::shared_ptr` while maintaining strict separation from IDL-derived interfaces that continue using `rpc::shared_ptr`.
+
+### 1. Architecture Separation Principle
+
+**Core Components** (now using `std::shared_ptr`):
+- `rpc::service` - Main service management class
+- `rpc::service_proxy` - Service communication proxy
+- `rpc::object_proxy` - Object reference proxy
+- `rpc::child_service` - Child zone service management
+
+**IDL-Derived Interfaces** (continue using `rpc::shared_ptr`):
+- All interfaces defined in `.idl` files (e.g., `i_host`, `i_example`)
+- Generated proxy/stub classes for RPC marshalling
+- User-implemented interface classes
+
+### 2. Key Technical Changes
+
+**Service Class Updates**:
+```cpp
+// OLD: rpc::service used rpc::enable_shared_from_this
+class service : public rpc::enable_shared_from_this<service>
+
+// NEW: service uses std::enable_shared_from_this
+class service : public std::enable_shared_from_this<service>
+```
+
+**Container Type Migration**:
+```cpp
+// OLD: rpc pointer containers
+std::map<zone_route, rpc::weak_ptr<service_proxy>> other_zones;
+std::unordered_map<object, rpc::weak_ptr<object_proxy>> proxies_;
+
+// NEW: std pointer containers
+std::map<zone_route, std::weak_ptr<service_proxy>> other_zones;
+std::unordered_map<object, std::weak_ptr<object_proxy>> proxies_;
+```
+
+**Member Pointer Compatibility**:
+```cpp
+// NEW: stdex::member_ptr for std::shared_ptr thread safety
+stdex::member_ptr<service_proxy> service_proxy_;
+stdex::member_ptr<child_service> child_service_;
+```
+
+### 3. Service Creation Pattern Changes
+
+**Before Migration**:
+```cpp
+auto root_service = rpc::make_shared<rpc::service>("host", rpc::zone{zone_id});
+```
+
+**After Migration**:
+```cpp
+auto root_service = std::make_shared<rpc::service>("host", rpc::zone{zone_id});
+```
+
+### 4. Generator Updates
+
+**Generated Proxy Constructors**:
+```cpp
+// OLD: Generated constructors used rpc::shared_ptr<rpc::object_proxy>
+i_example_proxy(rpc::shared_ptr<rpc::object_proxy> object_proxy)
+
+// NEW: Generated constructors use std::shared_ptr<object_proxy>
+i_example_proxy(std::shared_ptr<object_proxy> object_proxy)
+```
+
+**Generated Factory Methods**:
+```cpp
+// OLD: Factory methods returned rpc::shared_ptr and took rpc::object_proxy
+static rpc::shared_ptr<i_example> create(const rpc::shared_ptr<rpc::object_proxy>& object_proxy)
+
+// NEW: Factory methods still return rpc::shared_ptr but take std::object_proxy
+static rpc::shared_ptr<i_example> create(const std::shared_ptr<object_proxy>& object_proxy)
+```
+
+### 5. Critical Design Rules
+
+**No Bridging Policy**:
+- **NEVER** cast between `rpc::shared_ptr` and `std::shared_ptr`
+- **NEVER** use raw pointer conversion between the two types
+- Use proper type-specific containers and member pointers
+
+**Type Ownership Patterns**:
+- Core components OWN `std::shared_ptr` objects
+- Core components can REFERENCE `rpc::shared_ptr` objects (IDL interfaces)
+- IDL interfaces only work with `rpc::shared_ptr` for marshalling compatibility
+
+### 6. Thread Safety Maintenance
+
+**stdex::member_ptr Introduction**:
+```cpp
+namespace stdex {
+    template<typename T>
+    class member_ptr {
+        std::shared_ptr<T> ptr_;
+    public:
+        std::shared_ptr<T> get_nullable() const { return ptr_; }
+        // Provides same thread-safe stack copying as rpc::member_ptr
+    };
+}
+```
+
+### 7. Files Modified in Migration
+
+**Core Headers**:
+- `/rpc/include/rpc/internal/service.h` - Service class and containers
+- `/rpc/include/rpc/internal/service_proxy.h` - Service proxy class
+- `/rpc/include/rpc/internal/object_proxy.h` - Object proxy class
+- `/rpc/include/rpc/internal/member_ptr.h` - Added stdex::member_ptr
+- `/rpc/include/rpc/service_proxies/basic_service_proxies.h` - Local service proxies
+
+**Generator**:
+- `/generator/src/synchronous_generator.cpp` - Updated generated constructor signatures
+
+**Test Infrastructure**:
+- `/tests/fixtures/include/test_globals.h` - Global service variables
+- `/tests/fixtures/include/inproc_setup.h` - Service creation
+- `/tests/fixtures/include/enclave_setup.h` - Enclave service setup
+- `/tests/common/include/common/foo_impl.h` - Test implementation classes
+
+### 8. Benefits Achieved
+
+- **Type Safety**: Clear separation between framework and interface pointer types
+- **Performance**: Direct std::shared_ptr usage in core components eliminates conversion overhead
+- **Maintainability**: Standard library types for core infrastructure, custom types only where needed for RPC marshalling
+- **Thread Safety**: Maintained through stdex::member_ptr wrapper
+- **Architecture Clarity**: Framework components vs. RPC interfaces have distinct pointer semantics
+
 ---
 
-This codebase represents a mature RPC system with recent enhancements for JSON schema generation, improved IDL attribute handling, comprehensive hierarchical zone testing, and now robust format/version fallback validation. The build system is well-integrated and the code generation pipeline is robust and extensible.
+This codebase represents a mature RPC system with recent enhancements for JSON schema generation, improved IDL attribute handling, comprehensive hierarchical zone testing, robust format/version fallback validation, and now clean smart pointer architecture separation. The build system is well-integrated and the code generation pipeline is robust and extensible.
 - when running tests with:
 - Always load all the .md files in the root directory and in the docs folder

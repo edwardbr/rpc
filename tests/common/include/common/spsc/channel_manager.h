@@ -25,7 +25,7 @@ namespace rpc::spsc
     public:
         using connection_handler = std::function<CORO_TASK(int)(const rpc::interface_descriptor& input_descr,
             rpc::interface_descriptor& output_interface,
-            rpc::shared_ptr<rpc::service> child_service_ptr,
+            std::shared_ptr<rpc::service> child_service_ptr,
             std::shared_ptr<channel_manager>)>;
 
     private:
@@ -50,7 +50,7 @@ namespace rpc::spsc
         std::queue<std::vector<uint8_t>> send_queue_;
         coro::mutex send_queue_mtx_;
 
-        rpc::shared_ptr<rpc::service> service_;
+        std::shared_ptr<rpc::service> service_;
 
         connection_handler connection_handler_;
         coro::event shutdown_event_;
@@ -61,7 +61,7 @@ namespace rpc::spsc
         bool peer_cancel_received_ = false;
 
         channel_manager(std::chrono::milliseconds timeout,
-            rpc::shared_ptr<rpc::service> service,
+            std::shared_ptr<rpc::service> service,
             queue_type* send_spsc_queue,
             queue_type* receive_spsc_queue,
             connection_handler handler);
@@ -80,7 +80,7 @@ namespace rpc::spsc
 
     public:
         static std::shared_ptr<channel_manager> create(std::chrono::milliseconds timeout,
-            rpc::shared_ptr<rpc::service> service,
+            std::shared_ptr<rpc::service> service,
             queue_type* send_spsc_queue,
             queue_type* receive_spsc_queue,
             connection_handler handler);

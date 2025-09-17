@@ -16,7 +16,7 @@ extern rpc::telemetry_service_manager telemetry_service_manager_;
 #endif
 
 // Other global variables used by the test setup classes
-extern rpc::weak_ptr<rpc::service> current_host_service;
+extern std::weak_ptr<rpc::service> current_host_service;
 extern std::atomic<uint64_t>* zone_gen;
 extern bool enable_telemetry_server;
 

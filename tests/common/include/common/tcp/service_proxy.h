@@ -17,21 +17,21 @@ namespace rpc::tcp
     // This is for hosts to call services on an enclave
     class service_proxy : public rpc::service_proxy
     {
-        service_proxy(const char* name, destination_zone destination_zone_id, const rpc::shared_ptr<service>& svc,
+        service_proxy(const char* name, destination_zone destination_zone_id, const std::shared_ptr<rpc::service>& svc,
                       std::shared_ptr<worker_release> connection, std::chrono::milliseconds timeout,
                       coro::net::tcp::client::options opts);
 
         service_proxy(const service_proxy& other) = default;
 
-        rpc::shared_ptr<rpc::service_proxy> clone() override;
+        std::shared_ptr<rpc::service_proxy> clone() override;
 
-        static rpc::shared_ptr<service_proxy> create(const char* name, destination_zone destination_zone_id,
-                                                     const rpc::shared_ptr<service>& svc,
+        static std::shared_ptr<rpc::service_proxy> create(const char* name, destination_zone destination_zone_id,
+                                                     const std::shared_ptr<rpc::service>& svc,
                                                      std::chrono::milliseconds timeout,
                                                      coro::net::tcp::client::options opts);
 
-        static CORO_TASK(rpc::shared_ptr<service_proxy>)
-            attach_remote(const char* name, const rpc::shared_ptr<service>& svc, destination_zone destination_zone_id,
+        static CORO_TASK(std::shared_ptr<rpc::service_proxy>)
+            attach_remote(const char* name, const std::shared_ptr<rpc::service>& svc, destination_zone destination_zone_id,
                           std::shared_ptr<worker_release> connection);
 
         CORO_TASK(int) connect(rpc::interface_descriptor input_descr, rpc::interface_descriptor& output_descr) override;

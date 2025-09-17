@@ -8,14 +8,14 @@
 
 namespace rpc
 {
-    object_proxy::object_proxy( object object_id, 
-                                rpc::shared_ptr<service_proxy> service_proxy)
+    object_proxy::object_proxy( object object_id,
+                                std::shared_ptr<rpc::service_proxy> service_proxy)
         : object_id_(object_id)
         , service_proxy_(service_proxy)
     {}
 
-    object_proxy::~object_proxy() 
-    { 
+    object_proxy::~object_proxy()
+    {
         // Get service_proxy once for the entire destructor to ensure consistency
         auto service_proxy = service_proxy_.get_nullable();
 
@@ -56,15 +56,15 @@ namespace rpc
         service_proxy->on_object_proxy_released(object_id_, inherited_count);
         service_proxy_ = nullptr;
     }
-    
+
     CORO_TASK(int) object_proxy::send(
-            uint64_t protocol_version 
-            , rpc::encoding encoding 
-            , uint64_t tag 
-            , rpc::interface_ordinal interface_id 
-            , rpc::method method_id 
+            uint64_t protocol_version
+            , rpc::encoding encoding
+            , uint64_t tag
+            , rpc::interface_ordinal interface_id
+            , rpc::method method_id
             , size_t in_size_
-            , const char* in_buf_ 
+            , const char* in_buf_
             , std::vector<char>& out_buf_)
     {
         auto service_proxy = service_proxy_.get_nullable();
@@ -75,13 +75,14 @@ namespace rpc
             protocol_version,
             encoding,
             tag,
-            object_id_, 
-            interface_id, 
-            method_id, 
-            in_size_, 
-            in_buf_, 
+            object_id_,
+            interface_id,
+            method_id,
+            in_size_,
+            in_buf_,
             out_buf_);
     }
+
     CORO_TASK(int) object_proxy::try_cast(std::function<interface_ordinal (uint64_t)> id_getter)
     {
         auto service_proxy = service_proxy_.get_nullable();
@@ -91,12 +92,18 @@ namespace rpc
         CO_RETURN CO_AWAIT service_proxy->sp_try_cast(service_proxy->get_destination_zone_id(), object_id_, id_getter);
     }
 
-    destination_zone object_proxy::get_destination_zone_id() const 
+    destination_zone object_proxy::get_destination_zone_id() const
     {
         auto service_proxy = service_proxy_.get_nullable();
         RPC_ASSERT(service_proxy);
         if (!service_proxy)
             return destination_zone{0};
         return service_proxy->get_destination_zone_id();
+    }
+
+    void object_proxy::register_interface(interface_ordinal interface_id, rpc::weak_ptr<proxy_base>& value)
+    {
+        std::lock_guard guard(insert_control_);
+        proxy_map[interface_id] = value;
     }
 }

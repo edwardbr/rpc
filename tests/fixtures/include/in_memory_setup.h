@@ -34,7 +34,7 @@ template<bool UseHostInChild> class in_memory_setup
 public:
     virtual ~in_memory_setup() = default;
 
-    rpc::shared_ptr<rpc::service> get_root_service() const { return nullptr; }
+    std::shared_ptr<rpc::service> get_root_service() const { return nullptr; }
     bool get_has_enclave() const { return has_enclave_; }
     rpc::shared_ptr<yyy::i_example> get_example() const { return i_example_ptr_; }
     rpc::shared_ptr<yyy::i_host> get_host() const { return i_host_ptr_; }

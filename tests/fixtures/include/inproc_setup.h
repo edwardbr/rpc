@@ -18,8 +18,8 @@
 
 template<bool UseHostInChild, bool RunStandardTests, bool CreateNewZoneThenCreateSubordinatedZone> class inproc_setup
 {
-    rpc::shared_ptr<rpc::service> root_service_;
-    rpc::shared_ptr<rpc::child_service> child_service_;
+    std::shared_ptr<rpc::service> root_service_;
+    std::shared_ptr<rpc::child_service> child_service_;
     rpc::shared_ptr<yyy::i_host> i_host_ptr_;
     rpc::weak_ptr<yyy::i_host> local_host_ptr_;
     rpc::shared_ptr<yyy::i_example> i_example_ptr_;
@@ -46,7 +46,7 @@ public:
 
     virtual ~inproc_setup() = default;
 
-    rpc::shared_ptr<rpc::service> get_root_service() const { return root_service_; }
+    std::shared_ptr<rpc::service> get_root_service() const { return root_service_; }
     bool get_has_enclave() const { return has_enclave_; }
     bool is_enclave_setup() const { return false; }
     rpc::shared_ptr<yyy::i_example> get_example() const { return i_example_ptr_; }
@@ -73,7 +73,7 @@ public:
             telemetry_service_manager_.create(test_info->test_suite_name(), test_info->name(), "../../rpc_test_diagram/");
 #endif
 
-        root_service_ = rpc::make_shared<rpc::service>("host", rpc::zone{++zone_gen_}
+        root_service_ = std::make_shared<rpc::service>("host", rpc::zone{++zone_gen_}
 #ifdef BUILD_COROUTINE
         , io_scheduler_
 #endif
@@ -94,7 +94,7 @@ public:
             i_example_ptr_,
             [&](const rpc::shared_ptr<yyy::i_host>& host,
                 rpc::shared_ptr<yyy::i_example>& new_example,
-                const rpc::shared_ptr<rpc::child_service>& child_service_ptr) -> CORO_TASK(int)
+                const std::shared_ptr<rpc::child_service>& child_service_ptr) -> CORO_TASK(int)
             {
                 i_host_ptr_ = host;
                 child_service_ = child_service_ptr;
@@ -182,7 +182,7 @@ public:
                 example_relay_ptr,
                 [&](const rpc::shared_ptr<yyy::i_host>& host,
                     rpc::shared_ptr<yyy::i_example>& new_example,
-                    const rpc::shared_ptr<rpc::child_service>& child_service_ptr) -> CORO_TASK(int)
+                    const std::shared_ptr<rpc::child_service>& child_service_ptr) -> CORO_TASK(int)
                 {
                     example_import_idl_register_stubs(child_service_ptr);
                     example_shared_idl_register_stubs(child_service_ptr);

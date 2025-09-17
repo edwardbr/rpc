@@ -232,8 +232,8 @@ namespace rpc
         current_service_tracker tracker(this);
         if (destination_zone_id != zone_id_.as_destination())
         {
-            rpc::shared_ptr<service_proxy> other_zone;
-            rpc::shared_ptr<service_proxy> opposite_direction_proxy;
+            std::shared_ptr<rpc::service_proxy> other_zone;
+            std::shared_ptr<rpc::service_proxy> opposite_direction_proxy;
 
             {
                 std::lock_guard g(zone_control);
@@ -363,7 +363,7 @@ namespace rpc
 
     CORO_TASK(void)
     service::clean_up_on_failed_connection(
-        const rpc::shared_ptr<service_proxy>& destination_zone, rpc::shared_ptr<rpc::casting_interface> input_interface)
+        const std::shared_ptr<rpc::service_proxy>& destination_zone, rpc::shared_ptr<rpc::casting_interface> input_interface)
     {
         if (destination_zone && input_interface)
         {
@@ -381,7 +381,7 @@ namespace rpc
     service::prepare_remote_input_interface(caller_channel_zone caller_channel_zone_id,
         caller_zone caller_zone_id,
         rpc::proxy_base* base,
-        rpc::shared_ptr<service_proxy>& destination_zone)
+        std::shared_ptr<rpc::service_proxy>& destination_zone)
     {
         auto object_proxy = base->get_object_proxy();
         auto object_service_proxy = object_proxy->get_service_proxy();
@@ -502,10 +502,10 @@ namespace rpc
         }
         else
         {
-            rpc::shared_ptr<service_proxy> destination_service_proxy = object_service_proxy;
-            rpc::shared_ptr<service_proxy> caller;
+            std::shared_ptr<rpc::service_proxy> destination_service_proxy = object_service_proxy;
+            std::shared_ptr<rpc::service_proxy> caller;
             bool need_add_ref = false;
-            std::map<zone_route, rpc::weak_ptr<service_proxy>>::iterator caller_found_iter;
+            std::map<zone_route, std::weak_ptr<service_proxy>>::iterator caller_found_iter;
             bool need_caller_from_found = false;
             {
                 std::lock_guard g(zone_control);
@@ -683,7 +683,7 @@ namespace rpc
         }
 
         // needed by the out call
-        rpc::shared_ptr<service_proxy> caller;
+        std::shared_ptr<rpc::service_proxy> caller;
 
         auto* pointer = iface->get_address();
         {
@@ -781,7 +781,7 @@ namespace rpc
         current_service_tracker tracker(this);
         if (destination_zone_id != zone_id_.as_destination())
         {
-            rpc::shared_ptr<service_proxy> other_zone;
+            std::shared_ptr<rpc::service_proxy> other_zone;
             {
                 std::lock_guard g(zone_control);
                 auto found = other_zones.lower_bound({destination_zone_id, {0}});
@@ -872,7 +872,7 @@ namespace rpc
                 // zone has no refcount issues to deal with
                 // there should always be a destination service_proxy in
                 // other_zones as the requester has a positive ref count to it through this service
-                rpc::shared_ptr<rpc::service_proxy> destination;
+                std::shared_ptr<rpc::service_proxy> destination;
                 {
                     std::lock_guard g(zone_control);
                     auto found = other_zones.lower_bound({{dest_channel}, {0}});
@@ -920,8 +920,8 @@ namespace rpc
             else if (build_channel)
             {
                 // we are here as this zone needs to send the destination addref and caller addref to different zones a fork is in progress
-                rpc::shared_ptr<rpc::service_proxy> destination;
-                rpc::shared_ptr<rpc::service_proxy> caller;
+                std::shared_ptr<rpc::service_proxy> destination;
+                std::shared_ptr<rpc::service_proxy> caller;
                 {
                     bool has_called_inner_add_zone_proxy = false;
                     {
@@ -1152,7 +1152,7 @@ namespace rpc
             }
             else
             {
-                rpc::shared_ptr<service_proxy> other_zone;
+                std::shared_ptr<rpc::service_proxy> other_zone;
                 { // brackets here as we are using a lock guard
                     std::lock_guard g(zone_control);
                     auto found = other_zones.find({destination_zone_id, caller_zone_id});
@@ -1167,7 +1167,7 @@ namespace rpc
 
                     if (!other_zone)
                     {
-                        rpc::shared_ptr<rpc::service_proxy> tmp;
+                        std::shared_ptr<rpc::service_proxy> tmp;
                         if (auto found = other_zones.lower_bound({destination_zone_id, {0}});
                             found != other_zones.end() && found->first.dest == destination_zone_id)
                         {
@@ -1232,7 +1232,7 @@ namespace rpc
             // find the caller
             if (zone_id_.as_caller() != caller_zone_id && !!(build_out_param_channel & add_ref_options::build_caller_route))
             {
-                rpc::shared_ptr<service_proxy> caller;
+                std::shared_ptr<rpc::service_proxy> caller;
                 {
                     std::lock_guard g(zone_control);
                     // we swap the parameter types as this is from perspective of the caller and not the proxy that called this function
@@ -1325,7 +1325,7 @@ namespace rpc
         return count;
     }
 
-    void service::cleanup_service_proxy(const rpc::shared_ptr<service_proxy>& other_zone)
+    void service::cleanup_service_proxy(const std::shared_ptr<rpc::service_proxy>& other_zone)
     {
         bool should_cleanup = !other_zone->release_external_ref();
         if (should_cleanup)
@@ -1395,7 +1395,7 @@ namespace rpc
 
         if (destination_zone_id != zone_id_.as_destination())
         {
-            rpc::shared_ptr<service_proxy> other_zone;
+            std::shared_ptr<rpc::service_proxy> other_zone;
             {
                 std::lock_guard g(zone_control);
                 auto found = other_zones.find({destination_zone_id, caller_zone_id});
@@ -1507,7 +1507,7 @@ namespace rpc
         }
     }
 
-    void service::inner_add_zone_proxy(const rpc::shared_ptr<service_proxy>& service_proxy)
+    void service::inner_add_zone_proxy(const std::shared_ptr<rpc::service_proxy>& service_proxy)
     {
         // this is for internal use only has no lock
         service_proxy->add_external_ref();
@@ -1522,14 +1522,14 @@ namespace rpc
             std::to_string(service_proxy->caller_zone_id_));
     }
 
-    void service::add_zone_proxy(const rpc::shared_ptr<service_proxy>& service_proxy)
+    void service::add_zone_proxy(const std::shared_ptr<rpc::service_proxy>& service_proxy)
     {
         RPC_ASSERT(service_proxy->get_destination_zone_id() != zone_id_.as_destination());
         std::lock_guard g(zone_control);
         inner_add_zone_proxy(service_proxy);
     }
 
-    rpc::shared_ptr<service_proxy> service::get_zone_proxy(caller_channel_zone caller_channel_zone_id,
+    std::shared_ptr<rpc::service_proxy> service::get_zone_proxy(caller_channel_zone caller_channel_zone_id,
         caller_zone caller_zone_id,
         destination_zone destination_zone_id,
         caller_zone new_caller_zone_id,
@@ -1692,7 +1692,7 @@ namespace rpc
         }
     }
 
-    bool child_service::set_parent_proxy(const rpc::shared_ptr<rpc::service_proxy>& parent_service_proxy)
+    bool child_service::set_parent_proxy(const std::shared_ptr<rpc::service_proxy>& parent_service_proxy)
     {
         std::lock_guard l(parent_protect);
         if (parent_service_proxy_)

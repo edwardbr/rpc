@@ -44,7 +44,7 @@ namespace rpc
     template<class T>
     CORO_TASK(int)
     demarshall_interface_proxy(uint64_t protocol_version,
-        const rpc::shared_ptr<rpc::service_proxy>& sp,
+        const std::shared_ptr<rpc::service_proxy>& sp,
         const rpc::interface_descriptor& encap,
         caller_zone caller_zone_id,
         rpc::shared_ptr<T>& val);
@@ -74,7 +74,7 @@ namespace rpc
     };
 
     // responsible for all object lifetimes created within the zone
-    class service : public i_marshaller, public rpc::enable_shared_from_this<service>
+    class service : public i_marshaller, public std::enable_shared_from_this<rpc::service>
     {
     protected:
         static std::atomic<uint64_t> zone_id_generator;
@@ -108,7 +108,7 @@ namespace rpc
         };
 
         mutable std::mutex zone_control;
-        std::map<zone_route, rpc::weak_ptr<service_proxy>> other_zones;
+        std::map<zone_route, std::weak_ptr<service_proxy>> other_zones;
 
         rpc::shared_ptr<casting_interface> get_castable_interface(object object_id, interface_ordinal interface_id);
 
@@ -122,8 +122,8 @@ namespace rpc
             caller_zone caller_zone_id,
             const shared_ptr<T>& iface);
 
-        void inner_add_zone_proxy(const rpc::shared_ptr<service_proxy>& service_proxy);
-        void cleanup_service_proxy(const rpc::shared_ptr<service_proxy>& other_zone);
+        void inner_add_zone_proxy(const std::shared_ptr<rpc::service_proxy>& service_proxy);
+        void cleanup_service_proxy(const std::shared_ptr<rpc::service_proxy>& other_zone);
 
         friend proxy_base;
         friend i_interface_stub;
@@ -164,8 +164,8 @@ namespace rpc
         zone get_zone_id() const { return zone_id_; }
         void set_zone_id(zone zone_id) { zone_id_ = zone_id; }
         virtual destination_zone get_parent_zone_id() const { return {0}; }
-        virtual rpc::shared_ptr<rpc::service_proxy> get_parent() const { return nullptr; }
-        virtual bool set_parent_proxy(const rpc::shared_ptr<rpc::service_proxy>&) 
+        virtual std::shared_ptr<rpc::service_proxy> get_parent() const { return nullptr; }
+        virtual bool set_parent_proxy(const std::shared_ptr<rpc::service_proxy>&) 
         { 
             RPC_ASSERT(false); 
             return false;
@@ -227,8 +227,8 @@ namespace rpc
 
         uint64_t release_local_stub(const rpc::shared_ptr<rpc::object_stub>& stub);
 
-        virtual void add_zone_proxy(const rpc::shared_ptr<service_proxy>& zone);
-        virtual rpc::shared_ptr<service_proxy> get_zone_proxy(caller_channel_zone caller_channel_zone_id,
+        virtual void add_zone_proxy(const std::shared_ptr<rpc::service_proxy>& zone);
+        virtual std::shared_ptr<rpc::service_proxy> get_zone_proxy(caller_channel_zone caller_channel_zone_id,
             caller_zone caller_zone_id,
             destination_zone destination_zone_id,
             caller_zone new_caller_zone_id,
@@ -244,13 +244,13 @@ namespace rpc
         prepare_remote_input_interface(caller_channel_zone caller_channel_zone_id,
             caller_zone caller_zone_id,
             rpc::proxy_base* base,
-            rpc::shared_ptr<service_proxy>& destination_zone);
+            std::shared_ptr<rpc::service_proxy>& destination_zone);
 
         CORO_TASK(void)
-        clean_up_on_failed_connection(const rpc::shared_ptr<service_proxy>& destination_zone,
+        clean_up_on_failed_connection(const std::shared_ptr<rpc::service_proxy>& destination_zone,
             rpc::shared_ptr<rpc::casting_interface> input_interface);
             
-        // int decrement_reference_count(const rpc::shared_ptr<service_proxy>& proxy, int ref_count);
+        // int decrement_reference_count(const std::shared_ptr<rpc::service_proxy>& proxy, int ref_count);
 
         template<class proxy_class, class in_param_type, class out_param_type, typename... Args>
         CORO_TASK(int)
@@ -266,7 +266,7 @@ namespace rpc
             auto new_service_proxy = proxy_class::create(name, new_zone_id, shared_from_this(), args...);
             add_zone_proxy(new_service_proxy);
             rpc::interface_descriptor input_descr{{0}, {0}};
-            rpc::shared_ptr<service_proxy> destination_zone;
+            std::shared_ptr<rpc::service_proxy> destination_zone;
             if (input_interface)
             {
                 if (input_interface->query_proxy_base())
@@ -323,7 +323,7 @@ namespace rpc
             rpc::interface_descriptor& output_descr,
             std::function<CORO_TASK(int)(const rpc::shared_ptr<PARENT_INTERFACE>&,
                 rpc::shared_ptr<CHILD_INTERFACE>&,
-                const rpc::shared_ptr<rpc::service>&)> fn,
+                const std::shared_ptr<rpc::service>&)> fn,
             Args&&... args)
         {
             // link the child to the parent
@@ -394,7 +394,7 @@ namespace rpc
         // the enclave needs to hold a hard lock to a root object that represents a runtime
         // the enclave service lifetime is managed by the transport functions
         std::mutex parent_protect;
-        rpc::shared_ptr<rpc::service_proxy> parent_service_proxy_;
+        std::shared_ptr<rpc::service_proxy> parent_service_proxy_;
         destination_zone parent_zone_id_;
 
     public:
@@ -417,8 +417,8 @@ namespace rpc
 
         virtual ~child_service();
 
-        rpc::shared_ptr<rpc::service_proxy> get_parent() const override { return parent_service_proxy_; }
-        bool set_parent_proxy(const rpc::shared_ptr<rpc::service_proxy>& parent_service_proxy) override;
+        std::shared_ptr<rpc::service_proxy> get_parent() const override { return parent_service_proxy_; }
+        bool set_parent_proxy(const std::shared_ptr<rpc::service_proxy>& parent_service_proxy) override;
 
         destination_zone get_parent_zone_id() const override { return parent_zone_id_; }
 
@@ -430,14 +430,14 @@ namespace rpc
             rpc::interface_descriptor& output_descr,
             std::function<CORO_TASK(int)(const rpc::shared_ptr<PARENT_INTERFACE>&,
                 rpc::shared_ptr<CHILD_INTERFACE>&,
-                const rpc::shared_ptr<rpc::child_service>&)> fn,
+                const std::shared_ptr<rpc::child_service>&)> fn,
 #ifdef BUILD_COROUTINE
             const std::shared_ptr<coro::io_scheduler>& io_scheduler,
 #endif
-            rpc::shared_ptr<child_service>& new_child_service,
+            std::shared_ptr<rpc::child_service>& new_child_service,
             Args&&... args)
         {
-            auto child_svc = rpc::shared_ptr<rpc::child_service>(
+            auto child_svc = std::shared_ptr<rpc::child_service>(
                 new rpc::child_service(name, zone_id, parent_zone_id
 #ifdef BUILD_COROUTINE
                 , io_scheduler

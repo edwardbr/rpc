@@ -28,7 +28,7 @@ namespace rpc
         return false;
     }
 
-    shared_ptr<object_proxy> casting_interface::get_object_proxy(const casting_interface& iface)
+    std::shared_ptr<rpc::object_proxy> casting_interface::get_object_proxy(const casting_interface& iface)
     {
         auto base = iface.query_proxy_base();
         if (!base)
@@ -44,7 +44,7 @@ namespace rpc
         return obj->get_object_id();
     }
 
-    shared_ptr<service_proxy> casting_interface::get_service_proxy(const casting_interface& iface)
+    std::shared_ptr<rpc::service_proxy> casting_interface::get_service_proxy(const casting_interface& iface)
     {
         auto obj = get_object_proxy(iface);
         if (!obj)
@@ -52,7 +52,7 @@ namespace rpc
         return obj->get_service_proxy();
     }
 
-    shared_ptr<service> casting_interface::get_service(const casting_interface& iface)
+    std::shared_ptr<rpc::service> casting_interface::get_service(const casting_interface& iface)
     {
         auto proxy = get_service_proxy(iface);
         if (!proxy)

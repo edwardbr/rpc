@@ -8,8 +8,8 @@
 
 template<bool UseHostInChild, bool RunStandardTests, bool CreateNewZoneThenCreateSubordinatedZone> class spsc_setup
 {
-    rpc::shared_ptr<rpc::service> root_service_;
-    rpc::shared_ptr<rpc::service> peer_service_;
+    std::shared_ptr<rpc::service> root_service_;
+    std::shared_ptr<rpc::service> peer_service_;
 
     rpc::spsc::queue_type send_spsc_queue_;
     rpc::spsc::queue_type receive_spsc_queue_;
@@ -34,7 +34,7 @@ public:
 
     virtual ~spsc_setup() = default;
 
-    rpc::shared_ptr<rpc::service> get_root_service() const { return root_service_; }
+    std::shared_ptr<rpc::service> get_root_service() const { return root_service_; }
     bool get_has_enclave() const { return has_enclave_; }
     bool is_enclave_setup() const { return false; }
     rpc::shared_ptr<yyy::i_example> get_example() const { return i_example_ptr_; }
@@ -79,7 +79,7 @@ public:
                   receive_spsc_queue = &receive_spsc_queue_,
                   use_host_in_child = use_host_in_child_](const rpc::interface_descriptor& input_interface,
                   rpc::interface_descriptor& output_interface,
-                  rpc::shared_ptr<rpc::service> service,
+                  std::shared_ptr<rpc::service> service,
                   std::shared_ptr<rpc::spsc::channel_manager> channel) -> CORO_TASK(int)
         {
             auto ret = CO_AWAIT service->attach_remote_zone<rpc::spsc::service_proxy, yyy::i_host, yyy::i_example>(
@@ -88,7 +88,7 @@ public:
                 output_interface,
                 [&](const rpc::shared_ptr<yyy::i_host>& host,
                     rpc::shared_ptr<yyy::i_example>& new_example,
-                    const rpc::shared_ptr<rpc::service>& child_service_ptr) -> CORO_TASK(int)
+                    const std::shared_ptr<rpc::service>& child_service_ptr) -> CORO_TASK(int)
                 {
                     new_example = rpc::shared_ptr<yyy::i_example>(new marshalled_tests::example(child_service_ptr, host));
 
@@ -197,7 +197,7 @@ public:
                 example_relay_ptr,
                 [&](const rpc::shared_ptr<yyy::i_host>& host,
                     rpc::shared_ptr<yyy::i_example>& new_example,
-                    const rpc::shared_ptr<rpc::child_service>& child_service_ptr) -> CORO_TASK(int)
+                    const std::shared_ptr<rpc::child_service>& child_service_ptr) -> CORO_TASK(int)
                 {
                     example_import_idl_register_stubs(child_service_ptr);
                     example_shared_idl_register_stubs(child_service_ptr);

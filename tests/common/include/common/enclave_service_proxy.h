@@ -25,16 +25,16 @@ namespace rpc
             const char* name
             , destination_zone destination_zone_id
             , std::string filename
-            , const rpc::shared_ptr<service>& svc);
+            , const std::shared_ptr<rpc::service>& svc);
             
         enclave_service_proxy(const enclave_service_proxy& other) = default;
        
-        rpc::shared_ptr<service_proxy> clone() override;
+        std::shared_ptr<rpc::service_proxy> clone() override;
         
-        static rpc::shared_ptr<enclave_service_proxy> create(
+        static std::shared_ptr<enclave_service_proxy> create(
             const char* name
             , destination_zone destination_zone_id
-            , const rpc::shared_ptr<service>& svc
+            , const std::shared_ptr<rpc::service>& svc
             , std::string filename);
         
         CORO_TASK(int) connect(rpc::interface_descriptor input_descr, rpc::interface_descriptor& output_descr) override;

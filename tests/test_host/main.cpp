@@ -279,7 +279,7 @@ TYPED_TEST(type_test, standard_tests)
     run_coro_test(*this, [](auto& lib) { return coro_standard_tests<TypeParam>(lib); });
 }
 
-CORO_TASK(bool) dyanmic_cast_tests(rpc::shared_ptr<rpc::service> root_service)
+CORO_TASK(bool) dyanmic_cast_tests(std::shared_ptr<rpc::service> root_service)
 {
     auto f = rpc::shared_ptr<xxx::i_foo>(new foo());
 
@@ -2038,7 +2038,7 @@ template<class T> CORO_TASK(bool) coro_test_y_topology_and_set_host_with_prong_o
 }
 
 CORO_TASK(error_code)
-do_something_in_val(int val, const rpc::shared_ptr<rpc::object_proxy>& __rpc_op, uint64_t protocol_version, rpc::encoding enc)
+do_something_in_val(int val, const std::shared_ptr<rpc::object_proxy>& __rpc_op, uint64_t protocol_version, rpc::encoding enc)
 {
     auto __rpc_sp = __rpc_op->get_service_proxy();
     auto __rpc_version = __rpc_sp->get_remote_rpc_version();

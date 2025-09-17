@@ -7,8 +7,8 @@
 
 template<bool UseHostInChild, bool RunStandardTests, bool CreateNewZoneThenCreateSubordinatedZone> class tcp_setup
 {
-    rpc::shared_ptr<rpc::service> root_service_;
-    rpc::shared_ptr<rpc::service> peer_service_;
+    std::shared_ptr<rpc::service> root_service_;
+    std::shared_ptr<rpc::service> peer_service_;
 
     std::shared_ptr<rpc::tcp::listener<yyy::i_host, yyy::i_example>> peer_listener_;
     rpc::shared_ptr<yyy::i_host> i_host_ptr_;
@@ -31,7 +31,7 @@ public:
 
     virtual ~tcp_setup() = default;
 
-    rpc::shared_ptr<rpc::service> get_root_service() const { return root_service_; }
+    std::shared_ptr<rpc::service> get_root_service() const { return root_service_; }
     std::shared_ptr<rpc::tcp::listener<yyy::i_host, yyy::i_example>> get_peer_listener() const
     {
         return peer_listener_;
@@ -76,7 +76,7 @@ public:
         peer_listener_ = std::make_shared<rpc::tcp::listener<yyy::i_host, yyy::i_example>>(
             [](const rpc::shared_ptr<yyy::i_host>& host,
                 rpc::shared_ptr<yyy::i_example>& new_example,
-                const rpc::shared_ptr<rpc::service>& child_service_ptr) -> CORO_TASK(int)
+                const std::shared_ptr<rpc::service>& child_service_ptr) -> CORO_TASK(int)
             {
                 new_example = rpc::shared_ptr<yyy::i_example>(new marshalled_tests::example(child_service_ptr, host));
                 CO_RETURN rpc::error::OK();
@@ -175,7 +175,7 @@ public:
                 example_relay_ptr,
                 [&](const rpc::shared_ptr<yyy::i_host>& host,
                     rpc::shared_ptr<yyy::i_example>& new_example,
-                    const rpc::shared_ptr<rpc::child_service>& child_service_ptr) -> CORO_TASK(int)
+                    const std::shared_ptr<rpc::child_service>& child_service_ptr) -> CORO_TASK(int)
                 {
                     example_import_idl_register_stubs(child_service_ptr);
                     example_shared_idl_register_stubs(child_service_ptr);

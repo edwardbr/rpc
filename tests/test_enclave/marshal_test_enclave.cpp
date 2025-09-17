@@ -31,7 +31,7 @@ using namespace marshalled_tests;
 std::shared_ptr<rpc::i_telemetry_service> telemetry_service_;
 #endif
 
-rpc::shared_ptr<rpc::child_service> rpc_server;
+std::shared_ptr<rpc::child_service> rpc_server;
 
 int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t host_id, uint64_t child_zone_id, uint64_t* example_object_id)
 {
@@ -55,7 +55,7 @@ int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t host_id, uint64_t 
         output_descr,
         [](const rpc::shared_ptr<yyy::i_host>& host,
             rpc::shared_ptr<yyy::i_example>& new_example,
-            const rpc::shared_ptr<rpc::child_service>& child_service_ptr) -> int
+            const std::shared_ptr<rpc::child_service>& child_service_ptr) -> int
         {
             example_import_idl_register_stubs(child_service_ptr);
             example_shared_idl_register_stubs(child_service_ptr);

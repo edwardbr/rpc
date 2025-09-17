@@ -11,16 +11,16 @@ namespace rpc
     // This is for enclaves to call the host
     class host_service_proxy : public service_proxy
     {
-        host_service_proxy(const char* name, destination_zone host_zone_id, const rpc::shared_ptr<rpc::child_service>& svc);
+        host_service_proxy(const char* name, destination_zone host_zone_id, const std::shared_ptr<rpc::child_service>& svc);
         host_service_proxy(const host_service_proxy& other) = default;
 
-        rpc::shared_ptr<service_proxy> clone() override
+        std::shared_ptr<rpc::service_proxy> clone() override
         {
-            return rpc::shared_ptr<host_service_proxy>(new host_service_proxy(*this));
+            return std::shared_ptr<host_service_proxy>(new host_service_proxy(*this));
         }
 
-        static rpc::shared_ptr<service_proxy> create(
-            const char* name, destination_zone host_zone_id, const rpc::shared_ptr<rpc::child_service>& svc);
+        static std::shared_ptr<rpc::service_proxy> create(
+            const char* name, destination_zone host_zone_id, const std::shared_ptr<rpc::child_service>& svc);
 
         int initialise();
 

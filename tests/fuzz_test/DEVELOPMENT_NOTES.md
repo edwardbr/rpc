@@ -216,7 +216,7 @@ The final system should create pitchfork-shaped zone graphs where:
   service.cpp:962: RPC_ASSERT(parent);  // ← FAILS HERE
 
   The Problem: Zone 1 (AUTONOMOUS_ROOT) is a service, not a child_service. The base service class has:
-  virtual rpc::shared_ptr<rpc::service_proxy> get_parent() const { return nullptr; }
+  virtual std::shared_ptr<rpc::service_proxy> get_parent() const { return nullptr; }
 
   Only child_service overrides this to return an actual parent. Since Zone 1 is the root, it has no parent, so get_parent() returns nullptr.
 

@@ -43,7 +43,7 @@ namespace rpc::tcp
         std::queue<std::vector<uint8_t>> send_queue_;
         coro::mutex send_queue_mtx_;
 
-        rpc::shared_ptr<rpc::service> service_;
+        std::shared_ptr<rpc::service> service_;
 
         // read from the peer and fill the buffer as it has been presized
         CORO_TASK(int) read(std::vector<char>& buf);
@@ -65,7 +65,7 @@ namespace rpc::tcp
         channel_manager(coro::net::tcp::client client,
             std::chrono::milliseconds timeout,
             std::weak_ptr<worker_release> worker_release,
-            rpc::shared_ptr<rpc::service> service)
+            std::shared_ptr<rpc::service> service)
             : client_(std::move(client))
             , timeout_(timeout)
             , worker_release_(worker_release)
