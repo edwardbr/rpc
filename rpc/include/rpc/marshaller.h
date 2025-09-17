@@ -111,7 +111,7 @@ namespace rpc
 
         template<typename Ar> void serialize(Ar& ar)
         {
-            ar& YAS_OBJECT_NVP("interface_descriptor", ("object_id", object_id.id), ("zone_id", destination_zone_id.id));
+            ar& YAS_OBJECT_NVP("interface_descriptor", ("object_id", object_id), ("zone_id", destination_zone_id));
         }
     };
 

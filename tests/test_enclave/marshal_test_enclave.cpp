@@ -67,7 +67,7 @@ int marshal_test_init_enclave(uint64_t host_zone_id, uint64_t host_id, uint64_t 
     if (ret != rpc::error::OK())
         return ret;
 
-    *example_object_id = output_descr.object_id.id;
+    *example_object_id = output_descr.object_id.get_val();
 
     return rpc::error::OK();
 }

@@ -77,7 +77,7 @@ namespace rpc
             [this](std::pair<rpc::zone, name_count> const& it)
             {
                 fmt::println(
-                    output_, "error service zone_id {} service {} count {}", it.first.id, it.second.name, it.second.count);
+                    output_, "error service zone_id {} service {} count {}", it.first.get_val(), it.second.name, it.second.count);
             });
         std::for_each(impls.begin(),
             impls.end(),
@@ -86,7 +86,7 @@ namespace rpc
                 fmt::println(output_,
                     "error implementation {} zone_id {} count {}",
                     it.second.name,
-                    it.second.zone_id.id,
+                    it.second.zone_id.get_val(),
                     it.second.count);
             });
         std::for_each(stubs.begin(),
@@ -95,8 +95,8 @@ namespace rpc
             {
                 fmt::println(output_,
                     "error stub zone_id {} object_id {} count {} address {}",
-                    it.first.zone_id.id,
-                    it.first.object_id.id,
+                    it.first.zone_id.get_val(),
+                    it.first.object_id.get_val(),
                     it.second.count,
                     it.second.address);
             });
@@ -106,9 +106,9 @@ namespace rpc
             {
                 fmt::println(output_,
                     "error service proxy zone_id {} destination_zone_id {} caller_id {} name {} count {}",
-                    it.first.zone_id.id,
-                    it.first.destination_zone_id.id,
-                    it.first.caller_zone_id.id,
+                    it.first.zone_id.get_val(),
+                    it.first.destination_zone_id.get_val(),
+                    it.first.caller_zone_id.get_val(),
                     it.second.name,
                     it.second.count);
             });
@@ -118,9 +118,9 @@ namespace rpc
             {
                 fmt::println(output_,
                     "error object_proxy zone_id {} destination_zone_id {} object_id {} count {}",
-                    it.first.zone_id.id,
-                    it.first.destination_zone_id.id,
-                    it.first.object_id.id,
+                    it.first.zone_id.get_val(),
+                    it.first.destination_zone_id.get_val(),
+                    it.first.object_id.get_val(),
                     it.second);
             });
         std::for_each(interface_proxies.begin(),
@@ -130,9 +130,9 @@ namespace rpc
                 fmt::println(output_,
                     "error interface_proxy {} zone_id {} destination_zone_id {} object_id {} count {}",
                     it.second.name,
-                    it.first.zone_id.id,
-                    it.first.destination_zone_id.id,
-                    it.first.object_id.id,
+                    it.first.zone_id.get_val(),
+                    it.first.destination_zone_id.get_val(),
+                    it.first.object_id.get_val(),
                     it.second.count);
             });
 
@@ -293,7 +293,7 @@ namespace rpc
         std::ignore = options;
 
 #ifdef USE_RPC_TELEMETRY_RAII_LOGGING
-        auto dest = destination_channel_zone_id.get_val() ? rpc::zone(destination_channel_zone_id.id)
+        auto dest = destination_channel_zone_id.get_val() ? rpc::zone(destination_channel_zone_id.get_val())
                                                           : destination_zone_id.as_zone();
 
         if (rpc::add_ref_options::normal == options)
@@ -388,7 +388,7 @@ namespace rpc
         std::ignore = caller_zone_id;
 
 #ifdef USE_RPC_TELEMETRY_RAII_LOGGING
-        auto dest = destination_channel_zone_id.get_val() ? rpc::zone(destination_channel_zone_id.id)
+        auto dest = destination_channel_zone_id.get_val() ? rpc::zone(destination_channel_zone_id.get_val())
                                                           : destination_zone_id.as_zone();
 
         if (zone_id != dest)
@@ -425,11 +425,11 @@ namespace rpc
         std::string route_name;
         std::string destination_name;
 
-        auto search = services.find({destination_zone_id.id});
+        auto search = services.find({destination_zone_id.get_val()});
         if (search != services.end())
             destination_name = search->second.name;
         else
-            destination_name = std::to_string(destination_zone_id.id);
+            destination_name = std::to_string(destination_zone_id);
 
         if (zone_id.as_caller() == caller_zone_id)
         {
@@ -438,11 +438,11 @@ namespace rpc
         else
         {
             std::string caller_name;
-            search = services.find({caller_zone_id.id});
+            search = services.find({caller_zone_id.get_val()});
             if (search != services.end())
                 caller_name = search->second.name;
             else
-                caller_name = std::to_string(caller_zone_id.id);
+                caller_name = std::to_string(caller_zone_id);
             route_name = "channel from "s + caller_name + " to " + destination_name;
         }
 
@@ -483,11 +483,11 @@ namespace rpc
         std::string route_name;
         std::string destination_name;
 
-        auto search = services.find({destination_zone_id.id});
+        auto search = services.find({destination_zone_id.get_val()});
         if (search != services.end())
             destination_name = search->second.name;
         else
-            destination_name = std::to_string(destination_zone_id.id);
+            destination_name = std::to_string(destination_zone_id);
 
         if (zone_id.as_caller() == caller_zone_id)
         {
@@ -496,11 +496,11 @@ namespace rpc
         else
         {
             std::string caller_name;
-            search = services.find({caller_zone_id.id});
+            search = services.find({caller_zone_id.get_val()});
             if (search != services.end())
                 caller_name = search->second.name;
             else
-                caller_name = std::to_string(caller_zone_id.id);
+                caller_name = std::to_string(caller_zone_id);
             route_name = "channel from "s + caller_name + " to " + destination_name;
         }
 
@@ -643,7 +643,7 @@ namespace rpc
         //     object_id {}", name, zone_id.get_val(), destination_zone_id.get_val(), caller_zone_id.get_val(),
         //     object_id.get_val());
         // }
-        auto dest = destination_channel_zone_id.get_val() ? rpc::zone(destination_channel_zone_id.id)
+        auto dest = destination_channel_zone_id.get_val() ? rpc::zone(destination_channel_zone_id.get_val())
                                                           : destination_zone_id.as_zone();
 
         if (object_id == rpc::dummy_object_id)
@@ -681,7 +681,7 @@ namespace rpc
         std::ignore = caller_zone_id;
 
 #ifdef USE_RPC_TELEMETRY_RAII_LOGGING
-        auto dest = destination_channel_zone_id.get_val() ? rpc::zone(destination_channel_zone_id.id)
+        auto dest = destination_channel_zone_id.get_val() ? rpc::zone(destination_channel_zone_id.get_val())
                                                           : destination_zone_id.as_zone();
 
         if (object_id == rpc::dummy_object_id)
@@ -735,9 +735,9 @@ namespace rpc
                 message(level_enum::warn,
                     fmt::format("add_external_ref count does not match zone_id {} destination_zone_id {} "
                                 "caller_zone_id {} {} - {}",
-                        zone_id.id,
-                        destination_zone_id.id,
-                        caller_zone_id.id,
+                        zone_id.get_val(),
+                        destination_zone_id.get_val(),
+                        caller_zone_id.get_val(),
                         ref_count,
                         count)
                         .c_str());
@@ -804,9 +804,9 @@ namespace rpc
                 message(level_enum::warn,
                     fmt::format("release_external_ref count does not match zone_id {} destination_zone_id {} "
                                 "caller_zone_id {} {} - {}",
-                        zone_id.id,
-                        destination_zone_id.id,
-                        caller_zone_id.id,
+                        zone_id.get_val(),
+                        destination_zone_id.get_val(),
+                        caller_zone_id.get_val(),
                         ref_count,
                         count)
                         .c_str());

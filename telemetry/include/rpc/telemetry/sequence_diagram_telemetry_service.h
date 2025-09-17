@@ -34,8 +34,8 @@ namespace rpc
         {
             std::size_t operator()(zone_object const& s) const noexcept
             {
-                std::size_t h1 = std::hash<uint64_t>{}(s.zone_id.id);
-                std::size_t h2 = std::hash<uint64_t>{}(s.object_id.id);
+                std::size_t h1 = std::hash<uint64_t>{}(s.zone_id.get_val());
+                std::size_t h2 = std::hash<uint64_t>{}(s.object_id.get_val());
                 return h1 ^ (h2 << 1); // or use boost::hash_combine
             }
         };
@@ -56,9 +56,9 @@ namespace rpc
         {
             std::size_t operator()(orig_zone const& s) const noexcept
             {
-                std::size_t h1 = std::hash<uint64_t>{}(s.zone_id.id);
-                std::size_t h2 = std::hash<uint64_t>{}(s.destination_zone_id.id);
-                std::size_t h3 = std::hash<uint64_t>{}(s.caller_zone_id.id);
+                std::size_t h1 = std::hash<uint64_t>{}(s.zone_id.get_val());
+                std::size_t h2 = std::hash<uint64_t>{}(s.destination_zone_id.get_val());
+                std::size_t h3 = std::hash<uint64_t>{}(s.caller_zone_id.get_val());
                 return h1 ^ (h2 << 1) ^ (h3 << 2); // or use boost::hash_combine
             }
         };
@@ -80,9 +80,9 @@ namespace rpc
         {
             std::size_t operator()(interface_proxy_id const& s) const noexcept
             {
-                std::size_t h1 = std::hash<uint64_t>{}(s.zone_id.id);
-                std::size_t h2 = std::hash<uint64_t>{}(s.destination_zone_id.id);
-                std::size_t h3 = std::hash<uint64_t>{}(s.object_id.id);
+                std::size_t h1 = std::hash<uint64_t>{}(s.zone_id.get_val());
+                std::size_t h2 = std::hash<uint64_t>{}(s.destination_zone_id.get_val());
+                std::size_t h3 = std::hash<uint64_t>{}(s.object_id.get_val());
                 return h1 ^ (h2 << 1) ^ (h3 << 2); // or use boost::hash_combine
             }
         };

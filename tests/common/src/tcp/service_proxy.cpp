@@ -57,11 +57,7 @@ namespace rpc::tcp
     {
         RPC_ASSERT(svc);
 
-        // std::string msg("attach_remote this service ");
-        // msg += std::to_string(svc->get_zone_id().get_val());
-        // msg += " to ";
-        // msg += std::to_string(destination_zone_id.get_val());
-        // RPC_ERROR(msg.c_str());
+        // RPC_DEBUG("attach_remote this service {} to {}", svc->get_zone_id(), destination_zone_id.get_val());
 
         auto ret = rpc::shared_ptr<service_proxy>(new service_proxy(
             name, destination_zone_id, svc, connection, std::chrono::milliseconds(0), coro::net::tcp::client::options()));
@@ -78,9 +74,7 @@ namespace rpc::tcp
     CORO_TASK(int)
     service_proxy::connect(rpc::interface_descriptor input_descr, rpc::interface_descriptor& output_descr)
     {
-        // std::string msg("connect ");
-        // msg += std::to_string(get_zone_id().get_val());
-        // RPC_ERROR(msg.c_str());
+        // RPC_DEBUG("connect {}", get_zone_id());
 
         auto service = get_operating_zone_service();
         assert(connection_ == nullptr);
@@ -154,9 +148,7 @@ namespace rpc::tcp
         const char* in_buf_,
         std::vector<char>& out_buf_)
     {
-        // std::string msg("send ");
-        // msg += std::to_string(get_zone_id().get_val());
-        // RPC_ERROR(msg.c_str());
+        // RPC_DEBUG("send {}", get_zone_id());
 
         if (destination_zone_id != get_destination_zone_id())
         {
@@ -190,9 +182,7 @@ namespace rpc::tcp
 
         out_buf_.swap(call_receive.payload);
 
-        // msg = "send complete ";
-        // msg += std::to_string(get_zone_id().get_val());
-        // RPC_ERROR(msg.c_str());
+        // RPC_DEBUG("send complete {}", get_zone_id());
 
         CO_RETURN call_receive.err_code;
     }
@@ -201,9 +191,7 @@ namespace rpc::tcp
     service_proxy::try_cast(
         uint64_t protocol_version, destination_zone destination_zone_id, object object_id, interface_ordinal interface_id)
     {
-        // std::string msg("try_cast ");
-        // msg += std::to_string(get_zone_id().get_val());
-        // RPC_ERROR(msg.c_str());
+        // RPC_DEBUG("try_cast {}", get_zone_id());
 
         if (!connection_)
         {
@@ -225,9 +213,7 @@ namespace rpc::tcp
             CO_RETURN ret;
         }
 
-        // msg = std::string("try_cast complete ");
-        // msg += std::to_string(get_zone_id().get_val());
-        // RPC_ERROR(msg.c_str());
+        // RPC_DEBUG("try_cast complete {}", get_zone_id());
 
         CO_RETURN try_cast_receive.err_code;
     }
@@ -243,9 +229,7 @@ namespace rpc::tcp
         rpc::add_ref_options build_out_param_channel,
         uint64_t& reference_count)
     {
-        // auto msg = std::string("add_ref ");
-        // msg += std::to_string(get_zone_id().get_val());
-        // RPC_ERROR(msg.c_str());
+        // RPC_DEBUG("add_ref {}", get_zone_id());
 
 #ifdef USE_RPC_TELEMETRY
         if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
@@ -287,16 +271,14 @@ namespace rpc::tcp
 #ifdef USE_RPC_TELEMETRY
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             {
-                auto error_message = std::string("add_ref failed ") + std::to_string(response.err_code);
+                auto error_message = fmt::format("add_ref failed {}", response.err_code);
                 telemetry_service->message(rpc::i_telemetry_service::err, error_message.c_str());
             }
 #endif
             RPC_ASSERT(false);
             CO_RETURN response.err_code;
         }
-        // msg = std::string("add_ref complete ");
-        // msg += std::to_string(get_zone_id().get_val());
-        // RPC_ERROR(msg.c_str());
+        // RPC_DEBUG("add_ref complete {}", get_zone_id());
 
         CO_RETURN rpc::error::OK();
     }
@@ -333,7 +315,7 @@ namespace rpc::tcp
 #ifdef USE_RPC_TELEMETRY
             if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
             {
-                auto error_message = std::string("release failed ") + std::to_string(response.err_code);
+                auto error_message = fmt::format("release failed {}", response.err_code);
                 telemetry_service->message(rpc::i_telemetry_service::err, error_message.c_str());
             }
 #endif

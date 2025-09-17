@@ -1,5 +1,5 @@
 /*
- *   Copyright (c) 2025 Edward Boggis-Rolfe
+ *   Copyright (c) 2024 Edward Boggis-Rolfe
  *   All rights reserved.
  */
 #pragma once
@@ -8,62 +8,11 @@
 #include <functional>
 
 #include "rpc/coroutine_support.h"
+#include <rpc/serialiser.h>
 
 //this class is to ensure type safty of parameters as it gets difficult guaranteeing parameter order
 namespace rpc
 {
-    template<typename Type>
-    struct type_id
-    {
-        //keep it public
-        uint64_t id = 0;
-
-        type_id() = default;
-        type_id(uint64_t initial_id) : id(initial_id){}
-        type_id(const type_id<Type>& initial_id) = default;
-
-        //getter
-        constexpr uint64_t get_val() const {return id;}//only for c calls
-        uint64_t& get_ref() {return id;}//for c calls
-
-        //setter
-        void operator=(uint64_t val) {id = val;}
-        void operator=(const type_id<Type>& val) {id = val.id;}
-
-        //setter
-        constexpr bool operator==(const type_id<Type>& val) const {return id == val.id;}
-
-        //setter
-        constexpr bool operator!=(const type_id<Type>& val) const {return id != val.id;}
-
-        //less
-        constexpr bool operator<(uint64_t val) const {return id < val;}
-        constexpr bool operator<(const uint64_t& val) const {return id < val;}
-        constexpr bool operator<(const type_id<Type>& val) const {return id < val.id;}
-
-        constexpr bool is_set() const noexcept
-        {
-            return id != 0;
-        }
-    };
-
-    //the actual zone that a service is running on
-    struct ZoneId{};
-    //the zone that is the ultimate zone for this call
-    struct DestinationZoneId{};
-    //a zone that calls are made to get through to the destincation zone
-    struct DestinationChannelZoneId{};
-
-    //the zone that initiates a call
-    struct CallerZoneId{};
-    //a zone that channels calls from a caller
-    struct CallerChannelZoneId{};
-
-    // the zone that made the add_ref request (provides authoritative routing context)
-    struct KnownDirectionZoneId
-    {
-    };
-
     struct zone;
     struct destination_zone;
     struct destination_channel_zone;
@@ -72,105 +21,477 @@ namespace rpc
     struct caller_channel_zone;
     struct known_direction_zone;
 
-
-    struct zone : public type_id<ZoneId>
+    struct zone
     {
+    private:
+        uint64_t id = 0;
+
+    public:
         zone() = default;
-        zone(const type_id<ZoneId>& other) : type_id<ZoneId>(other){}
-
-        type_id<DestinationZoneId> as_destination() const {return {id};}    
-        type_id<DestinationChannelZoneId> as_destination_channel() const {return {id};}       
-        type_id<CallerZoneId> as_caller() const {return {id};}              
-        type_id<CallerChannelZoneId> as_caller_channel() const {return {id};}        
-    };
-
-    struct destination_zone : public type_id<DestinationZoneId>
-    {
-        destination_zone() = default;
-        destination_zone(const type_id<DestinationZoneId>& other) : type_id<DestinationZoneId>(other){}
-
-        type_id<ZoneId> as_zone() const {return {id};}        
-        type_id<DestinationChannelZoneId> as_destination_channel() const {return {id};}        
-        type_id<CallerZoneId> as_caller() const {return {id};}        
-        type_id<CallerChannelZoneId> as_caller_channel() const {return {id};}   
-    };
-
-    //the zone that a service proxy was cloned from
-    struct destination_channel_zone : public type_id<DestinationChannelZoneId>
-    {
-        destination_channel_zone() = default;
-        destination_channel_zone(const type_id<DestinationChannelZoneId>& other) : type_id<DestinationChannelZoneId>(other){}
-
-        type_id<DestinationZoneId> as_destination() const {return {id};}     
-        type_id<CallerChannelZoneId> as_caller_channel() const {return {id};}   
-    };
-
-    //the zone that initiated the call
-    struct caller_zone : public type_id<CallerZoneId>
-    {
-        caller_zone() = default;
-        caller_zone(const type_id<CallerZoneId>& other) : type_id<CallerZoneId>(other){}
-        
-        type_id<CallerChannelZoneId> as_caller_channel() const {return {id};}   
-        type_id<DestinationZoneId> as_destination() const {return {id};}     //this one is wierd, its for cloning service proxies
-        type_id<DestinationChannelZoneId> as_destination_channel() const {return {id};}   
-        type_id<KnownDirectionZoneId> as_known_direction_channel() const { return {id}; }
-    };
-
-    //the zone that initiated the call
-    struct caller_channel_zone : public type_id<CallerChannelZoneId>
-    {
-        caller_channel_zone() = default;
-        caller_channel_zone(const type_id<CallerChannelZoneId>& other) : type_id<CallerChannelZoneId>(other){}
-
-        type_id<DestinationZoneId> as_destination() const {return {id};}     //this one is wierd, its for cloning service proxies
-        type_id<DestinationChannelZoneId> as_destination_channel() const {return {id};}  
-    };
-
-    // the zone that made the add_ref request (provides authoritative routing context)
-    struct known_direction_zone : public type_id<KnownDirectionZoneId>
-    {
-        known_direction_zone() = default;
-        known_direction_zone(const type_id<KnownDirectionZoneId>& other)
-            : type_id<KnownDirectionZoneId>(other)
+        zone(const zone&) = default;
+        zone(zone&&) noexcept = default;
+        zone(uint64_t initial_id)
+            : id(initial_id)
         {
         }
-        
-        // Construct from any zone type
-        known_direction_zone(const zone& zone_id) : type_id<KnownDirectionZoneId>(zone_id.id) {}
-        known_direction_zone(const destination_zone& zone_id) : type_id<KnownDirectionZoneId>(zone_id.id) {}
-        known_direction_zone(const caller_zone& zone_id) : type_id<KnownDirectionZoneId>(zone_id.id) {}
+        zone& operator=(const zone&) = default;
+        zone& operator=(zone&&) noexcept = default;
+        zone& operator=(uint64_t other)
+        {
+            id = other;
+            return *this;
+        }
 
-        // Indicates this requester has first-hand knowledge of the reference origin
-        bool is_authoritative() const { return id != 0; }
-        
-        // Convert to other zone types for routing purposes  
-        type_id<DestinationZoneId> as_destination() const { return {id}; }
-        type_id<ZoneId> as_zone() const { return {id}; }
+        uint64_t get_val() const { return id; }
+
+        // compare
+        constexpr bool operator==(const zone& val) const { return id == val.id; }
+        template<typename T, std::enable_if_t<std::is_unsigned<T>::value, int> = 0>
+        constexpr bool operator==(T val) const
+        {
+            return id == static_cast<uint64_t>(val);
+        }
+        constexpr bool operator!=(const zone& val) const { return id != val.id; }
+        template<typename T, std::enable_if_t<std::is_unsigned<T>::value, int> = 0>
+        constexpr bool operator!=(T val) const
+        {
+            return id != static_cast<uint64_t>(val);
+        }
+
+        // less
+        constexpr bool operator<(uint64_t val) const { return id < val; }
+        constexpr bool operator<(const zone& val) const { return id < val.id; }
+
+        constexpr bool is_set() const noexcept { return id != 0; }
+
+        inline destination_zone as_destination() const;
+        inline destination_channel_zone as_destination_channel() const;
+        inline caller_zone as_caller() const;
+        inline caller_channel_zone as_caller_channel() const;
+
+        template<typename Ar> void serialize(Ar& ar)
+        {
+            ar& YAS_OBJECT_NVP("id", ("id", id));
+        }
     };
 
-    //an id for objects unique to each zone
-    struct ObjectId{};
-    struct object : public type_id<ObjectId>
+    struct destination_zone
     {
+    private:
+        uint64_t id = 0;
+
+    public:
+        destination_zone() = default;
+        destination_zone(const destination_zone&) = default;
+        destination_zone(destination_zone&&) noexcept = default;
+        destination_zone(uint64_t initial_id)
+            : id(initial_id)
+        {
+        }
+        destination_zone& operator=(const destination_zone&) = default;
+        destination_zone& operator=(destination_zone&&) noexcept = default;
+        destination_zone& operator=(uint64_t other)
+        {
+            id = other;
+            return *this;
+        }
+
+        uint64_t get_val() const { return id; }
+
+        // compare
+        constexpr bool operator==(const destination_zone& val) const { return id == val.id; }
+        template<typename T, std::enable_if_t<std::is_unsigned<T>::value, int> = 0>
+        constexpr bool operator==(T val) const
+        {
+            return id == static_cast<uint64_t>(val);
+        }
+        constexpr bool operator!=(const destination_zone& val) const { return id != val.id; }
+        template<typename T, std::enable_if_t<std::is_unsigned<T>::value, int> = 0>
+        constexpr bool operator!=(T val) const
+        {
+            return id != static_cast<uint64_t>(val);
+        }
+
+        constexpr bool operator<(uint64_t val) const { return id < val; }
+        constexpr bool operator<(const destination_zone& val) const { return id < val.id; }
+
+        constexpr bool is_set() const noexcept { return id != 0; }
+
+        inline zone as_zone() const;
+        inline destination_channel_zone as_destination_channel() const;
+        inline caller_zone as_caller() const;
+        inline caller_channel_zone as_caller_channel() const;
+
+        template<typename Ar> void serialize(Ar& ar)
+        {
+            ar& YAS_OBJECT_NVP("id", ("id", id));
+        }
+    };
+
+    // the zone that a service proxy was cloned from
+    struct destination_channel_zone
+    {
+    private:
+        uint64_t id = 0;
+
+    public:
+        destination_channel_zone() = default;
+        destination_channel_zone(const destination_channel_zone&) = default;
+        destination_channel_zone(destination_channel_zone&&) noexcept = default;
+        destination_channel_zone(uint64_t initial_id)
+            : id(initial_id)
+        {
+        }
+        destination_channel_zone& operator=(const destination_channel_zone&) = default;
+        destination_channel_zone& operator=(destination_channel_zone&&) noexcept = default;
+        destination_channel_zone& operator=(uint64_t other)
+        {
+            id = other;
+            return *this;
+        }
+
+        uint64_t get_val() const { return id; }
+
+        // compare
+        constexpr bool operator==(const destination_channel_zone& val) const { return id == val.id; }
+        template<typename T, std::enable_if_t<std::is_unsigned<T>::value, int> = 0>
+        constexpr bool operator==(T val) const
+        {
+            return id == static_cast<uint64_t>(val);
+        }
+        constexpr bool operator!=(const destination_channel_zone& val) const { return id != val.id; }
+        template<typename T, std::enable_if_t<std::is_unsigned<T>::value, int> = 0>
+        constexpr bool operator!=(T val) const
+        {
+            return id != static_cast<uint64_t>(val);
+        }
+
+        constexpr bool operator<(uint64_t val) const { return id < val; }
+        constexpr bool operator<(const destination_channel_zone& val) const { return id < val.id; }
+
+        constexpr bool is_set() const noexcept { return id != 0; }
+
+        inline destination_zone as_destination() const;
+        inline caller_channel_zone as_caller_channel() const;
+
+        template<typename Ar> void serialize(Ar& ar)
+        {
+            ar& YAS_OBJECT_NVP("id", ("id", id));
+        }
+    };
+
+    // the zone that initiated the call
+    struct caller_zone
+    {
+    private:
+        uint64_t id = 0;
+
+    public:
+        caller_zone() = default;
+        caller_zone(const caller_zone&) = default;
+        caller_zone(caller_zone&&) noexcept = default;
+        caller_zone(uint64_t initial_id)
+            : id(initial_id)
+        {
+        }
+        caller_zone& operator=(const caller_zone&) = default;
+        caller_zone& operator=(caller_zone&&) noexcept = default;
+        caller_zone& operator=(uint64_t other)
+        {
+            id = other;
+            return *this;
+        }
+
+        uint64_t get_val() const { return id; }
+
+        // compare
+        constexpr bool operator==(const caller_zone& val) const { return id == val.id; }
+        template<typename T, std::enable_if_t<std::is_unsigned<T>::value, int> = 0>
+        constexpr bool operator==(T val) const
+        {
+            return id == static_cast<uint64_t>(val);
+        }
+        constexpr bool operator!=(const caller_zone& val) const { return id != val.id; }
+        template<typename T, std::enable_if_t<std::is_unsigned<T>::value, int> = 0>
+        constexpr bool operator!=(T val) const
+        {
+            return id != static_cast<uint64_t>(val);
+        }
+
+        // less
+        constexpr bool operator<(uint64_t val) const { return id < val; }
+        constexpr bool operator<(const caller_zone& val) const { return id < val.id; }
+
+        constexpr bool is_set() const noexcept { return id != 0; }
+
+        inline caller_channel_zone as_caller_channel() const;
+        inline destination_zone as_destination() const;
+        inline destination_channel_zone as_destination_channel() const;
+        inline known_direction_zone as_known_direction_zone() const;
+
+        template<typename Ar> void serialize(Ar& ar)
+        {
+            ar& YAS_OBJECT_NVP("id", ("id", id));
+        }
+    };
+
+    // the zone that initiated the call
+    struct caller_channel_zone
+    {
+    private:
+        uint64_t id = 0;
+
+    public:
+        caller_channel_zone() = default;
+        caller_channel_zone(const caller_channel_zone&) = default;
+        caller_channel_zone(caller_channel_zone&&) noexcept = default;
+        caller_channel_zone(uint64_t initial_id)
+            : id(initial_id)
+        {
+        }
+        caller_channel_zone& operator=(const caller_channel_zone&) = default;
+        caller_channel_zone& operator=(caller_channel_zone&&) noexcept = default;
+        caller_channel_zone& operator=(uint64_t other)
+        {
+            id = other;
+            return *this;
+        }
+
+        uint64_t get_val() const { return id; }
+
+        // compare
+        constexpr bool operator==(const caller_channel_zone& val) const { return id == val.id; }
+        template<typename T, std::enable_if_t<std::is_unsigned<T>::value, int> = 0>
+        constexpr bool operator==(T val) const
+        {
+            return id == static_cast<uint64_t>(val);
+        }
+        constexpr bool operator!=(const caller_channel_zone& val) const { return id != val.id; }
+        template<typename T, std::enable_if_t<std::is_unsigned<T>::value, int> = 0>
+        constexpr bool operator!=(T val) const
+        {
+            return id != static_cast<uint64_t>(val);
+        }
+
+        // less
+        constexpr bool operator<(uint64_t val) const { return id < val; }
+        constexpr bool operator<(const caller_channel_zone& val) const { return id < val.id; }
+
+        constexpr bool is_set() const noexcept { return id != 0; }
+
+        inline destination_zone as_destination() const;
+        inline destination_channel_zone as_destination_channel() const;
+
+        template<typename Ar> void serialize(Ar& ar)
+        {
+            ar& YAS_OBJECT_NVP("id", ("id", id));
+        }
+    };
+
+    struct known_direction_zone
+    {
+    private:
+        uint64_t id = 0;
+
+    public:
+        known_direction_zone() = default;
+        known_direction_zone(const known_direction_zone&) = default;
+        known_direction_zone(known_direction_zone&&) noexcept = default;
+        known_direction_zone(zone z) noexcept
+            : id(z.get_val())
+        {
+        }
+        known_direction_zone(uint64_t initial_id)
+            : id(initial_id)
+        {
+        }
+        known_direction_zone& operator=(const known_direction_zone&) = default;
+        known_direction_zone& operator=(known_direction_zone&&) noexcept = default;
+        known_direction_zone& operator=(uint64_t other)
+        {
+            id = other;
+            return *this;
+        }
+
+        uint64_t get_val() const { return id; }
+
+        // compare
+        constexpr bool operator==(const known_direction_zone& val) const { return id == val.id; }
+        template<typename T, std::enable_if_t<std::is_unsigned<T>::value, int> = 0>
+        constexpr bool operator==(T val) const
+        {
+            return id == static_cast<uint64_t>(val);
+        }
+        constexpr bool operator!=(const known_direction_zone& val) const { return id != val.id; }
+        template<typename T, std::enable_if_t<std::is_unsigned<T>::value, int> = 0>
+        constexpr bool operator!=(T val) const
+        {
+            return id != static_cast<uint64_t>(val);
+        }
+
+        // less
+        constexpr bool operator<(uint64_t val) const { return id < val; }
+        constexpr bool operator<(const known_direction_zone& val) const { return id < val.id; }
+
+        constexpr bool is_set() const noexcept { return id != 0; }
+
+        inline destination_zone as_destination() const;
+        // inline destination_channel_zone as_destination_channel() const;
+
+        template<typename Ar> void serialize(Ar& ar)
+        {
+            ar& YAS_OBJECT_NVP("id", ("id", id));
+        }
+    };
+
+    // an id for objects unique to each zone
+    struct object
+    {
+    private:
+        uint64_t id = 0;
+
+    public:
         object() = default;
-        object(const type_id<ObjectId>& other) : type_id<ObjectId>(other){}
+        object(const object&) = default;
+        object(object&&) noexcept = default;
+        object(uint64_t initial_id)
+            : id(initial_id)
+        {
+        }
+        object& operator=(const object&) = default;
+        object& operator=(object&&) noexcept = default;
+        object& operator=(uint64_t other)
+        {
+            id = other;
+            return *this;
+        }
+
+        uint64_t get_val() const { return id; }
+
+        // compare
+        constexpr bool operator==(const object& val) const { return id == val.id; }
+        template<typename T, std::enable_if_t<std::is_unsigned<T>::value, int> = 0>
+        constexpr bool operator==(T val) const
+        {
+            return id == static_cast<uint64_t>(val);
+        }
+        constexpr bool operator!=(const object& val) const { return id != val.id; }
+        template<typename T, std::enable_if_t<std::is_unsigned<T>::value, int> = 0>
+        constexpr bool operator!=(T val) const
+        {
+            return id != static_cast<uint64_t>(val);
+        }
+
+        // less
+        constexpr bool operator<(uint64_t val) const { return id < val; }
+        constexpr bool operator<(object val) const { return id < val.id; }
+
+        constexpr bool is_set() const noexcept { return id != 0; }
+
+        template<typename Ar> void serialize(Ar& ar)
+        {
+            ar& YAS_OBJECT_NVP("id", ("id", id));
+        }
     };
 
-    //an id for interfaces
-    struct InterfaceId{};
-    struct interface_ordinal : public type_id<InterfaceId> //cant use the name interface
+    // an id for interfaces
+    struct interface_ordinal // cant use the name interface
     {
-        constexpr interface_ordinal() = default;
-        constexpr interface_ordinal(const type_id<InterfaceId>& other) : type_id<InterfaceId>(other){}
+    private:
+        uint64_t id = 0;
+
+    public:
+        interface_ordinal() = default;
+        interface_ordinal(const interface_ordinal&) = default;
+        interface_ordinal(interface_ordinal&&) noexcept = default;
+        interface_ordinal(uint64_t initial_id)
+            : id(initial_id)
+        {
+        }
+        interface_ordinal& operator=(const interface_ordinal&) = default;
+        interface_ordinal& operator=(interface_ordinal&&) noexcept = default;
+        interface_ordinal& operator=(uint64_t other)
+        {
+            id = other;
+            return *this;
+        }
+
+        uint64_t get_val() const { return id; }
+
+        // compare
+        constexpr bool operator==(const interface_ordinal& val) const { return id == val.id; }
+        template<typename T, std::enable_if_t<std::is_unsigned<T>::value, int> = 0>
+        constexpr bool operator==(T val) const
+        {
+            return id == static_cast<uint64_t>(val);
+        }
+        constexpr bool operator!=(const interface_ordinal& val) const { return id != val.id; }
+        template<typename T, std::enable_if_t<std::is_unsigned<T>::value, int> = 0>
+        constexpr bool operator!=(T val) const
+        {
+            return id != static_cast<uint64_t>(val);
+        }
+
+        // less
+        constexpr bool operator<(uint64_t val) const { return id < val; }
+        constexpr bool operator<(interface_ordinal val) const { return id < val.id; }
+
+        constexpr bool is_set() const noexcept { return id != 0; }
+
+        template<typename Ar> void serialize(Ar& ar)
+        {
+            ar& YAS_OBJECT_NVP("id", ("id", id));
+        }
     };
 
-    //an id for method ordinals
-    struct MethodId{};
-    struct method : public type_id<MethodId>
+    // an id for method ordinals
+    struct method
     {
+    private:
+        uint64_t id = 0;
+
+    public:
         method() = default;
-        method(const type_id<MethodId>& other) : type_id<MethodId>(other){}
+        method(const method&) = default;
+        method(method&&) noexcept = default;
+        method(uint64_t initial_id)
+            : id(initial_id)
+        {
+        }
+        method& operator=(const method&) = default;
+        method& operator=(method&&) noexcept = default;
+        method& operator=(uint64_t other)
+        {
+            id = other;
+            return *this;
+        }
+
+        uint64_t get_val() const { return id; }
+
+        // compare
+        constexpr bool operator==(const method& val) const { return id == val.id; }
+        template<typename T, std::enable_if_t<std::is_unsigned<T>::value, int> = 0>
+        constexpr bool operator==(T val) const
+        {
+            return id == static_cast<uint64_t>(val);
+        }
+        constexpr bool operator!=(const method& val) const { return id != val.id; }
+        template<typename T, std::enable_if_t<std::is_unsigned<T>::value, int> = 0>
+        constexpr bool operator!=(T val) const
+        {
+            return id != static_cast<uint64_t>(val);
+        }
+
+        // less
+        constexpr bool operator<(uint64_t val) const { return id < val; }
+        constexpr bool operator<(method val) const { return id < val.id; }
+
+        constexpr bool is_set() const noexcept { return id != 0; }
+
+        template<typename Ar> void serialize(Ar& ar)
+        {
+            ar& YAS_OBJECT_NVP("id", ("id", id));
+        }
     };
 
     struct function_info
@@ -184,96 +505,166 @@ namespace rpc
         std::string in_json_schema;
         std::string out_json_schema;
     };
+
+    // converters
+    destination_zone zone::as_destination() const
+    {
+        return destination_zone(id);
+    }
+    destination_channel_zone zone::as_destination_channel() const
+    {
+        return destination_channel_zone(id);
+    }
+    caller_zone zone::as_caller() const
+    {
+        return caller_zone(id);
+    }
+    caller_channel_zone zone::as_caller_channel() const
+    {
+        return caller_channel_zone(id);
+    }
+
+    zone destination_zone::as_zone() const
+    {
+        return zone(id);
+    }
+    destination_channel_zone destination_zone::as_destination_channel() const
+    {
+        return destination_channel_zone(id);
+    }
+    caller_zone destination_zone::as_caller() const
+    {
+        return caller_zone(id);
+    }
+    caller_channel_zone destination_zone::as_caller_channel() const
+    {
+        return caller_channel_zone(id);
+    }
+
+    destination_zone destination_channel_zone::as_destination() const
+    {
+        return destination_zone(id);
+    }
+    caller_channel_zone destination_channel_zone::as_caller_channel() const
+    {
+        return caller_channel_zone(id);
+    }
+
+    caller_channel_zone caller_zone::as_caller_channel() const
+    {
+        return caller_channel_zone(id);
+    }
+    destination_zone caller_zone::as_destination() const
+    {
+        return destination_zone(id);
+    }
+    destination_channel_zone caller_zone::as_destination_channel() const
+    {
+        return destination_channel_zone(id);
+    }
+    
+    known_direction_zone caller_zone::as_known_direction_zone() const
+    {
+        return known_direction_zone(id);
+    }
+
+    destination_zone caller_channel_zone::as_destination() const
+    {
+        return destination_zone(id);
+    }
+    destination_channel_zone caller_channel_zone::as_destination_channel() const
+    {
+        return destination_channel_zone(id);
+    }    
+    
+    destination_zone known_direction_zone::as_destination() const
+    {
+        return destination_zone(id);        
+    }
 }
 
 namespace std
 {
-    template<typename Type>
-    inline std::string to_string(rpc::type_id<Type> _Val) {
-        return std::to_string(_Val.get_val());
+    // Remove the old template for type_id, and provide overloads for each affected class:
+    inline std::string to_string(const rpc::zone& val)
+    {
+        return std::to_string(val.get_val());
     }
+    inline std::string to_string(const rpc::destination_zone& val)
+    {
+        return std::to_string(val.get_val());
+    }
+    inline std::string to_string(const rpc::destination_channel_zone& val)
+    {
+        return std::to_string(val.get_val());
+    }
+    inline std::string to_string(const rpc::caller_zone& val)
+    {
+        return std::to_string(val.get_val());
+    }
+    inline std::string to_string(const rpc::caller_channel_zone& val)
+    {
+        return std::to_string(val.get_val());
+    }
+    inline std::string to_string(const rpc::known_direction_zone& val)
+    {
+        return std::to_string(val.get_val());
+    }
+    inline std::string to_string(const rpc::object& val)
+    {
+        return std::to_string(val.get_val());
+    }
+    inline std::string to_string(const rpc::interface_ordinal& val)
+    {
+        return std::to_string(val.get_val());
+    }
+    inline std::string to_string(const rpc::method& val)
+    {
+        return std::to_string(val.get_val());
+    }
+
+    template<> struct hash<rpc::zone>
+    {
+        auto operator()(const rpc::zone& item) const noexcept { return (std::size_t)item.get_val(); }
+    };
+
+    template<> struct hash<rpc::destination_zone>
+    {
+        auto operator()(const rpc::destination_zone& item) const noexcept { return (std::size_t)item.get_val(); }
+    };
+
+    template<> struct hash<rpc::destination_channel_zone>
+    {
+        auto operator()(const rpc::destination_channel_zone& item) const noexcept { return (std::size_t)item.get_val(); }
+    };
+
+    template<> struct hash<rpc::caller_zone>
+    {
+        auto operator()(const rpc::caller_zone& item) const noexcept { return (std::size_t)item.get_val(); }
+    };
+
+    template<> struct hash<rpc::caller_channel_zone>
+    {
+        auto operator()(const rpc::caller_channel_zone& item) const noexcept { return (std::size_t)item.get_val(); }
+    };
+
+    template<> struct hash<rpc::known_direction_zone>
+    {
+        auto operator()(const rpc::known_direction_zone& item) const noexcept { return (std::size_t)item.get_val(); }
+    };
+
+    template<> struct hash<rpc::interface_ordinal>
+    {
+        auto operator()(const rpc::interface_ordinal& item) const noexcept { return (std::size_t)item.get_val(); }
+    };
+
+    template<> struct hash<rpc::object>
+    {
+        auto operator()(const rpc::object& item) const noexcept { return (std::size_t)item.get_val(); }
+    };
+
+    template<> struct hash<rpc::method>
+    {
+        auto operator()(const rpc::method& item) const noexcept { return (std::size_t)item.get_val(); }
+    };
 }
-
-template<>
-struct std::hash<rpc::zone> 
-{
-    auto operator() (const rpc::zone& item) const noexcept
-    {
-        return (std::size_t)item.id;
-
-    }
-};
-
-template<>
-struct std::hash<rpc::destination_zone> 
-{
-    auto operator() (const rpc::destination_zone& item) const noexcept 
-    {
-        return (std::size_t)item.id;
-
-    }
-};
-
-template<>
-struct std::hash<rpc::destination_channel_zone> 
-{
-    auto operator() (const rpc::destination_channel_zone& item) const noexcept 
-    {
-        return (std::size_t)item.id;
-
-    }
-};
-
-template<>
-struct std::hash<rpc::caller_zone> 
-{
-    auto operator() (const rpc::caller_zone& item) const noexcept 
-    {
-        return (std::size_t)item.id;
-
-    }
-};
-
-template<>
-struct std::hash<rpc::caller_channel_zone> 
-{
-    auto operator() (const rpc::caller_channel_zone& item) const noexcept 
-    {
-        return (std::size_t)item.id;
-
-    }
-};
-
-template<> struct std::hash<rpc::known_direction_zone>
-{
-    auto operator()(const rpc::known_direction_zone& item) const noexcept { return (std::size_t)item.id; }
-};
-
-template<> struct std::hash<rpc::interface_ordinal>
-{
-    auto operator() (const rpc::interface_ordinal& item) const noexcept 
-    {
-        return (std::size_t)item.id;
-
-    }
-};
-
-template<>
-struct std::hash<rpc::object> 
-{
-    auto operator() (const rpc::object& item) const noexcept 
-    {
-        return (std::size_t)item.id;
-
-    }
-};
-
-template<>
-struct std::hash<rpc::method> 
-{
-    auto operator() (const rpc::method& item) const noexcept 
-    {
-        return (std::size_t)item.id;
-
-    }
-};

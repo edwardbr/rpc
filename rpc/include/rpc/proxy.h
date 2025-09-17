@@ -841,7 +841,7 @@ namespace rpc
             }
 
             rpc::shared_ptr<object_proxy> op = CO_AWAIT service_proxy->get_or_create_object_proxy(
-                encap.object_id, service_proxy::object_proxy_creation_rule::ADD_REF_IF_NEW, new_proxy_added, caller_zone_id.as_known_direction_channel());
+                encap.object_id, service_proxy::object_proxy_creation_rule::ADD_REF_IF_NEW, new_proxy_added, caller_zone_id.as_known_direction_zone());
             RPC_ASSERT(op != nullptr);
             if (!op)
             {

@@ -1083,7 +1083,7 @@ public:
             auto op = proxy->get_object_proxy();
             [[maybe_unused]] auto object_id = op->get_object_id();
             [[maybe_unused]] auto zone_id = op->get_service_proxy()->get_zone_id();
-            RPC_INFO("[GARBAGE_COLLECTOR] Object zone id: {} object_id: {}", zone_id.id, object_id.id);
+            RPC_INFO("[GARBAGE_COLLECTOR] Object zone id: {} object_id: {}", zone_id.get_val(), object_id.get_val());
 
             // Try to cast to interface types to get more information
             auto autonomous_node = rpc::dynamic_pointer_cast<i_autonomous_node>(obj);

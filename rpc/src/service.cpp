@@ -393,11 +393,11 @@ namespace rpc
         RPC_ASSERT(caller_zone_id.is_set());
         RPC_ASSERT(destination_zone_id.is_set());
 
-        uint64_t object_channel = caller_channel_zone_id.is_set() ? caller_channel_zone_id.id : caller_zone_id.id;
+        uint64_t object_channel = caller_channel_zone_id.is_set() ? caller_channel_zone_id.get_val() : caller_zone_id.get_val();
         RPC_ASSERT(object_channel);
 
         uint64_t destination_channel
-            = destination_channel_zone_id.is_set() ? destination_channel_zone_id.id : destination_zone_id.id;
+            = destination_channel_zone_id.is_set() ? destination_channel_zone_id.get_val() : destination_zone_id.get_val();
         RPC_ASSERT(destination_channel);
 
         destination_zone = object_service_proxy;
@@ -464,11 +464,11 @@ namespace rpc
         RPC_ASSERT(caller_zone_id.is_set());
         RPC_ASSERT(destination_zone_id.is_set());
 
-        uint64_t object_channel = caller_channel_zone_id.is_set() ? caller_channel_zone_id.id : caller_zone_id.id;
+        uint64_t object_channel = caller_channel_zone_id.is_set() ? caller_channel_zone_id.get_val() : caller_zone_id.get_val();
         RPC_ASSERT(object_channel);
 
         uint64_t destination_channel
-            = destination_channel_zone_id.is_set() ? destination_channel_zone_id.id : destination_zone_id.id;
+            = destination_channel_zone_id.is_set() ? destination_channel_zone_id.get_val() : destination_zone_id.get_val();
         RPC_ASSERT(destination_channel);
 
         if (object_channel == destination_channel)
@@ -715,7 +715,7 @@ namespace rpc
             if (outcall)
             {
                 std::lock_guard g(zone_control);
-                uint64_t object_channel = caller_channel_zone_id.is_set() ? caller_channel_zone_id.id : caller_zone_id.id;
+                uint64_t object_channel = caller_channel_zone_id.is_set() ? caller_channel_zone_id.get_val() : caller_zone_id.get_val();
                 RPC_ASSERT(object_channel);
                 // and the caller with destination info
                 auto found = other_zones.find(
@@ -838,7 +838,7 @@ namespace rpc
         uint64_t& reference_count)
     {
         // note if known_direction_zone_id is always 0 test_y_topology_and_set_host_with_prong_object will fail.
-        // known_direction_zone_id.id = 0;
+        // known_direction_zone_id.get_val() = 0;
         current_service_tracker tracker(this);
 #ifdef USE_RPC_TELEMETRY
         if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
@@ -854,9 +854,9 @@ namespace rpc
 #endif
 
         auto dest_channel = destination_zone_id.get_val();
-        if (destination_channel_zone_id != zone_id_.as_destination_channel() && destination_channel_zone_id.id != 0)
+        if (destination_channel_zone_id != zone_id_.as_destination_channel() && destination_channel_zone_id.get_val() != 0)
             dest_channel = destination_channel_zone_id.get_val();
-        auto caller_channel = caller_channel_zone_id.is_set() ? caller_channel_zone_id.id : caller_zone_id.id;
+        auto caller_channel = caller_channel_zone_id.is_set() ? caller_channel_zone_id.get_val() : caller_zone_id.get_val();
 
         if (destination_zone_id != zone_id_.as_destination())
         {
@@ -880,10 +880,10 @@ namespace rpc
                     {
                         RPC_ERROR("unable to find destination channel to build a channel with - current_zone: {}, "
                                   "requester: {}, caller: {}, sender: {}",
-                            zone_id_.id,
-                            known_direction_zone_id.id,
-                            caller_zone_id.id,
-                            destination_zone_id.id);
+                            zone_id_.get_val(),
+                            known_direction_zone_id.get_val(),
+                            caller_zone_id.get_val(),
+                            destination_zone_id.get_val());
                         RPC_ASSERT(false);
                         CO_RETURN rpc::error::OBJECT_NOT_FOUND();
                     }
