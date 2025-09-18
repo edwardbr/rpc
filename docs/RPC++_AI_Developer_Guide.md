@@ -16,7 +16,7 @@ This document provides detailed technical information for AI assistants and deve
 
 ```
 Service (Zone Container - Root Level)
-├── other_zones: Map<{destination_zone, caller_zone}, weak_ptr<service_proxy>>
+├── other_zones: Map<{destination_zone, caller_zone}, std::weak_ptr<rpc::object_stub>>
 │   ├── Service Proxy (Communication Channel)
 │   │   ├── proxies_: Map<object_id, weak_ptr<object_proxy>>
 │   │   ├── lifetime_lock_count_: External reference counter (atomic<int>)

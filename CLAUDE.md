@@ -476,7 +476,7 @@ class service : public std::enable_shared_from_this<service>
 **Container Type Migration**:
 ```cpp
 // OLD: rpc pointer containers
-std::map<zone_route, rpc::weak_ptr<service_proxy>> other_zones;
+std::map<zone_route, std::weak_ptr<rpc::object_stub>> other_zones;
 std::unordered_map<object, rpc::weak_ptr<object_proxy>> proxies_;
 
 // NEW: std pointer containers

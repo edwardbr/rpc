@@ -83,12 +83,12 @@ namespace rpc
 
         // map object_id's to stubs
         mutable std::mutex stub_control;
-        std::unordered_map<object, rpc::weak_ptr<object_stub>> stubs;
+        std::unordered_map<object, std::weak_ptr<object_stub>> stubs;
         std::unordered_map<rpc::interface_ordinal,
-            std::shared_ptr<std::function<rpc::shared_ptr<rpc::i_interface_stub>(const rpc::shared_ptr<rpc::i_interface_stub>&)>>>
+            std::shared_ptr<std::function<std::shared_ptr<rpc::i_interface_stub>(const std::shared_ptr<rpc::i_interface_stub>&)>>>
             stub_factories;
         // map wrapped objects pointers to stubs
-        std::map<void*, rpc::weak_ptr<object_stub>> wrapped_object_to_stub;
+        std::map<void*, std::weak_ptr<object_stub>> wrapped_object_to_stub;
         std::string name_;
 
 #ifdef BUILD_COROUTINE
@@ -114,7 +114,7 @@ namespace rpc
 
         template<class T>
         CORO_TASK(interface_descriptor)
-        proxy_bind_in_param(uint64_t protocol_version, const shared_ptr<T>& iface, shared_ptr<object_stub>& stub);
+        proxy_bind_in_param(uint64_t protocol_version, const shared_ptr<T>& iface, std::shared_ptr<rpc::object_stub>& stub);
         template<class T>
         CORO_TASK(interface_descriptor)
         stub_bind_out_param(uint64_t protocol_version,
@@ -184,11 +184,11 @@ namespace rpc
             caller_channel_zone caller_channel_zone_id,
             caller_zone caller_zone_id,
             rpc::casting_interface* pointer,
-            std::function<rpc::shared_ptr<i_interface_stub>(rpc::shared_ptr<object_stub>)> fn,
+            std::function<std::shared_ptr<rpc::i_interface_stub>(std::shared_ptr<object_stub>)> fn,
             bool outcall,
-            rpc::shared_ptr<object_stub>& stub);
+            std::shared_ptr<object_stub>& stub);
 
-        rpc::weak_ptr<object_stub> get_object(object object_id) const;
+        std::weak_ptr<object_stub> get_object(object object_id) const;
 
         CORO_TASK(int)
         send(uint64_t protocol_version,
@@ -225,7 +225,7 @@ namespace rpc
             caller_zone caller_zone_id,
             uint64_t& reference_count) override;
 
-        uint64_t release_local_stub(const rpc::shared_ptr<rpc::object_stub>& stub);
+        uint64_t release_local_stub(const std::shared_ptr<object_stub>& stub);
 
         virtual void add_zone_proxy(const std::shared_ptr<rpc::service_proxy>& zone);
         virtual std::shared_ptr<rpc::service_proxy> get_zone_proxy(caller_channel_zone caller_channel_zone_id,
@@ -281,7 +281,7 @@ namespace rpc
                     caller_channel_zone empty_caller_channel_zone = {};
                     caller_zone caller_zone_id = zone_id_.as_caller();
 
-                    rpc::shared_ptr<rpc::object_stub> stub;
+                    std::shared_ptr<object_stub> stub;
                     auto factory = create_interface_stub(input_interface);
                     input_descr = CO_AWAIT get_proxy_stub_descriptor(rpc::get_version(),
                         empty_caller_channel_zone,
@@ -361,16 +361,16 @@ namespace rpc
         }
 
         template<class T>
-        std::function<shared_ptr<i_interface_stub>(const shared_ptr<object_stub>& stub)> create_interface_stub(
+        std::function<std::shared_ptr<rpc::i_interface_stub>(const std::shared_ptr<object_stub>& stub)> create_interface_stub(
             const shared_ptr<T>& iface);
         int create_interface_stub(rpc::interface_ordinal interface_id,
             std::function<interface_ordinal(uint8_t)> original_interface_id,
-            const rpc::shared_ptr<rpc::i_interface_stub>& original,
-            rpc::shared_ptr<rpc::i_interface_stub>& new_stub);
+            const std::shared_ptr<rpc::i_interface_stub>& original,
+            std::shared_ptr<rpc::i_interface_stub>& new_stub);
 
         // note this function is not thread safe!  Use it before using the service class for normal operation
         void add_interface_stub_factory(std::function<interface_ordinal(uint8_t)> id_getter,
-            std::shared_ptr<std::function<rpc::shared_ptr<rpc::i_interface_stub>(const rpc::shared_ptr<rpc::i_interface_stub>&)>>
+            std::shared_ptr<std::function<std::shared_ptr<rpc::i_interface_stub>(const std::shared_ptr<rpc::i_interface_stub>&)>>
                 factory);
 
         friend service_proxy;
@@ -501,7 +501,7 @@ namespace rpc
             RPC_ASSERT(false);
             CO_RETURN{{0}, {0}};
         }
-        rpc::shared_ptr<rpc::object_stub> stub;
+        std::shared_ptr<object_stub> stub;
         auto factory = serv.create_interface_stub(iface);
         CO_RETURN CO_AWAIT serv.get_proxy_stub_descriptor(
             rpc::get_version(), empty_caller_channel_zone, caller_zone_id, iface.get(), factory, false, stub);

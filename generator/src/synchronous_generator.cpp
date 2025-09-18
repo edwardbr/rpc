@@ -416,7 +416,7 @@ namespace synchronous_generator
         switch (pt)
         {
         case PROXY_PREPARE_IN:
-            return fmt::format("rpc::shared_ptr<rpc::object_stub> {}_stub_;", name);
+            return fmt::format("std::shared_ptr<rpc::object_stub> {}_stub_;", name);
         case PROXY_PREPARE_IN_INTERFACE_ID:
             return fmt::format(
                 "RPC_ASSERT(rpc::are_in_same_zone(this, {0}.get()));\n"
@@ -497,7 +497,7 @@ namespace synchronous_generator
         switch (option)
         {
         case PROXY_PREPARE_IN:
-            return fmt::format("rpc::shared_ptr<rpc::object_stub> {}_stub_;", name);
+            return fmt::format("std::shared_ptr<rpc::object_stub> {}_stub_;", name);
         case PROXY_PREPARE_IN_INTERFACE_ID:
             return fmt::format(
                 "RPC_ASSERT(rpc::are_in_same_zone(this, {0}.get()));\n"
@@ -1227,9 +1227,9 @@ namespace synchronous_generator
         done.insert(ns);
 
         stub("srv->add_interface_stub_factory(::{0}::get_id, "
-             "std::make_shared<std::function<rpc::shared_ptr<rpc::i_interface_stub>(const "
-             "rpc::shared_ptr<rpc::i_interface_stub>&)>>([](const rpc::shared_ptr<rpc::i_interface_stub>& "
-             "original) -> rpc::shared_ptr<rpc::i_interface_stub>",
+             "std::make_shared<std::function<std::shared_ptr<rpc::i_interface_stub>(const "
+             "std::shared_ptr<rpc::i_interface_stub>&)>>([](const std::shared_ptr<rpc::i_interface_stub>& "
+             "original) -> std::shared_ptr<rpc::i_interface_stub>",
             ns);
         stub("{{");
         stub("auto ci = original->get_castable_interface();");
@@ -1240,7 +1240,7 @@ namespace synchronous_generator
         stub("if(tmp != nullptr)");
         stub("{{");
         stub("rpc::shared_ptr<::{0}> tmp_ptr(ci, tmp);", ns);
-        stub("return rpc::static_pointer_cast<rpc::i_interface_stub>(::{}_stub::create(tmp_ptr, "
+        stub("return std::static_pointer_cast<rpc::i_interface_stub>(::{}_stub::create(tmp_ptr, "
              "original->get_object_stub()));",
             ns);
         stub("}}");
@@ -1252,7 +1252,7 @@ namespace synchronous_generator
     void write_stub_cast_factory(const class_entity& m_ob, writer& stub)
     {
         auto interface_name = std::string(m_ob.get_entity_type() == entity_type::LIBRARY ? "i_" : "") + m_ob.get_name();
-        stub("int {}_stub::cast(rpc::interface_ordinal interface_id, rpc::shared_ptr<rpc::i_interface_stub>& "
+        stub("int {}_stub::cast(rpc::interface_ordinal interface_id, std::shared_ptr<rpc::i_interface_stub>& "
              "new_stub)",
             interface_name);
         stub("{{");
@@ -1274,27 +1274,27 @@ namespace synchronous_generator
         stub("class {0}_stub : public rpc::i_interface_stub", interface_name);
         stub("{{");
         stub("rpc::shared_ptr<{}> __rpc_target_;", interface_name);
-        stub("rpc::weak_ptr<rpc::object_stub> target_stub_;", interface_name);
+        stub("std::weak_ptr<rpc::object_stub> target_stub_;", interface_name);
         stub("");
-        stub("{0}_stub(const rpc::shared_ptr<{0}>& __rpc_target, rpc::weak_ptr<rpc::object_stub> "
+        stub("{0}_stub(const rpc::shared_ptr<{0}>& __rpc_target, std::weak_ptr<rpc::object_stub> "
              "__rpc_target_stub) : ",
             interface_name);
         stub("  __rpc_target_(__rpc_target),", interface_name);
         stub("  target_stub_(__rpc_target_stub)");
         stub("  {{}}");
-        stub("mutable rpc::weak_ptr<{}_stub> weak_this_;", interface_name);
+        stub("mutable std::weak_ptr<{}_stub> weak_this_;", interface_name);
         stub("");
         stub("public:");
         stub("virtual ~{0}_stub() = default;", interface_name);
-        stub("static rpc::shared_ptr<{0}_stub> create(const rpc::shared_ptr<{0}>& __rpc_target, "
-             "rpc::weak_ptr<rpc::object_stub> __rpc_target_stub)",
+        stub("static std::shared_ptr<{0}_stub> create(const rpc::shared_ptr<{0}>& __rpc_target, "
+             "std::weak_ptr<rpc::object_stub> __rpc_target_stub)",
             interface_name);
         stub("{{");
-        stub("auto __rpc_ret = rpc::shared_ptr<{0}_stub>(new {0}_stub(__rpc_target, __rpc_target_stub));", interface_name);
+        stub("auto __rpc_ret = std::shared_ptr<{0}_stub>(new {0}_stub(__rpc_target, __rpc_target_stub));", interface_name);
         stub("__rpc_ret->weak_this_ = __rpc_ret;", interface_name);
         stub("return __rpc_ret;", interface_name);
         stub("}}");
-        stub("rpc::shared_ptr<{0}_stub> shared_from_this(){{return rpc::shared_ptr<{0}_stub>(weak_this_);}}",
+        stub("std::shared_ptr<{0}_stub> shared_from_this(){{return weak_this_.lock();}}",
             interface_name);
         stub("");
         stub("rpc::interface_ordinal get_interface_id(uint64_t rpc_version) const override");
@@ -1305,13 +1305,13 @@ namespace synchronous_generator
              "rpc::static_pointer_cast<rpc::casting_interface>(__rpc_target_); }}",
             interface_name);
 
-        stub("rpc::weak_ptr<rpc::object_stub> get_object_stub() const override {{ return target_stub_;}}");
+        stub("std::weak_ptr<rpc::object_stub> get_object_stub() const override {{ return target_stub_;}}");
         stub("void* get_pointer() const override {{ return __rpc_target_.get();}}");
         stub("CORO_TASK(int) call(uint64_t protocol_version, rpc::encoding enc, rpc::caller_channel_zone "
              "caller_channel_zone_id, rpc::caller_zone caller_zone_id, rpc::method method_id, size_t in_size_, "
              "const char* in_buf_, std::vector<char>& "
              "__rpc_out_buf) override;");
-        stub("int cast(rpc::interface_ordinal interface_id, rpc::shared_ptr<rpc::i_interface_stub>& new_stub) "
+        stub("int cast(rpc::interface_ordinal interface_id, std::shared_ptr<rpc::i_interface_stub>& new_stub) "
              "override;");
         stub("}};");
         stub("");
@@ -1713,7 +1713,7 @@ namespace synchronous_generator
 
         header("template<> CORO_TASK(rpc::interface_descriptor) "
                "rpc::service::proxy_bind_in_param(uint64_t protocol_version, const rpc::shared_ptr<::{}{}>& "
-               "iface, rpc::shared_ptr<rpc::object_stub>& stub);",
+               "iface, std::shared_ptr<rpc::object_stub>& stub);",
             ns,
             interface_name);
         header("template<> CORO_TASK(rpc::interface_descriptor) "
@@ -1740,7 +1740,7 @@ namespace synchronous_generator
             interface_declaration_generator::build_scoped_name(owner, ns);
         }
 
-        proxy("template<> void object_proxy::create_interface_proxy(shared_ptr<::{}{}>& "
+        proxy("template<> void object_proxy::create_interface_proxy(rpc::shared_ptr<::{}{}>& "
               "inface)",
             ns,
             interface_name);
@@ -1749,20 +1749,20 @@ namespace synchronous_generator
         proxy("}}");
         proxy("");
 
-        stub("template<> std::function<shared_ptr<i_interface_stub>(const shared_ptr<object_stub>& stub)> "
-             "service::create_interface_stub(const shared_ptr<::{}{}>& iface)",
+        stub("template<> std::function<std::shared_ptr<rpc::i_interface_stub>(const std::shared_ptr<rpc::object_stub>& stub)> "
+             "service::create_interface_stub(const rpc::shared_ptr<::{}{}>& iface)",
             ns,
             interface_name);
         stub("{{");
-        stub("return [&](const shared_ptr<object_stub>& stub) -> "
-             "shared_ptr<i_interface_stub>{{");
-        stub("return static_pointer_cast<i_interface_stub>(::{}{}_stub::create(iface, stub));", ns, interface_name);
+        stub("return [&](const std::shared_ptr<rpc::object_stub>& stub) -> "
+             "std::shared_ptr<rpc::i_interface_stub>{{");
+        stub("return std::static_pointer_cast<rpc::i_interface_stub>(::{}{}_stub::create(iface, stub));", ns, interface_name);
         stub("}};");
         stub("}}");
 
         stub("template<> CORO_TASK(interface_descriptor) service::proxy_bind_in_param(uint64_t protocol_version, "
              "const "
-             "shared_ptr<::{}{}>& iface, shared_ptr<object_stub>& stub)",
+             "rpc::shared_ptr<::{}{}>& iface, std::shared_ptr<rpc::object_stub>& stub)",
             ns,
             interface_name);
         stub("{{");
@@ -1777,7 +1777,7 @@ namespace synchronous_generator
         stub("}}");
 
         stub("template<> CORO_TASK(interface_descriptor) service::stub_bind_out_param(uint64_t protocol_version, "
-             "caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, const shared_ptr<::{}{}>& "
+             "caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, const rpc::shared_ptr<::{}{}>& "
              "iface)",
             ns,
             interface_name);
@@ -1787,7 +1787,7 @@ namespace synchronous_generator
         stub("CO_RETURN {{{{0}},{{0}}}};");
         stub("}}");
 
-        stub("shared_ptr<object_stub> stub;");
+        stub("std::shared_ptr<rpc::object_stub> stub;");
 
         stub("auto factory = create_interface_stub(iface);");
         stub("CO_RETURN CO_AWAIT get_proxy_stub_descriptor(protocol_version, caller_channel_zone_id, "

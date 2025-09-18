@@ -33,12 +33,12 @@ namespace rpc
 
     //this method is not thread safe as it is only used when the object is constructed by service
     //or by an internal call by this class
-    void object_stub::add_interface(const rpc::shared_ptr<i_interface_stub>& iface)
+    void object_stub::add_interface(const std::shared_ptr<rpc::i_interface_stub>& iface)
     {
         stub_map[iface->get_interface_id(rpc::VERSION_2)] = iface;
     }
 
-    rpc::shared_ptr<i_interface_stub> object_stub::get_interface(interface_ordinal interface_id)
+    std::shared_ptr<rpc::i_interface_stub> object_stub::get_interface(interface_ordinal interface_id)
     {
         std::lock_guard g(map_control);
         auto res = stub_map.find(interface_id);
@@ -58,7 +58,7 @@ namespace rpc
         , const char* in_buf_
         , std::vector<char>& out_buf_)
     {
-        rpc::shared_ptr<i_interface_stub> stub;
+        std::shared_ptr<rpc::i_interface_stub> stub;
         {
             std::lock_guard g(map_control);
             auto item = stub_map.find(interface_id);
@@ -82,8 +82,8 @@ namespace rpc
         auto item = stub_map.find(interface_id);
         if (item == stub_map.end())
         {
-            rpc::shared_ptr<i_interface_stub> new_stub;
-            rpc::shared_ptr<i_interface_stub> stub = stub_map.begin()->second;
+            std::shared_ptr<rpc::i_interface_stub> new_stub;
+            std::shared_ptr<rpc::i_interface_stub> stub = stub_map.begin()->second;
             ret = stub->cast(interface_id, new_stub);
             if (ret == rpc::error::OK() && new_stub)
             {

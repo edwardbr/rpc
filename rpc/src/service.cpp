@@ -104,7 +104,7 @@ namespace rpc
         other_zones.clear();
     }
 
-    object service::get_object_id(const shared_ptr<casting_interface>& ptr) const
+    object service::get_object_id(const rpc::shared_ptr<casting_interface>& ptr) const
     {
         if (ptr == nullptr)
             return {};
@@ -339,7 +339,7 @@ namespace rpc
                 RPC_ERROR("Unsupported service version {} in send", protocol_version);
                 CO_RETURN rpc::error::INVALID_VERSION();
             }
-            rpc::weak_ptr<object_stub> weak_stub = get_object(object_id);
+            std::weak_ptr<object_stub> weak_stub = get_object(object_id);
             auto stub = weak_stub.lock();
             if (stub == nullptr)
             {
@@ -665,9 +665,9 @@ namespace rpc
         caller_channel_zone caller_channel_zone_id,
         caller_zone caller_zone_id,
         rpc::casting_interface* iface,
-        std::function<rpc::shared_ptr<i_interface_stub>(rpc::shared_ptr<object_stub>)> fn,
+        std::function<std::shared_ptr<rpc::i_interface_stub>(std::shared_ptr<rpc::object_stub>)> fn,
         bool outcall,
-        rpc::shared_ptr<object_stub>& stub)
+        std::shared_ptr<rpc::object_stub>& stub)
     {
         if (outcall)
         {
@@ -702,8 +702,8 @@ namespace rpc
                 {
                     // else create a stub
                     auto id = generate_new_object_id();
-                    stub = rpc::make_shared<object_stub>(id, *this, pointer);
-                    rpc::shared_ptr<i_interface_stub> interface_stub = fn(stub);
+                    stub = std::make_shared<object_stub>(id, *this, pointer);
+                    std::shared_ptr<rpc::i_interface_stub> interface_stub = fn(stub);
                     stub->add_interface(interface_stub);
                     wrapped_object_to_stub[pointer] = stub;
                     stubs[id] = stub;
@@ -761,7 +761,7 @@ namespace rpc
         CO_RETURN{stub->get_id(), zone_id_.as_destination()};
     }
 
-    rpc::weak_ptr<object_stub> service::get_object(object object_id) const
+    std::weak_ptr<object_stub> service::get_object(object object_id) const
     {
         std::lock_guard l(stub_control);
         auto item = stubs.find(object_id);
@@ -769,7 +769,7 @@ namespace rpc
         {
             // we need a test if we get here
             RPC_ASSERT(false);
-            return rpc::weak_ptr<object_stub>();
+            return std::weak_ptr<object_stub>();
         }
 
         return item->second;
@@ -815,7 +815,7 @@ namespace rpc
                 RPC_ERROR("Unsupported service version {} in try_cast", protocol_version);
                 CO_RETURN rpc::error::INVALID_VERSION();
             }
-            rpc::weak_ptr<object_stub> weak_stub = get_object(object_id);
+            std::weak_ptr<object_stub> weak_stub = get_object(object_id);
             auto stub = weak_stub.lock();
             if (!stub)
             {
@@ -1285,7 +1285,7 @@ namespace rpc
                 CO_RETURN rpc::error::OK();
             }
 
-            rpc::weak_ptr<object_stub> weak_stub = get_object(object_id);
+            std::weak_ptr<object_stub> weak_stub = get_object(object_id);
             auto stub = weak_stub.lock();
             if (!stub)
             {
@@ -1298,7 +1298,7 @@ namespace rpc
         }
     }
 
-    uint64_t service::release_local_stub(const rpc::shared_ptr<rpc::object_stub>& stub)
+    uint64_t service::release_local_stub(const std::shared_ptr<rpc::object_stub>& stub)
     {
         std::lock_guard l(stub_control);
         uint64_t count = stub->release();
@@ -1445,7 +1445,7 @@ namespace rpc
             }
 
             bool reset_stub = false;
-            rpc::shared_ptr<rpc::object_stub> stub;
+            std::shared_ptr<rpc::object_stub> stub;
             uint64_t count = 0;
             // these scope brackets are needed as otherwise there will be a recursive lock on a mutex in rare cases when the stub is reset
             {
@@ -1626,13 +1626,13 @@ namespace rpc
 
     int service::create_interface_stub(rpc::interface_ordinal interface_id,
         std::function<interface_ordinal(uint8_t)> interface_getter,
-        const rpc::shared_ptr<rpc::i_interface_stub>& original,
-        rpc::shared_ptr<rpc::i_interface_stub>& new_stub)
+        const std::shared_ptr<rpc::i_interface_stub>& original,
+        std::shared_ptr<rpc::i_interface_stub>& new_stub)
     {
         // an identity check, send back the same pointer
         if (interface_getter(rpc::VERSION_2) == interface_id)
         {
-            new_stub = rpc::static_pointer_cast<rpc::i_interface_stub>(original);
+            new_stub = std::static_pointer_cast<rpc::i_interface_stub>(original);
             return rpc::error::OK();
         }
 
@@ -1655,7 +1655,7 @@ namespace rpc
 
     // note this function is not thread safe!  Use it before using the service class for normal operation
     void service::add_interface_stub_factory(std::function<interface_ordinal(uint8_t)> id_getter,
-        std::shared_ptr<std::function<rpc::shared_ptr<rpc::i_interface_stub>(const rpc::shared_ptr<rpc::i_interface_stub>&)>> factory)
+        std::shared_ptr<std::function<std::shared_ptr<rpc::i_interface_stub>(const std::shared_ptr<rpc::i_interface_stub>&)>> factory)
     {
         auto interface_id = id_getter(rpc::VERSION_2);
         auto it = stub_factories.find({interface_id});

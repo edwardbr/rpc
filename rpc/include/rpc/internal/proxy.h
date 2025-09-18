@@ -42,7 +42,7 @@ namespace rpc
         template<class T>
         CORO_TASK(interface_descriptor)
         proxy_bind_in_param(
-            uint64_t protocol_version, const rpc::shared_ptr<T>& iface, rpc::shared_ptr<rpc::object_stub>& stub);
+            uint64_t protocol_version, const rpc::shared_ptr<T>& iface, std::shared_ptr<rpc::object_stub>& stub);
         template<class T>
         CORO_TASK(interface_descriptor)
         stub_bind_out_param(uint64_t protocol_version,
@@ -89,7 +89,7 @@ namespace rpc
     template<class T>
     CORO_TASK(interface_descriptor)
     proxy_base::proxy_bind_in_param(
-        uint64_t protocol_version, const rpc::shared_ptr<T>& iface, rpc::shared_ptr<rpc::object_stub>& stub)
+        uint64_t protocol_version, const rpc::shared_ptr<T>& iface, std::shared_ptr<rpc::object_stub>& stub)
     {
         if (!iface)
             CO_RETURN interface_descriptor();
