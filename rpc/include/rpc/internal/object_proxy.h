@@ -16,6 +16,7 @@
 #include <rpc/internal/coroutine_support.h>
 #include <rpc/internal/serialiser.h>
 #include <rpc/internal/version.h>
+#include <rpc/internal/remote_pointer.h>
 
 // Forward declarations
 namespace rpc
