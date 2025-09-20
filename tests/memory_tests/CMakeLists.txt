@@ -6,7 +6,9 @@ add_executable(rpc_memory_tests
 # The shared pointer implementation lives entirely in headers, so we only need include paths.
 target_include_directories(rpc_memory_tests
   PRIVATE
-    ${PROJECT_SOURCE_DIR}/rpc/include)
+    ${PROJECT_SOURCE_DIR}/rpc/include
+    ${PROJECT_SOURCE_DIR}/tests/common/include
+    ${CMAKE_BINARY_DIR}/generated/include)
 
 target_compile_definitions(rpc_memory_tests PRIVATE ${HOST_DEFINES})
 

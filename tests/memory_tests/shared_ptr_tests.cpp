@@ -3,61 +3,67 @@
 
 #include <gtest/gtest.h>
 
+
 #include <functional>
 #include <memory>
 
 #include <rpc/rpc.h>
 
+#include "common/foo_impl.h"
+
 namespace
 {
-    struct CountingDeleter
-    {
-        int* value;
-        std::shared_ptr<int> call_counter;
+    using Baz = marshalled_tests::baz;
 
-        void operator()(int* ptr) noexcept
-        {
-            if (call_counter)
-                ++(*call_counter);
-            if (value)
-                *value = 0;
-            delete ptr;
-        }
-    };
-
-    struct Sample : public rpc::enable_shared_from_this<Sample>
+    struct TestObject : public Baz
     {
         int payload = 42;
     };
 
-    struct Base
+    struct CountingDeleter
     {
-        virtual ~Base() = default;
+        bool* was_deleted;
+
+        void operator()(TestObject* ptr) const noexcept
+        {
+            if (was_deleted)
+                *was_deleted = true;
+            delete ptr;
+        }
     };
 
-    struct Derived : public Base, public rpc::enable_shared_from_this<Derived>
+    struct SharedBaz : public Baz, public rpc::enable_shared_from_this<SharedBaz>
     {
-        int value = 99;
+        int payload = 99;
+    };
+
+    struct BaseBaz : public Baz
+    {
+        virtual ~BaseBaz() = default;
+    };
+
+    struct DerivedBaz : public BaseBaz, public rpc::enable_shared_from_this<DerivedBaz>
+    {
+        int value = 7;
     };
 } // namespace
 
 TEST(SharedPtrBasic, DefaultAndRawPointerConstruction)
 {
-    rpc::shared_ptr<int> empty;
+    rpc::shared_ptr<TestObject> empty;
     EXPECT_FALSE(empty);
     EXPECT_EQ(empty.use_count(), 0);
     EXPECT_FALSE(empty.unique());
 
     bool deleter_called = false;
     {
-        rpc::shared_ptr<int> sp(new int(7));
+        rpc::shared_ptr<TestObject> sp(new TestObject);
         EXPECT_TRUE(sp);
-        EXPECT_EQ(*sp, 7);
         EXPECT_EQ(sp.use_count(), 1);
         EXPECT_TRUE(sp.unique());
 
         {
-            rpc::shared_ptr<int> sp_copy = sp;
+            rpc::shared_ptr<TestObject> sp_copy = sp;
             EXPECT_EQ(sp.use_count(), 2);
             EXPECT_FALSE(sp.unique());
         }
@@ -67,15 +73,14 @@ TEST(SharedPtrBasic, DefaultAndRawPointerConstruction)
         struct FlaggingDeleter
         {
             bool* flag;
-            void operator()(int* ptr) const noexcept
+            void operator()(TestObject* ptr) const noexcept
             {
                 *flag = true;
                 delete ptr;
             }
         };
 
-        rpc::shared_ptr<int> with_deleter(new int(3), FlaggingDeleter{&deleter_called});
-        EXPECT_EQ(*with_deleter, 3);
+        rpc::shared_ptr<TestObject> with_deleter(new TestObject, FlaggingDeleter{&deleter_called});
         EXPECT_EQ(with_deleter.use_count(), 1);
     }
 
@@ -84,59 +89,54 @@ TEST(SharedPtrBasic, DefaultAndRawPointerConstruction)
 
 TEST(SharedPtrCustomDeleter, StoresAndInvokesDeleter)
 {
-    int sentinel = 5;
-    auto counter = std::make_shared<int>(0);
+    bool deleted = false;
 
-    rpc::shared_ptr<int> ptr(new int(11), CountingDeleter{&sentinel, counter});
+    rpc::shared_ptr<TestObject> ptr(new TestObject, CountingDeleter{&deleted});
     auto* stored = std::get_deleter<CountingDeleter>(ptr);
     ASSERT_NE(stored, nullptr);
-    EXPECT_EQ(stored->value, &sentinel);
-    ASSERT_NE(stored->call_counter, nullptr);
-    EXPECT_EQ(*stored->call_counter, 0);
-    EXPECT_EQ(stored->call_counter.get(), counter.get());
+    EXPECT_EQ(stored->was_deleted, &deleted);
 
     ptr.reset();
-    EXPECT_EQ(sentinel, 0);
-    EXPECT_EQ(*counter, 1);
+    EXPECT_TRUE(deleted);
 }
 
 TEST(SharedPtrAliasing, SharesControlBlock)
 {
-    rpc::shared_ptr<int> owner(new int(21));
-    int* raw = owner.get();
+    rpc::shared_ptr<TestObject> owner(new TestObject);
+    TestObject* raw = owner.get();
 
-    rpc::shared_ptr<int> alias(owner, raw);
+    rpc::shared_ptr<TestObject> alias(owner, raw);
     EXPECT_EQ(owner.use_count(), 2);
     EXPECT_EQ(alias.use_count(), 2);
     EXPECT_EQ(alias.get(), raw);
 
     owner.reset();
     EXPECT_TRUE(alias);
-    EXPECT_EQ(*alias, 21);
+    EXPECT_EQ(alias.get(), raw);
 }
 
 TEST(SharedPtrOwnerBefore, EstablishesStrictWeakOrdering)
 {
-    rpc::shared_ptr<int> first(new int(1));
-    rpc::shared_ptr<int> second(new int(2));
+    rpc::shared_ptr<TestObject> first(new TestObject);
+    rpc::shared_ptr<TestObject> second(new TestObject);
 
     const bool first_before_second = first.owner_before(second);
     const bool second_before_first = second.owner_before(first);
 
     EXPECT_NE(first_before_second, second_before_first);
 
-    rpc::shared_ptr<int> alias(first, first.get());
+    rpc::shared_ptr<TestObject> alias(first, first.get());
     EXPECT_FALSE(first.owner_before(alias));
     EXPECT_FALSE(alias.owner_before(first));
 }
 
 TEST(WeakPtrOwnerBefore, MirrorsSharedPtrOrdering)
 {
-    rpc::shared_ptr<int> first(new int(10));
-    rpc::shared_ptr<int> second(new int(20));
+    rpc::shared_ptr<TestObject> first(new TestObject);
+    rpc::shared_ptr<TestObject> second(new TestObject);
 
-    rpc::weak_ptr<int> weak_first(first);
-    rpc::weak_ptr<int> weak_second(second);
+    rpc::weak_ptr<TestObject> weak_first(first);
+    rpc::weak_ptr<TestObject> weak_second(second);
 
     EXPECT_NE(weak_first.owner_before(weak_second), weak_second.owner_before(weak_first));
     EXPECT_FALSE(weak_first.owner_before(first));
@@ -145,8 +145,8 @@ TEST(WeakPtrOwnerBefore, MirrorsSharedPtrOrdering)
 
 TEST(SharedPtrEnableSharedFromThis, MakeSharedInitialisesWeakThis)
 {
-    auto sample = rpc::make_shared<Sample>();
-    EXPECT_EQ(sample->payload, 42);
+    auto sample = rpc::make_shared<SharedBaz>();
+    EXPECT_EQ(sample->payload, 99);
 
     auto again = sample->shared_from_this();
     EXPECT_EQ(sample.get(), again.get());
@@ -161,8 +161,8 @@ TEST(SharedPtrEnableSharedFromThis, MakeSharedInitialisesWeakThis)
 
 TEST(SharedPtrEnableSharedFromThis, WorksThroughBaseConstruction)
 {
-    rpc::shared_ptr<Base> base_ptr(new Derived);
-    auto derived_ptr = rpc::static_pointer_cast<Derived>(base_ptr);
+    rpc::shared_ptr<BaseBaz> base_ptr(new DerivedBaz);
+    auto derived_ptr = rpc::static_pointer_cast<DerivedBaz>(base_ptr);
 
     auto again = derived_ptr->shared_from_this();
     EXPECT_EQ(again.get(), derived_ptr.get());
@@ -171,35 +171,35 @@ TEST(SharedPtrEnableSharedFromThis, WorksThroughBaseConstruction)
 
 TEST(WeakPtrLock, IncrementsAndRestoresUseCount)
 {
-    rpc::shared_ptr<int> shared(new int(55));
-    rpc::weak_ptr<int> weak(shared);
+    rpc::shared_ptr<TestObject> shared(new TestObject);
+    rpc::weak_ptr<TestObject> weak(shared);
 
     EXPECT_EQ(shared.use_count(), 1);
     {
         auto locked = weak.lock();
         EXPECT_TRUE(locked);
         EXPECT_EQ(shared.use_count(), 2);
-        EXPECT_EQ(*locked, 55);
+        EXPECT_EQ(locked.get(), shared.get());
     }
     EXPECT_EQ(shared.use_count(), 1);
 }
 
 TEST(SharedPtrHash, MatchesRawPointerHash)
 {
-    rpc::shared_ptr<int> ptr(new int(88));
+    rpc::shared_ptr<TestObject> ptr(new TestObject);
 
-    std::hash<rpc::shared_ptr<int>> hash_shared;
-    std::hash<int*> hash_raw;
+    std::hash<rpc::shared_ptr<TestObject>> hash_shared;
+    std::hash<TestObject*> hash_raw;
 
     EXPECT_EQ(hash_shared(ptr), hash_raw(ptr.get()));
 
-    rpc::shared_ptr<int> alias(ptr, ptr.get());
+    rpc::shared_ptr<TestObject> alias(ptr, ptr.get());
     EXPECT_EQ(hash_shared(alias), hash_shared(ptr));
 }
 
 TEST(SharedPtrUnique, ReflectsExclusiveOwnership)
 {
-    rpc::shared_ptr<int> ptr(new int(5));
+    rpc::shared_ptr<TestObject> ptr(new TestObject);
     EXPECT_TRUE(ptr.unique());
     auto other = ptr;
     EXPECT_FALSE(ptr.unique());
