@@ -24,6 +24,15 @@ namespace rpc
     template<class T> class weak_ptr;
     template<class T> class enable_shared_from_this;
 
+    template<class T>
+    struct is_casting_compatible
+        : std::bool_constant<std::is_base_of_v<casting_interface, std::remove_cv_t<std::remove_extent_t<T>>>>
+    {
+    };
+
+    template<class T>
+    inline constexpr bool is_casting_compatible_v = is_casting_compatible<T>::value;
+
     namespace internal
     {
         class ref_count_base
@@ -168,6 +177,8 @@ namespace rpc
     public:
         using element_type = std::remove_extent_t<T>;
         using weak_type = weak_ptr<T>;
+
+        static_assert(is_casting_compatible_v<T>, "rpc::shared_ptr requires T to derive from rpc::casting_interface");
 
         constexpr shared_ptr() noexcept = default;
         constexpr shared_ptr(std::nullptr_t) noexcept
@@ -431,6 +442,8 @@ namespace rpc
     public:
         using element_type = std::remove_extent_t<T>;
 
+        static_assert(is_casting_compatible_v<T>, "rpc::weak_ptr requires T to derive from rpc::casting_interface");
+
         constexpr weak_ptr() noexcept = default;
 
         template<class Y, std::enable_if_t<std::is_convertible_v<Y*, T*>, int> = 0>
@@ -556,6 +569,13 @@ namespace rpc
     };
 
     template<class T>
+    template<class U>
+    bool shared_ptr<T>::owner_before(const weak_ptr<U>& other) const noexcept
+    {
+        return std::less<internal::ref_count_base*>()(rep_, other.rep_);
+    }
+
+    template<class T>
     class enable_shared_from_this
     {
     protected:
@@ -602,6 +622,8 @@ namespace rpc
     template<class T, class... Args>
     shared_ptr<T> make_shared(Args&&... args)
     {
+        static_assert(is_casting_compatible_v<T>, "rpc::make_shared requires T to derive from rpc::casting_interface");
+
         using Alloc = std::allocator<T>;
         using Rep = internal::ref_count_obj<T, Alloc>;
         Alloc alloc;
@@ -715,7 +737,7 @@ namespace rpc
         }
 
         // Remote proxy casting is intentionally deferred; the implementation can consult
-        // casting_interface::query_proxy_base when the proxy pipeline is wired up.
+        // casting_interface::query_casting_interface when the proxy pipeline is wired up.
         CO_RETURN shared_ptr<T1>();
     }
 } // namespace rpc

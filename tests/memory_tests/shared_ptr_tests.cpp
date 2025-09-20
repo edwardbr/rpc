@@ -14,6 +14,12 @@
 namespace
 {
     using Baz = marshalled_tests::baz;
+    using Foo = marshalled_tests::foo;
+    using Multi = marshalled_tests::multiple_inheritance;
+
+    static_assert(rpc::is_casting_compatible_v<Baz>);
+    static_assert(rpc::is_casting_compatible_v<Foo>);
+    static_assert(!rpc::is_casting_compatible_v<int>);
 
     struct TestObject : public Baz
     {
@@ -45,6 +51,13 @@ namespace
     struct DerivedBaz : public BaseBaz, public rpc::enable_shared_from_this<DerivedBaz>
     {
         int value = 7;
+    };
+
+    struct foo_derived : public Foo
+    {
+        using Foo::Foo;
+
+        void* get_address() const override { return const_cast<foo_derived*>(this); }
     };
 } // namespace
 
@@ -167,6 +180,34 @@ TEST(SharedPtrEnableSharedFromThis, WorksThroughBaseConstruction)
     auto again = derived_ptr->shared_from_this();
     EXPECT_EQ(again.get(), derived_ptr.get());
     EXPECT_EQ(derived_ptr.use_count(), again.use_count());
+}
+
+TEST(SharedPtrPolymorphism, UpcastsAndDowncastsInterfaces)
+{
+    auto derived = rpc::make_shared<foo_derived>();
+    rpc::shared_ptr<Foo> base = derived;
+
+    EXPECT_EQ(base.get(), static_cast<Foo*>(derived.get()));
+    EXPECT_EQ(base.use_count(), 2);
+    EXPECT_EQ(derived.use_count(), 2);
+
+    auto cast_back = rpc::static_pointer_cast<foo_derived>(base);
+    EXPECT_EQ(cast_back.get(), derived.get());
+    EXPECT_EQ(cast_back.use_count(), 3);
+
+    base.reset();
+    EXPECT_EQ(derived.use_count(), 2);
+}
+
+TEST(SharedPtrPolymorphism, SupportsMultipleInheritanceInterfaces)
+{
+    rpc::shared_ptr<Multi> multi(new Multi);
+    rpc::shared_ptr<xxx::i_bar> as_bar = multi;
+    rpc::shared_ptr<xxx::i_baz> as_baz = multi;
+
+    EXPECT_EQ(as_bar.get(), static_cast<xxx::i_bar*>(multi.get()));
+    EXPECT_EQ(as_baz.get(), static_cast<xxx::i_baz*>(multi.get()));
+    EXPECT_EQ(multi.use_count(), 3);
 }
 
 TEST(WeakPtrLock, IncrementsAndRestoresUseCount)

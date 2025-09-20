@@ -380,7 +380,7 @@ namespace rpc
     CORO_TASK(interface_descriptor)
     service::prepare_remote_input_interface(caller_channel_zone caller_channel_zone_id,
         caller_zone caller_zone_id,
-        rpc::proxy_base* base,
+        rpc::casting_interface* base,
         std::shared_ptr<rpc::service_proxy>& destination_zone)
     {
         auto object_proxy = base->get_object_proxy();
@@ -452,7 +452,7 @@ namespace rpc
     service::prepare_out_param(uint64_t protocol_version,
         caller_channel_zone caller_channel_zone_id,
         caller_zone caller_zone_id,
-        rpc::proxy_base* base)
+        rpc::casting_interface* base)
     {
         auto object_proxy = base->get_object_proxy();
         auto object_service_proxy = object_proxy->get_service_proxy();
@@ -671,14 +671,14 @@ namespace rpc
     {
         if (outcall)
         {
-            proxy_base* proxy_base = nullptr;
+            casting_interface* casting_interface = nullptr;
             if (caller_channel_zone_id.is_set() || caller_zone_id.is_set())
             {
-                proxy_base = iface->query_proxy_base();
+                casting_interface = iface->query_casting_interface();
             }
-            if (proxy_base)
+            if (casting_interface)
             {
-                CO_RETURN CO_AWAIT prepare_out_param(protocol_version, caller_channel_zone_id, caller_zone_id, proxy_base);
+                CO_RETURN CO_AWAIT prepare_out_param(protocol_version, caller_channel_zone_id, caller_zone_id, casting_interface);
             }
         }
 

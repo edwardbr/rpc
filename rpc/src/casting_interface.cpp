@@ -13,10 +13,6 @@ namespace rpc
             return true;
         if (!second)
             return true;
-        auto first_address_null = first->query_proxy_base() == nullptr;
-        auto second_address_null = second->query_proxy_base() == nullptr;
-        if (first_address_null || second_address_null)
-            return true;
 
         // if((!first_address_null && second_address_null) || (first_address_null && !second_address_null))
         //     return false;
@@ -30,10 +26,7 @@ namespace rpc
 
     std::shared_ptr<rpc::object_proxy> casting_interface::get_object_proxy(const casting_interface& iface)
     {
-        auto base = iface.query_proxy_base();
-        if (!base)
-            return nullptr;
-        return base->get_object_proxy();
+        return iface->get_object_proxy();
     }
 
     object casting_interface::get_object_id(const casting_interface& iface)
