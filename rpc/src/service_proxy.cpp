@@ -16,7 +16,7 @@ namespace rpc
         , name_(name)
     {
 #ifdef USE_RPC_TELEMETRY
-        if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+        if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
         {
             telemetry_service->on_service_proxy_creation(
                 svc->get_name().c_str(), name, get_zone_id(), get_destination_zone_id(), svc->get_zone_id().as_caller());
@@ -66,7 +66,7 @@ namespace rpc
             }
         }
 #ifdef USE_RPC_TELEMETRY
-        if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+        if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
         {
             telemetry_service->on_service_proxy_deletion(get_zone_id(), destination_zone_id_, caller_zone_id_);
         }
@@ -104,7 +104,7 @@ namespace rpc
         std::lock_guard g(insert_control_);
         auto count = ++lifetime_lock_count_;
 #ifdef USE_RPC_TELEMETRY
-        if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+        if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
         {
             telemetry_service->on_service_proxy_add_external_ref(
                 zone_id_, destination_channel_zone_, destination_zone_id_, caller_zone_id_, count);
@@ -131,7 +131,7 @@ namespace rpc
     {
         auto count = --lifetime_lock_count_;
 #ifdef USE_RPC_TELEMETRY
-        if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+        if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
         {
             telemetry_service->on_service_proxy_release_external_ref(
                 zone_id_, destination_channel_zone_, destination_zone_id_, caller_zone_id_, count);
@@ -198,7 +198,7 @@ namespace rpc
         {
             auto if_id = id_getter(version);
 #ifdef USE_RPC_TELEMETRY
-            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
             {
                 telemetry_service->on_service_proxy_try_cast(
                     get_zone_id(), destination_zone_id, get_caller_zone_id(), object_id, if_id);
@@ -228,7 +228,7 @@ namespace rpc
         object object_id, caller_channel_zone caller_channel_zone_id, add_ref_options build_out_param_channel, known_direction_zone known_direction_zone_id, uint64_t& ref_count)
     {
 #ifdef USE_RPC_TELEMETRY
-        if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+        if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
         {
             telemetry_service->on_service_proxy_add_ref(get_zone_id(),
                 destination_zone_id_,
@@ -276,7 +276,7 @@ namespace rpc
     CORO_TASK(int) service_proxy::sp_release(object object_id, uint64_t& ref_count)
     {
 #ifdef USE_RPC_TELEMETRY
-        if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+        if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
         {
             telemetry_service->on_service_proxy_release(
                 get_zone_id(), destination_zone_id_, destination_channel_zone_, get_caller_zone_id(), object_id);
@@ -360,7 +360,7 @@ namespace rpc
         RPC_ASSERT(caller_zone_id == get_caller_zone_id());
 
 #ifdef USE_RPC_TELEMETRY
-        if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+        if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
         {
             telemetry_service->on_service_proxy_release(
                 get_zone_id(), destination_zone_id_, destination_channel_zone_, caller_zone_id, object_id);
@@ -413,7 +413,7 @@ namespace rpc
         }
 
 #ifdef USE_RPC_TELEMETRY
-        if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+        if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
         {
             telemetry_service->on_cloned_service_proxy_creation(ret->service_.lock()->get_name().c_str(),
                 ret->name_.c_str(),
@@ -452,7 +452,7 @@ namespace rpc
                 // Either no entry exists, or the weak_ptr is expired - create new object_proxy
                 op = std::shared_ptr<rpc::object_proxy>(new object_proxy(object_id, shared_from_this()));
 #ifdef USE_RPC_TELEMETRY
-                if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+                if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
                 {
                     telemetry_service->on_object_proxy_creation(
                         get_zone_id(), get_destination_zone_id(), object_id, true);
@@ -468,7 +468,7 @@ namespace rpc
         if (is_new && rule == object_proxy_creation_rule::ADD_REF_IF_NEW)
         {
 #ifdef USE_RPC_TELEMETRY
-            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
             {
                 telemetry_service->message(rpc::i_telemetry_service::level_enum::info, "get_or_create_object_proxy calling sp_add_ref with normal options for new object_proxy");
             }

@@ -624,7 +624,7 @@ namespace synchronous_generator
             proxy("auto __rpc_version = __rpc_sp->get_remote_rpc_version();");
             proxy("const auto __rpc_min_version = std::max<std::uint64_t>(rpc::LOWEST_SUPPORTED_VERSION, 1);");
             proxy("#ifdef USE_RPC_TELEMETRY");
-            proxy("if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)");
+            proxy("if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)");
             proxy("{{");
             proxy("telemetry_service->on_interface_proxy_send(\"{0}::{1}\", "
                   "__rpc_sp->get_zone_id(), "
@@ -1129,7 +1129,7 @@ namespace synchronous_generator
         proxy("#ifdef USE_RPC_TELEMETRY");
         proxy("auto __rpc_op = casting_interface::get_object_proxy(*this);");
         proxy("auto __rpc_sp = __rpc_op->get_service_proxy();");
-        proxy("if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)");
+        proxy("if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)");
         proxy("{{");
         proxy("telemetry_service->on_interface_proxy_creation(\"{0}\", "
               "__rpc_sp->get_zone_id(), "
@@ -1145,7 +1145,7 @@ namespace synchronous_generator
         proxy("virtual ~{}_proxy()", interface_name);
         proxy("{{");
         proxy("#ifdef USE_RPC_TELEMETRY");
-        proxy("if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)");
+        proxy("if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)");
         proxy("{{");
         proxy("auto __rpc_op = casting_interface::get_object_proxy(*this);");
         proxy("auto __rpc_sp = __rpc_op->get_service_proxy();");

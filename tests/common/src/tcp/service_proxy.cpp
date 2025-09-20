@@ -232,7 +232,7 @@ namespace rpc::tcp
         // RPC_DEBUG("add_ref {}", get_zone_id());
 
 #ifdef USE_RPC_TELEMETRY
-        if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+        if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
         {
             telemetry_service->on_service_proxy_add_ref(get_zone_id(),
                 destination_zone_id,
@@ -269,7 +269,7 @@ namespace rpc::tcp
         {
             RPC_ERROR("failed response.err_code failed");
 #ifdef USE_RPC_TELEMETRY
-            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
             {
                 auto error_message = fmt::format("add_ref failed {}", response.err_code);
                 telemetry_service->message(rpc::i_telemetry_service::err, error_message.c_str());
@@ -313,7 +313,7 @@ namespace rpc::tcp
         {
             RPC_ERROR("failed response.err_code failed");
 #ifdef USE_RPC_TELEMETRY
-            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
             {
                 auto error_message = fmt::format("release failed {}", response.err_code);
                 telemetry_service->message(rpc::i_telemetry_service::err, error_message.c_str());

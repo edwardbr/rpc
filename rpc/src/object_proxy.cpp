@@ -37,7 +37,7 @@ namespace rpc
 #endif
 
 #ifdef USE_RPC_TELEMETRY
-        if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service && service_proxy)
+        if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service && service_proxy)
         {
             telemetry_service->on_object_proxy_deletion(service_proxy->get_zone_id(), service_proxy->get_destination_zone_id(), object_id_);
         }

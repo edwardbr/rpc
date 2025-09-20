@@ -14,6 +14,7 @@
 
 #ifdef USE_RPC_TELEMETRY
 #include <rpc/telemetry/i_telemetry_service.h>
+#include <rpc/telemetry/multiplexing_telemetry_service.h>
 #endif
 
 template<bool UseHostInChild, bool RunStandardTests, bool CreateNewZoneThenCreateSubordinatedZone> class inproc_setup
@@ -32,7 +33,7 @@ template<bool UseHostInChild, bool RunStandardTests, bool CreateNewZoneThenCreat
 
 #ifdef BUILD_COROUTINE
     std::shared_ptr<coro::io_scheduler> io_scheduler_;
-#endif    
+#endif
     bool error_has_occured_ = false;
 
     bool startup_complete_ = false;
@@ -41,7 +42,7 @@ template<bool UseHostInChild, bool RunStandardTests, bool CreateNewZoneThenCreat
 public:
 #ifdef BUILD_COROUTINE
     std::shared_ptr<coro::io_scheduler> get_scheduler() const { return io_scheduler_; }
-#endif    
+#endif
     bool error_has_occured() const { return error_has_occured_; }
 
     virtual ~inproc_setup() = default;
@@ -67,15 +68,20 @@ public:
     CORO_TASK(bool) CoroSetUp()
     {
         zone_gen = &zone_gen_;
-        auto test_info = ::testing::UnitTest::GetInstance()->current_test_info();
 #ifdef USE_RPC_TELEMETRY
-        if (enable_telemetry_server)
-            telemetry_service_manager_.create(test_info->test_suite_name(), test_info->name(), "../../rpc_test_diagram/");
+        auto test_info = ::testing::UnitTest::GetInstance()->current_test_info();
+        if (auto telemetry_service
+            = std::static_pointer_cast<rpc::multiplexing_telemetry_service>(rpc::get_telemetry_service()))
+        {
+            telemetry_service->start_test(test_info->test_suite_name(), test_info->name());
+        }
 #endif
 
-        root_service_ = std::make_shared<rpc::service>("host", rpc::zone{++zone_gen_}
+        root_service_ = std::make_shared<rpc::service>("host",
+            rpc::zone{++zone_gen_}
 #ifdef BUILD_COROUTINE
-        , io_scheduler_
+            ,
+            io_scheduler_
 #endif
         );
         example_import_idl_register_stubs(root_service_);
@@ -127,10 +133,10 @@ public:
         while (startup_complete_ == false || io_scheduler_->process_events())
         {
         }
-#else      
+#else
         check_for_error(CoroSetUp());
         ASSERT_EQ(startup_complete_, true);
-#endif        
+#endif
 
         // auto err_code = SYNC_WAIT();
 
@@ -148,19 +154,23 @@ public:
 
     virtual void tear_down()
     {
-#ifdef BUILD_COROUTINE        
+#ifdef BUILD_COROUTINE
         io_scheduler_->schedule(CoroTearDown());
         while (shutdown_complete_ == false || io_scheduler_->process_events())
         {
         }
 #else
-        CoroTearDown();        
-#endif        
+        CoroTearDown();
+#endif
         root_service_ = nullptr;
         current_host_service.reset();
         zone_gen = nullptr;
 #ifdef USE_RPC_TELEMETRY
-        RESET_TELEMETRY_SERVICE
+        if (auto telemetry_service
+            = std::static_pointer_cast<rpc::multiplexing_telemetry_service>(rpc::get_telemetry_service()))
+        {
+            telemetry_service->reset_for_test();
+        }
 #endif
         // SYNC_WAIT(CoroTearDown());
     }

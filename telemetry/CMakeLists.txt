@@ -39,7 +39,12 @@ endif()
 if(${BUILD_HOST})
 
   message("rpc_telemetry_host")
-  add_library(rpc_telemetry_host STATIC src/sequence_diagram_telemetry_service.cpp src/console_telemetry_service.cpp src/telemetry_handler.cpp src/telemetry_service_factory.cpp)
+  add_library(rpc_telemetry_host STATIC
+    src/sequence_diagram_telemetry_service.cpp
+    src/console_telemetry_service.cpp
+    src/telemetry_handler.cpp
+    src/telemetry_service_factory.cpp
+    src/multiplexing_telemetry_service.cpp)
 
   target_include_directories(rpc_telemetry_host PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>")
   target_compile_options(rpc_telemetry_host PRIVATE ${HOST_COMPILE_OPTIONS} ${WARN_OK})

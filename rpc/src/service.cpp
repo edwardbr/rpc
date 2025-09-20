@@ -48,7 +48,7 @@ namespace rpc
         , io_scheduler_(scheduler)
     {
 #ifdef USE_RPC_TELEMETRY
-        if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+        if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
             telemetry_service->on_service_creation(name, zone_id, destination_zone{0});
 #endif
     }
@@ -66,7 +66,7 @@ namespace rpc
         , name_(name)
     {
 #ifdef USE_RPC_TELEMETRY
-        if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+        if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
             telemetry_service->on_service_creation(name, zone_id, destination_zone{0});
 #endif
     }
@@ -82,7 +82,7 @@ namespace rpc
     service::~service()
     {
 #ifdef USE_RPC_TELEMETRY
-        if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+        if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
             telemetry_service->on_service_deletion(zone_id_);
 #endif
 
@@ -417,7 +417,7 @@ namespace rpc
         }
 
 #ifdef USE_RPC_TELEMETRY
-        if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+        if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
         {
             telemetry_service->on_service_proxy_add_ref(zone_id_,
                 destination_zone_id,
@@ -477,7 +477,7 @@ namespace rpc
             // note the caller_channel_zone_id is 0 as both the caller and the destination are in from the same direction so any other value is wrong
             // Dont external_add_ref the local service proxy as we are return to source no channel is required
 #ifdef USE_RPC_TELEMETRY
-            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
             {
                 telemetry_service->on_service_proxy_add_ref(zone_id_,
                     destination_zone_id,
@@ -597,7 +597,7 @@ namespace rpc
             }
 
 #ifdef USE_RPC_TELEMETRY
-            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
             {
                 telemetry_service->on_service_proxy_add_ref(
                     zone_id_, destination_zone_id, {0}, caller_zone_id, object_id, rpc::add_ref_options::build_destination_route);
@@ -628,7 +628,7 @@ namespace rpc
             std::ignore = refcount;
 
 #ifdef USE_RPC_TELEMETRY
-            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
             {
                 telemetry_service->on_service_proxy_add_ref(zone_id_,
                     destination_zone_id,
@@ -735,7 +735,7 @@ namespace rpc
         if (outcall)
         {
 #ifdef USE_RPC_TELEMETRY
-            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
             {
                 telemetry_service->on_service_proxy_add_ref(zone_id_,
                     zone_id_.as_destination(),
@@ -797,7 +797,7 @@ namespace rpc
                 }
             }
 #ifdef USE_RPC_TELEMETRY
-            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
             {
                 telemetry_service->on_service_try_cast(zone_id_, destination_zone_id, {0}, object_id, interface_id);
             }
@@ -841,7 +841,7 @@ namespace rpc
         // known_direction_zone_id.get_val() = 0;
         current_service_tracker tracker(this);
 #ifdef USE_RPC_TELEMETRY
-        if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+        if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
         {
             telemetry_service->on_service_add_ref(zone_id_,
                 destination_channel_zone_id,
@@ -901,7 +901,7 @@ namespace rpc
                 }
 
 #ifdef USE_RPC_TELEMETRY
-                if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+                if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
                 {
                     telemetry_service->on_service_proxy_add_ref(
                         zone_id_, destination_zone_id, {0}, caller_zone_id, object_id, build_out_param_channel);
@@ -1025,7 +1025,7 @@ namespace rpc
                             if (dc == cc)
                             {
 #ifdef USE_RPC_TELEMETRY
-                                if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+                                if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
                                 {
                                     telemetry_service->on_service_proxy_add_ref(
                                         zone_id_, destination_zone_id, {0}, caller_zone_id, object_id, build_out_param_channel);
@@ -1055,7 +1055,7 @@ namespace rpc
                         if (!!(build_out_param_channel & add_ref_options::build_destination_route))
                         {
 #ifdef USE_RPC_TELEMETRY
-                            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+                            if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
                             {
                                 telemetry_service->on_service_proxy_add_ref(zone_id_,
                                     destination_zone_id,
@@ -1081,7 +1081,7 @@ namespace rpc
                         if (!!(build_out_param_channel & add_ref_options::build_caller_route))
                         {
 #ifdef USE_RPC_TELEMETRY
-                            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+                            if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
                             {
                                 telemetry_service->on_service_proxy_add_ref(caller->zone_id_,
                                     destination_zone_id,
@@ -1201,7 +1201,7 @@ namespace rpc
                 }
 
 #ifdef USE_RPC_TELEMETRY
-                if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+                if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
                 {
                     telemetry_service->on_service_proxy_add_ref(
                         zone_id_, destination_zone_id, {0}, caller_zone_id, object_id, build_out_param_channel);
@@ -1261,7 +1261,7 @@ namespace rpc
                     }
                 }
 #ifdef USE_RPC_TELEMETRY
-                if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+                if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
                 {
                     telemetry_service->on_service_proxy_add_ref(
                         zone_id_, destination_zone_id, {0}, caller_zone_id, object_id, add_ref_options::build_caller_route);
@@ -1414,7 +1414,7 @@ namespace rpc
                 CO_RETURN rpc::error::ZONE_NOT_FOUND();
             }
 #ifdef USE_RPC_TELEMETRY
-            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
                 telemetry_service->on_service_release(
                     zone_id_, other_zone->get_destination_channel_zone_id(), destination_zone_id, object_id, caller_zone_id);
 #endif
@@ -1433,7 +1433,7 @@ namespace rpc
         else
         {
 #ifdef USE_RPC_TELEMETRY
-            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
                 telemetry_service->on_service_release(zone_id_, {0}, destination_zone_id, object_id, caller_zone_id);
 #endif
 

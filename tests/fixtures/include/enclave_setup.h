@@ -42,7 +42,7 @@ public:
     rpc::shared_ptr<yyy::i_example> get_example() const { return i_example_ptr_; }
     rpc::shared_ptr<yyy::i_host> get_host() const { return i_host_ptr_; }
     bool get_use_host_in_child() const { return use_host_in_child_; }
-    
+
     bool error_has_occured() const { return error_has_occured_; }
 
     CORO_TASK(void) check_for_error(CORO_TASK(bool) task)
@@ -58,12 +58,12 @@ public:
     virtual void set_up()
     {
         zone_gen = &zone_gen_;
-        auto test_info = ::testing::UnitTest::GetInstance()->current_test_info();
 #ifdef USE_RPC_TELEMETRY
-        if (enable_telemetry_server)
+        auto test_info = ::testing::UnitTest::GetInstance()->current_test_info();
+        if (auto telemetry_service
+            = std::static_pointer_cast<rpc::multiplexing_telemetry_service>(rpc::get_telemetry_service()))
         {
-            telemetry_service_manager_.create(
-                test_info->test_suite_name(), test_info->name(), "../../rpc_test_diagram/");
+            telemetry_service->start_test(test_info->test_suite_name(), test_info->name());
         }
 #endif
         root_service_ = std::make_shared<rpc::service>("host", rpc::zone{++zone_gen_});
@@ -90,7 +90,11 @@ public:
         current_host_service.reset();
         zone_gen = nullptr;
 #ifdef USE_RPC_TELEMETRY
-        RESET_TELEMETRY_SERVICE
+        if (auto telemetry_service
+            = std::static_pointer_cast<rpc::multiplexing_telemetry_service>(rpc::get_telemetry_service()))
+        {
+            telemetry_service->reset_for_test();
+        }
 #endif
     }
 

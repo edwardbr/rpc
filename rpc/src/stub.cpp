@@ -11,14 +11,14 @@ namespace rpc
         , zone_(zone)
     {
 #ifdef USE_RPC_TELEMETRY
-        if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+        if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
             telemetry_service->on_stub_creation(zone_.get_zone_id(), id_, (uint64_t)target);
 #endif            
     }
     object_stub::~object_stub()
     {
 #ifdef USE_RPC_TELEMETRY
-        if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+        if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
             telemetry_service->on_stub_deletion(zone_.get_zone_id(), id_);
 #endif            
     }
@@ -97,7 +97,7 @@ namespace rpc
     {
         uint64_t ret = ++reference_count;
 #ifdef USE_RPC_TELEMETRY
-        if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+        if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
             telemetry_service->on_stub_add_ref(zone_.get_zone_id(), id_, {}, ret, {});
 #endif            
         RPC_ASSERT(ret != std::numeric_limits<uint64_t>::max());
@@ -109,7 +109,7 @@ namespace rpc
     {
         uint64_t count = --reference_count;
 #ifdef USE_RPC_TELEMETRY
-        if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+        if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
             telemetry_service->on_stub_release(zone_.get_zone_id(), id_, {}, count, {});
 #endif            
         RPC_ASSERT(count != std::numeric_limits<uint64_t>::max());

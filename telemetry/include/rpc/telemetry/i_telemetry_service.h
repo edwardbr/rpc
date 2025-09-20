@@ -168,27 +168,17 @@ namespace rpc
     }
 #endif
 
-    // dont use this class directly use the macro below so that it can be conditionally compiled out
-    class telemetry_service_manager
-    {
-        static inline std::shared_ptr<i_telemetry_service> telemetry_service_ = nullptr;
+    // Global telemetry service - defined in main.cpp (host) or set by enclave initialization
+    extern std::shared_ptr<i_telemetry_service> telemetry_service_;
 
-    public:
-#ifdef _IN_ENCLAVE
-        bool create();
-#else
-        bool create(const std::string& test_suite_name, const std::string& name, const std::filesystem::path& directory);
-#endif
+    // Simple function to get the global telemetry service
+    inline std::shared_ptr<i_telemetry_service> get_telemetry_service() {
+        return telemetry_service_;
+    }
 
-        static std::shared_ptr<i_telemetry_service> get() { return telemetry_service_; }
-
-        telemetry_service_manager() = default;
-        ~telemetry_service_manager() { telemetry_service_.reset(); }
-        static void reset() { telemetry_service_.reset(); }
-    };
 }
 #ifdef USE_RPC_TELEMETRY
-#define RESET_TELEMETRY_SERVICE rpc::telemetry_service_manager::reset();
+#define RESET_TELEMETRY_SERVICE if(auto svc = get_telemetry_service();svc);
 #else
 #define RESET_TELEMETRY_SERVICE
 #endif

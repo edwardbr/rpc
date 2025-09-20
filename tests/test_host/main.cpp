@@ -8,11 +8,19 @@
 #include <string_view>
 #include <thread>
 #include <unordered_map>
+#include <filesystem>
 
 // RPC headers
 #include <rpc/rpc.h>
+#ifdef USE_RPC_TELEMETRY
+#include <rpc/telemetry/i_telemetry_service.h>
+#include <rpc/telemetry/multiplexing_telemetry_service.h>
+#include <rpc/telemetry/console_telemetry_service.h>
+#include <rpc/telemetry/sequence_diagram_telemetry_service.h>
+#endif
 
 // Other headers
+#include <args.hxx>
 #ifdef BUILD_COROUTINE
 #include <coro/io_scheduler.hpp>
 #endif
@@ -76,15 +84,86 @@ namespace
 
     extern "C" int main(int argc, char* argv[])
     {
-        // Parse command line arguments
-        for (size_t i = 1; i < argc; ++i)
+        try
         {
-            std::string arg = argv[i];
-            if (arg == "-t" || arg == "--enable_telemetry_server")
-                enable_telemetry_server = true;
-            if (arg == "-m" || arg == "--enable_multithreaded_tests")
-                enable_multithreaded_tests = true;
+            args::ArgumentParser parser("RPC++ Test Suite - Comprehensive RPC testing framework");
+
+            // Basic test control flags
+            args::HelpFlag help(parser, "help", "Display this help menu", {'h', "help"});
+            args::Flag enable_multithreaded_flag(parser, "multithreaded", "Enable multithreaded tests", {'m', "enable-multithreaded"});
+
+            // Telemetry service flags
+            args::Flag enable_console_telemetry(parser, "console", "Add console telemetry service", {"telemetry-console"});
+            args::Flag enable_sequence_diagram_telemetry(parser, "sequence", "Add sequence diagram telemetry service", {"telemetry-sequence"});
+            args::ValueFlag<std::string> sequence_path(parser, "sequence-path", "Sequence diagram output path", {"sequence-path"}, "../../rpc_test_diagram/");
+
+            try
+            {
+                parser.ParseCLI(argc, argv);
+            }
+            catch (const args::Help&)
+            {
+                std::cout << parser;
+                std::cout << "\nGoogle Test Integration:\n";
+                std::cout << "  All Google Test flags are supported and will be passed through.\n";
+                std::cout << "  Use --gtest_help to see Google Test specific options.\n\n";
+                std::cout << "Examples:\n";
+                std::cout << "  ./rpc_test --telemetry-console\n";
+                std::cout << "  ./rpc_test --telemetry-console --telemetry-sequence\n";
+                std::cout << "  ./rpc_test --telemetry-console --gtest_filter=\"*standard_tests*\"\n";
+                return 0;
+            }
+            catch (const args::ParseError& e)
+            {
+                // Ignore parse errors as they might be Google Test arguments
+                // std::cerr << "Note: " << e.what() << std::endl;
+            }
+
+            // Extract parsed values
+            enable_multithreaded_tests = args::get(enable_multithreaded_flag);
+
+#ifdef USE_RPC_TELEMETRY
+            // Ensure we have a multiplexing telemetry service when any telemetry flags are provided
+            if ((args::get(enable_console_telemetry) || args::get(enable_sequence_diagram_telemetry)))
+            {
+                // Create empty multiplexing service
+                std::vector<std::shared_ptr<rpc::i_telemetry_service>> empty_services;
+                if (rpc::multiplexing_telemetry_service::create(std::move(empty_services)))
+                {
+                    std::cout << "Created multiplexing telemetry service" << std::endl;
+                }
+            }
+
+            // Assume telemetry_service_ is always a multiplexing service and register configurations
+            if (rpc::get_telemetry_service())
+            {
+                auto multiplexing_service = std::static_pointer_cast<rpc::multiplexing_telemetry_service>(rpc::get_telemetry_service());
+
+                if (args::get(enable_console_telemetry))
+                {
+                    multiplexing_service->register_service_config("console", "../../rpc_test_diagram/");
+                    std::cout << "Registered console telemetry service configuration" << std::endl;
+                }
+
+                if (args::get(enable_sequence_diagram_telemetry))
+                {
+                    multiplexing_service->register_service_config("sequence", sequence_path.Get());
+                    std::cout << "Registered sequence diagram telemetry service configuration" << std::endl;
+                }
+            }
+            assert(rpc::get_telemetry_service());
+#endif
         }
+        catch (const std::exception& e)
+        {
+            std::cerr << "Error during argument parsing: " << e.what() << std::endl;
+            return 1;
+        }
+
+        // Print configuration summary
+        std::cout << "\n=== RPC++ Test Configuration ===" << std::endl;
+        std::cout << "Multithreaded tests: " << (enable_multithreaded_tests ? "YES" : "NO") << std::endl;
+        std::cout << "==================================\n" << std::endl;
 
 #ifndef _WIN32
         // Initialize comprehensive crash handler with multi-threaded support
@@ -153,6 +232,7 @@ namespace
         {
             // Initialize global logger for consistent logging
             rpc_global_logger::get_logger();
+
             ::testing::InitGoogleTest(&argc, argv);
             ret = RUN_ALL_TESTS();
             rpc_global_logger::reset_logger();
@@ -2044,7 +2124,7 @@ do_something_in_val(int val, const std::shared_ptr<rpc::object_proxy>& __rpc_op,
     auto __rpc_version = __rpc_sp->get_remote_rpc_version();
     const auto __rpc_min_version = std::max<std::uint64_t>(rpc::LOWEST_SUPPORTED_VERSION, 1);
 #ifdef USE_RPC_TELEMETRY
-    if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+    if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
     {
         telemetry_service->on_interface_proxy_send("i_foo::do_something_in_val",
             __rpc_sp->get_zone_id(),

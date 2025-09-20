@@ -60,7 +60,7 @@ namespace rpc
         if (status)
         {
 #ifdef USE_RPC_TELEMETRY
-            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
             {
                 auto error_message = std::string("sgx_create_enclave failed ") + std::to_string(status);
                 telemetry_service->message(rpc::i_telemetry_service::err, error_message.c_str());
@@ -81,7 +81,7 @@ namespace rpc
         if (status)
         {
 #ifdef USE_RPC_TELEMETRY
-            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
             {
                 telemetry_service->message(rpc::i_telemetry_service::err, "marshal_test_init_enclave failed");
             }
@@ -148,7 +148,7 @@ namespace rpc
         if (status)
         {
 #ifdef USE_RPC_TELEMETRY
-            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
             {
                 auto error_message = std::string("call_enclave failed ") + std::to_string(status);
                 telemetry_service->message(rpc::i_telemetry_service::err, error_message.c_str());
@@ -185,7 +185,7 @@ namespace rpc
             if (status)
             {
 #ifdef USE_RPC_TELEMETRY
-                if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+                if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
                 {
                     auto error_message = std::string("call_enclave failed ") + std::to_string(status);
                     telemetry_service->message(rpc::i_telemetry_service::err, error_message.c_str());
@@ -231,7 +231,7 @@ namespace rpc
         if (status)
         {
 #ifdef USE_RPC_TELEMETRY
-            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
             {
                 auto error_message = std::string("try_cast_enclave failed ") + std::to_string(status);
                 telemetry_service->message(rpc::i_telemetry_service::err, error_message.c_str());
@@ -255,7 +255,7 @@ namespace rpc
         uint64_t& reference_count)
     {
 #ifdef USE_RPC_TELEMETRY
-        if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+        if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
         {
             telemetry_service->on_service_proxy_add_ref(
                 get_zone_id()
@@ -300,7 +300,7 @@ namespace rpc
         if (status)
         {
 #ifdef USE_RPC_TELEMETRY
-            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
             {
                 auto error_message = std::string("add_ref_enclave failed ") + std::to_string(status);
                 telemetry_service->message(rpc::i_telemetry_service::err, error_message.c_str());
@@ -339,7 +339,7 @@ namespace rpc
         if (status)
         {
 #ifdef USE_RPC_TELEMETRY
-            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
             {
                 auto error_message = std::string("release_enclave failed ") + std::to_string(status);
                 telemetry_service->message(rpc::i_telemetry_service::err, error_message.c_str());

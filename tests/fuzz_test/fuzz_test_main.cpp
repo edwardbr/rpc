@@ -26,6 +26,8 @@
 #include "rpc/service_proxies/basic_service_proxies.h"
 #ifdef USE_RPC_TELEMETRY
 #include <rpc/telemetry/i_telemetry_service.h>
+#include <rpc/telemetry/multiplexing_telemetry_service.h>
+#include <rpc/telemetry/console_telemetry_service.h>
 #endif
 
 // Other headers
@@ -35,11 +37,6 @@
 #include <yas/types/std/vector.hpp>
 #include "fuzz_test/fuzz_test.h"
 #include "fuzz_test/fuzz_test_stub.h"
-
-#ifdef USE_RPC_TELEMETRY
-// Use extern declaration to reference the global telemetry service manager from test_fixtures
-extern rpc::telemetry_service_manager telemetry_service_manager_;
-#endif
 
 using namespace fuzz_test;
 
@@ -194,8 +191,8 @@ public:
     {
     }
 
-    CORO_TASK(int) create_shared_object(
-        int id, std::string name, int initial_value, rpc::shared_ptr<i_shared_object>& created_object) override
+    CORO_TASK(int)
+    create_shared_object(int id, std::string name, int initial_value, rpc::shared_ptr<i_shared_object>& created_object) override
     {
         RPC_INFO("[FACTORY] create_shared_object(id={}, name={}, initial_value={})", id, name, initial_value);
         try
@@ -213,7 +210,8 @@ public:
         }
     }
 
-    CORO_TASK(int) place_shared_object(rpc::shared_ptr<i_shared_object> new_object, rpc::shared_ptr<i_shared_object> target_object) override
+    CORO_TASK(int)
+    place_shared_object(rpc::shared_ptr<i_shared_object> new_object, rpc::shared_ptr<i_shared_object> target_object) override
     {
         RPC_INFO("[FACTORY] place_shared_object() called");
         if (!new_object || !target_object)
@@ -675,7 +673,8 @@ public:
         CO_RETURN rpc::error::OK();
     }
 
-    CORO_TASK(int) execute_instruction(instruction instruction,
+    CORO_TASK(int)
+    execute_instruction(instruction instruction,
         rpc::shared_ptr<i_shared_object> input_object,
         rpc::shared_ptr<i_shared_object>& output_object) override
     {
@@ -799,7 +798,8 @@ public:
         CO_RETURN rpc::error::OK();
     }
 
-    CORO_TASK(int) get_node_status(node_type& current_type, uint64_t& current_id, int& connections_count, int& objects_held) override
+    CORO_TASK(int)
+    get_node_status(node_type& current_type, uint64_t& current_id, int& connections_count, int& objects_held) override
     {
         current_type = node_type_;
         current_id = node_id_;
@@ -814,7 +814,8 @@ public:
         CO_RETURN rpc::error::OK();
     }
 
-    CORO_TASK(int) create_child_node(
+    CORO_TASK(int)
+    create_child_node(
         node_type child_type, uint64_t child_zone_id, bool cache_locally, rpc::shared_ptr<i_autonomous_node>& child_node) override
     {
         std::ignore = cache_locally;
@@ -843,7 +844,7 @@ public:
                     {child_zone_id},
                     self,
                     child_node,
-                    [=](const rpc::shared_ptr<i_autonomous_node>& parent,
+                    [=, this](const rpc::shared_ptr<i_autonomous_node>& parent,
                         rpc::shared_ptr<i_autonomous_node>& new_child,
                         const std::shared_ptr<rpc::child_service>& child_service_ptr) -> int
                     {
@@ -903,12 +904,18 @@ public:
     }
 
     // Unused legacy methods
-    CORO_TASK(int) connect_to_node([[maybe_unused]] rpc::shared_ptr<i_autonomous_node> target_node) override { CO_RETURN rpc::error::OK(); }
-    CORO_TASK(int) pass_object_to_connected([[maybe_unused]] int connection_index, [[maybe_unused]] rpc::shared_ptr<i_shared_object> object) override
+    CORO_TASK(int) connect_to_node([[maybe_unused]] rpc::shared_ptr<i_autonomous_node> target_node) override
     {
         CO_RETURN rpc::error::OK();
     }
-    CORO_TASK(int) request_child_creation([[maybe_unused]] rpc::shared_ptr<i_autonomous_node> target_parent,
+    CORO_TASK(int)
+    pass_object_to_connected(
+        [[maybe_unused]] int connection_index, [[maybe_unused]] rpc::shared_ptr<i_shared_object> object) override
+    {
+        CO_RETURN rpc::error::OK();
+    }
+    CORO_TASK(int)
+    request_child_creation([[maybe_unused]] rpc::shared_ptr<i_autonomous_node> target_parent,
         [[maybe_unused]] node_type child_type,
         [[maybe_unused]] uint64_t child_zone_id,
         [[maybe_unused]] rpc::shared_ptr<i_autonomous_node>& child_proxy) override
@@ -1261,7 +1268,8 @@ rpc::shared_ptr<i_autonomous_node> create_deep_branch(
         }
         else
         {
-            spdlog::error("Failed to create child node {} of {} (zone_id={}, result={})", i + 1, depth, child_zone_id, result);
+            spdlog::error(
+                "Failed to create child node {} of {} (zone_id={}, result={})", i + 1, depth, child_zone_id, result);
             break;
         }
     }
@@ -1526,16 +1534,15 @@ int main(int argc, char** argv)
 
         // Main test options
         args::ValueFlag<int> test_cycles(parser, "cycles", "Number of test cycles to run (default: 5)", {'c', "cycles"}, 5);
-        args::ValueFlag<int> instruction_count(parser, "instructions", "Number of instructions per runner (default: 10)", {'i', "instructions"}, 10);
+        args::ValueFlag<int> instruction_count(
+            parser, "instructions", "Number of instructions per runner (default: 10)", {'i', "instructions"}, 10);
         args::ValueFlag<std::string> output_dir(parser,
             "directory",
             "Directory for JSON scenario files (default: tests/fuzz_test/replays)",
             {'o', "output-dir"},
             "tests/fuzz_test/replays");
-        args::Flag keep_success(
-            parser, "keep", "Keep successful test files (default: delete them)", {"keep-success"});
-        args::Flag enable_telemetry(
-            parser, "enable telemetry", "Enable telemetry output", {'t', "enable-telemetry"});
+        args::Flag keep_success(parser, "keep", "Keep successful test files (default: delete them)", {"keep-success"});
+        args::Flag enable_telemetry(parser, "enable telemetry", "Enable telemetry output", {'t', "enable-telemetry"});
 
         try
         {
@@ -1563,8 +1570,23 @@ int main(int argc, char** argv)
             std::string file = args::get(replay_file);
             spdlog::info("REPLAY MODE: Replaying scenario from {}", file);
 #ifdef USE_RPC_TELEMETRY
-            if(args::get(enable_telemetry))
-                telemetry_service_manager_.create("autonomous_test", "autonomous_test", "../../rpc_test_diagram/");
+            if (args::get(enable_telemetry))
+            {
+                // Add test-specific telemetry services if the global multiplexer exists
+                if (rpc::telemetry_service_)
+                {
+                    auto multiplexing_service
+                        = std::static_pointer_cast<rpc::multiplexing_telemetry_service>(rpc::telemetry_service_);
+
+                    // Add console telemetry for this test
+                    std::shared_ptr<rpc::i_telemetry_service> console_service;
+                    if (rpc::console_telemetry_service::create(
+                            console_service, "autonomous_test", "autonomous_test", "../../rpc_test_diagram/"))
+                    {
+                        multiplexing_service->add_child(console_service);
+                    }
+                }
+            }
 #endif
             return replay_test_scenario(file);
         }
@@ -1583,8 +1605,23 @@ int main(int argc, char** argv)
         for (int cycle = 1; cycle <= cycles; ++cycle)
         {
 #ifdef USE_RPC_TELEMETRY
-            if(args::get(enable_telemetry))
-                telemetry_service_manager_.create("autonomous_test", "autonomous_test", "../../rpc_test_diagram/");
+            if (args::get(enable_telemetry))
+            {
+                // Add test-specific telemetry services if the global multiplexer exists
+                if (rpc::telemetry_service_)
+                {
+                    auto multiplexing_service
+                        = std::static_pointer_cast<rpc::multiplexing_telemetry_service>(rpc::telemetry_service_);
+
+                    // Add console telemetry for this test
+                    std::shared_ptr<rpc::i_telemetry_service> console_service;
+                    if (rpc::console_telemetry_service::create(
+                            console_service, "autonomous_test", "autonomous_test", "../../rpc_test_diagram/"))
+                    {
+                        multiplexing_service->add_child(console_service);
+                    }
+                }
+            }
 #endif
             try
             {
@@ -1600,13 +1637,21 @@ int main(int argc, char** argv)
                 // collection in run_autonomous_instruction_test didn't complete
 
 #ifdef USE_RPC_TELEMETRY
-                telemetry_service_manager_.reset();
+                if (auto telemetry_service
+                    = std::static_pointer_cast<rpc::multiplexing_telemetry_service>(rpc::get_telemetry_service()))
+                {
+                    telemetry_service->reset_for_test();
+                }
 #endif
                 throw; // Re-throw to let main catch block handle it
             }
 
 #ifdef USE_RPC_TELEMETRY
-            telemetry_service_manager_.reset();
+            if (auto telemetry_service
+                = std::static_pointer_cast<rpc::multiplexing_telemetry_service>(rpc::get_telemetry_service()))
+            {
+                telemetry_service->reset_for_test();
+            }
 #endif
         }
 
