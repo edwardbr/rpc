@@ -177,8 +177,3 @@ namespace rpc
     }
 
 }
-#ifdef USE_RPC_TELEMETRY
-#define RESET_TELEMETRY_SERVICE if(auto svc = get_telemetry_service();svc);
-#else
-#define RESET_TELEMETRY_SERVICE
-#endif

@@ -40,6 +40,7 @@ if(${BUILD_HOST})
 
   message("rpc_telemetry_host")
   add_library(rpc_telemetry_host STATIC
+    src/animation_telemetry_service.cpp
     src/sequence_diagram_telemetry_service.cpp
     src/console_telemetry_service.cpp
     src/telemetry_handler.cpp

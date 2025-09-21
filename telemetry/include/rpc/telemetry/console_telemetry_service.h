@@ -28,12 +28,18 @@ namespace rpc
         mutable std::unordered_map<uint64_t, std::set<uint64_t>> zone_children_;
         // Track zone relationships: zone_id -> parent zone (0 if root)
         mutable std::unordered_map<uint64_t, uint64_t> zone_parents_;
-        
+
         // Thread safety: shared_mutex allows multiple concurrent readers with exclusive writers
         mutable std::shared_mutex zone_names_mutex_;
         mutable std::shared_mutex zone_children_mutex_;
         mutable std::shared_mutex zone_parents_mutex_;
-        
+
+        // Optional file output
+        std::filesystem::path log_directory_;
+        std::string test_suite_name_;
+        std::string test_name_;
+        mutable std::string logger_name_;  // Store logger name for proper cleanup
+
         static constexpr size_t ASYNC_QUEUE_SIZE = 8192;
 
         std::string get_zone_name(uint64_t zone_id) const;
@@ -44,6 +50,10 @@ namespace rpc
         void init_logger() const;
         void print_topology_diagram() const;
         void print_zone_tree(uint64_t zone_id, int depth) const;
+
+        console_telemetry_service(const std::string& test_suite_name,
+                                 const std::string& test_name,
+                                 const std::filesystem::path& directory);
 
     public:
         static bool create(std::shared_ptr<rpc::i_telemetry_service>& service,

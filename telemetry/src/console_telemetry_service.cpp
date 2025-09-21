@@ -12,11 +12,20 @@
 // Other headers
 #include <spdlog/async.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/sinks/basic_file_sink.h>
+#include <spdlog/sinks/sink.h>
 #include <spdlog/spdlog.h>
 
 namespace rpc
 {
     console_telemetry_service::console_telemetry_service() = default;
+
+    console_telemetry_service::console_telemetry_service(const std::string& test_suite_name,
+                                                         const std::string& test_name,
+                                                         const std::filesystem::path& directory)
+        : log_directory_(directory), test_suite_name_(test_suite_name), test_name_(test_name)
+    {
+    }
 
     console_telemetry_service::~console_telemetry_service()
     {
@@ -29,8 +38,10 @@ namespace rpc
             auto tp = spdlog::thread_pool();
 
             // Remove logger from spdlog registry to prevent conflicts
-            // std::string logger_name = logger_->name();
-            // spdlog::drop(logger_name);
+            if (!logger_name_.empty())
+            {
+                spdlog::drop(logger_name_);
+            }
 
             // Drop the logger reference to allow proper cleanup
             logger_.reset();
@@ -121,48 +132,76 @@ namespace rpc
 
     void console_telemetry_service::init_logger() const
     {
-        /*if (!logger_)
+        if (!logger_)
         {
-            try
+            if (!log_directory_.empty() && !test_suite_name_.empty() && !test_name_.empty())
             {
-                // Use unique logger name based on instance address to avoid conflicts
-                std::string logger_name = "console_telemetry_" + std::to_string(reinterpret_cast<uintptr_t>(this));
-
-                // Try to get existing logger first
-                logger_ = spdlog::get(logger_name);
-                if (!logger_)
-                {
-                    // Create async logger using spdlog's async factory
-                    logger_ = spdlog::stdout_color_mt<spdlog::async_factory>(logger_name);
-                }
-
-                // Use raw pattern to preserve our custom ANSI formatting
-                logger_->set_pattern("%v");
-                logger_->set_level(spdlog::level::trace);
-            }
-            catch (...)
-            {
+                // File output mode - create logger with both console and file sinks
                 try
                 {
-                    // Fallback to synchronous logging if async fails
-                    std::string fallback_name
-                        = "console_telemetry_sync_" + std::to_string(reinterpret_cast<uintptr_t>(this));
-                    logger_ = spdlog::get(fallback_name);
-                    if (!logger_)
+                    // Sanitize test suite name by replacing problematic characters with #
+                    auto fixed_suite_name = test_suite_name_;
+                    for (auto& ch : fixed_suite_name)
                     {
-                        logger_ = spdlog::stdout_color_mt(fallback_name);
+                        if (ch == '/' || ch == '\\' || ch == ':' || ch == '*')
+                            ch = '#';
                     }
-                    logger_->set_pattern("%v");
+
+                    // Create directories if they don't exist
+                    std::error_code ec;
+                    auto full_directory_path = log_directory_ / fixed_suite_name;
+                    std::filesystem::create_directories(full_directory_path, ec);
+
+                    if (ec)
+                    {
+                        // Log directory creation failure but continue with console-only logging
+                        auto console_logger = spdlog::default_logger();
+                        console_logger->warn("Failed to create console telemetry directory '{}': {} - falling back to console-only mode",
+                                           full_directory_path.string(), ec.message());
+                        logger_ = spdlog::default_logger();
+                        return;
+                    }
+
+                    // Create log file path
+                    auto log_file_path = log_directory_ / fixed_suite_name / (test_name_ + "_console.log");
+
+                    // Use unique logger name based on instance address to avoid conflicts
+                    logger_name_ = "console_telemetry_" + std::to_string(reinterpret_cast<uintptr_t>(this));
+
+                    // Create sinks - console sink with colors, file sink without colors
+                    auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+                    auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(log_file_path.string());
+
+                    // Set patterns - console keeps ANSI colors, file uses clean format
+                    console_sink->set_pattern("%v");  // Raw pattern preserves our ANSI formatting
+                    file_sink->set_pattern("[%Y-%m-%d %H:%M:%S.%e] %v");  // Clean timestamped format for file
+
+                    // Create logger with both sinks
+                    std::vector<spdlog::sink_ptr> sinks = {console_sink, file_sink};
+                    logger_ = std::make_shared<spdlog::logger>(logger_name_, sinks.begin(), sinks.end());
+
+                    logger_->set_level(spdlog::level::trace);
+                    logger_->flush_on(spdlog::level::trace);  // Ensure all messages are written to file
+
+                    // Register with spdlog to avoid name conflicts
+                    spdlog::register_logger(logger_);
+
+                    // Log success message to console
+                    auto console_logger = spdlog::default_logger();
+                    console_logger->info("Console telemetry logging to file: {}", log_file_path.string());
                 }
                 catch (...)
                 {
-                    // Last resort - use default logger
+                    // Fallback to console only if file logging fails
                     logger_ = spdlog::default_logger();
                 }
             }
-        }*/
-
-        logger_ = spdlog::default_logger();
+            else
+            {
+                // Console output mode (default behavior)
+                logger_ = spdlog::default_logger();
+            }
+        }
     }
 
     void console_telemetry_service::register_zone_name(uint64_t zone_id, const char* name, bool optional_replace) const
@@ -189,12 +228,20 @@ namespace rpc
         const std::string& name,
         const std::filesystem::path& directory)
     {
-        // Discard the parameters - console output doesn't need them
-        (void)test_suite_name;
-        (void)name;
-        (void)directory;
+        std::shared_ptr<console_telemetry_service> console_service;
 
-        auto console_service = std::make_shared<console_telemetry_service>();
+        if (!directory.empty())
+        {
+            // File output mode - use constructor with directory parameters
+            console_service = std::shared_ptr<console_telemetry_service>(
+                new console_telemetry_service(test_suite_name, name, directory));
+        }
+        else
+        {
+            // Console output mode - use default constructor
+            console_service = std::make_shared<console_telemetry_service>();
+        }
+
         console_service->init_logger();
         service = console_service;
         return true;

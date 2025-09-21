@@ -8,6 +8,7 @@
 #ifndef _IN_ENCLAVE
 #include <rpc/telemetry/console_telemetry_service.h>
 #include <rpc/telemetry/sequence_diagram_telemetry_service.h>
+#include <rpc/telemetry/animation_telemetry_service.h>
 #endif
 
 namespace rpc
@@ -70,6 +71,14 @@ namespace rpc
             else if (config.type == "sequence")
             {
                 if (rpc::sequence_diagram_telemetry_service::create(service,
+                    test_suite_name, name, config.output_path))
+                {
+                    children_.push_back(service);
+                }
+            }
+            else if (config.type == "animation")
+            {
+                if (rpc::animation_telemetry_service::create(service,
                     test_suite_name, name, config.output_path))
                 {
                     children_.push_back(service);
