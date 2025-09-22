@@ -5,6 +5,11 @@
 
 #include <common/foo_impl.h>
 
+#ifdef USE_RPC_TELEMETRY
+#include <rpc/telemetry/i_telemetry_service.h>
+#include <rpc/telemetry/multiplexing_telemetry_service.h>
+#endif
+
 template<bool UseHostInChild, bool RunStandardTests, bool CreateNewZoneThenCreateSubordinatedZone> class tcp_setup
 {
     std::shared_ptr<rpc::service> root_service_;
@@ -56,19 +61,22 @@ public:
     CORO_TASK(bool) CoroSetUp(bool& is_ready)
     {
         zone_gen = &zone_gen_;
-        auto test_info = ::testing::UnitTest::GetInstance()->current_test_info();
 #ifdef USE_RPC_TELEMETRY
-        if (enable_telemetry_server)
-            telemetry_service_manager_.create(test_info->test_suite_name(), test_info->name(), "../../rpc_test_diagram/");
+        auto test_info = ::testing::UnitTest::GetInstance()->current_test_info();
+        if (auto telemetry_service
+            = std::static_pointer_cast<rpc::multiplexing_telemetry_service>(rpc::get_telemetry_service()))
+        {
+            telemetry_service->start_test(test_info->test_suite_name(), test_info->name());
+        }
 #endif
 
         auto root_zone_id = rpc::zone{++zone_gen_};
         auto peer_zone_id = rpc::zone{++zone_gen_};
-        root_service_ = rpc::make_shared<rpc::service>("host", root_zone_id, io_scheduler_);
+        root_service_ = std::make_shared<rpc::service>("host", root_zone_id, io_scheduler_);
         example_import_idl_register_stubs(root_service_);
         example_shared_idl_register_stubs(root_service_);
         example_idl_register_stubs(root_service_);
-        peer_service_ = rpc::make_shared<rpc::service>("peer", peer_zone_id, io_scheduler_);
+        peer_service_ = std::make_shared<rpc::service>("peer", peer_zone_id, io_scheduler_);
         example_import_idl_register_stubs(peer_service_);
         example_shared_idl_register_stubs(peer_service_);
         example_idl_register_stubs(peer_service_);
@@ -142,7 +150,11 @@ public:
         root_service_.reset();
         zone_gen = nullptr;
 #ifdef USE_RPC_TELEMETRY
-        RESET_TELEMETRY_SERVICE
+        if (auto telemetry_service
+            = std::static_pointer_cast<rpc::multiplexing_telemetry_service>(rpc::get_telemetry_service()))
+        {
+            telemetry_service->reset_for_test();
+        }
 #endif
         has_stopped_ = true;
         CO_RETURN;

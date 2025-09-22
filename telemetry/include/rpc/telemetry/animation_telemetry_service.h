@@ -4,67 +4,26 @@
  */
 #pragma once
 
-#include <string>
+#include <chrono>
 #include <filesystem>
+#include <mutex>
+#include <string>
 #include <unordered_map>
-#include <set>
-#include <memory>
-#include <shared_mutex>
-// types.h is included via i_telemetry_service.h
-#include <rpc/telemetry/i_telemetry_service.h>
+#include <vector>
 
-namespace spdlog
-{
-    class logger;    
-}
+#include <rpc/telemetry/i_telemetry_service.h>
 
 namespace rpc
 {
-    class console_telemetry_service : public rpc::i_telemetry_service
+    class animation_telemetry_service : public rpc::i_telemetry_service
     {
-        mutable std::unordered_map<uint64_t, std::string> zone_names_;
-        mutable std::shared_ptr<spdlog::logger> logger_;
-        // Track zone relationships: zone_id -> set of child zones
-        mutable std::unordered_map<uint64_t, std::set<uint64_t>> zone_children_;
-        // Track zone relationships: zone_id -> parent zone (0 if root)
-        mutable std::unordered_map<uint64_t, uint64_t> zone_parents_;
-
-        // Thread safety: shared_mutex allows multiple concurrent readers with exclusive writers
-        mutable std::shared_mutex zone_names_mutex_;
-        mutable std::shared_mutex zone_children_mutex_;
-        mutable std::shared_mutex zone_parents_mutex_;
-
-        // Optional file output
-        std::filesystem::path log_directory_;
-        std::string test_suite_name_;
-        std::string test_name_;
-        mutable std::string logger_name_;  // Store logger name for proper cleanup
-
-        static constexpr size_t ASYNC_QUEUE_SIZE = 8192;
-
-        std::string get_zone_name(uint64_t zone_id) const;
-        std::string get_zone_color(uint64_t zone_id) const;
-        std::string get_level_color(level_enum level) const;
-        std::string reset_color() const;
-        void register_zone_name(uint64_t zone_id, const char* name, bool optional_replace) const;
-        void init_logger() const;
-        void print_topology_diagram() const;
-        void print_zone_tree(uint64_t zone_id, int depth) const;
-
-        console_telemetry_service(const std::string& test_suite_name,
-                                 const std::string& test_name,
-                                 const std::filesystem::path& directory);
-
     public:
         static bool create(std::shared_ptr<rpc::i_telemetry_service>& service,
             const std::string& test_suite_name,
             const std::string& name,
             const std::filesystem::path& directory);
 
-        virtual ~console_telemetry_service();
-        console_telemetry_service();
-        console_telemetry_service(const console_telemetry_service&) = delete;
-        console_telemetry_service& operator=(const console_telemetry_service&) = delete;
+        ~animation_telemetry_service() override;
 
         void on_service_creation(const char* name, rpc::zone zone_id, rpc::destination_zone parent_zone_id) const override;
         void on_service_deletion(rpc::zone zone_id) const override;
@@ -96,8 +55,9 @@ namespace rpc
             rpc::zone zone_id,
             rpc::destination_zone destination_zone_id,
             rpc::caller_zone caller_zone_id) const override;
-        void on_service_proxy_deletion(
-            rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::caller_zone caller_zone_id) const override;
+        void on_service_proxy_deletion(rpc::zone zone_id,
+            rpc::destination_zone destination_zone_id,
+            rpc::caller_zone caller_zone_id) const override;
         void on_service_proxy_try_cast(rpc::zone zone_id,
             rpc::destination_zone destination_zone_id,
             rpc::caller_zone caller_zone_id,
@@ -149,8 +109,9 @@ namespace rpc
             rpc::destination_zone destination_zone_id,
             rpc::object object_id,
             bool add_ref_done) const override;
-        void on_object_proxy_deletion(
-            rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id) const override;
+        void on_object_proxy_deletion(rpc::zone zone_id,
+            rpc::destination_zone destination_zone_id,
+            rpc::object object_id) const override;
 
         void on_interface_proxy_creation(const char* name,
             rpc::zone zone_id,
@@ -169,5 +130,61 @@ namespace rpc
             rpc::method method_id) const override;
 
         void message(level_enum level, const char* message) const override;
+
+    private:
+        enum class field_kind
+        {
+            string,
+            number,
+            boolean,
+            floating
+        };
+
+        struct event_field
+        {
+            std::string key;
+            std::string value;
+            field_kind type;
+        };
+
+        struct event_record
+        {
+            double timestamp = 0.0;
+            std::string type;
+            std::vector<event_field> fields;
+        };
+
+        animation_telemetry_service(std::filesystem::path output_path,
+            std::string test_suite_name,
+            std::string test_name);
+
+        static std::string sanitize_name(const std::string& name);
+        static std::string escape_json(const std::string& input);
+        static event_field make_string_field(const std::string& key, const std::string& value);
+        static event_field make_number_field(const std::string& key, uint64_t value);
+        static event_field make_signed_field(const std::string& key, int64_t value);
+        static event_field make_boolean_field(const std::string& key, bool value);
+        static event_field make_floating_field(const std::string& key, double value);
+
+        void record_event(const std::string& type, std::initializer_list<event_field> fields = {}) const;
+        void record_event(const std::string& type, std::vector<event_field>&& fields) const;
+        void write_output() const;
+
+        inline double timestamp_now() const
+        {
+            auto now = std::chrono::steady_clock::now();
+            auto delta = std::chrono::duration<double>(now - start_time_);
+            return delta.count();
+        }
+
+        mutable std::mutex mutex_;
+        mutable std::vector<event_record> events_;
+        mutable std::unordered_map<uint64_t, std::string> zone_names_;
+        mutable std::unordered_map<uint64_t, uint64_t> zone_parents_;
+
+        std::filesystem::path output_path_;
+        std::string suite_name_;
+        std::string test_name_;
+        std::chrono::steady_clock::time_point start_time_;
     };
 }

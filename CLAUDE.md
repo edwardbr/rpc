@@ -252,6 +252,59 @@ cmake --build build --target fuzz_test_main
 ### Debug Code Generation
 Set `DEBUG_RPC_GEN=ON` in CMake to enable generator debugging output.
 
+### Run Tests with Telemetry Services
+RPC++ provides comprehensive telemetry services for debugging and visualization. Multiple telemetry services can be enabled simultaneously.
+
+#### Console Telemetry (with optional file output)
+```bash
+# Console output only (default behavior)
+./build/output/debug/rpc_test --telemetry-console --gtest_filter="type_test/0.initialisation_test"
+
+# Console + file output with custom directory
+./build/output/debug/rpc_test --telemetry-console --console-path=/tmp/telemetry_logs/ --gtest_filter="type_test/0.initialisation_test"
+```
+
+**Console Telemetry Features**:
+- **Dual-sink architecture**: Logs to both console (with ANSI colors) and file (with timestamps) when directory is provided
+- **Automatic directory creation**: Creates `{console_path}/{test_suite}/{test_name}_console.log` structure
+- **Zone topology visualization**: Shows hierarchical zone relationships with colored output
+- **Thread-safe logging**: Uses spdlog multi-threaded sinks for safe concurrent access
+- **Graceful fallback**: Falls back to console-only mode if file logging fails
+
+#### Sequence Diagram Telemetry
+```bash
+./build/output/debug/rpc_test --telemetry-sequence --sequence-path=./diagrams/ --gtest_filter="type_test/0.initialisation_test"
+```
+
+#### Animation Telemetry
+```bash
+./build/output/debug/rpc_test --animation-sequence --animation-path=./animations/ --gtest_filter="type_test/0.initialisation_test"
+```
+
+#### Combined Telemetry Services
+```bash
+# Use all telemetry services with custom paths
+./build/output/debug/rpc_test \
+  --telemetry-console --console-path=./logs/ \
+  --telemetry-sequence --sequence-path=./diagrams/ \
+  --animation-sequence --animation-path=./animations/ \
+  --gtest_filter="type_test/0.initialisation_test"
+```
+
+**What telemetry captures**:
+- Service and zone creation/deletion events
+- Object proxy lifecycle (creation, add_ref, release, deletion)
+- Interface proxy operations and method calls
+- Stub operations and reference counting
+- Service proxy operations across zones
+- Zone hierarchy relationships and topology
+
+**Output formats**:
+- **Console**: Colored real-time output with zone hierarchy diagrams
+- **File logs**: Timestamped clean format for post-analysis (when `--console-path` provided)
+- **Sequence diagrams**: PlantUML format (.pu files) for interaction visualization
+- **Animation**: Interactive HTML with timeline controls for dynamic analysis
+
 ## Architecture Notes
 - **Type Safety**: Full C++ type system support
 - **Transport Independence**: Protocol-agnostic design
@@ -576,8 +629,56 @@ namespace stdex {
 - **Thread Safety**: Maintained through stdex::member_ptr wrapper
 - **Architecture Clarity**: Framework components vs. RPC interfaces have distinct pointer semantics
 
+## Console Telemetry Enhancement: File Output Support (September 2025)
+
+**Location**: `/telemetry/src/console_telemetry_service.cpp`
+
+**Objective**: Enhanced console telemetry service to support optional file output alongside console output, providing persistent logging for debugging and analysis.
+
+**Major Achievements**:
+
+### 1. Dual-Sink Architecture Implementation
+- **Multi-Sink Logger**: Created spdlog logger with both console and file sinks when directory is provided
+- **Format Differentiation**: Console sink preserves ANSI color formatting, file sink uses clean timestamped format
+- **Thread-Safe Operation**: Uses spdlog's multi-threaded sinks for safe concurrent logging
+- **Graceful Fallback**: Automatically falls back to console-only mode if file logging fails
+
+### 2. Command Line Interface Enhancement
+- **New Parameter**: Added `--console-path` argument to control telemetry file output directory
+- **Flexible Configuration**: Supports both console-only mode (default) and console+file mode
+- **Directory Structure**: Automatically creates `{path}/{test_suite}/{test_name}_console.log` hierarchy
+- **Integration**: Seamlessly integrated with existing multiplexing telemetry service architecture
+
+### 3. Technical Implementation Details
+```cpp
+// File output mode - create logger with both console and file sinks
+auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(log_file_path.string());
+
+// Different patterns for different outputs
+console_sink->set_pattern("%v");  // Preserves ANSI colors
+file_sink->set_pattern("[%Y-%m-%d %H:%M:%S.%e] %v");  // Clean timestamps
+```
+
+### 4. Benefits Achieved
+- **Persistent Logging**: Telemetry events are now preserved to files for post-analysis
+- **Non-Intrusive**: Maintains existing console behavior while adding file capability
+- **Performance Optimized**: Asynchronous file writing with automatic flushing
+- **Developer Friendly**: Simple command-line control with sensible defaults
+
+**Usage Examples**:
+```bash
+# Console only (default)
+./build/output/debug/rpc_test --telemetry-console
+
+# Console + file output
+./build/output/debug/rpc_test --telemetry-console --console-path=/tmp/logs/
+```
+
+This enhancement provides developers with persistent telemetry logs for debugging complex RPC scenarios while maintaining the real-time console visualization capabilities.
+
 ---
 
-This codebase represents a mature RPC system with recent enhancements for JSON schema generation, improved IDL attribute handling, comprehensive hierarchical zone testing, robust format/version fallback validation, and now clean smart pointer architecture separation. The build system is well-integrated and the code generation pipeline is robust and extensible.
+This codebase represents a mature RPC system with recent enhancements for JSON schema generation, improved IDL attribute handling, comprehensive hierarchical zone testing, robust format/version fallback validation, clean smart pointer architecture separation, and now enhanced telemetry with persistent file logging. The build system is well-integrated and the code generation pipeline is robust and extensible.
 - when running tests with:
 - Always load all the .md files in the root directory and in the docs folder

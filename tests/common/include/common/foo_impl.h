@@ -34,7 +34,7 @@ namespace marshalled_tests
         baz()
         {
 #ifdef USE_RPC_TELEMETRY
-            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
                 telemetry_service->on_impl_creation("baz", (uint64_t)this, rpc::service::get_current_service() ? rpc::service::get_current_service()->get_zone_id() : rpc::zone{0});
 #endif
         }
@@ -42,7 +42,7 @@ namespace marshalled_tests
         virtual ~baz()
         {
 #ifdef USE_RPC_TELEMETRY
-            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
                 telemetry_service->on_impl_deletion((uint64_t)this, rpc::service::get_current_service() ? rpc::service::get_current_service()->get_zone_id() : rpc::zone{0});
 #endif
         }
@@ -82,14 +82,14 @@ namespace marshalled_tests
         foo()
         {
 #ifdef USE_RPC_TELEMETRY
-            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
                 telemetry_service->on_impl_creation("foo", (uint64_t)this, rpc::service::get_current_service() ? rpc::service::get_current_service()->get_zone_id() : rpc::zone{0});
 #endif
         }
         virtual ~foo()
         {
 #ifdef USE_RPC_TELEMETRY
-            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
                 telemetry_service->on_impl_deletion((uint64_t)this, rpc::service::get_current_service() ? rpc::service::get_current_service()->get_zone_id() : rpc::zone{0});
 #endif
         }
@@ -327,7 +327,7 @@ namespace marshalled_tests
         CORO_TASK(error_code) exception_test() override
         {
 #ifdef USE_RPC_TELEMETRY
-            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
                 telemetry_service->message(rpc::i_telemetry_service::info, "exception_test");
 #endif
             throw std::runtime_error("oops");
@@ -351,14 +351,14 @@ namespace marshalled_tests
         multiple_inheritance()
         {
 #ifdef USE_RPC_TELEMETRY
-            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
                 telemetry_service->on_impl_creation("multiple_inheritance", (uint64_t)this, rpc::service::get_current_service() ? rpc::service::get_current_service()->get_zone_id() : rpc::zone{0});
 #endif
         }
         virtual ~multiple_inheritance()
         {
 #ifdef USE_RPC_TELEMETRY
-            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
                 telemetry_service->on_impl_deletion((uint64_t)this, rpc::service::get_current_service() ? rpc::service::get_current_service()->get_zone_id() : rpc::zone{0});
 #endif
         }
@@ -400,14 +400,14 @@ namespace marshalled_tests
             , this_service_(this_service)
         {
 #ifdef USE_RPC_TELEMETRY
-            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
                 telemetry_service->on_impl_creation("example", (uint64_t)this, rpc::service::get_current_service() ? rpc::service::get_current_service()->get_zone_id() : rpc::zone{0});
 #endif
         }
         virtual ~example()
         {
 #ifdef USE_RPC_TELEMETRY
-            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
                 telemetry_service->on_impl_deletion((uint64_t)this, rpc::service::get_current_service() ? rpc::service::get_current_service()->get_zone_id() : rpc::zone{0});
 #endif
         }
@@ -575,7 +575,7 @@ namespace marshalled_tests
             rpc::shared_ptr<i_example> app;
             {
 #ifdef USE_RPC_TELEMETRY
-                auto telemetry_service = rpc::telemetry_service_manager::get();
+                auto telemetry_service = rpc::get_telemetry_service();
                 if (telemetry_service)
                     telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return");
 #endif
@@ -610,7 +610,7 @@ namespace marshalled_tests
 
             {
 #ifdef USE_RPC_TELEMETRY
-                auto telemetry_service = rpc::telemetry_service_manager::get();
+                auto telemetry_service = rpc::get_telemetry_service();
                 if (telemetry_service)
                     telemetry_service->message(rpc::i_telemetry_service::info, "look_up_app");
 #endif
@@ -647,7 +647,7 @@ namespace marshalled_tests
 
             rpc::shared_ptr<i_example> app;
 #ifdef USE_RPC_TELEMETRY
-            auto telemetry_service = rpc::telemetry_service_manager::get();
+            auto telemetry_service = rpc::get_telemetry_service();
             if (telemetry_service)
                 telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_not_return_and_delete");
 #endif
@@ -684,7 +684,7 @@ namespace marshalled_tests
 
             {
 #ifdef USE_RPC_TELEMETRY
-                auto telemetry_service = rpc::telemetry_service_manager::get();
+                auto telemetry_service = rpc::get_telemetry_service();
                 if (telemetry_service)
                     telemetry_service->message(rpc::i_telemetry_service::info, "call_host_look_up_app_and_delete");
 #endif
@@ -759,7 +759,7 @@ namespace marshalled_tests
         send_interface_back(const rpc::shared_ptr<xxx::i_baz>& input, rpc::shared_ptr<xxx::i_baz>& output) override
         {
 #ifdef USE_RPC_TELEMETRY
-            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
                 telemetry_service->message(rpc::i_telemetry_service::info, "send_interface_back");
 #endif
             output = input;

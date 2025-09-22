@@ -66,11 +66,14 @@ public:
                 }});
 #endif                
         zone_gen = &zone_gen_;
-        auto test_info = ::testing::UnitTest::GetInstance()->current_test_info();
 #ifdef USE_RPC_TELEMETRY
-        if (enable_telemetry_server)
-            telemetry_service_manager_.create(test_info->test_suite_name(), test_info->name(), "../../rpc_test_diagram/");
+        auto test_info = ::testing::UnitTest::GetInstance()->current_test_info();
+        if (auto telemetry_service = std::static_pointer_cast<rpc::multiplexing_telemetry_service>(rpc::get_telemetry_service()))
+        {
+            telemetry_service->start_test(test_info->test_suite_name(), test_info->name());
+        }
 #endif
+
 
         i_host_ptr_ = rpc::shared_ptr<yyy::i_host>(new host());
         local_host_ptr_ = i_host_ptr_;
@@ -84,7 +87,10 @@ public:
         i_example_ptr_ = nullptr;
         zone_gen = nullptr;
 #ifdef USE_RPC_TELEMETRY
-        RESET_TELEMETRY_SERVICE
+        if (auto telemetry_service = std::static_pointer_cast<rpc::multiplexing_telemetry_service>(rpc::get_telemetry_service()))
+        {
+            telemetry_service->reset_for_test();
+        }
 #endif
     }
 };

@@ -65,7 +65,7 @@ namespace rpc
         if (status)
         {
 #ifdef USE_RPC_TELEMETRY
-            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
             {
                 telemetry_service->message(rpc::i_telemetry_service::err, "call_host failed");
             }
@@ -97,7 +97,7 @@ namespace rpc
             if (status)
             {
 #ifdef USE_RPC_TELEMETRY
-                if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+                if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
                 {
                     telemetry_service->message(rpc::i_telemetry_service::err, "call_host failed");
                 }
@@ -120,7 +120,7 @@ namespace rpc
         if (status)
         {
 #ifdef USE_RPC_TELEMETRY
-            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
             {
                 telemetry_service->message(rpc::i_telemetry_service::err, "try_cast failed");
             }
@@ -143,7 +143,7 @@ namespace rpc
         uint64_t& reference_count)
     {
 #ifdef USE_RPC_TELEMETRY
-        if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+        if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
         {
             telemetry_service->on_service_proxy_add_ref(get_zone_id(),
                 destination_zone_id,
@@ -167,7 +167,7 @@ namespace rpc
         if (status)
         {
 #ifdef USE_RPC_TELEMETRY
-            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
             {
                 telemetry_service->message(rpc::i_telemetry_service::err, "add_ref_host failed");
             }
@@ -192,7 +192,7 @@ namespace rpc
         if (status)
         {
 #ifdef USE_RPC_TELEMETRY
-            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
             {
                 telemetry_service->message(rpc::i_telemetry_service::err, "release_host failed");
             }

@@ -45,7 +45,10 @@
       "cacheVariables": {
         "BUILD_COROUTINE": "OFF",
         "BUILD_TYPE": "debug",
-        "CMAKE_BUILD_TYPE": "Debug"
+        "CMAKE_BUILD_TYPE": "Debug",
+        "USE_RPC_LOGGING": "ON",
+        "USE_RPC_TELEMETRY": "ON",
+        "USE_CONSOLE_TELEMETRY": "ON"
       }
     },
     {

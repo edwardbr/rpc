@@ -4,68 +4,116 @@
  */
 #pragma once
 
+#include <vector>
+#include <memory>
 #include <string>
 #include <filesystem>
-#include <unordered_map>
-#include <set>
-#include <memory>
-#include <shared_mutex>
-// types.h is included via i_telemetry_service.h
+
 #include <rpc/telemetry/i_telemetry_service.h>
 
-namespace spdlog
-{
-    class logger;    
+#ifndef _IN_ENCLAVE
+// Forward declare TestInfo to avoid including gtest in headers
+namespace testing {
+    class TestInfo;
 }
+#endif
 
 namespace rpc
 {
-    class console_telemetry_service : public rpc::i_telemetry_service
+#ifndef _IN_ENCLAVE
+    /**
+     * @brief Configuration for creating telemetry services with test-specific names.
+     */
+    struct telemetry_service_config
     {
-        mutable std::unordered_map<uint64_t, std::string> zone_names_;
-        mutable std::shared_ptr<spdlog::logger> logger_;
-        // Track zone relationships: zone_id -> set of child zones
-        mutable std::unordered_map<uint64_t, std::set<uint64_t>> zone_children_;
-        // Track zone relationships: zone_id -> parent zone (0 if root)
-        mutable std::unordered_map<uint64_t, uint64_t> zone_parents_;
+        std::string type;          // "console", "file", etc.
+        std::string output_path;   // For file/console services that need a path
 
-        // Thread safety: shared_mutex allows multiple concurrent readers with exclusive writers
-        mutable std::shared_mutex zone_names_mutex_;
-        mutable std::shared_mutex zone_children_mutex_;
-        mutable std::shared_mutex zone_parents_mutex_;
+        telemetry_service_config(const std::string& t, const std::string& path = "")
+            : type(t), output_path(path) {}
+    };
+#endif
 
-        // Optional file output
-        std::filesystem::path log_directory_;
-        std::string test_suite_name_;
-        std::string test_name_;
-        mutable std::string logger_name_;  // Store logger name for proper cleanup
-
-        static constexpr size_t ASYNC_QUEUE_SIZE = 8192;
-
-        std::string get_zone_name(uint64_t zone_id) const;
-        std::string get_zone_color(uint64_t zone_id) const;
-        std::string get_level_color(level_enum level) const;
-        std::string reset_color() const;
-        void register_zone_name(uint64_t zone_id, const char* name, bool optional_replace) const;
-        void init_logger() const;
-        void print_topology_diagram() const;
-        void print_zone_tree(uint64_t zone_id, int depth) const;
-
-        console_telemetry_service(const std::string& test_suite_name,
-                                 const std::string& test_name,
-                                 const std::filesystem::path& directory);
+    /**
+     * @brief A telemetry service that forwards all telemetry events to multiple child services.
+     *
+     * This service implements i_telemetry_service and acts as a multiplexer, forwarding all
+     * telemetry events to a configurable list of child telemetry services. This allows
+     * running multiple telemetry backends simultaneously (e.g., console + file + custom).
+     *
+     * Non-enclave builds only.
+     */
+    class multiplexing_telemetry_service : public rpc::i_telemetry_service
+    {
+    private:
+        std::vector<std::shared_ptr<i_telemetry_service>> children_;
+#ifndef _IN_ENCLAVE
+        std::vector<telemetry_service_config> service_configs_;
+#endif
 
     public:
-        static bool create(std::shared_ptr<rpc::i_telemetry_service>& service,
-            const std::string& test_suite_name,
-            const std::string& name,
-            const std::filesystem::path& directory);
+        /**
+         * @brief Factory method to create a multiplexing telemetry service.
+         *
+         * @param service Output parameter for the created service
+         * @param child_services Vector of child telemetry services to forward to
+         * @return true if creation was successful, false otherwise
+         */
+        static bool create(std::vector<std::shared_ptr<i_telemetry_service>>&& child_services);
 
-        virtual ~console_telemetry_service();
-        console_telemetry_service();
-        console_telemetry_service(const console_telemetry_service&) = delete;
-        console_telemetry_service& operator=(const console_telemetry_service&) = delete;
+        /**
+         * @brief Constructor with child services.
+         *
+         * @param child_services Vector of child telemetry services to forward to
+         */
+        explicit multiplexing_telemetry_service(std::vector<std::shared_ptr<i_telemetry_service>>&& child_services);
 
+        virtual ~multiplexing_telemetry_service() {};
+        multiplexing_telemetry_service(const multiplexing_telemetry_service&) = delete;
+        multiplexing_telemetry_service& operator=(const multiplexing_telemetry_service&) = delete;
+
+        /**
+         * @brief Add a child telemetry service to forward events to.
+         *
+         * @param child The child service to add
+         */
+        void add_child(std::shared_ptr<i_telemetry_service> child);
+
+        /**
+         * @brief Get the number of child services.
+         *
+         * @return size_t Number of child services
+         */
+        size_t get_child_count() const;
+
+        /**
+         * @brief Clear all child services (for test cleanup).
+         */
+        void clear_children();
+
+#ifndef _IN_ENCLAVE        
+        /**
+         * @brief Register a telemetry service configuration that will be created for each test.
+         *
+         * @param type Type of service ("console", "sequence", "animation", etc.)
+         * @param output_path Optional output path for services that need it
+         */
+        void register_service_config(const std::string& type, const std::string& output_path = "");
+
+        /**
+         * @brief Reset for a new test - clear children and recreate them with current test info.
+         *
+         * @param test_info Current test information for creating services with correct names
+         */
+        void start_test(const char* test_suite_name, const char* name);
+        
+        /**
+         * @brief Reset for a new test - clear children hem with current test info.
+         */
+        void reset_for_test();
+#endif
+
+        // i_telemetry_service interface - all methods forward to children
         void on_service_creation(const char* name, rpc::zone zone_id, rpc::destination_zone parent_zone_id) const override;
         void on_service_deletion(rpc::zone zone_id) const override;
         void on_service_try_cast(rpc::zone zone_id,

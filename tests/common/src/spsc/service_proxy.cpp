@@ -224,7 +224,7 @@ namespace rpc::spsc
         RPC_DEBUG("add_ref {}", get_zone_id().get_val());
 
 #ifdef USE_RPC_TELEMETRY
-        if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+        if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
         {
             telemetry_service->on_service_proxy_add_ref(get_zone_id(),
                 destination_zone_id,
@@ -261,7 +261,7 @@ namespace rpc::spsc
         {
             RPC_ERROR("failed addref_receive.err_code failed");
 #ifdef USE_RPC_TELEMETRY
-            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
             {
                 auto error_message = std::string("add_ref failed ") + std::to_string(response_data.err_code);
                 telemetry_service->message(rpc::i_telemetry_service::err, error_message.c_str());
@@ -305,7 +305,7 @@ namespace rpc::spsc
         {
             RPC_ERROR("failed response_data.err_code failed");
 #ifdef USE_RPC_TELEMETRY
-            if (auto telemetry_service = rpc::telemetry_service_manager::get(); telemetry_service)
+            if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
             {
                 auto error_message = std::string("release failed ") + std::to_string(response_data.err_code);
                 telemetry_service->message(rpc::i_telemetry_service::err, error_message.c_str());
