@@ -28,7 +28,6 @@ namespace rpc
     // Forward declarations for circular dependency resolution
     template<typename T> class shared_ptr;
     template<typename T> class weak_ptr;
-    template<typename T> class optimistic_ptr;
     // template<typename T, typename Deleter = std::default_delete<T>> class unique_ptr;  // Commented out - not needed
 
     // NAMESPACE_INLINE_BEGIN  // Commented out to simplify
@@ -583,7 +582,6 @@ namespace rpc
             return ultimate_actual_object_proxy_sp_;
         }
 
-        template<typename U> friend class optimistic_ptr;
         template<typename U> friend class weak_ptr;
         template<typename U>
         friend class shared_ptr; // Allow different template instantiations to access private members
@@ -591,131 +589,6 @@ namespace rpc
         template<class T1_cast, class T2_cast>
         friend shared_ptr<T1_cast> dynamic_pointer_cast(const shared_ptr<T2_cast>& from) noexcept;
         template<typename U> friend class enable_shared_from_this;
-    };
-
-    template<typename T> class optimistic_ptr
-    {
-        rpc::shared_ptr<T> held_proxy_sp_;
-        std::shared_ptr<rpc::object_proxy> ultimate_actual_object_proxy_sp_{nullptr};
-
-    public:
-        using element_type = T;
-        constexpr optimistic_ptr() noexcept = default;
-        constexpr optimistic_ptr(std::nullptr_t) noexcept { }
-
-        explicit optimistic_ptr(const rpc::shared_ptr<T>& proxy_sp_param)
-        {
-            // Commented out proxy-specific code to break circular dependency
-            // if (proxy_sp_param && proxy_sp_param->query_proxy_base() != nullptr)
-            // {
-            //     held_proxy_sp_ = proxy_sp_param;
-            //     if (auto proxy_base_ptr = held_proxy_sp_->query_proxy_base())
-            //     {
-            //         ultimate_actual_object_proxy_sp_ = proxy_base_ptr->get_object_proxy();
-            //     }
-            //     if (ultimate_actual_object_proxy_sp_)
-            //     {
-            //         ultimate_actual_object_proxy_sp_->increment_remote_weak_callable();
-            //     }
-            //     else
-            //     {
-            //         held_proxy_sp_.reset();
-            //     }
-            // }
-            // else if (proxy_sp_param)
-            // { /* Error: not a proxy */
-            // }
-
-            // Simple assignment for now - will be enhanced later
-            held_proxy_sp_ = proxy_sp_param;
-        }
-        explicit optimistic_ptr(rpc::shared_ptr<T>&& proxy_sp_param)
-        {
-            // Commented out proxy-specific code to break circular dependency
-            // if (proxy_sp_param && proxy_sp_param->query_proxy_base() != nullptr)
-            // {
-            //     held_proxy_sp_ = std::move(proxy_sp_param);
-            //     if (auto proxy_base_ptr = held_proxy_sp_->query_proxy_base())
-            //     {
-            //         ultimate_actual_object_proxy_sp_ = proxy_base_ptr->get_object_proxy();
-            //     }
-            //     if (ultimate_actual_object_proxy_sp_)
-            //     {
-            //         ultimate_actual_object_proxy_sp_->increment_remote_weak_callable();
-            //     }
-            //     else
-            //     {
-            //         held_proxy_sp_.reset();
-            //     }
-            // }
-            // else if (proxy_sp_param)
-            // { /* Error: not a proxy */
-            // }
-
-            // Simple assignment for now - will be enhanced later
-            held_proxy_sp_ = std::move(proxy_sp_param);
-        }
-
-        optimistic_ptr(const optimistic_ptr& r)
-            : held_proxy_sp_(r.held_proxy_sp_)
-            , ultimate_actual_object_proxy_sp_(r.ultimate_actual_object_proxy_sp_)
-        {
-            // Commented out remote reference counting to break circular dependency
-            // if (ultimate_actual_object_proxy_sp_)
-            //     ultimate_actual_object_proxy_sp_->increment_remote_weak_callable();
-        }
-        optimistic_ptr(optimistic_ptr&& r) noexcept
-            : held_proxy_sp_(std::move(r.held_proxy_sp_))
-            , ultimate_actual_object_proxy_sp_(std::move(r.ultimate_actual_object_proxy_sp_))
-        {
-        }
-        optimistic_ptr& operator=(const optimistic_ptr& r)
-        {
-            if (this != &r)
-            {
-                // Commented out remote reference counting to break circular dependency
-                // if (ultimate_actual_object_proxy_sp_)
-                //     ultimate_actual_object_proxy_sp_->decrement_remote_weak_callable_and_signal_if_appropriate();
-                held_proxy_sp_ = r.held_proxy_sp_;
-                ultimate_actual_object_proxy_sp_ = r.ultimate_actual_object_proxy_sp_;
-                // if (ultimate_actual_object_proxy_sp_)
-                //     ultimate_actual_object_proxy_sp_->increment_remote_weak_callable();
-            }
-            return *this;
-        }
-        optimistic_ptr& operator=(optimistic_ptr&& r) noexcept
-        {
-            if (this != &r)
-            {
-                // Commented out remote reference counting to break circular dependency
-                // if (ultimate_actual_object_proxy_sp_)
-                //     ultimate_actual_object_proxy_sp_->decrement_remote_weak_callable_and_signal_if_appropriate();
-                held_proxy_sp_ = std::move(r.held_proxy_sp_);
-                ultimate_actual_object_proxy_sp_ = std::move(r.ultimate_actual_object_proxy_sp_);
-            }
-            return *this;
-        }
-        ~optimistic_ptr()
-        {
-            // Commented out remote reference counting to break circular dependency
-            // if (ultimate_actual_object_proxy_sp_)
-            //     ultimate_actual_object_proxy_sp_->decrement_remote_weak_callable_and_signal_if_appropriate();
-        }
-
-        T* operator->() const noexcept { return held_proxy_sp_.operator->(); }
-        T& operator*() const { return *held_proxy_sp_; }
-        T* get() const noexcept { return held_proxy_sp_.get(); }
-        long use_count() const noexcept { return held_proxy_sp_.use_count(); }
-        explicit operator bool() const noexcept { return static_cast<bool>(held_proxy_sp_); }
-        rpc::shared_ptr<T> get_proxy_shared_ptr() const { return held_proxy_sp_; }
-        void reset() noexcept { optimistic_ptr().swap(*this); }
-        void reset(const rpc::shared_ptr<T>& proxy_sp) { optimistic_ptr(proxy_sp).swap(*this); }
-        void reset(rpc::shared_ptr<T>&& proxy_sp) { optimistic_ptr(std::move(proxy_sp)).swap(*this); }
-        void swap(optimistic_ptr& r) noexcept
-        {
-            held_proxy_sp_.swap(r.held_proxy_sp_);
-            ultimate_actual_object_proxy_sp_.swap(r.ultimate_actual_object_proxy_sp_);
-        }
     };
 
     template<typename T> class weak_ptr
@@ -735,11 +608,6 @@ namespace rpc
             static_assert(std::is_convertible<Y*, T*>::value, "Y* must be convertible to T*");
             if (cb_)
                 cb_->increment_local_weak();
-        }
-        template<typename Y>
-        weak_ptr(const optimistic_ptr<Y>& o) noexcept
-            : weak_ptr(o.get_proxy_shared_ptr())
-        {
         }
 
         weak_ptr(const weak_ptr& r) noexcept
@@ -793,11 +661,6 @@ namespace rpc
             return *this;
         }
         template<typename Y> weak_ptr& operator=(const shared_ptr<Y>& r) noexcept
-        {
-            weak_ptr(r).swap(*this);
-            return *this;
-        }
-        template<typename Y> weak_ptr& operator=(const optimistic_ptr<Y>& r) noexcept
         {
             weak_ptr(r).swap(*this);
             return *this;
@@ -1046,13 +909,6 @@ namespace std
     template<typename T> struct hash<rpc::shared_ptr<T>>
     {
         size_t operator()(const rpc::shared_ptr<T>& p) const noexcept { return std::hash<T*>()(p.get()); }
-    };
-    template<typename T> struct hash<rpc::optimistic_ptr<T>>
-    {
-        size_t operator()(const rpc::optimistic_ptr<T>& p) const noexcept
-        {
-            return std::hash<rpc::shared_ptr<T>>()(p.get_proxy_shared_ptr());
-        }
     };
     // Commented out unique_ptr hash specialization - not needed
     // template<typename T, typename D> struct hash<rpc::unique_ptr<T, D>>
