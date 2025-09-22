@@ -9,7 +9,9 @@ host::host()
 {
 #ifdef USE_RPC_TELEMETRY
     if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
-        telemetry_service->on_impl_creation("host", (uint64_t)this, rpc::service::get_current_service() ? rpc::service::get_current_service()->get_zone_id() : rpc::zone{0});
+        telemetry_service->on_impl_creation("host",
+            (uint64_t)this,
+            rpc::service::get_current_service() ? rpc::service::get_current_service()->get_zone_id() : rpc::zone{0});
 #endif
 }
 
@@ -17,7 +19,8 @@ host::~host()
 {
 #ifdef USE_RPC_TELEMETRY
     if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
-        telemetry_service->on_impl_deletion((uint64_t)this, rpc::service::get_current_service() ? rpc::service::get_current_service()->get_zone_id() : rpc::zone{0});
+        telemetry_service->on_impl_deletion((uint64_t)this,
+            rpc::service::get_current_service() ? rpc::service::get_current_service()->get_zone_id() : rpc::zone{0});
 #endif
 }
 

@@ -102,34 +102,31 @@ TEST(McpSchemaValidationTest, InputOutputSchemaSeparation)
     ASSERT_FALSE(fi.empty()) << "Function info should not be empty";
 
     // Find a function with both input and output parameters
-    auto it = std::find_if(fi.begin(), fi.end(), [](const auto& func) { 
-        return func.name == "call_host_create_enclave"; 
-    });
+    auto it = std::find_if(fi.begin(), fi.end(), [](const auto& func) { return func.name == "call_host_create_enclave"; });
 
     ASSERT_NE(it, fi.end()) << "Should find call_host_create_enclave function";
 
     // Verify input schema exists and is valid
     EXPECT_FALSE(it->in_json_schema.empty()) << "Input schema should not be empty";
-    
+
     nlohmann::json in_schema_json;
-    ASSERT_NO_THROW(in_schema_json = nlohmann::json::parse(it->in_json_schema)) 
-        << "Input schema should be valid JSON";
-    
+    ASSERT_NO_THROW(in_schema_json = nlohmann::json::parse(it->in_json_schema)) << "Input schema should be valid JSON";
+
     EXPECT_EQ(in_schema_json["type"], "object") << "Input schema should be object type";
     EXPECT_TRUE(in_schema_json.contains("description")) << "Input schema should have description";
-    EXPECT_TRUE(in_schema_json["description"].get<std::string>().find("Input parameters") != std::string::npos) 
+    EXPECT_TRUE(in_schema_json["description"].get<std::string>().find("Input parameters") != std::string::npos)
         << "Input schema description should indicate input parameters";
 
     // Verify output schema exists and is valid
     EXPECT_FALSE(it->out_json_schema.empty()) << "Output schema should not be empty";
-    
+
     nlohmann::json out_schema_json;
-    ASSERT_NO_THROW(out_schema_json = nlohmann::json::parse(it->out_json_schema)) 
+    ASSERT_NO_THROW(out_schema_json = nlohmann::json::parse(it->out_json_schema))
         << "Output schema should be valid JSON";
-    
+
     EXPECT_EQ(out_schema_json["type"], "object") << "Output schema should be object type";
     EXPECT_TRUE(out_schema_json.contains("description")) << "Output schema should have description";
-    EXPECT_TRUE(out_schema_json["description"].get<std::string>().find("Output parameters") != std::string::npos) 
+    EXPECT_TRUE(out_schema_json["description"].get<std::string>().find("Output parameters") != std::string::npos)
         << "Output schema description should indicate output parameters";
 
     // Test that schemas are different (since this function has both input and output params)
@@ -144,23 +141,22 @@ TEST(McpSchemaValidationTest, InputOnlyFunctionSchemas)
     ASSERT_FALSE(fi.empty()) << "Function info should not be empty";
 
     // Find a function with only input parameters (no [out] attributes)
-    auto it = std::find_if(fi.begin(), fi.end(), [](const auto& func) { 
-        return func.name == "call_host_create_enclave_and_throw_away"; 
-    });
+    auto it = std::find_if(
+        fi.begin(), fi.end(), [](const auto& func) { return func.name == "call_host_create_enclave_and_throw_away"; });
 
     ASSERT_NE(it, fi.end()) << "Should find call_host_create_enclave_and_throw_away function";
 
     // Verify input schema exists
     EXPECT_FALSE(it->in_json_schema.empty()) << "Input schema should not be empty for input-only function";
-    
+
     // Verify output schema indicates no output parameters
     nlohmann::json out_schema_json;
-    ASSERT_NO_THROW(out_schema_json = nlohmann::json::parse(it->out_json_schema)) 
+    ASSERT_NO_THROW(out_schema_json = nlohmann::json::parse(it->out_json_schema))
         << "Output schema should be valid JSON";
-    
+
     // For functions with no output parameters, the schema should still be valid but indicate no properties
     EXPECT_EQ(out_schema_json["type"], "object") << "Output schema should be object type";
-    EXPECT_FALSE(out_schema_json.contains("properties") && !out_schema_json["properties"].empty()) 
+    EXPECT_FALSE(out_schema_json.contains("properties") && !out_schema_json["properties"].empty())
         << "Output schema should not have properties for input-only function";
 }
 

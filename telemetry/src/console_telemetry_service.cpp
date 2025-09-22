@@ -20,10 +20,11 @@ namespace rpc
 {
     console_telemetry_service::console_telemetry_service() = default;
 
-    console_telemetry_service::console_telemetry_service(const std::string& test_suite_name,
-                                                         const std::string& test_name,
-                                                         const std::filesystem::path& directory)
-        : log_directory_(directory), test_suite_name_(test_suite_name), test_name_(test_name)
+    console_telemetry_service::console_telemetry_service(
+        const std::string& test_suite_name, const std::string& test_name, const std::filesystem::path& directory)
+        : log_directory_(directory)
+        , test_suite_name_(test_suite_name)
+        , test_name_(test_name)
     {
     }
 
@@ -156,8 +157,10 @@ namespace rpc
                     {
                         // Log directory creation failure but continue with console-only logging
                         auto console_logger = spdlog::default_logger();
-                        console_logger->warn("Failed to create console telemetry directory '{}': {} - falling back to console-only mode",
-                                           full_directory_path.string(), ec.message());
+                        console_logger->warn(
+                            "Failed to create console telemetry directory '{}': {} - falling back to console-only mode",
+                            full_directory_path.string(),
+                            ec.message());
                         logger_ = spdlog::default_logger();
                         return;
                     }
@@ -173,15 +176,15 @@ namespace rpc
                     auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(log_file_path.string());
 
                     // Set patterns - console keeps ANSI colors, file uses clean format
-                    console_sink->set_pattern("%v");  // Raw pattern preserves our ANSI formatting
-                    file_sink->set_pattern("[%Y-%m-%d %H:%M:%S.%e] %v");  // Clean timestamped format for file
+                    console_sink->set_pattern("%v");                     // Raw pattern preserves our ANSI formatting
+                    file_sink->set_pattern("[%Y-%m-%d %H:%M:%S.%e] %v"); // Clean timestamped format for file
 
                     // Create logger with both sinks
                     std::vector<spdlog::sink_ptr> sinks = {console_sink, file_sink};
                     logger_ = std::make_shared<spdlog::logger>(logger_name_, sinks.begin(), sinks.end());
 
                     logger_->set_level(spdlog::level::trace);
-                    logger_->flush_on(spdlog::level::trace);  // Ensure all messages are written to file
+                    logger_->flush_on(spdlog::level::trace); // Ensure all messages are written to file
 
                     // Register with spdlog to avoid name conflicts
                     spdlog::register_logger(logger_);
@@ -253,7 +256,10 @@ namespace rpc
         register_zone_name(zone_id.get_val(), name, false);
         init_logger();
         if (parent_zone_id.get_val() == 0)
-            logger_->info("{}{} service_creation{}", get_zone_color(zone_id.get_val()), get_zone_name(zone_id.get_val()), reset_color());
+            logger_->info("{}{} service_creation{}",
+                get_zone_color(zone_id.get_val()),
+                get_zone_name(zone_id.get_val()),
+                reset_color());
         else
             logger_->info("{}{} child_zone_creation: parent={}{}",
                 get_zone_color(zone_id.get_val()),
@@ -361,7 +367,8 @@ namespace rpc
     void console_telemetry_service::on_service_deletion(rpc::zone zone_id) const
     {
         init_logger();
-        logger_->info("{}{} service_deletion{}", get_zone_color(zone_id.get_val()), get_zone_name(zone_id.get_val()), reset_color());
+        logger_->info(
+            "{}{} service_deletion{}", get_zone_color(zone_id.get_val()), get_zone_name(zone_id.get_val()), reset_color());
     }
 
     void console_telemetry_service::on_service_try_cast(rpc::zone zone_id,

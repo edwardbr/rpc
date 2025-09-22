@@ -130,12 +130,15 @@ namespace rpc
         friend current_service_tracker;
 
     protected:
-        struct child_service_tag {};
-        
+        struct child_service_tag
+        {
+        };
+
     public:
 #ifdef BUILD_COROUTINE
         explicit service(const char* name, zone zone_id, const std::shared_ptr<coro::io_scheduler>& scheduler);
-        explicit service(const char* name, zone zone_id, const std::shared_ptr<coro::io_scheduler>& scheduler, child_service_tag);
+        explicit service(
+            const char* name, zone zone_id, const std::shared_ptr<coro::io_scheduler>& scheduler, child_service_tag);
 #else
         explicit service(const char* name, zone zone_id);
         explicit service(const char* name, zone zone_id, child_service_tag);
@@ -165,9 +168,9 @@ namespace rpc
         void set_zone_id(zone zone_id) { zone_id_ = zone_id; }
         virtual destination_zone get_parent_zone_id() const { return {0}; }
         virtual std::shared_ptr<rpc::service_proxy> get_parent() const { return nullptr; }
-        virtual bool set_parent_proxy(const std::shared_ptr<rpc::service_proxy>&) 
-        { 
-            RPC_ASSERT(false); 
+        virtual bool set_parent_proxy(const std::shared_ptr<rpc::service_proxy>&)
+        {
+            RPC_ASSERT(false);
             return false;
         }
 
@@ -249,7 +252,7 @@ namespace rpc
         CORO_TASK(void)
         clean_up_on_failed_connection(const std::shared_ptr<rpc::service_proxy>& destination_zone,
             rpc::shared_ptr<rpc::casting_interface> input_interface);
-            
+
         // int decrement_reference_count(const std::shared_ptr<rpc::service_proxy>& proxy, int ref_count);
 
         template<class proxy_class, class in_param_type, class out_param_type, typename... Args>
@@ -361,8 +364,8 @@ namespace rpc
         }
 
         template<class T>
-        std::function<std::shared_ptr<rpc::i_interface_stub>(const std::shared_ptr<object_stub>& stub)> create_interface_stub(
-            const shared_ptr<T>& iface);
+        std::function<std::shared_ptr<rpc::i_interface_stub>(const std::shared_ptr<object_stub>& stub)>
+        create_interface_stub(const shared_ptr<T>& iface);
         int create_interface_stub(rpc::interface_ordinal interface_id,
             std::function<interface_ordinal(uint8_t)> original_interface_id,
             const std::shared_ptr<rpc::i_interface_stub>& original,
@@ -437,11 +440,13 @@ namespace rpc
             std::shared_ptr<rpc::child_service>& new_child_service,
             Args&&... args)
         {
-            auto child_svc = std::shared_ptr<rpc::child_service>(
-                new rpc::child_service(name, zone_id, parent_zone_id
+            auto child_svc = std::shared_ptr<rpc::child_service>(new rpc::child_service(name,
+                zone_id,
+                parent_zone_id
 #ifdef BUILD_COROUTINE
-                , io_scheduler
-#endif                
+                ,
+                io_scheduler
+#endif
                 ));
 
             // link the child to the parent
@@ -452,9 +457,9 @@ namespace rpc
                 CO_RETURN rpc::error::UNABLE_TO_CREATE_SERVICE_PROXY();
             }
             child_svc->add_zone_proxy(parent_service_proxy);
-            if(!child_svc->set_parent_proxy(parent_service_proxy))
+            if (!child_svc->set_parent_proxy(parent_service_proxy))
             {
-                RPC_ERROR("Unable to create set_parent_proxy in create_child_service"); 
+                RPC_ERROR("Unable to create set_parent_proxy in create_child_service");
                 CO_RETURN rpc::error::UNABLE_TO_CREATE_SERVICE_PROXY();
             }
             parent_service_proxy->set_parent_channel(true);

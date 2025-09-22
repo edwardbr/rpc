@@ -55,9 +55,8 @@ namespace rpc
             rpc::zone zone_id,
             rpc::destination_zone destination_zone_id,
             rpc::caller_zone caller_zone_id) const override;
-        void on_service_proxy_deletion(rpc::zone zone_id,
-            rpc::destination_zone destination_zone_id,
-            rpc::caller_zone caller_zone_id) const override;
+        void on_service_proxy_deletion(
+            rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::caller_zone caller_zone_id) const override;
         void on_service_proxy_try_cast(rpc::zone zone_id,
             rpc::destination_zone destination_zone_id,
             rpc::caller_zone caller_zone_id,
@@ -109,9 +108,8 @@ namespace rpc
             rpc::destination_zone destination_zone_id,
             rpc::object object_id,
             bool add_ref_done) const override;
-        void on_object_proxy_deletion(rpc::zone zone_id,
-            rpc::destination_zone destination_zone_id,
-            rpc::object object_id) const override;
+        void on_object_proxy_deletion(
+            rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id) const override;
 
         void on_interface_proxy_creation(const char* name,
             rpc::zone zone_id,
@@ -154,9 +152,7 @@ namespace rpc
             std::vector<event_field> fields;
         };
 
-        animation_telemetry_service(std::filesystem::path output_path,
-            std::string test_suite_name,
-            std::string test_name);
+        animation_telemetry_service(std::filesystem::path output_path, std::string test_suite_name, std::string test_name);
 
         static std::string sanitize_name(const std::string& name);
         static std::string escape_json(const std::string& input);

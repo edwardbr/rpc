@@ -31,7 +31,8 @@ namespace rpc
         stdex::member_ptr<service_proxy> service_proxy_;
         std::unordered_map<interface_ordinal, rpc::weak_ptr<proxy_base>> proxy_map;
         std::mutex insert_control_;
-        std::atomic<int> inherited_reference_count_{0}; // Track inherited references from race conditions during destruction and their continued presence in the service other_zones collection
+        std::atomic<int> inherited_reference_count_{0}; // Track inherited references from race conditions during destruction
+                                                        // and their continued presence in the service other_zones collection
 
         object_proxy(object object_id, std::shared_ptr<rpc::service_proxy> service_proxy);
 
@@ -45,7 +46,8 @@ namespace rpc
     public:
         virtual ~object_proxy();
 
-        // Called when this object_proxy inherits a reference from a race condition during the destruction of a proxy but the service other_zones collection still has a record of it
+        // Called when this object_proxy inherits a reference from a race condition during the destruction of a proxy
+        // but the service other_zones collection still has a record of it
         void inherit_extra_reference() { inherited_reference_count_++; }
 
         std::shared_ptr<rpc::service_proxy> get_service_proxy() const { return service_proxy_.get_nullable(); }

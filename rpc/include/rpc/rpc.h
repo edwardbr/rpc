@@ -5,7 +5,9 @@
 #pragma once
 
 // for future coroutine deliniation
-#define NAMESPACE_INLINE_BEGIN inline namespace synchronous {
+#define NAMESPACE_INLINE_BEGIN                                                                                         \
+    inline namespace synchronous                                                                                       \
+    {
 #define NAMESPACE_INLINE_END }
 
 #include <rpc/internal/version.h>

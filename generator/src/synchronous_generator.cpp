@@ -666,9 +666,9 @@ namespace synchronous_generator
 
             proxy("std::vector<char> __rpc_out_buf(RPC_OUT_BUFFER_SIZE); //max size using short string optimisation");
             proxy("auto __rpc_ret = rpc::error::OK();");
-            
+
             proxy("//PROXY_PREPARE_IN");
-    
+
             proxy("if (__rpc_version < __rpc_min_version)");
             proxy("{{");
             proxy("CO_RETURN rpc::error::INVALID_VERSION();");
@@ -696,8 +696,8 @@ namespace synchronous_generator
                     proxy(output);
                 }
                 count++;
-            }            
-            
+            }
+
             proxy("while (__rpc_version >= __rpc_min_version)");
             proxy("{{");
             proxy("std::vector<char> __rpc_in_buf;");
@@ -750,12 +750,12 @@ namespace synchronous_generator
             if (tag.empty())
                 tag = "0";
 
-            proxy("__rpc_ret = CO_AWAIT __rpc_op->send(__rpc_version, __rpc_encoding, (uint64_t){}, {}::get_id(__rpc_version), {{{}}}, __rpc_in_buf.size(), "
+            proxy("__rpc_ret = CO_AWAIT __rpc_op->send(__rpc_version, __rpc_encoding, (uint64_t){}, "
+                  "{}::get_id(__rpc_version), {{{}}}, __rpc_in_buf.size(), "
                   "__rpc_in_buf.data(), __rpc_out_buf);",
                 tag,
                 interface_name,
                 function_count);
-
 
             proxy("if(__rpc_ret == rpc::error::INVALID_VERSION())");
             proxy("{{");
@@ -789,7 +789,8 @@ namespace synchronous_generator
 
             proxy("if(__rpc_ret >= rpc::error::MIN() && __rpc_ret <= rpc::error::MAX())");
             proxy("{{");
-            proxy("//if you fall into this rabbit hole ensure that you have added any error offsets compatible with your error code system to the rpc library");
+            proxy("//if you fall into this rabbit hole ensure that you have added any error offsets compatible with "
+                  "your error code system to the rpc library");
             proxy("//this is only here to handle rpc generated errors and not application errors");
             proxy("//clean up any input stubs, this code has to assume that the destination is behaving correctly");
             proxy("RPC_ERROR(\"failed in {}\");", function->get_name());
@@ -862,16 +863,16 @@ namespace synchronous_generator
                 stub("catch(const std::exception& ex)");
                 stub("{{");
                 stub("RPC_ERROR(\"Exception has occurred in an {} implementation in function {} {{}}\", ex.what());",
-                     interface_name,
-                     function->get_name());
+                    interface_name,
+                    function->get_name());
                 stub("__rpc_ret = rpc::error::EXCEPTION();");
                 stub("}}");
                 stub("#endif");
                 stub("catch(...)");
                 stub("{{");
                 stub("RPC_ERROR(\"Exception has occurred in an {} implementation in function {}\");",
-                     interface_name,
-                     function->get_name());
+                    interface_name,
+                    function->get_name());
                 stub("__rpc_ret = rpc::error::EXCEPTION();");
                 stub("}}");
             }
@@ -1294,8 +1295,7 @@ namespace synchronous_generator
         stub("__rpc_ret->weak_this_ = __rpc_ret;", interface_name);
         stub("return __rpc_ret;", interface_name);
         stub("}}");
-        stub("std::shared_ptr<{0}_stub> shared_from_this(){{return weak_this_.lock();}}",
-            interface_name);
+        stub("std::shared_ptr<{0}_stub> shared_from_this(){{return weak_this_.lock();}}", interface_name);
         stub("");
         stub("rpc::interface_ordinal get_interface_id(uint64_t rpc_version) const override");
         stub("{{");
@@ -1418,7 +1418,8 @@ namespace synchronous_generator
                 {
                     template_deduction deduction;
                     m_ob.deduct_template_type(param, deduction);
-                    if (deduction.type == template_deduction_type::CLASS || deduction.type == template_deduction_type::TYPENAME)
+                    if (deduction.type == template_deduction_type::CLASS
+                        || deduction.type == template_deduction_type::TYPENAME)
                     {
                         header("id ^= rpc::id<{}>::get({});", param.get_name(), version.symbol);
                         header("id = (id << 1)|(id >> (sizeof(id) - 1));//rotl");
@@ -1749,7 +1750,8 @@ namespace synchronous_generator
         proxy("}}");
         proxy("");
 
-        stub("template<> std::function<std::shared_ptr<rpc::i_interface_stub>(const std::shared_ptr<rpc::object_stub>& stub)> "
+        stub("template<> std::function<std::shared_ptr<rpc::i_interface_stub>(const std::shared_ptr<rpc::object_stub>& "
+             "stub)> "
              "service::create_interface_stub(const rpc::shared_ptr<::{}{}>& iface)",
             ns,
             interface_name);

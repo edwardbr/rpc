@@ -9,7 +9,8 @@
 #include <string>
 #include <mutex>
 
-namespace spdlog {
+namespace spdlog
+{
     class logger;
 }
 
@@ -25,7 +26,7 @@ private:
 public:
     static std::shared_ptr<spdlog::logger> get_logger();
     static void reset_logger();
-    
+
     // Convenience logging methods
     static void debug(const std::string& message);
     static void trace(const std::string& message);

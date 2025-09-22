@@ -44,8 +44,8 @@ namespace rpc::tcp
     {
         RPC_ASSERT(svc);
 
-        auto ret
-            = std::shared_ptr<rpc::service_proxy>(new service_proxy(name, destination_zone_id, svc, nullptr, timeout, opts));
+        auto ret = std::shared_ptr<rpc::service_proxy>(
+            new service_proxy(name, destination_zone_id, svc, nullptr, timeout, opts));
         return ret;
     }
 
@@ -284,8 +284,11 @@ namespace rpc::tcp
     }
 
     CORO_TASK(int)
-    service_proxy::release(
-        uint64_t protocol_version, destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id, uint64_t& reference_count)
+    service_proxy::release(uint64_t protocol_version,
+        destination_zone destination_zone_id,
+        object object_id,
+        caller_zone caller_zone_id,
+        uint64_t& reference_count)
     {
         RPC_ERROR("release zone: {}", get_zone_id().get_val());
 

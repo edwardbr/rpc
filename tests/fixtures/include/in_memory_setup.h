@@ -28,7 +28,7 @@ template<bool UseHostInChild> class in_memory_setup
 
 #ifdef BUILD_COROUTINE
     std::shared_ptr<coro::io_scheduler> io_scheduler_;
-#endif    
+#endif
     bool error_has_occured_ = false;
 
 public:
@@ -43,7 +43,7 @@ public:
 
 #ifdef BUILD_COROUTINE
     std::shared_ptr<coro::io_scheduler> get_scheduler() const { return io_scheduler_; }
-#endif    
+#endif
     bool error_has_occured() const { return error_has_occured_; }
 
     CORO_TASK(void) check_for_error(CORO_TASK(bool) task)
@@ -58,22 +58,22 @@ public:
 
     virtual void set_up()
     {
-#ifdef BUILD_COROUTINE        
+#ifdef BUILD_COROUTINE
         io_scheduler_ = coro::io_scheduler::make_shared(
             coro::io_scheduler::options{.thread_strategy = coro::io_scheduler::thread_strategy_t::manual,
                 .pool = coro::thread_pool::options{
                     .thread_count = 1,
                 }});
-#endif                
+#endif
         zone_gen = &zone_gen_;
 #ifdef USE_RPC_TELEMETRY
         auto test_info = ::testing::UnitTest::GetInstance()->current_test_info();
-        if (auto telemetry_service = std::static_pointer_cast<rpc::multiplexing_telemetry_service>(rpc::get_telemetry_service()))
+        if (auto telemetry_service
+            = std::static_pointer_cast<rpc::multiplexing_telemetry_service>(rpc::get_telemetry_service()))
         {
             telemetry_service->start_test(test_info->test_suite_name(), test_info->name());
         }
 #endif
-
 
         i_host_ptr_ = rpc::shared_ptr<yyy::i_host>(new host());
         local_host_ptr_ = i_host_ptr_;
@@ -87,7 +87,8 @@ public:
         i_example_ptr_ = nullptr;
         zone_gen = nullptr;
 #ifdef USE_RPC_TELEMETRY
-        if (auto telemetry_service = std::static_pointer_cast<rpc::multiplexing_telemetry_service>(rpc::get_telemetry_service()))
+        if (auto telemetry_service
+            = std::static_pointer_cast<rpc::multiplexing_telemetry_service>(rpc::get_telemetry_service()))
         {
             telemetry_service->reset_for_test();
         }

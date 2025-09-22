@@ -66,10 +66,8 @@ namespace fingerprint
         return nullptr;
     };
 
-    std::string extract_subsituted_templates(const std::string& source,
-        const class_entity& cls,
-        std::vector<const class_entity*> entity_stack,
-        uint64_t rpc_version)
+    std::string extract_subsituted_templates(
+        const std::string& source, const class_entity& cls, std::vector<const class_entity*> entity_stack, uint64_t rpc_version)
     {
         std::stringstream sstr;
         std::stringstream temp;
@@ -156,10 +154,8 @@ namespace fingerprint
         return output;
     }
 
-    uint64_t generate(const class_entity& cls,
-        std::vector<const class_entity*> entity_stack,
-        writer* comment,
-        uint64_t rpc_version)
+    uint64_t generate(
+        const class_entity& cls, std::vector<const class_entity*> entity_stack, writer* comment, uint64_t rpc_version)
     {
         for (const auto* tmp : entity_stack)
         {
@@ -284,7 +280,8 @@ namespace fingerprint
                     auto template_params = get_template_param(param_type);
                     if (!template_params.empty())
                     {
-                        auto substituted_template_param = extract_subsituted_templates(template_params, cls, entity_stack, rpc_version);
+                        auto substituted_template_param
+                            = extract_subsituted_templates(template_params, cls, entity_stack, rpc_version);
                         seed += substitute_template_params(param_type, substituted_template_param);
                     }
                     else
@@ -367,7 +364,8 @@ namespace fingerprint
                     auto template_params = get_template_param(param_type);
                     if (!template_params.empty())
                     {
-                        auto substituted_template_param = extract_subsituted_templates(template_params, cls, entity_stack, rpc_version);
+                        auto substituted_template_param
+                            = extract_subsituted_templates(template_params, cls, entity_stack, rpc_version);
                         seed += substitute_template_params(param_type, substituted_template_param);
                     }
                     else
@@ -375,7 +373,7 @@ namespace fingerprint
                         const class_entity* type_info = find_type(param_type, cls);
                         if (type_info && type_info != &cls)
                         {
-                        uint64_t type_id = generate(*type_info, entity_stack, nullptr, rpc_version);
+                            uint64_t type_id = generate(*type_info, entity_stack, nullptr, rpc_version);
                             seed += std::to_string(type_id);
                         }
                         else

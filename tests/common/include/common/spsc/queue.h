@@ -22,7 +22,7 @@ namespace spsc
         {
             std::size_t head = head_.load(std::memory_order_relaxed);
             std::size_t next_head = next(head);
-            if(next_head == tail_.load(std::memory_order_acquire))
+            if (next_head == tail_.load(std::memory_order_acquire))
                 return false;
             ring_[head] = value;
             head_.store(next_head, std::memory_order_release);
@@ -32,7 +32,7 @@ namespace spsc
         bool pop(T& value) noexcept
         {
             std::size_t tail = tail_.load(std::memory_order_relaxed);
-            if(tail == head_.load(std::memory_order_acquire))
+            if (tail == head_.load(std::memory_order_acquire))
                 return false;
             // make sure we don't keep a copy of the objects in the ring, which may take up memory
             // (for instance if the objects have big buffers), and more importantly may contain

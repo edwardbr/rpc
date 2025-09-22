@@ -108,9 +108,9 @@ namespace rpc::spsc
                 .payload_size = payload.size()};
 
             RPC_DEBUG("send_payload {}\nprefix = {}\npayload = {}",
-                     service_->get_zone_id().get_val(),
-                     rpc::to_yas_json<std::string>(prefix),
-                     rpc::to_yas_json<std::string>(payload_envelope));
+                service_->get_zone_id().get_val(),
+                rpc::to_yas_json<std::string>(prefix),
+                rpc::to_yas_json<std::string>(payload_envelope));
 
             send_queue_.push(rpc::to_yas_binary(prefix));
             send_queue_.push(payload);
@@ -132,8 +132,10 @@ namespace rpc::spsc
             // we register the receive listener before we do the send
             result_listener res_payload;
             {
-                RPC_DEBUG("call_peer started zone: {} sequence_number: {} id: {}", 
-                         service_->get_zone_id().get_val(), sequence_number, rpc::id<SendPayload>::get(rpc::get_version()));
+                RPC_DEBUG("call_peer started zone: {} sequence_number: {} id: {}",
+                    service_->get_zone_id().get_val(),
+                    sequence_number,
+                    rpc::id<SendPayload>::get(rpc::get_version()));
                 std::scoped_lock lock(pending_transmits_mtx_);
                 auto [it, success] = pending_transmits_.try_emplace(sequence_number, &res_payload);
                 assert(success);
@@ -145,16 +147,20 @@ namespace rpc::spsc
             {
                 RPC_ERROR("failed call_peer send_payload send");
                 std::scoped_lock lock(pending_transmits_mtx_);
-                RPC_ERROR("call_peer failed zone: {} sequence_number: {} id: {}", 
-                         service_->get_zone_id().get_val(), sequence_number, rpc::id<SendPayload>::get(rpc::get_version()));
+                RPC_ERROR("call_peer failed zone: {} sequence_number: {} id: {}",
+                    service_->get_zone_id().get_val(),
+                    sequence_number,
+                    rpc::id<SendPayload>::get(rpc::get_version()));
                 pending_transmits_.erase(sequence_number);
                 CO_RETURN err;
             }
 
             co_await res_payload.event; // now wait for the reply
 
-            RPC_DEBUG("call_peer succeeded zone: {} sequence_number: {} id: {}", 
-                     service_->get_zone_id().get_val(), sequence_number, rpc::id<SendPayload>::get(rpc::get_version()));
+            RPC_DEBUG("call_peer succeeded zone: {} sequence_number: {} id: {}",
+                service_->get_zone_id().get_val(),
+                sequence_number,
+                rpc::id<SendPayload>::get(rpc::get_version()));
 
             assert(res_payload.payload.payload_fingerprint == rpc::id<ReceivePayload>::get(res_payload.prefix.version));
 

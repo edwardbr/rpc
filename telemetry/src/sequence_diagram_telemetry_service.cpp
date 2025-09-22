@@ -79,8 +79,11 @@ namespace rpc
             services.end(),
             [this](std::pair<rpc::zone, name_count> const& it)
             {
-                fmt::println(
-                    output_, "error service zone_id {} service {} count {}", it.first.get_val(), it.second.name, it.second.count);
+                fmt::println(output_,
+                    "error service zone_id {} service {} count {}",
+                    it.first.get_val(),
+                    it.second.name,
+                    it.second.count);
             });
         std::for_each(impls.begin(),
             impls.end(),
@@ -207,7 +210,8 @@ namespace rpc
         return service_order(zone_id) + destination_zone_id.get_val() * 10000;
     }
 
-    void sequence_diagram_telemetry_service::on_service_creation(const char* name, rpc::zone zone_id, rpc::destination_zone parent_zone_id) const
+    void sequence_diagram_telemetry_service::on_service_creation(
+        const char* name, rpc::zone zone_id, rpc::destination_zone parent_zone_id) const
     {
         std::lock_guard g(mux);
         auto entry = services.find(zone_id);
@@ -224,7 +228,7 @@ namespace rpc
         }
         fflush(output_);
     }
-    
+
     void sequence_diagram_telemetry_service::on_service_deletion(rpc::zone zone_id) const
     {
         std::lock_guard g(mux);

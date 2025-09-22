@@ -101,12 +101,19 @@ namespace rpc
         [[nodiscard]] CORO_TASK(int) sp_try_cast(
             destination_zone destination_zone_id, object object_id, std::function<interface_ordinal(uint64_t)> id_getter);
 
-        [[nodiscard]] CORO_TASK(int) sp_add_ref(
-            object object_id, caller_channel_zone caller_channel_zone_id, add_ref_options build_out_param_channel, known_direction_zone known_direction_zone_id, uint64_t& ref_count);
+        [[nodiscard]] CORO_TASK(int) sp_add_ref(object object_id,
+            caller_channel_zone caller_channel_zone_id,
+            add_ref_options build_out_param_channel,
+            known_direction_zone known_direction_zone_id,
+            uint64_t& ref_count);
 
         CORO_TASK(int) sp_release(object object_id, uint64_t& ref_count);
 
-        CORO_TASK(void) cleanup_after_object(std::shared_ptr<rpc::service> svc, std::shared_ptr<rpc::service_proxy> self, object object_id, int inherited_reference_count);
+        CORO_TASK(void)
+        cleanup_after_object(std::shared_ptr<rpc::service> svc,
+            std::shared_ptr<rpc::service_proxy> self,
+            object object_id,
+            int inherited_reference_count);
 
         void on_object_proxy_released(object object_id, int inherited_reference_count);
 
@@ -120,7 +127,8 @@ namespace rpc
         }
 
         virtual std::shared_ptr<rpc::service_proxy> clone() = 0;
-        std::shared_ptr<rpc::service_proxy> clone_for_zone(destination_zone destination_zone_id, caller_zone caller_zone_id);
+        std::shared_ptr<rpc::service_proxy> clone_for_zone(
+            destination_zone destination_zone_id, caller_zone caller_zone_id);
 
         // the zone where this proxy is created
         zone get_zone_id() const { return zone_id_; }
@@ -140,8 +148,11 @@ namespace rpc
             RELEASE_IF_NOT_NEW,
         };
 
-        CORO_TASK(std::shared_ptr<rpc::object_proxy>) get_or_create_object_proxy(
-            object object_id, object_proxy_creation_rule rule, bool new_proxy_added, known_direction_zone known_direction_zone_id);
+        CORO_TASK(std::shared_ptr<rpc::object_proxy>)
+        get_or_create_object_proxy(object object_id,
+            object_proxy_creation_rule rule,
+            bool new_proxy_added,
+            known_direction_zone known_direction_zone_id);
 
         friend service;
         friend child_service;

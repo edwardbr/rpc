@@ -15,7 +15,7 @@
 #define RPC_ASSERT(x)                                                                                                  \
     if (!(x))                                                                                                          \
     {                                                                                                                  \
-        rpc::thread_local_dump_on_assert("RPC_ASSERT failed: " #x, __FILE__, __LINE__);                              \
+        rpc::thread_local_dump_on_assert("RPC_ASSERT failed: " #x, __FILE__, __LINE__);                                \
         std::abort();                                                                                                  \
     }
 #elif defined(RPC_HANG_ON_FAILED_ASSERT)

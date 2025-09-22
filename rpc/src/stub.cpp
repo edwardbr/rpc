@@ -13,14 +13,14 @@ namespace rpc
 #ifdef USE_RPC_TELEMETRY
         if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
             telemetry_service->on_stub_creation(zone_.get_zone_id(), id_, (uint64_t)target);
-#endif            
+#endif
     }
     object_stub::~object_stub()
     {
 #ifdef USE_RPC_TELEMETRY
         if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
             telemetry_service->on_stub_deletion(zone_.get_zone_id(), id_);
-#endif            
+#endif
     }
 
     rpc::shared_ptr<rpc::casting_interface> object_stub::get_castable_interface() const
@@ -31,8 +31,8 @@ namespace rpc
         return iface->get_castable_interface();
     }
 
-    //this method is not thread safe as it is only used when the object is constructed by service
-    //or by an internal call by this class
+    // this method is not thread safe as it is only used when the object is constructed by service
+    // or by an internal call by this class
     void object_stub::add_interface(const std::shared_ptr<rpc::i_interface_stub>& iface)
     {
         stub_map[iface->get_interface_id(rpc::VERSION_2)] = iface;
@@ -42,21 +42,21 @@ namespace rpc
     {
         std::lock_guard g(map_control);
         auto res = stub_map.find(interface_id);
-        if(res == stub_map.end())
+        if (res == stub_map.end())
             return nullptr;
         return res->second;
     }
 
-    CORO_TASK(int) object_stub::call(
-        uint64_t protocol_version
-        , rpc::encoding enc
-        , caller_channel_zone caller_channel_zone_id
-        , caller_zone caller_zone_id
-        , interface_ordinal interface_id
-        , method method_id
-        , size_t in_size_
-        , const char* in_buf_
-        , std::vector<char>& out_buf_)
+    CORO_TASK(int)
+    object_stub::call(uint64_t protocol_version,
+        rpc::encoding enc,
+        caller_channel_zone caller_channel_zone_id,
+        caller_zone caller_zone_id,
+        interface_ordinal interface_id,
+        method method_id,
+        size_t in_size_,
+        const char* in_buf_,
+        std::vector<char>& out_buf_)
     {
         std::shared_ptr<rpc::i_interface_stub> stub;
         {
@@ -67,10 +67,11 @@ namespace rpc
                 stub = item->second;
             }
         }
-        if(stub)
+        if (stub)
         {
-            CO_RETURN CO_AWAIT stub->call(protocol_version, enc, caller_channel_zone_id, caller_zone_id, method_id, in_size_, in_buf_, out_buf_);
-        }        
+            CO_RETURN CO_AWAIT stub->call(
+                protocol_version, enc, caller_channel_zone_id, caller_zone_id, method_id, in_size_, in_buf_, out_buf_);
+        }
         RPC_ERROR("Invalid interface ID in stub call");
         CO_RETURN rpc::error::INVALID_INTERFACE_ID();
     }
@@ -99,7 +100,7 @@ namespace rpc
 #ifdef USE_RPC_TELEMETRY
         if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
             telemetry_service->on_stub_add_ref(zone_.get_zone_id(), id_, {}, ret, {});
-#endif            
+#endif
         RPC_ASSERT(ret != std::numeric_limits<uint64_t>::max());
         RPC_ASSERT(ret != 0);
         return ret;
@@ -111,7 +112,7 @@ namespace rpc
 #ifdef USE_RPC_TELEMETRY
         if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
             telemetry_service->on_stub_release(zone_.get_zone_id(), id_, {}, count, {});
-#endif            
+#endif
         RPC_ASSERT(count != std::numeric_limits<uint64_t>::max());
         return count;
     }

@@ -271,7 +271,7 @@ namespace rpc
                     opposite_direction_proxy->add_external_ref();
                 }
                 else if (auto found = other_zones.lower_bound({caller_channel_zone_id.as_destination(), {0}});
-                    found != other_zones.end())
+                         found != other_zones.end())
                 {
                     auto temp = found->second.lock();
                     while (!temp)
@@ -362,8 +362,8 @@ namespace rpc
     }
 
     CORO_TASK(void)
-    service::clean_up_on_failed_connection(
-        const std::shared_ptr<rpc::service_proxy>& destination_zone, rpc::shared_ptr<rpc::casting_interface> input_interface)
+    service::clean_up_on_failed_connection(const std::shared_ptr<rpc::service_proxy>& destination_zone,
+        rpc::shared_ptr<rpc::casting_interface> input_interface)
     {
         if (destination_zone && input_interface)
         {
@@ -393,11 +393,12 @@ namespace rpc
         RPC_ASSERT(caller_zone_id.is_set());
         RPC_ASSERT(destination_zone_id.is_set());
 
-        uint64_t object_channel = caller_channel_zone_id.is_set() ? caller_channel_zone_id.get_val() : caller_zone_id.get_val();
+        uint64_t object_channel
+            = caller_channel_zone_id.is_set() ? caller_channel_zone_id.get_val() : caller_zone_id.get_val();
         RPC_ASSERT(object_channel);
 
-        uint64_t destination_channel
-            = destination_channel_zone_id.is_set() ? destination_channel_zone_id.get_val() : destination_zone_id.get_val();
+        uint64_t destination_channel = destination_channel_zone_id.is_set() ? destination_channel_zone_id.get_val()
+                                                                            : destination_zone_id.get_val();
         RPC_ASSERT(destination_channel);
 
         destination_zone = object_service_proxy;
@@ -464,11 +465,12 @@ namespace rpc
         RPC_ASSERT(caller_zone_id.is_set());
         RPC_ASSERT(destination_zone_id.is_set());
 
-        uint64_t object_channel = caller_channel_zone_id.is_set() ? caller_channel_zone_id.get_val() : caller_zone_id.get_val();
+        uint64_t object_channel
+            = caller_channel_zone_id.is_set() ? caller_channel_zone_id.get_val() : caller_zone_id.get_val();
         RPC_ASSERT(object_channel);
 
-        uint64_t destination_channel
-            = destination_channel_zone_id.is_set() ? destination_channel_zone_id.get_val() : destination_zone_id.get_val();
+        uint64_t destination_channel = destination_channel_zone_id.is_set() ? destination_channel_zone_id.get_val()
+                                                                            : destination_zone_id.get_val();
         RPC_ASSERT(destination_channel);
 
         if (object_channel == destination_channel)
@@ -550,7 +552,7 @@ namespace rpc
                                 std::to_string(caller_zone_id.as_destination()),
                                 std::to_string(0));
                             RPC_ASSERT(alternative_caller_service_proxy);
-                            CO_RETURN {};
+                            CO_RETURN{};
                         }
 
                         // now make a copy of the original as we need it back
@@ -579,7 +581,7 @@ namespace rpc
                 {
                     // caller service_proxy was destroyed - this is a race condition
                     RPC_ERROR("caller service_proxy was destroyed during lookup");
-                    CO_RETURN {}; // Return empty interface descriptor to indicate failure
+                    CO_RETURN{}; // Return empty interface descriptor to indicate failure
                 }
             }
 
@@ -587,7 +589,7 @@ namespace rpc
             if (!caller)
             {
                 RPC_ERROR("Failed to obtain valid caller service_proxy");
-                CO_RETURN {};
+                CO_RETURN{};
             }
 
             // Call add_external_ref() outside the mutex to prevent race with service_proxy destruction
@@ -623,7 +625,7 @@ namespace rpc
             else
             {
                 RPC_ERROR("destination_zone service_proxy was destroyed during operation");
-                CO_RETURN {};
+                CO_RETURN{};
             }
             std::ignore = refcount;
 
@@ -715,7 +717,8 @@ namespace rpc
             if (outcall)
             {
                 std::lock_guard g(zone_control);
-                uint64_t object_channel = caller_channel_zone_id.is_set() ? caller_channel_zone_id.get_val() : caller_zone_id.get_val();
+                uint64_t object_channel
+                    = caller_channel_zone_id.is_set() ? caller_channel_zone_id.get_val() : caller_zone_id.get_val();
                 RPC_ASSERT(object_channel);
                 // and the caller with destination info
                 auto found = other_zones.find(
@@ -856,7 +859,8 @@ namespace rpc
         auto dest_channel = destination_zone_id.get_val();
         if (destination_channel_zone_id != zone_id_.as_destination_channel() && destination_channel_zone_id.get_val() != 0)
             dest_channel = destination_channel_zone_id.get_val();
-        auto caller_channel = caller_channel_zone_id.is_set() ? caller_channel_zone_id.get_val() : caller_zone_id.get_val();
+        auto caller_channel
+            = caller_channel_zone_id.is_set() ? caller_channel_zone_id.get_val() : caller_zone_id.get_val();
 
         if (destination_zone_id != zone_id_.as_destination())
         {
@@ -1174,7 +1178,7 @@ namespace rpc
                             tmp = found->second.lock();
                         }
                         else if (auto found = other_zones.lower_bound({known_direction_zone_id.as_destination(), {0}});
-                            found != other_zones.end())
+                                 found != other_zones.end())
                         {
                             // note that this is to support the Y shaped topology problem that the send function has the
                             // other half of this solution the known_direction_zone_id is a hint explaining where the

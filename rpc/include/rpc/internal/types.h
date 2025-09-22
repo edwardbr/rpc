@@ -10,7 +10,7 @@
 #include "rpc/internal/coroutine_support.h"
 #include <rpc/internal/serialiser.h>
 
-//this class is to ensure type safty of parameters as it gets difficult guaranteeing parameter order
+// this class is to ensure type safty of parameters as it gets difficult guaranteeing parameter order
 namespace rpc
 {
     struct zone;
@@ -69,10 +69,7 @@ namespace rpc
         inline caller_zone as_caller() const;
         inline caller_channel_zone as_caller_channel() const;
 
-        template<typename Ar> void serialize(Ar& ar)
-        {
-            ar& YAS_OBJECT_NVP("id", ("id", id));
-        }
+        template<typename Ar> void serialize(Ar& ar) { ar& YAS_OBJECT_NVP("id", ("id", id)); }
     };
 
     struct destination_zone
@@ -122,10 +119,7 @@ namespace rpc
         inline caller_zone as_caller() const;
         inline caller_channel_zone as_caller_channel() const;
 
-        template<typename Ar> void serialize(Ar& ar)
-        {
-            ar& YAS_OBJECT_NVP("id", ("id", id));
-        }
+        template<typename Ar> void serialize(Ar& ar) { ar& YAS_OBJECT_NVP("id", ("id", id)); }
     };
 
     // the zone that a service proxy was cloned from
@@ -174,10 +168,7 @@ namespace rpc
         inline destination_zone as_destination() const;
         inline caller_channel_zone as_caller_channel() const;
 
-        template<typename Ar> void serialize(Ar& ar)
-        {
-            ar& YAS_OBJECT_NVP("id", ("id", id));
-        }
+        template<typename Ar> void serialize(Ar& ar) { ar& YAS_OBJECT_NVP("id", ("id", id)); }
     };
 
     // the zone that initiated the call
@@ -229,10 +220,7 @@ namespace rpc
         inline destination_channel_zone as_destination_channel() const;
         inline known_direction_zone as_known_direction_zone() const;
 
-        template<typename Ar> void serialize(Ar& ar)
-        {
-            ar& YAS_OBJECT_NVP("id", ("id", id));
-        }
+        template<typename Ar> void serialize(Ar& ar) { ar& YAS_OBJECT_NVP("id", ("id", id)); }
     };
 
     // the zone that initiated the call
@@ -282,10 +270,7 @@ namespace rpc
         inline destination_zone as_destination() const;
         inline destination_channel_zone as_destination_channel() const;
 
-        template<typename Ar> void serialize(Ar& ar)
-        {
-            ar& YAS_OBJECT_NVP("id", ("id", id));
-        }
+        template<typename Ar> void serialize(Ar& ar) { ar& YAS_OBJECT_NVP("id", ("id", id)); }
     };
 
     struct known_direction_zone
@@ -338,10 +323,7 @@ namespace rpc
         inline destination_zone as_destination() const;
         // inline destination_channel_zone as_destination_channel() const;
 
-        template<typename Ar> void serialize(Ar& ar)
-        {
-            ar& YAS_OBJECT_NVP("id", ("id", id));
-        }
+        template<typename Ar> void serialize(Ar& ar) { ar& YAS_OBJECT_NVP("id", ("id", id)); }
     };
 
     // an id for objects unique to each zone
@@ -388,10 +370,7 @@ namespace rpc
 
         constexpr bool is_set() const noexcept { return id != 0; }
 
-        template<typename Ar> void serialize(Ar& ar)
-        {
-            ar& YAS_OBJECT_NVP("id", ("id", id));
-        }
+        template<typename Ar> void serialize(Ar& ar) { ar& YAS_OBJECT_NVP("id", ("id", id)); }
     };
 
     // an id for interfaces
@@ -438,10 +417,7 @@ namespace rpc
 
         constexpr bool is_set() const noexcept { return id != 0; }
 
-        template<typename Ar> void serialize(Ar& ar)
-        {
-            ar& YAS_OBJECT_NVP("id", ("id", id));
-        }
+        template<typename Ar> void serialize(Ar& ar) { ar& YAS_OBJECT_NVP("id", ("id", id)); }
     };
 
     // an id for method ordinals
@@ -488,10 +464,7 @@ namespace rpc
 
         constexpr bool is_set() const noexcept { return id != 0; }
 
-        template<typename Ar> void serialize(Ar& ar)
-        {
-            ar& YAS_OBJECT_NVP("id", ("id", id));
-        }
+        template<typename Ar> void serialize(Ar& ar) { ar& YAS_OBJECT_NVP("id", ("id", id)); }
     };
 
     struct function_info
@@ -562,7 +535,7 @@ namespace rpc
     {
         return destination_channel_zone(id);
     }
-    
+
     known_direction_zone caller_zone::as_known_direction_zone() const
     {
         return known_direction_zone(id);
@@ -575,11 +548,11 @@ namespace rpc
     destination_channel_zone caller_channel_zone::as_destination_channel() const
     {
         return destination_channel_zone(id);
-    }    
-    
+    }
+
     destination_zone known_direction_zone::as_destination() const
     {
-        return destination_zone(id);        
+        return destination_zone(id);
     }
 }
 
@@ -635,7 +608,10 @@ namespace std
 
     template<> struct hash<rpc::destination_channel_zone>
     {
-        auto operator()(const rpc::destination_channel_zone& item) const noexcept { return (std::size_t)item.get_val(); }
+        auto operator()(const rpc::destination_channel_zone& item) const noexcept
+        {
+            return (std::size_t)item.get_val();
+        }
     };
 
     template<> struct hash<rpc::caller_zone>

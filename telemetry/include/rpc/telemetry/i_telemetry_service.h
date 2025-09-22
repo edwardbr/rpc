@@ -43,7 +43,8 @@ namespace rpc
         };
         virtual ~i_telemetry_service() = default;
 
-        virtual void on_service_creation(const char* name, rpc::zone zone_id, rpc::destination_zone parent_zone_id) const = 0;
+        virtual void on_service_creation(const char* name, rpc::zone zone_id, rpc::destination_zone parent_zone_id) const
+            = 0;
         virtual void on_service_deletion(zone zone_id) const = 0;
         virtual void on_service_try_cast(zone zone_id,
             destination_zone destination_zone_id,
@@ -161,7 +162,8 @@ namespace rpc
 
 #if defined(USE_THREAD_LOCAL_LOGGING) && !defined(_IN_ENCLAVE)
     // Helper function to log telemetry messages to circular buffers
-    inline void telemetry_to_thread_local_buffer(i_telemetry_service::level_enum level, const std::string& message) {
+    inline void telemetry_to_thread_local_buffer(i_telemetry_service::level_enum level, const std::string& message)
+    {
         // Map telemetry levels to RPC logging levels
         int rpc_level = static_cast<int>(level);
         rpc::thread_local_log(rpc_level, "[TELEMETRY] " + message, __FILE__, __LINE__, __FUNCTION__);
@@ -172,7 +174,8 @@ namespace rpc
     extern std::shared_ptr<i_telemetry_service> telemetry_service_;
 
     // Simple function to get the global telemetry service
-    inline std::shared_ptr<i_telemetry_service> get_telemetry_service() {
+    inline std::shared_ptr<i_telemetry_service> get_telemetry_service()
+    {
         return telemetry_service_;
     }
 

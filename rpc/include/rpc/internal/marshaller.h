@@ -79,8 +79,10 @@ namespace rpc
             add_ref_options build_out_param_channel,
             uint64_t& reference_count)
             = 0;
-        virtual CORO_TASK(int) release(
-            uint64_t protocol_version, destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id,
+        virtual CORO_TASK(int) release(uint64_t protocol_version,
+            destination_zone destination_zone_id,
+            object object_id,
+            caller_zone caller_zone_id,
             uint64_t& reference_count)
             = 0;
     };

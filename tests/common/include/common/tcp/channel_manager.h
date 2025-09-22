@@ -108,9 +108,9 @@ namespace rpc::tcp
             }
 
             RPC_DEBUG("receive_payload complete {}\nprefix = {}\npayload = {}",
-                     service_->get_zone_id().get_val(),
-                     rpc::to_yas_json<std::string>(prefix),
-                     rpc::to_yas_json<std::string>(payload));
+                service_->get_zone_id().get_val(),
+                rpc::to_yas_json<std::string>(prefix),
+                rpc::to_yas_json<std::string>(payload));
 
             co_return rpc::error::OK();
         }
@@ -134,9 +134,9 @@ namespace rpc::tcp
                 .payload_size = payload.size()};
 
             RPC_DEBUG("send_payload {}\nprefix = {}\npayload = {}",
-                     service_->get_zone_id().get_val(),
-                     rpc::to_yas_json<std::string>(prefix),
-                     rpc::to_yas_json<std::string>(payload_envelope));
+                service_->get_zone_id().get_val(),
+                rpc::to_yas_json<std::string>(prefix),
+                rpc::to_yas_json<std::string>(payload_envelope));
 
             send_queue_.push(rpc::to_yas_binary(prefix));
             send_queue_.push(payload);
@@ -162,9 +162,9 @@ namespace rpc::tcp
                 .payload_size = payload.size()};
 
             RPC_DEBUG("immediate_send_payload {}\nprefix = {}\npayload = {}",
-                     service_->get_zone_id().get_val(),
-                     rpc::to_yas_json<std::string>(prefix),
-                     rpc::to_yas_json<std::string>(payload));
+                service_->get_zone_id().get_val(),
+                rpc::to_yas_json<std::string>(prefix),
+                rpc::to_yas_json<std::string>(payload));
 
             std::vector<uint8_t> buf = rpc::to_yas_binary(prefix);
             auto marshal_status = client_.send(std::span{(const char*)buf.data(), buf.size()});
@@ -191,8 +191,8 @@ namespace rpc::tcp
                 if (status != coro::poll_status::event)
                 {
                     RPC_ERROR("client_.poll failed {} fd = {}",
-                             service_->get_zone_id().get_val(),
-                             client_.socket().native_handle());
+                        service_->get_zone_id().get_val(),
+                        client_.socket().native_handle());
 
                     CO_RETURN rpc::error::TRANSPORT_ERROR();
                 }
@@ -201,9 +201,8 @@ namespace rpc::tcp
             }
             if (marshal_status.first != coro::net::send_status::ok)
             {
-                RPC_ERROR("client_.send failed {} fd = {}",
-                         service_->get_zone_id().get_val(),
-                         client_.socket().native_handle());
+                RPC_ERROR(
+                    "client_.send failed {} fd = {}", service_->get_zone_id().get_val(), client_.socket().native_handle());
 
                 CO_RETURN rpc::error::TRANSPORT_ERROR();
             }

@@ -90,15 +90,22 @@ namespace
 
             // Basic test control flags
             args::HelpFlag help(parser, "help", "Display this help menu", {'h', "help"});
-            args::Flag enable_multithreaded_flag(parser, "multithreaded", "Enable multithreaded tests", {'m', "enable-multithreaded"});
+            args::Flag enable_multithreaded_flag(
+                parser, "multithreaded", "Enable multithreaded tests", {'m', "enable-multithreaded"});
 
             // Telemetry service flags
-            args::Flag enable_console_telemetry(parser, "console", "Add console telemetry service", {"telemetry-console", "console"});
-            args::ValueFlag<std::string> console_path(parser, "console-path", "Console telemetry output path", {"console-path"}, "../../rpc_test_diagram/");
-            args::Flag enable_sequence_diagram_telemetry(parser, "sequence", "Add sequence diagram telemetry service", {"telemetry-sequence"});
-            args::ValueFlag<std::string> sequence_path(parser, "sequence-path", "Sequence diagram output path", {"sequence-path"}, "../../rpc_test_diagram/");
-            args::Flag enable_animation_telemetry(parser, "animation", "Add animation telemetry service", {"animation-sequence"});
-            args::ValueFlag<std::string> animation_path(parser, "animation-path", "Animation diagram output path", {"animation-path"}, "../../rpc_test_diagram/");
+            args::Flag enable_console_telemetry(
+                parser, "console", "Add console telemetry service", {"telemetry-console", "console"});
+            args::ValueFlag<std::string> console_path(
+                parser, "console-path", "Console telemetry output path", {"console-path"}, "../../rpc_test_diagram/");
+            args::Flag enable_sequence_diagram_telemetry(
+                parser, "sequence", "Add sequence diagram telemetry service", {"telemetry-sequence"});
+            args::ValueFlag<std::string> sequence_path(
+                parser, "sequence-path", "Sequence diagram output path", {"sequence-path"}, "../../rpc_test_diagram/");
+            args::Flag enable_animation_telemetry(
+                parser, "animation", "Add animation telemetry service", {"animation-sequence"});
+            args::ValueFlag<std::string> animation_path(
+                parser, "animation-path", "Animation diagram output path", {"animation-path"}, "../../rpc_test_diagram/");
 
             try
             {
@@ -127,7 +134,8 @@ namespace
 
 #ifdef USE_RPC_TELEMETRY
             // Ensure we have a multiplexing telemetry service when any telemetry flags are provided
-            if ((args::get(enable_console_telemetry) || args::get(enable_sequence_diagram_telemetry) || args::get(enable_animation_telemetry)))
+            if ((args::get(enable_console_telemetry) || args::get(enable_sequence_diagram_telemetry)
+                    || args::get(enable_animation_telemetry)))
             {
                 // Create empty multiplexing service
                 std::vector<std::shared_ptr<rpc::i_telemetry_service>> empty_services;
@@ -140,7 +148,8 @@ namespace
             // Assume telemetry_service_ is always a multiplexing service and register configurations
             if (rpc::get_telemetry_service())
             {
-                auto multiplexing_service = std::static_pointer_cast<rpc::multiplexing_telemetry_service>(rpc::get_telemetry_service());
+                auto multiplexing_service
+                    = std::static_pointer_cast<rpc::multiplexing_telemetry_service>(rpc::get_telemetry_service());
 
                 if (args::get(enable_console_telemetry))
                 {
@@ -2126,7 +2135,8 @@ template<class T> CORO_TASK(bool) coro_test_y_topology_and_set_host_with_prong_o
 }
 
 CORO_TASK(error_code)
-do_something_in_val(int val, const std::shared_ptr<rpc::object_proxy>& __rpc_op, uint64_t protocol_version, rpc::encoding enc)
+do_something_in_val(
+    int val, const std::shared_ptr<rpc::object_proxy>& __rpc_op, uint64_t protocol_version, rpc::encoding enc)
 {
     auto __rpc_sp = __rpc_op->get_service_proxy();
     auto __rpc_version = __rpc_sp->get_remote_rpc_version();
@@ -2145,11 +2155,11 @@ do_something_in_val(int val, const std::shared_ptr<rpc::object_proxy>& __rpc_op,
     std::vector<char> __rpc_out_buf(RPC_OUT_BUFFER_SIZE); // max size using short string optimisation
     auto __rpc_ret = rpc::error::OK();
     // PROXY_PREPARE_IN
-    
+
     if (protocol_version < __rpc_min_version)
     {
         CO_RETURN rpc::error::INVALID_VERSION();
-    }    
+    }
 
     while (protocol_version >= __rpc_min_version)
     {
@@ -2260,8 +2270,7 @@ TYPED_TEST(remote_type_test, test_explicit_format_fallback_with_invalid_encoding
 }
 
 // Test that explicitly forces version fallback using the direct proxy approach
-template<class T>
-CORO_TASK(bool) coro_test_explicit_version_fallback_using_direct_proxy(T& lib)
+template<class T> CORO_TASK(bool) coro_test_explicit_version_fallback_using_direct_proxy(T& lib)
 {
     // Get a proxy to test version negotiation
     rpc::shared_ptr<xxx::i_foo> foo_proxy;
@@ -2283,7 +2292,7 @@ CORO_TASK(bool) coro_test_explicit_version_fallback_using_direct_proxy(T& lib)
 
     // After the call, the service proxy version should have been updated to a supported version
     auto negotiated_version = service_proxy->get_remote_rpc_version();
-    EXPECT_EQ(negotiated_version, rpc::VERSION_3);    
+    EXPECT_EQ(negotiated_version, rpc::VERSION_3);
 
     // Test 2: Force an unsupported low version (1) to trigger version fallback
     error = CO_AWAIT do_something_in_val(test_value + 1, __rpc_op, 1, rpc::encoding::yas_json);
@@ -2354,9 +2363,7 @@ CORO_TASK(bool) coro_test_explicit_version_fallback_using_direct_proxy(T& lib)
 
 TYPED_TEST(remote_type_test, test_explicit_version_fallback_using_direct_proxy)
 {
-    run_coro_test(*this, [](auto& lib) {
-        return coro_test_explicit_version_fallback_using_direct_proxy<TypeParam>(lib);
-    });
+    run_coro_test(*this, [](auto& lib) { return coro_test_explicit_version_fallback_using_direct_proxy<TypeParam>(lib); });
 }
 
 static_assert(rpc::id<std::string>::get(rpc::VERSION_2) == rpc::STD_STRING_ID);

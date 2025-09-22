@@ -276,8 +276,11 @@ namespace rpc::spsc
     }
 
     CORO_TASK(int)
-    service_proxy::release(
-        uint64_t protocol_version, destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id, uint64_t& reference_count)
+    service_proxy::release(uint64_t protocol_version,
+        destination_zone destination_zone_id,
+        object object_id,
+        caller_zone caller_zone_id,
+        uint64_t& reference_count)
     {
         RPC_DEBUG("release zone: {}", get_zone_id().get_val());
 

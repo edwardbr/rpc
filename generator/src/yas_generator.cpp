@@ -594,17 +594,18 @@ namespace yas_generator
             proxy("#ifdef USE_RPC_LOGGING");
             proxy("catch(std::exception& ex)");
             proxy("{{");
-            proxy("RPC_ERROR(\"A proxy deserialisation error has occurred in an {} implementation in function {} {{}}\", ex.what());",
-                  interface_name,
-                  function->get_name());
+            proxy("RPC_ERROR(\"A proxy deserialisation error has occurred in an {} implementation in function {} "
+                  "{{}}\", ex.what());",
+                interface_name,
+                function->get_name());
             proxy("return rpc::error::PROXY_DESERIALISATION_ERROR();");
             proxy("}}");
             proxy("#endif");
             proxy("catch(...)");
             proxy("{{");
             proxy("RPC_ERROR(\"Exception has occurred in an {} implementation in function {}\");",
-                  interface_name,
-                  function->get_name());
+                interface_name,
+                function->get_name());
             proxy("return rpc::error::PROXY_DESERIALISATION_ERROR();");
             proxy("}}");
         }
@@ -682,17 +683,18 @@ namespace yas_generator
             stub("#ifdef USE_RPC_LOGGING");
             stub("catch(std::exception& ex)");
             stub("{{");
-            stub("RPC_ERROR(\"A stub deserialisation error has occurred in an {} implementation in function {} {{}}\", ex.what());",
-                 interface_name,
-                 function->get_name());
+            stub("RPC_ERROR(\"A stub deserialisation error has occurred in an {} implementation in function {} {{}}\", "
+                 "ex.what());",
+                interface_name,
+                function->get_name());
             stub("return rpc::error::STUB_DESERIALISATION_ERROR();");
             stub("}}");
             stub("#endif");
             stub("catch(...)");
             stub("{{");
             stub("RPC_ERROR(\"Exception has occurred in an {} implementation in function {}\");",
-                 interface_name,
-                 function->get_name());
+                interface_name,
+                function->get_name());
             stub("return rpc::error::STUB_DESERIALISATION_ERROR();");
             stub("}}");
         }

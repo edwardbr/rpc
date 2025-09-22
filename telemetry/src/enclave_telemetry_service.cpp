@@ -7,9 +7,10 @@
 
 namespace rpc
 {
-    enclave_telemetry_service::enclave_telemetry_service(){}
-    
-    void enclave_telemetry_service::on_service_creation(const char* name, rpc::zone zone_id, rpc::destination_zone parent_zone_id) const
+    enclave_telemetry_service::enclave_telemetry_service() { }
+
+    void enclave_telemetry_service::on_service_creation(
+        const char* name, rpc::zone zone_id, rpc::destination_zone parent_zone_id) const
     {
         on_service_creation_host(name, zone_id.get_val(), parent_zone_id.get_val());
     }

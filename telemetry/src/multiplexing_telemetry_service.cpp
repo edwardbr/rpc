@@ -62,24 +62,21 @@ namespace rpc
 
             if (config.type == "console")
             {
-                if (rpc::console_telemetry_service::create(service,
-                    test_suite_name, name, config.output_path))
+                if (rpc::console_telemetry_service::create(service, test_suite_name, name, config.output_path))
                 {
                     children_.push_back(service);
                 }
             }
             else if (config.type == "sequence")
             {
-                if (rpc::sequence_diagram_telemetry_service::create(service,
-                    test_suite_name, name, config.output_path))
+                if (rpc::sequence_diagram_telemetry_service::create(service, test_suite_name, name, config.output_path))
                 {
                     children_.push_back(service);
                 }
             }
             else if (config.type == "animation")
             {
-                if (rpc::animation_telemetry_service::create(service,
-                    test_suite_name, name, config.output_path))
+                if (rpc::animation_telemetry_service::create(service, test_suite_name, name, config.output_path))
                 {
                     children_.push_back(service);
                 }
@@ -146,8 +143,13 @@ namespace rpc
         {
             if (child)
             {
-                child->on_service_add_ref(zone_id, destination_channel_zone_id, destination_zone_id,
-                                        object_id, caller_channel_zone_id, caller_zone_id, options);
+                child->on_service_add_ref(zone_id,
+                    destination_channel_zone_id,
+                    destination_zone_id,
+                    object_id,
+                    caller_channel_zone_id,
+                    caller_zone_id,
+                    options);
             }
         }
     }
@@ -162,8 +164,8 @@ namespace rpc
         {
             if (child)
             {
-                child->on_service_release(zone_id, destination_channel_zone_id, destination_zone_id,
-                                        object_id, caller_zone_id);
+                child->on_service_release(
+                    zone_id, destination_channel_zone_id, destination_zone_id, object_id, caller_zone_id);
             }
         }
     }
@@ -178,8 +180,8 @@ namespace rpc
         {
             if (child)
             {
-                child->on_service_proxy_creation(service_name, service_proxy_name, zone_id,
-                                               destination_zone_id, caller_zone_id);
+                child->on_service_proxy_creation(
+                    service_name, service_proxy_name, zone_id, destination_zone_id, caller_zone_id);
             }
         }
     }
@@ -194,8 +196,8 @@ namespace rpc
         {
             if (child)
             {
-                child->on_cloned_service_proxy_creation(service_name, service_proxy_name, zone_id,
-                                                      destination_zone_id, caller_zone_id);
+                child->on_cloned_service_proxy_creation(
+                    service_name, service_proxy_name, zone_id, destination_zone_id, caller_zone_id);
             }
         }
     }
@@ -222,8 +224,7 @@ namespace rpc
         {
             if (child)
             {
-                child->on_service_proxy_try_cast(zone_id, destination_zone_id, caller_zone_id,
-                                               object_id, interface_id);
+                child->on_service_proxy_try_cast(zone_id, destination_zone_id, caller_zone_id, object_id, interface_id);
             }
         }
     }
@@ -239,8 +240,8 @@ namespace rpc
         {
             if (child)
             {
-                child->on_service_proxy_add_ref(zone_id, destination_zone_id, destination_channel_zone_id,
-                                              caller_zone_id, object_id, options);
+                child->on_service_proxy_add_ref(
+                    zone_id, destination_zone_id, destination_channel_zone_id, caller_zone_id, object_id, options);
             }
         }
     }
@@ -255,8 +256,8 @@ namespace rpc
         {
             if (child)
             {
-                child->on_service_proxy_release(zone_id, destination_zone_id, destination_channel_zone_id,
-                                              caller_zone_id, object_id);
+                child->on_service_proxy_release(
+                    zone_id, destination_zone_id, destination_channel_zone_id, caller_zone_id, object_id);
             }
         }
     }
@@ -271,8 +272,8 @@ namespace rpc
         {
             if (child)
             {
-                child->on_service_proxy_add_external_ref(zone_id, destination_channel_zone_id,
-                                                       destination_zone_id, caller_zone_id, ref_count);
+                child->on_service_proxy_add_external_ref(
+                    zone_id, destination_channel_zone_id, destination_zone_id, caller_zone_id, ref_count);
             }
         }
     }
@@ -287,8 +288,8 @@ namespace rpc
         {
             if (child)
             {
-                child->on_service_proxy_release_external_ref(zone_id, destination_channel_zone_id,
-                                                           destination_zone_id, caller_zone_id, ref_count);
+                child->on_service_proxy_release_external_ref(
+                    zone_id, destination_channel_zone_id, destination_zone_id, caller_zone_id, ref_count);
             }
         }
     }
@@ -443,8 +444,8 @@ namespace rpc
         {
             if (child)
             {
-                child->on_interface_proxy_send(method_name, zone_id, destination_zone_id,
-                                             object_id, interface_id, method_id);
+                child->on_interface_proxy_send(
+                    method_name, zone_id, destination_zone_id, object_id, interface_id, method_id);
             }
         }
     }

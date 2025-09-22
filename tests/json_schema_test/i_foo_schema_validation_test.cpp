@@ -557,18 +557,20 @@ TEST(McpSchemaValidationTest, IFooAllFunctionsOutputSchemaValidation)
                         out_val, buffer, rpc::encoding::yas_json);
                 serialization_success = (err == 0);
             }
-            else if (func_info.name == "receive_interface" || func_info.name == "give_interface" || 
-                     func_info.name == "call_baz_interface" || func_info.name == "create_baz_interface" ||
-                     func_info.name == "get_null_interface" || func_info.name == "set_interface" ||
-                     func_info.name == "get_interface")
+            else if (func_info.name == "receive_interface" || func_info.name == "give_interface"
+                     || func_info.name == "call_baz_interface" || func_info.name == "create_baz_interface"
+                     || func_info.name == "get_null_interface" || func_info.name == "set_interface"
+                     || func_info.name == "get_interface")
             {
-                std::cout << "INFO: Function " << func_info.name << " has interface output parameters - skipping stub_serialiser test" << std::endl;
+                std::cout << "INFO: Function " << func_info.name
+                          << " has interface output parameters - skipping stub_serialiser test" << std::endl;
                 functions_with_no_output++;
                 continue;
             }
             else
             {
-                std::cout << "INFO: Function " << func_info.name << " has no testable output parameters or not implemented in output test" << std::endl;
+                std::cout << "INFO: Function " << func_info.name
+                          << " has no testable output parameters or not implemented in output test" << std::endl;
                 functions_with_no_output++;
                 continue;
             }
@@ -612,7 +614,8 @@ TEST(McpSchemaValidationTest, IFooAllFunctionsOutputSchemaValidation)
             }
             catch (const std::exception& e)
             {
-                std::cout << "ERROR: Output schema validation failed for " << func_info.name << ": " << e.what() << std::endl;
+                std::cout << "ERROR: Output schema validation failed for " << func_info.name << ": " << e.what()
+                          << std::endl;
                 std::cout << "Output Payload: " << payload_json.dump(2) << std::endl;
                 std::cout << "Output Schema: " << schema_json.dump(2) << std::endl;
                 failed_functions.push_back(func_info.name + " (output payload validation failed)");
@@ -658,7 +661,7 @@ TEST(McpSchemaValidationTest, IFooAllFunctionsOutputSchemaValidation)
                   << " failed functions. This is expected during development." << std::endl;
     }
 
-    SUCCEED() << "Output schema validation test completed. Tested " << tested_functions << " functions with output parameters, "
-              << functions_with_no_output << " had no output parameters, skipped " << skipped_functions 
-              << ", failed " << failed_functions.size();
+    SUCCEED() << "Output schema validation test completed. Tested " << tested_functions
+              << " functions with output parameters, " << functions_with_no_output
+              << " had no output parameters, skipped " << skipped_functions << ", failed " << failed_functions.size();
 }

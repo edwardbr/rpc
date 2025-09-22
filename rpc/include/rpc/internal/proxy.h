@@ -84,7 +84,6 @@ namespace rpc
         virtual ~proxy_impl() = default;
     };
 
-
     // declared here as object_proxy and service_proxy is not fully defined in the body of proxy_base
     template<class T>
     CORO_TASK(interface_descriptor)
@@ -151,8 +150,10 @@ namespace rpc
                 CO_RETURN rpc::error::OBJECT_NOT_FOUND();
             }
 
-            std::shared_ptr<rpc::object_proxy> op = CO_AWAIT service_proxy->get_or_create_object_proxy(
-                encap.object_id, service_proxy::object_proxy_creation_rule::ADD_REF_IF_NEW, new_proxy_added, caller_zone_id.as_known_direction_zone());
+            std::shared_ptr<rpc::object_proxy> op = CO_AWAIT service_proxy->get_or_create_object_proxy(encap.object_id,
+                service_proxy::object_proxy_creation_rule::ADD_REF_IF_NEW,
+                new_proxy_added,
+                caller_zone_id.as_known_direction_zone());
             RPC_ASSERT(op != nullptr);
             if (!op)
             {
@@ -178,7 +179,7 @@ namespace rpc
         auto object_proxy = object_proxy_.get_nullable();
         RPC_ASSERT(object_proxy);
         if (!object_proxy)
-            CO_RETURN {{0}, {0}};
+            CO_RETURN{{0}, {0}};
         auto operating_service = object_proxy->get_service_proxy()->get_operating_zone_service();
 
         // this is to check that an interface is belonging to another zone and not the operating zone

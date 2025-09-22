@@ -182,13 +182,19 @@ namespace rpc
         return err_code;
     }
 
-    int host_service_proxy::release(
-        uint64_t protocol_version, destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id,
+    int host_service_proxy::release(uint64_t protocol_version,
+        destination_zone destination_zone_id,
+        object object_id,
+        caller_zone caller_zone_id,
         uint64_t& reference_count)
     {
         int err_code = 0;
-        sgx_status_t status = ::release_host(
-            &err_code, protocol_version, destination_zone_id.get_val(), object_id.get_val(), caller_zone_id.get_val(), &reference_count);
+        sgx_status_t status = ::release_host(&err_code,
+            protocol_version,
+            destination_zone_id.get_val(),
+            object_id.get_val(),
+            caller_zone_id.get_val(),
+            &reference_count);
         if (status)
         {
 #ifdef USE_RPC_TELEMETRY

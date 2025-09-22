@@ -219,8 +219,7 @@ int main(const int argc, char* argv[])
         stub_header_path = stub_header_path.size() ? stub_header_path : (stub_path + ".h");
 
         // do the generation of the checksums, in a directory that matches the main header one
-        auto checksums_path
-            = std::filesystem::path(output_path) / "check_sums";
+        auto checksums_path = std::filesystem::path(output_path) / "check_sums";
         std::filesystem::create_directories(checksums_path);
         component_checksum::write_namespace(*objects, checksums_path);
 

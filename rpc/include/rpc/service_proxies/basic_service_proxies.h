@@ -20,8 +20,9 @@ namespace rpc
 
         friend make_shared_local_service_proxy_enabler;
 
-        local_service_proxy(
-            const char* name, const std::shared_ptr<child_service>& child_svc, const std::shared_ptr<rpc::service>& parent_svc)
+        local_service_proxy(const char* name,
+            const std::shared_ptr<child_service>& child_svc,
+            const std::shared_ptr<rpc::service>& parent_svc)
             : service_proxy(name, parent_svc->get_zone_id().as_destination(), child_svc)
             , parent_service_(parent_svc)
         {
@@ -142,8 +143,10 @@ namespace rpc
 
         friend rpc::service;
 
-        local_child_service_proxy(
-            const char* name, destination_zone destination_zone_id, const std::shared_ptr<rpc::service>& parent_svc, connect_fn fn)
+        local_child_service_proxy(const char* name,
+            destination_zone destination_zone_id,
+            const std::shared_ptr<rpc::service>& parent_svc,
+            connect_fn fn)
             : service_proxy(name, destination_zone_id, parent_svc)
             , fn_(fn)
         {
@@ -235,7 +238,8 @@ namespace rpc
                 CO_RETURN rpc::error::ZONE_NOT_INITIALISED();
             CO_RETURN CO_AWAIT child_service->try_cast(protocol_version, destination_zone_id, object_id, interface_id);
         }
-        CORO_TASK(int) add_ref(uint64_t protocol_version,
+        CORO_TASK(int)
+        add_ref(uint64_t protocol_version,
             destination_channel_zone destination_channel_zone_id,
             destination_zone destination_zone_id,
             object object_id,
@@ -278,7 +282,8 @@ namespace rpc
                 CO_RETURN rpc::error::ZONE_NOT_INITIALISED();
             }
 
-            auto ret = CO_AWAIT child_service->release(protocol_version, destination_zone_id, object_id, caller_zone_id, reference_count);
+            auto ret = CO_AWAIT child_service->release(
+                protocol_version, destination_zone_id, object_id, caller_zone_id, reference_count);
             CO_RETURN ret;
         }
 

@@ -16,9 +16,9 @@
 #include <rpc/internal/version.h>
 #include <rpc/internal/marshaller.h>
 #include <rpc/internal/member_ptr.h>
-#include <rpc/internal/coroutine_support.h>  // Needed for CORO_TASK macros
+#include <rpc/internal/coroutine_support.h> // Needed for CORO_TASK macros
 // #include <rpc/internal/proxy.h>  // Commented out to break circular dependency
-#include <rpc/internal/casting_interface.h>  // Needed for dynamic_pointer_cast
+#include <rpc/internal/casting_interface.h> // Needed for dynamic_pointer_cast
 
 namespace rpc
 {
@@ -32,7 +32,7 @@ namespace rpc
     // template<typename T, typename Deleter = std::default_delete<T>> class unique_ptr;  // Commented out - not needed
 
     // NAMESPACE_INLINE_BEGIN  // Commented out to simplify
-    
+
     namespace internal
     {
         struct control_block_base
@@ -382,9 +382,7 @@ namespace rpc
         //     typename = std::enable_if_t<std::is_base_of<T, Y>::value && std::is_base_of<casting_interface, Y>::value>>
         // explicit shared_ptr(
         //     Y* p, std::shared_ptr<rpc::object_proxy> obj_proxy_for_p_obj, Deleter d = Deleter(), Alloc cb_alloc = Alloc())
-        template<typename Y,
-            typename Deleter = std::default_delete<Y>,
-            typename Alloc = std::allocator<char>>
+        template<typename Y, typename Deleter = std::default_delete<Y>, typename Alloc = std::allocator<char>>
         explicit shared_ptr(
             Y* p, std::shared_ptr<rpc::object_proxy> obj_proxy_for_p_obj, Deleter d = Deleter(), Alloc cb_alloc = Alloc())
             : ptr_(p)
@@ -587,7 +585,8 @@ namespace rpc
 
         template<typename U> friend class optimistic_ptr;
         template<typename U> friend class weak_ptr;
-        template<typename U> friend class shared_ptr;  // Allow different template instantiations to access private members
+        template<typename U>
+        friend class shared_ptr; // Allow different template instantiations to access private members
         template<typename U, typename... Args> friend shared_ptr<U> make_shared(Args&&... args);
         template<class T1_cast, class T2_cast>
         friend shared_ptr<T1_cast> dynamic_pointer_cast(const shared_ptr<T2_cast>& from) noexcept;
@@ -1071,5 +1070,5 @@ namespace std
             return 0;
         }
     };
-    
+
 } // namespace std

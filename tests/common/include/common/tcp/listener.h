@@ -94,7 +94,7 @@ namespace rpc::tcp
                             worker_release);
                     if (ret != rpc::error::OK())
                     {
-                        // report error  
+                        // report error
                         RPC_ERROR("failed to connect to zone {}", ret);
                         CO_RETURN;
                     }

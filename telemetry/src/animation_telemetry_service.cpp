@@ -2111,9 +2111,8 @@ namespace rpc
         return true;
     }
 
-    animation_telemetry_service::animation_telemetry_service(std::filesystem::path output_path,
-        std::string test_suite_name,
-        std::string test_name)
+    animation_telemetry_service::animation_telemetry_service(
+        std::filesystem::path output_path, std::string test_suite_name, std::string test_name)
         : output_path_(std::move(output_path))
         , suite_name_(std::move(test_suite_name))
         , test_name_(std::move(test_name))
@@ -2129,9 +2128,8 @@ namespace rpc
     std::string animation_telemetry_service::sanitize_name(const std::string& name)
     {
         std::string sanitized = name;
-        std::replace_if(sanitized.begin(), sanitized.end(), [](char ch) {
-            return ch == '/' || ch == '\\' || ch == ':' || ch == '*';
-        }, '#');
+        std::replace_if(
+            sanitized.begin(), sanitized.end(), [](char ch) { return ch == '/' || ch == '\\' || ch == ':' || ch == '*'; }, '#');
         return sanitized;
     }
 
@@ -2176,36 +2174,31 @@ namespace rpc
     }
 
     animation_telemetry_service::event_field animation_telemetry_service::make_string_field(
-        const std::string& key,
-        const std::string& value)
+        const std::string& key, const std::string& value)
     {
         return event_field{key, value, field_kind::string};
     }
 
     animation_telemetry_service::event_field animation_telemetry_service::make_number_field(
-        const std::string& key,
-        uint64_t value)
+        const std::string& key, uint64_t value)
     {
         return event_field{key, std::to_string(value), field_kind::number};
     }
 
     animation_telemetry_service::event_field animation_telemetry_service::make_signed_field(
-        const std::string& key,
-        int64_t value)
+        const std::string& key, int64_t value)
     {
         return event_field{key, std::to_string(value), field_kind::number};
     }
 
     animation_telemetry_service::event_field animation_telemetry_service::make_boolean_field(
-        const std::string& key,
-        bool value)
+        const std::string& key, bool value)
     {
         return event_field{key, value ? "true" : "false", field_kind::boolean};
     }
 
     animation_telemetry_service::event_field animation_telemetry_service::make_floating_field(
-        const std::string& key,
-        double value)
+        const std::string& key, double value)
     {
         std::ostringstream oss;
         oss << std::fixed << std::setprecision(6) << value;
@@ -2258,9 +2251,7 @@ namespace rpc
 
     void animation_telemetry_service::on_service_deletion(rpc::zone zone_id) const
     {
-        std::vector<event_field> fields = {
-            make_number_field("zone", zone_id.get_val())
-        };
+        std::vector<event_field> fields = {make_number_field("zone", zone_id.get_val())};
         std::lock_guard<std::mutex> lock(mutex_);
         zone_names_.erase(zone_id.get_val());
         zone_parents_.erase(zone_id.get_val());
@@ -2324,8 +2315,7 @@ namespace rpc
         rpc::destination_zone destination_zone_id,
         rpc::caller_zone caller_zone_id) const
     {
-        std::vector<event_field> fields = {
-            make_string_field("serviceName", service_name ? service_name : ""),
+        std::vector<event_field> fields = {make_string_field("serviceName", service_name ? service_name : ""),
             make_string_field("serviceProxyName", service_proxy_name ? service_proxy_name : ""),
             make_number_field("zone", zone_id.get_val()),
             make_number_field("destinationZone", destination_zone_id.get_val()),
@@ -2339,8 +2329,7 @@ namespace rpc
         rpc::destination_zone destination_zone_id,
         rpc::caller_zone caller_zone_id) const
     {
-        std::vector<event_field> fields = {
-            make_string_field("serviceName", service_name ? service_name : ""),
+        std::vector<event_field> fields = {make_string_field("serviceName", service_name ? service_name : ""),
             make_string_field("serviceProxyName", service_proxy_name ? service_proxy_name : ""),
             make_number_field("zone", zone_id.get_val()),
             make_number_field("destinationZone", destination_zone_id.get_val()),
@@ -2348,9 +2337,8 @@ namespace rpc
         record_event("cloned_service_proxy_creation", std::move(fields));
     }
 
-    void animation_telemetry_service::on_service_proxy_deletion(rpc::zone zone_id,
-        rpc::destination_zone destination_zone_id,
-        rpc::caller_zone caller_zone_id) const
+    void animation_telemetry_service::on_service_proxy_deletion(
+        rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::caller_zone caller_zone_id) const
     {
         record_event("service_proxy_deletion",
             {make_number_field("zone", zone_id.get_val()),
@@ -2432,8 +2420,7 @@ namespace rpc
 
     void animation_telemetry_service::on_impl_creation(const char* name, uint64_t address, rpc::zone zone_id) const
     {
-        std::vector<event_field> fields = {
-            make_string_field("name", name ? name : ""),
+        std::vector<event_field> fields = {make_string_field("name", name ? name : ""),
             make_number_field("address", address),
             make_number_field("zone", zone_id.get_val())};
         record_event("impl_creation", std::move(fields));
@@ -2441,8 +2428,8 @@ namespace rpc
 
     void animation_telemetry_service::on_impl_deletion(uint64_t address, rpc::zone zone_id) const
     {
-        record_event("impl_deletion",
-            {make_number_field("address", address), make_number_field("zone", zone_id.get_val())});
+        record_event(
+            "impl_deletion", {make_number_field("address", address), make_number_field("zone", zone_id.get_val())});
     }
 
     void animation_telemetry_service::on_stub_creation(rpc::zone zone_id, rpc::object object_id, uint64_t address) const
@@ -2459,10 +2446,8 @@ namespace rpc
             {make_number_field("zone", zone_id.get_val()), make_number_field("object", object_id.get_val())});
     }
 
-    void animation_telemetry_service::on_stub_send(rpc::zone zone_id,
-        rpc::object object_id,
-        rpc::interface_ordinal interface_id,
-        rpc::method method_id) const
+    void animation_telemetry_service::on_stub_send(
+        rpc::zone zone_id, rpc::object object_id, rpc::interface_ordinal interface_id, rpc::method method_id) const
     {
         record_event("stub_send",
             {make_number_field("zone", zone_id.get_val()),
@@ -2499,10 +2484,8 @@ namespace rpc
                 make_number_field("callerZone", caller_zone_id.get_val())});
     }
 
-    void animation_telemetry_service::on_object_proxy_creation(rpc::zone zone_id,
-        rpc::destination_zone destination_zone_id,
-        rpc::object object_id,
-        bool add_ref_done) const
+    void animation_telemetry_service::on_object_proxy_creation(
+        rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id, bool add_ref_done) const
     {
         record_event("object_proxy_creation",
             {make_number_field("zone", zone_id.get_val()),
@@ -2511,9 +2494,8 @@ namespace rpc
                 make_boolean_field("addRefDone", add_ref_done)});
     }
 
-    void animation_telemetry_service::on_object_proxy_deletion(rpc::zone zone_id,
-        rpc::destination_zone destination_zone_id,
-        rpc::object object_id) const
+    void animation_telemetry_service::on_object_proxy_deletion(
+        rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id) const
     {
         record_event("object_proxy_deletion",
             {make_number_field("zone", zone_id.get_val()),
@@ -2527,8 +2509,7 @@ namespace rpc
         rpc::object object_id,
         rpc::interface_ordinal interface_id) const
     {
-        std::vector<event_field> fields = {
-            make_string_field("name", name ? name : ""),
+        std::vector<event_field> fields = {make_string_field("name", name ? name : ""),
             make_number_field("zone", zone_id.get_val()),
             make_number_field("destinationZone", destination_zone_id.get_val()),
             make_number_field("object", object_id.get_val()),
@@ -2555,8 +2536,7 @@ namespace rpc
         rpc::interface_ordinal interface_id,
         rpc::method method_id) const
     {
-        std::vector<event_field> fields = {
-            make_string_field("methodName", method_name ? method_name : ""),
+        std::vector<event_field> fields = {make_string_field("methodName", method_name ? method_name : ""),
             make_number_field("zone", zone_id.get_val()),
             make_number_field("destinationZone", destination_zone_id.get_val()),
             make_number_field("object", object_id.get_val()),
@@ -2567,8 +2547,7 @@ namespace rpc
 
     void animation_telemetry_service::message(level_enum level, const char* message) const
     {
-        std::vector<event_field> fields = {
-            make_number_field("level", static_cast<uint64_t>(level)),
+        std::vector<event_field> fields = {make_number_field("level", static_cast<uint64_t>(level)),
             make_string_field("message", message ? message : "")};
         record_event("message", std::move(fields));
     }
@@ -2609,12 +2588,14 @@ namespace rpc
         }
 
         output << "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\" />\n";
-        output << "<title>" << kTitlePrefix << " - " << escape_json(suite_name_) << "." << escape_json(test_name_) << "</title>\n";
+        output << "<title>" << kTitlePrefix << " - " << escape_json(suite_name_) << "." << escape_json(test_name_)
+               << "</title>\n";
         output << "<style>\n" << kAnimationStyles << "\n</style>\n";
         output << "</head>\n<body>\n";
         output << "<div class=\"header\">\n";
         output << "  <h1>" << kTitlePrefix << "</h1>\n";
-        output << "  <div class=\"subtitle\">" << escape_json(suite_name_) << " / " << escape_json(test_name_) << "</div>\n";
+        output << "  <div class=\"subtitle\">" << escape_json(suite_name_) << " / " << escape_json(test_name_)
+               << "</div>\n";
         output << "</div>\n";
         output << "<div class=\"controls\">\n";
         output << "  <button id=\"start-button\">Start</button>\n";
@@ -2655,7 +2636,8 @@ namespace rpc
         output << "</div>\n";
 
         output << "<script>\n";
-        output << "const telemetryMeta = { suite: \"" << escape_json(suite_name_) << "\", test: \"" << escape_json(test_name_) << "\" };\n";
+        output << "const telemetryMeta = { suite: \"" << escape_json(suite_name_) << "\", test: \""
+               << escape_json(test_name_) << "\" };\n";
         output << "const zoneMetadata = {\n";
         bool first_zone = true;
         for (const auto& entry : zone_names_copy)
@@ -2668,8 +2650,8 @@ namespace rpc
             const auto zone_id = entry.first;
             const auto parent_it = zone_parents_copy.find(zone_id);
             uint64_t parent_zone = parent_it != zone_parents_copy.end() ? parent_it->second : 0;
-            output << "  \"" << zone_id << "\": { name: \"" << escape_json(entry.second) << "\", parent: "
-                   << parent_zone << " }";
+            output << "  \"" << zone_id << "\": { name: \"" << escape_json(entry.second)
+                   << "\", parent: " << parent_zone << " }";
         }
         if (!first_zone)
         {
@@ -2681,8 +2663,8 @@ namespace rpc
         for (size_t idx = 0; idx < events_copy.size(); ++idx)
         {
             const auto& evt = events_copy[idx];
-            output << "  { type: \"" << escape_json(evt.type) << "\", timestamp: " << std::fixed
-                   << std::setprecision(6) << evt.timestamp << ", data: {";
+            output << "  { type: \"" << escape_json(evt.type) << "\", timestamp: " << std::fixed << std::setprecision(6)
+                   << evt.timestamp << ", data: {";
             for (size_t field_idx = 0; field_idx < evt.fields.size(); ++field_idx)
             {
                 const auto& field = evt.fields[field_idx];

@@ -861,8 +861,10 @@ namespace interface_declaration_generator
                                 output("std::vector<char> __buffer;");
                                 output("auto __this = static_cast<subclass*>(this);");
                                 output("auto __rpc_sp = rpc::casting_interface::get_service_proxy(*__this);");
-                                output("auto __rpc_version = __rpc_sp ? __rpc_sp->get_remote_rpc_version() : rpc::get_version();");
-                                output("auto __rpc_encoding = __rpc_sp ? __rpc_sp->get_encoding() : rpc::encoding::enc_default;");
+                                output("auto __rpc_version = __rpc_sp ? __rpc_sp->get_remote_rpc_version() : "
+                                       "rpc::get_version();");
+                                output("auto __rpc_encoding = __rpc_sp ? __rpc_sp->get_encoding() : "
+                                       "rpc::encoding::enc_default;");
                                 output.print_tabs();
                                 output.raw("auto __err = proxy_serialiser<rpc::serialiser::yas, rpc::encoding>::{}(",
                                     function->get_name());

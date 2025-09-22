@@ -13,7 +13,8 @@
 
 #ifndef _IN_ENCLAVE
 // Forward declare TestInfo to avoid including gtest in headers
-namespace testing {
+namespace testing
+{
     class TestInfo;
 }
 #endif
@@ -26,11 +27,14 @@ namespace rpc
      */
     struct telemetry_service_config
     {
-        std::string type;          // "console", "file", etc.
-        std::string output_path;   // For file/console services that need a path
+        std::string type;        // "console", "file", etc.
+        std::string output_path; // For file/console services that need a path
 
         telemetry_service_config(const std::string& t, const std::string& path = "")
-            : type(t), output_path(path) {}
+            : type(t)
+            , output_path(path)
+        {
+        }
     };
 #endif
 
@@ -68,7 +72,7 @@ namespace rpc
          */
         explicit multiplexing_telemetry_service(std::vector<std::shared_ptr<i_telemetry_service>>&& child_services);
 
-        virtual ~multiplexing_telemetry_service() {};
+        virtual ~multiplexing_telemetry_service(){};
         multiplexing_telemetry_service(const multiplexing_telemetry_service&) = delete;
         multiplexing_telemetry_service& operator=(const multiplexing_telemetry_service&) = delete;
 
@@ -91,7 +95,7 @@ namespace rpc
          */
         void clear_children();
 
-#ifndef _IN_ENCLAVE        
+#ifndef _IN_ENCLAVE
         /**
          * @brief Register a telemetry service configuration that will be created for each test.
          *
@@ -106,7 +110,7 @@ namespace rpc
          * @param test_info Current test information for creating services with correct names
          */
         void start_test(const char* test_suite_name, const char* name);
-        
+
         /**
          * @brief Reset for a new test - clear children hem with current test info.
          */

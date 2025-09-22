@@ -8,7 +8,8 @@
 
 namespace rpc
 {
-    service_proxy::service_proxy(const char* name, destination_zone destination_zone_id, const std::shared_ptr<rpc::service>& svc)
+    service_proxy::service_proxy(
+        const char* name, destination_zone destination_zone_id, const std::shared_ptr<rpc::service>& svc)
         : zone_id_(svc->get_zone_id())
         , destination_zone_id_(destination_zone_id)
         , caller_zone_id_(svc->get_zone_id().as_caller())
@@ -25,16 +26,16 @@ namespace rpc
         RPC_ASSERT(svc != nullptr);
     }
 
-    service_proxy::service_proxy(const service_proxy& other) :
-            std::enable_shared_from_this<rpc::service_proxy>(other),
-            zone_id_(other.zone_id_),
-            destination_zone_id_(other.destination_zone_id_),
-            destination_channel_zone_(other.destination_channel_zone_),
-            caller_zone_id_(other.caller_zone_id_),
-            service_(other.service_),
-            lifetime_lock_count_(0),
-            enc_(other.enc_),
-            name_(other.name_)
+    service_proxy::service_proxy(const service_proxy& other)
+        : std::enable_shared_from_this<rpc::service_proxy>(other)
+        , zone_id_(other.zone_id_)
+        , destination_zone_id_(other.destination_zone_id_)
+        , destination_channel_zone_(other.destination_channel_zone_)
+        , caller_zone_id_(other.caller_zone_id_)
+        , service_(other.service_)
+        , lifetime_lock_count_(0)
+        , enc_(other.enc_)
+        , name_(other.name_)
     {
         RPC_ASSERT(service_.lock() != nullptr);
     }
@@ -45,14 +46,16 @@ namespace rpc
         {
 #ifdef USE_RPC_LOGGING
             RPC_WARNING("service_proxy destructor: {} proxies still in map for destination_zone={}, caller_zone={}",
-                       proxies_.size(), destination_zone_id_.get_val(), caller_zone_id_.get_val());
+                proxies_.size(),
+                destination_zone_id_.get_val(),
+                caller_zone_id_.get_val());
 
             // Log details of remaining proxies
             for (const auto& proxy_entry : proxies_)
             {
                 auto proxy = proxy_entry.second.lock();
-                RPC_WARNING("  Remaining proxy: object_id={}, valid={}",
-                          proxy_entry.first.get_val(), (proxy ? "true" : "false"));
+                RPC_WARNING(
+                    "  Remaining proxy: object_id={}, valid={}", proxy_entry.first.get_val(), (proxy ? "true" : "false"));
             }
 #endif
         }
@@ -91,7 +94,8 @@ namespace rpc
         version_.store(std::clamp(version, min_version, max_version));
     }
 
-    CORO_TASK(int) service_proxy::connect(rpc::interface_descriptor input_descr, rpc::interface_descriptor& output_descr)
+    CORO_TASK(int)
+    service_proxy::connect(rpc::interface_descriptor input_descr, rpc::interface_descriptor& output_descr)
     {
         std::ignore = input_descr;
         std::ignore = output_descr;
@@ -224,8 +228,11 @@ namespace rpc
         CO_RETURN last_error;
     }
 
-    [[nodiscard]] CORO_TASK(int) service_proxy::sp_add_ref(
-        object object_id, caller_channel_zone caller_channel_zone_id, add_ref_options build_out_param_channel, known_direction_zone known_direction_zone_id, uint64_t& ref_count)
+    [[nodiscard]] CORO_TASK(int) service_proxy::sp_add_ref(object object_id,
+        caller_channel_zone caller_channel_zone_id,
+        add_ref_options build_out_param_channel,
+        known_direction_zone known_direction_zone_id,
+        uint64_t& ref_count)
     {
 #ifdef USE_RPC_TELEMETRY
         if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
@@ -309,11 +316,18 @@ namespace rpc
         CO_RETURN last_error;
     }
 
-    CORO_TASK(void) service_proxy::cleanup_after_object(std::shared_ptr<rpc::service> svc, std::shared_ptr<rpc::service_proxy> self, object object_id, int inherited_reference_count)
+    CORO_TASK(void)
+    service_proxy::cleanup_after_object(std::shared_ptr<rpc::service> svc,
+        std::shared_ptr<rpc::service_proxy> self,
+        object object_id,
+        int inherited_reference_count)
     {
         // self is needed to keep the service proxy alive in the async destruction of the service_proxy
         RPC_DEBUG("cleanup_after_object service zone: {} destination_zone={}, caller_zone={}, object_id = {}",
-                  get_zone_id().get_val(), destination_zone_id_.get_val(), caller_zone_id_.get_val(), object_id.get_val());
+            get_zone_id().get_val(),
+            destination_zone_id_.get_val(),
+            caller_zone_id_.get_val(),
+            object_id.get_val());
 
         auto caller_zone_id = get_zone_id().as_caller();
 
@@ -332,7 +346,9 @@ namespace rpc
         for (int i = 0; i < inherited_reference_count; i++)
         {
             RPC_DEBUG("Releasing inherited reference {}/{} for object {}",
-                        (i + 1), inherited_reference_count, object_id.get_val());
+                (i + 1),
+                inherited_reference_count,
+                object_id.get_val());
 
             auto ret = CO_AWAIT release(version_.load(), destination_zone_id_, object_id, caller_zone_id, ref_count);
             if (ret != rpc::error::OK())
@@ -351,7 +367,10 @@ namespace rpc
     void service_proxy::on_object_proxy_released(object object_id, int inherited_reference_count)
     {
         RPC_DEBUG("on_object_proxy_released service zone: {} destination_zone={}, caller_zone={}, object_id = {}",
-                  get_zone_id().get_val(), destination_zone_id_.get_val(), caller_zone_id_.get_val(), object_id.get_val());
+            get_zone_id().get_val(),
+            destination_zone_id_.get_val(),
+            caller_zone_id_.get_val(),
+            object_id.get_val());
 
         // this keeps the underlying service alive while the service proxy is released
         auto current_service = get_operating_zone_service();
@@ -380,8 +399,9 @@ namespace rpc
                     if (inherited_reference_count > 0)
                     {
                         // There are other proxies - we need to create a new entry to handle the remaining references
-                        RPC_DEBUG("Race condition avoided - transferring reference Object ID: {}, transferring to new proxy entry, skipping remote release calls",
-                                 object_id.get_val());
+                        RPC_DEBUG("Race condition avoided - transferring reference Object ID: {}, transferring to new "
+                                  "proxy entry, skipping remote release calls",
+                            object_id.get_val());
                         existing_proxy->inherit_extra_reference();
                         return;
                     }
@@ -393,13 +413,15 @@ namespace rpc
 
         // Schedule the coroutine work asynchronously
 #ifdef BUILD_COROUTINE
-        current_service->schedule(cleanup_after_object(current_service, shared_from_this(), object_id, inherited_reference_count));
+        current_service->schedule(
+            cleanup_after_object(current_service, shared_from_this(), object_id, inherited_reference_count));
 #else
         cleanup_after_object(current_service, shared_from_this(), object_id, inherited_reference_count);
 #endif
     }
 
-    std::shared_ptr<rpc::service_proxy> service_proxy::clone_for_zone(destination_zone destination_zone_id, caller_zone caller_zone_id)
+    std::shared_ptr<rpc::service_proxy> service_proxy::clone_for_zone(
+        destination_zone destination_zone_id, caller_zone caller_zone_id)
     {
         RPC_ASSERT(!(caller_zone_id_ == caller_zone_id && destination_zone_id_ == destination_zone_id));
         auto ret = clone();
@@ -425,11 +447,15 @@ namespace rpc
         return ret;
     }
 
-    CORO_TASK(std::shared_ptr<rpc::object_proxy>) service_proxy::get_or_create_object_proxy(
+    CORO_TASK(std::shared_ptr<rpc::object_proxy>)
+    service_proxy::get_or_create_object_proxy(
         object object_id, object_proxy_creation_rule rule, bool new_proxy_added, known_direction_zone known_direction_zone_id)
     {
         RPC_DEBUG("get_or_create_object_proxy service zone: {} destination_zone={}, caller_zone={}, object_id = {}",
-                  zone_id_.get_val(), destination_zone_id_.get_val(), caller_zone_id_.get_val(), object_id.get_val());
+            zone_id_.get_val(),
+            destination_zone_id_.get_val(),
+            caller_zone_id_.get_val(),
+            object_id.get_val());
 
         std::shared_ptr<rpc::object_proxy> op;
         bool is_new = false;
@@ -454,8 +480,7 @@ namespace rpc
 #ifdef USE_RPC_TELEMETRY
                 if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
                 {
-                    telemetry_service->on_object_proxy_creation(
-                        get_zone_id(), get_destination_zone_id(), object_id, true);
+                    telemetry_service->on_object_proxy_creation(get_zone_id(), get_destination_zone_id(), object_id, true);
                 }
 #endif
                 proxies_[object_id] = op;
@@ -470,11 +495,13 @@ namespace rpc
 #ifdef USE_RPC_TELEMETRY
             if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
             {
-                telemetry_service->message(rpc::i_telemetry_service::level_enum::info, "get_or_create_object_proxy calling sp_add_ref with normal options for new object_proxy");
+                telemetry_service->message(rpc::i_telemetry_service::level_enum::info,
+                    "get_or_create_object_proxy calling sp_add_ref with normal options for new object_proxy");
             }
 #endif
             uint64_t ref_count = 0;
-            auto ret = CO_AWAIT sp_add_ref(object_id, {0}, rpc::add_ref_options::normal, known_direction_zone_id, ref_count);
+            auto ret
+                = CO_AWAIT sp_add_ref(object_id, {0}, rpc::add_ref_options::normal, known_direction_zone_id, ref_count);
             if (ret != error::OK())
             {
                 RPC_ERROR("sp_add_ref failed");
@@ -489,7 +516,8 @@ namespace rpc
         }
         if (!is_new && rule == object_proxy_creation_rule::RELEASE_IF_NOT_NEW)
         {
-            RPC_DEBUG("get_or_create_object_proxy calling sp_release due to object_proxy_creation_rule::RELEASE_IF_NOT_NEW");
+            RPC_DEBUG(
+                "get_or_create_object_proxy calling sp_release due to object_proxy_creation_rule::RELEASE_IF_NOT_NEW");
 
             // as this is an out parameter the callee will be doing an add ref if the object proxy is already
             // found we can do a release

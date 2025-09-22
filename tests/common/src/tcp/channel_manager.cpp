@@ -521,12 +521,14 @@ namespace rpc::tcp
             }
 
             RPC_DEBUG("receive_anonymous_payload seq = 0 {}\n payload = {}",
-                     service_->get_zone_id().get_val(), rpc::to_yas_json<std::string>(payload));
+                service_->get_zone_id().get_val(),
+                rpc::to_yas_json<std::string>(payload));
         }
         else
         {
             RPC_DEBUG("receive_anonymous_payload seq != 0 {} sequence_number = {}",
-                     service_->get_zone_id().get_val(), prefix.sequence_number);
+                service_->get_zone_id().get_val(),
+                prefix.sequence_number);
 
             result_listener res_payload;
             {
