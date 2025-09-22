@@ -108,7 +108,7 @@ namespace rpc
         }
 
         // else encapsulate away
-        CO_RETURN CO_AWAIT operating_service->proxy_bind_in_param(protocol_version, iface, stub);
+        CO_RETURN CO_AWAIT operating_service->bind_in_proxy(protocol_version, iface, stub);
     }
 
     // do not use directly it is for the interface generator use rpc::create_interface_proxy if you want to get a proxied pointer to a remote implementation
@@ -189,7 +189,7 @@ namespace rpc
         }
 
         // else encapsulate away
-        CO_RETURN operating_service->stub_bind_out_param(protocol_version, caller_channel_zone_id, caller_zone_id, iface);
+        CO_RETURN operating_service->bind_out_stub(protocol_version, caller_channel_zone_id, caller_zone_id, iface);
     }
 
     // do not use directly it is for the interface generator use rpc::create_interface_proxy if you want to get a proxied pointer to a remote implementation

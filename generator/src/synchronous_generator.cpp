@@ -1712,12 +1712,12 @@ namespace synchronous_generator
         }
 
         header("template<> CORO_TASK(rpc::interface_descriptor) "
-               "rpc::service::proxy_bind_in_param(uint64_t protocol_version, const rpc::shared_ptr<::{}{}>& "
+               "rpc::service::bind_in_proxy(uint64_t protocol_version, const rpc::shared_ptr<::{}{}>& "
                "iface, std::shared_ptr<rpc::object_stub>& stub);",
             ns,
             interface_name);
         header("template<> CORO_TASK(rpc::interface_descriptor) "
-               "rpc::service::stub_bind_out_param(uint64_t protocol_version, caller_channel_zone "
+               "rpc::service::bind_out_stub(uint64_t protocol_version, caller_channel_zone "
                "caller_channel_zone_id, caller_zone caller_zone_id, const rpc::shared_ptr<::{}{}>& "
                "iface);",
             ns,
@@ -1760,7 +1760,7 @@ namespace synchronous_generator
         stub("}};");
         stub("}}");
 
-        stub("template<> CORO_TASK(interface_descriptor) service::proxy_bind_in_param(uint64_t protocol_version, "
+        stub("template<> CORO_TASK(interface_descriptor) service::bind_in_proxy(uint64_t protocol_version, "
              "const "
              "rpc::shared_ptr<::{}{}>& iface, std::shared_ptr<rpc::object_stub>& stub)",
             ns,
@@ -1776,7 +1776,7 @@ namespace synchronous_generator
              "false, stub);");
         stub("}}");
 
-        stub("template<> CORO_TASK(interface_descriptor) service::stub_bind_out_param(uint64_t protocol_version, "
+        stub("template<> CORO_TASK(interface_descriptor) service::bind_out_stub(uint64_t protocol_version, "
              "caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, const rpc::shared_ptr<::{}{}>& "
              "iface)",
             ns,

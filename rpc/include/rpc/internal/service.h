@@ -114,10 +114,10 @@ namespace rpc
 
         template<class T>
         CORO_TASK(interface_descriptor)
-        proxy_bind_in_param(uint64_t protocol_version, const shared_ptr<T>& iface, std::shared_ptr<rpc::object_stub>& stub);
+        bind_in_proxy(uint64_t protocol_version, const shared_ptr<T>& iface, std::shared_ptr<rpc::object_stub>& stub);
         template<class T>
         CORO_TASK(interface_descriptor)
-        stub_bind_out_param(uint64_t protocol_version,
+        bind_out_stub(uint64_t protocol_version,
             caller_channel_zone caller_channel_zone_id,
             caller_zone caller_zone_id,
             const shared_ptr<T>& iface);

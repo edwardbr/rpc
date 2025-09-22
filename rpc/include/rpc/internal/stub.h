@@ -88,7 +88,7 @@ namespace rpc
             rpc::service& zone
             , uint64_t protocol_version, caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, const shared_ptr<T>& iface)
         {
-            CO_RETURN CO_AWAIT zone.stub_bind_out_param(protocol_version
+            CO_RETURN CO_AWAIT zone.bind_out_stub(protocol_version
             , caller_channel_zone_id
             , caller_zone_id
             , iface);
