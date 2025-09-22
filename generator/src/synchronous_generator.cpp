@@ -618,7 +618,7 @@ namespace synchronous_generator
             }
             proxy("{{");
 
-            proxy("auto __rpc_op = casting_interface::get_object_proxy(*this);");
+            proxy("auto __rpc_op = object_proxy_.get_nullable();");
             proxy("auto __rpc_sp = __rpc_op->get_service_proxy();");
             proxy("auto __rpc_encoding = __rpc_sp->get_encoding();");
             proxy("auto __rpc_version = __rpc_sp->get_remote_rpc_version();");
@@ -1122,13 +1122,13 @@ namespace synchronous_generator
             proxy("}}");
         }
 
-        proxy("class {0}_proxy : public rpc::proxy_impl<{0}>", interface_name);
+        proxy("class {0}_proxy : public rpc::interface_proxy<{0}>", interface_name);
         proxy("{{");
         proxy("{}_proxy(std::shared_ptr<rpc::object_proxy> object_proxy) : ", interface_name);
-        proxy("  rpc::proxy_impl<{}>(object_proxy)", interface_name);
+        proxy("  rpc::interface_proxy<{}>(object_proxy)", interface_name);
         proxy("{{");
         proxy("#ifdef USE_RPC_TELEMETRY");
-        proxy("auto __rpc_op = casting_interface::get_object_proxy(*this);");
+        proxy("auto __rpc_op = object_proxy_.get_nullable();");
         proxy("auto __rpc_sp = __rpc_op->get_service_proxy();");
         proxy("if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)");
         proxy("{{");
@@ -1148,7 +1148,7 @@ namespace synchronous_generator
         proxy("#ifdef USE_RPC_TELEMETRY");
         proxy("if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)");
         proxy("{{");
-        proxy("auto __rpc_op = casting_interface::get_object_proxy(*this);");
+        proxy("auto __rpc_op = object_proxy_.get_nullable();");
         proxy("auto __rpc_sp = __rpc_op->get_service_proxy();");
         proxy("telemetry_service->on_interface_proxy_deletion("
               "__rpc_sp->get_zone_id(), "

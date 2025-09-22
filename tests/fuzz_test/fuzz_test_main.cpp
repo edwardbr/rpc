@@ -1080,13 +1080,7 @@ public:
                 continue;
             }
 
-            auto* proxy = obj->query_proxy_base();
-            if (!proxy)
-            {
-                continue;
-            }
-
-            auto op = proxy->get_object_proxy();
+            auto op = obj->get_object_proxy();
             [[maybe_unused]] auto object_id = op->get_object_id();
             [[maybe_unused]] auto zone_id = op->get_service_proxy()->get_zone_id();
             RPC_INFO("[GARBAGE_COLLECTOR] Object zone id: {} object_id: {}", zone_id.get_val(), object_id.get_val());

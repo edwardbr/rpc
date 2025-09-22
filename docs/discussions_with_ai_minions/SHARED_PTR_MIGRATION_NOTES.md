@@ -30,14 +30,12 @@ This document chronicles the successful migration of RPC++ from complex proxy-in
 **Problem**: Complex interdependencies between headers causing compilation failures
 ```cpp
 // Before: Circular includes
-#include <rpc/internal/proxy.h>      // ❌ Caused circular dependency
 #include <rpc/internal/remote_pointer.h>
 ```
 
 **Solution**: Strategic commenting and targeted includes
 ```cpp
 // After: Selective includes
-// #include <rpc/internal/proxy.h>  // Commented out to break circular dependency
 #include <rpc/internal/casting_interface.h>  // Only what's needed for interface casting
 #include <rpc/internal/coroutine_support.h>  // For CORO_TASK macros
 ```
@@ -195,7 +193,6 @@ CORO_ASSERT_NE(i_bar_ptr1, nullptr);  // ✅ Now passes
 4. Test proxy integration thoroughly
 
 ### Interface Extension Points
-- `get_ultimate_object_proxy_for()` - Ready for enhanced proxy detection
 - Control block constructors - Support for proxy-specific initialization
 - Friend class declarations - Allow optimistic_ptr access to internals
 

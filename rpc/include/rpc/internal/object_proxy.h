@@ -23,13 +23,14 @@ namespace rpc
 {
     class service;
     class service_proxy;
-    class proxy_base;
+    class casting_interface;
+    template<typename T> class weak_ptr;
 
     class object_proxy : public std::enable_shared_from_this<rpc::object_proxy>
     {
         object object_id_;
         stdex::member_ptr<service_proxy> service_proxy_;
-        std::unordered_map<interface_ordinal, rpc::weak_ptr<proxy_base>> proxy_map;
+        std::unordered_map<interface_ordinal, rpc::weak_ptr<casting_interface>> proxy_map;
         std::mutex insert_control_;
         std::atomic<int> inherited_reference_count_{0}; // Track inherited references from race conditions during destruction
                                                         // and their continued presence in the service other_zones collection
@@ -37,7 +38,7 @@ namespace rpc
         object_proxy(object object_id, std::shared_ptr<rpc::service_proxy> service_proxy);
 
         // note the interface pointer may change if there is already an interface inserted successfully
-        void register_interface(interface_ordinal interface_id, rpc::weak_ptr<proxy_base>& value);
+        void register_interface(interface_ordinal interface_id, rpc::weak_ptr<casting_interface>& value);
 
         CORO_TASK(int) try_cast(std::function<interface_ordinal(uint64_t)> id_getter);
 
@@ -73,14 +74,14 @@ namespace rpc
 
         template<class T> CORO_TASK(int) query_interface(rpc::shared_ptr<T>& iface, bool do_remote_check = true)
         {
-            auto create = [&](std::unordered_map<interface_ordinal, rpc::weak_ptr<proxy_base>>::iterator item) -> int
+            auto create = [&](std::unordered_map<interface_ordinal, rpc::weak_ptr<casting_interface>>::iterator item) -> int
             {
-                rpc::shared_ptr<proxy_base> proxy = item->second.lock();
+                rpc::shared_ptr<casting_interface> proxy = item->second.lock();
                 if (!proxy)
                 {
                     // weak pointer needs refreshing
                     create_interface_proxy<T>(iface);
-                    item->second = rpc::reinterpret_pointer_cast<proxy_base>(iface);
+                    item->second = rpc::reinterpret_pointer_cast<casting_interface>(iface);
                     return rpc::error::OK();
                 }
                 iface = rpc::reinterpret_pointer_cast<T>(proxy);
@@ -103,7 +104,7 @@ namespace rpc
                 if (!do_remote_check)
                 {
                     create_interface_proxy<T>(iface);
-                    proxy_map[T::get_id(rpc::VERSION_2)] = rpc::reinterpret_pointer_cast<proxy_base>(iface);
+                    proxy_map[T::get_id(rpc::VERSION_2)] = rpc::reinterpret_pointer_cast<casting_interface>(iface);
                     CO_RETURN rpc::error::OK();
                 }
             }
@@ -130,7 +131,7 @@ namespace rpc
                     }
                 }
                 create_interface_proxy<T>(iface);
-                proxy_map[T::get_id(rpc::VERSION_2)] = rpc::reinterpret_pointer_cast<proxy_base>(iface);
+                proxy_map[T::get_id(rpc::VERSION_2)] = rpc::reinterpret_pointer_cast<casting_interface>(iface);
                 CO_RETURN rpc::error::OK();
             }
         }

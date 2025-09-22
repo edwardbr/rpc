@@ -20,7 +20,6 @@
 #include <rpc/internal/version.h>
 #include <rpc/internal/marshaller.h>
 #include <rpc/internal/remote_pointer.h>
-#include <rpc/internal/casting_interface.h>
 #include <rpc/internal/coroutine_support.h>
 #ifdef USE_RPC_TELEMETRY
 #include <rpc/telemetry/i_telemetry_service.h>
@@ -37,6 +36,7 @@ namespace rpc
     class service;
     class child_service;
     class service_proxy;
+    class casting_interface;
     struct current_service_tracker;
 
     const object dummy_object_id = {std::numeric_limits<uint64_t>::max()};
@@ -125,7 +125,7 @@ namespace rpc
         void inner_add_zone_proxy(const std::shared_ptr<rpc::service_proxy>& service_proxy);
         void cleanup_service_proxy(const std::shared_ptr<rpc::service_proxy>& other_zone);
 
-        friend proxy_base;
+        friend casting_interface;
         friend i_interface_stub;
         friend current_service_tracker;
 
@@ -181,7 +181,7 @@ namespace rpc
         prepare_out_param(uint64_t protocol_version,
             caller_channel_zone caller_channel_zone_id,
             caller_zone caller_zone_id,
-            rpc::proxy_base* base);
+            rpc::casting_interface* base);
         CORO_TASK(interface_descriptor)
         get_proxy_stub_descriptor(uint64_t protocol_version,
             caller_channel_zone caller_channel_zone_id,
@@ -246,7 +246,7 @@ namespace rpc
         CORO_TASK(interface_descriptor)
         prepare_remote_input_interface(caller_channel_zone caller_channel_zone_id,
             caller_zone caller_zone_id,
-            rpc::proxy_base* base,
+            rpc::casting_interface* base,
             std::shared_ptr<rpc::service_proxy>& destination_zone);
 
         CORO_TASK(void)
@@ -263,8 +263,8 @@ namespace rpc
             rpc::shared_ptr<out_param_type>& output_interface,
             Args&&... args)
         {
-            RPC_ASSERT(input_interface == nullptr || !input_interface->query_proxy_base()
-                       || casting_interface::get_zone(*input_interface) == zone_id_);
+            // RPC_ASSERT(input_interface == nullptr || input_interface->is_local()
+            //            || casting_interface::get_zone(*input_interface) == zone_id_);
 
             auto new_service_proxy = proxy_class::create(name, new_zone_id, shared_from_this(), args...);
             add_zone_proxy(new_service_proxy);
@@ -272,14 +272,7 @@ namespace rpc
             std::shared_ptr<rpc::service_proxy> destination_zone;
             if (input_interface)
             {
-                if (input_interface->query_proxy_base())
-                {
-                    input_descr = CO_AWAIT prepare_remote_input_interface({0},
-                        new_service_proxy->get_destination_zone_id().as_caller(),
-                        input_interface->query_proxy_base(),
-                        destination_zone);
-                }
-                else
+                if (input_interface->is_local())
                 {
                     caller_channel_zone empty_caller_channel_zone = {};
                     caller_zone caller_zone_id = zone_id_.as_caller();
@@ -293,6 +286,13 @@ namespace rpc
                         factory,
                         false,
                         stub);
+                }
+                else
+                {
+                    input_descr = CO_AWAIT prepare_remote_input_interface({0},
+                        new_service_proxy->get_destination_zone_id().as_caller(),
+                        input_interface.get(),
+                        destination_zone);
                 }
             }
 
@@ -356,7 +356,7 @@ namespace rpc
             if (child_ptr)
             {
                 RPC_ASSERT(
-                    !child_ptr->query_proxy_base()
+                    child_ptr->is_local()
                     && "we cannot support remote pointers to subordinate zones as it has not been registered yet");
                 output_descr = CO_AWAIT rpc::create_interface_stub(*this, child_ptr);
             }
@@ -486,7 +486,7 @@ namespace rpc
             if (child_ptr)
             {
                 RPC_ASSERT(
-                    !child_ptr->query_proxy_base()
+                    child_ptr->is_local()
                     && "we cannot support remote pointers to subordinate zones as it has not been registered yet");
                 output_descr = CO_AWAIT rpc::create_interface_stub(*child_svc, child_ptr);
             }

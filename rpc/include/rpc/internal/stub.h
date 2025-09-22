@@ -15,7 +15,6 @@
 #include <rpc/internal/types.h>
 #include <rpc/internal/marshaller.h>
 #include <rpc/internal/remote_pointer.h>
-#include <rpc/internal/casting_interface.h>
 #ifdef USE_RPC_TELEMETRY
 #include <rpc/telemetry/i_telemetry_service.h>
 #endif
@@ -28,6 +27,7 @@ namespace rpc
     class object_stub;
     class service;
     class service_proxy;
+    class casting_interface;
 
     class object_stub
     {

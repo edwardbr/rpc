@@ -271,7 +271,7 @@ namespace rpc
                     opposite_direction_proxy->add_external_ref();
                 }
                 else if (auto found = other_zones.lower_bound({caller_channel_zone_id.as_destination(), {0}});
-                         found != other_zones.end())
+                    found != other_zones.end())
                 {
                     auto temp = found->second.lock();
                     while (!temp)
@@ -380,7 +380,7 @@ namespace rpc
     CORO_TASK(interface_descriptor)
     service::prepare_remote_input_interface(caller_channel_zone caller_channel_zone_id,
         caller_zone caller_zone_id,
-        rpc::proxy_base* base,
+        rpc::casting_interface* base,
         std::shared_ptr<rpc::service_proxy>& destination_zone)
     {
         auto object_proxy = base->get_object_proxy();
@@ -453,7 +453,7 @@ namespace rpc
     service::prepare_out_param(uint64_t protocol_version,
         caller_channel_zone caller_channel_zone_id,
         caller_zone caller_zone_id,
-        rpc::proxy_base* base)
+        rpc::casting_interface* base)
     {
         auto object_proxy = base->get_object_proxy();
         auto object_service_proxy = object_proxy->get_service_proxy();
@@ -673,14 +673,10 @@ namespace rpc
     {
         if (outcall)
         {
-            proxy_base* proxy_base = nullptr;
-            if (caller_channel_zone_id.is_set() || caller_zone_id.is_set())
+            rpc::casting_interface* casting_interface = nullptr;
+            if ((caller_channel_zone_id.is_set() || caller_zone_id.is_set()) && iface)
             {
-                proxy_base = iface->query_proxy_base();
-            }
-            if (proxy_base)
-            {
-                CO_RETURN CO_AWAIT prepare_out_param(protocol_version, caller_channel_zone_id, caller_zone_id, proxy_base);
+                CO_RETURN CO_AWAIT prepare_out_param(protocol_version, caller_channel_zone_id, caller_zone_id, iface);
             }
         }
 
@@ -1178,7 +1174,7 @@ namespace rpc
                             tmp = found->second.lock();
                         }
                         else if (auto found = other_zones.lower_bound({known_direction_zone_id.as_destination(), {0}});
-                                 found != other_zones.end())
+                            found != other_zones.end())
                         {
                             // note that this is to support the Y shaped topology problem that the send function has the
                             // other half of this solution the known_direction_zone_id is a hint explaining where the

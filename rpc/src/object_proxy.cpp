@@ -95,7 +95,7 @@ namespace rpc
         return service_proxy->get_destination_zone_id();
     }
 
-    void object_proxy::register_interface(interface_ordinal interface_id, rpc::weak_ptr<proxy_base>& value)
+    void object_proxy::register_interface(interface_ordinal interface_id, rpc::weak_ptr<casting_interface>& value)
     {
         std::lock_guard guard(insert_control_);
         proxy_map[interface_id] = value;

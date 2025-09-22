@@ -37,7 +37,6 @@ if(BUILD_ENCLAVE)
     include/rpc/internal/casting_interface.h
     include/rpc/internal/service.h
     include/rpc/internal/stub.h
-    include/rpc/internal/proxy.h
     include/rpc/internal/object_proxy.h
     include/rpc/internal/service_proxy.h
     include/rpc/internal/serialiser.h
@@ -82,7 +81,6 @@ add_library(
   include/rpc/internal/casting_interface.h
   include/rpc/internal/service.h
   include/rpc/internal/stub.h
-  include/rpc/internal/proxy.h
   include/rpc/internal/object_proxy.h
   include/rpc/internal/service_proxy.h
   include/rpc/internal/serialiser.h

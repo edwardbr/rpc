@@ -24,8 +24,11 @@
 // the key interzone communication definiton that all services and service_proxies need to implement
 #include <rpc/internal/marshaller.h>
 
+#include <rpc/internal/object_proxy.h>
 #include <rpc/internal/casting_interface.h>
 #include <rpc/internal/service.h>
+#include <rpc/internal/service_proxy.h>
 #include <rpc/internal/stub.h>
-#include <rpc/internal/proxy.h>
 #include <rpc/internal/serialiser.h>
+
+#include <rpc/internal/bindings.h>

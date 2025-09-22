@@ -17,7 +17,6 @@
 #include <rpc/internal/marshaller.h>
 #include <rpc/internal/member_ptr.h>
 #include <rpc/internal/coroutine_support.h> // Needed for CORO_TASK macros
-#include <rpc/internal/casting_interface.h> // Needed for dynamic_pointer_cast
 
 namespace rpc
 {
@@ -594,7 +593,7 @@ namespace rpc
             CO_RETURN shared_ptr<T1>(from, ptr);
 
         // Then try remote interface casting through object_proxy
-        auto ob = casting_interface::get_object_proxy(*from);
+        auto ob = from->get_object_proxy();
         if (!ob)
         {
             CO_RETURN shared_ptr<T1>();
@@ -680,11 +679,6 @@ namespace rpc
 
     template<typename T, typename... Args> shared_ptr<T> make_shared(Args&&... args)
     {
-        // Commented out casting_interface static_assert to break circular dependency
-        // static_assert(std::is_base_of<rpc::casting_interface, T>::value,
-        //     "T must be a casting_interface for rpc::make_shared, "
-        //     "even if initially local, to support potential RPC interactions later.");
-
         using Alloc = std::allocator<T>;
         using CBAllocForMakeShared =
             typename std::allocator_traits<Alloc>::template rebind_alloc<internal::control_block_make_shared<T, Alloc, Args...>>;

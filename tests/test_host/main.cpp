@@ -2250,7 +2250,7 @@ template<class T> CORO_TASK(bool) coro_test_explicit_format_fallback_with_invali
     auto invalid_encoding = static_cast<rpc::encoding>(999);
 
     // now use a hacked do_something_in_val taking the object proxy from the original interface and force feed in a bad encoding
-    auto __rpc_op = rpc::casting_interface::get_object_proxy(*foo_proxy);
+    auto __rpc_op = foo_proxy->get_object_proxy();
     error = CO_AWAIT do_something_in_val(test_value, __rpc_op, rpc::VERSION_3, invalid_encoding);
 
     // Call should succeed due to automatic fallback
@@ -2277,7 +2277,7 @@ template<class T> CORO_TASK(bool) coro_test_explicit_version_fallback_using_dire
     CORO_ASSERT_EQ(CO_AWAIT lib.get_example()->create_foo(foo_proxy), 0);
 
     // Get the object proxy for direct testing
-    auto __rpc_op = rpc::casting_interface::get_object_proxy(*foo_proxy);
+    auto __rpc_op = foo_proxy->get_object_proxy();
     auto service_proxy = rpc::casting_interface::get_service_proxy(*foo_proxy);
     auto original_version = service_proxy->get_remote_rpc_version();
 

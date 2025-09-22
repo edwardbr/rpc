@@ -9,42 +9,21 @@
 #include <vector>
 #include <type_traits>
 #include <stdint.h>
+#include <memory>
+#include <unordered_map>
+
+#ifdef USE_RPC_TELEMETRY
+#include <rpc/telemetry/i_telemetry_service.h>
+#endif
 
 namespace rpc
 {
-    class proxy_base;
     class object_proxy;
+    class object_stub;
     class service_proxy;
     class service;
     class object;
     template<class T> class shared_ptr;
-
-    // this do nothing class is for static pointer casting
-    class casting_interface
-    {
-    public:
-        virtual ~casting_interface() = default;
-        virtual void* get_address() const = 0;
-        virtual const rpc::casting_interface* query_interface(rpc::interface_ordinal interface_id) const = 0;
-        // this is only implemented by proxy_base
-        virtual proxy_base* query_proxy_base() const { return nullptr; }
-
-        static std::shared_ptr<rpc::object_proxy> get_object_proxy(const casting_interface& iface);
-        static object get_object_id(const casting_interface& iface);
-        static std::shared_ptr<rpc::service_proxy> get_service_proxy(const casting_interface& iface);
-        static std::shared_ptr<rpc::service> get_service(const casting_interface& iface);
-        static zone get_zone(const casting_interface& iface);
-        static destination_zone get_destination_zone(const casting_interface& iface);
-        static destination_channel_zone get_channel_zone(const casting_interface& iface);
-    };
-    bool are_in_same_zone(const casting_interface* first, const casting_interface* second);
-
-    // the route to all fingerprinting
-    template<typename T> class id
-    {
-        // not implemented here! only in the concrete derivations
-        // static constexpr uint64_t get(uint64_t)
-    };
 
     // this is a nice helper function to match an interface id to a interface in a version independent way
     template<class T> bool match(rpc::interface_ordinal interface_id)
@@ -52,41 +31,96 @@ namespace rpc
         return T::get_id(rpc::VERSION_2) == interface_id;
     }
 
-    // these will soon be superfluous
-    template<typename T> class has_get_id_member
+    // this is the base class to all interfaces
+    class casting_interface
     {
-        typedef char one;
-        struct two
-        {
-            char x[2];
-        };
-
-        template<typename C> static one test(decltype(&C::get_id));
-        template<typename C> static two test(...);
-
     public:
-        enum
-        {
-            value = sizeof(test<T>(0)) == sizeof(char)
-        };
+        virtual ~casting_interface() = default;
+        virtual void* get_address() const = 0;
+        virtual const rpc::casting_interface* query_interface(rpc::interface_ordinal interface_id) const = 0;
+
+        virtual bool is_local() const { return false; }
+        virtual std::shared_ptr<rpc::object_proxy> get_object_proxy() const { return nullptr; }
+
+        // in bindings.h        
+        template<class T>
+        CORO_TASK(interface_descriptor)
+        proxy_bind_in_param(
+            uint64_t protocol_version, const rpc::shared_ptr<T>& iface, std::shared_ptr<rpc::object_stub>& stub);
+
+        // declared here as object_proxy and service_proxy is not fully defined in the body of interface_proxy
+        template<class T>
+        CORO_TASK(interface_descriptor)
+        stub_bind_out_param(uint64_t protocol_version,
+            caller_channel_zone caller_channel_zone_id,
+            caller_zone caller_zone_id,
+            const rpc::shared_ptr<T>& iface);
+            
+        static object get_object_id(const casting_interface& iface);
+        static std::shared_ptr<rpc::service_proxy> get_service_proxy(const casting_interface& iface);
+        static std::shared_ptr<rpc::service> get_service(const casting_interface& iface);
+        static zone get_zone(const casting_interface& iface);
+        static destination_zone get_destination_zone(const casting_interface& iface);
+        static destination_channel_zone get_channel_zone(const casting_interface& iface);
     };
 
-    template<typename T> class has_id_get_member
+    bool are_in_same_zone(const casting_interface* first, const casting_interface* second);
+
+    // T is a class derived from casting_interface its role is to provide access to the object proxy to the remote zone
+    template<class T> class interface_proxy : public T
     {
-        typedef char one;
-        struct two
-        {
-            char x[2];
-        };
-
-        template<typename C> static one test(decltype(&id<C>::get));
-        template<typename C> static two test(...);
-
+    protected:
+        stdex::member_ptr<object_proxy> object_proxy_;
     public:
-        enum
+        interface_proxy(std::shared_ptr<rpc::object_proxy> object_proxy) : object_proxy_(object_proxy){}
+        virtual ~interface_proxy() = default;
+
+        void* get_address() const override { return (void*)this; }
+        const rpc::casting_interface* query_interface(rpc::interface_ordinal interface_id) const override
         {
-            value = sizeof(test<T>(0)) == sizeof(char)
-        };
+            if (rpc::match<T>(interface_id))
+                return static_cast<const T*>(this);
+            return nullptr;
+        }
+
+        bool is_local() const override { return false; }
+        std::shared_ptr<rpc::object_proxy> get_object_proxy() const override
+        {
+            return object_proxy_.get_nullable();
+        }
+    };
+
+    // do not use directly it is for the interface generator use rpc::create_interface_proxy if you want to get a proxied pointer to a remote implementation
+    template<class T>
+    CORO_TASK(int)
+    stub_bind_in_param(uint64_t protocol_version,
+        rpc::service& serv,
+        caller_channel_zone caller_channel_zone_id,
+        caller_zone caller_zone_id,
+        const rpc::interface_descriptor& encap,
+        rpc::shared_ptr<T>& iface);
+
+    // do not use directly it is for the interface generator use rpc::create_interface_proxy if you want to get a proxied pointer to a remote implementation
+    template<class T>
+    CORO_TASK(int)
+    proxy_bind_out_param(const std::shared_ptr<rpc::service_proxy>& sp,
+        const rpc::interface_descriptor& encap,
+        caller_zone caller_zone_id,
+        rpc::shared_ptr<T>& val);
+
+    template<class T>
+    CORO_TASK(int)
+    demarshall_interface_proxy(uint64_t protocol_version,
+        const std::shared_ptr<rpc::service_proxy>& sp,
+        const rpc::interface_descriptor& encap,
+        caller_zone caller_zone_id,
+        rpc::shared_ptr<T>& val);
+
+    // the route to all fingerprinting
+    template<typename T> class id
+    {
+        // not implemented here! only in the concrete derivations
+        // static constexpr uint64_t get(uint64_t)
     };
 
     constexpr uint64_t STD_VECTOR_UINT_8_ID = 0x71FC1FAC5CD5E6FA;
@@ -175,4 +209,5 @@ namespace rpc
     public:
         static constexpr uint64_t get(uint64_t) { return FLOAT_64_ID; }
     };
+
 }
