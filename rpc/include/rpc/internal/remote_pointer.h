@@ -17,18 +17,15 @@
 #include <rpc/internal/marshaller.h>
 #include <rpc/internal/member_ptr.h>
 #include <rpc/internal/coroutine_support.h> // Needed for CORO_TASK macros
-// #include <rpc/internal/proxy.h>  // Commented out to break circular dependency
 #include <rpc/internal/casting_interface.h> // Needed for dynamic_pointer_cast
 
 namespace rpc
 {
     class object_proxy;
-    class proxy_base;
 
     // Forward declarations for circular dependency resolution
     template<typename T> class shared_ptr;
     template<typename T> class weak_ptr;
-    // template<typename T, typename Deleter = std::default_delete<T>> class unique_ptr;  // Commented out - not needed
 
     // NAMESPACE_INLINE_BEGIN  // Commented out to simplify
 
@@ -38,23 +35,18 @@ namespace rpc
         {
             std::atomic<long> local_shared_owners{0};
             std::atomic<long> local_weak_owners{1};
-            std::shared_ptr<rpc::object_proxy> this_cb_object_proxy_sp_;
 
         protected:
             void* managed_object_ptr_{nullptr};
 
         public:
             control_block_base(void* obj_ptr, std::shared_ptr<rpc::object_proxy> obj_proxy_for_this_cb_obj)
-                : this_cb_object_proxy_sp_(std::move(obj_proxy_for_this_cb_obj))
-                , // Initialized in declaration order
-                managed_object_ptr_(obj_ptr)
+                : managed_object_ptr_(obj_ptr)
             {
             }
 
             control_block_base()
-                : this_cb_object_proxy_sp_(nullptr)
-                , // Initialized in declaration order
-                managed_object_ptr_(nullptr)
+                :managed_object_ptr_(nullptr)
             {
             }
 
@@ -92,12 +84,6 @@ namespace rpc
         {
             Deleter object_deleter_;
             Alloc control_block_allocator_;
-            control_block_impl(T* p, std::shared_ptr<rpc::object_proxy> obj_proxy, Deleter d, Alloc a)
-                : control_block_base(p, std::move(obj_proxy))
-                , object_deleter_(std::move(d))
-                , control_block_allocator_(std::move(a))
-            {
-            }
             control_block_impl(T* p, Deleter d, Alloc a)
                 : control_block_base(p, nullptr)
                 , object_deleter_(std::move(d))
@@ -168,43 +154,18 @@ namespace rpc
         };
     } // namespace internal
 
-    template<typename T>
-    std::shared_ptr<rpc::object_proxy> get_ultimate_object_proxy_for(T* ptr, rpc::internal::control_block_base* cb_of_ptr)
-    {
-        if (!ptr)
-            return nullptr;
-
-        // Commented out proxy-specific code to break circular dependency
-        // if (rpc::proxy_base* proxy = dynamic_cast<rpc::proxy_base*>(const_cast<std::remove_cv_t<T>*>(ptr)))
-        // {
-        //     return proxy->get_object_proxy();
-        // }
-        if (cb_of_ptr)
-        {
-            return cb_of_ptr->this_cb_object_proxy_sp_;
-        }
-        return nullptr;
-    }
-
     template<typename T> class shared_ptr
     {
         T* ptr_{nullptr};
         internal::control_block_base* cb_{nullptr};
-        std::shared_ptr<rpc::object_proxy> ultimate_actual_object_proxy_sp_{nullptr};
 
         void acquire_this() noexcept
         {
             if (cb_)
                 cb_->increment_local_shared();
-            // Commented out remote reference counting to break circular dependency
-            // if (ultimate_actual_object_proxy_sp_)
-            //     ultimate_actual_object_proxy_sp_->increment_remote_strong();
         }
         void release_this() noexcept
         {
-            // Commented out remote reference counting to break circular dependency
-            // if (ultimate_actual_object_proxy_sp_)
-            //     ultimate_actual_object_proxy_sp_->decrement_remote_strong_and_signal_if_appropriate();
             if (cb_)
                 cb_->decrement_local_shared_and_dispose_if_zero();
         }
@@ -213,16 +174,7 @@ namespace rpc
             : ptr_(p)
             , cb_(cb)
         {
-            if (cb_)
-            {
-                // Commented out remote reference counting to break circular dependency
-                ultimate_actual_object_proxy_sp_ = get_ultimate_object_proxy_for(ptr_, cb_);
-                // if (ultimate_actual_object_proxy_sp_)
-                // {
-                //     ultimate_actual_object_proxy_sp_->increment_remote_strong();
-                // }
-            }
-            else
+            if (!cb_)
             {
                 ptr_ = nullptr;
             }
@@ -234,12 +186,7 @@ namespace rpc
         shared_ptr(internal::control_block_base* cb, T* p, for_enable_shared_tag)
             : ptr_(p)
             , cb_(cb)
-            , ultimate_actual_object_proxy_sp_(nullptr)
         {
-            if (cb_ && ptr_)
-            {
-                ultimate_actual_object_proxy_sp_ = get_ultimate_object_proxy_for(ptr_, cb_);
-            }
         }
 
         template<typename Y, typename Deleter, typename Alloc> void create_cb_local(Y* p, Deleter d, Alloc cb_alloc)
@@ -270,7 +217,6 @@ namespace rpc
         explicit shared_ptr(Y* p)
             : ptr_(p)
             , cb_(nullptr)
-            , ultimate_actual_object_proxy_sp_(nullptr)
         {
             if (ptr_)
             {
@@ -292,7 +238,6 @@ namespace rpc
         shared_ptr(Y* p, Deleter d)
             : ptr_(p)
             , cb_(nullptr)
-            , ultimate_actual_object_proxy_sp_(nullptr)
         {
             try
             {
@@ -314,7 +259,6 @@ namespace rpc
         shared_ptr(std::nullptr_t, Deleter d)
             : ptr_(nullptr)
             , cb_(nullptr)
-            , ultimate_actual_object_proxy_sp_(nullptr)
         {
             try
             {
@@ -335,7 +279,6 @@ namespace rpc
         shared_ptr(Y* p, Deleter d, Alloc cb_alloc)
             : ptr_(p)
             , cb_(nullptr)
-            , ultimate_actual_object_proxy_sp_(nullptr)
         {
             try
             {
@@ -357,7 +300,6 @@ namespace rpc
         shared_ptr(std::nullptr_t, Deleter d, Alloc cb_alloc)
             : ptr_(nullptr)
             , cb_(nullptr)
-            , ultimate_actual_object_proxy_sp_(nullptr)
         {
             try
             {
@@ -374,19 +316,10 @@ namespace rpc
             }
         }
 
-        // Commented out casting_interface specific constructor to break circular dependency
-        // template<typename Y,
-        //     typename Deleter = std::default_delete<Y>,
-        //     typename Alloc = std::allocator<char>,
-        //     typename = std::enable_if_t<std::is_base_of<T, Y>::value && std::is_base_of<casting_interface, Y>::value>>
-        // explicit shared_ptr(
-        //     Y* p, std::shared_ptr<rpc::object_proxy> obj_proxy_for_p_obj, Deleter d = Deleter(), Alloc cb_alloc = Alloc())
-        template<typename Y, typename Deleter = std::default_delete<Y>, typename Alloc = std::allocator<char>>
-        explicit shared_ptr(
-            Y* p, std::shared_ptr<rpc::object_proxy> obj_proxy_for_p_obj, Deleter d = Deleter(), Alloc cb_alloc = Alloc())
+        template<typename Y, typename Deleter, typename Alloc>
+        explicit shared_ptr(Y* p, Deleter d, Alloc cb_alloc)
             : ptr_(p)
             , cb_(nullptr)
-            , ultimate_actual_object_proxy_sp_(nullptr)
         {
             if (!ptr_)
                 return;
@@ -395,7 +328,7 @@ namespace rpc
                 using ActualCB = internal::control_block_impl<Y, Deleter, Alloc>;
                 typename std::allocator_traits<Alloc>::template rebind_alloc<ActualCB> actual_cb_alloc(cb_alloc);
                 cb_ = std::allocator_traits<decltype(actual_cb_alloc)>::allocate(actual_cb_alloc, 1);
-                new (cb_) ActualCB(p, std::move(obj_proxy_for_p_obj), std::move(d), std::move(cb_alloc));
+                new (cb_) ActualCB(p, std::move(d), std::move(cb_alloc));
             }
             catch (...)
             {
@@ -410,7 +343,6 @@ namespace rpc
                 ptr_ = nullptr;
                 throw;
             }
-            ultimate_actual_object_proxy_sp_ = get_ultimate_object_proxy_for(ptr_, cb_);
             acquire_this();
         }
 
@@ -418,7 +350,6 @@ namespace rpc
         shared_ptr(const shared_ptr<Y>& r, element_type* p_alias) noexcept
             : ptr_(p_alias)
             , cb_(r.internal_get_cb())
-            , ultimate_actual_object_proxy_sp_(r.internal_get_ultimate_object_proxy())
         {
             acquire_this();
         }
@@ -427,7 +358,6 @@ namespace rpc
         shared_ptr(shared_ptr<Y>&& r, element_type* p_alias) noexcept
             : ptr_(p_alias)
             , cb_(r.internal_get_cb())
-            , ultimate_actual_object_proxy_sp_(std::move(r.internal_get_ultimate_object_proxy_ref()))
         {
             r.cb_ = nullptr;
             r.ptr_ = nullptr;
@@ -436,14 +366,12 @@ namespace rpc
         shared_ptr(const shared_ptr& r) noexcept
             : ptr_(r.ptr_)
             , cb_(r.cb_)
-            , ultimate_actual_object_proxy_sp_(r.ultimate_actual_object_proxy_sp_)
         {
             acquire_this();
         }
         shared_ptr(shared_ptr&& r) noexcept
             : ptr_(r.ptr_)
             , cb_(r.cb_)
-            , ultimate_actual_object_proxy_sp_(std::move(r.ultimate_actual_object_proxy_sp_))
         {
             r.cb_ = nullptr;
             r.ptr_ = nullptr;
@@ -453,7 +381,6 @@ namespace rpc
         shared_ptr(const shared_ptr<Y>& r) noexcept
             : ptr_(static_cast<T*>(r.internal_get_ptr()))
             , cb_(r.internal_get_cb())
-            , ultimate_actual_object_proxy_sp_(r.internal_get_ultimate_object_proxy())
         {
             acquire_this();
         }
@@ -461,7 +388,6 @@ namespace rpc
         shared_ptr(shared_ptr<Y>&& r) noexcept
             : ptr_(static_cast<T*>(r.internal_get_ptr()))
             , cb_(r.internal_get_cb())
-            , ultimate_actual_object_proxy_sp_(std::move(r.internal_get_ultimate_object_proxy_ref()))
         {
             r.cb_ = nullptr;
             r.ptr_ = nullptr;
@@ -479,45 +405,6 @@ namespace rpc
             this->swap(temp_T);
         }
 
-        // Commented out unique_ptr constructor - not needed
-        // template<typename Y, typename Deleter_U, typename = std::enable_if_t<std::is_convertible_v<Y*, T*>>>
-        // shared_ptr(rpc::unique_ptr<Y, Deleter_U>&& u)
-        //     : ptr_(nullptr)
-        //     , cb_(nullptr)
-        //     , ultimate_actual_object_proxy_sp_(nullptr)
-        // {
-        //     if (!u)
-        //         return;
-        //     Y* raw_p = u.get();
-        //     Deleter_U deleter = u.get_deleter();
-        //     try
-        //     {
-        //         create_cb_local<Y>(raw_p, std::move(deleter), std::allocator<char>());
-        //         ptr_ = raw_p;
-        //         u.release();
-        //     }
-        //     catch (...)
-        //     {
-        //         cb_ = nullptr;
-        //         ptr_ = nullptr;
-        //         throw;
-        //     }
-        //     if (cb_ || ptr_)
-        //     {
-        //         ultimate_actual_object_proxy_sp_ = get_ultimate_object_proxy_for(ptr_, cb_);
-        //         acquire_this();
-        //     }
-        // }
-
-        // Commented out all unique_ptr constructors - not needed
-        // template<typename Y,
-        //     typename Deleter_U,
-        //     typename = std::enable_if_t<std::is_convertible_v<Y*, T*> && std::is_base_of<casting_interface, Y>::value>>
-        // shared_ptr(rpc::unique_ptr<Y, Deleter_U>&& u, std::shared_ptr<rpc::object_proxy> obj_proxy_for_u_obj)
-        // {
-        //     // Implementation commented out
-        // }
-
         ~shared_ptr() { release_this(); }
         shared_ptr& operator=(const shared_ptr& r) noexcept
         {
@@ -526,7 +413,6 @@ namespace rpc
                 release_this();
                 cb_ = r.cb_;
                 ptr_ = r.ptr_;
-                ultimate_actual_object_proxy_sp_ = r.ultimate_actual_object_proxy_sp_;
                 acquire_this();
             }
             return *this;
@@ -538,7 +424,6 @@ namespace rpc
                 release_this();
                 cb_ = r.cb_;
                 ptr_ = r.ptr_;
-                ultimate_actual_object_proxy_sp_ = std::move(r.ultimate_actual_object_proxy_sp_);
                 r.cb_ = nullptr;
                 r.ptr_ = nullptr;
             }
@@ -551,18 +436,11 @@ namespace rpc
         {
             shared_ptr(p, std::move(d), std::move(cb_alloc)).swap(*this);
         }
-        template<typename Y, typename Deleter = std::default_delete<Y>, typename Alloc = std::allocator<char>>
-        void reset(
-            Y* p, std::shared_ptr<rpc::object_proxy> obj_proxy_for_p_obj, Deleter d = Deleter(), Alloc cb_alloc = Alloc())
-        {
-            shared_ptr(p, std::move(obj_proxy_for_p_obj), std::move(d), std::move(cb_alloc)).swap(*this);
-        }
 
         void swap(shared_ptr& r) noexcept
         {
             std::swap(ptr_, r.ptr_);
             std::swap(cb_, r.cb_);
-            ultimate_actual_object_proxy_sp_.swap(r.ultimate_actual_object_proxy_sp_);
         }
 
         T* get() const noexcept { return ptr_; }
@@ -573,14 +451,6 @@ namespace rpc
 
         internal::control_block_base* internal_get_cb() const { return cb_; }
         T* internal_get_ptr() const { return ptr_; }
-        const std::shared_ptr<rpc::object_proxy>& internal_get_ultimate_object_proxy() const
-        {
-            return ultimate_actual_object_proxy_sp_;
-        }
-        std::shared_ptr<rpc::object_proxy>& internal_get_ultimate_object_proxy_ref()
-        {
-            return ultimate_actual_object_proxy_sp_;
-        }
 
         template<typename U> friend class weak_ptr;
         template<typename U>
@@ -708,15 +578,6 @@ namespace rpc
         template<typename U> friend class enable_shared_from_this;
     };
 
-    // Commented out entire unique_ptr implementation - not needed
-    // template<typename T, typename Deleter> class unique_ptr
-    // {
-    //     // Implementation commented out
-    // };
-    // template<typename T, typename Deleter> class unique_ptr<T[], Deleter>
-    // {
-    //     // Array version implementation commented out
-    // };
 
     // --- Free Functions ---
     template<class T1, class T2>
@@ -738,6 +599,7 @@ namespace rpc
         {
             CO_RETURN shared_ptr<T1>();
         }
+
         shared_ptr<T1> ret;
         // This magic function will return a shared pointer to a new interface proxy
         // Its reference count will not be the same as the "from" pointer's value, semantically it
@@ -880,26 +742,6 @@ namespace rpc
         template<typename U> friend class shared_ptr;
     };
 
-    // template<typename InterfaceType, typename ConcreteLocalProxyType>
-    // rpc::shared_ptr<InterfaceType> create_shared_ptr_to_local_proxy(
-    //     const rpc::shared_ptr<InterfaceType>& actual_object_sp_target,
-    //     std::shared_ptr<rpc::object_proxy> obj_proxy_for_local_proxy_instance)
-    // {
-    //     static_assert(std::is_base_of<InterfaceType, ConcreteLocalProxyType>::value, "Proxy must implement interface.");
-    //     static_assert(std::is_base_of<rpc::proxy_base, ConcreteLocalProxyType>::value, "Proxy must be a proxy_base.");
-
-    //     ConcreteLocalProxyType* raw_local_proxy = new ConcreteLocalProxyType(actual_object_sp_target);
-
-    //     if (auto* proxy_base_ptr = raw_local_proxy->query_proxy_base())
-    //     {
-    //         const_cast<rpc::proxy_base*>(proxy_base_ptr)->object_proxy_ = obj_proxy_for_local_proxy_instance;
-    //     }
-
-    //     return rpc::shared_ptr<InterfaceType>(static_cast<InterfaceType*>(raw_local_proxy),
-    //         obj_proxy_for_local_proxy_instance,
-    //         std::default_delete<ConcreteLocalProxyType>());
-    // }
-
     // NAMESPACE_INLINE_END  // Commented out to simplify
 
 } // namespace rpc
@@ -910,11 +752,7 @@ namespace std
     {
         size_t operator()(const rpc::shared_ptr<T>& p) const noexcept { return std::hash<T*>()(p.get()); }
     };
-    // Commented out unique_ptr hash specialization - not needed
-    // template<typename T, typename D> struct hash<rpc::unique_ptr<T, D>>
-    // {
-    //     size_t operator()(const rpc::unique_ptr<T, D>& p) const noexcept { return std::hash<T*>()(p.get()); }
-    // };
+
     template<typename T> struct hash<rpc::weak_ptr<T>>
     {
         size_t operator()(const rpc::weak_ptr<T>& p) const noexcept
