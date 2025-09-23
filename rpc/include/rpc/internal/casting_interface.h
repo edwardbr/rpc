@@ -39,7 +39,7 @@ namespace rpc
         virtual void* get_address() const = 0;
         virtual const rpc::casting_interface* query_interface(rpc::interface_ordinal interface_id) const = 0;
 
-        virtual bool is_local() const { return false; }
+        virtual bool is_local() const { return true; }
         virtual std::shared_ptr<rpc::object_proxy> get_object_proxy() const { return nullptr; }
 
         // in bindings.h        

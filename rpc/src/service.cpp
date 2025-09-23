@@ -674,7 +674,7 @@ namespace rpc
         if (outcall)
         {
             rpc::casting_interface* casting_interface = nullptr;
-            if ((caller_channel_zone_id.is_set() || caller_zone_id.is_set()) && iface)
+            if ((caller_channel_zone_id.is_set() || caller_zone_id.is_set()) && !iface->is_local())
             {
                 CO_RETURN CO_AWAIT prepare_out_param(protocol_version, caller_channel_zone_id, caller_zone_id, iface);
             }

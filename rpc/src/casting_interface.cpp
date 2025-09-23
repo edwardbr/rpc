@@ -13,6 +13,8 @@ namespace rpc
             return true;
         if (!second)
             return true;
+        if (first->is_local() || second->is_local())
+            return true;
         auto first_address_null = first == nullptr;
         auto second_address_null = second == nullptr;
         if (first_address_null || second_address_null)
