@@ -9,8 +9,7 @@
 namespace rpc
 {
     // Global telemetry service definition for host builds
-#ifndef _IN_ENCLAVE
+#ifdef USE_RPC_TELEMETRY
     std::shared_ptr<i_telemetry_service> telemetry_service_ = nullptr;
 #endif
-
 }

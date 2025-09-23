@@ -39,7 +39,7 @@ namespace rpc
             void* managed_object_ptr_{nullptr};
 
         public:
-            control_block_base(void* obj_ptr, std::shared_ptr<rpc::object_proxy> obj_proxy_for_this_cb_obj)
+            control_block_base(void* obj_ptr)
                 : managed_object_ptr_(obj_ptr)
             {
             }
@@ -84,7 +84,7 @@ namespace rpc
             Deleter object_deleter_;
             Alloc control_block_allocator_;
             control_block_impl(T* p, Deleter d, Alloc a)
-                : control_block_base(p, nullptr)
+                : control_block_base(p)
                 , object_deleter_(std::move(d))
                 , control_block_allocator_(std::move(a))
             {
