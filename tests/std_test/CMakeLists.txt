@@ -37,7 +37,6 @@ set(BUILDABLE_TESTS
     Dev10_500860_overloaded_address_of
     Dev10_635436_shared_ptr_reset
     Dev10_722102_shared_ptr_nullptr
-    Dev11_0000000_tuple_cat
     Dev11_0000000_user_defined_literals
     Dev11_0535636_functional_overhaul
     GH_002299_implicit_sfinae_constraints
