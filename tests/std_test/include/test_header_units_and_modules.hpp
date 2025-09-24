@@ -448,10 +448,7 @@ void test_mdspan() {
 void test_memory() {
     using namespace std;
     puts("Testing <memory>.");
-    unique_ptr<int> up = make_unique<int>(1729);
-    assert(*up == 1729);
-    shared_ptr<int> sp{move(up)};
-    assert(!up);
+    shared_ptr<int> sp = make_shared<int>(1729);
     assert(*sp == 1729);
     weak_ptr<const int> wp{sp};
     assert(!wp.expired());

@@ -11,10 +11,9 @@ cmake_minimum_required(VERSION 3.24)
 set(BUILDABLE_TESTS
     # P0718R2_atomic_smart_ptrs                     # C++20 only - atomic<shared_ptr> specializations
     # P1020R1_smart_pointer_for_overwrite           # C++20 only - make_shared_for_overwrite not in C++17
-    # P0674R1_make_shared_for_arrays                # C++20 only - make_shared<T[]> not in C++17
-    # P1135R6_atomic_wait                           # C++20 only - atomic<shared_ptr> specializations
-    # LWG3018_shared_ptr_function                   # shared_ptr function tests disable as we are not going to implement that
-    # Dev10_498944_enable_shared_from_this_auto_ptr # not interested in auto_ptr
+    P1135R6_atomic_wait                           # C++20 only - atomic<shared_ptr> specializations
+    LWG3018_shared_ptr_function                   # shared_ptr function tests disable as we are not going to implement that
+    Dev10_498944_enable_shared_from_this_auto_ptr # not interested in auto_ptr
 
     Dev09_196243_tr1_enable_shared_from_this_ops  # enable_shared_from_this tests
     Dev10_445289_make_shared                      # make_shared tests
@@ -28,7 +27,7 @@ set(BUILDABLE_TESTS
     Dev11_0376122_grand_theft_bind
     Dev11_0920385_list_sort_allocator
     P2162R2_std_visit_for_derived_classes_from_variant
-    # VSO_0000000_has_static_rtti
+    VSO_0000000_has_static_rtti
     VSO_0000000_initialize_everything
     VSO_0105317_expression_sfinae
     
@@ -41,12 +40,8 @@ set(BUILDABLE_TESTS
     Dev11_0535636_functional_overhaul
     GH_002299_implicit_sfinae_constraints
     GH_005315_destructor_tombstones
-    # P0414R2_shared_ptr_for_arrays
     P0433R2_deduction_guides
     P0513R0_poisoning_the_hash
-    # P1132R7_out_ptr
-    # P2286R8_text_formatting_formattable
-    # P2404R3_move_only_types_for_comparison_concepts
     VSO_0000000_instantiate_iterators_misc
 )
 

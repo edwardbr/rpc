@@ -33,15 +33,11 @@ struct HasGetDeleter<Deleter, SmartPtr, void_t<GetDeleterResult<Deleter, SmartPt
 int main() {
     // Test dynamic_pointer_cast with shared_ptr
     {
-#ifdef _CPPRTTI
         const shared_ptr<exception> base      = make_shared<regex_error>(regex_constants::error_paren);
         const shared_ptr<regex_error> derived = dynamic_pointer_cast<regex_error>(base);
         assert(derived && derived->code() == regex_constants::error_paren);
 
         STATIC_ASSERT(HasDynamicPointerCast<logic_error, shared_ptr<exception>>::value);
-#else // _CPPRTTI
-        STATIC_ASSERT(!HasDynamicPointerCast<logic_error, shared_ptr<exception>>::value);
-#endif // _CPPRTTI
     }
 
     // Test get_deleter with shared_ptr
@@ -50,14 +46,10 @@ int main() {
         shared_ptr<int> sp2(new int(22), default_delete<int>{});
         shared_ptr<int> sp3(new int(33), default_delete<int>{}, allocator<int>{});
 
-#if _HAS_STATIC_RTTI
         assert(!get_deleter<default_delete<int>>(sp1));
         assert(get_deleter<default_delete<int>>(sp2) != nullptr);
         assert(get_deleter<default_delete<int>>(sp3) != nullptr);
 
         STATIC_ASSERT(HasGetDeleter<default_delete<short>, shared_ptr<short>>::value);
-#else // _HAS_STATIC_RTTI
-        STATIC_ASSERT(!HasGetDeleter<default_delete<short>, shared_ptr<short>>::value);
-#endif // _HAS_STATIC_RTTI
     }
 }

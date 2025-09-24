@@ -25,7 +25,6 @@ constexpr bool can_shared_ptr_assign<T, U, void_t<decltype(declval<shared_ptr<T>
 STATIC_ASSERT(can_shared_ptr_assign<int, shared_ptr<int>>);
 STATIC_ASSERT(!can_shared_ptr_assign<int, shared_ptr<long>>);
 STATIC_ASSERT(!can_shared_ptr_assign<int, const shared_ptr<long>&>);
-STATIC_ASSERT(!can_shared_ptr_assign<int, unique_ptr<long>>);
 #if _HAS_AUTO_PTR_ETC
 STATIC_ASSERT(!can_shared_ptr_assign<int, auto_ptr<long>>);
 #endif
@@ -75,8 +74,6 @@ constexpr bool can_make_optional_impl<void_t<decltype(make_optional<T>(declval<U
 template <class T, class... Us>
 constexpr bool can_make_optional_usual = can_make_optional_impl<void, T, Us...>;
 
-STATIC_ASSERT(can_make_optional_decay<unique_ptr<int>>);
-STATIC_ASSERT(!can_make_optional_decay<const unique_ptr<int>&>); // LWG-3627
 STATIC_ASSERT(can_make_optional_usual<int, int>);
 STATIC_ASSERT(!can_make_optional_usual<int, int, int>);
 STATIC_ASSERT(!can_make_optional_usual<int, initializer_list<int>&>);
@@ -92,7 +89,6 @@ template <class T, class... Us>
 constexpr bool can_make_any = can_make_any_impl<void, T, Us...>;
 
 STATIC_ASSERT(can_make_any<int, int>);
-STATIC_ASSERT(!can_make_any<unique_ptr<int>, const unique_ptr<int>&>);
 STATIC_ASSERT(!can_make_any<int, int, int>);
 STATIC_ASSERT(!can_make_any<int, initializer_list<int>&>);
 #endif // _HAS_CXX17

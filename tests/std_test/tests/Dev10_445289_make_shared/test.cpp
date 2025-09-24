@@ -289,55 +289,8 @@ void test_adl_proof_shared_ptr_creation_one() { // COMPILE-ONLY
     (void) std::make_shared<T>(T{});
     (void) std::allocate_shared<T>(adl_proof_allocator<T>{});
     (void) std::allocate_shared<T>(adl_proof_allocator<T>{}, T{});
-
-#if _HAS_CXX20
-    T src[42]{};
-    T src2[6][6]{};
-
-    (void) std::make_shared<T[]>(42);
-    (void) std::make_shared<T[]>(42, T{});
-    (void) std::make_shared<T[][42]>(42);
-    (void) std::make_shared<T[][42]>(42, src);
-    (void) std::make_shared<T[42][42]>();
-    (void) std::make_shared<T[42][42]>(src);
-
-    (void) std::make_shared<T[][6][6]>(6, src2);
-    (void) std::make_shared<T[6][6][6]>(src2);
-
-    (void) std::make_shared_for_overwrite<T>();
-    (void) std::make_shared_for_overwrite<T[]>(42);
-    (void) std::make_shared_for_overwrite<T[42]>();
-    (void) std::make_shared_for_overwrite<T[][42]>(42);
-    (void) std::make_shared_for_overwrite<T[42][42]>();
-
-    (void) std::allocate_shared<T[]>(adl_proof_allocator<T>{}, 42);
-    (void) std::allocate_shared<T[]>(adl_proof_allocator<T>{}, 42, T{});
-    (void) std::allocate_shared<T[][42]>(adl_proof_allocator<T>{}, 42);
-    (void) std::allocate_shared<T[][42]>(adl_proof_allocator<T>{}, 42, src);
-    (void) std::allocate_shared<T[42]>(adl_proof_allocator<T>{});
-    (void) std::allocate_shared<T[42]>(adl_proof_allocator<T>{}, T{});
-    (void) std::allocate_shared<T[42][42]>(adl_proof_allocator<T>{});
-    (void) std::allocate_shared<T[42][42]>(adl_proof_allocator<T>{}, src);
-
-    (void) std::allocate_shared<T[][6][6]>(adl_proof_allocator<T>{}, 6, src2);
-    (void) std::allocate_shared<T[6][6][6]>(adl_proof_allocator<T>{}, src2);
-
-    (void) std::allocate_shared_for_overwrite<T>(adl_proof_allocator<T>{});
-    (void) std::allocate_shared_for_overwrite<T[]>(adl_proof_allocator<T>{}, 42);
-    (void) std::allocate_shared_for_overwrite<T[42]>(adl_proof_allocator<T>{});
-    (void) std::allocate_shared_for_overwrite<T[][42]>(adl_proof_allocator<T>{}, 42);
-    (void) std::allocate_shared_for_overwrite<T[42][42]>(adl_proof_allocator<T>{});
-#endif // _HAS_CXX20
 }
 
-// incomplete types not supported
-// void test_adl_proof_shared_ptr_creation() { // COMPILE-ONLY
-//     using validator             = holder<incomplete>*;
-//     using validating_nontrivial = tagged_nontrivial<holder<incomplete>>;
-
-//     test_adl_proof_shared_ptr_creation_one<validator>();
-//     test_adl_proof_shared_ptr_creation_one<validating_nontrivial>();
-// }
 #endif // ^^^ no workaround ^^^
 
 

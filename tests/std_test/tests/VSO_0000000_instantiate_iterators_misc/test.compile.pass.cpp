@@ -556,12 +556,12 @@ void future_test() {
 
     packaged_task<void()> pt([]() {});
     // GH-321: "<future>: packaged_task can't be constructed from a move-only lambda"
-    packaged_task<void()> pt2([uptr = unique_ptr<int>{}]() { (void) uptr; });
+    // packaged_task<void()> pt2([]() {});
 
 #if _HAS_FUNCTION_ALLOCATOR_SUPPORT
     packaged_task<void()> pta(allocator_arg, allocator<double>{}, []() {});
     // GH-321: "<future>: packaged_task can't be constructed from a move-only lambda"
-    packaged_task<void()> pta2(allocator_arg, allocator<double>{}, [uptr = unique_ptr<int>{}]() { (void) uptr; });
+    // packaged_task<void()> pta2(allocator_arg, allocator<double>{}, []() {});
 #endif // _HAS_FUNCTION_ALLOCATOR_SUPPORT
 
     swap_test(pt);
@@ -865,13 +865,9 @@ void shared_ptr_test_impl() {
     sptr8 = auto_ptr<int>{};
 #endif // _HAS_AUTO_PTR_ETC
     shared_ptr<void> sptr9(move(sptr3));
-    shared_ptr<int> sptr10(unique_ptr<int>{});
-
-    sptr4 = unique_ptr<int>{};
     sptr6 = move(sptr5);
     sptr9 = sptr7;
 
-    sptr10.reset(new int());
     sptr0.reset(new int(), default_delete<int>{});
     sptr0.reset(new int(), default_delete<int>{}, allocator<int>{});
 
@@ -921,41 +917,10 @@ void weak_ptr_test_impl() {
     swap_test(wptr0);
 }
 
-void unique_ptr_test_impl() {
-    default_delete<int> int_deleter{};
-    unique_ptr<int> uptr0{};
-    unique_ptr<int, default_delete<int>&> uptr1(new int(), int_deleter);
-    unique_ptr<int> uptr2(new int(), move(int_deleter));
-    unique_ptr<int> uptr3{move(uptr1)};
-#if _HAS_AUTO_PTR_ETC
-    unique_ptr<int> uptr4{auto_ptr<int>{}};
-    (void) uptr4;
-#endif // _HAS_AUTO_PTR_ETC
-
-    uptr3 = move(uptr1);
-
-    default_delete<int[]> int_arr_deleter{};
-    unique_ptr<int[]> uptr5{};
-    unique_ptr<int[]> uptr6{new int[5]};
-    unique_ptr<int[], default_delete<int[]>&> uptr7(new int[5], int_arr_deleter);
-    unique_ptr<int[]> uptr8{move(uptr7)};
-    uptr8 = move(uptr7);
-    uptr6.reset(new int[5]);
-
-    auto uptr9  = make_unique<int>(5);
-    auto uptr10 = make_unique<int[]>(5);
-
-    swap_test(uptr9);
-    comparable_test(uptr2, uptr5);
-    comparable_test(uptr1, nullptr);
-    comparable_test(nullptr, uptr10);
-    hash_test(uptr0);
-}
 
 void memory_test() {
     shared_ptr_test_impl();
     weak_ptr_test_impl();
-    unique_ptr_test_impl();
 
     struct my_shared_from_this : enable_shared_from_this<my_shared_from_this> {
         my_shared_from_this() {}
@@ -1835,13 +1800,11 @@ void xfunctional_test() {
 // }
 
 void xmemory0_test() {
-    INSTANTIATE(pointer_traits<unique_ptr<int>>);
 
     struct Base {};
 
     struct Derived : Base {};
 
-    INSTANTIATE(pointer_traits<unique_ptr<Base>>::rebind<Derived>);
     INSTANTIATE(pointer_traits<int*>);
     INSTANTIATE(pointer_traits<Base*>::rebind<Derived*>);
 

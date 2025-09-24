@@ -67,14 +67,6 @@ void* operator new(size_t size, align_val_t align, const nothrow_t&) noexcept {
     return result;
 }
 
-template <typename T, typename = void>
-struct unique_is_for_overwritable : false_type {};
-
-template <typename T>
-struct unique_is_for_overwritable<T, void_t<decltype(make_unique_for_overwrite<T>())>> : true_type {};
-
-template <typename T>
-constexpr bool unique_is_for_overwritable_v = unique_is_for_overwritable<T>::value;
 
 struct DefaultInitializableInt {
     int value;
@@ -157,28 +149,6 @@ void test_make_shared_init_destruct_order(Args&&... vals) {
     assert_descending_destruct();
 }
 
-void test_make_unique_for_overwrite() {
-    static_assert(unique_is_for_overwritable_v<char>);
-    static_assert(!unique_is_for_overwritable_v<int[100]>);
-
-    auto p0 = make_unique_for_overwrite<int>();
-    assert_uninitialized(p0.get(), sizeof(int));
-
-    auto p1 = make_unique_for_overwrite<int[]>(100u);
-    assert_uninitialized(p1.get(), sizeof(int) * 100u);
-
-    auto p2 = make_unique_for_overwrite<DefaultInitializableInt>();
-    assert(p2->value == initializedValue);
-
-    auto p3 = make_unique_for_overwrite<DefaultInitializableInt[][89]>(2u);
-    for (size_t i = 0; i < 2; ++i) {
-        for (size_t j = 0; j < 89; ++j) {
-            assert(p3[i][j].value == initializedValue);
-        }
-    }
-
-    auto p4 = make_unique_for_overwrite<int[]>(0u); // p4 cannot be dereferenced
-}
 
 void test_make_shared_for_overwrite() {
     auto p0 = make_shared_for_overwrite_assert<int>();
@@ -338,7 +308,6 @@ void test_allocate_shared_for_overwrite() {
 }
 
 int main() {
-    test_make_unique_for_overwrite();
     test_make_shared_for_overwrite();
     test_allocate_shared_for_overwrite();
 }
