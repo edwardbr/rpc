@@ -10,7 +10,6 @@
 #include <new>
 #include <type_traits>
 
-using namespace std;
 
 #define STATIC_ASSERT(...) static_assert(__VA_ARGS__, #__VA_ARGS__)
 
@@ -27,8 +26,8 @@ public:
     typedef T& reference;
     typedef const T& const_reference;
     typedef T value_type;
-    typedef size_t size_type;
-    typedef ptrdiff_t difference_type;
+    typedef std::size_t size_type;
+    typedef std::ptrdiff_t difference_type;
 
     T* address(T& r) const {
         return &r;
@@ -38,8 +37,8 @@ public:
         return &s;
     }
 
-    size_t max_size() const {
-        return (static_cast<size_t>(0) - static_cast<size_t>(1)) / sizeof(T);
+    std::size_t max_size() const {
+        return (static_cast<std::size_t>(0) - static_cast<std::size_t>(1)) / sizeof(T);
     }
 
     template <typename U>
@@ -74,7 +73,7 @@ public:
 
     ~Mallocator() {}
 
-    T* allocate(const size_t n) const {
+    T* allocate(const std::size_t n) const {
         if (n == 0) {
             return nullptr;
         }
@@ -85,23 +84,23 @@ public:
             abort();
         }
 
-        memset(pv, 0xCC, n * sizeof(T) + 256);
+        std::memset(pv, 0xCC, n * sizeof(T) + 256);
         ++g_mallocs;
         return static_cast<T*>(static_cast<void*>(static_cast<unsigned char*>(pv) + 128));
     }
 
-    void deallocate(T* const p, size_t) const {
+    void deallocate(T* const p, std::size_t) const {
         unsigned char* const x = static_cast<unsigned char*>(static_cast<void*>(p)) - 128;
         const auto equal_to_cc = [](const unsigned char c) { return c == 0xCC; };
-        assert(all_of(x, x + 128, equal_to_cc));
+        assert(std::all_of(x, x + 128, equal_to_cc));
         const auto afterT = x + 128 + sizeof(T);
-        assert(all_of(afterT, afterT + 128, equal_to_cc));
+        assert(std::all_of(afterT, afterT + 128, equal_to_cc));
         ++g_frees;
         free(x);
     }
 
     template <typename U>
-    T* allocate(const size_t n, const U*) const {
+    T* allocate(const std::size_t n, const U*) const {
         return allocate(n);
     }
 
@@ -113,23 +112,23 @@ private:
 int g_news    = 0;
 int g_deletes = 0;
 
-void* operator new(size_t size) {
-    void* const p = ::operator new(size, nothrow);
+void* operator new(std::size_t size) {
+    void* const p = ::operator new(size, std::nothrow);
     assert(p != nullptr);
     return p;
 }
 
-void* operator new(size_t size, const nothrow_t&) noexcept {
+void* operator new(std::size_t size, const std::nothrow_t&) noexcept {
     ++g_news;
 
     return malloc(size == 0 ? 1 : size);
 }
 
 void operator delete(void* ptr) noexcept {
-    ::operator delete(ptr, nothrow);
+    ::operator delete(ptr, std::nothrow);
 }
 
-void operator delete(void* ptr, const nothrow_t&) noexcept {
+void operator delete(void* ptr, const std::nothrow_t&) noexcept {
     if (ptr) {
         ++g_deletes;
 
@@ -137,20 +136,20 @@ void operator delete(void* ptr, const nothrow_t&) noexcept {
     }
 }
 
-void* operator new[](size_t size) {
+void* operator new[](std::size_t size) {
     return ::operator new(size);
 }
 
-void* operator new[](size_t size, const nothrow_t&) noexcept {
-    return ::operator new(size, nothrow);
+void* operator new[](std::size_t size, const std::nothrow_t&) noexcept {
+    return ::operator new(size, std::nothrow);
 }
 
 void operator delete[](void* ptr) noexcept {
     ::operator delete(ptr);
 }
 
-void operator delete[](void* ptr, const nothrow_t&) noexcept {
-    ::operator delete(ptr, nothrow);
+void operator delete[](void* ptr, const std::nothrow_t&) noexcept {
+    ::operator delete(ptr, std::nothrow);
 }
 
 
@@ -213,8 +212,8 @@ constexpr bool is_adl_proof_allocator = false;
 
 template <class Alloc>
 constexpr bool
-    is_adl_proof_allocator<Alloc, void_t<typename adl_proof_allocator_provider<typename Alloc::value_type>::alloc>> =
-        is_same_v<typename adl_proof_allocator_provider<typename Alloc::value_type>::alloc, Alloc>;
+    is_adl_proof_allocator<Alloc, std::void_t<typename adl_proof_allocator_provider<typename Alloc::value_type>::alloc>> =
+        std::is_same_v<typename adl_proof_allocator_provider<typename Alloc::value_type>::alloc, Alloc>;
 
 template <class T>
 struct adl_proof_allocator_provider<T>::alloc {
@@ -226,29 +225,29 @@ struct adl_proof_allocator_provider<T>::alloc {
     };
 
     alloc() = default;
-    template <class OtherAlloc, enable_if_t<is_adl_proof_allocator<OtherAlloc>, int> = 0>
+    template <class OtherAlloc, std::enable_if_t<is_adl_proof_allocator<OtherAlloc>, int> = 0>
     constexpr alloc(const OtherAlloc&) noexcept {}
 
-    T* allocate(const size_t n) {
-        return allocator<T>{}.allocate(n);
+    T* allocate(const std::size_t n) {
+        return std::allocator<T>{}.allocate(n);
     }
 
 #if _HAS_CXX23
-    allocation_result<T*> allocate_at_least(const size_t n) {
-        return allocator<T>{}.allocate_at_least(n);
+    std::allocation_result<T*> allocate_at_least(const std::size_t n) {
+        return std::allocator<T>{}.allocate_at_least(n);
     }
 #endif // _HAS_CXX23
 
-    void deallocate(T* const p, const size_t n) {
-        return allocator<T>{}.deallocate(p, n);
+    void deallocate(T* const p, const std::size_t n) {
+        return std::allocator<T>{}.deallocate(p, n);
     }
 
-    template <class OtherAlloc, enable_if_t<is_adl_proof_allocator<OtherAlloc>, int> = 0>
+    template <class OtherAlloc, std::enable_if_t<is_adl_proof_allocator<OtherAlloc>, int> = 0>
     friend constexpr bool operator==(const alloc&, const OtherAlloc&) noexcept {
         return true;
     }
 #if !_HAS_CXX20
-    template <class OtherAlloc, enable_if_t<is_adl_proof_allocator<OtherAlloc>, int> = 0>
+    template <class OtherAlloc, std::enable_if_t<is_adl_proof_allocator<OtherAlloc>, int> = 0>
     friend constexpr bool operator!=(const alloc&, const OtherAlloc&) noexcept {
         return false;
     }
@@ -279,11 +278,11 @@ struct tagged_nontrivial {
 template <class T>
 void test_adl_proof_shared_ptr_creation_one() { // COMPILE-ONLY
     // Function calls are intentionally qualified.
-    (void) shared_ptr<T>{};
-    (void) shared_ptr<T>{new T};
-    (void) shared_ptr<T>{new T, default_delete<T>{}};
-    (void) shared_ptr<T>{new T, default_delete<T>{}, adl_proof_allocator<T>{}};
-    (void) shared_ptr<T>{std::make_unique<T>()};
+    (void) std::shared_ptr<T>{};
+    (void) std::shared_ptr<T>{new T};
+    (void) std::shared_ptr<T>{new T, std::default_delete<T>{}};
+    (void) std::shared_ptr<T>{new T, std::default_delete<T>{}, adl_proof_allocator<T>{}};
+    (void) std::shared_ptr<T>{std::make_unique<T>()};
 
     (void) std::make_shared<T>();
     (void) std::make_shared<T>(T{});
@@ -297,25 +296,25 @@ void test_adl_proof_shared_ptr_creation_one() { // COMPILE-ONLY
 int main() {
     reset();
 
-    shared_ptr<int> p(new int(100));
+    std::shared_ptr<int> p(new int(100));
     test_and_reset(0, 0, 2, 0, 0, 0);
 
-    shared_ptr<int> pd1(new int(201), scorch);
+    std::shared_ptr<int> pd1(new int(201), scorch);
     test_and_reset(0, 0, 2, 0, 0, 0);
 
-    shared_ptr<int> pd2(new int(202), Burn());
+    std::shared_ptr<int> pd2(new int(202), Burn());
     test_and_reset(0, 0, 2, 0, 0, 0);
 
-    shared_ptr<int> pda1(new int(301), scorch, Mallocator<int>());
+    std::shared_ptr<int> pda1(new int(301), scorch, Mallocator<int>());
     test_and_reset(1, 0, 1, 0, 0, 0);
 
-    shared_ptr<int> pda2(new int(302), Burn(), Mallocator<int>());
+    std::shared_ptr<int> pda2(new int(302), Burn(), Mallocator<int>());
     test_and_reset(1, 0, 1, 0, 0, 0);
 
-    shared_ptr<int> mp = make_shared<int>(401);
+    std::shared_ptr<int> mp = std::make_shared<int>(401);
     test_and_reset(0, 0, 1, 0, 0, 0);
 
-    shared_ptr<int> mpa = allocate_shared<int>(Mallocator<int>(), 402);
+    std::shared_ptr<int> mpa = std::allocate_shared<int>(Mallocator<int>(), 402);
     test_and_reset(1, 0, 0, 0, 0, 0);
 
     assert(*p == 100);
@@ -327,25 +326,25 @@ int main() {
     assert(*mpa == 402);
 
 
-    weak_ptr<int> wp(p);
+    std::weak_ptr<int> wp(p);
     test_and_reset(0, 0, 0, 0, 0, 0);
 
-    weak_ptr<int> wpd1(pd1);
+    std::weak_ptr<int> wpd1(pd1);
     test_and_reset(0, 0, 0, 0, 0, 0);
 
-    weak_ptr<int> wpd2(pd2);
+    std::weak_ptr<int> wpd2(pd2);
     test_and_reset(0, 0, 0, 0, 0, 0);
 
-    weak_ptr<int> wpda1(pda1);
+    std::weak_ptr<int> wpda1(pda1);
     test_and_reset(0, 0, 0, 0, 0, 0);
 
-    weak_ptr<int> wpda2(pda2);
+    std::weak_ptr<int> wpda2(pda2);
     test_and_reset(0, 0, 0, 0, 0, 0);
 
-    weak_ptr<int> wmp(mp);
+    std::weak_ptr<int> wmp(mp);
     test_and_reset(0, 0, 0, 0, 0, 0);
 
-    weak_ptr<int> wmpa(mpa);
+    std::weak_ptr<int> wmpa(mpa);
     test_and_reset(0, 0, 0, 0, 0, 0);
 
     assert(*wp.lock() == 100);

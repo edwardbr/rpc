@@ -7,7 +7,6 @@
 #include <memory>
 #include <new>
 
-using namespace std;
 
 template <typename T>
 struct MyAlloc {
@@ -38,10 +37,10 @@ struct MyAlloc {
         void* const pv = malloc((n + m_offset) * sizeof(T));
 
         if (!pv) {
-            throw bad_alloc();
+            throw std::bad_alloc();
         }
 
-        memset(pv, 0xAB, (n + m_offset) * sizeof(T));
+        std::memset(pv, 0xAB, (n + m_offset) * sizeof(T));
 
         return static_cast<T*>(pv) + m_offset;
     }
@@ -58,10 +57,10 @@ int main() {
 
     // Test shared_ptr with custom allocator
     {
-        shared_ptr<int> sp1(new int(1729), default_delete<int>(), alloc);
+        std::shared_ptr<int> sp1(new int(1729), std::default_delete<int>(), alloc);
         assert(*sp1 == 1729);
 
-        shared_ptr<int> sp2 = allocate_shared<int>(alloc, 1729);
+        std::shared_ptr<int> sp2 = std::allocate_shared<int>(alloc, 1729);
         assert(*sp2 == 1729);
     }
 }

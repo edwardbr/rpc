@@ -12,29 +12,28 @@
 #include <functional>
 #include <memory>
 
-using namespace std;
 
-void test1(const shared_ptr<int>& sp) {
+void test1(const std::shared_ptr<int>& sp) {
     assert(sp && *sp == 1729);
 }
 
-void test2(shared_ptr<int> sp) {
+void test2(std::shared_ptr<int> sp) {
     assert(sp && *sp == 19937);
 }
 
 int main() {
-    auto sp1 = make_shared<int>(1729);
+    auto sp1 = std::make_shared<int>(1729);
     test1(sp1);
     test1(sp1);
-    auto b1 = bind(&test1, sp1);
+    auto b1 = std::bind(&test1, sp1);
     sp1.reset();
     b1();
     b1();
 
-    auto sp2 = make_shared<int>(19937);
+    auto sp2 = std::make_shared<int>(19937);
     test2(sp2);
     test2(sp2);
-    auto b2 = bind(&test2, sp2);
+    auto b2 = std::bind(&test2, sp2);
     sp2.reset();
     b2();
     b2();

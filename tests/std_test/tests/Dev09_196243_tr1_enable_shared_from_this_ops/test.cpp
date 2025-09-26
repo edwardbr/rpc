@@ -4,9 +4,8 @@
 #include <cassert>
 #include <memory>
 
-using namespace std;
 
-struct X : enable_shared_from_this<X> {
+struct X : std::enable_shared_from_this<X> {
     explicit X(const int n) : m_n(n) {}
     int m_n;
 };
@@ -14,8 +13,8 @@ struct X : enable_shared_from_this<X> {
 int main() {
     // Test DDB-196243 "TR1 VC9 SP1: enable_shared_from_this's copy ctor and copy assignment operator do too much work".
     {
-        const shared_ptr<X> sp1(new X(11));
-        const shared_ptr<X> sp2(new X(22));
+        const std::shared_ptr<X> sp1(new X(11));
+        const std::shared_ptr<X> sp2(new X(22));
 
         X* const raw1 = sp1.get();
         X* const raw2 = sp2.get();
@@ -37,12 +36,12 @@ int main() {
         assert(raw2->shared_from_this() != sp1);
     }
 
-    // Test DDB-197048 "[VS2008 / TR1] still got problems with shared_ptr<const T>".
+    // Test DDB-197048 "[VS2008 / TR1] still got problems with std::shared_ptr<const T>".
     {
-        shared_ptr<const int> sp1(static_cast<const int*>(new int(6)));
+        std::shared_ptr<const int> sp1(static_cast<const int*>(new int(6)));
         // COMMENTED OUT: volatile not supported by libstdc++ in same way as MSVC STL
-        // shared_ptr<volatile int> sp2(static_cast<volatile int*>(new int(7)));
-        // shared_ptr<const volatile int> sp3(static_cast<const volatile int*>(new int(8)));
+        // std::shared_ptr<volatile int> sp2(static_cast<volatile int*>(new int(7)));
+        // std::shared_ptr<const volatile int> sp3(static_cast<const volatile int*>(new int(8)));
 
         assert(*sp1 == 6);
         // assert(*sp2 == 7);
@@ -51,8 +50,8 @@ int main() {
 
     // Test Dev10-654944 "shared_ptr: assignment is messed up".
     {
-        shared_ptr<int> p(new int(1729));
-        shared_ptr<int> z;
+        std::shared_ptr<int> p(new int(1729));
+        std::shared_ptr<int> z;
 
         assert(!!p);
         assert(*p == 1729);
@@ -64,17 +63,17 @@ int main() {
         assert(!z);
     }
 
-    // Test DevDiv-1178296 "<memory>: shared_ptr<volatile X> doesn't work with enable_shared_from_this<X>".
+    // Test DevDiv-1178296 "<memory>: std::shared_ptr<volatile X> doesn't work with std::enable_shared_from_this<X>".
     {
-        const auto sp1 = make_shared<const X>(100);
+        const auto sp1 = std::make_shared<const X>(100);
         // COMMENTED OUT: volatile enable_shared_from_this not supported by libstdc++
         // const auto sp2 = make_shared<volatile X>(200);
         // const auto sp3 = make_shared<const volatile X>(300);
 
-        const shared_ptr<const X> sp4(static_cast<const X*>(new X(400)));
+        const std::shared_ptr<const X> sp4(static_cast<const X*>(new X(400)));
         // COMMENTED OUT: volatile enable_shared_from_this not supported by libstdc++
-        // const shared_ptr<volatile X> sp5(static_cast<volatile X*>(new X(500)));
-        // const shared_ptr<const volatile X> sp6(static_cast<const volatile X*>(new X(600)));
+        // const std::shared_ptr<volatile X> sp5(static_cast<volatile X*>(new X(500)));
+        // const std::shared_ptr<const volatile X> sp6(static_cast<const volatile X*>(new X(600)));
 
         assert(sp1->m_n == 100);
         // assert(sp2->m_n == 200);

@@ -106,9 +106,6 @@
 
 #include <instantiate_containers_iterators_common.hpp>
 
-
-using namespace std;
-
 #define STATIC_ASSERT(...) static_assert(__VA_ARGS__, #__VA_ARGS__)
 
 #ifndef _M_CEE_PURE
@@ -119,7 +116,7 @@ STATIC_ASSERT(memory_order_consume == memory_order::consume);
 STATIC_ASSERT(memory_order_acquire == memory_order::acquire);
 STATIC_ASSERT(memory_order_release == memory_order::release);
 STATIC_ASSERT(memory_order_acq_rel == memory_order::acq_rel);
-STATIC_ASSERT(memory_order_seq_cst == memory_order::seq_cst);
+STATIC_ASSERT(std::memory_order_seq_cst == memory_order::seq_cst);
 
 // LWG-3268
 STATIC_ASSERT(memory_order::memory_order_relaxed == memory_order::relaxed);
@@ -127,56 +124,56 @@ STATIC_ASSERT(memory_order::memory_order_consume == memory_order::consume);
 STATIC_ASSERT(memory_order::memory_order_acquire == memory_order::acquire);
 STATIC_ASSERT(memory_order::memory_order_release == memory_order::release);
 STATIC_ASSERT(memory_order::memory_order_acq_rel == memory_order::acq_rel);
-STATIC_ASSERT(memory_order::memory_order_seq_cst == memory_order::seq_cst);
+STATIC_ASSERT(memory_order::std::memory_order_seq_cst == memory_order::seq_cst);
 #endif // _HAS_CXX20
 
 template <typename AtomicType>
 void atomic_read_test_impl(AtomicType& value) {
     (void) atomic_is_lock_free(&value);
     (void) atomic_load(&value);
-    (void) atomic_load_explicit(&value, memory_order_seq_cst);
+    (void) atomic_load_explicit(&value, std::memory_order_seq_cst);
 }
 
 template <typename AtomicType, typename ValueType>
-void atomic_has_arithmetic_ops_test_impl(AtomicType& value, ValueType element, true_type) {
-    atomic_fetch_add(&value, element);
-    atomic_fetch_add_explicit(&value, element, memory_order_seq_cst);
-    atomic_fetch_sub(&value, element);
-    atomic_fetch_sub_explicit(&value, element, memory_order_seq_cst);
-    atomic_fetch_and(&value, element);
-    atomic_fetch_and_explicit(&value, element, memory_order_seq_cst);
-    atomic_fetch_or(&value, element);
-    atomic_fetch_or_explicit(&value, element, memory_order_seq_cst);
-    atomic_fetch_xor(&value, element);
-    atomic_fetch_xor_explicit(&value, element, memory_order_seq_cst);
+void atomic_has_arithmetic_ops_test_impl(AtomicType& value, ValueType element, std::true_type) {
+    std::atomic_fetch_add(&value, element);
+    std::atomic_fetch_add_explicit(&value, element, std::memory_order_seq_cst);
+    std::atomic_fetch_sub(&value, element);
+    std::atomic_fetch_sub_explicit(&value, element, std::memory_order_seq_cst);
+    std::atomic_fetch_and(&value, element);
+    std::atomic_fetch_and_explicit(&value, element, std::memory_order_seq_cst);
+    std::atomic_fetch_or(&value, element);
+    std::atomic_fetch_or_explicit(&value, element, std::memory_order_seq_cst);
+    std::atomic_fetch_xor(&value, element);
+    std::atomic_fetch_xor_explicit(&value, element, std::memory_order_seq_cst);
 }
 
 template <typename AtomicType, typename ValueType>
-void atomic_has_arithmetic_ops_test_impl(AtomicType&, ValueType, false_type) {}
+void atomic_has_arithmetic_ops_test_impl(AtomicType&, ValueType, std::false_type) {}
 
 template <typename AtomicType, typename ValueType>
 void atomic_write_test_impl(AtomicType& value, ValueType element) {
     ValueType* ptr_element = &element;
 
-    atomic_init(&value, element);
-    atomic_store(&value, element);
-    atomic_store_explicit(&value, element, memory_order_seq_cst);
-    atomic_exchange(&value, element);
-    atomic_exchange_explicit(&value, element, memory_order_seq_cst);
-    atomic_compare_exchange_weak(&value, ptr_element, element);
-    atomic_compare_exchange_weak_explicit(&value, ptr_element, element, memory_order_seq_cst, memory_order_seq_cst);
-    atomic_compare_exchange_strong(&value, ptr_element, element);
-    atomic_compare_exchange_strong_explicit(&value, ptr_element, element, memory_order_seq_cst, memory_order_seq_cst);
+    std::atomic_init(&value, element);
+    std::atomic_store(&value, element);
+    std::atomic_store_explicit(&value, element, std::memory_order_seq_cst);
+    std::atomic_exchange(&value, element);
+    std::atomic_exchange_explicit(&value, element, std::memory_order_seq_cst);
+    std::atomic_compare_exchange_weak(&value, ptr_element, element);
+    std::atomic_compare_exchange_weak_explicit(&value, ptr_element, element, std::memory_order_seq_cst, std::memory_order_seq_cst);
+    std::atomic_compare_exchange_strong(&value, ptr_element, element);
+    std::atomic_compare_exchange_strong_explicit(&value, ptr_element, element, std::memory_order_seq_cst, std::memory_order_seq_cst);
 
-    atomic_has_arithmetic_ops_test_impl(value, element, negation<is_same<ValueType, bool>>());
+    atomic_has_arithmetic_ops_test_impl(value, element, std::negation<std::is_same<ValueType, bool>>());
 }
 
 template <typename T>
 void atomic_test_impl(T element) {
-    atomic<T> value{element};
-    volatile atomic<T> v_value{element};
-    const atomic<T> c_value{element};
-    const volatile atomic<T> cv_value{element};
+    std::atomic<T> value{element};
+    volatile std::atomic<T> v_value{element};
+    const std::atomic<T> c_value{element};
+    const volatile std::atomic<T> cv_value{element};
 
     atomic_read_test_impl(value);
     atomic_read_test_impl(v_value);
@@ -195,7 +192,7 @@ void atomic_test_impl() {
 
 void atomic_test() {
     int a = 0;
-    kill_dependency(a);
+    std::kill_dependency(a);
 
     uint8_t one_byte = 0;
     STATIC_ASSERT(sizeof(one_byte) == 1);
@@ -236,26 +233,26 @@ void atomic_test() {
 #endif // _M_CEE_PURE
 
 void chrono_test() {
-    using namespace chrono;
-    treat_as_floating_point<float> a{};
-    duration_values<float> b{};
-    duration<float> c{};
-    (void) duration_cast<duration<float, ratio<2>>>(c);
-    duration<double> d(1.0f);
-    duration<double> e(c);
+    using namespace std::chrono;
+    std::chrono::treat_as_floating_point<float> a{};
+    std::chrono::duration_values<float> b{};
+    std::chrono::duration<float> c{};
+    (void) std::chrono::duration_cast<std::chrono::duration<float, std::ratio<2>>>(c);
+    std::chrono::duration<double> d(1.0f);
+    std::chrono::duration<double> e(c);
 
-    time_point<system_clock> time_pt = system_clock::now();
+    std::chrono::time_point<std::chrono::system_clock> time_pt = std::chrono::system_clock::now();
 
-    INSTANTIATE(common_type_t<duration<float>, duration<double>>);
-    INSTANTIATE(common_type_t<time_point<system_clock>, time_point<system_clock>>);
+    INSTANTIATE(std::common_type_t<std::chrono::duration<float>, std::chrono::duration<double>>);
+    INSTANTIATE(std::common_type_t<std::chrono::time_point<std::chrono::system_clock>, std::chrono::time_point<std::chrono::system_clock>>);
 
     (void) a;
     (void) b;
     (void) d;
     (void) e;
 
-    duration<float> dur1{};
-    duration<double, ratio<2>> dur2{};
+    std::chrono::duration<float> dur1{};
+    std::chrono::duration<double, std::ratio<2>> dur2{};
 
     (void) (dur1 + dur2);
     (void) (dur1 - dur2);
@@ -264,19 +261,19 @@ void chrono_test() {
     (void) (dur1 / 2.0);
     (void) (dur1 / dur2);
 
-    duration<int> dur3{};
-    duration<int, ratio<2>> dur4{};
+    std::chrono::duration<int> dur3{};
+    std::chrono::duration<int, std::ratio<2>> dur4{};
 
     (void) (dur3 % 2);
     (void) (dur3 % dur4);
 
     comparable_test(dur1, dur2);
 
-    (void) floor<duration<int>>(dur1);
-    (void) ceil<duration<int>>(dur1);
+    (void) std::chrono::floor<std::chrono::duration<int>>(dur1);
+    (void) ceil<std::chrono::duration<int>>(dur1);
 
-    (void) round<duration<int>>(dur1); // float -> int
-    (void) round<duration<int>>(dur3); // int -> int
+    (void) round<std::chrono::duration<int>>(dur1); // float -> int
+    (void) round<std::chrono::duration<int>>(dur3); // int -> int
 
     (void) abs(dur1);
 
@@ -286,38 +283,38 @@ void chrono_test() {
     (void) (time_pt - time_pt);
     comparable_test(time_pt);
 
-    (void) (time_point_cast<duration<float>>(time_pt));
+    (void) (time_point_cast<std::chrono::duration<float>>(time_pt));
 
-    (void) (floor<duration<float>>(time_pt));
-    (void) (ceil<duration<float>>(time_pt));
+    (void) (std::chrono::floor<std::chrono::duration<float>>(time_pt));
+    (void) (ceil<std::chrono::duration<float>>(time_pt));
 }
 
 #ifndef _M_CEE_PURE
 template <typename ConditionVariable>
 void condition_variable_test_impl() {
     ConditionVariable cv{};
-    unique_lock<mutex> lock;
+    std::unique_lock<std::mutex> lock;
 
     auto pr0  = []() { return true; };
-    auto soon = chrono::system_clock::now() + chrono::minutes(2);
+    auto soon = std::chrono::system_clock::now() + std::chrono::minutes(2);
 
     cv.wait(lock);
     cv.wait(lock, pr0);
-    (void) cv.wait_for(lock, chrono::seconds(1));
-    (void) cv.wait_for(lock, chrono::seconds(1), pr0);
+    (void) cv.wait_for(lock, std::chrono::seconds(1));
+    (void) cv.wait_for(lock, std::chrono::seconds(1), pr0);
     (void) cv.wait_until(lock, soon);
     (void) cv.wait_until(lock, soon, pr0);
 }
 
 void condition_variable_test() {
-    condition_variable_test_impl<condition_variable_any>();
+    condition_variable_test_impl<std::condition_variable_any>();
 }
 #endif // _M_CEE_PURE
 
-void check_nested_exception_impl(const exception& ex) { // unroll nested exceptions
+void check_nested_exception_impl(const std::exception& ex) { // unroll nested exceptions
     try {
-        rethrow_if_nested(ex);
-    } catch (const exception& e) {
+        std::rethrow_if_nested(ex);
+    } catch (const std::exception& e) {
         check_nested_exception_impl(e);
     } catch (...) {
     }
@@ -329,19 +326,19 @@ void exception_test_impl(const ThrowingFunction& tf) {
         try {
             tf();
         } catch (...) {
-            throw_with_nested("WOOFx2");
+            std::throw_with_nested("WOOFx2");
         }
-    } catch (const exception& e) {
+    } catch (const std::exception& e) {
         check_nested_exception_impl(e);
     }
 }
 
 void exception_test() {
-    exception e{};
-    exception_ptr e_ptr = make_exception_ptr(e);
+    std::exception e{};
+    std::exception_ptr e_ptr = std::make_exception_ptr(e);
 
     exception_test_impl([]() { throw 23; }); // can't nest
-    exception_test_impl([]() { throw runtime_error("WOOF"); }); // can nest
+    exception_test_impl([]() { throw std::runtime_error("WOOF"); }); // can nest
 }
 
 // template <typename CharType>
@@ -350,43 +347,43 @@ void exception_test() {
 
 //     basic_string<CharType> str = c_str;
 
-//     path p0(str.begin(), str.end());
+//     path p0(str.begin(), str.std::end());
 //     path p1(c_str);
 //     path p2(str);
 
 //     locale default_locale{};
-//     path p3(str.begin(), str.end(), default_locale);
+//     path p3(str.begin(), str.std::end(), default_locale);
 //     path p4(c_str, default_locale);
 //     path p5(str, default_locale);
 
 //     p0 = c_str;
 //     p1 = str;
-//     p2.assign(str.begin(), str.end());
+//     p2.assign(str.begin(), str.std::end());
 //     p3.assign(c_str);
 //     p4.assign(str);
 //     p5 /= c_str;
 //     p0 /= str;
-//     p0.append(str.begin(), str.end());
+//     p0.append(str.begin(), str.std::end());
 //     p0.append(c_str);
 //     p0 += *c_str;
 //     p0 += str;
 //     p0 += c_str;
-//     p0.concat(str.begin(), str.end());
+//     p0.concat(str.begin(), str.std::end());
 //     p0.concat(str.begin());
 //     p0.concat(c_str);
 //     p0.concat(*c_str);
 //     p0.concat(str);
 
-//     (void) p0.string<CharType>(str.get_allocator());
+//     (void) p0.std::string<CharType>(str.get_allocator());
 //     (void) p0.generic_string<CharType>(str.get_allocator());
 
-//     stringstream ss{};
+//     std::stringstream ss{};
 
 //     ss << p0;
 //     ss >> p0;
 
 //     auto u8str = p0.u8string();
-//     (void) u8path(u8str.begin(), u8str.end());
+//     (void) u8path(u8str.begin(), u8str.std::end());
 //     (void) u8path(u8str.c_str());
 // }
 
@@ -404,10 +401,10 @@ void exception_test() {
 
 template <typename CharType>
 void fstream_test_impl() {
-    basic_filebuf<CharType, char_traits<CharType>> fb;
-    basic_ifstream<CharType, char_traits<CharType>> ifs;
-    basic_ofstream<CharType, char_traits<CharType>> ofs;
-    basic_fstream<CharType, char_traits<CharType>> fs;
+    std::basic_filebuf<CharType, std::char_traits<CharType>> fb;
+    std::basic_ifstream<CharType, std::char_traits<CharType>> ifs;
+    std::basic_ofstream<CharType, std::char_traits<CharType>> ofs;
+    std::basic_fstream<CharType, std::char_traits<CharType>> fs;
 
     swap_test(fb);
     swap_test(ifs);
@@ -422,17 +419,17 @@ void fstream_test() {
 
 template <typename ReturnType, typename Function>
 void function_test_impl(Function func) {
-    function<ReturnType()> f0;
-    function<ReturnType()> f1 = nullptr;
-    function<ReturnType()> f2 = f0;
-    function<ReturnType()> f3 = move(f0);
-    function<ReturnType()> f4 = func;
+    std::function<ReturnType()> f0;
+    std::function<ReturnType()> f1 = nullptr;
+    std::function<ReturnType()> f2 = f0;
+    std::function<ReturnType()> f3 = std::move(f0);
+    std::function<ReturnType()> f4 = func;
     const auto& cf            = f0;
     f0                        = f1;
-    f0                        = move(f1);
+    f0                        = std::move(f1);
     f0                        = nullptr;
     f0                        = func;
-    f0                        = ref(func);
+    f0                        = std::ref(func);
     swap_test(f0);
     (void) !cf;
     (void) cf();
@@ -443,40 +440,40 @@ void function_test_impl(Function func) {
     equality_test(nullptr, f0);
 
 #if _HAS_FUNCTION_ALLOCATOR_SUPPORT
-    function<ReturnType()> f5(allocator_arg, allocator<double>{});
-    function<ReturnType()> f6(allocator_arg, allocator<double>{}, nullptr);
-    function<ReturnType()> f7(allocator_arg, allocator<double>{}, f5);
-    function<ReturnType()> f8(allocator_arg, allocator<double>{}, move(f5));
-    function<ReturnType()> f9(allocator_arg, allocator<double>{}, func);
-    TRAIT_V(uses_allocator, function<ReturnType()>, allocator<double>);
+    std::function<ReturnType()> f5(std::allocator_arg, std::allocator<double>{});
+    std::function<ReturnType()> f6(std::allocator_arg, std::allocator<double>{}, nullptr);
+    std::function<ReturnType()> f7(std::allocator_arg, std::allocator<double>{}, f5);
+    std::function<ReturnType()> f8(std::allocator_arg, std::allocator<double>{}, std::move(f5));
+    std::function<ReturnType()> f9(std::allocator_arg, std::allocator<double>{}, func);
+    TRAIT_V(std::uses_allocator, std::function<ReturnType()>, std::allocator<double>);
 #endif // _HAS_FUNCTION_ALLOCATOR_SUPPORT
 }
 
 void functional_test() {
-    using namespace placeholders;
+    using namespace std::placeholders;
 
     // different return types to trigger <type_traits>::_Invoke_ret
     function_test_impl<void>([]() {});
     function_test_impl<int>([]() { return 4; });
-    function_test_impl<vector<int>>([]() { return vector<int>{}; });
+    function_test_impl<std::vector<int>>([]() { return std::vector<int>{}; });
 
-    auto ph                  = _1;
-    const auto cph           = _2;
-    volatile auto vph        = _3;
-    const volatile auto cvph = _4;
+    auto ph                  = std::placeholders::_1;
+    const auto cph           = std::placeholders::_2;
+    volatile auto vph        = std::placeholders::_3;
+    const volatile auto cvph = std::placeholders::_4;
 
-    TRAIT_V(is_placeholder, decltype(ph));
-    TRAIT_V(is_placeholder, decltype(cph));
-    TRAIT_V(is_placeholder, decltype(vph));
-    TRAIT_V(is_placeholder, decltype(cvph));
+    TRAIT_V(std::is_placeholder, decltype(ph));
+    TRAIT_V(std::is_placeholder, decltype(cph));
+    TRAIT_V(std::is_placeholder, decltype(vph));
+    TRAIT_V(std::is_placeholder, decltype(cvph));
 
-    TRAIT_V(is_placeholder, int);
-    TRAIT_V(is_placeholder, const int);
-    TRAIT_V(is_placeholder, volatile int);
-    TRAIT_V(is_placeholder, const volatile int);
+    TRAIT_V(std::is_placeholder, int);
+    TRAIT_V(std::is_placeholder, const int);
+    TRAIT_V(std::is_placeholder, volatile int);
+    TRAIT_V(std::is_placeholder, const volatile int);
 
     // implicit return type
-    auto be                  = bind([](int, int) {}, _1, 2);
+    auto be                  = std::bind([](int, int) {}, std::placeholders::_1, 2);
     const auto cbe           = be;
     volatile auto vbe        = be;
     const volatile auto cvbe = be;
@@ -486,30 +483,30 @@ void functional_test() {
     volatile auto not_vbe        = not_be;
     const volatile auto not_cvbe = not_be;
 
-    TRAIT_V(is_bind_expression, decltype(be));
-    TRAIT_V(is_bind_expression, decltype(cbe));
-    TRAIT_V(is_bind_expression, decltype(vbe));
-    TRAIT_V(is_bind_expression, decltype(cvbe));
+    TRAIT_V(std::is_bind_expression, decltype(be));
+    TRAIT_V(std::is_bind_expression, decltype(cbe));
+    TRAIT_V(std::is_bind_expression, decltype(vbe));
+    TRAIT_V(std::is_bind_expression, decltype(cvbe));
 
-    TRAIT_V(is_bind_expression, decltype(not_be));
-    TRAIT_V(is_bind_expression, decltype(not_cbe));
-    TRAIT_V(is_bind_expression, decltype(not_vbe));
-    TRAIT_V(is_bind_expression, decltype(not_cvbe));
+    TRAIT_V(std::is_bind_expression, decltype(not_be));
+    TRAIT_V(std::is_bind_expression, decltype(not_cbe));
+    TRAIT_V(std::is_bind_expression, decltype(not_vbe));
+    TRAIT_V(std::is_bind_expression, decltype(not_cvbe));
 
     be(1);
     cbe(2);
     // volatile binder calls not supported
 
     // with explicit return type
-    auto be_ret                  = bind<void>([](int, int) {}, _1, 2);
+    auto be_ret                  = std::bind<void>([](int, int) {}, std::placeholders::_1, 2);
     const auto cbe_ret           = be;
     volatile auto vbe_ret        = be;
     const volatile auto cvbe_ret = be;
 
-    TRAIT_V(is_bind_expression, decltype(be_ret));
-    TRAIT_V(is_bind_expression, decltype(cbe_ret));
-    TRAIT_V(is_bind_expression, decltype(vbe_ret));
-    TRAIT_V(is_bind_expression, decltype(cvbe_ret));
+    TRAIT_V(std::is_bind_expression, decltype(be_ret));
+    TRAIT_V(std::is_bind_expression, decltype(cbe_ret));
+    TRAIT_V(std::is_bind_expression, decltype(vbe_ret));
+    TRAIT_V(std::is_bind_expression, decltype(cvbe_ret));
 
     be_ret(3);
     cbe_ret(4);
@@ -519,25 +516,25 @@ void functional_test() {
 #ifndef _M_CEE_PURE
 template <typename Future>
 void future_test_impl(Future& f) {
-    using namespace chrono;
+    using namespace std::chrono;
 
     (void) f.wait_for(seconds(3));
-    (void) f.wait_until(system_clock::now());
+    (void) f.wait_until(std::chrono::system_clock::now());
 }
 
 void future_test() {
-    auto bp = future_errc::broken_promise;
+    auto bp = std::future_errc::broken_promise;
     (void) bp;
-    bool iece = is_error_code_enum_v<decltype(bp)>;
+    bool iece = std::is_error_code_enum_v<decltype(bp)>;
     (void) iece;
 
-    future<int> f{};
-    future<int&> fr{};
-    future<void> fv{};
+    std::future<int> f{};
+    std::future<int&> fr{};
+    std::future<void> fv{};
 
-    shared_future<int> sf{};
-    shared_future<int&> sfr{};
-    shared_future<void> sfv{};
+    std::shared_future<int> sf{};
+    std::shared_future<int&> sfr{};
+    std::shared_future<void> sfv{};
 
     future_test_impl(f);
     future_test_impl(fr);
@@ -546,40 +543,40 @@ void future_test() {
     future_test_impl(sfr);
     future_test_impl(sfv);
 
-    promise<int> p(allocator_arg, allocator<double>{});
-    promise<int&> pr(allocator_arg, allocator<double>{});
-    promise<void> pv(allocator_arg, allocator<double>{});
+    std::promise<int> p(std::allocator_arg, std::allocator<double>{});
+    std::promise<int&> pr(std::allocator_arg, std::allocator<double>{});
+    std::promise<void> pv(std::allocator_arg, std::allocator<double>{});
 
     swap_test(p);
     swap_test(pr);
     swap_test(pv);
 
-    packaged_task<void()> pt([]() {});
+    std::packaged_task<void()> pt([]() {});
     // GH-321: "<future>: packaged_task can't be constructed from a move-only lambda"
     // packaged_task<void()> pt2([]() {});
 
 #if _HAS_FUNCTION_ALLOCATOR_SUPPORT
-    packaged_task<void()> pta(allocator_arg, allocator<double>{}, []() {});
+    std::packaged_task<void()> pta(std::allocator_arg, std::allocator<double>{}, []() {});
     // GH-321: "<future>: packaged_task can't be constructed from a move-only lambda"
-    // packaged_task<void()> pta2(allocator_arg, allocator<double>{}, []() {});
+    // packaged_task<void()> pta2(std::allocator_arg, std::allocator<double>{}, []() {});
 #endif // _HAS_FUNCTION_ALLOCATOR_SUPPORT
 
     swap_test(pt);
 
-    (void) async([]() {});
-    (void) async(launch::async, []() {});
+    (void) std::async([]() {});
+    (void) std::async(std::launch::async, []() {});
 
-    TRAIT_V(uses_allocator, promise<int>, allocator<double>);
+    TRAIT_V(std::uses_allocator, std::promise<int>, std::allocator<double>);
 
 #if _HAS_FUNCTION_ALLOCATOR_SUPPORT
-    TRAIT_V(uses_allocator, packaged_task<void()>, allocator<double>);
+    TRAIT_V(std::uses_allocator, std::packaged_task<void()>, std::allocator<double>);
 #endif // _HAS_FUNCTION_ALLOCATOR_SUPPORT
 }
 #endif // _M_CEE_PURE
 
 template <typename IoManipOut, typename IoManipIn>
 void iomanip_test_impl(IoManipOut out, IoManipIn in) {
-    stringstream ss{};
+    std::stringstream ss{};
     ss << out;
     ss >> in;
 }
@@ -591,7 +588,7 @@ void iomanip_test_impl(IoManipOut out, IoManipIn in) {
 
 // template <typename IoManip>
 // void iomanip_test_impl_for_setfill(IoManip out) {
-//     stringstream ss{};
+//     std::stringstream ss{};
 //     ss << out;
 // }
 
@@ -601,7 +598,7 @@ void iomanip_test_impl(IoManipOut out, IoManipIn in) {
 //     time_t t          = time(nullptr);
 //     tm time{};
 //     localtime_s(&time, &t);
-//     string str = "string with \" quotes ";
+//     std::string str = "std::string with \" quotes ";
 
 //     iomanip_test_impl_for_setfill(sf);
 //     iomanip_test_impl(put_money(money), get_money(money));
@@ -616,22 +613,22 @@ void iomanip_test_impl(IoManipOut out, IoManipIn in) {
 // }
 
 void ios_test() {
-    stringstream ss{};
-    basic_ios<char, char_traits<char>> b_ios(ss.rdbuf());
+    std::stringstream ss{};
+    std::basic_ios<char, std::char_traits<char>> b_ios(ss.rdbuf());
 }
 
 void iosfwd_test() {
-    streampos sp; // fpos<char_traits<char>::state_type>
-    wstreampos wsp; // fpos<char_traits<wchar_t>::state_type>
+    std::streampos sp; // fpos<std::char_traits<char>::state_type>
+    std::wstreampos wsp; // fpos<std::char_traits<wchar_t>::state_type>
 
-    INSTANTIATE(char_traits<char>);
-    INSTANTIATE(char_traits<wchar_t>);
+    INSTANTIATE(std::char_traits<char>);
+    INSTANTIATE(std::char_traits<wchar_t>);
 #ifdef __cpp_char8_t
-    INSTANTIATE(char_traits<char8_t>);
+    INSTANTIATE(std::char_traits<char8_t>);
 #endif // __cpp_char8_t
-    INSTANTIATE(char_traits<char16_t>);
-    INSTANTIATE(char_traits<char32_t>);
-    INSTANTIATE(char_traits<unsigned short>);
+    INSTANTIATE(std::char_traits<char16_t>);
+    INSTANTIATE(std::char_traits<char32_t>);
+    INSTANTIATE(std::char_traits<unsigned short>);
     // Other templates in iosfwd are forward decls.
     // Will instantiate in the test for the header where they are defined.
 }
@@ -640,20 +637,20 @@ template <typename Container>
 void nonmember_reverse_iterator_functions_test() {
     Container c{1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
 
-    (void) rbegin(c);
-    (void) crbegin(c);
-    (void) rend(c);
-    (void) crend(c);
+    (void) std::rbegin(c);
+    (void) std::crbegin(c);
+    (void) std::rend(c);
+    (void) std::crend(c);
 }
 
 template <typename Container>
 void nonmember_iterator_functions_test() {
     Container c{1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
 
-    (void) begin(c);
-    (void) cbegin(c);
-    (void) end(c);
-    (void) cend(c);
+    (void) std::begin(c);
+    (void) std::cbegin(c);
+    (void) std::end(c);
+    (void) std::cend(c);
 }
 
 // void msvc_array_iterators_test() {
@@ -673,48 +670,48 @@ void nonmember_iterator_functions_test() {
 // }
 
 void iterators_test() {
-    fwd_iterators_test<forward_list<int>>();
-    fwd_iterators_test<list<int>>();
-    fwd_iterators_test<vector<int>>();
+    fwd_iterators_test<std::forward_list<int>>();
+    fwd_iterators_test<std::list<int>>();
+    fwd_iterators_test<std::vector<int>>();
 
-    bidi_iterators_test<list<int>>();
-    bidi_iterators_test<vector<int>>();
+    bidi_iterators_test<std::list<int>>();
+    bidi_iterators_test<std::vector<int>>();
 
     nonmember_iterator_functions_test<int[]>();
-    nonmember_iterator_functions_test<initializer_list<int>>();
-    nonmember_iterator_functions_test<forward_list<int>>();
-    nonmember_iterator_functions_test<list<int>>();
-    nonmember_iterator_functions_test<vector<int>>();
+    nonmember_iterator_functions_test<std::initializer_list<int>>();
+    nonmember_iterator_functions_test<std::forward_list<int>>();
+    nonmember_iterator_functions_test<std::list<int>>();
+    nonmember_iterator_functions_test<std::vector<int>>();
 
     nonmember_reverse_iterator_functions_test<int[]>();
-    nonmember_reverse_iterator_functions_test<initializer_list<int>>();
-    nonmember_reverse_iterator_functions_test<list<int>>();
-    nonmember_reverse_iterator_functions_test<vector<int>>();
+    nonmember_reverse_iterator_functions_test<std::initializer_list<int>>();
+    nonmember_reverse_iterator_functions_test<std::list<int>>();
+    nonmember_reverse_iterator_functions_test<std::vector<int>>();
 
     // msvc_array_iterators_test();
 
     int arr[]                = {1};
-    initializer_list<int> il = {2};
-    forward_list<int> flist{3};
-    list<int> lst{4};
-    vector<int> vec{5};
+    std::initializer_list<int> il = {2};
+    std::forward_list<int> flist{3};
+    std::list<int> lst{4};
+    std::vector<int> vec{5};
 
-    (void) size(arr);
-    (void) data(arr);
-    (void) empty(arr);
+    (void) std::size(arr);
+    (void) std::data(arr);
+    (void) std::empty(arr);
 
-    (void) size(il);
-    (void) data(il);
-    (void) empty(il);
+    (void) std::size(il);
+    (void) std::data(il);
+    (void) std::empty(il);
 
-    (void) empty(flist);
+    (void) std::empty(flist);
 
-    (void) size(lst);
-    (void) empty(lst);
+    (void) std::size(lst);
+    (void) std::empty(lst);
 
-    (void) size(vec);
-    (void) data(vec);
-    (void) empty(vec);
+    (void) std::size(vec);
+    (void) std::data(vec);
+    (void) std::empty(vec);
 
 #if _HAS_CXX20
     (void) ssize(arr);
@@ -723,7 +720,7 @@ void iterators_test() {
     (void) ssize(vec);
 #endif // _HAS_CXX20
 
-    deque<int> value{1, 2, 3};
+    std::deque<int> value{1, 2, 3};
     auto it  = inserter(value, begin(value));
     auto fit = front_inserter(value);
     auto bit = back_inserter(value);
@@ -732,11 +729,11 @@ void iterators_test() {
     swap_test(fit);
     swap_test(bit);
 
-    stringstream ss("1 2 3 4 5");
-    istream_iterator<int> isi(ss);
-    ostream_iterator<int> osi(ss, " ");
-    istreambuf_iterator<char> isbi(ss);
-    ostreambuf_iterator<char> osbi(ss);
+    std::stringstream ss("1 2 3 4 5");
+    std::istream_iterator<int> isi(ss);
+    std::ostream_iterator<int> osi(ss, " ");
+    std::istreambuf_iterator<char> isbi(ss);
+    std::ostreambuf_iterator<char> osbi(ss);
 
     equality_test(isi);
     equality_test(isbi);
@@ -747,17 +744,17 @@ void iterators_test() {
 }
 
 void istream_test() {
-    stringstream ss{};
-    istream is(ss.rdbuf());
+    std::stringstream ss{};
+    std::istream is(ss.rdbuf());
 
-    wstringstream wss{};
-    wistream wis(wss.rdbuf());
+    std::wstringstream wss{};
+    std::wistream wis(wss.rdbuf());
 
     unsigned short us{};
     wis >> us;
 
-    iostream ios(ss.rdbuf());
-    wiostream wios(wss.rdbuf());
+    std::iostream ios(ss.rdbuf());
+    std::wiostream wios(wss.rdbuf());
 
     // /analyze doesn't like these being nullptr
     char c_str[]           = "1";
@@ -770,16 +767,16 @@ void istream_test() {
     is >> *sc_str;
     is >> uc_str;
     is >> *uc_str;
-    move(is) >> c_str;
-    is >> ws; // io manipulator, not variable
+    std::move(is) >> c_str;
+    is >> std::ws; // io manipulator, not variable
 }
 
 template <typename T>
 void numeric_limits_test_impl() {
-    INSTANTIATE(numeric_limits<T>);
-    INSTANTIATE(numeric_limits<const T>);
-    INSTANTIATE(numeric_limits<volatile T>);
-    INSTANTIATE(numeric_limits<const volatile T>);
+    INSTANTIATE(std::numeric_limits<T>);
+    INSTANTIATE(std::numeric_limits<const T>);
+    INSTANTIATE(std::numeric_limits<volatile T>);
+    INSTANTIATE(std::numeric_limits<const volatile T>);
 }
 
 void limits_test() {
@@ -805,32 +802,32 @@ void limits_test() {
     numeric_limits_test_impl<double>();
     numeric_limits_test_impl<long double>();
 
-    numeric_limits_test_impl<string>();
+    numeric_limits_test_impl<std::string>();
 }
 
 void locale_test() {
     char c{};
-    locale loc{};
+    std::locale loc{};
     // need all collates to instantiate <locale> _Lstrcoll and _Lstrxfrm
-    auto cc   = has_facet<collate<char>>(loc);
-    auto cw   = has_facet<collate<wchar_t>>(loc);
-    auto cbnc = has_facet<collate_byname<char>>(loc);
-    auto cbnw = has_facet<collate_byname<wchar_t>>(loc);
-    auto ctc  = has_facet<ctype<char>>(loc);
-    (void) isalnum(c, loc);
-    (void) isalpha(c, loc);
-    (void) isblank(c, loc);
-    (void) iscntrl(c, loc);
-    (void) isdigit(c, loc);
-    (void) isgraph(c, loc);
-    (void) islower(c, loc);
-    (void) isprint(c, loc);
-    (void) ispunct(c, loc);
-    (void) isspace(c, loc);
-    (void) isupper(c, loc);
-    (void) isxdigit(c, loc);
-    (void) tolower(c, loc);
-    (void) toupper(c, loc);
+    auto cc   = std::has_facet<std::collate<char>>(loc);
+    auto cw   = std::has_facet<std::collate<wchar_t>>(loc);
+    auto cbnc = std::has_facet<std::collate_byname<char>>(loc);
+    auto cbnw = std::has_facet<std::collate_byname<wchar_t>>(loc);
+    auto ctc  = std::has_facet<std::ctype<char>>(loc);
+    (void) std::isalnum(c, loc);
+    (void) std::isalpha(c, loc);
+    (void) std::isblank(c, loc);
+    (void) std::iscntrl(c, loc);
+    (void) std::isdigit(c, loc);
+    (void) std::isgraph(c, loc);
+    (void) std::islower(c, loc);
+    (void) std::isprint(c, loc);
+    (void) std::ispunct(c, loc);
+    (void) std::isspace(c, loc);
+    (void) std::isupper(c, loc);
+    (void) std::isxdigit(c, loc);
+    (void) std::tolower(c, loc);
+    (void) std::toupper(c, loc);
 
     (void) cc;
     (void) cw;
@@ -852,33 +849,33 @@ void owner_less_test_impl(OwnerLess ol, SmartPtr ptr) {
 }
 
 void shared_ptr_test_impl() {
-    shared_ptr<int> sptr0(new int());
-    shared_ptr<int> sptr1(new int(), default_delete<int>{});
-    shared_ptr<int> sptr2(nullptr, default_delete<int>{});
-    shared_ptr<int> sptr3(nullptr, default_delete<int>{}, allocator<int>{});
-    shared_ptr<int> sptr4(new int(), default_delete<int>{}, allocator<int>{});
-    shared_ptr<int> sptr5(sptr0, nullptr);
-    shared_ptr<void> sptr6(sptr1);
-    shared_ptr<int> sptr7(weak_ptr<int>{sptr2});
+    std::shared_ptr<int> sptr0(new int());
+    std::shared_ptr<int> sptr1(new int(), std::default_delete<int>{});
+    std::shared_ptr<int> sptr2(nullptr, std::default_delete<int>{});
+    std::shared_ptr<int> sptr3(nullptr, std::default_delete<int>{}, std::allocator<int>{});
+    std::shared_ptr<int> sptr4(new int(), std::default_delete<int>{}, std::allocator<int>{});
+    std::shared_ptr<int> sptr5(sptr0, nullptr);
+    std::shared_ptr<void> sptr6(sptr1);
+    std::shared_ptr<int> sptr7(std::weak_ptr<int>{sptr2});
 #if _HAS_AUTO_PTR_ETC
-    shared_ptr<int> sptr8(auto_ptr<int>{});
-    sptr8 = auto_ptr<int>{};
+    std::shared_ptr<int> sptr8(std::auto_ptr<int>{});
+    sptr8 = std::auto_ptr<int>{};
 #endif // _HAS_AUTO_PTR_ETC
-    shared_ptr<void> sptr9(move(sptr3));
-    sptr6 = move(sptr5);
+    std::shared_ptr<void> sptr9(std::move(sptr3));
+    sptr6 = std::move(sptr5);
     sptr9 = sptr7;
 
-    sptr0.reset(new int(), default_delete<int>{});
-    sptr0.reset(new int(), default_delete<int>{}, allocator<int>{});
+    sptr0.reset(new int(), std::default_delete<int>{});
+    sptr0.reset(new int(), std::default_delete<int>{}, std::allocator<int>{});
 
     comparable_test(sptr0, sptr6);
     comparable_test(sptr0, nullptr);
     comparable_test(nullptr, sptr0);
-    cout << sptr0;
+    std::cout << sptr0;
     swap_test(sptr0);
 
-    auto sptr11 = make_shared<int>(5);
-    auto sptr12 = allocate_shared<int>(allocator<int>{}, 6);
+    auto sptr11 = std::make_shared<int>(5);
+    auto sptr12 = std::allocate_shared<int>(std::allocator<int>{}, 6);
 
     struct Cat {
         virtual ~Cat() {}
@@ -886,34 +883,34 @@ void shared_ptr_test_impl() {
 
     struct Kitten : Cat {};
 
-    (void) static_pointer_cast<void>(sptr0);
-    (void) const_pointer_cast<const int>(sptr0);
-    (void) dynamic_pointer_cast<Kitten>(make_shared<Cat>());
+    (void) std::static_pointer_cast<void>(sptr0);
+    (void) std::const_pointer_cast<const int>(sptr0);
+    (void) std::dynamic_pointer_cast<Kitten>(std::make_shared<Cat>());
 
-    (void) get_deleter<default_delete<int>>(sptr0);
+    (void) std::get_deleter<std::default_delete<int>>(sptr0);
     hash_test(sptr0);
 
-    (void) atomic_is_lock_free(&sptr0);
-    (void) atomic_load(&sptr0);
-    (void) atomic_load_explicit(&sptr0, memory_order_seq_cst);
-    atomic_store(&sptr0, sptr0);
-    atomic_store_explicit(&sptr0, sptr0, memory_order_seq_cst);
-    atomic_exchange(&sptr0, sptr0);
-    atomic_exchange_explicit(&sptr0, sptr0, memory_order_seq_cst);
-    atomic_compare_exchange_weak(&sptr0, &sptr0, sptr0);
-    atomic_compare_exchange_weak_explicit(&sptr0, &sptr0, sptr0, memory_order_seq_cst, memory_order_seq_cst);
-    atomic_compare_exchange_strong(&sptr0, &sptr0, sptr0);
-    atomic_compare_exchange_strong_explicit(&sptr0, &sptr0, sptr0, memory_order_seq_cst, memory_order_seq_cst);
+    (void) std::atomic_is_lock_free(&sptr0);
+    (void) std::atomic_load(&sptr0);
+    (void) std::atomic_load_explicit(&sptr0, std::memory_order_seq_cst);
+    std::atomic_store(&sptr0, sptr0);
+    std::atomic_store_explicit(&sptr0, sptr0, std::memory_order_seq_cst);
+    std::atomic_exchange(&sptr0, sptr0);
+    std::atomic_exchange_explicit(&sptr0, sptr0, std::memory_order_seq_cst);
+    std::atomic_compare_exchange_weak(&sptr0, &sptr0, sptr0);
+    std::atomic_compare_exchange_weak_explicit(&sptr0, &sptr0, sptr0, std::memory_order_seq_cst, std::memory_order_seq_cst);
+    std::atomic_compare_exchange_strong(&sptr0, &sptr0, sptr0);
+    std::atomic_compare_exchange_strong_explicit(&sptr0, &sptr0, sptr0, std::memory_order_seq_cst, std::memory_order_seq_cst);
 }
 
 void weak_ptr_test_impl() {
-    weak_ptr<int> wptr0(make_shared<int>(5));
-    weak_ptr<void> wptr1(wptr0);
-    weak_ptr<void> wptr2(move(wptr0));
+    std::weak_ptr<int> wptr0(std::make_shared<int>(5));
+    std::weak_ptr<void> wptr1(wptr0);
+    std::weak_ptr<void> wptr2(std::move(wptr0));
 
     wptr1 = wptr0;
-    wptr2 = move(wptr0);
-    wptr0 = make_shared<int>(5);
+    wptr2 = std::move(wptr0);
+    wptr0 = std::make_shared<int>(5);
     swap_test(wptr0);
 }
 
@@ -922,65 +919,65 @@ void memory_test() {
     shared_ptr_test_impl();
     weak_ptr_test_impl();
 
-    struct my_shared_from_this : enable_shared_from_this<my_shared_from_this> {
+    struct my_shared_from_this : std::enable_shared_from_this<my_shared_from_this> {
         my_shared_from_this() {}
     };
     my_shared_from_this msft{};
-    default_delete<void> dd0{default_delete<int>{}};
+    std::default_delete<void> dd0{std::default_delete<int>{}};
     (void) dd0;
-    default_delete<int[]> dd1{default_delete<int[]>{}};
+    std::default_delete<int[]> dd1{std::default_delete<int[]>{}};
     dd1(new int[5]);
 
 #if _HAS_GARBAGE_COLLECTION_SUPPORT_DELETED_IN_CXX23
     int* int_ptr{};
-    undeclare_reachable(int_ptr);
+    std::undeclare_reachable(int_ptr);
 #endif // _HAS_GARBAGE_COLLECTION_SUPPORT_DELETED_IN_CXX23
 
-    auto sptr = make_shared<int>(5);
-    auto wptr = weak_ptr<int>(sptr);
-    owner_less_test_impl(owner_less<shared_ptr<int>>{}, sptr);
-    owner_less_test_impl(owner_less<weak_ptr<int>>{}, weak_ptr<int>(sptr));
-    owner_less_test_impl(owner_less<void>{}, sptr, wptr);
+    auto sptr = std::make_shared<int>(5);
+    auto wptr = std::weak_ptr<int>(sptr);
+    owner_less_test_impl(std::owner_less<std::shared_ptr<int>>{}, sptr);
+    owner_less_test_impl(std::owner_less<std::weak_ptr<int>>{}, std::weak_ptr<int>(sptr));
+    owner_less_test_impl(std::owner_less<void>{}, sptr, wptr);
 }
 
 #ifndef _M_CEE_PURE
 template <typename Mutex>
 void timed_mutex_test_impl() {
     Mutex mtx{};
-    (void) mtx.try_lock_for(chrono::seconds(1));
-    (void) mtx.try_lock_until(chrono::system_clock::now());
+    (void) mtx.try_lock_for(std::chrono::seconds(1));
+    (void) mtx.try_lock_until(std::chrono::system_clock::now());
 }
 
 void mutex_test() {
-    mutex mtx{};
-    recursive_mutex rmtx{};
-    recursive_timed_mutex rtmtx{};
+    std::mutex mtx{};
+    std::recursive_mutex rmtx{};
+    std::recursive_timed_mutex rtmtx{};
 
-    (void) try_lock(mtx, rmtx);
-    (void) try_lock(mtx, rmtx, rtmtx);
-    lock(mtx, rmtx);
-    lock(mtx, rmtx, rtmtx);
+    (void) std::try_lock(mtx, rmtx);
+    (void) std::try_lock(mtx, rmtx, rtmtx);
+    std::lock(mtx, rmtx);
+    std::lock(mtx, rmtx, rtmtx);
     // lock_guard and scoped_lock instantiated in P0156R2_scoped_lock
-    unique_lock<recursive_timed_mutex> ul_mtx1{rtmtx, chrono::seconds(1)};
-    unique_lock<recursive_timed_mutex> ul_mtx2{rtmtx, chrono::system_clock::now()};
+    std::unique_lock<std::recursive_timed_mutex> ul_mtx1{rtmtx, std::chrono::seconds(1)};
+    std::unique_lock<std::recursive_timed_mutex> ul_mtx2{rtmtx, std::chrono::system_clock::now()};
 
-    timed_mutex_test_impl<unique_lock<recursive_timed_mutex>>();
+    timed_mutex_test_impl<std::unique_lock<std::recursive_timed_mutex>>();
     swap_test(ul_mtx2);
-    once_flag of{};
-    call_once(of, []() {});
-    condition_variable_test_impl<condition_variable>();
+    std::once_flag of{};
+    std::call_once(of, []() {});
+    condition_variable_test_impl<std::condition_variable>();
 
-    timed_mutex_test_impl<timed_mutex>();
-    timed_mutex_test_impl<recursive_timed_mutex>();
+    timed_mutex_test_impl<std::timed_mutex>();
+    timed_mutex_test_impl<std::recursive_timed_mutex>();
 }
 #endif // _M_CEE_PURE
 
 void ostream_test() {
-    stringstream ss{};
-    ostream os{ss.rdbuf()};
+    std::stringstream ss{};
+    std::ostream os{ss.rdbuf()};
 
-    wstringstream wss{};
-    wostream wos{wss.rdbuf()};
+    std::wstringstream wss{};
+    std::wostream wos{wss.rdbuf()};
 
     unsigned short us{};
     wos << us;
@@ -1004,23 +1001,23 @@ void ostream_test() {
     os << uc_str;
     os << *uc_str;
 
-    string str{};
+    std::string str{};
     os << str;
-    os << endl;
-    os << ends;
-    os << flush;
-    os << error_code{};
+    os << std::endl;
+    os << std::ends;
+    os << std::flush;
+    os << std::error_code{};
 }
 
 template <typename Distribution>
 void distribution_test_impl(Distribution& d) {
-    random_device rd{};
-    mt19937 gen(rd());
+    std::random_device rd{};
+    std::mt19937 gen(rd());
     (void) d(gen);
     (void) d(gen, d.param());
     equality_test(d);
-    cin >> d;
-    cout << d;
+    std::cin >> d;
+    std::cout << d;
 }
 
 template <typename Engine, typename SeedArg>
@@ -1028,85 +1025,85 @@ void common_engine_test_impl(SeedArg& sa) {
     Engine eng(sa);
     eng.seed(sa);
     equality_test(eng);
-    cin >> eng;
-    cout << eng;
+    std::cin >> eng;
+    std::cout << eng;
 }
 
 template <typename Engine>
 void engine_test_impl() {
-    seed_seq ss({1, 2, 3, 4, 5});
+    std::seed_seq ss({1, 2, 3, 4, 5});
     common_engine_test_impl<Engine>(ss);
 }
 
 #if _HAS_TR1_NAMESPACE
 template <typename Engine>
 void tr1_engine_test_impl() {
-    random_device rd{};
-    mt19937 gen(rd());
+    std::random_device rd{};
+    std::mt19937 gen(rd());
     common_engine_test_impl<Engine>(gen);
 }
 #endif // _HAS_TR1_NAMESPACE
 
 void random_test() {
-    seed_seq ss0({1, 2, 3, 4, 5, 6});
-    vector<uint32_t> v{1, 2, 3, 4};
-    seed_seq ss1(v.begin(), v.end());
+    std::seed_seq ss0({1, 2, 3, 4, 5, 6});
+    std::vector<uint32_t> v{1, 2, 3, 4};
+    std::seed_seq ss1(v.begin(), v.end());
     ss0.generate(v.begin(), v.end());
-    ss1.param(ostream_iterator<unsigned int>(cout, " "));
+    ss1.param(std::ostream_iterator<unsigned int>(std::cout, " "));
 
-    random_device rd{};
-    mt19937 gen(rd());
-    (void) generate_canonical<double, 10>(gen);
+    std::random_device rd{};
+    std::mt19937 gen(rd());
+    (void) std::generate_canonical<double, 10>(gen);
 
-    engine_test_impl<minstd_rand0>(); // linear_congruential_engine
-    engine_test_impl<mt19937>(); // mersenne_twister_engine
-    engine_test_impl<ranlux24_base>(); // subtract_with_carry_engine
-    engine_test_impl<ranlux24>(); // discard_block_engine
-    engine_test_impl<knuth_b>(); // shuffle_order_engine
-    engine_test_impl<independent_bits_engine<minstd_rand0, 2, uint32_t>>();
-    engine_test_impl<mt19937_64>();
-    engine_test_impl<ranlux48_base>();
-    engine_test_impl<ranlux48>();
+    engine_test_impl<std::minstd_rand0>(); // linear_congruential_engine
+    engine_test_impl<std::mt19937>(); // mersenne_twister_engine
+    engine_test_impl<std::ranlux24_base>(); // subtract_with_carry_engine
+    engine_test_impl<std::ranlux24>(); // discard_block_engine
+    engine_test_impl<std::knuth_b>(); // shuffle_order_engine
+    engine_test_impl<std::independent_bits_engine<std::minstd_rand0, 2, uint32_t>>();
+    engine_test_impl<std::mt19937_64>();
+    engine_test_impl<std::ranlux48_base>();
+    engine_test_impl<std::ranlux48>();
 
 #if _HAS_TR1_NAMESPACE
-    linear_congruential<uint_fast32_t, 16807, 0, 2147483647> minstd_rand_eng(gen);
+    std::tr1::linear_congruential<uint_fast32_t, 16807, 0, 2147483647> minstd_rand_eng(gen);
     minstd_rand_eng.seed(gen);
 
-    tr1_engine_test_impl<linear_congruential<uint_fast32_t, 16807, 0, 2147483647>>();
-    tr1_engine_test_impl<ranlux3>();
-    tr1_engine_test_impl<ranlux4>();
-    tr1_engine_test_impl<ranlux3_01>();
-    tr1_engine_test_impl<ranlux4_01>();
-    tr1_engine_test_impl<ranlux64_base_01>();
-    tr1_engine_test_impl<ranlux_base_01>();
+    tr1_engine_test_impl<std::tr1::linear_congruential<uint_fast32_t, 16807, 0, 2147483647>>();
+    tr1_engine_test_impl<std::tr1::ranlux3>();
+    tr1_engine_test_impl<std::tr1::ranlux4>();
+    tr1_engine_test_impl<std::tr1::ranlux3_01>();
+    tr1_engine_test_impl<std::tr1::ranlux4_01>();
+    tr1_engine_test_impl<std::tr1::ranlux64_base_01>();
+    tr1_engine_test_impl<std::tr1::ranlux_base_01>();
 #endif // _HAS_TR1_NAMESPACE
 
-    uniform_int_distribution<> uni_int_d{};
-    bernoulli_distribution bern_d{};
-    geometric_distribution<> geo_d{};
-    poisson_distribution<> pois_d{};
-    binomial_distribution<> binom_d{};
-    uniform_real_distribution<> uni_real_d{};
-    exponential_distribution<> expon_d{};
-    normal_distribution<> norm_d{};
-    gamma_distribution<> gamma_d{};
-    weibull_distribution<> weib_d{};
-    extreme_value_distribution<> ext_v_d{};
-    lognormal_distribution<> log_norm_d{};
-    chi_squared_distribution<> chi_sq_d{};
-    cauchy_distribution<> cauchy_d{};
-    fisher_f_distribution<> fish_f_d{};
-    student_t_distribution<> stud_t_d{};
-    negative_binomial_distribution<> neg_bi_d{};
-    discrete_distribution<> disc_d1(v.begin(), v.end());
+    std::uniform_int_distribution<> uni_int_d{};
+    std::bernoulli_distribution bern_d{};
+    std::geometric_distribution<> geo_d{};
+    std::poisson_distribution<> pois_d{};
+    std::binomial_distribution<> binom_d{};
+    std::uniform_real_distribution<> uni_real_d{};
+    std::exponential_distribution<> expon_d{};
+    std::normal_distribution<> norm_d{};
+    std::gamma_distribution<> gamma_d{};
+    std::weibull_distribution<> weib_d{};
+    std::extreme_value_distribution<> ext_v_d{};
+    std::lognormal_distribution<> log_norm_d{};
+    std::chi_squared_distribution<> chi_sq_d{};
+    std::cauchy_distribution<> cauchy_d{};
+    std::fisher_f_distribution<> fish_f_d{};
+    std::student_t_distribution<> stud_t_d{};
+    std::negative_binomial_distribution<> neg_bi_d{};
+    std::discrete_distribution<> disc_d1(v.begin(), v.end());
     auto sq_func = [](double val) { return val * val; };
-    discrete_distribution<> disc_d2(5, 3.5, 7.5, sq_func);
-    piecewise_constant_distribution<> piece_const_d1(v.begin(), v.end(), v.begin());
-    piecewise_constant_distribution<> piece_const_d2{{1.0, 2.0, 3.0, 4.0, 5.0}, sq_func};
-    piecewise_constant_distribution<> piece_const_d3(4, 0.0, 10.0, sq_func);
-    piecewise_linear_distribution<> piece_line_d1(v.begin(), v.end(), v.begin());
-    piecewise_linear_distribution<> piece_line_d2({1.0, 2.0, 3.0, 4.0}, sq_func);
-    piecewise_linear_distribution<> piece_line_d3(4, 0.0, 10.0, sq_func);
+    std::discrete_distribution<> disc_d2(5, 3.5, 7.5, sq_func);
+    std::piecewise_constant_distribution<> piece_const_d1(v.begin(), v.end(), v.begin());
+    std::piecewise_constant_distribution<> piece_const_d2{{1.0, 2.0, 3.0, 4.0, 5.0}, sq_func};
+    std::piecewise_constant_distribution<> piece_const_d3(4, 0.0, 10.0, sq_func);
+    std::piecewise_linear_distribution<> piece_line_d1(v.begin(), v.end(), v.begin());
+    std::piecewise_linear_distribution<> piece_line_d2({1.0, 2.0, 3.0, 4.0}, sq_func);
+    std::piecewise_linear_distribution<> piece_line_d3(4, 0.0, 10.0, sq_func);
 
     distribution_test_impl(uni_int_d);
     distribution_test_impl(bern_d);
@@ -1136,29 +1133,29 @@ void random_test() {
 }
 
 void ratio_test() {
-    using half       = ratio<1, 2>;
-    using one        = ratio_add<half, half>;
-    using half_again = ratio_subtract<one, half>;
-    using quarter    = ratio_multiply<half, half>;
-    using two        = ratio_divide<one, half>;
+    using half       = std::ratio<1, 2>;
+    using one        = std::ratio_add<half, half>;
+    using half_again = std::ratio_subtract<one, half>;
+    using quarter    = std::ratio_multiply<half, half>;
+    using two        = std::ratio_divide<one, half>;
 
-    TRAIT_V(ratio_equal, half, half);
-    TRAIT_V(ratio_not_equal, half_again, quarter);
-    TRAIT_V(ratio_less, half, two);
-    TRAIT_V(ratio_less_equal, half, half_again);
-    TRAIT_V(ratio_greater, one, half);
-    TRAIT_V(ratio_greater_equal, half, half_again);
+    TRAIT_V(std::ratio_equal, half, half);
+    TRAIT_V(std::ratio_not_equal, half_again, quarter);
+    TRAIT_V(std::ratio_less, half, two);
+    TRAIT_V(std::ratio_less_equal, half, half_again);
+    TRAIT_V(std::ratio_greater, one, half);
+    TRAIT_V(std::ratio_greater_equal, half, half_again);
 }
 
 template <typename CharType>
 void regex_traits_test_impl() {
     CharType buffer[10]{};
-    regex_traits<CharType> rt{};
+    std::regex_traits<CharType> rt{};
 
-    rt.transform(begin(buffer), end(buffer));
-    rt.transform_primary(begin(buffer), end(buffer));
-    rt.lookup_classname(begin(buffer), end(buffer));
-    rt.lookup_collatename(begin(buffer), end(buffer));
+    rt.transform(std::begin(buffer), std::end(buffer));
+    rt.transform_primary(std::begin(buffer), std::end(buffer));
+    rt.lookup_classname(std::begin(buffer), std::end(buffer));
+    rt.lookup_collatename(std::begin(buffer), std::end(buffer));
 }
 
 template <typename SubMatchType>
@@ -1167,7 +1164,7 @@ void sub_match_test_impl() {
     using char_type = typename SubMatchType::value_type;
 
     char_type value{};
-    basic_string<char_type> str{};
+    std::basic_string<char_type> str{};
 
     comparable_test(sm);
     comparable_test(sm, &value);
@@ -1177,7 +1174,7 @@ void sub_match_test_impl() {
     comparable_test(sm, str);
     comparable_test(str, sm);
 
-    basic_stringstream<char_type> ss{};
+    std::basic_stringstream<char_type> ss{};
     ss << sm;
 }
 
@@ -1185,9 +1182,9 @@ template <typename MatchResultsType>
 void match_results_test_impl() {
     MatchResultsType mr{};
     using char_type = typename MatchResultsType::char_type;
-    basic_stringstream<char_type> ss{};
-    ostream_iterator<int, char_type> out_it(ss);
-    basic_string<char_type> str{};
+    std::basic_stringstream<char_type> ss{};
+    std::ostream_iterator<int, char_type> out_it(ss);
+    std::basic_string<char_type> str{};
 
     char_type out_buffer[5]{};
 
@@ -1204,46 +1201,46 @@ void match_results_test_impl() {
 template <typename BasicRegexType>
 void basic_regex_test_impl() {
     using char_type = typename BasicRegexType::value_type;
-    basic_string<char_type> str{};
+    std::basic_string<char_type> str{};
 
     BasicRegexType br1(str);
-    BasicRegexType br2(begin(str), end(str), regex_constants::ECMAScript);
-    BasicRegexType br3(begin(str), end(str));
+    BasicRegexType br2(std::begin(str), std::end(str), std::regex_constants::ECMAScript);
+    BasicRegexType br3(std::begin(str), std::end(str));
 
     br1 = str;
     br2.assign(str);
-    br3.assign(begin(str), end(str));
+    br3.assign(std::begin(str), std::end(str));
 
     swap_test(br1);
 
-    (void) regex_match(begin(str), end(str), br1);
-    (void) regex_match(str.c_str(), br1);
+    (void) std::regex_match(std::begin(str), std::end(str), br1);
+    (void) std::regex_match(str.c_str(), br1);
 
-    match_results<const char_type*> mrc{};
-    regex_match(str.c_str(), mrc, br1);
+    std::match_results<const char_type*> mrc{};
+    std::regex_match(str.c_str(), mrc, br1);
 
-    match_results<typename basic_string<char_type>::const_iterator> mrs{};
-    regex_match(str, mrs, br1);
-    (void) regex_match(str, br1);
+    std::match_results<typename std::basic_string<char_type>::const_iterator> mrs{};
+    std::regex_match(str, mrs, br1);
+    (void) std::regex_match(str, br1);
 
-    regex_search(cbegin(str), cend(str), mrs, br1);
-    (void) regex_search(cbegin(str), cend(str), br1);
-    (void) regex_search(str.c_str(), br1);
-    regex_search(str.c_str(), mrc, br1);
-    regex_search(str, mrs, br1);
-    (void) regex_search(str, br1);
+    std::regex_search(std::cbegin(str), std::cend(str), mrs, br1);
+    (void) std::regex_search(std::cbegin(str), std::cend(str), br1);
+    (void) std::regex_search(str.c_str(), br1);
+    std::regex_search(str.c_str(), mrc, br1);
+    std::regex_search(str, mrs, br1);
+    (void) std::regex_search(str, br1);
 
-    basic_stringstream<char_type> ss{};
-    ostream_iterator<int, char_type> out_it(ss);
+    std::basic_stringstream<char_type> ss{};
+    std::ostream_iterator<int, char_type> out_it(ss);
     char_type out_buffer[5] = {0};
 
-    regex_replace(out_it, cbegin(str), cend(str), br1, str);
-    regex_replace(out_buffer, cbegin(str), cend(str), br1, str);
-    regex_replace(out_it, begin(str), end(str), br1, str.c_str());
-    (void) regex_replace(str, br1, str);
-    (void) regex_replace(str, br1, str.c_str());
-    (void) regex_replace(str.c_str(), br1, str);
-    (void) regex_replace(str.c_str(), br1, str.c_str());
+    std::regex_replace(out_it, std::cbegin(str), std::cend(str), br1, str);
+    std::regex_replace(out_buffer, std::cbegin(str), std::cend(str), br1, str);
+    std::regex_replace(out_it, std::begin(str), std::end(str), br1, str.c_str());
+    (void) std::regex_replace(str, br1, str);
+    (void) std::regex_replace(str, br1, str.c_str());
+    (void) std::regex_replace(str.c_str(), br1, str);
+    (void) std::regex_replace(str.c_str(), br1, str.c_str());
 }
 
 template <typename RegexTokenIterator>
@@ -1260,28 +1257,28 @@ void regex_test() {
     regex_traits_test_impl<char>();
     regex_traits_test_impl<wchar_t>();
 
-    sub_match_test_impl<csub_match>();
-    sub_match_test_impl<wcsub_match>();
-    sub_match_test_impl<ssub_match>();
-    sub_match_test_impl<wssub_match>();
+    sub_match_test_impl<std::csub_match>();
+    sub_match_test_impl<std::wcsub_match>();
+    sub_match_test_impl<std::ssub_match>();
+    sub_match_test_impl<std::wssub_match>();
 
-    match_results_test_impl<cmatch>();
-    match_results_test_impl<wcmatch>();
-    match_results_test_impl<smatch>();
-    match_results_test_impl<wsmatch>();
+    match_results_test_impl<std::cmatch>();
+    match_results_test_impl<std::wcmatch>();
+    match_results_test_impl<std::smatch>();
+    match_results_test_impl<std::wsmatch>();
 
-    basic_regex_test_impl<regex>();
-    basic_regex_test_impl<wregex>();
+    basic_regex_test_impl<std::regex>();
+    basic_regex_test_impl<std::wregex>();
 
-    cregex_iterator cri{};
-    wcregex_iterator wcri{};
-    sregex_iterator sri{};
-    wsregex_iterator wsri{};
+    std::cregex_iterator cri{};
+    std::wcregex_iterator wcri{};
+    std::sregex_iterator sri{};
+    std::wsregex_iterator wsri{};
 
-    regex_token_iterator_test_impl<cregex_token_iterator>();
-    regex_token_iterator_test_impl<wcregex_token_iterator>();
-    regex_token_iterator_test_impl<sregex_token_iterator>();
-    regex_token_iterator_test_impl<wsregex_token_iterator>();
+    regex_token_iterator_test_impl<std::cregex_token_iterator>();
+    regex_token_iterator_test_impl<std::wcregex_token_iterator>();
+    regex_token_iterator_test_impl<std::sregex_token_iterator>();
+    regex_token_iterator_test_impl<std::wsregex_token_iterator>();
 }
 
 // need custom minimal allocator to use for scoped_allocator_test to reach all template paths
@@ -1292,7 +1289,7 @@ struct custom_allocator {
     custom_allocator() {}
 
     template <class U>
-    custom_allocator(const custom_allocator<U>&) {}
+    custom_allocator(const std::allocator<U>&) {}
 
     T* allocate(size_t) {
         return nullptr;
@@ -1302,44 +1299,44 @@ struct custom_allocator {
 };
 
 template <typename T, typename U>
-bool operator==(const custom_allocator<T>&, const custom_allocator<U>&) {
+bool operator==(const std::allocator<T>&, const std::allocator<U>&) {
     return true;
 }
 
 template <typename T, typename U>
-bool operator!=(const custom_allocator<T>& a, const custom_allocator<U>& b) {
+bool operator!=(const std::allocator<T>& a, const std::allocator<U>& b) {
     return !(a == b);
 }
 
 void scoped_allocator_test() {
-    using my_vector_saa = scoped_allocator_adaptor<allocator<vector<int>>, allocator<int>>;
-    using my_double_saa = scoped_allocator_adaptor<allocator<vector<double>>, allocator<int>>;
+    using my_vector_saa = scoped_allocator_adaptor<std::allocator<std::vector<int>>, std::allocator<int>>;
+    using my_double_saa = scoped_allocator_adaptor<std::allocator<std::vector<double>>, std::allocator<int>>;
 
-    INSTANTIATE(my_vector_saa::rebind<allocator<double>>);
+    INSTANTIATE(my_vector_saa::rebind<std::allocator<double>>);
 
-    allocator<vector<int>> vec_alloc{};
-    allocator<int> int_alloc{};
+    std::allocator<std::vector<int>> vec_alloc{};
+    std::allocator<int> int_alloc{};
 
-    my_vector_saa saa1(move(vec_alloc), move(int_alloc));
+    my_vector_saa saa1(std::move(vec_alloc), std::move(int_alloc));
     my_double_saa saa2(saa1);
-    my_vector_saa saa3(move(saa2));
-    saa2 = move(saa1);
+    my_vector_saa saa3(std::move(saa2));
+    saa2 = std::move(saa1);
     saa3 = saa2;
 
-    scoped_allocator_adaptor<custom_allocator<int>>
+    scoped_allocator_adaptor<std::allocator<int>>
         custom_saa{}; // needed to hit .construct paths with nonconvertible allocator
 
-    vector<int> val{};
-    vector<int>* ptr = &val;
+    std::vector<int> val{};
+    std::vector<int>* ptr = &val;
     custom_saa.construct(ptr, static_cast<size_t>(1), 2);
 
     saa1.construct(ptr, static_cast<size_t>(1), 2);
 
     tuple<int, int> tuple_val{};
-    tuple<int, int>* tuple_ptr = &tuple_val; // tuple needed to hit .construct paths with allocator_arg_t
+    tuple<int, int>* tuple_ptr = &tuple_val; // tuple needed to hit .construct paths with std::allocator_arg_t
     saa1.construct(tuple_ptr, make_pair(1, 2));
 
-    using my_pair = pair<vector<int>, vector<int>>;
+    using my_pair = pair<std::vector<int>, std::vector<int>>;
     auto pair_ptr = static_cast<my_pair*>(malloc(sizeof(my_pair)));
 
     custom_saa.construct(
@@ -1352,44 +1349,44 @@ void scoped_allocator_test() {
     saa1.construct(tp_ptr, piecewise_construct, make_tuple(make_pair(1, 2)), make_tuple(make_pair(1, 2)));
 
     saa1.construct(pair_ptr);
-    vector<int> vec{};
-    saa1.construct(pair_ptr, move(vec), move(vec));
+    std::vector<int> vec{};
+    saa1.construct(pair_ptr, std::move(vec), std::move(vec));
 
     my_pair vec_pair{};
     saa1.construct(pair_ptr, vec_pair);
-    saa1.construct(pair_ptr, move(vec_pair));
+    saa1.construct(pair_ptr, std::move(vec_pair));
 
     equality_test(saa1); // same outer, same inner
     equality_test(saa1, saa2); // different outer, same inner
 
-    scoped_allocator_adaptor<allocator<vector<double>>, allocator<double>> saa4;
+    scoped_allocator_adaptor<std::allocator<std::vector<double>>, std::allocator<double>> saa4;
     equality_test(saa1, saa4); // different outer, different inner
 
-    scoped_allocator_adaptor<allocator<vector<int>>, allocator<double>> saa5{};
+    scoped_allocator_adaptor<std::allocator<std::vector<int>>, std::allocator<double>> saa5{};
     equality_test(saa1, saa5); // same outer, different inner
 
-    scoped_allocator_adaptor<allocator<vector<double>>> saa6; // different outer, missing inner
+    scoped_allocator_adaptor<std::allocator<std::vector<double>>> saa6; // different outer, missing inner
     equality_test(saa1, saa6);
 
-    scoped_allocator_adaptor<allocator<vector<int>>> saa7; // same outer, missing inner
+    scoped_allocator_adaptor<std::allocator<std::vector<int>>> saa7; // same outer, missing inner
     equality_test(saa1, saa7);
 }
 
 #ifndef _M_CEE_PURE
 void shared_mutex_test() {
-    using namespace chrono;
+    using namespace std::chrono;
 
-    timed_mutex_test_impl<shared_timed_mutex>();
+    timed_mutex_test_impl<std::shared_timed_mutex>();
 
-    shared_timed_mutex stm{};
+    std::shared_timed_mutex stm{};
     (void) stm.try_lock_shared_for(seconds(1));
-    (void) stm.try_lock_shared_until(system_clock::now());
+    (void) stm.try_lock_shared_until(std::chrono::system_clock::now());
 
-    shared_lock<shared_timed_mutex> sl1(stm, seconds(1));
-    shared_lock<shared_timed_mutex> sl2(stm, system_clock::now());
+    std::shared_lock<std::shared_timed_mutex> sl1(stm, std::chrono::seconds(1));
+    std::shared_lock<std::shared_timed_mutex> sl2(stm, std::chrono::system_clock::now());
 
     (void) sl1.try_lock_for(seconds(1));
-    (void) sl2.try_lock_until(system_clock::now());
+    (void) sl2.try_lock_until(std::chrono::system_clock::now());
     swap_test(sl1);
 }
 #endif // _M_CEE_PURE
@@ -1401,23 +1398,23 @@ void sstream_test_impl() {
 }
 
 void sstream_test() {
-    sstream_test_impl<stringbuf>();
-    sstream_test_impl<wstringbuf>();
-    sstream_test_impl<istringstream>();
-    sstream_test_impl<wistringstream>();
-    sstream_test_impl<ostringstream>();
-    sstream_test_impl<wostringstream>();
-    sstream_test_impl<stringstream>();
-    sstream_test_impl<wstringstream>();
+    sstream_test_impl<std::stringbuf>();
+    sstream_test_impl<std::wstringbuf>();
+    sstream_test_impl<std::istringstream>();
+    sstream_test_impl<std::wistringstream>();
+    sstream_test_impl<std::ostringstream>();
+    sstream_test_impl<std::wostringstream>();
+    sstream_test_impl<std::stringstream>();
+    sstream_test_impl<std::wstringstream>();
 }
 
 void streambuf_test() {
-    stringstream ss{};
-    basic_streambuf<char>& bsbc = *ss.rdbuf();
+    std::stringstream ss{};
+    std::basic_streambuf<char>& bsbc = *ss.rdbuf();
     (void) bsbc;
 
-    wstringstream wss{};
-    basic_streambuf<wchar_t>& bsbwc = *wss.rdbuf();
+    std::wstringstream wss{};
+    std::basic_streambuf<wchar_t>& bsbwc = *wss.rdbuf();
     (void) bsbwc;
 
     // istreambuf_iterator and ostreambuf_iterator covered in iterators test
@@ -1425,79 +1422,79 @@ void streambuf_test() {
 
 #ifndef _M_CEE_PURE
 void thread_test() {
-    using namespace chrono;
+    using namespace std::chrono;
 
-    thread thr([](int, int) {}, 1, 2);
+    std::thread thr([](int, int) {}, 1, 2);
 
-    this_thread::sleep_for(seconds(1));
-    this_thread::sleep_until(system_clock::now());
+    std::this_thread::sleep_for(seconds(1));
+    std::this_thread::sleep_until(std::chrono::system_clock::now());
 
-    thread::id thr_id{};
+    std::thread::id thr_id{};
 
-    cout << thr_id;
+    std::cout << thr_id;
     hash_test(thr_id);
 }
 #endif // _M_CEE_PURE
 
 void tuple_test() {
-    allocator<double> my_alloc{};
-    custom_allocator<double> custom_alloc{}; // to hit _Tuple_val non-convertible allocator
+    std::allocator<double> my_alloc{};
+    std::allocator<double> custom_alloc{}; // to hit _Tuple_val non-convertible allocator
 
-    tuple<> empty_tuple1(allocator_arg, allocator<double>());
-    tuple<> empty_tuple2(allocator_arg, allocator<double>(), empty_tuple1);
+    tuple<> empty_tuple1(std::allocator_arg, std::allocator<double>());
+    tuple<> empty_tuple2(std::allocator_arg, std::allocator<double>(), empty_tuple1);
     (void) empty_tuple2;
 
     tuple<int, int> tup1{};
     tuple<const int&, const int&> tup2(tup1);
-    tuple<const int&, const int&> tup3(allocator_arg, my_alloc, tup1);
+    tuple<const int&, const int&> tup3(std::allocator_arg, my_alloc, tup1);
     tuple<const char*, const char*> tup4("Hello", "World");
-    tuple<const char*, const char*> tup5(allocator_arg, my_alloc, "Hello", "World");
-    tuple<string, string> tup6("Hello", "World");
-    tuple<string, string> tup7(allocator_arg, my_alloc, "Hello", "World");
+    tuple<const char*, const char*> tup5(std::allocator_arg, my_alloc, "Hello", "World");
+    tuple<std::string, std::string> tup6("Hello", "World");
+    tuple<std::string, std::string> tup7(std::allocator_arg, my_alloc, "Hello", "World");
 
     tup6 = tup4;
-    tup7 = move(tup5);
+    tup7 = std::move(tup5);
 
-    tuple<int, int> tup8(allocator_arg, my_alloc);
-    tuple<int, int> tup9(allocator_arg, my_alloc, tup8);
+    tuple<int, int> tup8(std::allocator_arg, my_alloc);
+    tuple<int, int> tup9(std::allocator_arg, my_alloc, tup8);
     auto int_pair = make_pair(1, 2);
     tuple<int, int> tup10(int_pair);
-    tuple<int, int> tup11(allocator_arg, my_alloc, int_pair);
+    tuple<int, int> tup11(std::allocator_arg, my_alloc, int_pair);
 
     tup10 = int_pair;
 
-    tuple<int, int> tup12(allocator_arg, my_alloc, move(tup9));
-    tuple<int, int> tup13(move(int_pair));
-    tuple<int, int> tup14(allocator_arg, my_alloc, move(int_pair));
+    tuple<int, int> tup12(std::allocator_arg, my_alloc, std::move(tup9));
+    tuple<int, int> tup13(std::move(int_pair));
+    tuple<int, int> tup14(std::allocator_arg, my_alloc, std::move(int_pair));
 
-    tup11 = move(int_pair);
+    tup11 = std::move(int_pair);
 
     comparable_test(tup12);
     swap_test(tup13);
 
     // Extras to ensure hitting _Tuple_val specializations.
-    tuple<int> tup15(allocator_arg, custom_alloc, 1); // construct with non-convertible allocator.
-    tuple<tuple<int, int>> tup16(allocator_arg, my_alloc, tup14); // construct with leading allocator.
-    tuple<string> tup17(allocator_arg, my_alloc, "MyStr"); // construct with trailing allocator.
+    tuple<int> tup15(std::allocator_arg, custom_alloc, 1); // construct with non-convertible allocator.
+    tuple<tuple<int, int>> tup16(std::allocator_arg, my_alloc, tup14); // construct with leading allocator.
+    tuple<std::string> tup17(std::allocator_arg, my_alloc, "MyStr"); // construct with trailing allocator.
 
     (void) get<0>(tup15);
-    (void) get<0>(move(tup16));
+    (void) get<0>(std::move(tup16));
 
-    const tuple<string> tup17_c = tup17;
+    const tuple<std::string> tup17_c = tup17;
     (void) get<0>(tup17_c);
-    (void) get<0>(move(tup17_c));
+    (void) get<0>(std::move(tup17_c));
 
     (void) get<int>(tup15);
-    (void) get<tuple<int, int>>(move(tup16));
-    (void) get<string>(tup17_c);
-    (void) get<string>(move(tup17_c));
+    (void) get<tuple<int, int>>(std::move(tup16));
+    (void) get<std::string>(tup17_c);
+    (void) get<std::string>(std::move(tup17_c));
 
     // (void) get<volatile int>(tuple<volatile int>{});
     // (void) get<const volatile int>(tuple<const volatile int>{});
 
     int a = 1, b = 2;
     tie(a, b) = make_tuple(a, b);
-    (void) forward_as_tuple(string{}, string{});
+    (void) forward_as_tuple(std::string{}, std::string{});
 
     (void) tuple_cat(tup15, tup16);
 
@@ -1506,10 +1503,10 @@ void tuple_test() {
     (void) make_from_tuple<long>(tuple<int>(1729));
 #endif // _HAS_CXX17
 
-    pair<string, string> pair1(
+    pair<std::string, std::string> pair1(
         piecewise_construct, make_tuple("Hello", static_cast<size_t>(6)), make_tuple("World", static_cast<size_t>(6)));
 
-    TRAIT_V(uses_allocator, tuple<int>, allocator<double>);
+    TRAIT_V(uses_allocator, tuple<int>, std::allocator<double>);
 }
 
 struct utility_test_helper {};
@@ -1539,10 +1536,10 @@ void utility_test() {
 
     // pair piecewise construct from tuple covered in tuple_test
 
-    pair<string, string> p3("Hello", "World");
+    pair<std::string, std::string> p3("Hello", "World");
     pair<const char*, const char*> p4("Hello", "World");
-    pair<string, string> p5(move(p4));
-    p5 = move(p4);
+    pair<std::string, std::string> p5(std::move(p4));
+    p5 = std::move(p4);
 
     swap_test(p3);
     comparable_test(p1);
@@ -1571,26 +1568,26 @@ void utility_test() {
     INSTANTIATE(tuple_element_t<2, volatile tuple<int, int, int>>);
     INSTANTIATE(tuple_element_t<2, const volatile tuple<int, int, int>>);
 
-    auto p6       = make_pair(1, string("test"));
+    auto p6       = make_pair(1, std::string("test"));
     const auto p7 = as_const(p6);
 
     (void) get<0>(p6);
     (void) get<int>(p6);
-    (void) get<string>(p6);
+    (void) get<std::string>(p6);
 
     (void) get<0>(p7);
     (void) get<int>(p7);
-    (void) get<string>(p7);
+    (void) get<std::string>(p7);
 
-    (void) get<0>(move(p6));
-    (void) get<int>(move(p6));
-    (void) get<string>(move(p6));
+    (void) get<0>(std::move(p6));
+    (void) get<int>(std::move(p6));
+    (void) get<std::string>(std::move(p6));
 
-    (void) get<0>(move(p7));
-    (void) get<int>(move(p7));
-    (void) get<string>(move(p7));
+    (void) get<0>(std::move(p7));
+    (void) get<int>(std::move(p7));
+    (void) get<std::string>(std::move(p7));
 
-    exchange(p3, move(p5));
+    exchange(p3, std::move(p5));
 }
 
 void typeindex_test() {
@@ -1670,10 +1667,10 @@ void xfunctional_test() {
     auto cmft  = mem_fun(&A::cfn);
     auto cmft1 = mem_fun(&A::cfn1);
 
-    auto mfrt   = mem_fun_ref(&A::fn);
-    auto mfrt1  = mem_fun_ref(&A::fn1);
-    auto cmfrt  = mem_fun_ref(&A::cfn);
-    auto cmfrt1 = mem_fun_ref(&A::cfn1);
+    auto mfrt   = std::mem_fun_ref(&A::fn);
+    auto mfrt1  = std::mem_fun_ref(&A::fn1);
+    auto cmfrt  = std::mem_fun_ref(&A::cfn);
+    auto cmfrt1 = std::mem_fun_ref(&A::cfn1);
 
     (void) mft;
     (void) mft1;
@@ -1756,7 +1753,7 @@ void xfunctional_test() {
 // void xlocale_test() {
 //     locale loc1{};
 
-//     loc1(string{"Hello"}, string{"World"});
+//     loc1(std::string{"Hello"}, std::string{"World"});
 //     loc1.combine<numpunct<char>>(loc1);
 //     locale loc2(loc1, new codecvt_utf8<wchar_t>);
 //     use_facet<moneypunct<char, true>>(loc2);
@@ -1808,31 +1805,31 @@ void xmemory0_test() {
     INSTANTIATE(pointer_traits<int*>);
     INSTANTIATE(pointer_traits<Base*>::rebind<Derived*>);
 
-    INSTANTIATE(allocator_traits<allocator<int>>);
-    INSTANTIATE(allocator_traits<allocator<int>>::rebind_alloc<double>);
-    INSTANTIATE(allocator_traits<allocator<int>>::rebind_traits<double>);
+    INSTANTIATE(allocator_traits<std::allocator<int>>);
+    INSTANTIATE(allocator_traits<std::allocator<int>>::rebind_alloc<double>);
+    INSTANTIATE(allocator_traits<std::allocator<int>>::rebind_traits<double>);
 
-    allocator<int> ai{};
-    custom_allocator<int> cai{};
+    std::allocator<int> ai{};
+    std::allocator<int> cai{};
     int* ptr{};
 
-    allocator_traits<custom_allocator<int>>::construct(cai, ptr, 5);
-    allocator_traits<custom_allocator<int>>::destroy(cai, ptr);
+    allocator_traits<std::allocator<int>>::construct(cai, ptr, 5);
+    allocator_traits<std::allocator<int>>::destroy(cai, ptr);
 
-    allocator_traits<allocator<int>>::construct(ai, ptr, 5);
-    allocator_traits<allocator<int>>::destroy(ai, ptr);
+    allocator_traits<std::allocator<int>>::construct(ai, ptr, 5);
+    allocator_traits<std::allocator<int>>::destroy(ai, ptr);
 
-    INSTANTIATE(allocator<int>::rebind<double>);
+    INSTANTIATE(std::allocator<int>::rebind<double>);
 
-    allocator<double> ad(ai);
+    std::allocator<double> ad(ai);
     ai = ad;
 
-    allocator<int> ai2(ad);
+    std::allocator<int> ai2(ad);
 
     ai2.construct(ptr, 1);
     ai2.destroy(ptr);
 
-    INSTANTIATE(allocator<double>::rebind<int>);
+    INSTANTIATE(std::allocator<double>::rebind<int>);
 
     ad = ai2;
     equality_test(ad, ai);
@@ -1962,12 +1959,12 @@ void xtgmath_test() {
 }
 
 void xtr1common_test() {
-    INSTANTIATE(integral_constant<int, 5>);
-    INSTANTIATE(bool_constant<true>);
-    INSTANTIATE(enable_if<true>);
-    INSTANTIATE(enable_if<false>);
-    INSTANTIATE(conditional_t<true, int, double>);
-    INSTANTIATE(conditional_t<false, int, double>);
+    INSTANTIATE(std::integral_constant<int, 5>);
+    INSTANTIATE(std::bool_constant<true>);
+    INSTANTIATE(std::enable_if<true>);
+    INSTANTIATE(std::enable_if<false>);
+    INSTANTIATE(std::conditional_t<true, int, double>);
+    INSTANTIATE(std::conditional_t<false, int, double>);
     // rest of traits in this header tested in type_traits_test:
     // is_same, remove_const, remove_volatile, remove_cv,
     // is_integral, is_floating_point, is_arithmetic,

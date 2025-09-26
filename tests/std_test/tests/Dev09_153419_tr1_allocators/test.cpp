@@ -5,9 +5,7 @@
 #include <cstdlib>
 #include <memory>
 
-using namespace std;
-
-// Test shared_ptr and weak_ptr with custom allocators
+// Test std::shared_ptr and std::weak_ptr with custom allocators
 int g_mallocs = 0;
 
 template <typename T>
@@ -44,16 +42,14 @@ void custom_deleter(int* p) {
 }
 
 int main() {
-    // Test shared_ptr with custom deleter and allocator
+    // Test std::shared_ptr with custom deleter and allocator
     {
         int* const raw = new int(47);
 
         int initial_mallocs = g_mallocs;
-
-        shared_ptr<int> sp(raw, custom_deleter, Mallocator<double>());
+std::shared_ptr<int> sp(raw, custom_deleter, Mallocator<double>());
         assert(g_mallocs > initial_mallocs); // allocator was used
-
-        weak_ptr<int> wp(sp);
+std::weak_ptr<int> wp(sp);
         assert(wp.lock().get() == raw);
         assert(*wp.lock() == 47);
 
@@ -63,10 +59,10 @@ int main() {
         wp.reset();
     }
 
-    // Test allocate_shared
+    // Test std::allocate_shared
     {
         int initial_mallocs = g_mallocs;
-        shared_ptr<int> sp = allocate_shared<int>(Mallocator<int>(), 123);
+        std::shared_ptr<int> sp = std::allocate_shared<int>(Mallocator<int>(), 123);
         assert(g_mallocs > initial_mallocs); // allocator was used
         assert(*sp == 123);
     }

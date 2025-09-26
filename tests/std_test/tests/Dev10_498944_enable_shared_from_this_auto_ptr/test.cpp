@@ -6,9 +6,8 @@
 #include <memory>
 #include <utility>
 
-using namespace std;
 
-class A : public enable_shared_from_this<A> {
+class A : public std::enable_shared_from_this<A> {
 public:
     explicit A(const int n) : m_n(n) {}
 
@@ -22,17 +21,17 @@ private:
 
 int main() {
     {
-        auto_ptr<A> a(new A(4));
-        shared_ptr<A> s(move(a));
-        shared_ptr<A> t = s->shared_from_this();
+        std::auto_ptr<A> a(new A(4));
+        std::shared_ptr<A> s(std::move(a));
+        std::shared_ptr<A> t = s->shared_from_this();
         assert(t->num() == 4);
     }
 
     {
-        auto_ptr<A> a(new A(7));
-        shared_ptr<A> s;
-        s               = move(a);
-        shared_ptr<A> t = s->shared_from_this();
+        std::auto_ptr<A> a(new A(7));
+        std::shared_ptr<A> s;
+        s               = std::move(a);
+        std::shared_ptr<A> t = s->shared_from_this();
         assert(t->num() == 7);
     }
 }

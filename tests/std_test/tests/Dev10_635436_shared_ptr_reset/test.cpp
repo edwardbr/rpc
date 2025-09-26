@@ -7,9 +7,7 @@
 #include <utility>
 #include <vector>
 
-using namespace std;
-
-vector<pair<string, int>> results;
+std::vector<std::pair<std::string, int>> results;
 
 class Cat {
 public:
@@ -26,7 +24,7 @@ private:
     Cat& operator=(const Cat&);
 
     int m_n;
-    shared_ptr<Cat> m_p;
+    std::shared_ptr<Cat> m_p;
 };
 
 void deleter(Cat* p) {
@@ -64,7 +62,7 @@ void Cat::vanish2() {
 void Cat::vanish3() {
     results.emplace_back("Cat::vanish3()", m_n);
 
-    m_p.reset(new Cat(33), deleter, allocator<int>());
+    m_p.reset(new Cat(33), deleter, std::allocator<int>());
 }
 
 Cat::~Cat() {
@@ -170,7 +168,7 @@ int main() {
     // results.emplace_back("END", 5);
 
 
-    vector<pair<string, int>> correct;
+    std::vector<std::pair<std::string, int>> correct;
 
     correct.emplace_back("BEGIN", 0);
     correct.emplace_back("Cat::Cat()", 1729);

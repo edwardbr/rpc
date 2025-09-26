@@ -9,30 +9,29 @@
 #include <thread>
 #endif // _M_CEE_PURE
 
-using namespace std;
 
 // Also test GH-1102 "<memory>: weak_ptr conversions don't preserve control blocks for expired objects"
 template <typename T, typename U>
-[[nodiscard]] bool owner_equal(const weak_ptr<T>& t, const weak_ptr<U>& u) {
+[[nodiscard]] bool owner_equal(const std::weak_ptr<T>& t, const std::weak_ptr<U>& u) {
     return !t.owner_before(u) && !u.owner_before(t);
 }
 
 void test_owner_equal() {
-    shared_ptr<int> sp_alive1(new int(0));
-    shared_ptr<int> sp_alive2(new int(0));
-    shared_ptr<int> sp_expiring3(new int(0));
-    shared_ptr<int> sp_expiring4(new int(0));
+    std::shared_ptr<int> sp_alive1(new int(0));
+    std::shared_ptr<int> sp_alive2(new int(0));
+    std::shared_ptr<int> sp_expiring3(new int(0));
+    std::shared_ptr<int> sp_expiring4(new int(0));
 
-    weak_ptr<int> wp_empty;
-    weak_ptr<int> wp_also_empty;
+    std::weak_ptr<int> wp_empty;
+    std::weak_ptr<int> wp_also_empty;
 
-    weak_ptr<int> wp_alive(sp_alive1);
-    weak_ptr<int> wp_alive_same(sp_alive1);
-    weak_ptr<int> wp_alive_different(sp_alive2);
+    std::weak_ptr<int> wp_alive(sp_alive1);
+    std::weak_ptr<int> wp_alive_same(sp_alive1);
+    std::weak_ptr<int> wp_alive_different(sp_alive2);
 
-    weak_ptr<int> wp_expired(sp_expiring3);
-    weak_ptr<int> wp_expired_same(sp_expiring3);
-    weak_ptr<int> wp_expired_different(sp_expiring4);
+    std::weak_ptr<int> wp_expired(sp_expiring3);
+    std::weak_ptr<int> wp_expired_same(sp_expiring3);
+    std::weak_ptr<int> wp_expired_different(sp_expiring4);
 
     sp_expiring3.reset();
     sp_expiring4.reset();
@@ -152,34 +151,34 @@ int main() {
     test_owner_equal();
     // test_gh_258();
 
-    shared_ptr<D> spd(new D);
+    std::shared_ptr<D> spd(new D);
 
-    const weak_ptr<D> wpd_zero(spd);
-    weak_ptr<D> wpd_one(spd);
-    weak_ptr<D> wpd_two(spd);
+    const std::weak_ptr<D> wpd_zero(spd);
+    std::weak_ptr<D> wpd_one(spd);
+    std::weak_ptr<D> wpd_two(spd);
 
-    weak_ptr<A> wpa0(wpd_zero);
+    std::weak_ptr<A> wpa0(wpd_zero);
     assert(!wpa0.expired());
     assert(owner_equal(wpa0, wpd_zero));
     assert(wpa0.lock()->a == 10);
 
     spd.reset();
 
-    weak_ptr<A> wpa1(wpd_one);
+    std::weak_ptr<A> wpa1(wpd_one);
     assert(wpa1.expired());
     assert(owner_equal(wpa1, wpd_zero));
 
-    weak_ptr<A> wpa2;
+    std::weak_ptr<A> wpa2;
     wpa2 = wpd_one;
     assert(wpa2.expired());
     assert(owner_equal(wpa2, wpd_zero));
 
-    weak_ptr<A> wpa3(move(wpd_one));
+    std::weak_ptr<A> wpa3(std::move(wpd_one));
     assert(wpa3.expired());
     assert(owner_equal(wpa3, wpd_zero));
 
-    weak_ptr<A> wpa4;
-    wpa4 = move(wpd_two);
+    std::weak_ptr<A> wpa4;
+    wpa4 = std::move(wpd_two);
     assert(wpa4.expired());
     assert(owner_equal(wpa4, wpd_zero));
 }

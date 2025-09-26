@@ -6,8 +6,6 @@
 #include <functional>
 #include <memory>
 
-using namespace std;
-
 struct A {
     int f() {
         return 8;
@@ -18,10 +16,9 @@ void test_orig() {
     A a;
     A& r = a;
 
-    function<int(A)> f(&A::f);
-    function<int(A&)> g(&A::f);
-    function<int(A*)> h(&A::f);
-
+    std::function<int(A)> f(&A::f);
+    std::function<int(A&)> g(&A::f);
+    std::function<int(A*)> h(&A::f);
     assert(f(a) == 8);
     assert(g(r) == 8);
     assert(h(&a) == 8);
@@ -44,25 +41,23 @@ struct B {
 struct X : public B {};
 
 void test_DevDiv_294051() {
-    shared_ptr<B> b(new B);
-    shared_ptr<X> x(new X);
-
+    std::shared_ptr<B> b(new B);
+    std::shared_ptr<X> x(new X);
     b->data = 220;
     x->data = 330;
 
-    function<int(B, int)> f1                     = &B::func;
-    function<int(X, int)> f1x                    = &B::func;
-    function<int(B&, int)> f2                    = &B::func;
-    function<int(X&, int)> f3                    = &B::func;
-    function<int(B*, int)> f4                    = &B::func;
-    function<int(X*, int)> f5                    = &B::func;
-    function<int(shared_ptr<B>, int)> f6         = &B::func;
-    function<int(shared_ptr<X>, int)> f7         = &B::func;
-    function<int(const shared_ptr<B>&, int)> f8  = &B::func;
-    function<int(const shared_ptr<X>&, int)> f9  = &B::func;
-    function<int(reference_wrapper<B>, int)> f10 = &B::func;
-    function<int(reference_wrapper<X>, int)> f11 = &B::func;
-
+    std::function<int(B, int)> f1                     = &B::func;
+    std::function<int(X, int)> f1x                    = &B::func;
+    std::function<int(B&, int)> f2                    = &B::func;
+    std::function<int(X&, int)> f3                    = &B::func;
+    std::function<int(B*, int)> f4                    = &B::func;
+    std::function<int(X*, int)> f5                    = &B::func;
+    std::function<int(std::shared_ptr<B>, int)> f6         = &B::func;
+    std::function<int(std::shared_ptr<X>, int)> f7         = &B::func;
+    std::function<int(const std::shared_ptr<B>&, int)> f8  = &B::func;
+    std::function<int(const std::shared_ptr<X>&, int)> f9  = &B::func;
+    std::function<int(std::reference_wrapper<B>, int)> f10 = &B::func;
+    std::function<int(std::reference_wrapper<X>, int)> f11 = &B::func;
     assert(f1(*b, 1000) == 1225);
     assert(f1x(*x, 1000) == 1335);
     assert(f2(*b, 2000) == 2225);
@@ -73,22 +68,20 @@ void test_DevDiv_294051() {
     assert(f7(x, 7000) == 7335);
     assert(f8(b, 8000) == 8225);
     assert(f9(x, 9000) == 9335);
-    assert(f10(ref(*b), 10000) == 10225);
-    assert(f11(ref(*x), 11000) == 11335);
-
-    function<int(B)> g1                     = &B::data;
-    function<int(X)> g1x                    = &B::data;
-    function<int(B&)> g2                    = &B::data;
-    function<int(X&)> g3                    = &B::data;
-    function<int(B*)> g4                    = &B::data;
-    function<int(X*)> g5                    = &B::data;
-    function<int(shared_ptr<B>)> g6         = &B::data;
-    function<int(shared_ptr<X>)> g7         = &B::data;
-    function<int(const shared_ptr<B>&)> g8  = &B::data;
-    function<int(const shared_ptr<X>&)> g9  = &B::data;
-    function<int(reference_wrapper<B>)> g10 = &B::data;
-    function<int(reference_wrapper<X>)> g11 = &B::data;
-
+    assert(f10(std::ref(*b), 10000) == 10225);
+    assert(f11(std::ref(*x), 11000) == 11335);
+    std::function<int(B)> g1                     = &B::data;
+    std::function<int(X)> g1x                    = &B::data;
+    std::function<int(B&)> g2                    = &B::data;
+    std::function<int(X&)> g3                    = &B::data;
+    std::function<int(B*)> g4                    = &B::data;
+    std::function<int(X*)> g5                    = &B::data;
+    std::function<int(std::shared_ptr<B>)> g6         = &B::data;
+    std::function<int(std::shared_ptr<X>)> g7         = &B::data;
+    std::function<int(const std::shared_ptr<B>&)> g8  = &B::data;
+    std::function<int(const std::shared_ptr<X>&)> g9  = &B::data;
+    std::function<int(std::reference_wrapper<B>)> g10 = &B::data;
+    std::function<int(std::reference_wrapper<X>)> g11 = &B::data;
     assert(g1(*b) == 220);
     assert(g1x(*x) == 330);
     assert(g2(*b) == 220);
@@ -99,8 +92,8 @@ void test_DevDiv_294051() {
     assert(g7(x) == 330);
     assert(g8(b) == 220);
     assert(g9(x) == 330);
-    assert(g10(ref(*b)) == 220);
-    assert(g11(ref(*x)) == 330);
+    assert(g10(std::ref(*b)) == 220);
+    assert(g11(std::ref(*x)) == 330);
 }
 
 
