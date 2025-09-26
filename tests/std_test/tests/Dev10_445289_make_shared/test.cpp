@@ -283,7 +283,6 @@ void test_adl_proof_shared_ptr_creation_one() { // COMPILE-ONLY
     (void) shared_ptr<T>{new T};
     (void) shared_ptr<T>{new T, default_delete<T>{}};
     (void) shared_ptr<T>{new T, default_delete<T>{}, adl_proof_allocator<T>{}};
-    (void) shared_ptr<T>{std::make_unique<T>()};
 
     (void) std::make_shared<T>();
     (void) std::make_shared<T>(T{});

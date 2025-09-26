@@ -19,7 +19,7 @@ set(BUILDABLE_TESTS
     Dev10_445289_make_shared                      # make_shared tests
     Dev10_654977_655012_shared_ptr_move          # shared_ptr move semantics
     # Dev11_1066589_shared_ptr_atomic_deadlock     # shared_ptr atomic operations - requires C++20 atomic<shared_ptr>
-    # Dev10_851347_weak_ptr_virtual_inheritance     # uses Microsoft private members
+    Dev10_851347_weak_ptr_virtual_inheritance    
     
     
     Dev09_153419_tr1_allocators
@@ -27,22 +27,22 @@ set(BUILDABLE_TESTS
     Dev11_0376122_grand_theft_bind
     Dev11_0920385_list_sort_allocator
     P2162R2_std_visit_for_derived_classes_from_variant
-    # VSO_0000000_has_static_rtti # Conflicts with std library headers
-    # VSO_0000000_initialize_everything # May have similar conflicts
+    VSO_0000000_has_static_rtti 
+    VSO_0000000_initialize_everything 
     VSO_0105317_expression_sfinae
     
 
-    # Dev10_847656_shared_ptr_is_convertible # Complex overload resolution ambiguity
+    Dev10_847656_shared_ptr_is_convertible 
     Dev10_500860_overloaded_address_of
     Dev10_635436_shared_ptr_reset
-    # Dev10_722102_shared_ptr_nullptr # Array type SFINAE constraints not implemented
+    Dev10_722102_shared_ptr_nullptr # Array type SFINAE constraints not implemented
     Dev11_0000000_user_defined_literals
     Dev11_0535636_functional_overhaul
-    # GH_002299_implicit_sfinae_constraints # Advanced SFINAE constraints not fully implemented
-    # GH_005315_destructor_tombstones # Advanced destructor testing
+    GH_002299_implicit_sfinae_constraints # Advanced SFINAE constraints not fully implemented
+    GH_005315_destructor_tombstones # Advanced destructor testing
     P0433R2_deduction_guides # Conflicts with std library headers
     P0513R0_poisoning_the_hash
-    # VSO_0000000_instantiate_iterators_misc # Conflicts with std library headers
+    VSO_0000000_instantiate_iterators_misc # Conflicts with std library headers
 )
 
 foreach(test_name ${BUILDABLE_TESTS})

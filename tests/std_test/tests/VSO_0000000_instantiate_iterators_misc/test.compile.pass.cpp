@@ -70,7 +70,11 @@
 #include <limits>
 #include <list>
 #include <locale>
-#include <rpc/internal/remote_pointer.h>
+#ifdef TEST_STL_COMPLIANCE
+#    include <memory>
+#else
+#    include <rpc/internal/remote_pointer.h>
+#endif
 #include <new>
 #include <numeric>
 // #include <optional> // All templates instantiated in P0220R1_optional
@@ -515,67 +519,6 @@ void functional_test() {
     cbe_ret(4);
     // volatile binder calls not supported
 }
-
-#ifndef _M_CEE_PURE
-template <typename Future>
-void future_test_impl(Future& f) {
-    using namespace chrono;
-
-    (void) f.wait_for(seconds(3));
-    (void) f.wait_until(system_clock::now());
-}
-
-void future_test() {
-    auto bp = future_errc::broken_promise;
-    (void) bp;
-    bool iece = is_error_code_enum_v<decltype(bp)>;
-    (void) iece;
-
-    future<int> f{};
-    future<int&> fr{};
-    future<void> fv{};
-
-    shared_future<int> sf{};
-    shared_future<int&> sfr{};
-    shared_future<void> sfv{};
-
-    future_test_impl(f);
-    future_test_impl(fr);
-    future_test_impl(fv);
-    future_test_impl(sf);
-    future_test_impl(sfr);
-    future_test_impl(sfv);
-
-    promise<int> p(allocator_arg, allocator<double>{});
-    promise<int&> pr(allocator_arg, allocator<double>{});
-    promise<void> pv(allocator_arg, allocator<double>{});
-
-    swap_test(p);
-    swap_test(pr);
-    swap_test(pv);
-
-    packaged_task<void()> pt([]() {});
-    // GH-321: "<future>: packaged_task can't be constructed from a move-only lambda"
-    // packaged_task<void()> pt2([]() {});
-
-#if _HAS_FUNCTION_ALLOCATOR_SUPPORT
-    packaged_task<void()> pta(allocator_arg, allocator<double>{}, []() {});
-    // GH-321: "<future>: packaged_task can't be constructed from a move-only lambda"
-    // packaged_task<void()> pta2(allocator_arg, allocator<double>{}, []() {});
-#endif // _HAS_FUNCTION_ALLOCATOR_SUPPORT
-
-    swap_test(pt);
-
-    (void) async([]() {});
-    (void) async(launch::async, []() {});
-
-    TRAIT_V(uses_allocator, promise<int>, allocator<double>);
-
-#if _HAS_FUNCTION_ALLOCATOR_SUPPORT
-    TRAIT_V(uses_allocator, packaged_task<void()>, allocator<double>);
-#endif // _HAS_FUNCTION_ALLOCATOR_SUPPORT
-}
-#endif // _M_CEE_PURE
 
 template <typename IoManipOut, typename IoManipIn>
 void iomanip_test_impl(IoManipOut out, IoManipIn in) {

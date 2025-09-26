@@ -11,6 +11,61 @@
 #include <type_traits> // For std::is_base_of_v, std::is_convertible_v, std::remove_extent_t, etc.
 #include <functional>  // For std::hash
 #include <cstddef>     // For std::nullptr_t, std::size_t
+#include <typeinfo>    // For std::type_info used by get_deleter
+
+#include <typeinfo>    // For std::type_info used by get_deleter
+
+namespace rpc_sp_detail
+{
+    template<typename Y, typename Ty, typename = void>
+    struct sp_convertible : std::bool_constant<std::is_convertible_v<Y*, Ty*>>
+    {
+    };
+
+    template<typename Y, typename U, typename Void>
+    struct sp_convertible<Y, U[], Void> : std::false_type
+    {
+    };
+
+    template<typename Y, typename U>
+    struct sp_convertible<Y, U[], std::void_t<Y (*)[]>>
+        : std::bool_constant<std::is_convertible_v<Y (*)[], U (*)[]>>
+    {
+    };
+
+    template<typename Y, typename U, std::size_t Ext, typename Void>
+    struct sp_convertible<Y, U[Ext], Void> : std::false_type
+    {
+    };
+
+    template<typename Y, typename U, std::size_t Ext>
+    struct sp_convertible<Y, U[Ext], std::void_t<Y (*)[Ext]>>
+        : std::bool_constant<std::is_convertible_v<Y (*)[Ext], U (*)[Ext]>>
+    {
+    };
+
+    template<typename Y, typename Ty, typename = void>
+    struct sp_pointer_compatible : std::bool_constant<std::is_convertible_v<Y*, Ty*>>
+    {
+    };
+
+    template<typename U, std::size_t Ext>
+    struct sp_pointer_compatible<U[Ext], U[]> : std::true_type
+    {
+    };
+    template<typename U, std::size_t Ext>
+    struct sp_pointer_compatible<U[Ext], const U[]> : std::true_type
+    {
+    };
+    template<typename U, std::size_t Ext>
+    struct sp_pointer_compatible<U[Ext], volatile U[]> : std::true_type
+    {
+    };
+    template<typename U, std::size_t Ext>
+    struct sp_pointer_compatible<U[Ext], const volatile U[]> : std::true_type
+    {
+    };
+} // namespace rpc_sp_detail
 
 #ifdef TEST_STL_COMPLIANCE
 namespace std
@@ -51,62 +106,236 @@ namespace std
         }
     };
 
-    // Minimal unique_ptr implementation for tests
-    template<typename T, typename Deleter = default_delete<T>>
-    class unique_ptr {
-        T* ptr_;
-        Deleter deleter_;
+    namespace __rpc_detail
+    {
+        template<typename T, typename Enable = void> struct call_signature;
 
+        template<typename R, typename... Args>
+        struct call_signature<R(Args...), void>
+        {
+            using signature = R(Args...);
+        };
+
+        template<typename R, typename... Args>
+        struct call_signature<R (*)(Args...), void> : call_signature<R(Args...)>
+        {
+        };
+
+        template<typename R, typename... Args>
+        struct call_signature<R (&)(Args...), void> : call_signature<R(Args...)>
+        {
+        };
+
+        template<typename R, typename... Args>
+        struct call_signature<R (*)(Args...) noexcept, void> : call_signature<R(Args...)>
+        {
+        };
+
+        template<typename R, typename... Args>
+        struct call_signature<R (&)(Args...) noexcept, void> : call_signature<R(Args...)>
+        {
+        };
+
+        template<typename R, typename Class, typename... Args>
+        struct call_signature<R (Class::*)(Args...), void> : call_signature<R(Args...)>
+        {
+        };
+
+        template<typename R, typename Class, typename... Args>
+        struct call_signature<R (Class::*)(Args...) const, void> : call_signature<R(Args...)>
+        {
+        };
+
+        template<typename R, typename Class, typename... Args>
+        struct call_signature<R (Class::*)(Args...) volatile, void> : call_signature<R(Args...)>
+        {
+        };
+
+        template<typename R, typename Class, typename... Args>
+        struct call_signature<R (Class::*)(Args...) const volatile, void> : call_signature<R(Args...)>
+        {
+        };
+
+        template<typename R, typename Class, typename... Args>
+        struct call_signature<R (Class::*)(Args...) noexcept, void> : call_signature<R(Args...)>
+        {
+        };
+
+        template<typename R, typename Class, typename... Args>
+        struct call_signature<R (Class::*)(Args...) const noexcept, void> : call_signature<R(Args...)>
+        {
+        };
+
+        template<typename R, typename Class, typename... Args>
+        struct call_signature<R (Class::*)(Args...) volatile noexcept, void> : call_signature<R(Args...)>
+        {
+        };
+
+        template<typename R, typename Class, typename... Args>
+        struct call_signature<R (Class::*)(Args...) const volatile noexcept, void> : call_signature<R(Args...)>
+        {
+        };
+
+        template<typename R, typename Class, typename... Args>
+        struct call_signature<R (Class::*)(Args...) &, void> : call_signature<R (Class::*)(Args...)>
+        {
+        };
+
+        template<typename R, typename Class, typename... Args>
+        struct call_signature<R (Class::*)(Args...) const &, void> : call_signature<R (Class::*)(Args...) const>
+        {
+        };
+
+        template<typename R, typename Class, typename... Args>
+        struct call_signature<R (Class::*)(Args...) volatile &, void>
+            : call_signature<R (Class::*)(Args...) volatile>
+        {
+        };
+
+        template<typename R, typename Class, typename... Args>
+        struct call_signature<R (Class::*)(Args...) const volatile &, void>
+            : call_signature<R (Class::*)(Args...) const volatile>
+        {
+        };
+
+        template<typename R, typename Class, typename... Args>
+        struct call_signature<R (Class::*)(Args...) &&, void> : call_signature<R (Class::*)(Args...)>
+        {
+        };
+
+        template<typename R, typename Class, typename... Args>
+        struct call_signature<R (Class::*)(Args...) const &&, void> : call_signature<R (Class::*)(Args...) const>
+        {
+        };
+
+        template<typename R, typename Class, typename... Args>
+        struct call_signature<R (Class::*)(Args...) volatile &&, void>
+            : call_signature<R (Class::*)(Args...) volatile>
+        {
+        };
+
+        template<typename R, typename Class, typename... Args>
+        struct call_signature<R (Class::*)(Args...) const volatile &&, void>
+            : call_signature<R (Class::*)(Args...) const volatile>
+        {
+        };
+
+        template<typename R, typename Class, typename... Args>
+        struct call_signature<R (Class::*)(Args...) & noexcept, void>
+            : call_signature<R (Class::*)(Args...) noexcept>
+        {
+        };
+
+        template<typename R, typename Class, typename... Args>
+        struct call_signature<R (Class::*)(Args...) const & noexcept, void>
+            : call_signature<R (Class::*)(Args...) const noexcept>
+        {
+        };
+
+        template<typename R, typename Class, typename... Args>
+        struct call_signature<R (Class::*)(Args...) volatile & noexcept, void>
+            : call_signature<R (Class::*)(Args...) volatile noexcept>
+        {
+        };
+
+        template<typename R, typename Class, typename... Args>
+        struct call_signature<R (Class::*)(Args...) const volatile & noexcept, void>
+            : call_signature<R (Class::*)(Args...) const volatile noexcept>
+        {
+        };
+
+        template<typename R, typename Class, typename... Args>
+        struct call_signature<R (Class::*)(Args...) && noexcept, void>
+            : call_signature<R (Class::*)(Args...) noexcept>
+        {
+        };
+
+        template<typename R, typename Class, typename... Args>
+        struct call_signature<R (Class::*)(Args...) const && noexcept, void>
+            : call_signature<R (Class::*)(Args...) const noexcept>
+        {
+        };
+
+        template<typename R, typename Class, typename... Args>
+        struct call_signature<R (Class::*)(Args...) volatile && noexcept, void>
+            : call_signature<R (Class::*)(Args...) volatile noexcept>
+        {
+        };
+
+        template<typename R, typename Class, typename... Args>
+        struct call_signature<R (Class::*)(Args...) const volatile && noexcept, void>
+            : call_signature<R (Class::*)(Args...) const volatile noexcept>
+        {
+        };
+
+        template<typename F>
+        struct call_signature<F, std::void_t<decltype(&std::decay_t<F>::operator())>>
+            : call_signature<decltype(&std::decay_t<F>::operator())>
+        {
+        };
+
+        template<typename F, typename = void> struct is_callable : std::false_type
+        {
+        };
+
+        template<typename F>
+        struct is_callable<F, std::void_t<typename call_signature<F>::signature>> : std::true_type
+        {
+        };
+    } // namespace __rpc_detail
+
+    template<typename Signature>
+    class packaged_task;
+
+    template<typename R, typename... Args>
+    class packaged_task<R(Args...)>
+    {
     public:
-        using pointer = T*;
-        using element_type = T;
-        using deleter_type = Deleter;
+        using result_type = R;
 
-        constexpr unique_ptr() noexcept : ptr_(nullptr) {}
-        constexpr unique_ptr(std::nullptr_t) noexcept : ptr_(nullptr) {}
-        explicit unique_ptr(pointer p) noexcept : ptr_(p) {}
+        packaged_task() noexcept = default;
 
-        unique_ptr(const unique_ptr&) = delete;
-        unique_ptr& operator=(const unique_ptr&) = delete;
+        template<typename F, typename = std::enable_if_t<std::is_constructible_v<std::function<R(Args...)>, F>>>
+        explicit packaged_task(F&& f)
+            : callable_(std::forward<F>(f))
+        {
+        }
 
-        unique_ptr(unique_ptr&& u) noexcept : ptr_(u.release()), deleter_(std::move(u.deleter_)) {}
-        unique_ptr& operator=(unique_ptr&& u) noexcept {
-            if (this != &u) {
-                reset(u.release());
-                deleter_ = std::move(u.deleter_);
+        packaged_task(const packaged_task&) = delete;
+        packaged_task& operator=(const packaged_task&) = delete;
+
+        packaged_task(packaged_task&&) noexcept = default;
+        packaged_task& operator=(packaged_task&&) noexcept = default;
+
+        ~packaged_task() = default;
+
+        void swap(packaged_task& other) noexcept { callable_.swap(other.callable_); }
+
+        explicit operator bool() const noexcept { return static_cast<bool>(callable_); }
+
+        template<typename... CallArgs>
+        R operator()(CallArgs&&... args)
+        {
+            if (!callable_)
+            {
+                throw std::bad_function_call();
             }
-            return *this;
+            return callable_(std::forward<CallArgs>(args)...);
         }
 
-        ~unique_ptr() { reset(); }
-
-        pointer release() noexcept {
-            pointer p = ptr_;
-            ptr_ = nullptr;
-            return p;
-        }
-
-        void reset(pointer ptr = pointer()) noexcept {
-            pointer old = ptr_;
-            ptr_ = ptr;
-            if (old != nullptr)
-                deleter_(old);
-        }
-
-        pointer get() const noexcept { return ptr_; }
-        deleter_type& get_deleter() noexcept { return deleter_; }
-        const deleter_type& get_deleter() const noexcept { return deleter_; }
-
-        explicit operator bool() const noexcept { return ptr_ != nullptr; }
-
-        T& operator*() const { return *ptr_; }
-        pointer operator->() const noexcept { return ptr_; }
+    private:
+        std::function<R(Args...)> callable_;
     };
 
-    template<typename T, typename... Args>
-    unique_ptr<T> make_unique(Args&&... args) {
-        return unique_ptr<T>(new T(std::forward<Args>(args)...));
-    }
+    template<typename R, typename... Args>
+    packaged_task(R (*)(Args...)) -> packaged_task<R(Args...)>;
+
+    template<typename F,
+             typename Decayed = std::decay_t<F>,
+             typename = std::enable_if_t<!std::is_pointer_v<Decayed> && !std::is_function_v<Decayed>
+                                         && __rpc_detail::is_callable<Decayed>::value>,
+             typename Sig = typename __rpc_detail::call_signature<Decayed>::signature>
+    packaged_task(F) -> packaged_task<Sig>;
 
 #else
 
@@ -122,6 +351,12 @@ namespace rpc
     // Forward declarations for circular dependency resolution
     template<typename T> class shared_ptr;
     template<typename T> class weak_ptr;
+
+    namespace __rpc_shared_ptr_detail
+    {
+        template<typename T, typename ValueAlloc, typename... Args>
+        shared_ptr<T> make_shared_with_value_alloc(const ValueAlloc&, Args&&...);
+    }
 
     // NAMESPACE_INLINE_BEGIN  // Commented out to simplify
 
@@ -149,6 +384,7 @@ namespace rpc
             virtual ~control_block_base() = default;
             virtual void dispose_object_actual() = 0;
             virtual void destroy_self_actual() = 0;
+            virtual void* get_deleter_ptr(const std::type_info&) noexcept { return nullptr; }
 
             void* get_managed_object_ptr() const { return managed_object_ptr_; }
 
@@ -189,10 +425,12 @@ namespace rpc
         {
             Deleter object_deleter_;
             Alloc control_block_allocator_;
-            control_block_impl(T* p, Deleter d, Alloc a)
+            bool expose_deleter_;
+            control_block_impl(T* p, Deleter d, Alloc a, bool expose_deleter)
                 : control_block_base(to_void_ptr(p))
                 , object_deleter_(std::move(d))
                 , control_block_allocator_(std::move(a))
+                , expose_deleter_(expose_deleter)
             {
             }
 
@@ -217,6 +455,17 @@ namespace rpc
                 ReboundAlloc rebound_alloc(control_block_allocator_);
                 std::allocator_traits<ReboundAlloc>::destroy(rebound_alloc, this);
                 std::allocator_traits<ReboundAlloc>::deallocate(rebound_alloc, this, 1);
+            }
+
+            void* get_deleter_ptr(const std::type_info& type) noexcept override
+            {
+                if (!expose_deleter_)
+                    return nullptr;
+                if (type == typeid(Deleter))
+                {
+                    return static_cast<void*>(&object_deleter_);
+                }
+                return nullptr;
             }
         };
 
@@ -259,14 +508,23 @@ namespace rpc
                     allocator_instance_);
                 std::allocator_traits<decltype(actual_cb_allocator)>::deallocate(actual_cb_allocator, this, 1);
             }
+            void* get_deleter_ptr(const std::type_info&) noexcept override { return nullptr; }
             ~control_block_make_shared() { }
         };
     } // namespace impl
 
     template<typename T> class shared_ptr
     {
-        T* ptr_{nullptr};
+        using element_type_impl = std::remove_extent_t<T>;
+
+        element_type_impl* ptr_{nullptr};
         impl::control_block_base* cb_{nullptr};
+
+        template<typename Y>
+        using is_ptr_convertible = rpc_sp_detail::sp_convertible<Y, T>;
+
+        template<typename Y>
+        using is_pointer_compatible = rpc_sp_detail::sp_pointer_compatible<Y, T>;
 
         void acquire_this() noexcept
         {
@@ -280,7 +538,7 @@ namespace rpc
                 cb_->decrement_local_shared_and_dispose_if_zero();
         }
 
-        shared_ptr(impl::control_block_base* cb, T* p)
+        shared_ptr(impl::control_block_base* cb, element_type_impl* p)
             : ptr_(p)
             , cb_(cb)
         {
@@ -293,7 +551,7 @@ namespace rpc
         enum class for_enable_shared_tag
         {
         };
-        shared_ptr(impl::control_block_base* cb, T* p, for_enable_shared_tag)
+        shared_ptr(impl::control_block_base* cb, element_type_impl* p, for_enable_shared_tag)
             : ptr_(p)
             , cb_(cb)
         {
@@ -301,61 +559,30 @@ namespace rpc
             // The reference count is already correct from the original shared_ptr
         }
 
-        template<typename Y, typename Deleter, typename Alloc> void create_cb_local(Y* p, Deleter d, Alloc cb_alloc)
+        template<typename Y, typename Deleter, typename Alloc>
+        void create_cb_local(Y* p, Deleter d, Alloc cb_alloc, bool expose_deleter)
         {
-            if (!p)
-            {
-                if constexpr (std::is_same_v<Deleter, std::default_delete<Y>>
-                              && std::is_same_v<Alloc, std::allocator<char>>)
-                {
-                    return;
-                }
-            }
-
             using ActualCB = impl::control_block_impl<Y, Deleter, Alloc>;
             typename std::allocator_traits<Alloc>::template rebind_alloc<ActualCB> actual_cb_alloc(cb_alloc);
             cb_ = std::allocator_traits<decltype(actual_cb_alloc)>::allocate(actual_cb_alloc, 1);
-            new (cb_) ActualCB(p, std::move(d), std::move(cb_alloc));
+            new (cb_) ActualCB(p, std::move(d), std::move(cb_alloc), expose_deleter);
         }
 
     public:
-        using element_type = std::remove_extent_t<T>;
+        using element_type = element_type_impl;
         using weak_type = weak_ptr<T>;
 
         constexpr shared_ptr() noexcept = default;
         constexpr shared_ptr(std::nullptr_t) noexcept { }
 
-        template<typename Y, typename = std::enable_if_t<std::is_convertible_v<Y*, T*> ||
-                                                       (std::is_array_v<T> && std::is_convertible_v<Y*, std::remove_extent_t<T>*>)>>
+        template<typename Y, typename = std::enable_if_t<is_ptr_convertible<Y>::value>>
         explicit shared_ptr(Y* p)
-            : ptr_(p)
-            , cb_(nullptr)
-        {
-            if (ptr_)
-            {
-                try
-                {
-                    create_cb_local<Y>(p, std::default_delete<Y>(), std::allocator<char>());
-                }
-                catch (...)
-                {
-                    ptr_ = nullptr;
-                    cb_ = nullptr;
-                    throw;
-                }
-                acquire_this();
-                try_enable_shared_from_this(*this, p);
-            }
-        }
-
-        template<typename Y, typename Deleter, typename = std::enable_if_t<std::is_convertible_v<Y*, T*>>>
-        shared_ptr(Y* p, Deleter d)
-            : ptr_(p)
+            : ptr_(static_cast<element_type_impl*>(p))
             , cb_(nullptr)
         {
             try
             {
-                create_cb_local<Y>(p, std::move(d), std::allocator<char>());
+                create_cb_local<Y>(p, std::default_delete<Y>(), std::allocator<char>(), false);
             }
             catch (...)
             {
@@ -363,11 +590,29 @@ namespace rpc
                 cb_ = nullptr;
                 throw;
             }
-            if (cb_ || ptr_)
-            {
-                acquire_this();
+            acquire_this();
+            if (ptr_)
                 try_enable_shared_from_this(*this, p);
+        }
+
+        template<typename Y, typename Deleter, typename = std::enable_if_t<is_ptr_convertible<Y>::value>>
+        shared_ptr(Y* p, Deleter d)
+            : ptr_(static_cast<element_type_impl*>(p))
+            , cb_(nullptr)
+        {
+            try
+            {
+                create_cb_local<Y>(p, std::move(d), std::allocator<char>(), true);
             }
+            catch (...)
+            {
+                ptr_ = nullptr;
+                cb_ = nullptr;
+                throw;
+            }
+            acquire_this();
+            if (ptr_)
+                try_enable_shared_from_this(*this, p);
         }
 
         template<typename Deleter>
@@ -377,7 +622,7 @@ namespace rpc
         {
             try
             {
-                create_cb_local<T>(nullptr, std::move(d), std::allocator<char>());
+                create_cb_local<T>(nullptr, std::move(d), std::allocator<char>(), true);
             }
             catch (...)
             {
@@ -390,14 +635,14 @@ namespace rpc
             }
         }
 
-        template<typename Y, typename Deleter, typename Alloc, typename = std::enable_if_t<std::is_convertible_v<Y*, T*>>>
+        template<typename Y, typename Deleter, typename Alloc, typename = std::enable_if_t<is_ptr_convertible<Y>::value>>
         shared_ptr(Y* p, Deleter d, Alloc cb_alloc)
-            : ptr_(p)
+            : ptr_(static_cast<element_type_impl*>(p))
             , cb_(nullptr)
         {
             try
             {
-                create_cb_local<Y>(p, std::move(d), std::move(cb_alloc));
+                create_cb_local<Y>(p, std::move(d), std::move(cb_alloc), true);
             }
             catch (...)
             {
@@ -405,11 +650,9 @@ namespace rpc
                 cb_ = nullptr;
                 throw;
             }
-            if (cb_ || ptr_)
-            {
-                acquire_this();
+            acquire_this();
+            if (ptr_)
                 try_enable_shared_from_this(*this, p);
-            }
         }
 
         template<typename Deleter, typename Alloc>
@@ -419,7 +662,7 @@ namespace rpc
         {
             try
             {
-                create_cb_local<T>(nullptr, std::move(d), std::move(cb_alloc));
+                create_cb_local<T>(nullptr, std::move(d), std::move(cb_alloc), true);
             }
             catch (...)
             {
@@ -431,30 +674,6 @@ namespace rpc
                 acquire_this();
             }
         }
-
-#ifdef TEST_STL_COMPLIANCE
-        template<typename Y, typename D, typename = std::enable_if_t<std::is_convertible_v<Y*, T*>>>
-        shared_ptr(unique_ptr<Y, D>&& r)
-            : ptr_(r.get())
-            , cb_(nullptr)
-        {
-            if (ptr_)
-            {
-                try
-                {
-                    create_cb_local<Y>(r.release(), r.get_deleter(), std::allocator<char>());
-                }
-                catch (...)
-                {
-                    ptr_ = nullptr;
-                    cb_ = nullptr;
-                    throw;
-                }
-                acquire_this();
-            }
-        }
-#endif
-
 
         template<typename Y>
         shared_ptr(const shared_ptr<Y>& r, element_type* p_alias) noexcept
@@ -487,23 +706,23 @@ namespace rpc
             r.ptr_ = nullptr;
         }
 
-        template<typename Y, typename = std::enable_if_t<std::is_convertible_v<Y*, T*>>>
+        template<typename Y, typename = std::enable_if_t<is_pointer_compatible<Y>::value>>
         shared_ptr(const shared_ptr<Y>& r) noexcept
-            : ptr_(static_cast<T*>(r.internal_get_ptr()))
+            : ptr_(static_cast<element_type_impl*>(r.internal_get_ptr()))
             , cb_(r.internal_get_cb())
         {
             acquire_this();
         }
-        template<typename Y, typename = std::enable_if_t<std::is_convertible_v<Y*, T*>>>
+        template<typename Y, typename = std::enable_if_t<is_pointer_compatible<Y>::value>>
         shared_ptr(shared_ptr<Y>&& r) noexcept
-            : ptr_(static_cast<T*>(r.internal_get_ptr()))
+            : ptr_(static_cast<element_type_impl*>(r.internal_get_ptr()))
             , cb_(r.internal_get_cb())
         {
             r.cb_ = nullptr;
             r.ptr_ = nullptr;
         }
 
-        template<typename Y, typename = std::enable_if_t<std::is_convertible_v<Y*, T*>>>
+        template<typename Y, typename = std::enable_if_t<is_pointer_compatible<Y>::value>>
         explicit shared_ptr(const weak_ptr<Y>& r)
         {
             shared_ptr<Y> temp = r.lock();
@@ -518,30 +737,34 @@ namespace rpc
         ~shared_ptr() { release_this(); }
         shared_ptr& operator=(const shared_ptr& r) noexcept
         {
-            if (this != std::addressof(r))
-            {
-                release_this();
-                cb_ = r.cb_;
-                ptr_ = r.ptr_;
-                acquire_this();
-            }
+            shared_ptr(r).swap(*this);
+            return *this;
+        }
+        template<typename Y, typename = std::enable_if_t<is_pointer_compatible<Y>::value>>
+        shared_ptr& operator=(const shared_ptr<Y>& r) noexcept
+        {
+            shared_ptr(r).swap(*this);
             return *this;
         }
         shared_ptr& operator=(shared_ptr&& r) noexcept
         {
-            if (this != std::addressof(r))
-            {
-                release_this();
-                cb_ = r.cb_;
-                ptr_ = r.ptr_;
-                r.cb_ = nullptr;
-                r.ptr_ = nullptr;
-            }
+            shared_ptr(std::move(r)).swap(*this);
+            return *this;
+        }
+        template<typename Y, typename = std::enable_if_t<is_pointer_compatible<Y>::value>>
+        shared_ptr& operator=(shared_ptr<Y>&& r) noexcept
+        {
+            shared_ptr(std::move(r)).swap(*this);
+            return *this;
+        }
+        shared_ptr& operator=(std::nullptr_t) noexcept
+        {
+            reset();
             return *this;
         }
 
         void reset() noexcept { shared_ptr().swap(*this); }
-        template<typename Y, typename Deleter = std::default_delete<Y>, typename Alloc = std::allocator<char>>
+        template<typename Y, typename Deleter = std::default_delete<Y>, typename Alloc = std::allocator<char>, typename = std::enable_if_t<is_ptr_convertible<Y>::value>>
         void reset(Y* p, Deleter d = Deleter(), Alloc cb_alloc = Alloc())
         {
             shared_ptr(p, std::move(d), std::move(cb_alloc)).swap(*this);
@@ -553,18 +776,25 @@ namespace rpc
             std::swap(cb_, r.cb_);
         }
 
-        T* get() const noexcept { return ptr_; }
+        element_type_impl* get() const noexcept { return ptr_; }
 
         template<typename U = T>
-        std::enable_if_t<!std::is_void_v<U> && !std::is_array_v<U>, U&>
-        operator*() const noexcept { return *ptr_; }
+        std::enable_if_t<!std::is_void_v<U> && !std::is_array_v<U>, std::remove_extent_t<U>&>
+        operator*() const noexcept
+        {
+            using result_type = std::remove_extent_t<U>;
+            return *static_cast<result_type*>(ptr_);
+        }
 
         template<typename U = T>
-        std::enable_if_t<!std::is_void_v<U> && std::is_array_v<U>, std::remove_extent_t<U>&>
-        operator*() const noexcept { return *ptr_; }
-
-        T* operator->() const noexcept { return ptr_; }
+        std::enable_if_t<!std::is_void_v<U> && !std::is_array_v<U>, std::remove_extent_t<U>*>
+        operator->() const noexcept
+        {
+            using result_type = std::remove_extent_t<U>;
+            return static_cast<result_type*>(ptr_);
+        }
         long use_count() const noexcept { return cb_ ? cb_->local_shared_owners.load(std::memory_order_relaxed) : 0; }
+        bool unique() const noexcept { return use_count() == 1; }
         explicit operator bool() const noexcept { return ptr_ != nullptr; }
 
         template<typename Y>
@@ -578,13 +808,15 @@ namespace rpc
         }
 
         impl::control_block_base* internal_get_cb() const { return cb_; }
-        T* internal_get_ptr() const { return ptr_; }
+        element_type_impl* internal_get_ptr() const { return ptr_; }
 
         template<typename U> friend class weak_ptr;
         template<typename U>
         friend class shared_ptr; // Allow different template instantiations to access private members
         template<typename U, typename... Args> friend shared_ptr<U> make_shared(Args&&... args);
         template<typename U, typename Alloc, typename... Args> friend shared_ptr<U> allocate_shared(const Alloc& alloc, Args&&... args);
+        template<typename U, typename ValueAlloc, typename... Args>
+        friend shared_ptr<U> __rpc_shared_ptr_detail::make_shared_with_value_alloc(const ValueAlloc&, Args&&...);
         template<class T1_cast, class T2_cast>
         friend shared_ptr<T1_cast> dynamic_pointer_cast(const shared_ptr<T2_cast>& from) noexcept;
         template<typename U> friend class enable_shared_from_this;
@@ -592,19 +824,45 @@ namespace rpc
 
     template<typename T> class weak_ptr
     {
-        impl::control_block_base* cb_{nullptr};
-        T* ptr_for_lock_{nullptr};
+        using element_type_impl = std::remove_extent_t<T>;
 
-    public:
-        using element_type = std::remove_extent_t<T>;
-        constexpr weak_ptr() noexcept = default;
+        impl::control_block_base* cb_{nullptr};
+        element_type_impl* ptr_for_lock_{nullptr};
 
         template<typename Y>
+        using is_pointer_compatible = rpc_sp_detail::sp_pointer_compatible<Y, T>;
+
+        template<typename SourceElement>
+        static element_type_impl* convert_ptr_for_lock(impl::control_block_base* source_cb,
+                                                       SourceElement* source_ptr) noexcept
+        {
+            if (!source_ptr)
+                return nullptr;
+
+            using source_base_t = std::remove_cv_t<SourceElement>;
+            using dest_base_t = std::remove_cv_t<element_type_impl>;
+
+            if constexpr (std::is_same_v<source_base_t, dest_base_t>)
+            {
+                return static_cast<element_type_impl*>(source_ptr);
+            }
+            else
+            {
+                if (!source_cb || source_cb->get_managed_object_ptr() == nullptr)
+                    return nullptr;
+                return static_cast<element_type_impl*>(source_ptr);
+            }
+        }
+
+    public:
+        using element_type = element_type_impl;
+        constexpr weak_ptr() noexcept = default;
+
+        template<typename Y, typename = std::enable_if_t<is_pointer_compatible<Y>::value>>
         weak_ptr(const shared_ptr<Y>& r) noexcept
             : cb_(r.internal_get_cb())
             , ptr_for_lock_(r.internal_get_ptr())
         {
-            static_assert(std::is_convertible<Y*, T*>::value, "Y* must be convertible to T*");
             if (cb_)
                 cb_->increment_local_weak();
         }
@@ -616,12 +874,11 @@ namespace rpc
             if (cb_)
                 cb_->increment_local_weak();
         }
-        template<typename Y>
+        template<typename Y, typename = std::enable_if_t<is_pointer_compatible<Y>::value>>
         weak_ptr(const weak_ptr<Y>& r) noexcept
             : cb_(r.cb_)
-            , ptr_for_lock_(static_cast<T*>(r.ptr_for_lock_))
+            , ptr_for_lock_(convert_ptr_for_lock<typename weak_ptr<Y>::element_type>(r.cb_, r.ptr_for_lock_))
         {
-            static_assert(std::is_convertible_v<Y*, T*>, "Y* must be convertible to T*");
             if (cb_)
                 cb_->increment_local_weak();
         }
@@ -633,12 +890,11 @@ namespace rpc
             r.cb_ = nullptr;
             r.ptr_for_lock_ = nullptr;
         }
-        template<typename Y>
+        template<typename Y, typename = std::enable_if_t<std::is_convertible_v<typename weak_ptr<Y>::element_type*, element_type_impl*>>>
         weak_ptr(weak_ptr<Y>&& r) noexcept
             : cb_(r.cb_)
-            , ptr_for_lock_(static_cast<T*>(r.ptr_for_lock_))
+            , ptr_for_lock_(convert_ptr_for_lock<typename weak_ptr<Y>::element_type>(r.cb_, r.ptr_for_lock_))
         {
-            static_assert(std::is_convertible_v<Y*, T*>, "Y* must be convertible to T*");
             r.cb_ = nullptr;
             r.ptr_for_lock_ = nullptr;
         }
@@ -654,12 +910,14 @@ namespace rpc
             weak_ptr(r).swap(*this);
             return *this;
         }
-        template<typename Y> weak_ptr& operator=(const weak_ptr<Y>& r) noexcept
+        template<typename Y, typename = std::enable_if_t<is_pointer_compatible<Y>::value>>
+        weak_ptr& operator=(const weak_ptr<Y>& r) noexcept
         {
             weak_ptr(r).swap(*this);
             return *this;
         }
-        template<typename Y> weak_ptr& operator=(const shared_ptr<Y>& r) noexcept
+        template<typename Y, typename = std::enable_if_t<is_pointer_compatible<Y>::value>>
+        weak_ptr& operator=(const shared_ptr<Y>& r) noexcept
         {
             weak_ptr(r).swap(*this);
             return *this;
@@ -669,7 +927,8 @@ namespace rpc
             weak_ptr(std::move(r)).swap(*this);
             return *this;
         }
-        template<typename Y> weak_ptr& operator=(weak_ptr<Y>&& r) noexcept
+        template<typename Y, typename = std::enable_if_t<is_pointer_compatible<Y>::value>>
+        weak_ptr& operator=(weak_ptr<Y>&& r) noexcept
         {
             weak_ptr(std::move(r)).swap(*this);
             return *this;
@@ -684,7 +943,7 @@ namespace rpc
             {
                 if (cb_->local_shared_owners.compare_exchange_weak(
                         c, c + 1, std::memory_order_acq_rel, std::memory_order_relaxed))
-                    return shared_ptr<T>(cb_, static_cast<T*>(ptr_for_lock_));
+                    return shared_ptr<T>(cb_, ptr_for_lock_);
             }
             return {};
         }
@@ -721,6 +980,104 @@ namespace rpc
     };
 
 
+    template<typename T = void> struct owner_less;
+
+    template<typename T>
+    struct owner_less
+    {
+        using is_transparent = void;
+
+        bool operator()(const shared_ptr<T>& lhs, const shared_ptr<T>& rhs) const noexcept { return lhs.owner_before(rhs); }
+        bool operator()(const shared_ptr<T>& lhs, const weak_ptr<T>& rhs) const noexcept { return lhs.owner_before(rhs); }
+        bool operator()(const weak_ptr<T>& lhs, const shared_ptr<T>& rhs) const noexcept { return lhs.owner_before(rhs); }
+        bool operator()(const weak_ptr<T>& lhs, const weak_ptr<T>& rhs) const noexcept { return lhs.owner_before(rhs); }
+    };
+
+    template<>
+    struct owner_less<void>
+    {
+        using is_transparent = void;
+
+        template<typename T, typename U>
+        bool operator()(const shared_ptr<T>& lhs, const shared_ptr<U>& rhs) const noexcept
+        {
+            return lhs.owner_before(rhs);
+        }
+
+        template<typename T, typename U>
+        bool operator()(const shared_ptr<T>& lhs, const weak_ptr<U>& rhs) const noexcept
+        {
+            return lhs.owner_before(rhs);
+        }
+
+        template<typename T, typename U>
+        bool operator()(const weak_ptr<T>& lhs, const shared_ptr<U>& rhs) const noexcept
+        {
+            return lhs.owner_before(rhs);
+        }
+
+        template<typename T, typename U>
+        bool operator()(const weak_ptr<T>& lhs, const weak_ptr<U>& rhs) const noexcept
+        {
+            return lhs.owner_before(rhs);
+        }
+    };
+
+    template<typename T>
+    shared_ptr(const weak_ptr<T>&) -> shared_ptr<T>;
+
+    template<typename T>
+    shared_ptr(weak_ptr<T>&&) -> shared_ptr<T>;
+
+    template<typename T>
+    weak_ptr(const shared_ptr<T>&) -> weak_ptr<T>;
+
+    template<typename T>
+    weak_ptr(const weak_ptr<T>&) -> weak_ptr<T>;
+
+    template<typename T>
+    weak_ptr(weak_ptr<T>&&) -> weak_ptr<T>;
+
+    owner_less()-> owner_less<void>;
+
+    template<typename T>
+    owner_less(const owner_less<T>&) -> owner_less<T>;
+
+
+    namespace __rpc_shared_ptr_detail
+    {
+        template<typename T, typename ValueAlloc, typename... Args>
+        shared_ptr<T> make_shared_with_value_alloc(const ValueAlloc& value_alloc, Args&&... args)
+        {
+            using ControlBlockAlloc = typename std::allocator_traits<ValueAlloc>::template rebind_alloc<
+                impl::control_block_make_shared<T, ValueAlloc, Args...>>;
+            using ControlBlockAllocTraits = std::allocator_traits<ControlBlockAlloc>;
+
+            ControlBlockAlloc cb_alloc(value_alloc);
+            auto* cb_ptr = ControlBlockAllocTraits::allocate(cb_alloc, 1);
+
+            try
+            {
+                ControlBlockAllocTraits::construct(
+                    cb_alloc, cb_ptr, value_alloc, std::forward<Args>(args)...);
+            }
+            catch (...)
+            {
+                ControlBlockAllocTraits::deallocate(cb_alloc, cb_ptr, 1);
+                throw;
+            }
+
+            cb_ptr->increment_local_shared();
+            using result_element_type = typename shared_ptr<T>::element_type;
+            shared_ptr<T> result(
+                static_cast<impl::control_block_base*>(cb_ptr),
+                static_cast<result_element_type*>(cb_ptr->get_managed_object_ptr()));
+            try_enable_shared_from_this(
+                result, static_cast<result_element_type*>(cb_ptr->get_managed_object_ptr()));
+            return result;
+        }
+    } // namespace __rpc_shared_ptr_detail
+
     // --- Free Functions ---
 
     // Comparison operators for shared_ptr
@@ -739,7 +1096,9 @@ namespace rpc
     template<typename T, typename U>
     bool operator<(const shared_ptr<T>& a, const shared_ptr<U>& b) noexcept
     {
-        return std::less<std::common_type_t<T*, U*>>{}(a.get(), b.get());
+        using APtr = typename shared_ptr<T>::element_type*;
+        using BPtr = typename shared_ptr<U>::element_type*;
+        return std::less<std::common_type_t<APtr, BPtr>>{}(a.get(), b.get());
     }
 
     template<typename T, typename U>
@@ -760,55 +1119,56 @@ namespace rpc
         return !(a < b);
     }
 
+    template<typename T>
+    void swap(shared_ptr<T>& lhs, shared_ptr<T>& rhs) noexcept
+    {
+        lhs.swap(rhs);
+    }
+
+    template<typename T>
+    void swap(weak_ptr<T>& lhs, weak_ptr<T>& rhs) noexcept
+    {
+        lhs.swap(rhs);
+    }
+
+    template<typename Deleter, typename T>
+    Deleter* get_deleter(const shared_ptr<T>& p) noexcept
+    {
+        if constexpr (std::is_reference_v<Deleter>)
+        {
+            return nullptr;
+        }
+
+        using StoredDeleter = std::remove_cv_t<std::remove_reference_t<Deleter>>;
+
+        auto* cb = p.internal_get_cb();
+        if (!cb)
+        {
+            return nullptr;
+        }
+
+        void* result = cb->get_deleter_ptr(typeid(StoredDeleter));
+        if (!result)
+        {
+            return nullptr;
+        }
+
+        return static_cast<Deleter*>(result);
+    }
+
     template<typename T, typename... Args> shared_ptr<T> make_shared(Args&&... args)
     {
-        using Alloc = std::allocator<std::remove_cv_t<T>>;
-        using CBAllocForMakeShared =
-            typename std::allocator_traits<Alloc>::template rebind_alloc<impl::control_block_make_shared<T, Alloc, Args...>>;
-
-        CBAllocForMakeShared cb_alloc;
-        auto* cb_ptr = std::allocator_traits<CBAllocForMakeShared>::allocate(cb_alloc, 1);
-
-        try
-        {
-            std::allocator_traits<CBAllocForMakeShared>::construct(cb_alloc, cb_ptr, Alloc(), std::forward<Args>(args)...);
-        }
-        catch (...)
-        {
-            std::allocator_traits<CBAllocForMakeShared>::deallocate(cb_alloc, cb_ptr, 1);
-            throw;
-        }
-        cb_ptr->increment_local_shared();
-        shared_ptr<T> result(
-            static_cast<impl::control_block_base*>(cb_ptr), static_cast<T*>(cb_ptr->get_managed_object_ptr()));
-        try_enable_shared_from_this(result, static_cast<T*>(cb_ptr->get_managed_object_ptr()));
-        return result;
+        using ValueAlloc = std::allocator<std::remove_cv_t<T>>;
+        ValueAlloc value_alloc;
+        return __rpc_shared_ptr_detail::make_shared_with_value_alloc<T>(value_alloc, std::forward<Args>(args)...);
     }
 
     template<typename T, typename Alloc, typename... Args>
     shared_ptr<T> allocate_shared(const Alloc& alloc, Args&&... args)
     {
-        using CleanAlloc = std::allocator<std::remove_cv_t<T>>;
-        using CBAllocForMakeShared =
-            typename std::allocator_traits<CleanAlloc>::template rebind_alloc<impl::control_block_make_shared<T, CleanAlloc, Args...>>;
-
-        CBAllocForMakeShared cb_alloc;
-        auto* cb_ptr = std::allocator_traits<CBAllocForMakeShared>::allocate(cb_alloc, 1);
-
-        try
-        {
-            std::allocator_traits<CBAllocForMakeShared>::construct(cb_alloc, cb_ptr, CleanAlloc(), std::forward<Args>(args)...);
-        }
-        catch (...)
-        {
-            std::allocator_traits<CBAllocForMakeShared>::deallocate(cb_alloc, cb_ptr, 1);
-            throw;
-        }
-        cb_ptr->increment_local_shared();
-        shared_ptr<T> result(
-            static_cast<impl::control_block_base*>(cb_ptr), static_cast<T*>(cb_ptr->get_managed_object_ptr()));
-        try_enable_shared_from_this(result, static_cast<T*>(cb_ptr->get_managed_object_ptr()));
-        return result;
+        using ValueAlloc = typename std::allocator_traits<Alloc>::template rebind_alloc<std::remove_cv_t<T>>;
+        ValueAlloc value_alloc(alloc);
+        return __rpc_shared_ptr_detail::make_shared_with_value_alloc<T>(value_alloc, std::forward<Args>(args)...);
     }
 
     template<typename T> class enable_shared_from_this
@@ -816,14 +1176,18 @@ namespace rpc
     protected:
         mutable weak_ptr<T> weak_this_;
         constexpr enable_shared_from_this() noexcept = default;
-        enable_shared_from_this(const enable_shared_from_this&) noexcept = default;
-        enable_shared_from_this& operator=(const enable_shared_from_this&) noexcept = default;
+        enable_shared_from_this(const enable_shared_from_this&) noexcept {}
+        enable_shared_from_this& operator=(const enable_shared_from_this&) noexcept { return *this; }
+        enable_shared_from_this(enable_shared_from_this&&) noexcept {}
+        enable_shared_from_this& operator=(enable_shared_from_this&&) noexcept { return *this; }
         ~enable_shared_from_this() = default;
 
         template<typename ActualPtrType>
         void internal_set_weak_this(impl::control_block_base* cb_for_this_obj, ActualPtrType* ptr_to_this_obj) const
         {
-            if (static_cast<const void*>(static_cast<const T*>(ptr_to_this_obj)) == static_cast<const void*>(this))
+            using esft_element = typename shared_ptr<T>::element_type;
+            if (static_cast<const void*>(static_cast<const esft_element*>(ptr_to_this_obj))
+                == static_cast<const void*>(this))
             {
                 if (weak_this_.expired())
                 {
@@ -832,7 +1196,7 @@ namespace rpc
                         // Directly construct weak_ptr from the control block and pointer
                         // instead of creating a temporary shared_ptr
                         weak_this_.cb_ = cb_for_this_obj;
-                        weak_this_.ptr_for_lock_ = const_cast<T*>(static_cast<const T*>(ptr_to_this_obj));
+                        weak_this_.ptr_for_lock_ = const_cast<esft_element*>(static_cast<const esft_element*>(ptr_to_this_obj));
                         if (cb_for_this_obj) {
                             cb_for_this_obj->increment_local_weak();
                         }
@@ -924,13 +1288,15 @@ namespace rpc
     template<typename T>
     bool operator<(const shared_ptr<T>& x, std::nullptr_t) noexcept
     {
-        return std::less<T*>()(x.get(), nullptr);
+        using Ptr = typename shared_ptr<T>::element_type*;
+        return std::less<Ptr>()(x.get(), nullptr);
     }
 
     template<typename T>
     bool operator<(std::nullptr_t, const shared_ptr<T>& x) noexcept
     {
-        return std::less<T*>()(nullptr, x.get());
+        using Ptr = typename shared_ptr<T>::element_type*;
+        return std::less<Ptr>()(nullptr, x.get());
     }
 
     template<typename T>
@@ -984,7 +1350,8 @@ namespace rpc
     struct hash<shared_ptr<T>>
     {
         size_t operator()(const shared_ptr<T>& p) const noexcept {
-            return std::hash<T*>()(p.get());
+            using Ptr = typename shared_ptr<T>::element_type*;
+            return std::hash<Ptr>()(p.get());
         }
     };
 
@@ -1011,7 +1378,11 @@ namespace std
 {
     template<typename T> struct hash<rpc::shared_ptr<T>>
     {
-        size_t operator()(const rpc::shared_ptr<T>& p) const noexcept { return std::hash<T*>()(p.get()); }
+        size_t operator()(const rpc::shared_ptr<T>& p) const noexcept
+        {
+            using Ptr = typename rpc::shared_ptr<T>::element_type*;
+            return std::hash<Ptr>()(p.get());
+        }
     };
 
     template<typename T> struct hash<rpc::weak_ptr<T>>

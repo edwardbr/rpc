@@ -3,12 +3,48 @@
 
 #include <cassert>
 #include <rpc/internal/remote_pointer.h>
-// #include <regex>
 #include <type_traits>
 
 using namespace std;
 
 #define STATIC_ASSERT(...) static_assert(__VA_ARGS__, #__VA_ARGS__)
+
+struct diagnostic_context
+{
+    virtual ~diagnostic_context() = default;
+    virtual const char* component() const noexcept = 0;
+};
+
+struct regex_constants
+{
+    enum error_type
+    {
+        error_paren = 1
+    };
+};
+
+class regex_error : public logic_error, public diagnostic_context
+{
+public:
+    explicit regex_error(regex_constants::error_type error_code)
+        : logic_error("regex_error")
+        , error_code_(error_code)
+    {
+    }
+
+    regex_constants::error_type code() const noexcept
+    {
+        return error_code_;
+    }
+
+    const char* component() const noexcept override
+    {
+        return "test_regex";
+    }
+
+private:
+    regex_constants::error_type error_code_;
+};
 
 // Test RTTI functionality with shared_ptr
 template <typename To, typename From>

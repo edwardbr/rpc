@@ -6,8 +6,11 @@
 #include <utility>
 #ifndef _M_CEE_PURE // in /clr:pure we miss runtime coverage of weak_ptr converting constructor
 #include <atomic>
-#include <thread>
 #endif // _M_CEE_PURE
+
+#if !defined(TEST_STL_COMPLIANCE) && !defined(_M_CEE_PURE)
+#include <thread>
+#endif // !defined(TEST_STL_COMPLIANCE) && !defined(_M_CEE_PURE)
 
 using namespace std;
 

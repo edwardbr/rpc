@@ -37,6 +37,14 @@ namespace std {
     // Factory function for unique_ptr
     template<typename T, typename... Args>
     unique_ptr<T> make_unique(Args&&... args);
+
+    // Lightweight packaged_task with CTAD coverage for callable wrappers
+    template<typename Signature>
+    class packaged_task;
+
+    // owner_less predicate mirroring <memory> semantics with CTAD support
+    template<typename T = void>
+    struct owner_less;
 }
 ```
 
@@ -60,8 +68,9 @@ Both `shared_ptr<T>` and `weak_ptr<T>` are implemented with:
 
 - **Hash specializations**: Support for `std::unordered_map` and `std::unordered_set`
 - **Comparison operators**: Full set of relational operators
-- **Conversion constructors**: Support for `unique_ptr` to `shared_ptr` conversion
+- **Conversion constructors & deduction guides**: Support for `unique_ptr` to `shared_ptr` conversion with CTAD, including array types
 - **Aliasing constructors**: Share ownership while pointing to different objects
+- **`owner_less` predicate**: Matches standard ordering semantics for associative containers
 
 ## Technical Challenges Resolved
 
@@ -85,6 +94,22 @@ Both `shared_ptr<T>` and `weak_ptr<T>` are implemented with:
 **Problem**: `weak_ptr::lock()` returning wrong type in test mode
 **Solution**: Conditional return types based on compilation mode
 
+### 6. Array Element Type Handling
+**Problem**: Array specialisations stored raw pointer-to-array and broke CTAD
+**Solution**: Store `remove_extent_t` everywhere internally so deduction guides and comparisons match the standard
+
+### 7. `unique_ptr` Conversion Coverage
+**Problem**: Production builds compile against the real `<memory>` and rejected our CTAD guide
+**Solution**: Express deduction guides using fully qualified `std::unique_ptr` so both modes agree
+
+### 8. `enable_shared_from_this` Copy Safety
+**Problem**: Copying or assigning derived objects overwrote the stored `weak_ptr`, breaking `shared_from_this`
+**Solution**: Provide no-op copy/move operations in `enable_shared_from_this` so the hidden weak state is never propagated
+
+### 9. Allocator Propagation in `allocate_shared`
+**Problem**: Custom allocators (for example `Mallocator`) were ignored, leading to wrong allocation counters
+**Solution**: Rebind and reuse the caller-provided allocator for both control block and object storage
+
 ## Files Modified
 
 - `/rpc/include/rpc/internal/remote_pointer.h` - Main implementation
@@ -92,12 +117,15 @@ Both `shared_ptr<T>` and `weak_ptr<T>` are implemented with:
 
 ## Test Results
 
-Successfully compiles and passes the `Dev10_445289_make_shared` test, which validates:
-- `make_shared<T>()` functionality
-- `allocate_shared<T>()` with custom allocators
-- `shared_ptr` and `weak_ptr` basic operations
-- Memory management and reference counting
-- Exception safety guarantees
+Successfully compiles and passes key MSVC STL conformance tests, including:
+- `Dev10_445289_make_shared` (factory functions & reference counting)
+- `P0433R2_deduction_guides` (CTAD for smart pointers, owner_less, packaged_task)
+
+These cover:
+- `make_shared<T>()` and `allocate_shared<T>()` with allocators
+- `shared_ptr` / `weak_ptr` basic and array semantics
+- CTAD for `shared_ptr`, `weak_ptr`, `owner_less`, `packaged_task`
+- Memory management, reference counting, and exception safety guarantees
 
 ## Build Issues Resolved
 

@@ -10,7 +10,9 @@
 #include <string>
 #include <vector>
 #include <csignal>
-#include <memory>
+#ifndef TEST_STL_COMPLIANCE
+#    include <memory>
+#endif
 #include <cstring>
 
 // Platform detection
