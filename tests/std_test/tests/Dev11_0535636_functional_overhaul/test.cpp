@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <functional>
-#include <memory>
+#include <rpc/internal/remote_pointer.h>
 #include <string>
 #include <type_traits>
 

@@ -5,7 +5,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
-#include <memory>
+#include <rpc/internal/remote_pointer.h>
 #include <new>
 #include <stdexcept>
 #include <string_view>

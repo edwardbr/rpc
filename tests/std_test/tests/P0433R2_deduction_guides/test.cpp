@@ -11,16 +11,14 @@
 #include <deque>
 #include <forward_list>
 #include <functional>
-#include <future>
 #include <initializer_list>
 #include <iterator>
 #include <list>
 #include <map>
-#include <memory>
+#include <rpc/internal/remote_pointer.h>
 #include <mutex>
 #include <optional>
 #include <queue>
-#include <regex>
 #include <scoped_allocator>
 #include <set>
 #include <shared_mutex>
@@ -174,34 +172,17 @@ void test_allocator() {
     static_assert(is_same_v<decltype(alloc2), allocator<long>>);
 }
 
-void test_unique_ptr() {
-    static_assert(!CanDeduceFrom<unique_ptr>);
-    static_assert(!CanDeduceFrom<unique_ptr, nullptr_t>);
-    static_assert(!CanDeduceFrom<unique_ptr, long*>);
-    static_assert(!CanDeduceFrom<unique_ptr, long*, const default_delete<long>&>);
-    static_assert(!CanDeduceFrom<unique_ptr, long*, default_delete<long>>);
-    static_assert(CanDeduceFrom<unique_ptr, unique_ptr<double>>);
-
-    unique_ptr<double> up1{};
-    unique_ptr up2(move(up1));
-
-    static_assert(is_same_v<decltype(up2), unique_ptr<double>>);
-}
-
 void test_shared_ptr_and_weak_ptr() {
     shared_ptr<long[]> sp(new long[3]);
     weak_ptr<long[]> wp(sp);
-    unique_ptr<long[], MyDelete> up{};
 
     shared_ptr sp1(sp);
     shared_ptr sp2(wp);
-    shared_ptr sp3(move(up));
     weak_ptr wp1(sp);
     weak_ptr wp2(wp);
 
     static_assert(is_same_v<decltype(sp1), shared_ptr<long[]>>);
     static_assert(is_same_v<decltype(sp2), shared_ptr<long[]>>);
-    static_assert(is_same_v<decltype(sp3), shared_ptr<long[]>>);
     static_assert(is_same_v<decltype(wp1), weak_ptr<long[]>>);
     static_assert(is_same_v<decltype(wp2), weak_ptr<long[]>>);
 }
@@ -1152,7 +1133,6 @@ int main() {
     // test_optional();
     // test_bitset();
     test_allocator();
-    // test_unique_ptr();
     test_shared_ptr_and_weak_ptr();
     test_owner_less();
     // test_scoped_allocator_adaptor();

@@ -4,7 +4,7 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
-#include <memory>
+#include <rpc/internal/remote_pointer.h>
 #include <thread>
 #include <atomic>
 #include <type_traits>

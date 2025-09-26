@@ -3,7 +3,8 @@
 
 #include <cassert>
 #include <cstdlib>
-#include <memory>
+
+#include <rpc/internal/remote_pointer.h>
 
 using namespace std;
 

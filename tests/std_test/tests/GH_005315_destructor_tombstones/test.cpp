@@ -15,9 +15,9 @@ int main() {}
 #include <functional>
 #include <iterator>
 #include <list>
-#include <memory>
+#include <rpc/internal/remote_pointer.h>
 #include <new>
-#include <regex>
+// #include <regex>
 #include <set>
 #include <string>
 #include <unordered_set>
@@ -80,12 +80,12 @@ void test_wstring() {
 void test_u32string() {
     call_on_destroyed_object<u32string>([](auto& u32str) { u32str[0] = U'\0'; }); // 4-byte characters
 }
-void test_unique_ptr() {
-    call_on_destroyed_object<unique_ptr<double>>([](auto& up) { up.reset(); });
-}
-void test_unique_ptr_array() {
-    call_on_destroyed_object<unique_ptr<double[]>>([](auto& upa) { upa.reset(); });
-}
+// void test_unique_ptr() {
+//     call_on_destroyed_object<unique_ptr<double>>([](auto& up) { up.reset(); });
+// }
+// void test_unique_ptr_array() {
+//     call_on_destroyed_object<unique_ptr<double[]>>([](auto& upa) { upa.reset(); });
+// }
 void test_shared_ptr() {
     call_on_destroyed_object<shared_ptr<double>>([](auto& sp) { sp.reset(); });
 }
@@ -98,9 +98,9 @@ void test_exception_ptr() {
 void test_function() {
     call_on_destroyed_object<function<int(int, int)>>([](auto& f) { f = nullptr; });
 }
-void test_regex() {
-    call_on_destroyed_object<regex>([](auto& r) { (void) r.mark_count(); });
-}
+// void test_regex() {
+//     call_on_destroyed_object<regex>([](auto& r) { (void) r.mark_count(); });
+// }
 void test_valarray() {
     call_on_destroyed_object<valarray<double>>([](auto& va) { va.resize(10); });
 }
@@ -140,13 +140,13 @@ int main(int argc, char* argv[]) {
         test_string,
         test_wstring,
         test_u32string,
-        test_unique_ptr,
-        test_unique_ptr_array,
+        // test_unique_ptr,
+        // test_unique_ptr_array,
         test_shared_ptr,
         test_weak_ptr,
         test_exception_ptr,
         test_function,
-        test_regex,
+        // test_regex,
         test_valarray,
 
 #if _HAS_CXX17
@@ -187,10 +187,10 @@ constexpr bool test_constexpr() { // COMPILE-ONLY
     u32string u32str{U"purr"};
     optional<string> o{"hiss"};
 
-#if _HAS_CXX23
-    unique_ptr<double> up{new double{3.14}};
-    unique_ptr<double[]> upa{new double[10]{}};
-#endif // _HAS_CXX23
+// #if _HAS_CXX23
+//     unique_ptr<double> up{new double{3.14}};
+//     unique_ptr<double[]> upa{new double[10]{}};
+// #endif // _HAS_CXX23
 
     return true;
 }

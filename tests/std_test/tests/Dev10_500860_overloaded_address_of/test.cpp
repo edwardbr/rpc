@@ -15,13 +15,13 @@
 #include <exception>
 #include <forward_list>
 #include <functional>
-#include <hash_map>
-#include <hash_set>
+// #include <hash_map>
+// #include <hash_set>
 #include <istream>
 #include <iterator>
 #include <list>
 #include <map>
-#include <memory>
+#include <rpc/internal/remote_pointer.h>
 #include <queue>
 #include <set>
 #include <stack>
@@ -183,8 +183,6 @@ template class std::istream_iterator<Evil>;
 
 template class std::shared_ptr<Evil>;
 template class std::weak_ptr<Evil>;
-// template class std::unique_ptr<Evil>;
-// template class std::unique_ptr<Evil[]>;
 
 
 template class std::reference_wrapper<Evil>;

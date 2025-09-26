@@ -8,7 +8,7 @@
 #include <cstddef>
 #include <cstdlib>
 #include <functional>
-#include <memory>
+#include <rpc/internal/remote_pointer.h>
 #include <new>
 #include <type_traits>
 #include <utility>

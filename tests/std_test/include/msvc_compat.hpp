@@ -5,7 +5,7 @@
 #pragma once
 
 #include <cstdlib>
-#include <memory>
+// #include <memory>
 
 // Platform detection
 #ifdef _MSC_VER
@@ -124,7 +124,7 @@ inline int _CrtDumpMemoryLeaks() {
 // MSVC warning pragma compatibility
 #ifndef _MSC_VER
     #define __pragma(x)
-    #define _Pragma(x)
+    // #define _Pragma(x)
     #ifndef __analysis_assume
         #define __analysis_assume(x)
     #endif

@@ -4,7 +4,7 @@
 #include <cassert>
 #include <cstddef>
 #include <functional>
-#include <memory>
+#include <rpc/internal/remote_pointer.h>
 #include <type_traits>
 
 using namespace std;

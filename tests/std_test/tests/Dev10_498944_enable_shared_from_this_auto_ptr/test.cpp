@@ -3,7 +3,7 @@
 
 #define _HAS_AUTO_PTR_ETC 1
 #include <cassert>
-#include <memory>
+#include <rpc/internal/remote_pointer.h>
 #include <utility>
 
 using namespace std;

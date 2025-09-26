@@ -6,7 +6,6 @@
 #pragma once
 
 #include <string>
-#include <memory>
 #include <unordered_map>
 #include <mutex>
 #include <assert.h>

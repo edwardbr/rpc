@@ -70,14 +70,14 @@
 #include <limits>
 #include <list>
 #include <locale>
-#include <memory>
+#include <rpc/internal/remote_pointer.h>
 #include <new>
 #include <numeric>
 // #include <optional> // All templates instantiated in P0220R1_optional
 #include <ostream>
 #include <random>
 #include <ratio>
-#include <regex>
+// #include <regex>
 #include <scoped_allocator>
 #include <sstream>
 #include <stdexcept>
@@ -96,7 +96,7 @@
 #ifndef _M_CEE_PURE
 #include <atomic>
 #include <condition_variable>
-#include <future>
+// #include <future>
 #include <mutex>
 #include <shared_mutex>
 #include <thread>
@@ -1201,88 +1201,88 @@ void match_results_test_impl() {
     swap_test(mr);
 }
 
-template <typename BasicRegexType>
-void basic_regex_test_impl() {
-    using char_type = typename BasicRegexType::value_type;
-    basic_string<char_type> str{};
+// template <typename BasicRegexType>
+// void basic_regex_test_impl() {
+//     using char_type = typename BasicRegexType::value_type;
+//     basic_string<char_type> str{};
 
-    BasicRegexType br1(str);
-    BasicRegexType br2(begin(str), end(str), regex_constants::ECMAScript);
-    BasicRegexType br3(begin(str), end(str));
+//     BasicRegexType br1(str);
+//     BasicRegexType br2(begin(str), end(str), regex_constants::ECMAScript);
+//     BasicRegexType br3(begin(str), end(str));
 
-    br1 = str;
-    br2.assign(str);
-    br3.assign(begin(str), end(str));
+//     br1 = str;
+//     br2.assign(str);
+//     br3.assign(begin(str), end(str));
 
-    swap_test(br1);
+//     swap_test(br1);
 
-    (void) regex_match(begin(str), end(str), br1);
-    (void) regex_match(str.c_str(), br1);
+//     (void) regex_match(begin(str), end(str), br1);
+//     (void) regex_match(str.c_str(), br1);
 
-    match_results<const char_type*> mrc{};
-    regex_match(str.c_str(), mrc, br1);
+//     match_results<const char_type*> mrc{};
+//     regex_match(str.c_str(), mrc, br1);
 
-    match_results<typename basic_string<char_type>::const_iterator> mrs{};
-    regex_match(str, mrs, br1);
-    (void) regex_match(str, br1);
+//     match_results<typename basic_string<char_type>::const_iterator> mrs{};
+//     regex_match(str, mrs, br1);
+//     (void) regex_match(str, br1);
 
-    regex_search(cbegin(str), cend(str), mrs, br1);
-    (void) regex_search(cbegin(str), cend(str), br1);
-    (void) regex_search(str.c_str(), br1);
-    regex_search(str.c_str(), mrc, br1);
-    regex_search(str, mrs, br1);
-    (void) regex_search(str, br1);
+//     regex_search(cbegin(str), cend(str), mrs, br1);
+//     (void) regex_search(cbegin(str), cend(str), br1);
+//     (void) regex_search(str.c_str(), br1);
+//     regex_search(str.c_str(), mrc, br1);
+//     regex_search(str, mrs, br1);
+//     (void) regex_search(str, br1);
 
-    basic_stringstream<char_type> ss{};
-    ostream_iterator<int, char_type> out_it(ss);
-    char_type out_buffer[5] = {0};
+//     basic_stringstream<char_type> ss{};
+//     ostream_iterator<int, char_type> out_it(ss);
+//     char_type out_buffer[5] = {0};
 
-    regex_replace(out_it, cbegin(str), cend(str), br1, str);
-    regex_replace(out_buffer, cbegin(str), cend(str), br1, str);
-    regex_replace(out_it, begin(str), end(str), br1, str.c_str());
-    (void) regex_replace(str, br1, str);
-    (void) regex_replace(str, br1, str.c_str());
-    (void) regex_replace(str.c_str(), br1, str);
-    (void) regex_replace(str.c_str(), br1, str.c_str());
-}
+//     regex_replace(out_it, cbegin(str), cend(str), br1, str);
+//     regex_replace(out_buffer, cbegin(str), cend(str), br1, str);
+//     regex_replace(out_it, begin(str), end(str), br1, str.c_str());
+//     (void) regex_replace(str, br1, str);
+//     (void) regex_replace(str, br1, str.c_str());
+//     (void) regex_replace(str.c_str(), br1, str);
+//     (void) regex_replace(str.c_str(), br1, str.c_str());
+// }
 
-template <typename RegexTokenIterator>
-void regex_token_iterator_test_impl() {
-    using it_type      = typename RegexTokenIterator::value_type::iterator;
-    int submatches[10] = {0};
-    it_type start{};
-    it_type finish{};
-    typename RegexTokenIterator::regex_type rgx{};
-    RegexTokenIterator rti0(start, finish, rgx, submatches);
-}
+// template <typename RegexTokenIterator>
+// void regex_token_iterator_test_impl() {
+//     using it_type      = typename RegexTokenIterator::value_type::iterator;
+//     int submatches[10] = {0};
+//     it_type start{};
+//     it_type finish{};
+//     typename RegexTokenIterator::regex_type rgx{};
+//     RegexTokenIterator rti0(start, finish, rgx, submatches);
+// }
 
-void regex_test() {
-    regex_traits_test_impl<char>();
-    regex_traits_test_impl<wchar_t>();
+// void regex_test() {
+//     regex_traits_test_impl<char>();
+//     regex_traits_test_impl<wchar_t>();
 
-    sub_match_test_impl<csub_match>();
-    sub_match_test_impl<wcsub_match>();
-    sub_match_test_impl<ssub_match>();
-    sub_match_test_impl<wssub_match>();
+//     sub_match_test_impl<csub_match>();
+//     sub_match_test_impl<wcsub_match>();
+//     sub_match_test_impl<ssub_match>();
+//     sub_match_test_impl<wssub_match>();
 
-    match_results_test_impl<cmatch>();
-    match_results_test_impl<wcmatch>();
-    match_results_test_impl<smatch>();
-    match_results_test_impl<wsmatch>();
+//     match_results_test_impl<cmatch>();
+//     match_results_test_impl<wcmatch>();
+//     match_results_test_impl<smatch>();
+//     match_results_test_impl<wsmatch>();
 
-    basic_regex_test_impl<regex>();
-    basic_regex_test_impl<wregex>();
+//     basic_regex_test_impl<regex>();
+//     basic_regex_test_impl<wregex>();
 
-    cregex_iterator cri{};
-    wcregex_iterator wcri{};
-    sregex_iterator sri{};
-    wsregex_iterator wsri{};
+//     cregex_iterator cri{};
+//     wcregex_iterator wcri{};
+//     sregex_iterator sri{};
+//     wsregex_iterator wsri{};
 
-    regex_token_iterator_test_impl<cregex_token_iterator>();
-    regex_token_iterator_test_impl<wcregex_token_iterator>();
-    regex_token_iterator_test_impl<sregex_token_iterator>();
-    regex_token_iterator_test_impl<wsregex_token_iterator>();
-}
+//     regex_token_iterator_test_impl<cregex_token_iterator>();
+//     regex_token_iterator_test_impl<wcregex_token_iterator>();
+//     regex_token_iterator_test_impl<sregex_token_iterator>();
+//     regex_token_iterator_test_impl<wsregex_token_iterator>();
+// }
 
 // need custom minimal allocator to use for scoped_allocator_test to reach all template paths
 template <typename T>

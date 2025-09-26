@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <cassert>
-#include <memory>
+#include <rpc/internal/remote_pointer.h>
 #include <utility>
 #ifndef _M_CEE_PURE // in /clr:pure we miss runtime coverage of weak_ptr converting constructor
 #include <atomic>
