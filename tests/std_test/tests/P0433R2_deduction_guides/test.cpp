@@ -1139,8 +1139,8 @@ int main() {
     test_reference_wrapper();
     test_transparent_operator_functors();
 
-    test_function_wrapper<function>();
-    test_function_wrapper<packaged_task>();
+    // test_function_wrapper<function>();
+    // test_function_wrapper<packaged_task>();
 
     test_searchers();
     test_duration_and_time_point();

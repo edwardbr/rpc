@@ -10,9 +10,7 @@
 #include <string>
 #include <vector>
 #include <csignal>
-#ifndef TEST_STL_COMPLIANCE
-#    include <memory>
-#endif
+#include <rpc/internal/remote_pointer.h>
 #include <cstring>
 
 // Platform detection

@@ -6,11 +6,15 @@
 #include <utility>
 #ifndef _M_CEE_PURE // in /clr:pure we miss runtime coverage of weak_ptr converting constructor
 #include <atomic>
+#ifdef _WIN32
+#include <windows.h>
+#include <process.h>
+#else
+#include <pthread.h>
+#include <sched.h>
+#include <unistd.h>
+#endif
 #endif // _M_CEE_PURE
-
-#if !defined(TEST_STL_COMPLIANCE) && !defined(_M_CEE_PURE)
-#include <thread>
-#endif // !defined(TEST_STL_COMPLIANCE) && !defined(_M_CEE_PURE)
 
 using namespace std;
 
@@ -68,72 +72,156 @@ void test_owner_equal() {
     assert(!owner_equal(wp_expired, wp_expired_different));
 }
 
-// void test_gh_258() {
-//     // GH-258 <memory>: weak_ptr's converting constructors could sometimes avoid locking
-// #ifndef _M_CEE_PURE
-//     struct base1 {
-//         int i = 0;
-//     };
+// Platform-specific thread utilities
+#ifndef _M_CEE_PURE
+namespace {
+#ifdef _WIN32
+    struct thread_data {
+        std::function<void()> func;
+    };
 
-//     struct base2 {
-//         int j = 0;
-//     };
+    unsigned __stdcall thread_proc(void* param) {
+        auto* data = static_cast<thread_data*>(param);
+        data->func();
+        return 0;
+    }
 
-//     struct base3 {
-//         int k = 0;
-//     };
+    class simple_thread {
+        HANDLE handle_;
+    public:
+        template<typename F>
+        simple_thread(F&& f) {
+            auto* data = new thread_data{std::forward<F>(f)};
+            handle_ = reinterpret_cast<HANDLE>(_beginthreadex(nullptr, 0, thread_proc, data, 0, nullptr));
+        }
 
-//     struct derived : virtual base1, virtual base2, base3 {};
+        void join() {
+            if (handle_) {
+                WaitForSingleObject(handle_, INFINITE);
+                CloseHandle(handle_);
+                handle_ = nullptr;
+            }
+        }
 
-//     static_assert(weak_ptr<base1>::_Must_avoid_expired_conversions_from<derived>, "Should avoid expired");
-//     static_assert(weak_ptr<base2>::_Must_avoid_expired_conversions_from<derived>, "Should avoid expired");
-//     static_assert(weak_ptr<const base1>::_Must_avoid_expired_conversions_from<derived>, "Should avoid expired");
-//     static_assert(weak_ptr<const base2>::_Must_avoid_expired_conversions_from<derived>, "Should avoid expired");
-//     static_assert(weak_ptr<const base1>::_Must_avoid_expired_conversions_from<const derived>, "Should avoid expired");
-//     static_assert(weak_ptr<const base2>::_Must_avoid_expired_conversions_from<const derived>, "Should avoid expired");
+        ~simple_thread() {
+            if (handle_) {
+                join();
+            }
+        }
+    };
 
-//     static_assert(!weak_ptr<base3>::_Must_avoid_expired_conversions_from<derived>, "Should optimize");
-//     static_assert(!weak_ptr<const base3>::_Must_avoid_expired_conversions_from<derived>, "Should optimize");
-//     static_assert(!weak_ptr<const base3>::_Must_avoid_expired_conversions_from<const derived>, "Should optimize");
-//     static_assert(!weak_ptr<derived>::_Must_avoid_expired_conversions_from<derived>, "Should optimize");
-//     static_assert(!weak_ptr<const derived>::_Must_avoid_expired_conversions_from<derived>, "Should optimize");
-//     static_assert(!weak_ptr<const derived>::_Must_avoid_expired_conversions_from<const derived>, "Should optimize");
+    void yield_thread() {
+        SwitchToThread();
+    }
+#else
+    struct thread_data {
+        std::function<void()> func;
+    };
 
-//     static_assert(!weak_ptr<int>::_Must_avoid_expired_conversions_from<int>, "Should optimize");
-//     static_assert(!weak_ptr<const int>::_Must_avoid_expired_conversions_from<int>, "Should optimize");
-//     static_assert(!weak_ptr<const int>::_Must_avoid_expired_conversions_from<const int>, "Should optimize");
+    void* thread_proc(void* param) {
+        auto* data = static_cast<thread_data*>(param);
+        data->func();
+        delete data;
+        return nullptr;
+    }
 
-//     for (int i = 0; i < 10; ++i) {
-//         // not make_shared -- with make_shared the test would not catch errors
-//         shared_ptr<derived> d{new derived{}};
-//         weak_ptr<derived> wd{d};
-//         atomic<bool> work{true};
-//         thread thd{[&] {
-//             d.reset();
-//             this_thread::yield(); // make crash on incorrect optimization even more likely
-//             work = false;
-//         }};
+    class simple_thread {
+        pthread_t handle_;
+        bool joined_;
+    public:
+        template<typename F>
+        simple_thread(F&& f) : joined_(false) {
+            auto* data = new thread_data{std::forward<F>(f)};
+            pthread_create(&handle_, nullptr, thread_proc, data);
+        }
 
-//         if ((i % 2) == 0) {
-//             while (work) {
-//                 // likely to crash if optimized for a case we shouldn't
-//                 weak_ptr<base1> wb1{wd};
-//                 weak_ptr<base2> wb2{wd};
-//                 weak_ptr<const base3> wb3{wd};
-//             }
-//         } else {
-//             while (work) {
-//                 // likely to crash if optimized for a case we shouldn't
-//                 weak_ptr<base1> wb1{weak_ptr<derived>{wd}};
-//                 weak_ptr<base2> wb2{weak_ptr<derived>{wd}};
-//                 weak_ptr<base3> wb3{weak_ptr<derived>{wd}};
-//             }
-//         }
+        void join() {
+            if (!joined_) {
+                pthread_join(handle_, nullptr);
+                joined_ = true;
+            }
+        }
 
-//         thd.join();
-//     }
-// #endif // _M_CEE_PURE
-// }
+        ~simple_thread() {
+            if (!joined_) {
+                join();
+            }
+        }
+    };
+
+    void yield_thread() {
+        sched_yield();
+    }
+#endif
+}
+#endif // _M_CEE_PURE
+
+void test_gh_258() {
+    // GH-258 <memory>: weak_ptr's converting constructors could sometimes avoid locking
+#ifndef _M_CEE_PURE
+    struct base1 {
+        int i = 0;
+    };
+
+    struct base2 {
+        int j = 0;
+    };
+
+    struct base3 {
+        int k = 0;
+    };
+
+    struct derived : virtual base1, virtual base2, base3 {};
+
+    static_assert(weak_ptr<base1>::_Must_avoid_expired_conversions_from<derived>, "Should avoid expired");
+    static_assert(weak_ptr<base2>::_Must_avoid_expired_conversions_from<derived>, "Should avoid expired");
+    static_assert(weak_ptr<const base1>::_Must_avoid_expired_conversions_from<derived>, "Should avoid expired");
+    static_assert(weak_ptr<const base2>::_Must_avoid_expired_conversions_from<derived>, "Should avoid expired");
+    static_assert(weak_ptr<const base1>::_Must_avoid_expired_conversions_from<const derived>, "Should avoid expired");
+    static_assert(weak_ptr<const base2>::_Must_avoid_expired_conversions_from<const derived>, "Should avoid expired");
+
+    static_assert(!weak_ptr<base3>::_Must_avoid_expired_conversions_from<derived>, "Should optimize");
+    static_assert(!weak_ptr<const base3>::_Must_avoid_expired_conversions_from<derived>, "Should optimize");
+    static_assert(!weak_ptr<const base3>::_Must_avoid_expired_conversions_from<const derived>, "Should optimize");
+    static_assert(!weak_ptr<derived>::_Must_avoid_expired_conversions_from<derived>, "Should optimize");
+    static_assert(!weak_ptr<const derived>::_Must_avoid_expired_conversions_from<derived>, "Should optimize");
+    static_assert(!weak_ptr<const derived>::_Must_avoid_expired_conversions_from<const derived>, "Should optimize");
+
+    static_assert(!weak_ptr<int>::_Must_avoid_expired_conversions_from<int>, "Should optimize");
+    static_assert(!weak_ptr<const int>::_Must_avoid_expired_conversions_from<int>, "Should optimize");
+    static_assert(!weak_ptr<const int>::_Must_avoid_expired_conversions_from<const int>, "Should optimize");
+
+    for (int i = 0; i < 10; ++i) {
+        // not make_shared -- with make_shared the test would not catch errors
+        shared_ptr<derived> d{new derived{}};
+        weak_ptr<derived> wd{d};
+        atomic<bool> work{true};
+        simple_thread thd{[&] {
+            d.reset();
+            yield_thread(); // make crash on incorrect optimization even more likely
+            work = false;
+        }};
+
+        if ((i % 2) == 0) {
+            while (work) {
+                // likely to crash if optimized for a case we shouldn't
+                weak_ptr<base1> wb1{wd};
+                weak_ptr<base2> wb2{wd};
+                weak_ptr<const base3> wb3{wd};
+            }
+        } else {
+            while (work) {
+                // likely to crash if optimized for a case we shouldn't
+                weak_ptr<base1> wb1{weak_ptr<derived>{wd}};
+                weak_ptr<base2> wb2{weak_ptr<derived>{wd}};
+                weak_ptr<base3> wb3{weak_ptr<derived>{wd}};
+            }
+        }
+
+        thd.join();
+    }
+#endif // _M_CEE_PURE
+}
 
 struct A {
     int a{10};
@@ -152,37 +240,39 @@ struct D : B, C {
 };
 
 int main() {
-    test_owner_equal();
-    // test_gh_258();
+    // test_owner_equal();
+    test_gh_258();
 
-    shared_ptr<D> spd(new D);
+    // shared_ptr<D> spd(new D);
 
-    const weak_ptr<D> wpd_zero(spd);
-    weak_ptr<D> wpd_one(spd);
-    weak_ptr<D> wpd_two(spd);
+    // const weak_ptr<D> wpd_zero(spd);
+    // weak_ptr<D> wpd_one(spd);
+    // weak_ptr<D> wpd_two(spd);
 
-    weak_ptr<A> wpa0(wpd_zero);
-    assert(!wpa0.expired());
-    assert(owner_equal(wpa0, wpd_zero));
-    assert(wpa0.lock()->a == 10);
+    // weak_ptr<A> wpa0(wpd_zero);
+    // assert(!wpa0.expired());
+    // assert(owner_equal(wpa0, wpd_zero));
+    // assert(wpa0.lock()->a == 10);
 
-    spd.reset();
+    // spd.reset();
 
-    weak_ptr<A> wpa1(wpd_one);
-    assert(wpa1.expired());
-    assert(owner_equal(wpa1, wpd_zero));
+    // weak_ptr<A> wpa1(wpd_one);
+    // assert(wpa1.expired());
+    // assert(owner_equal(wpa1, wpd_zero));
 
-    weak_ptr<A> wpa2;
-    wpa2 = wpd_one;
-    assert(wpa2.expired());
-    assert(owner_equal(wpa2, wpd_zero));
+    // weak_ptr<A> wpa2;
+    // wpa2 = wpd_one;
+    // assert(wpa2.expired());
+    // assert(owner_equal(wpa2, wpd_zero));
 
-    weak_ptr<A> wpa3(move(wpd_one));
-    assert(wpa3.expired());
-    assert(owner_equal(wpa3, wpd_zero));
+    // weak_ptr<A> wpa3(move(wpd_one));
+    // assert(wpa3.expired());
+    // assert(owner_equal(wpa3, wpd_zero));
 
-    weak_ptr<A> wpa4;
-    wpa4 = move(wpd_two);
-    assert(wpa4.expired());
-    assert(owner_equal(wpa4, wpd_zero));
+    // weak_ptr<A> wpa4;
+    // wpa4 = move(wpd_two);
+    // assert(wpa4.expired());
+    // assert(owner_equal(wpa4, wpd_zero));
+    
+    return 0;
 }

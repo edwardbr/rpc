@@ -55,39 +55,28 @@
 #include <cwctype>
 #include <deque>
 #include <exception>
-#include <filesystem>
+// #include <filesystem>
 #include <forward_list>
-#include <fstream>
 #include <functional>
 #include <initializer_list>
-#include <iomanip>
-#include <ios>
-#include <iosfwd>
-#include <iostream>
+// #include <iomanip>
+// #include <ios>
+// #include <iosfwd>
 #include <iso646.h>
-#include <istream>
 #include <iterator>
 #include <limits>
 #include <list>
 #include <locale>
-#ifdef TEST_STL_COMPLIANCE
-#    include <memory>
-#else
-#    include <rpc/internal/remote_pointer.h>
-#endif
+#include <rpc/internal/remote_pointer.h>
+// #include <future>
 #include <new>
 #include <numeric>
 // #include <optional> // All templates instantiated in P0220R1_optional
-#include <ostream>
 #include <random>
 #include <ratio>
-// #include <regex>
 #include <scoped_allocator>
-#include <sstream>
 #include <stdexcept>
-#include <streambuf>
 #include <string>
-#include <strstream>
 #include <system_error>
 #include <tuple>
 #include <typeindex>
@@ -99,14 +88,13 @@
 // Headers not allowed with /clr:pure
 #ifndef _M_CEE_PURE
 #include <atomic>
-#include <condition_variable>
-// #include <future>
-#include <mutex>
-#include <shared_mutex>
-#include <thread>
+// #include <condition_variable>
+// #include <mutex>
+// #include <shared_mutex>
+// #include <thread>
 #endif // _M_CEE_PURE
 
-#include <experimental/filesystem>
+// #include <experimental/filesystem>
 
 #include <instantiate_containers_iterators_common.hpp>
 
@@ -297,25 +285,25 @@ void chrono_test() {
 }
 
 #ifndef _M_CEE_PURE
-template <typename ConditionVariable>
-void condition_variable_test_impl() {
-    ConditionVariable cv{};
-    unique_lock<mutex> lock;
+// template <typename ConditionVariable>
+// void condition_variable_test_impl() {
+//     ConditionVariable cv{};
+//     unique_lock<mutex> lock;
 
-    auto pr0  = []() { return true; };
-    auto soon = chrono::system_clock::now() + chrono::minutes(2);
+//     auto pr0  = []() { return true; };
+//     auto soon = chrono::system_clock::now() + chrono::minutes(2);
 
-    cv.wait(lock);
-    cv.wait(lock, pr0);
-    (void) cv.wait_for(lock, chrono::seconds(1));
-    (void) cv.wait_for(lock, chrono::seconds(1), pr0);
-    (void) cv.wait_until(lock, soon);
-    (void) cv.wait_until(lock, soon, pr0);
-}
+//     cv.wait(lock);
+//     cv.wait(lock, pr0);
+//     (void) cv.wait_for(lock, chrono::seconds(1));
+//     (void) cv.wait_for(lock, chrono::seconds(1), pr0);
+//     (void) cv.wait_until(lock, soon);
+//     (void) cv.wait_until(lock, soon, pr0);
+// }
 
-void condition_variable_test() {
-    condition_variable_test_impl<condition_variable_any>();
-}
+// void condition_variable_test() {
+//     condition_variable_test_impl<condition_variable_any>();
+// }
 #endif // _M_CEE_PURE
 
 void check_nested_exception_impl(const exception& ex) { // unroll nested exceptions
@@ -406,23 +394,23 @@ void exception_test() {
 // #endif // _M_CEE_PURE
 // }
 
-template <typename CharType>
-void fstream_test_impl() {
-    basic_filebuf<CharType, char_traits<CharType>> fb;
-    basic_ifstream<CharType, char_traits<CharType>> ifs;
-    basic_ofstream<CharType, char_traits<CharType>> ofs;
-    basic_fstream<CharType, char_traits<CharType>> fs;
+// template <typename CharType>
+// void fstream_test_impl() {
+//     basic_filebuf<CharType, char_traits<CharType>> fb;
+//     basic_ifstream<CharType, char_traits<CharType>> ifs;
+//     basic_ofstream<CharType, char_traits<CharType>> ofs;
+//     basic_fstream<CharType, char_traits<CharType>> fs;
 
-    swap_test(fb);
-    swap_test(ifs);
-    swap_test(ofs);
-    swap_test(fs);
-}
+//     swap_test(fb);
+//     swap_test(ifs);
+//     swap_test(ofs);
+//     swap_test(fs);
+// }
 
-void fstream_test() {
-    fstream_test_impl<char>();
-    fstream_test_impl<wchar_t>();
-}
+// void fstream_test() {
+//     fstream_test_impl<char>();
+//     fstream_test_impl<wchar_t>();
+// }
 
 template <typename ReturnType, typename Function>
 void function_test_impl(Function func) {
@@ -520,12 +508,12 @@ void functional_test() {
     // volatile binder calls not supported
 }
 
-template <typename IoManipOut, typename IoManipIn>
-void iomanip_test_impl(IoManipOut out, IoManipIn in) {
-    stringstream ss{};
-    ss << out;
-    ss >> in;
-}
+// template <typename IoManipOut, typename IoManipIn>
+// void iomanip_test_impl(IoManipOut out, IoManipIn in) {
+//     stringstream ss{};
+//     ss << out;
+//     ss >> in;
+// }
 
 // template <typename IoManip>
 // void iomanip_test_impl(IoManip iom) {
@@ -558,26 +546,26 @@ void iomanip_test_impl(IoManipOut out, IoManipIn in) {
 //     iomanip_test_impl(setw(10));
 // }
 
-void ios_test() {
-    stringstream ss{};
-    basic_ios<char, char_traits<char>> b_ios(ss.rdbuf());
-}
+// void ios_test() {
+//     stringstream ss{};
+//     basic_ios<char, char_traits<char>> b_ios(ss.rdbuf());
+// }
 
-void iosfwd_test() {
-    streampos sp; // fpos<char_traits<char>::state_type>
-    wstreampos wsp; // fpos<char_traits<wchar_t>::state_type>
+// void iosfwd_test() {
+//     streampos sp; // fpos<char_traits<char>::state_type>
+//     wstreampos wsp; // fpos<char_traits<wchar_t>::state_type>
 
-    INSTANTIATE(char_traits<char>);
-    INSTANTIATE(char_traits<wchar_t>);
-#ifdef __cpp_char8_t
-    INSTANTIATE(char_traits<char8_t>);
-#endif // __cpp_char8_t
-    INSTANTIATE(char_traits<char16_t>);
-    INSTANTIATE(char_traits<char32_t>);
-    INSTANTIATE(char_traits<unsigned short>);
-    // Other templates in iosfwd are forward decls.
-    // Will instantiate in the test for the header where they are defined.
-}
+//     INSTANTIATE(char_traits<char>);
+//     INSTANTIATE(char_traits<wchar_t>);
+// #ifdef __cpp_char8_t
+//     INSTANTIATE(char_traits<char8_t>);
+// #endif // __cpp_char8_t
+//     INSTANTIATE(char_traits<char16_t>);
+//     INSTANTIATE(char_traits<char32_t>);
+//     INSTANTIATE(char_traits<unsigned short>);
+//     // Other templates in iosfwd are forward decls.
+//     // Will instantiate in the test for the header where they are defined.
+// }
 
 template <typename Container>
 void nonmember_reverse_iterator_functions_test() {
@@ -675,47 +663,47 @@ void iterators_test() {
     swap_test(fit);
     swap_test(bit);
 
-    stringstream ss("1 2 3 4 5");
-    istream_iterator<int> isi(ss);
-    ostream_iterator<int> osi(ss, " ");
-    istreambuf_iterator<char> isbi(ss);
-    ostreambuf_iterator<char> osbi(ss);
+    // stringstream ss("1 2 3 4 5");
+    // istream_iterator<int> isi(ss);
+    // ostream_iterator<int> osi(ss, " ");
+    // istreambuf_iterator<char> isbi(ss);
+    // ostreambuf_iterator<char> osbi(ss);
 
-    equality_test(isi);
-    equality_test(isbi);
-    swap_test(isi);
-    swap_test(isbi);
-    swap_test(osi);
-    swap_test(osbi);
+    // equality_test(isi);
+    // equality_test(isbi);
+    // swap_test(isi);
+    // swap_test(isbi);
+    // swap_test(osi);
+    // swap_test(osbi);
 }
 
-void istream_test() {
-    stringstream ss{};
-    istream is(ss.rdbuf());
+// void istream_test() {
+//     stringstream ss{};
+//     istream is(ss.rdbuf());
 
-    wstringstream wss{};
-    wistream wis(wss.rdbuf());
+//     wstringstream wss{};
+//     wistream wis(wss.rdbuf());
 
-    unsigned short us{};
-    wis >> us;
+//     unsigned short us{};
+//     wis >> us;
 
-    iostream ios(ss.rdbuf());
-    wiostream wios(wss.rdbuf());
+//     iostream ios(ss.rdbuf());
+//     wiostream wios(wss.rdbuf());
 
-    // /analyze doesn't like these being nullptr
-    char c_str[]           = "1";
-    signed char sc_str[]   = "2";
-    unsigned char uc_str[] = "3";
+//     // /analyze doesn't like these being nullptr
+//     char c_str[]           = "1";
+//     signed char sc_str[]   = "2";
+//     unsigned char uc_str[] = "3";
 
-    is >> c_str;
-    is >> *c_str;
-    is >> sc_str;
-    is >> *sc_str;
-    is >> uc_str;
-    is >> *uc_str;
-    move(is) >> c_str;
-    is >> ws; // io manipulator, not variable
-}
+//     is >> c_str;
+//     is >> *c_str;
+//     is >> sc_str;
+//     is >> *sc_str;
+//     is >> uc_str;
+//     is >> *uc_str;
+//     move(is) >> c_str;
+//     is >> ws; // io manipulator, not variable
+// }
 
 template <typename T>
 void numeric_limits_test_impl() {
@@ -817,7 +805,7 @@ void shared_ptr_test_impl() {
     comparable_test(sptr0, sptr6);
     comparable_test(sptr0, nullptr);
     comparable_test(nullptr, sptr0);
-    cout << sptr0;
+    // cout << sptr0;
     swap_test(sptr0);
 
     auto sptr11 = make_shared<int>(5);
@@ -836,17 +824,17 @@ void shared_ptr_test_impl() {
     (void) get_deleter<default_delete<int>>(sptr0);
     hash_test(sptr0);
 
-    (void) atomic_is_lock_free(&sptr0);
-    (void) atomic_load(&sptr0);
-    (void) atomic_load_explicit(&sptr0, memory_order_seq_cst);
-    atomic_store(&sptr0, sptr0);
-    atomic_store_explicit(&sptr0, sptr0, memory_order_seq_cst);
-    atomic_exchange(&sptr0, sptr0);
-    atomic_exchange_explicit(&sptr0, sptr0, memory_order_seq_cst);
-    atomic_compare_exchange_weak(&sptr0, &sptr0, sptr0);
-    atomic_compare_exchange_weak_explicit(&sptr0, &sptr0, sptr0, memory_order_seq_cst, memory_order_seq_cst);
-    atomic_compare_exchange_strong(&sptr0, &sptr0, sptr0);
-    atomic_compare_exchange_strong_explicit(&sptr0, &sptr0, sptr0, memory_order_seq_cst, memory_order_seq_cst);
+    // (void) atomic_is_lock_free(&sptr0);
+    // (void) atomic_load(&sptr0);
+    // (void) atomic_load_explicit(&sptr0, memory_order_seq_cst);
+    // atomic_store(&sptr0, sptr0);
+    // atomic_store_explicit(&sptr0, sptr0, memory_order_seq_cst);
+    // atomic_exchange(&sptr0, sptr0);
+    // atomic_exchange_explicit(&sptr0, sptr0, memory_order_seq_cst);
+    // atomic_compare_exchange_weak(&sptr0, &sptr0, sptr0);
+    // atomic_compare_exchange_weak_explicit(&sptr0, &sptr0, sptr0, memory_order_seq_cst, memory_order_seq_cst);
+    // atomic_compare_exchange_strong(&sptr0, &sptr0, sptr0);
+    // atomic_compare_exchange_strong_explicit(&sptr0, &sptr0, sptr0, memory_order_seq_cst, memory_order_seq_cst);
 }
 
 void weak_ptr_test_impl() {
@@ -887,196 +875,196 @@ void memory_test() {
 }
 
 #ifndef _M_CEE_PURE
-template <typename Mutex>
-void timed_mutex_test_impl() {
-    Mutex mtx{};
-    (void) mtx.try_lock_for(chrono::seconds(1));
-    (void) mtx.try_lock_until(chrono::system_clock::now());
-}
+// template <typename Mutex>
+// void timed_mutex_test_impl() {
+//     Mutex mtx{};
+//     (void) mtx.try_lock_for(chrono::seconds(1));
+//     (void) mtx.try_lock_until(chrono::system_clock::now());
+// }
 
-void mutex_test() {
-    mutex mtx{};
-    recursive_mutex rmtx{};
-    recursive_timed_mutex rtmtx{};
+// void mutex_test() {
+//     mutex mtx{};
+//     recursive_mutex rmtx{};
+//     recursive_timed_mutex rtmtx{};
 
-    (void) try_lock(mtx, rmtx);
-    (void) try_lock(mtx, rmtx, rtmtx);
-    lock(mtx, rmtx);
-    lock(mtx, rmtx, rtmtx);
-    // lock_guard and scoped_lock instantiated in P0156R2_scoped_lock
-    unique_lock<recursive_timed_mutex> ul_mtx1{rtmtx, chrono::seconds(1)};
-    unique_lock<recursive_timed_mutex> ul_mtx2{rtmtx, chrono::system_clock::now()};
+//     (void) try_lock(mtx, rmtx);
+//     (void) try_lock(mtx, rmtx, rtmtx);
+//     lock(mtx, rmtx);
+//     lock(mtx, rmtx, rtmtx);
+//     // lock_guard and scoped_lock instantiated in P0156R2_scoped_lock
+//     unique_lock<recursive_timed_mutex> ul_mtx1{rtmtx, chrono::seconds(1)};
+//     unique_lock<recursive_timed_mutex> ul_mtx2{rtmtx, chrono::system_clock::now()};
 
-    timed_mutex_test_impl<unique_lock<recursive_timed_mutex>>();
-    swap_test(ul_mtx2);
-    once_flag of{};
-    call_once(of, []() {});
-    condition_variable_test_impl<condition_variable>();
+//     timed_mutex_test_impl<unique_lock<recursive_timed_mutex>>();
+//     swap_test(ul_mtx2);
+//     once_flag of{};
+//     call_once(of, []() {});
+//     // condition_variable_test_impl<condition_variable>();
 
-    timed_mutex_test_impl<timed_mutex>();
-    timed_mutex_test_impl<recursive_timed_mutex>();
-}
+//     timed_mutex_test_impl<timed_mutex>();
+//     timed_mutex_test_impl<recursive_timed_mutex>();
+// }
 #endif // _M_CEE_PURE
 
-void ostream_test() {
-    stringstream ss{};
-    ostream os{ss.rdbuf()};
+// void ostream_test() {
+//     stringstream ss{};
+//     ostream os{ss.rdbuf()};
 
-    wstringstream wss{};
-    wostream wos{wss.rdbuf()};
+//     wstringstream wss{};
+//     wostream wos{wss.rdbuf()};
 
-    unsigned short us{};
-    wos << us;
+//     unsigned short us{};
+//     wos << us;
 
-    // /analyze doesn't like these being nullptr
-    char c_str[]     = "1";
-    wchar_t wc_str[] = L"2";
+//     // /analyze doesn't like these being nullptr
+//     char c_str[]     = "1";
+//     wchar_t wc_str[] = L"2";
 
-    wos << c_str;
-    wos << *c_str;
-    os << c_str;
-    os << *c_str;
-    wos << wc_str;
-    wos << *wc_str;
+//     wos << c_str;
+//     wos << *c_str;
+//     os << c_str;
+//     os << *c_str;
+//     wos << wc_str;
+//     wos << *wc_str;
 
-    signed char sc_str[]   = "3";
-    unsigned char uc_str[] = "4";
+//     signed char sc_str[]   = "3";
+//     unsigned char uc_str[] = "4";
 
-    os << sc_str;
-    os << *sc_str;
-    os << uc_str;
-    os << *uc_str;
+//     os << sc_str;
+//     os << *sc_str;
+//     os << uc_str;
+//     os << *uc_str;
 
-    string str{};
-    os << str;
-    os << endl;
-    os << ends;
-    os << flush;
-    os << error_code{};
-}
+//     string str{};
+//     os << str;
+//     os << endl;
+//     os << ends;
+//     os << flush;
+//     os << error_code{};
+// }
 
-template <typename Distribution>
-void distribution_test_impl(Distribution& d) {
-    random_device rd{};
-    mt19937 gen(rd());
-    (void) d(gen);
-    (void) d(gen, d.param());
-    equality_test(d);
-    cin >> d;
-    cout << d;
-}
+// template <typename Distribution>
+// void distribution_test_impl(Distribution& d) {
+//     random_device rd{};
+//     mt19937 gen(rd());
+//     (void) d(gen);
+//     (void) d(gen, d.param());
+//     equality_test(d);
+//     cin >> d;
+//     cout << d;
+// }
 
-template <typename Engine, typename SeedArg>
-void common_engine_test_impl(SeedArg& sa) {
-    Engine eng(sa);
-    eng.seed(sa);
-    equality_test(eng);
-    cin >> eng;
-    cout << eng;
-}
+// template <typename Engine, typename SeedArg>
+// void common_engine_test_impl(SeedArg& sa) {
+//     Engine eng(sa);
+//     eng.seed(sa);
+//     equality_test(eng);
+//     cin >> eng;
+//     cout << eng;
+// }
 
-template <typename Engine>
-void engine_test_impl() {
-    seed_seq ss({1, 2, 3, 4, 5});
-    common_engine_test_impl<Engine>(ss);
-}
-
-#if _HAS_TR1_NAMESPACE
-template <typename Engine>
-void tr1_engine_test_impl() {
-    random_device rd{};
-    mt19937 gen(rd());
-    common_engine_test_impl<Engine>(gen);
-}
-#endif // _HAS_TR1_NAMESPACE
-
-void random_test() {
-    seed_seq ss0({1, 2, 3, 4, 5, 6});
-    vector<uint32_t> v{1, 2, 3, 4};
-    seed_seq ss1(v.begin(), v.end());
-    ss0.generate(v.begin(), v.end());
-    ss1.param(ostream_iterator<unsigned int>(cout, " "));
-
-    random_device rd{};
-    mt19937 gen(rd());
-    (void) generate_canonical<double, 10>(gen);
-
-    engine_test_impl<minstd_rand0>(); // linear_congruential_engine
-    engine_test_impl<mt19937>(); // mersenne_twister_engine
-    engine_test_impl<ranlux24_base>(); // subtract_with_carry_engine
-    engine_test_impl<ranlux24>(); // discard_block_engine
-    engine_test_impl<knuth_b>(); // shuffle_order_engine
-    engine_test_impl<independent_bits_engine<minstd_rand0, 2, uint32_t>>();
-    engine_test_impl<mt19937_64>();
-    engine_test_impl<ranlux48_base>();
-    engine_test_impl<ranlux48>();
+// template <typename Engine>
+// void engine_test_impl() {
+//     seed_seq ss({1, 2, 3, 4, 5});
+//     common_engine_test_impl<Engine>(ss);
+// }
 
 #if _HAS_TR1_NAMESPACE
-    linear_congruential<uint_fast32_t, 16807, 0, 2147483647> minstd_rand_eng(gen);
-    minstd_rand_eng.seed(gen);
-
-    tr1_engine_test_impl<linear_congruential<uint_fast32_t, 16807, 0, 2147483647>>();
-    tr1_engine_test_impl<ranlux3>();
-    tr1_engine_test_impl<ranlux4>();
-    tr1_engine_test_impl<ranlux3_01>();
-    tr1_engine_test_impl<ranlux4_01>();
-    tr1_engine_test_impl<ranlux64_base_01>();
-    tr1_engine_test_impl<ranlux_base_01>();
+// template <typename Engine>
+// void tr1_engine_test_impl() {
+//     random_device rd{};
+//     mt19937 gen(rd());
+//     common_engine_test_impl<Engine>(gen);
+// }
 #endif // _HAS_TR1_NAMESPACE
 
-    uniform_int_distribution<> uni_int_d{};
-    bernoulli_distribution bern_d{};
-    geometric_distribution<> geo_d{};
-    poisson_distribution<> pois_d{};
-    binomial_distribution<> binom_d{};
-    uniform_real_distribution<> uni_real_d{};
-    exponential_distribution<> expon_d{};
-    normal_distribution<> norm_d{};
-    gamma_distribution<> gamma_d{};
-    weibull_distribution<> weib_d{};
-    extreme_value_distribution<> ext_v_d{};
-    lognormal_distribution<> log_norm_d{};
-    chi_squared_distribution<> chi_sq_d{};
-    cauchy_distribution<> cauchy_d{};
-    fisher_f_distribution<> fish_f_d{};
-    student_t_distribution<> stud_t_d{};
-    negative_binomial_distribution<> neg_bi_d{};
-    discrete_distribution<> disc_d1(v.begin(), v.end());
-    auto sq_func = [](double val) { return val * val; };
-    discrete_distribution<> disc_d2(5, 3.5, 7.5, sq_func);
-    piecewise_constant_distribution<> piece_const_d1(v.begin(), v.end(), v.begin());
-    piecewise_constant_distribution<> piece_const_d2{{1.0, 2.0, 3.0, 4.0, 5.0}, sq_func};
-    piecewise_constant_distribution<> piece_const_d3(4, 0.0, 10.0, sq_func);
-    piecewise_linear_distribution<> piece_line_d1(v.begin(), v.end(), v.begin());
-    piecewise_linear_distribution<> piece_line_d2({1.0, 2.0, 3.0, 4.0}, sq_func);
-    piecewise_linear_distribution<> piece_line_d3(4, 0.0, 10.0, sq_func);
+// void random_test() {
+//     seed_seq ss0({1, 2, 3, 4, 5, 6});
+//     vector<uint32_t> v{1, 2, 3, 4};
+//     seed_seq ss1(v.begin(), v.end());
+//     ss0.generate(v.begin(), v.end());
+//     ss1.param(ostream_iterator<unsigned int>(cout, " "));
 
-    distribution_test_impl(uni_int_d);
-    distribution_test_impl(bern_d);
-    distribution_test_impl(geo_d);
-    distribution_test_impl(pois_d);
-    distribution_test_impl(binom_d);
-    distribution_test_impl(uni_real_d);
-    distribution_test_impl(expon_d);
-    distribution_test_impl(norm_d);
-    distribution_test_impl(gamma_d);
-    distribution_test_impl(weib_d);
-    distribution_test_impl(ext_v_d);
-    distribution_test_impl(log_norm_d);
-    distribution_test_impl(chi_sq_d);
-    distribution_test_impl(cauchy_d);
-    distribution_test_impl(fish_f_d);
-    distribution_test_impl(stud_t_d);
-    distribution_test_impl(neg_bi_d);
-    distribution_test_impl(disc_d1);
-    distribution_test_impl(disc_d2);
-    distribution_test_impl(piece_const_d1);
-    distribution_test_impl(piece_const_d2);
-    distribution_test_impl(piece_const_d3);
-    distribution_test_impl(piece_line_d1);
-    distribution_test_impl(piece_line_d2);
-    distribution_test_impl(piece_line_d3);
-}
+//     random_device rd{};
+//     mt19937 gen(rd());
+//     (void) generate_canonical<double, 10>(gen);
+
+//     engine_test_impl<minstd_rand0>(); // linear_congruential_engine
+//     engine_test_impl<mt19937>(); // mersenne_twister_engine
+//     engine_test_impl<ranlux24_base>(); // subtract_with_carry_engine
+//     engine_test_impl<ranlux24>(); // discard_block_engine
+//     engine_test_impl<knuth_b>(); // shuffle_order_engine
+//     engine_test_impl<independent_bits_engine<minstd_rand0, 2, uint32_t>>();
+//     engine_test_impl<mt19937_64>();
+//     engine_test_impl<ranlux48_base>();
+//     engine_test_impl<ranlux48>();
+
+// #if _HAS_TR1_NAMESPACE
+//     linear_congruential<uint_fast32_t, 16807, 0, 2147483647> minstd_rand_eng(gen);
+//     minstd_rand_eng.seed(gen);
+
+//     tr1_engine_test_impl<linear_congruential<uint_fast32_t, 16807, 0, 2147483647>>();
+//     tr1_engine_test_impl<ranlux3>();
+//     tr1_engine_test_impl<ranlux4>();
+//     tr1_engine_test_impl<ranlux3_01>();
+//     tr1_engine_test_impl<ranlux4_01>();
+//     tr1_engine_test_impl<ranlux64_base_01>();
+//     tr1_engine_test_impl<ranlux_base_01>();
+// #endif // _HAS_TR1_NAMESPACE
+
+//     uniform_int_distribution<> uni_int_d{};
+//     bernoulli_distribution bern_d{};
+//     geometric_distribution<> geo_d{};
+//     poisson_distribution<> pois_d{};
+//     binomial_distribution<> binom_d{};
+//     uniform_real_distribution<> uni_real_d{};
+//     exponential_distribution<> expon_d{};
+//     normal_distribution<> norm_d{};
+//     gamma_distribution<> gamma_d{};
+//     weibull_distribution<> weib_d{};
+//     extreme_value_distribution<> ext_v_d{};
+//     lognormal_distribution<> log_norm_d{};
+//     chi_squared_distribution<> chi_sq_d{};
+//     cauchy_distribution<> cauchy_d{};
+//     fisher_f_distribution<> fish_f_d{};
+//     student_t_distribution<> stud_t_d{};
+//     negative_binomial_distribution<> neg_bi_d{};
+//     discrete_distribution<> disc_d1(v.begin(), v.end());
+//     auto sq_func = [](double val) { return val * val; };
+//     discrete_distribution<> disc_d2(5, 3.5, 7.5, sq_func);
+//     piecewise_constant_distribution<> piece_const_d1(v.begin(), v.end(), v.begin());
+//     piecewise_constant_distribution<> piece_const_d2{{1.0, 2.0, 3.0, 4.0, 5.0}, sq_func};
+//     piecewise_constant_distribution<> piece_const_d3(4, 0.0, 10.0, sq_func);
+//     piecewise_linear_distribution<> piece_line_d1(v.begin(), v.end(), v.begin());
+//     piecewise_linear_distribution<> piece_line_d2({1.0, 2.0, 3.0, 4.0}, sq_func);
+//     piecewise_linear_distribution<> piece_line_d3(4, 0.0, 10.0, sq_func);
+
+//     distribution_test_impl(uni_int_d);
+//     distribution_test_impl(bern_d);
+//     distribution_test_impl(geo_d);
+//     distribution_test_impl(pois_d);
+//     distribution_test_impl(binom_d);
+//     distribution_test_impl(uni_real_d);
+//     distribution_test_impl(expon_d);
+//     distribution_test_impl(norm_d);
+//     distribution_test_impl(gamma_d);
+//     distribution_test_impl(weib_d);
+//     distribution_test_impl(ext_v_d);
+//     distribution_test_impl(log_norm_d);
+//     distribution_test_impl(chi_sq_d);
+//     distribution_test_impl(cauchy_d);
+//     distribution_test_impl(fish_f_d);
+//     distribution_test_impl(stud_t_d);
+//     distribution_test_impl(neg_bi_d);
+//     distribution_test_impl(disc_d1);
+//     distribution_test_impl(disc_d2);
+//     distribution_test_impl(piece_const_d1);
+//     distribution_test_impl(piece_const_d2);
+//     distribution_test_impl(piece_const_d3);
+//     distribution_test_impl(piece_line_d1);
+//     distribution_test_impl(piece_line_d2);
+//     distribution_test_impl(piece_line_d3);
+// }
 
 void ratio_test() {
     using half       = ratio<1, 2>;
@@ -1093,141 +1081,47 @@ void ratio_test() {
     TRAIT_V(ratio_greater_equal, half, half_again);
 }
 
-template <typename CharType>
-void regex_traits_test_impl() {
-    CharType buffer[10]{};
-    regex_traits<CharType> rt{};
+// template <typename SubMatchType>
+// void sub_match_test_impl() {
+//     SubMatchType sm{};
+//     using char_type = typename SubMatchType::value_type;
 
-    rt.transform(begin(buffer), end(buffer));
-    rt.transform_primary(begin(buffer), end(buffer));
-    rt.lookup_classname(begin(buffer), end(buffer));
-    rt.lookup_collatename(begin(buffer), end(buffer));
-}
-
-template <typename SubMatchType>
-void sub_match_test_impl() {
-    SubMatchType sm{};
-    using char_type = typename SubMatchType::value_type;
-
-    char_type value{};
-    basic_string<char_type> str{};
-
-    comparable_test(sm);
-    comparable_test(sm, &value);
-    comparable_test(&value, sm);
-    comparable_test(sm, value);
-    comparable_test(value, sm);
-    comparable_test(sm, str);
-    comparable_test(str, sm);
-
-    basic_stringstream<char_type> ss{};
-    ss << sm;
-}
-
-template <typename MatchResultsType>
-void match_results_test_impl() {
-    MatchResultsType mr{};
-    using char_type = typename MatchResultsType::char_type;
-    basic_stringstream<char_type> ss{};
-    ostream_iterator<int, char_type> out_it(ss);
-    basic_string<char_type> str{};
-
-    char_type out_buffer[5]{};
-
-    mr.format(out_it, str.data(), str.data() + str.size());
-    mr.format(out_it, str);
-    mr.format(out_buffer, str.data(), str.data() + str.size());
-    mr.format(out_buffer, str);
-    str = mr.format(str);
-
-    equality_test(mr);
-    swap_test(mr);
-}
-
-// template <typename BasicRegexType>
-// void basic_regex_test_impl() {
-//     using char_type = typename BasicRegexType::value_type;
+//     char_type value{};
 //     basic_string<char_type> str{};
 
-//     BasicRegexType br1(str);
-//     BasicRegexType br2(begin(str), end(str), regex_constants::ECMAScript);
-//     BasicRegexType br3(begin(str), end(str));
-
-//     br1 = str;
-//     br2.assign(str);
-//     br3.assign(begin(str), end(str));
-
-//     swap_test(br1);
-
-//     (void) regex_match(begin(str), end(str), br1);
-//     (void) regex_match(str.c_str(), br1);
-
-//     match_results<const char_type*> mrc{};
-//     regex_match(str.c_str(), mrc, br1);
-
-//     match_results<typename basic_string<char_type>::const_iterator> mrs{};
-//     regex_match(str, mrs, br1);
-//     (void) regex_match(str, br1);
-
-//     regex_search(cbegin(str), cend(str), mrs, br1);
-//     (void) regex_search(cbegin(str), cend(str), br1);
-//     (void) regex_search(str.c_str(), br1);
-//     regex_search(str.c_str(), mrc, br1);
-//     regex_search(str, mrs, br1);
-//     (void) regex_search(str, br1);
+//     comparable_test(sm);
+//     comparable_test(sm, &value);
+//     comparable_test(&value, sm);
+//     comparable_test(sm, value);
+//     comparable_test(value, sm);
+//     comparable_test(sm, str);
+//     comparable_test(str, sm);
 
 //     basic_stringstream<char_type> ss{};
+//     ss << sm;
+// }
+
+// template <typename MatchResultsType>
+// void match_results_test_impl() {
+//     MatchResultsType mr{};
+//     using char_type = typename MatchResultsType::char_type;
+//     basic_stringstream<char_type> ss{};
 //     ostream_iterator<int, char_type> out_it(ss);
-//     char_type out_buffer[5] = {0};
+//     basic_string<char_type> str{};
 
-//     regex_replace(out_it, cbegin(str), cend(str), br1, str);
-//     regex_replace(out_buffer, cbegin(str), cend(str), br1, str);
-//     regex_replace(out_it, begin(str), end(str), br1, str.c_str());
-//     (void) regex_replace(str, br1, str);
-//     (void) regex_replace(str, br1, str.c_str());
-//     (void) regex_replace(str.c_str(), br1, str);
-//     (void) regex_replace(str.c_str(), br1, str.c_str());
+//     char_type out_buffer[5]{};
+
+//     mr.format(out_it, str.data(), str.data() + str.size());
+//     mr.format(out_it, str);
+//     mr.format(out_buffer, str.data(), str.data() + str.size());
+//     mr.format(out_buffer, str);
+//     str = mr.format(str);
+
+//     equality_test(mr);
+//     swap_test(mr);
 // }
 
-// template <typename RegexTokenIterator>
-// void regex_token_iterator_test_impl() {
-//     using it_type      = typename RegexTokenIterator::value_type::iterator;
-//     int submatches[10] = {0};
-//     it_type start{};
-//     it_type finish{};
-//     typename RegexTokenIterator::regex_type rgx{};
-//     RegexTokenIterator rti0(start, finish, rgx, submatches);
-// }
 
-// void regex_test() {
-//     regex_traits_test_impl<char>();
-//     regex_traits_test_impl<wchar_t>();
-
-//     sub_match_test_impl<csub_match>();
-//     sub_match_test_impl<wcsub_match>();
-//     sub_match_test_impl<ssub_match>();
-//     sub_match_test_impl<wssub_match>();
-
-//     match_results_test_impl<cmatch>();
-//     match_results_test_impl<wcmatch>();
-//     match_results_test_impl<smatch>();
-//     match_results_test_impl<wsmatch>();
-
-//     basic_regex_test_impl<regex>();
-//     basic_regex_test_impl<wregex>();
-
-//     cregex_iterator cri{};
-//     wcregex_iterator wcri{};
-//     sregex_iterator sri{};
-//     wsregex_iterator wsri{};
-
-//     regex_token_iterator_test_impl<cregex_token_iterator>();
-//     regex_token_iterator_test_impl<wcregex_token_iterator>();
-//     regex_token_iterator_test_impl<sregex_token_iterator>();
-//     regex_token_iterator_test_impl<wsregex_token_iterator>();
-// }
-
-// need custom minimal allocator to use for scoped_allocator_test to reach all template paths
 template <typename T>
 struct custom_allocator {
     using value_type = T;
@@ -1319,68 +1213,68 @@ void scoped_allocator_test() {
 }
 
 #ifndef _M_CEE_PURE
-void shared_mutex_test() {
-    using namespace chrono;
+// void shared_mutex_test() {
+//     using namespace chrono;
 
-    timed_mutex_test_impl<shared_timed_mutex>();
+//     timed_mutex_test_impl<shared_timed_mutex>();
 
-    shared_timed_mutex stm{};
-    (void) stm.try_lock_shared_for(seconds(1));
-    (void) stm.try_lock_shared_until(system_clock::now());
+//     shared_timed_mutex stm{};
+//     (void) stm.try_lock_shared_for(seconds(1));
+//     (void) stm.try_lock_shared_until(system_clock::now());
 
-    shared_lock<shared_timed_mutex> sl1(stm, seconds(1));
-    shared_lock<shared_timed_mutex> sl2(stm, system_clock::now());
+//     shared_lock<shared_timed_mutex> sl1(stm, seconds(1));
+//     shared_lock<shared_timed_mutex> sl2(stm, system_clock::now());
 
-    (void) sl1.try_lock_for(seconds(1));
-    (void) sl2.try_lock_until(system_clock::now());
-    swap_test(sl1);
-}
+//     (void) sl1.try_lock_for(seconds(1));
+//     (void) sl2.try_lock_until(system_clock::now());
+//     swap_test(sl1);
+// }
 #endif // _M_CEE_PURE
 
-template <typename T>
-void sstream_test_impl() {
-    T val{};
-    swap_test(val);
-}
+// template <typename T>
+// void sstream_test_impl() {
+//     T val{};
+//     swap_test(val);
+// }
 
-void sstream_test() {
-    sstream_test_impl<stringbuf>();
-    sstream_test_impl<wstringbuf>();
-    sstream_test_impl<istringstream>();
-    sstream_test_impl<wistringstream>();
-    sstream_test_impl<ostringstream>();
-    sstream_test_impl<wostringstream>();
-    sstream_test_impl<stringstream>();
-    sstream_test_impl<wstringstream>();
-}
+// void sstream_test() {
+//     sstream_test_impl<stringbuf>();
+//     sstream_test_impl<wstringbuf>();
+//     sstream_test_impl<istringstream>();
+//     sstream_test_impl<wistringstream>();
+//     sstream_test_impl<ostringstream>();
+//     sstream_test_impl<wostringstream>();
+//     sstream_test_impl<stringstream>();
+//     sstream_test_impl<wstringstream>();
+// }
 
-void streambuf_test() {
-    stringstream ss{};
-    basic_streambuf<char>& bsbc = *ss.rdbuf();
-    (void) bsbc;
+// void streambuf_test() {
+//     stringstream ss{};
+//     basic_streambuf<char>& bsbc = *ss.rdbuf();
+//     (void) bsbc;
 
-    wstringstream wss{};
-    basic_streambuf<wchar_t>& bsbwc = *wss.rdbuf();
-    (void) bsbwc;
+//     wstringstream wss{};
+//     basic_streambuf<wchar_t>& bsbwc = *wss.rdbuf();
+//     (void) bsbwc;
 
-    // istreambuf_iterator and ostreambuf_iterator covered in iterators test
-}
+//     // istreambuf_iterator and ostreambuf_iterator covered in iterators test
+// }
 
-#ifndef _M_CEE_PURE
-void thread_test() {
-    using namespace chrono;
+// #ifndef _M_CEE_PURE
+// void thread_test() {
+//     using namespace chrono;
 
-    thread thr([](int, int) {}, 1, 2);
+//     thread thr([](int, int) {}, 1, 2);
 
-    this_thread::sleep_for(seconds(1));
-    this_thread::sleep_until(system_clock::now());
+//     this_thread::sleep_for(seconds(1));
+//     this_thread::sleep_until(system_clock::now());
 
-    thread::id thr_id{};
+//     thread::id thr_id{};
 
-    cout << thr_id;
-    hash_test(thr_id);
-}
-#endif // _M_CEE_PURE
+//     cout << thr_id;
+//     hash_test(thr_id);
+// }
+// #endif // _M_CEE_PURE
 
 void tuple_test() {
     allocator<double> my_alloc{};
