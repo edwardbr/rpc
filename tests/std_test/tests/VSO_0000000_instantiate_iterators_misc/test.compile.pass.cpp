@@ -859,8 +859,9 @@ void memory_test() {
     my_shared_from_this msft{};
     default_delete<void> dd0{default_delete<int>{}};
     (void) dd0;
-    default_delete<int[]> dd1{default_delete<int[]>{}};
-    dd1(new int[5]);
+    // Array deletion helpers are no longer supported in the RPC memory wrappers.
+    // default_delete<int[]> dd1{default_delete<int[]>{}};
+    // dd1(new int[5]);
 
 #if _HAS_GARBAGE_COLLECTION_SUPPORT_DELETED_IN_CXX23
     int* int_ptr{};

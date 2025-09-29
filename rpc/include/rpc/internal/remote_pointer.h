@@ -52,23 +52,6 @@ namespace rpc
         }
     };
 
-    template<typename T> struct default_delete<T[]>
-    {
-        constexpr default_delete() noexcept = default;
-
-        template<typename U, typename = std::enable_if_t<std::is_convertible_v<U (*)[], T (*)[]>>>
-        default_delete(const default_delete<U[]>&) noexcept
-        {
-        }
-
-        template<typename U, typename = std::enable_if_t<std::is_convertible_v<U (*)[], T (*)[]>>>
-        void operator()(U* ptr) const noexcept
-        {
-            static_assert(sizeof(U) > 0, "can't delete an incomplete type");
-            delete[] ptr;
-        }
-    };
-
     class bad_weak_ptr : public std::exception
     {
     public:
@@ -83,48 +66,13 @@ namespace rpc
     {
         namespace __shared_ptr_pointer_utils
         {
-            template<typename Y, typename Ty, typename = void>
+            template<typename Y, typename Ty>
             struct sp_convertible : std::bool_constant<std::is_convertible_v<Y*, Ty*>>
             {
             };
 
-            template<typename Y, typename U, typename Void> struct sp_convertible<Y, U[], Void> : std::false_type
-            {
-            };
-
-            template<typename Y, typename U>
-            struct sp_convertible<Y, U[], std::void_t<Y (*)[]>>
-                : std::bool_constant<std::is_convertible_v<Y (*)[], U (*)[]>>
-            {
-            };
-
-            template<typename Y, typename U, std::size_t Ext, typename Void>
-            struct sp_convertible<Y, U[Ext], Void> : std::false_type
-            {
-            };
-
-            template<typename Y, typename U, std::size_t Ext>
-            struct sp_convertible<Y, U[Ext], std::void_t<Y (*)[Ext]>>
-                : std::bool_constant<std::is_convertible_v<Y (*)[Ext], U (*)[Ext]>>
-            {
-            };
-
-            template<typename Y, typename Ty, typename = void>
+            template<typename Y, typename Ty>
             struct sp_pointer_compatible : std::bool_constant<std::is_convertible_v<Y*, Ty*>>
-            {
-            };
-
-            template<typename U, std::size_t Ext> struct sp_pointer_compatible<U[Ext], U[]> : std::true_type
-            {
-            };
-            template<typename U, std::size_t Ext> struct sp_pointer_compatible<U[Ext], const U[]> : std::true_type
-            {
-            };
-            template<typename U, std::size_t Ext> struct sp_pointer_compatible<U[Ext], volatile U[]> : std::true_type
-            {
-            };
-            template<typename U, std::size_t Ext>
-            struct sp_pointer_compatible<U[Ext], const volatile U[]> : std::true_type
             {
             };
         } // namespace __shared_ptr_pointer_utils
@@ -551,6 +499,8 @@ namespace rpc
     {
         using element_type_impl = std::remove_extent_t<T>;
 
+        static_assert(!std::is_array_v<T>, "shared_ptr no longer supports array types");
+
         element_type_impl* ptr_{nullptr};
         __rpc_internal::__shared_ptr_control_block::control_block_base* cb_{nullptr};
 
@@ -899,6 +849,8 @@ namespace rpc
     template<typename T> class weak_ptr
     {
         using element_type_impl = std::remove_extent_t<T>;
+
+        static_assert(!std::is_array_v<T>, "weak_ptr no longer supports array types");
 
         __rpc_internal::__shared_ptr_control_block::control_block_base* cb_{nullptr};
         element_type_impl* ptr_for_lock_{nullptr};
