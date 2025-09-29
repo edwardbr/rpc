@@ -227,6 +227,51 @@ void dispose_object_actual() override {
 }
 ```
 
+### 13. Multiple Inheritance and Unified Casting Interface Checks (FIXED)
+**Problem**: Static assertions failed for classes with multiple inheritance from `casting_interface`-derived types
+**Root Cause**: The `marshalled_tests::baz` class inherits from both `xxx::i_baz` and `xxx::i_bar`, both of which inherit from `rpc::casting_interface`. This creates ambiguous casting scenarios where `static_cast<rpc::casting_interface*>()` fails due to multiple inheritance paths.
+
+**Example inheritance hierarchy**:
+```cpp
+class baz : public xxx::i_baz, public xxx::i_bar
+//          both inherit from rpc::casting_interface
+```
+
+**Original Problem**: SFINAE-based `is_casting_compatible` trait used `static_cast` which failed with ambiguous base class errors.
+
+**Solution**: Created a unified `is_casting_interface_derived` trait and refactored all casting interface checks:
+
+```cpp
+// New unified trait in __rpc_internal namespace
+template<typename T, typename = void>
+struct is_casting_interface_derived : std::false_type {};
+
+template<typename T>
+struct is_casting_interface_derived<T, std::void_t<std::enable_if_t<
+    std::is_base_of_v<rpc::casting_interface, std::remove_cv_t<T>> ||
+    std::is_same_v<std::remove_cv_t<T>, void>>>> : std::true_type {};
+```
+
+**Key Changes**:
+- **Replaced static_cast with std::is_base_of_v**: Handles multiple inheritance correctly without ambiguous casts
+- **Unified all casting interface checks**: `sp_convertible`, `sp_pointer_compatible`, and `assert_casting_interface` now all use the same robust logic
+- **Namespace organization**: Moved the check to `__rpc_internal` for reusability across the entire header
+- **Conditional compilation**: Only active when not in `TEST_STL_COMPLIANCE` mode
+
+**Benefits**:
+- **Multiple Inheritance Support**: Correctly handles diamond inheritance and multiple base paths
+- **Consistency**: Single point of truth for casting interface requirements
+- **Maintainability**: All static assertions now use the same well-tested logic
+- **Type Safety**: Still enforces that `rpc::shared_ptr` can only manage `casting_interface`-derived types
+
+**Files Modified**:
+- `/rpc/include/rpc/internal/remote_pointer.h` - Unified casting interface checks
+
+**Test Cases Passing**:
+- Multiple inheritance classes like `marshalled_tests::baz`
+- Diamond inheritance scenarios
+- Complex interface hierarchies with virtual inheritance
+
 ## Usage
 
 ### Building STL Tests

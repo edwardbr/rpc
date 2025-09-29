@@ -33,6 +33,7 @@ namespace std
 namespace rpc
 {
     class object_proxy;
+    class casting_interface;
 
 #endif
 
@@ -64,16 +65,42 @@ namespace rpc
 
     namespace __rpc_internal
     {
+#ifndef TEST_STL_COMPLIANCE
+        // Generic check for casting_interface inheritance that handles multiple inheritance
+        template<typename T, typename = void>
+        struct is_casting_interface_derived : std::false_type
+        {
+        };
+
+        template<typename T>
+        struct is_casting_interface_derived<T, std::void_t<std::enable_if_t<
+            std::is_base_of_v<rpc::casting_interface, std::remove_cv_t<T>> || std::is_same_v<std::remove_cv_t<T>, void>>>> : std::true_type
+        {
+        };
+#endif        
+
         namespace __shared_ptr_pointer_utils
         {
             template<typename Y, typename Ty>
             struct sp_convertible : std::bool_constant<std::is_convertible_v<Y*, Ty*>>
             {
+#ifndef TEST_STL_COMPLIANCE
+                static_assert(is_casting_interface_derived<Y>::value,
+                    "rpc::shared_ptr can only manage casting_interface-derived types or void");
+                static_assert(is_casting_interface_derived<Ty>::value,
+                    "rpc::shared_ptr can only manage casting_interface-derived types or void");
+#endif
             };
 
             template<typename Y, typename Ty>
             struct sp_pointer_compatible : std::bool_constant<std::is_convertible_v<Y*, Ty*>>
             {
+#ifndef TEST_STL_COMPLIANCE
+                static_assert(is_casting_interface_derived<Y>::value,
+                    "rpc::shared_ptr can only manage casting_interface-derived types or void");
+                static_assert(is_casting_interface_derived<Ty>::value,
+                    "rpc::shared_ptr can only manage casting_interface-derived types or void");
+#endif
             };
         } // namespace __shared_ptr_pointer_utils
 
@@ -501,6 +528,16 @@ namespace rpc
 
         static_assert(!std::is_array_v<T>, "shared_ptr no longer supports array types");
 
+#ifndef TEST_STL_COMPLIANCE
+        template<typename Candidate>
+        static constexpr void assert_casting_interface()
+        {
+            using clean_t = std::remove_cv_t<std::remove_reference_t<Candidate>>;
+            static_assert(__rpc_internal::is_casting_interface_derived<clean_t>::value,
+                "rpc::shared_ptr can only manage casting_interface-derived types");
+        }
+#endif
+
         element_type_impl* ptr_{nullptr};
         __rpc_internal::__shared_ptr_control_block::control_block_base* cb_{nullptr};
 
@@ -553,6 +590,9 @@ namespace rpc
             : ptr_(static_cast<element_type_impl*>(p))
             , cb_(nullptr)
         {
+#ifndef TEST_STL_COMPLIANCE
+            assert_casting_interface<Y>();
+#endif
             try
             {
                 cb_ = new __rpc_internal::__shared_ptr_control_block::control_block_impl_default_delete<Y>(p);
@@ -573,6 +613,9 @@ namespace rpc
             : ptr_(static_cast<element_type_impl*>(p))
             , cb_(nullptr)
         {
+#ifndef TEST_STL_COMPLIANCE
+            assert_casting_interface<Y>();
+#endif
             try
             {
                 using CleanDeleter = std::decay_t<Deleter>;
@@ -617,6 +660,9 @@ namespace rpc
             : ptr_(static_cast<element_type_impl*>(p))
             , cb_(nullptr)
         {
+#ifndef TEST_STL_COMPLIANCE
+            assert_casting_interface<Y>();
+#endif
             try
             {
                 using CleanDeleter = std::decay_t<Deleter>;
@@ -1233,6 +1279,9 @@ namespace rpc
             template<typename T, typename ValueAlloc, typename... Args>
             shared_ptr<T> make_shared_with_value_alloc(const ValueAlloc& value_alloc, Args&&... args)
             {
+#ifndef TEST_STL_COMPLIANCE
+                shared_ptr<T>::template assert_casting_interface<std::remove_extent_t<T>>();
+#endif
                 using ControlBlockAlloc = typename std::allocator_traits<ValueAlloc>::template rebind_alloc<
                     __shared_ptr_control_block::control_block_make_shared<T, ValueAlloc, Args...>>;
                 using ControlBlockAllocTraits = std::allocator_traits<ControlBlockAlloc>;
