@@ -15,6 +15,10 @@
 
 #include <typeinfo> // For std::type_info used by get_deleter
 
+
+// note that these classes borrow the std namespace for testing purposes in tests/std_test/tests
+// for normal rpc mode these classes use the rpc namespace
+
 #ifdef TEST_STL_COMPLIANCE
 
 #define RPC_MEMORY std
@@ -1464,6 +1468,7 @@ namespace rpc
         return shared_ptr<T>(r, p);
     }
 
+#ifdef TEST_STL_COMPLIANCE
     template<typename T, typename U> shared_ptr<T> dynamic_pointer_cast(const shared_ptr<U>& r) noexcept
     {
         if (auto p = dynamic_cast<T*>(r.get()))
@@ -1472,6 +1477,38 @@ namespace rpc
         }
         return shared_ptr<T>();
     }
+
+#else
+
+    template<typename T, typename U> shared_ptr<T> dynamic_pointer_cast(const shared_ptr<U>& from) noexcept
+    {        
+        if (!from)
+            CO_RETURN shared_ptr<T>();
+            
+        T* ptr = nullptr;
+
+        // First try local interface casting
+        ptr = const_cast<T*>(static_cast<const T*>(from->query_interface(T::get_id(VERSION_2))));
+        if (ptr)
+            CO_RETURN shared_ptr<T>(from, ptr);
+
+        // Then try remote interface casting through object_proxy
+        auto ob = from->get_object_proxy();
+        if (!ob)
+        {
+            CO_RETURN shared_ptr<T>();
+        }
+
+        shared_ptr<T> ret;
+        // This magic function will return a shared pointer to a new interface proxy
+        // Its reference count will not be the same as the "from" pointer's value, semantically it
+        // behaves the same as with normal dynamic_pointer_cast in that you can use this function to
+        // cast back to the original. However static_pointer_cast in this case will not work for
+        // remote interfaces.
+        CO_AWAIT ob->template query_interface<T>(ret);
+        CO_RETURN ret;
+    }
+#endif
 
     template<typename T, typename U> shared_ptr<T> const_pointer_cast(const shared_ptr<U>& r) noexcept
     {

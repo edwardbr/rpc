@@ -4,6 +4,21 @@
 
 This document describes the implementation work done to make the `rpc::shared_ptr` and `rpc::weak_ptr` classes in `/rpc/include/rpc/internal/remote_pointer.h` compliant with STL specifications for testing purposes.
 
+These tests were hived off from https://github.com/microsoft/STL and The Microsoft C++ Standard Library is under the Apache License v2.0 with LLVM Exception
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this directory except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+
 ## Problem Statement
 
 The RPC++ framework includes custom implementations of `shared_ptr` and `weak_ptr` in the `rpc` namespace that are designed for distributed object management. However, to validate that these implementations follow STL semantics correctly, we needed to make them compilable and testable against the Microsoft STL test suite located in `/tests/std_test/`.
@@ -16,6 +31,8 @@ The solution uses conditional compilation with the `TEST_STL_COMPLIANCE` macro t
 
 1. **Production Mode** (`#ifndef TEST_STL_COMPLIANCE`): Classes are in `rpc` namespace with RPC-specific functionality
 2. **Test Mode** (`#ifdef TEST_STL_COMPLIANCE`): Classes are in `std` namespace with STL-compliant interfaces
+
+**Note**: The header explicitly documents that "these classes borrow the std namespace for testing purposes in tests/std_test/tests - for normal rpc mode these classes use the rpc namespace". This dual-namespace approach allows comprehensive STL compliance testing while maintaining clean separation in production code.
 
 ## Key Components Implemented
 
@@ -177,9 +194,15 @@ weak_ptr(const weak_ptr<Y>& r) noexcept {
 
 ## Files Modified
 
-- `/rpc/include/rpc/internal/remote_pointer.h` - Main implementation with race condition fixes
+- `/rpc/include/rpc/internal/remote_pointer.h` - Main implementation with:
+  - Race condition fixes for virtual inheritance
+  - Unified casting interface checks with multiple inheritance support
+  - RPC-aware dynamic_pointer_cast with local/remote fallback
+  - Enhanced header documentation explaining dual-namespace usage
+  - Function pointer handling and explicit type conversions
 - `/tests/std_test/CMakeLists.txt` - Build configuration for STL tests
 - `/tests/std_test/tests/Dev10_851347_weak_ptr_virtual_inheritance/test.cpp` - Threading implementation fixes
+- `/tests/std_test/tests/remote_pointer_stl_compliance.md` - This documentation file with licensing information
 
 ## Test Results
 
@@ -271,6 +294,64 @@ struct is_casting_interface_derived<T, std::void_t<std::enable_if_t<
 - Multiple inheritance classes like `marshalled_tests::baz`
 - Diamond inheritance scenarios
 - Complex interface hierarchies with virtual inheritance
+
+### 14. RPC-Aware Dynamic Pointer Casting (ENHANCED)
+**Enhancement**: Specialized `dynamic_pointer_cast` implementation for RPC mode that handles both local and remote interface casting.
+
+**Problem**: Standard `dynamic_pointer_cast` only works with local C++ objects, but RPC++ needs to support casting across distributed object boundaries.
+
+**Solution**: Conditional implementation based on compilation mode:
+
+**STL Compliance Mode** (TEST_STL_COMPLIANCE):
+```cpp
+template<typename T, typename U>
+shared_ptr<T> dynamic_pointer_cast(const shared_ptr<U>& r) noexcept {
+    if (auto p = dynamic_cast<T*>(r.get())) {
+        return shared_ptr<T>(r, p);
+    }
+    return shared_ptr<T>();
+}
+```
+
+**RPC Mode** (Production):
+```cpp
+template<typename T, typename U>
+shared_ptr<T> dynamic_pointer_cast(const shared_ptr<U>& from) noexcept {
+    if (!from)
+        CO_RETURN shared_ptr<T>();
+
+    T* ptr = nullptr;
+
+    // First try local interface casting
+    ptr = const_cast<T*>(static_cast<const T*>(
+        from->query_interface(T::get_id(VERSION_2))));
+    if (ptr)
+        CO_RETURN shared_ptr<T>(from, ptr);
+
+    // Then try remote interface casting through object_proxy
+    auto ob = from->get_object_proxy();
+    if (!ob) {
+        CO_RETURN shared_ptr<T>();
+    }
+
+    shared_ptr<T> ret;
+    CO_AWAIT ob->template query_interface<T>(ret);
+    CO_RETURN ret;
+}
+```
+
+**Key Features**:
+- **Dual-Path Casting**: First attempts local interface casting using `query_interface()`, then falls back to remote casting via `object_proxy`
+- **Coroutine-Based**: Uses `CO_RETURN` and `CO_AWAIT` for asynchronous remote interface queries
+- **Version-Aware**: Uses `T::get_id(VERSION_2)` for proper interface identification
+- **Reference Count Semantics**: Remote casting creates new proxy with independent reference counting
+- **Compatibility Note**: `static_pointer_cast` will not work for remote interfaces, only `dynamic_pointer_cast`
+
+**Benefits**:
+- **Distributed Object Support**: Enables interface casting across process/network boundaries
+- **Transparent Fallback**: Automatically tries local casting first, then remote
+- **Asynchronous Operation**: Non-blocking remote interface queries
+- **Type Safety**: Maintains strong typing across distributed boundaries
 
 ## Usage
 
