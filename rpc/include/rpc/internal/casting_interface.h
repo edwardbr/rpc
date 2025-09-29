@@ -12,10 +12,6 @@
 #include <memory>
 #include <unordered_map>
 
-#ifdef USE_RPC_TELEMETRY
-#include <rpc/telemetry/i_telemetry_service.h>
-#endif
-
 namespace rpc
 {
     class object_proxy;

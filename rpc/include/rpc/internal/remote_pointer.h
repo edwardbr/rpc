@@ -31,6 +31,7 @@ namespace std
 #include "marshaller.h"
 #include "member_ptr.h"
 #include "coroutine_support.h" // Needed for CORO_TASK macro
+#include "casting_interface.h"
 
 #define RPC_MEMORY rpc
 
@@ -290,8 +291,11 @@ namespace rpc
 
             struct control_block_base
             {
-                std::atomic<long> local_shared_owners{0};
-                std::atomic<long> local_weak_owners{1};
+                std::atomic<long> shared_owners{0};
+                std::atomic<long> weak_owners{1};
+#ifndef TEST_STL_COMPLIANCE
+                bool is_local = false;
+#endif            
 
             protected:
                 void* managed_object_ptr_{nullptr};
@@ -300,6 +304,11 @@ namespace rpc
                 control_block_base(void* obj_ptr)
                     : managed_object_ptr_(obj_ptr)
                 {
+#ifndef TEST_STL_COMPLIANCE
+                    rpc::casting_interface* ptr = reinterpret_cast<rpc::casting_interface*>(managed_object_ptr_);
+                    if(ptr)
+                        is_local = ptr->is_local();
+#endif            
                 }
 
                 control_block_base()
@@ -314,37 +323,37 @@ namespace rpc
 
                 void* get_managed_object_ptr() const { return managed_object_ptr_; }
 
-                void increment_local_shared() { local_shared_owners.fetch_add(1, std::memory_order_relaxed); }
-                void increment_local_weak() { local_weak_owners.fetch_add(1, std::memory_order_relaxed); }
+                void increment_shared() { shared_owners.fetch_add(1, std::memory_order_relaxed); }
+                void increment_weak() { weak_owners.fetch_add(1, std::memory_order_relaxed); }
 
                 // Try to increment shared count only if it's not zero (thread-safe)
                 bool try_increment_shared() noexcept
                 {
-                    long current = local_shared_owners.load(std::memory_order_relaxed);
+                    long current = shared_owners.load(std::memory_order_relaxed);
                     do
                     {
                         if (current == 0)
                         {
                             return false; // Already expired, cannot increment
                         }
-                    } while (!local_shared_owners.compare_exchange_weak(current, current + 1, std::memory_order_relaxed));
+                    } while (!shared_owners.compare_exchange_weak(current, current + 1, std::memory_order_relaxed));
                     return true;
                 }
 
-                void decrement_local_shared_and_dispose_if_zero()
+                void decrement_shared_and_dispose_if_zero()
                 {
-                    if (local_shared_owners.fetch_sub(1, std::memory_order_acq_rel) == 1)
+                    if (shared_owners.fetch_sub(1, std::memory_order_acq_rel) == 1)
                     {
                         dispose_object_actual();
-                        decrement_local_weak_and_destroy_if_zero();
+                        decrement_weak_and_destroy_if_zero();
                     }
                 }
 
-                void decrement_local_weak_and_destroy_if_zero()
+                void decrement_weak_and_destroy_if_zero()
                 {
-                    if (local_weak_owners.fetch_sub(1, std::memory_order_acq_rel) == 1)
+                    if (weak_owners.fetch_sub(1, std::memory_order_acq_rel) == 1)
                     {
-                        if (local_shared_owners.load(std::memory_order_acquire) == 0)
+                        if (shared_owners.load(std::memory_order_acquire) == 0)
                         {
                             destroy_self_actual();
                         }
@@ -552,13 +561,13 @@ namespace rpc
         void acquire_this() noexcept
         {
             if (cb_)
-                cb_->increment_local_shared();
+                cb_->increment_shared();
         }
 
         void release_this() noexcept
         {
             if (cb_)
-                cb_->decrement_local_shared_and_dispose_if_zero();
+                cb_->decrement_shared_and_dispose_if_zero();
         }
 
         shared_ptr(__rpc_internal::__shared_ptr_control_block::control_block_base* cb, element_type_impl* p)
@@ -865,7 +874,7 @@ namespace rpc
             using result_type = std::remove_extent_t<U>;
             return static_cast<result_type*>(ptr_);
         }
-        long use_count() const noexcept { return cb_ ? cb_->local_shared_owners.load(std::memory_order_relaxed) : 0; }
+        long use_count() const noexcept { return cb_ ? cb_->shared_owners.load(std::memory_order_relaxed) : 0; }
         bool unique() const noexcept { return use_count() == 1; }
         explicit operator bool() const noexcept { return ptr_ != nullptr; }
 
@@ -935,14 +944,14 @@ namespace rpc
             if (other.cb_)
             {
                 cb_ = other.cb_; // Always share control block first
-                cb_->increment_local_weak();
+                cb_->increment_weak();
 
                 // Try to temporarily lock the object to safely convert the pointer
                 if (cb_->try_increment_shared())
                 {
                     ptr_for_lock_
                         = convert_ptr_for_lock<typename weak_ptr<Y>::element_type>(other.cb_, other.ptr_for_lock_);
-                    cb_->decrement_local_shared_and_dispose_if_zero();
+                    cb_->decrement_shared_and_dispose_if_zero();
                 }
                 else
                 {
@@ -963,7 +972,7 @@ namespace rpc
             cb_ = other.cb_;
             ptr_for_lock_ = convert_ptr_for_lock<typename weak_ptr<Y>::element_type>(other.cb_, other.ptr_for_lock_);
             if (cb_)
-                cb_->increment_local_weak();
+                cb_->increment_weak();
         }
 
         // Thread-safe move conversion
@@ -972,14 +981,14 @@ namespace rpc
             if (other.cb_)
             {
                 cb_ = other.cb_; // Take ownership of control block
-                cb_->increment_local_weak();
+                cb_->increment_weak();
 
                 // Try to temporarily lock the object to safely convert the pointer
                 if (cb_->try_increment_shared())
                 {
                     ptr_for_lock_
                         = convert_ptr_for_lock<typename weak_ptr<Y>::element_type>(other.cb_, other.ptr_for_lock_);
-                    cb_->decrement_local_shared_and_dispose_if_zero();
+                    cb_->decrement_shared_and_dispose_if_zero();
                 }
                 else
                 {
@@ -988,7 +997,7 @@ namespace rpc
                 }
 
                 // Clear the other weak_ptr
-                other.cb_->decrement_local_weak_and_destroy_if_zero();
+                other.cb_->decrement_weak_and_destroy_if_zero();
                 other.cb_ = nullptr;
                 other.ptr_for_lock_ = nullptr;
             }
@@ -1038,7 +1047,7 @@ namespace rpc
             , ptr_for_lock_(r.internal_get_ptr())
         {
             if (cb_)
-                cb_->increment_local_weak();
+                cb_->increment_weak();
         }
 
         weak_ptr(const weak_ptr& r) noexcept
@@ -1046,7 +1055,7 @@ namespace rpc
             , ptr_for_lock_(r.ptr_for_lock_)
         {
             if (cb_)
-                cb_->increment_local_weak();
+                cb_->increment_weak();
         }
         template<typename Y, typename = std::enable_if_t<is_pointer_compatible<Y>::value>>
         weak_ptr(const weak_ptr<Y>& r) noexcept
@@ -1089,7 +1098,7 @@ namespace rpc
         ~weak_ptr()
         {
             if (cb_)
-                cb_->decrement_local_weak_and_destroy_if_zero();
+                cb_->decrement_weak_and_destroy_if_zero();
         }
 
         weak_ptr& operator=(const weak_ptr& r) noexcept
@@ -1125,16 +1134,16 @@ namespace rpc
         {
             if (!cb_)
                 return {};
-            long c = cb_->local_shared_owners.load(std::memory_order_relaxed);
+            long c = cb_->shared_owners.load(std::memory_order_relaxed);
             while (c > 0)
             {
-                if (cb_->local_shared_owners.compare_exchange_weak(
+                if (cb_->shared_owners.compare_exchange_weak(
                         c, c + 1, std::memory_order_acq_rel, std::memory_order_relaxed))
                     return shared_ptr<T>(cb_, ptr_for_lock_);
             }
             return {};
         }
-        long use_count() const noexcept { return cb_ ? cb_->local_shared_owners.load(std::memory_order_relaxed) : 0; }
+        long use_count() const noexcept { return cb_ ? cb_->shared_owners.load(std::memory_order_relaxed) : 0; }
         bool expired() const noexcept
         {
             if (!cb_)
@@ -1303,7 +1312,7 @@ namespace rpc
                     throw;
                 }
 
-                cb_ptr->increment_local_shared();
+                cb_ptr->increment_shared();
                 using result_element_type = typename shared_ptr<T>::element_type;
                 shared_ptr<T> result(static_cast<__shared_ptr_control_block::control_block_base*>(cb_ptr),
                     static_cast<result_element_type*>(cb_ptr->get_managed_object_ptr()));
@@ -1429,7 +1438,7 @@ namespace rpc
                             = const_cast<esft_element*>(static_cast<const esft_element*>(ptr_to_this_obj));
                         if (cb_for_this_obj)
                         {
-                            cb_for_this_obj->increment_local_weak();
+                            cb_for_this_obj->increment_weak();
                         }
                     }
                 }
