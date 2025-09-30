@@ -294,8 +294,9 @@ namespace rpc
                 std::atomic<long> shared_owners{0};
                 std::atomic<long> weak_owners{1};
 #ifndef TEST_STL_COMPLIANCE
+                std::atomic<long> optimistic_owners{0};
                 bool is_local = false;
-#endif            
+#endif
 
             protected:
                 void* managed_object_ptr_{nullptr};
@@ -308,7 +309,7 @@ namespace rpc
                     rpc::casting_interface* ptr = reinterpret_cast<rpc::casting_interface*>(managed_object_ptr_);
                     if(ptr)
                         is_local = ptr->is_local();
-#endif            
+#endif
                 }
 
                 control_block_base()
@@ -359,6 +360,67 @@ namespace rpc
                         }
                     }
                 }
+
+#ifndef TEST_STL_COMPLIANCE
+                // Fast increment when control block is guaranteed alive (e.g., copying from valid optimistic_ptr)
+                void increment_optimistic_no_lock() noexcept
+                {
+                    optimistic_owners.fetch_add(1, std::memory_order_relaxed);
+                }
+
+                // Safe increment when control block lifetime is uncertain (e.g., converting from shared_ptr/weak_ptr)
+                // Returns true if successful, false if control block is expired
+                bool try_increment_optimistic() noexcept
+                {
+                    // First, ensure control block stays alive during our operation
+                    long weak_count = weak_owners.load(std::memory_order_relaxed);
+
+                    do
+                    {
+                        // If weak_count is 0, control block is being/has been destroyed
+                        if (weak_count == 0)
+                        {
+                            return false;
+                        }
+                        // Try to increment weak_owners to keep control block alive
+                    } while (!weak_owners.compare_exchange_weak(weak_count, weak_count + 1,
+                                                                 std::memory_order_acquire,
+                                                                 std::memory_order_relaxed));
+
+                    // Control block is now guaranteed alive, safe to check optimistic_owners
+                    long prev = optimistic_owners.fetch_add(1, std::memory_order_relaxed);
+
+                    if (prev == 0)
+                    {
+                        // First optimistic_ptr: weak_owners already incremented above
+                        // This increment becomes the "optimistic_ptr weak_owner"
+                        // No need to call add_ref here - that will be done by the caller if needed
+                    }
+                    else
+                    {
+                        // Not the first optimistic_ptr: we pre-emptively incremented weak_owners
+                        // Undo that increment since weak_owners is only for control block lifetime
+                        decrement_weak_and_destroy_if_zero();
+                    }
+
+                    return true;
+                }
+
+                void decrement_optimistic_and_dispose_if_zero() noexcept
+                {
+                    long prev = optimistic_owners.fetch_sub(1, std::memory_order_acq_rel);
+                    // Note: No remote proxy release here - that's handled by optimistic_ptr destructor
+
+                    // If this was the last optimistic_ptr, decrement weak_owners
+                    // CRITICAL: This must be done last to prevent control block destruction
+                    // while other threads might be incrementing optimistic_owners
+                    if (prev == 1)
+                    {
+                        // Last optimistic_ptr: decrement the weak_owners that was added by first optimistic_ptr
+                        decrement_weak_and_destroy_if_zero();
+                    }
+                }
+#endif
             };
 
             template<typename T> static void* to_void_ptr(T* p)
@@ -1600,6 +1662,314 @@ namespace rpc
         return os << ptr.get();
     }
 
+#ifndef TEST_STL_COMPLIANCE
+    // Forward declaration
+    template<typename T> class optimistic_ptr;
+    template<typename T> class local_optimistic_ptr;
+
+    // optimistic_ptr<T> - Non-RAII smart pointer for RPC scenarios
+    // Weak semantics for local objects, shared semantics for remote proxies
+    template<typename T>
+    class optimistic_ptr
+    {
+        using element_type_impl = std::remove_extent_t<T>;
+
+        static_assert(!std::is_array_v<T>, "optimistic_ptr does not support array types");
+        static_assert(__rpc_internal::is_casting_interface_derived<T>::value,
+                     "optimistic_ptr can only manage casting_interface-derived types");
+
+        element_type_impl* ptr_{nullptr};
+        __rpc_internal::__shared_ptr_control_block::control_block_base* cb_{nullptr};
+
+        template<typename Y> using is_pointer_compatible = __rpc_internal::__shared_ptr_pointer_utils::sp_pointer_compatible<Y, T>;
+
+        void acquire_this() noexcept
+        {
+            if (cb_)
+                cb_->increment_optimistic_no_lock();
+        }
+
+        void release_this() noexcept
+        {
+            if (cb_)
+                cb_->decrement_optimistic_and_dispose_if_zero();
+        }
+
+    public:
+        using element_type = element_type_impl;
+
+        constexpr optimistic_ptr() noexcept = default;
+        constexpr optimistic_ptr(std::nullptr_t) noexcept {}
+
+        // Copy constructor - source is valid, control block guaranteed alive
+        optimistic_ptr(const optimistic_ptr& r) noexcept
+            : ptr_(r.ptr_)
+            , cb_(r.cb_)
+        {
+            acquire_this();
+        }
+
+        // Move constructor
+        optimistic_ptr(optimistic_ptr&& r) noexcept
+            : ptr_(r.ptr_)
+            , cb_(r.cb_)
+        {
+            r.ptr_ = nullptr;
+            r.cb_ = nullptr;
+        }
+
+        // Heterogeneous copy constructor (upcasts)
+        template<typename Y, typename = std::enable_if_t<is_pointer_compatible<Y>::value>>
+        optimistic_ptr(const optimistic_ptr<Y>& r) noexcept
+            : ptr_(static_cast<element_type_impl*>(r.ptr_))
+            , cb_(r.cb_)
+        {
+            acquire_this();
+        }
+
+        // Heterogeneous move constructor
+        template<typename Y, typename = std::enable_if_t<is_pointer_compatible<Y>::value>>
+        optimistic_ptr(optimistic_ptr<Y>&& r) noexcept
+            : ptr_(static_cast<element_type_impl*>(r.ptr_))
+            , cb_(r.cb_)
+        {
+            r.ptr_ = nullptr;
+            r.cb_ = nullptr;
+        }
+
+        // Construct from shared_ptr - control block lifetime uncertain
+        explicit optimistic_ptr(const shared_ptr<T>& sp) noexcept
+            : ptr_(nullptr)
+            , cb_(nullptr)
+        {
+            if (sp && sp.cb_ && sp.cb_->try_increment_optimistic())
+            {
+                cb_ = sp.cb_;
+                ptr_ = sp.ptr_;
+            }
+        }
+
+        // Construct from weak_ptr
+        explicit optimistic_ptr(const weak_ptr<T>& wp) noexcept
+            : ptr_(nullptr)
+            , cb_(nullptr)
+        {
+            // weak_ptr has cb_ member we can access via friend
+            auto cb = wp.cb_;
+            if (cb && cb->try_increment_optimistic())
+            {
+                cb_ = cb;
+                ptr_ = wp.ptr_;
+            }
+        }
+
+        ~optimistic_ptr() noexcept
+        {
+            release_this();
+        }
+
+        // Copy assignment
+        optimistic_ptr& operator=(const optimistic_ptr& r) noexcept
+        {
+            optimistic_ptr(r).swap(*this);
+            return *this;
+        }
+
+        // Move assignment
+        optimistic_ptr& operator=(optimistic_ptr&& r) noexcept
+        {
+            optimistic_ptr(std::move(r)).swap(*this);
+            return *this;
+        }
+
+        // Heterogeneous copy assignment
+        template<typename Y, typename = std::enable_if_t<is_pointer_compatible<Y>::value>>
+        optimistic_ptr& operator=(const optimistic_ptr<Y>& r) noexcept
+        {
+            optimistic_ptr(r).swap(*this);
+            return *this;
+        }
+
+        // Heterogeneous move assignment
+        template<typename Y, typename = std::enable_if_t<is_pointer_compatible<Y>::value>>
+        optimistic_ptr& operator=(optimistic_ptr<Y>&& r) noexcept
+        {
+            optimistic_ptr(std::move(r)).swap(*this);
+            return *this;
+        }
+
+        optimistic_ptr& operator=(std::nullptr_t) noexcept
+        {
+            reset();
+            return *this;
+        }
+
+        // Access operators - work for both local and remote objects
+        element_type_impl* operator->() const noexcept { return ptr_; }
+        element_type_impl& operator*() const noexcept { return *ptr_; }
+        element_type_impl* get() const noexcept { return ptr_; }
+
+        explicit operator bool() const noexcept { return ptr_ != nullptr; }
+
+        void reset() noexcept
+        {
+            optimistic_ptr().swap(*this);
+        }
+
+        void swap(optimistic_ptr& r) noexcept
+        {
+            std::swap(ptr_, r.ptr_);
+            std::swap(cb_, r.cb_);
+        }
+
+        long use_count() const noexcept
+        {
+            return cb_ ? cb_->shared_owners.load(std::memory_order_relaxed) : 0;
+        }
+
+        bool unique() const noexcept
+        {
+            return use_count() == 1;
+        }
+
+        // Internal access for friends
+        __rpc_internal::__shared_ptr_control_block::control_block_base* internal_get_cb() const noexcept { return cb_; }
+        element_type_impl* internal_get_ptr() const noexcept { return ptr_; }
+
+        template<typename Y> friend class optimistic_ptr;
+        template<typename Y> friend class shared_ptr;
+        template<typename Y> friend class weak_ptr;
+        template<typename Y> friend class local_optimistic_ptr;
+    };
+
+    // local_optimistic_ptr<T> - Temporary RAII lock for calling through optimistic_ptr
+    // Stack-only usage - NOT for use as class member
+    template<typename T>
+    class local_optimistic_ptr
+    {
+        using element_type_impl = std::remove_extent_t<T>;
+
+        T* ptr_{nullptr};
+        shared_ptr<T> local_lock_;  // Only set if object is local (RAII lock)
+
+    public:
+        // Constructor from optimistic_ptr
+        explicit local_optimistic_ptr(const optimistic_ptr<T>& opt) noexcept
+            : ptr_(nullptr)
+        {
+            if (!opt)
+            {
+                return;
+            }
+
+            auto cb = opt.internal_get_cb();
+            if (cb && cb->is_local)
+            {
+                // Local object - create temporary shared_ptr to RAII lock it
+                // Try to increment shared_owners
+                if (cb->try_increment_shared())
+                {
+                    local_lock_.ptr_ = opt.internal_get_ptr();
+                    local_lock_.cb_ = cb;
+                    ptr_ = local_lock_.ptr_;
+                }
+            }
+            else
+            {
+                // Remote object - just store the pointer (no RAII lock needed)
+                ptr_ = opt.internal_get_ptr();
+            }
+        }
+
+        // Default constructor
+        constexpr local_optimistic_ptr() noexcept = default;
+
+        // Assignment from optimistic_ptr
+        local_optimistic_ptr& operator=(const optimistic_ptr<T>& opt) noexcept
+        {
+            local_optimistic_ptr temp(opt);
+            swap(temp);
+            return *this;
+        }
+
+        // Move constructor
+        local_optimistic_ptr(local_optimistic_ptr&& other) noexcept
+            : ptr_(other.ptr_)
+            , local_lock_(std::move(other.local_lock_))
+        {
+            other.ptr_ = nullptr;
+        }
+
+        // Move assignment
+        local_optimistic_ptr& operator=(local_optimistic_ptr&& other) noexcept
+        {
+            local_optimistic_ptr temp(std::move(other));
+            swap(temp);
+            return *this;
+        }
+
+        // Delete copy constructor and assignment (prevent accidental copies)
+        local_optimistic_ptr(const local_optimistic_ptr&) = delete;
+        local_optimistic_ptr& operator=(const local_optimistic_ptr&) = delete;
+
+        ~local_optimistic_ptr() = default;  // RAII: local_lock_ releases automatically
+
+        // Access operators - return valid pointer to local object or remote proxy
+        T* operator->() const noexcept { return ptr_; }
+        T& operator*() const noexcept { return *ptr_; }
+        T* get() const noexcept { return ptr_; }
+
+        explicit operator bool() const noexcept { return ptr_ != nullptr; }
+
+        void swap(local_optimistic_ptr& other) noexcept
+        {
+            std::swap(ptr_, other.ptr_);
+            local_lock_.swap(other.local_lock_);
+        }
+
+        // Check if this is a local object (has RAII lock)
+        bool is_local() const noexcept { return local_lock_.operator bool(); }
+    };
+
+    // Comparison operators for optimistic_ptr
+    template<typename T, typename U>
+    bool operator==(const optimistic_ptr<T>& lhs, const optimistic_ptr<U>& rhs) noexcept
+    {
+        return lhs.get() == rhs.get();
+    }
+
+    template<typename T>
+    bool operator==(const optimistic_ptr<T>& lhs, std::nullptr_t) noexcept
+    {
+        return !lhs;
+    }
+
+    template<typename T>
+    bool operator==(std::nullptr_t, const optimistic_ptr<T>& rhs) noexcept
+    {
+        return !rhs;
+    }
+
+    template<typename T, typename U>
+    bool operator!=(const optimistic_ptr<T>& lhs, const optimistic_ptr<U>& rhs) noexcept
+    {
+        return !(lhs == rhs);
+    }
+
+    template<typename T>
+    bool operator!=(const optimistic_ptr<T>& lhs, std::nullptr_t) noexcept
+    {
+        return static_cast<bool>(lhs);
+    }
+
+    template<typename T>
+    bool operator!=(std::nullptr_t, const optimistic_ptr<T>& rhs) noexcept
+    {
+        return static_cast<bool>(rhs);
+    }
+
+#endif // !TEST_STL_COMPLIANCE
+
     // NAMESPACE_INLINE_END  // Commented out to simplify
 
 #ifdef TEST_STL_COMPLIANCE
@@ -1634,5 +2004,16 @@ namespace std
             return 0;
         }
     };
+
+#ifndef TEST_STL_COMPLIANCE
+    template<typename T> struct hash<::RPC_MEMORY::optimistic_ptr<T>>
+    {
+        size_t operator()(const ::RPC_MEMORY::optimistic_ptr<T>& p) const noexcept
+        {
+            using Ptr = typename ::RPC_MEMORY::optimistic_ptr<T>::element_type*;
+            return std::hash<Ptr>()(p.get());
+        }
+    };
+#endif
 
 } // namespace std

@@ -19,7 +19,9 @@ endif()
 # common_enclave
 
 if(${BUILD_ENCLAVE})
-  add_library(common_enclave STATIC src/host_service_proxy.cpp)
+  add_library(common_enclave 
+  STATIC 
+    src/host_service_proxy.cpp)
 
   target_compile_definitions(common_enclave PRIVATE ${ENCLAVE_DEFINES})
   target_include_directories(
@@ -47,7 +49,8 @@ endif()
 
 set(SOURCES 
   ${COROUTINE_SERVICE_PROXIES}
-  src/foo_impl.cpp)
+  src/foo_impl.cpp
+  src/tests.cpp)
 if(BUILD_ENCLAVE)
   list(APPEND SOURCES src/enclave_service_proxy.cpp)
   set(ADDITIONAL_TARGET marshal_test_edl_host rpc_telemetry_edl_header_host)
@@ -69,7 +72,11 @@ target_link_libraries(
   PRIVATE rpc::rpc_host
           ${ADDITIONAL_TARGET}          
           example_idl_host
+          example_import_idl_host
+          example_shared_idl_host
           ${RPC_HOST_FMT_LIB}
+          GTest::gtest_main
+          GTest::gmock_main
           tcp_idl_host
           spsc_idl_host
           yas_common)

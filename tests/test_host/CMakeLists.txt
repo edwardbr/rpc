@@ -4,7 +4,7 @@
 ]]
 cmake_minimum_required(VERSION 3.24)
 
-add_executable(rpc_test main.cpp ${COROUTINE_TESTS})
+add_executable(rpc_test main.cpp type_test_local_suite.cpp remote_type_test_suite.cpp type_test_with_host_suite.cpp ${COROUTINE_TESTS})
 
 target_compile_definitions(rpc_test PRIVATE ${HOST_DEFINES})
 

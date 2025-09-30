@@ -5,6 +5,7 @@
 #pragma once
 
 #include <example/example.h>
+
 #include <rpc/rpc.h>
 #ifdef USE_RPC_TELEMETRY
 #include <rpc/telemetry/i_telemetry_service.h>
