@@ -350,9 +350,17 @@ TYPED_TEST(type_test, local_optimistic_ptr_raii_lock_test)
 template<class T>
 CORO_TASK(bool) optimistic_ptr_remote_shared_semantics_test(T& lib)
 {
-    // Create interface (local or remote depending on setup)
+    // Get example object (local or remote depending on setup)
+    auto example = lib.get_example();
+    CORO_ASSERT_NE(example, nullptr);
+
+    // Create foo through example (will be local or marshalled depending on setup)
+    rpc::shared_ptr<xxx::i_foo> f;
+    CORO_ASSERT_EQ(CO_AWAIT example->create_foo(f), 0);
+    CORO_ASSERT_NE(f, nullptr);
+
+    // Create baz interface (local or marshalled depending on setup)
     rpc::shared_ptr<xxx::i_baz> baz;
-    auto f = rpc::shared_ptr<xxx::i_foo>(new foo());
     CORO_ASSERT_EQ(CO_AWAIT f->create_baz_interface(baz), 0);
     CORO_ASSERT_NE(baz, nullptr);
 
@@ -375,6 +383,7 @@ CORO_TASK(bool) optimistic_ptr_remote_shared_semantics_test(T& lib)
         // opt_baz pointer remains non-null but object is deleted
         CORO_ASSERT_NE(opt_baz, nullptr);  // Pointer still exists
         // Cannot safely call methods - object is deleted (this is expected behavior)
+        // (local_optimistic_ptr RAII locking is tested separately in test 3)
     }
     else
     {
@@ -383,9 +392,20 @@ CORO_TASK(bool) optimistic_ptr_remote_shared_semantics_test(T& lib)
         CORO_ASSERT_NE(opt_baz, nullptr);
         CORO_ASSERT_EQ(opt_baz.get(), raw_ptr);
 
-        // Can still call through optimistic_ptr (call baz's callback method)
+        // Can call through optimistic_ptr directly (shared semantics keep proxy alive)
         auto error = CO_AWAIT opt_baz->callback(42);
         CORO_ASSERT_EQ(error, 0);
+
+        // Also test with local_optimistic_ptr (should passthrough for remote)
+        {
+            rpc::local_optimistic_ptr<xxx::i_baz> local_opt_baz(opt_baz);
+            CORO_ASSERT_EQ(static_cast<bool>(local_opt_baz), true);
+            CORO_ASSERT_EQ(local_opt_baz.is_local(), false);  // Remote passthrough
+
+            // Can call through local_optimistic_ptr (just a passthrough)
+            auto error2 = CO_AWAIT local_opt_baz->callback(43);
+            CORO_ASSERT_EQ(error2, 0);
+        }
     }
 
     CO_RETURN true;
@@ -400,9 +420,17 @@ TYPED_TEST(type_test, optimistic_ptr_remote_shared_semantics_test)
 template<class T>
 CORO_TASK(bool) local_optimistic_ptr_remote_passthrough_test(T& lib)
 {
-    // Create interface (local or remote depending on setup)
+    // Get example object (local or remote depending on setup)
+    auto example = lib.get_example();
+    CORO_ASSERT_NE(example, nullptr);
+
+    // Create foo through example (will be local or marshalled depending on setup)
+    rpc::shared_ptr<xxx::i_foo> f;
+    CORO_ASSERT_EQ(CO_AWAIT example->create_foo(f), 0);
+    CORO_ASSERT_NE(f, nullptr);
+
+    // Create baz interface (local or marshalled depending on setup)
     rpc::shared_ptr<xxx::i_baz> baz;
-    auto f = rpc::shared_ptr<xxx::i_foo>(new foo());
     CORO_ASSERT_EQ(CO_AWAIT f->create_baz_interface(baz), 0);
     CORO_ASSERT_NE(baz, nullptr);
 
@@ -417,14 +445,30 @@ CORO_TASK(bool) local_optimistic_ptr_remote_passthrough_test(T& lib)
     if (is_local)
     {
         // Test local_optimistic_ptr RAII locking for LOCAL objects
-        // This was already tested in test 3, so just verify it's local
-        rpc::local_optimistic_ptr<xxx::i_baz> local_opt_baz(opt_baz);
-        CORO_ASSERT_EQ(static_cast<bool>(local_opt_baz), true);
-        CORO_ASSERT_EQ(local_opt_baz.is_local(), true);
+        // Keep baz alive initially so we can test with local_optimistic_ptr
+        {
+            // Create local_optimistic_ptr - this should create RAII lock
+            rpc::local_optimistic_ptr<xxx::i_baz> local_opt_baz(opt_baz);
+            CORO_ASSERT_EQ(static_cast<bool>(local_opt_baz), true);
+            CORO_ASSERT_EQ(local_opt_baz.is_local(), true);
+
+            // Clear the shared_ptr - but local_optimistic_ptr has RAII lock
+            baz.reset();
+
+            // Object is locked - can safely call methods even though shared_ptr is gone
+            auto error = CO_AWAIT local_opt_baz->callback(43);
+            CORO_ASSERT_EQ(error, 0);
+        } // RAII lock released here
+
+        // After local_optimistic_ptr destroyed, object may be deleted
+        // (if no other references exist)
     }
     else
     {
         // Test local_optimistic_ptr PASSTHROUGH for REMOTE objects
+        // Clear the shared_ptr - opt_baz keeps proxy alive via shared semantics
+        baz.reset();
+
         {
             // Create local_optimistic_ptr from remote optimistic_ptr
             rpc::local_optimistic_ptr<xxx::i_baz> local_opt_baz(opt_baz);
@@ -434,12 +478,12 @@ CORO_TASK(bool) local_optimistic_ptr_remote_passthrough_test(T& lib)
             // Should just passthrough to the remote proxy (no RAII lock)
             CORO_ASSERT_EQ(local_opt_baz.get(), opt_baz.get());
 
-            // Can call through local_optimistic_ptr
+            // Can call through local_optimistic_ptr (passthrough)
             auto error = CO_AWAIT local_opt_baz->callback(43);
             CORO_ASSERT_EQ(error, 0);
         }
 
-        // Remote proxy still accessible through opt_baz
+        // Remote proxy still accessible through opt_baz after local_optimistic_ptr destroyed
         auto error = CO_AWAIT opt_baz->callback(44);
         CORO_ASSERT_EQ(error, 0);
     }
@@ -456,9 +500,14 @@ TYPED_TEST(type_test, local_optimistic_ptr_remote_passthrough_test)
 template<class T>
 CORO_TASK(bool) optimistic_ptr_transparent_access_test(T& lib)
 {
+    auto example = lib.get_example();
     // Test 1: Local object access
     {
-        auto f_local = rpc::shared_ptr<xxx::i_foo>(new foo());
+        // Create interface (local or remote depending on setup)
+        rpc::shared_ptr<xxx::i_foo> f_local;
+        CORO_ASSERT_EQ(CO_AWAIT example->create_foo(f_local), 0);
+        CORO_ASSERT_NE(f_local, nullptr);
+            
         rpc::optimistic_ptr<xxx::i_foo> opt_f_local(f_local);
 
         // operator-> works transparently for local object
@@ -469,10 +518,11 @@ CORO_TASK(bool) optimistic_ptr_transparent_access_test(T& lib)
 
     // Test 2: Remote object access
     {
+                // Create interface (local or remote depending on setup)
         rpc::shared_ptr<xxx::i_baz> baz;
-        auto f = rpc::shared_ptr<xxx::i_foo>(new foo());
-        CORO_ASSERT_EQ(CO_AWAIT f->create_baz_interface(baz), 0);
-
+        CORO_ASSERT_EQ(CO_AWAIT example->create_baz(baz), 0);
+        CORO_ASSERT_NE(baz, nullptr);
+            
         rpc::optimistic_ptr<xxx::i_baz> opt_baz(baz);
 
         // operator-> works transparently for remote proxy
@@ -494,14 +544,20 @@ TYPED_TEST(type_test, optimistic_ptr_transparent_access_test)
 }
 
 // Test 7: Circular dependency resolution use case
-CORO_TASK(bool) optimistic_ptr_circular_dependency_test(std::shared_ptr<rpc::service> root_service)
+template<class T>
+CORO_TASK(bool) optimistic_ptr_circular_dependency_test(T& lib)
 {
     // Simulate circular dependency scenario:
     // - Host owns children (shared_ptr)
     // - Children hold optimistic_ptr to host (no RAII ownership)
 
-    // Create host (use foo implementation)
-    auto host = rpc::shared_ptr<xxx::i_foo>(new foo());
+    // Get example object (local or remote depending on setup)
+    auto example = lib.get_example();
+    CORO_ASSERT_NE(example, nullptr);
+
+    // Create host (will be local or marshalled depending on setup)
+    rpc::shared_ptr<xxx::i_foo> host;
+    CORO_ASSERT_EQ(CO_AWAIT example->create_foo(host), 0);
     CORO_ASSERT_NE(host, nullptr);
 
     // Create child
@@ -525,21 +581,25 @@ CORO_TASK(bool) optimistic_ptr_circular_dependency_test(std::shared_ptr<rpc::ser
 
 TYPED_TEST(type_test, optimistic_ptr_circular_dependency_test)
 {
-    auto& lib = this->get_lib();
-    auto root_service = lib.get_root_service();
-    run_coro_test(*this,
-        [root_service](auto& lib)
-        {
-            (void)lib;
-            return optimistic_ptr_circular_dependency_test(root_service);
-        });
+    run_coro_test(*this, [](auto& lib) { return optimistic_ptr_circular_dependency_test(lib); });
 }
 
 // Test 8: Comparison and nullptr operations
-CORO_TASK(bool) optimistic_ptr_comparison_test(std::shared_ptr<rpc::service> root_service)
+template<class T>
+CORO_TASK(bool) optimistic_ptr_comparison_test(T& lib)
 {
-    auto f1 = rpc::shared_ptr<xxx::i_foo>(new foo());
-    auto f2 = rpc::shared_ptr<xxx::i_foo>(new foo());
+    // Get example object (local or remote depending on setup)
+    auto example = lib.get_example();
+    CORO_ASSERT_NE(example, nullptr);
+
+    // Create two separate foo objects
+    rpc::shared_ptr<xxx::i_foo> f1;
+    CORO_ASSERT_EQ(CO_AWAIT example->create_foo(f1), 0);
+    CORO_ASSERT_NE(f1, nullptr);
+
+    rpc::shared_ptr<xxx::i_foo> f2;
+    CORO_ASSERT_EQ(CO_AWAIT example->create_foo(f2), 0);
+    CORO_ASSERT_NE(f2, nullptr);
 
     rpc::optimistic_ptr<xxx::i_foo> opt_f1(f1);
     rpc::optimistic_ptr<xxx::i_foo> opt_f2(f2);
@@ -566,23 +626,24 @@ CORO_TASK(bool) optimistic_ptr_comparison_test(std::shared_ptr<rpc::service> roo
 
 TYPED_TEST(type_test, optimistic_ptr_comparison_test)
 {
-    auto& lib = this->get_lib();
-    auto root_service = lib.get_root_service();
-    run_coro_test(*this,
-        [root_service](auto& lib)
-        {
-            (void)lib;
-            return optimistic_ptr_comparison_test(root_service);
-        });
+    run_coro_test(*this, [](auto& lib) { return optimistic_ptr_comparison_test(lib); });
 }
 
 // Test 9: Heterogeneous upcast (statically verifiable)
 template<class T>
 CORO_TASK(bool) optimistic_ptr_heterogeneous_upcast_test(T& lib)
 {
+    // Get example object (local or remote depending on setup)
+    auto example = lib.get_example();
+    CORO_ASSERT_NE(example, nullptr);
+
+    // Create foo through example (will be local or marshalled depending on setup)
+    rpc::shared_ptr<xxx::i_foo> f;
+    CORO_ASSERT_EQ(CO_AWAIT example->create_foo(f), 0);
+    CORO_ASSERT_NE(f, nullptr);
+
     // Create a baz object (implements both i_baz and i_bar)
     rpc::shared_ptr<xxx::i_baz> baz;
-    auto f = rpc::shared_ptr<xxx::i_foo>(new foo());
     CORO_ASSERT_EQ(CO_AWAIT f->create_baz_interface(baz), 0);
     CORO_ASSERT_NE(baz, nullptr);
 
@@ -606,9 +667,16 @@ TYPED_TEST(type_test, optimistic_ptr_heterogeneous_upcast_test)
 }
 
 // Test 10: Multiple optimistic_ptr instances to same object
-CORO_TASK(bool) optimistic_ptr_multiple_refs_test(std::shared_ptr<rpc::service> root_service)
+template<class T>
+CORO_TASK(bool) optimistic_ptr_multiple_refs_test(T& lib)
 {
-    auto f = rpc::shared_ptr<xxx::i_foo>(new foo());
+    // Get example object (local or remote depending on setup)
+    auto example = lib.get_example();
+    CORO_ASSERT_NE(example, nullptr);
+
+    // Create foo through example (will be local or marshalled depending on setup)
+    rpc::shared_ptr<xxx::i_foo> f;
+    CORO_ASSERT_EQ(CO_AWAIT example->create_foo(f), 0);
     CORO_ASSERT_NE(f, nullptr);
 
     // Create multiple optimistic_ptr instances to same object
@@ -633,14 +701,7 @@ CORO_TASK(bool) optimistic_ptr_multiple_refs_test(std::shared_ptr<rpc::service> 
 
 TYPED_TEST(type_test, optimistic_ptr_multiple_refs_test)
 {
-    auto& lib = this->get_lib();
-    auto root_service = lib.get_root_service();
-    run_coro_test(*this,
-        [root_service](auto& lib)
-        {
-            (void)lib;
-            return optimistic_ptr_multiple_refs_test(root_service);
-        });
+    run_coro_test(*this, [](auto& lib) { return optimistic_ptr_multiple_refs_test(lib); });
 }
 
 #endif // TEST_STL_COMPLIANCE
