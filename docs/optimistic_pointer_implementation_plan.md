@@ -2,16 +2,30 @@
 
 ## Overview
 
-This document outlines the plan for implementing `rpc::optimistic_ptr<T>` - a smart pointer optimized for RPC scenarios where objects are expected to be local most of the time but may occasionally be remote. The optimistic pointer provides better performance than `rpc::shared_ptr<T>` for predominantly local access patterns.
+This document outlines the plan for implementing `rpc::optimistic_ptr<T>` - a smart pointer optimized for RPC scenarios where objects are expected to be remote most of the time but may occasionally be local. The optimistic pointer is a callable non-RAII pointer that provides a non-locking alternative to `rpc::shared_ptr<T>`. It works transparently for both local and remote objects through their interface proxies.
+
+**Key Features**:
+- **Weak semantics for local objects**: Does not keep local objects alive (optimistic_owners doesn't prevent deletion)
+- **Shared semantics for remote proxies**: Keeps remote interface_proxy objects alive to prevent premature cleanup
+- **Direct callable**: `operator->` works for both local objects and remote proxies without exceptions
+- **Non-locking calls**: Locking happens remotely only if the destination object exists
+- **Circular dependency resolution**: Children can hold optimistic_ptr to host without RAII ownership
+
+**Use Cases**:
+- **Stateless services**: e.g., REST services where object lifetime is not client-managed
+- **Circular dependencies**: Host owns children (shared_ptr), children call host (optimistic_ptr)
+- **Optional RAII locking**: Use `local_optimistic_ptr` for temporary RAII lock on local objects during call scope
 
 ## Design Goals
 
 ### Primary Objectives
-1. **Local Access Optimization**: Minimize overhead for local object access (direct pointer dereference)
-2. **Transparent Remote Fallback**: Seamlessly handle remote objects when local assumption fails
-3. **Reference Counting**: Maintain proper object lifetime management across local/remote boundaries
-4. **Type Safety**: Preserve strong typing and casting_interface requirements
-5. **Thread Safety**: Safe concurrent access in multi-threaded RPC scenarios
+1. **Non-Locking Remote Calls**: Enable RPC calls without locking on the caller's side - locking happens remotely only if destination object exists
+2. **Stateless Service Support**: Optimize for stateless services (e.g., REST services) where object lifetime is not client-managed
+3. **Circular Dependency Resolution**: Handle scenarios where children should not hold RAII pointers to their owner (e.g., host owns children, children call host without locking)
+4. **Weak Pointer Semantics for Local Objects**: Local objects can be deleted regardless of optimistic reference count
+5. **Shared Pointer Semantics for Remote Objects**: Remote object proxies are kept alive by optimistic references to prevent premature cleanup
+6. **Type Safety**: Preserve strong typing and casting_interface requirements
+7. **Thread Safety**: Safe concurrent access in multi-threaded RPC scenarios
 
 ### Performance Targets
 - **Local Access**: Near-native pointer performance (single indirection)
@@ -35,29 +49,167 @@ private:
     template<typename Y, typename = std::enable_if_t<std::is_same_v<Y, void>>>
     explicit optimistic_ptr(Y* p);
 
+    // Helper methods for internal conversions (called by conversion functions)
+    friend template<typename T2, typename U> CORO_TASK(optimistic_ptr<T2>) convert_to_optimistic(const shared_ptr<U>&);
+    void internal_construct_from_shared(const shared_ptr<T>& sp);
+
 public:
-    // Standard shared_ptr-like interface
-    T* operator->() const;  // Throws bad_local_object if !is_local
-    T& operator*() const;   // Throws bad_local_object if !is_local
-    T* get() const;         // Throws bad_local_object if !is_local
+    // Same-type constructors and assignments (synchronous)
+    constexpr optimistic_ptr() noexcept = default;
+    constexpr optimistic_ptr(std::nullptr_t) noexcept;
+    optimistic_ptr(const optimistic_ptr<T>& r) noexcept;
+    optimistic_ptr(optimistic_ptr<T>&& r) noexcept;
+    optimistic_ptr& operator=(const optimistic_ptr<T>& r) noexcept;
+    optimistic_ptr& operator=(optimistic_ptr<T>&& r) noexcept;
+    optimistic_ptr& operator=(std::nullptr_t) noexcept;
+    ~optimistic_ptr();
 
-    // Assignment and conversion with shared_ptr and weak_ptr
-    optimistic_ptr& operator=(const shared_ptr<T>& r) noexcept;
-    optimistic_ptr& operator=(const weak_ptr<T>& r) noexcept;
-    optimistic_ptr(const shared_ptr<T>& r) noexcept;
-    optimistic_ptr(const weak_ptr<T>& r) noexcept;
+    // Heterogeneous constructors and assignments (statically verifiable upcasts)
+    template<typename Y, typename = std::enable_if_t<is_pointer_compatible<Y>::value>>
+    optimistic_ptr(const optimistic_ptr<Y>& r) noexcept;
 
-    // All operators and hash support identical to shared_ptr
+    template<typename Y, typename = std::enable_if_t<is_pointer_compatible<Y>::value>>
+    optimistic_ptr(optimistic_ptr<Y>&& r) noexcept;
+
+    template<typename Y, typename = std::enable_if_t<is_pointer_compatible<Y>::value>>
+    optimistic_ptr& operator=(const optimistic_ptr<Y>& r) noexcept;
+
+    template<typename Y, typename = std::enable_if_t<is_pointer_compatible<Y>::value>>
+    optimistic_ptr& operator=(optimistic_ptr<Y>&& r) noexcept;
+
+    // For downcasts, use async dynamic_cast_optimistic instead
+
+    // Standard interface - works for both local and remote objects
+    T* operator->() const noexcept;  // Returns pointer (local object or remote proxy)
+    T& operator*() const noexcept;   // Returns reference
+    T* get() const noexcept;         // Returns pointer
+
+    // Utility methods (identical to shared_ptr)
+    void reset() noexcept;
+    void swap(optimistic_ptr& r) noexcept;
     long use_count() const noexcept;
     bool unique() const noexcept;
     explicit operator bool() const noexcept;
+
+    // Comparison support
+    template<typename Y> bool owner_before(const optimistic_ptr<Y>& other) const noexcept;
+    template<typename Y> bool owner_before(const shared_ptr<Y>& other) const noexcept;
+
+    // Internal access for friend functions
+    __rpc_internal::__shared_ptr_control_block::control_block_base* internal_get_cb() const { return cb_; }
+    element_type_impl* internal_get_ptr() const { return ptr_; }
+
+    template<typename U> friend class optimistic_ptr;
+    template<typename U> friend class shared_ptr;
 };
 
-// Exception thrown when accessing non-local objects
-class bad_local_object : public std::exception {
+// Note: No bad_local_object exception needed
+// optimistic_ptr works transparently for both local and remote objects
+
+// Local optimistic pointer - temporary RAII lock for making optimistic calls
+template<typename T>
+class local_optimistic_ptr {
+private:
+    T* ptr_{nullptr};
+    shared_ptr<T> local_lock_;  // Only set if object is local (RAII lock)
+
+    // MUST NOT be a member of another class - stack-only usage
+    static_assert(true, "local_optimistic_ptr is for stack use only");
+
 public:
-    const char* what() const noexcept override { return "bad_local_object"; }
+    // Constructor from optimistic_ptr
+    explicit local_optimistic_ptr(const optimistic_ptr<T>& opt) noexcept {
+        if (!opt) {
+            ptr_ = nullptr;
+            return;
+        }
+
+        auto cb = opt.internal_get_cb();
+        if (cb && cb->is_local) {
+            // Local object - create temporary shared_ptr to RAII lock it
+            local_lock_ = shared_ptr<T>(cb, opt.internal_get_ptr());
+            local_lock_.internal_get_cb()->increment_shared();
+            ptr_ = local_lock_.get();
+        } else {
+            // Remote object - just store the pointer (no RAII lock needed)
+            ptr_ = opt.internal_get_ptr();
+        }
+    }
+
+    // Assignment from optimistic_ptr
+    local_optimistic_ptr& operator=(const optimistic_ptr<T>& opt) noexcept {
+        local_optimistic_ptr temp(opt);
+        swap(temp);
+        return *this;
+    }
+
+    // Move constructor
+    local_optimistic_ptr(local_optimistic_ptr&& other) noexcept
+        : ptr_(other.ptr_)
+        , local_lock_(std::move(other.local_lock_))
+    {
+        other.ptr_ = nullptr;
+    }
+
+    // Move assignment
+    local_optimistic_ptr& operator=(local_optimistic_ptr&& other) noexcept {
+        local_optimistic_ptr temp(std::move(other));
+        swap(temp);
+        return *this;
+    }
+
+    // Delete copy constructor and assignment (prevent accidental copies)
+    local_optimistic_ptr(const local_optimistic_ptr&) = delete;
+    local_optimistic_ptr& operator=(const local_optimistic_ptr&) = delete;
+
+    ~local_optimistic_ptr() = default;  // RAII: local_lock_ releases automatically
+
+    // Access operators - return valid pointer to local object or remote proxy
+    T* operator->() const noexcept { return ptr_; }
+    T& operator*() const noexcept { return *ptr_; }
+    T* get() const noexcept { return ptr_; }
+
+    explicit operator bool() const noexcept { return ptr_ != nullptr; }
+
+    void swap(local_optimistic_ptr& other) noexcept {
+        std::swap(ptr_, other.ptr_);
+        std::swap(local_lock_, other.local_lock_);
+    }
+
+    // Check if this is a local object (has RAII lock)
+    bool is_local() const noexcept { return local_lock_.operator bool(); }
 };
+
+// Async conversion functions (REQUIRED for type conversions)
+template<typename T, typename U>
+CORO_TASK(shared_ptr<T>) convert_to_shared(const shared_ptr<U>& from) noexcept;
+
+template<typename T, typename U>
+CORO_TASK(shared_ptr<T>) convert_to_shared(const optimistic_ptr<U>& from) noexcept;
+
+template<typename T, typename U>
+CORO_TASK(optimistic_ptr<T>) convert_to_optimistic(const shared_ptr<U>& from) noexcept;
+
+template<typename T, typename U>
+CORO_TASK(optimistic_ptr<T>) convert_to_optimistic(const optimistic_ptr<U>& from) noexcept;
+
+// Async casting functions
+template<typename T, typename U>
+CORO_TASK(shared_ptr<T>) dynamic_cast_shared(const shared_ptr<U>& from) noexcept;
+
+template<typename T, typename U>
+CORO_TASK(optimistic_ptr<T>) dynamic_cast_optimistic(const optimistic_ptr<U>& from) noexcept;
+
+// Synchronous casting functions (local aliasing only)
+template<typename T, typename U>
+optimistic_ptr<T> static_pointer_cast(const optimistic_ptr<U>& r) noexcept;
+
+template<typename T, typename U>
+optimistic_ptr<T> const_pointer_cast(const optimistic_ptr<U>& r) noexcept;
+
+template<typename T, typename U>
+optimistic_ptr<T> reinterpret_pointer_cast(const optimistic_ptr<U>& r) noexcept;
+
 #endif // !TEST_STL_COMPLIANCE
 ```
 
@@ -77,13 +229,45 @@ struct control_block_base {
 
 #ifndef TEST_STL_COMPLIANCE
     // NEW: Optimistic reference counting with dual ownership model
-    void increment_optimistic() {
+    // This function must be called when control block is guaranteed to be alive
+    // (e.g., from optimistic_ptr copy constructor when source is valid)
+    void increment_optimistic_no_lock() {
+        optimistic_owners.fetch_add(1, std::memory_order_relaxed);
+    }
+
+    // Safe increment when control block lifetime is uncertain
+    // Returns true if successful, false if control block is expired
+    bool try_increment_optimistic() {
+        // First, ensure control block stays alive during our operation
+        long weak_count = weak_owners.load(std::memory_order_relaxed);
+
+        do {
+            // If weak_count is 0, control block is being/has been destroyed
+            if (weak_count == 0) {
+                return false;
+            }
+            // Try to increment weak_owners to keep control block alive
+        } while (!weak_owners.compare_exchange_weak(weak_count, weak_count + 1,
+                                                     std::memory_order_acquire,
+                                                     std::memory_order_relaxed));
+
+        // Control block is now guaranteed alive, safe to check optimistic_owners
         long prev = optimistic_owners.fetch_add(1, std::memory_order_relaxed);
-        if (prev == 0 && !is_local) {
-            // Remote objects: optimistic_ptr participates in lifetime management
-            get_object_proxy_from_interface()->add_ref(add_ref_options::optimistic);
+
+        if (prev == 0) {
+            // First optimistic_ptr: weak_owners already incremented above
+            // This increment becomes the "optimistic_ptr weak_owner"
+            if (!is_local) {
+                // Remote objects: optimistic_ptr participates in remote proxy lifetime management
+                get_object_proxy_from_interface()->add_ref(add_ref_options::optimistic);
+            }
+        } else {
+            // Not the first optimistic_ptr: we pre-emptively incremented weak_owners
+            // Undo that increment since weak_owners is only for control block lifetime
+            decrement_weak_and_destroy_if_zero();
         }
-        // Local objects: optimistic_ptr behaves like weak_ptr, no lifetime management
+
+        return true;
     }
 
     void decrement_optimistic_and_dispose_if_zero() {
@@ -94,6 +278,14 @@ struct control_block_base {
         }
         // Local objects: Do NOT prevent disposal when shared_owners == 0
         // Object can be deleted regardless of optimistic_owners count
+
+        // If this was the last optimistic_ptr, decrement weak_owners
+        // CRITICAL: This must be done last to prevent control block destruction
+        // while other threads might be incrementing optimistic_owners
+        if (prev == 1) {
+            // Last optimistic_ptr: decrement the weak_owners that was added by first optimistic_ptr
+            decrement_weak_and_destroy_if_zero();
+        }
     }
 
     // Enhanced shared reference counting with conditional optimistic logic
@@ -139,7 +331,153 @@ private:
 - **Complete Hiding**: `optimistic_ptr` class entirely hidden when `TEST_STL_COMPLIANCE` defined
 - **Control Block Fields**: `optimistic_owners` and `is_local` hidden during STL testing
 - **Method Implementations**: Optimistic logic conditionally compiled out
-- **Exception Classes**: `bad_local_object` hidden during STL compliance testing
+- **No Exception Classes**: No `bad_local_object` exception - optimistic_ptr works transparently
+
+#### 2b. Updated shared_ptr<T> Class (Breaking Changes)
+Updated `shared_ptr` to remove heterogeneous constructors/assignments and require async conversions:
+
+```cpp
+template<typename T>
+class shared_ptr {
+private:
+    element_type_impl* ptr_{nullptr};
+    __rpc_internal::__shared_ptr_control_block::control_block_base* cb_{nullptr};
+
+    // Helper methods for internal conversions (called by conversion functions)
+    friend template<typename T2, typename U> CORO_TASK(shared_ptr<T2>) convert_to_shared(const optimistic_ptr<U>&);
+    void internal_construct_from_optimistic(const optimistic_ptr<T>& op);
+
+public:
+    // Same-type constructors and assignments (synchronous - KEPT)
+    constexpr shared_ptr() noexcept = default;
+    constexpr shared_ptr(std::nullptr_t) noexcept;
+
+    // Raw pointer constructors (kept)
+    template<typename Y, typename = std::enable_if_t<is_ptr_convertible<Y>::value>>
+    explicit shared_ptr(Y* p);
+
+    template<typename Y, typename Deleter, typename = std::enable_if_t<is_ptr_convertible<Y>::value>>
+    shared_ptr(Y* p, Deleter d);
+
+    template<typename Y, typename Deleter, typename Alloc, typename = std::enable_if_t<is_ptr_convertible<Y>::value>>
+    shared_ptr(Y* p, Deleter d, Alloc cb_alloc);
+
+    // Same-type copy/move (synchronous - KEPT)
+    shared_ptr(const shared_ptr<T>& r) noexcept;
+    shared_ptr(shared_ptr<T>&& r) noexcept;
+    shared_ptr& operator=(const shared_ptr<T>& r) noexcept;
+    shared_ptr& operator=(shared_ptr<T>&& r) noexcept;
+    shared_ptr& operator=(std::nullptr_t) noexcept;
+
+    // Aliasing constructors (kept)
+    template<typename Y>
+    shared_ptr(const shared_ptr<Y>& r, element_type* p_alias) noexcept;
+
+    template<typename Y>
+    shared_ptr(shared_ptr<Y>&& r, element_type* p_alias) noexcept;
+
+    // Heterogeneous copy/move constructors (kept - standard shared_ptr behavior)
+    template<typename Y, typename = std::enable_if_t<is_pointer_compatible<Y>::value>>
+    shared_ptr(const shared_ptr<Y>& r) noexcept;
+
+    template<typename Y, typename = std::enable_if_t<is_pointer_compatible<Y>::value>>
+    shared_ptr(shared_ptr<Y>&& r) noexcept;
+
+    // Heterogeneous assignments (kept - standard shared_ptr behavior)
+    template<typename Y, typename = std::enable_if_t<is_pointer_compatible<Y>::value>>
+    shared_ptr& operator=(const shared_ptr<Y>& r) noexcept;
+
+    template<typename Y, typename = std::enable_if_t<is_pointer_compatible<Y>::value>>
+    shared_ptr& operator=(shared_ptr<Y>&& r) noexcept;
+
+    // Weak pointer constructor (kept)
+    template<typename Y, typename = std::enable_if_t<is_pointer_compatible<Y>::value>>
+    explicit shared_ptr(const weak_ptr<Y>& r);
+
+    ~shared_ptr();
+
+    // Standard interface (kept)
+    void reset() noexcept;
+    template<typename Y, typename Deleter = default_delete<Y>, typename Alloc = std::allocator<char>>
+    void reset(Y* p, Deleter d = Deleter(), Alloc cb_alloc = Alloc());
+
+    void swap(shared_ptr& r) noexcept;
+    element_type_impl* get() const noexcept;
+    T& operator*() const noexcept;
+    T* operator->() const noexcept;
+    long use_count() const noexcept;
+    bool unique() const noexcept;
+    explicit operator bool() const noexcept;
+
+    template<typename Y> bool owner_before(const shared_ptr<Y>& other) const noexcept;
+    template<typename Y> bool owner_before(const weak_ptr<Y>& other) const noexcept;
+
+    // Internal access for friend functions
+    __rpc_internal::__shared_ptr_control_block::control_block_base* internal_get_cb() const { return cb_; }
+    element_type_impl* internal_get_ptr() const { return ptr_; }
+};
+
+// ✅ KEPT: Synchronous dynamic_pointer_cast (uses local query_interface)
+template<typename T, typename U>
+shared_ptr<T> dynamic_pointer_cast(const shared_ptr<U>& from) noexcept;
+
+// ✅ KEPT: Synchronous static pointer casts
+template<typename T, typename U>
+shared_ptr<T> static_pointer_cast(const shared_ptr<U>& r) noexcept;
+
+template<typename T, typename U>
+shared_ptr<T> const_pointer_cast(const shared_ptr<U>& r) noexcept;
+
+template<typename T, typename U>
+shared_ptr<T> reinterpret_pointer_cast(const shared_ptr<U>& r) noexcept;
+```
+
+**Key Features of shared_ptr**:
+1. ✅ **Standard semantics**: Identical to std::shared_ptr in TEST_STL_COMPLIANCE mode
+2. ✅ **Heterogeneous constructors/assignments**: All conversions work synchronously (Derived→Base, etc.)
+3. ✅ **Synchronous dynamic_pointer_cast**: Uses local query_interface for casting_interface types
+4. ✅ **Aliasing constructors**: Pointer aliasing works as in std::shared_ptr
+5. ✅ **Static/const/reinterpret casts**: All compile-time casts work synchronously
+6. ✅ **Added helper method**: `internal_construct_from_optimistic` for optimistic_ptr conversions
+7. ✅ **casting_interface requirement**: When !TEST_STL_COMPLIANCE, types must derive from casting_interface
+
+**What Works vs What Requires Async**:
+
+**✅ Synchronous (statically verifiable at compile time)**:
+```cpp
+// Upcast: Derived → Base (compile-time verifiable)
+rpc::shared_ptr<Derived> derived = get_derived();
+rpc::shared_ptr<Base> base = derived;  // ✅ Works - statically verifiable upcast
+
+// Same-type operations
+rpc::shared_ptr<Foo> foo1 = get_foo();
+rpc::shared_ptr<Foo> foo2 = foo1;  // ✅ Works - same type
+
+// Static cast (compile-time cast)
+rpc::shared_ptr<Derived> derived = get_derived();
+rpc::shared_ptr<Base> base = rpc::static_pointer_cast<Base>(derived);  // ✅ Works
+
+// Const cast
+rpc::shared_ptr<const Foo> cfoo = get_const_foo();
+rpc::shared_ptr<Foo> foo = rpc::const_pointer_cast<Foo>(cfoo);  // ✅ Works
+```
+
+**❌ Requires Async (runtime type checking needed)**:
+```cpp
+// Downcast: Base → Derived (requires runtime type check)
+rpc::shared_ptr<Base> base = get_base();
+// OLD: auto derived = rpc::dynamic_pointer_cast<Derived>(base);  // ❌ Removed
+// NEW: auto derived = CO_AWAIT rpc::dynamic_cast_shared<Derived>(base);  // ✅ Required
+
+// Cross-cast between unrelated types (requires query_interface)
+rpc::shared_ptr<Interface1> i1 = get_interface1();
+// auto i2 = CO_AWAIT rpc::dynamic_cast_shared<Interface2>(i1);  // ✅ Required
+```
+
+**Rationale**:
+- **Upcasts are safe**: Compile-time verifiable, no remote query needed
+- **Downcasts need validation**: May require remote `query_interface` call
+- **Only runtime checks require async**: If the compiler can verify it, it stays synchronous
 
 #### 3. Service Layer Architecture Changes
 
@@ -225,26 +563,64 @@ enum class object_locality {
 
 ### Dual Ownership Model
 
+#### Control Block Lifecycle Management
+**optimistic_ptr acts like weak_ptr for control block**:
+1. **First optimistic_ptr**: When `optimistic_owners` transitions from 0→1, increment `weak_owners`
+2. **Last optimistic_ptr**: When `optimistic_owners` transitions from 1→0, decrement `weak_owners` (may destroy control block)
+3. **Control block destruction**: Control block destroyed when `weak_owners` reaches 0 (no shared_ptr, weak_ptr, or optimistic_ptr exist)
+4. **Thread safety**: All reference count operations are atomic
+
 #### Local Objects (is_local == true)
 **Weak Pointer Semantics**:
-1. **No Lifetime Management**: optimistic_ptr does NOT keep local objects alive
-2. **Disposal Independence**: Object deleted when `shared_owners` reaches zero, regardless of `optimistic_owners` count
-3. **Dangling Reference Handling**: optimistic_ptr must handle cases where object is deleted while optimistic references exist
-4. **Access Behavior**: Direct access (`operator->`, `get()`) works normally for local objects
+1. **No Object Lifetime Management**: optimistic_ptr does NOT keep local objects alive
+2. **Control Block Lifetime**: optimistic_ptr DOES keep control block alive (through weak_owners)
+3. **Disposal Independence**: Object deleted when `shared_owners` reaches zero, regardless of `optimistic_owners` count
+4. **Dangling Reference Handling**: optimistic_ptr may reference deleted objects (pointer stored in control block may be stale)
+5. **Access Behavior**: Direct access (`operator->`, `get()`) returns pointer to local object or remote proxy
 
 #### Remote Objects (is_local == false)
-**Shared Pointer Semantics**:
-1. **Lifetime Management**: optimistic_ptr participates in keeping remote proxy objects alive
+**Shared Pointer Semantics for Proxy**:
+1. **Proxy Lifetime Management**: optimistic_ptr participates in keeping remote interface_proxy objects alive
 2. **Reference Counting**: Contributes to object_proxy lifecycle through add_ref/release calls
-3. **Disposal Prevention**: Remote objects kept alive while optimistic references exist
-4. **Access Behavior**: Direct access throws `bad_local_object`, must use RPC calls
+3. **Disposal Prevention**: Remote proxy objects kept alive while optimistic references exist
+4. **Access Behavior**: Direct access returns pointer to remote proxy (which makes RPC calls)
 
-#### Thread Safety Implications
-**Complex Decrement Logic**:
-1. **Race Condition Prevention**: Must handle concurrent access to both `shared_owners` and `optimistic_owners`
-2. **Atomic State Transitions**: Ensure consistent state when transitioning between zero/non-zero reference counts
-3. **Local vs Remote Logic**: Different disposal logic based on `is_local` flag requires careful synchronization
-4. **Dangling Reference Protection**: Local objects may be deleted while optimistic references exist - requires safe handling
+#### Thread Safety Implications and Race Condition Mitigation
+
+**Critical Race Conditions Addressed**:
+
+1. **Control Block Destruction Race**:
+   - **Problem**: Creating optimistic_ptr while control block is being destroyed
+   - **Solution**: Use `try_increment_optimistic()` with CAS loop on `weak_owners`
+   - **Guarantee**: Control block stays alive during optimistic_owners increment, or operation fails cleanly
+
+2. **0→1 Transition Race**:
+   - **Problem**: Multiple threads creating first optimistic_ptr simultaneously
+   - **Solution**: All threads pre-emptively increment weak_owners, only winner keeps it
+   - **Guarantee**: Exactly one weak_owners increment for 0→1 optimistic_owners transition
+
+3. **1→0 Transition Race**:
+   - **Problem**: Control block destruction while new optimistic_ptr being created
+   - **Solution**: Last optimistic_ptr decrements weak_owners, new attempts check weak_owners != 0
+   - **Guarantee**: Control block destroyed exactly once, new attempts fail gracefully
+
+**Reference Counting Invariants**:
+- `weak_owners` ≥ 1 while any (shared_ptr OR weak_ptr OR optimistic_ptr) exists
+- `weak_owners` = 1 base + count(shared_ptr > 0 || weak_ptr > 0) + bool(optimistic_owners > 0)
+- Control block destroyed when `weak_owners` reaches 0
+- Object destroyed when `shared_owners` reaches 0 (regardless of optimistic_owners for local)
+
+**Atomic Operations Order**:
+1. **increment_optimistic_no_lock**: Called when control block lifetime guaranteed (copy from valid optimistic_ptr)
+2. **try_increment_optimistic**: Called when control block lifetime uncertain (convert from shared_ptr/weak_ptr)
+   - Load weak_owners (relaxed)
+   - CAS loop: weak_owners != 0 → weak_owners + 1 (acquire on success)
+   - Increment optimistic_owners (relaxed)
+   - If prev == 0: keep weak_owners increment, else decrement it back
+3. **decrement_optimistic_and_dispose_if_zero**: Always safe due to control block guarantee
+   - Decrement optimistic_owners (acq_rel)
+   - If prev == 1 && !is_local: release remote proxy
+   - If prev == 1: decrement weak_owners (may destroy control block)
 
 ### Access Patterns
 
@@ -274,7 +650,7 @@ enum class object_locality {
 - [ ] Update `decrement_shared_and_dispose_if_zero()` for local disposal independence:
   - Dispose immediately when shared_owners reaches 0, regardless of optimistic_owners
 - [ ] Add `get_object_proxy_from_interface()` method to access object_proxy when `!is_local`
-- [ ] Add `bad_local_object` exception class (conditional compilation)
+- [ ] Remove `bad_local_object` exception class (not needed - optimistic_ptr works for both local and remote)
 - [ ] Ensure all optimistic code is hidden when `TEST_STL_COMPLIANCE` defined
 
 **Critical Requirements**:
@@ -292,34 +668,304 @@ enum class object_locality {
 - [ ] Identical memory layout to `shared_ptr` (element_type_impl* ptr_, control_block_base* cb_)
 - [ ] Constructor restrictions: no public raw pointer constructor (except void specialization)
 - [ ] Basic copy/move constructors and destructors with optimistic reference counting
+- [ ] Two increment methods for different safety guarantees:
+  - [ ] `increment_optimistic_no_lock()` - fast path when control block guaranteed alive (copy from valid optimistic_ptr)
+  - [ ] `try_increment_optimistic()` - safe path with CAS loop when control block lifetime uncertain (convert from shared_ptr/weak_ptr)
+
+**When to Use Each Increment Method**:
+```cpp
+// optimistic_ptr copy constructor - source is valid, control block guaranteed alive
+optimistic_ptr(const optimistic_ptr& other) {
+    cb_ = other.cb_;
+    ptr_ = other.ptr_;
+    if (cb_) {
+        cb_->increment_optimistic_no_lock();  // ✅ FAST PATH - control block guaranteed alive
+    }
+}
+
+// Constructor from shared_ptr - control block lifetime uncertain
+optimistic_ptr(const shared_ptr<T>& sp) {
+    if (sp) {
+        if (sp.internal_get_cb()->try_increment_optimistic()) {  // ✅ SAFE PATH - CAS loop
+            cb_ = sp.internal_get_cb();
+            ptr_ = sp.internal_get_ptr();
+        } else {
+            cb_ = nullptr;  // Control block was destroyed
+            ptr_ = nullptr;
+        }
+    }
+}
+
+// Constructor from weak_ptr - must check expiry
+optimistic_ptr(const weak_ptr<T>& wp) {
+    auto cb = wp.internal_get_cb();
+    if (cb && cb->try_increment_optimistic()) {  // ✅ SAFE PATH - may be expired
+        cb_ = cb;
+        ptr_ = wp.internal_get_ptr();
+    } else {
+        cb_ = nullptr;
+        ptr_ = nullptr;
+    }
+}
+```
 
 **Key Files**:
 - `/rpc/include/rpc/internal/remote_pointer.h` (add optimistic_ptr class)
 
-### Phase 3: Access Operations with Locality Checking
+### Phase 3: local_optimistic_ptr - Callable Optimistic Pointer
 **Deliverables**:
-- [ ] `operator->()` with `is_local` check, throws `bad_local_object` if remote
-- [ ] `operator*()` with `is_local` check, throws `bad_local_object` if remote
-- [ ] `get()` method with `is_local` check, throws `bad_local_object` if remote
+- [ ] `local_optimistic_ptr<T>` class with temporary RAII locking for local objects
+- [ ] Constructor from `optimistic_ptr<T>` with locality detection
+- [ ] Assignment operator from `optimistic_ptr<T>`
+- [ ] Move constructor and move assignment
+- [ ] Deleted copy constructor and copy assignment (prevent accidental copies)
+- [ ] `operator->()` returns valid pointer to local object or remote proxy
+- [ ] `operator*()` and `get()` methods for dereferencing
+- [ ] `is_local()` method to check if object is local (has RAII lock)
+- [ ] `operator bool()` to check for null
+
+**Key Design Constraints**:
+- **Stack use only**: MUST NOT be a member of another class
+- **Temporary RAII lock**: For local objects, creates temporary `shared_ptr` to prevent deletion during scope
+- **Remote proxy passthrough**: For remote objects, simply stores pointer without locking
+- **Move-only semantics**: Prevents accidental copies that would create multiple RAII locks
+
+**RAII Behavior**:
+```cpp
+void example(optimistic_ptr<IService> service) {
+    {
+        local_optimistic_ptr<IService> locked(service);
+        // If local: shared_owners incremented, object locked
+        // If remote: no locking, just proxy pointer
+
+        locked->do_work();  // Safe to call
+
+    } // locked destroyed here
+    // If local: shared_owners decremented, object may be deleted
+    // If remote: no reference count change
+}
+```
+
+### Phase 3b: Access Operations for optimistic_ptr (Works for Both Local and Remote)
+**Deliverables**:
+- [ ] `operator->()` returns pointer to local object or remote proxy (no exceptions)
+- [ ] `operator*()` returns reference to local object or remote proxy (no exceptions)
+- [ ] `get()` method returns pointer to local object or remote proxy (no exceptions)
 - [ ] `use_count()`, `unique()`, `operator bool()` identical to shared_ptr
 
-**Exception Behavior**:
-- All access operations must check `cb_->is_local` before allowing access
-- Throw `bad_local_object` exception for remote object access attempts
+**Behavior**:
+- All access operations work transparently for both local and remote objects
+- For local objects: returns pointer to actual local object
+- For remote objects: returns pointer to remote proxy (interface_proxy)
+- No exceptions thrown - operates like standard shared_ptr
+- `bad_local_object` exception removed (not needed with this design)
 
-### Phase 4: Interoperability with shared_ptr and weak_ptr
+### Phase 4: Pointer Conversions and Casting
+**Design Principle**: Maintain standard `shared_ptr` semantics for all operations. Heterogeneous constructors/assignments work synchronously. Dynamic casting uses local `query_interface` when available, with optional async versions for explicit remote calls.
+
 **Deliverables**:
-- [ ] Assignment operators from `shared_ptr<T>` and `weak_ptr<T>`
-- [ ] Copy constructors from `shared_ptr<T>` and `weak_ptr<T>`
-- [ ] Assignment operators to `shared_ptr<T>` and `weak_ptr<T>`
-- [ ] Proper reference count transitions between different pointer types
+- [ ] **Standard constructors and assignments (synchronous - identical to std::shared_ptr)**:
+  - [ ] `shared_ptr(const shared_ptr<T>&)` - same type copy constructor
+  - [ ] `shared_ptr(shared_ptr<T>&&)` - same type move constructor
+  - [ ] `template<typename Y> shared_ptr(const shared_ptr<Y>&)` - heterogeneous copy constructor (upcasts/downcasts)
+  - [ ] `template<typename Y> shared_ptr(shared_ptr<Y>&&)` - heterogeneous move constructor
+  - [ ] All corresponding assignment operators
+  - [ ] `optimistic_ptr(const optimistic_ptr<T>&)` - same type copy constructor
+  - [ ] `optimistic_ptr(optimistic_ptr<T>&&)` - same type move constructor
+  - [ ] `template<typename Y> optimistic_ptr(const optimistic_ptr<Y>&)` - heterogeneous copy constructor
+  - [ ] `template<typename Y> optimistic_ptr(optimistic_ptr<Y>&&)` - heterogeneous move constructor
+  - [ ] All corresponding assignment operators
 
-**Key Conversions**:
+- [ ] **Synchronous casting functions (work with both BUILD_COROUTINE on/off)**:
+  - [ ] `shared_ptr<T> static_pointer_cast(const shared_ptr<U>&)` - static cast (existing)
+  - [ ] `shared_ptr<T> const_pointer_cast(const shared_ptr<U>&)` - const cast (existing)
+  - [ ] `shared_ptr<T> reinterpret_pointer_cast(const shared_ptr<U>&)` - reinterpret cast (existing)
+  - [ ] `shared_ptr<T> dynamic_pointer_cast(const shared_ptr<U>&)` - dynamic cast using local query_interface (existing, keep as-is)
+  - [ ] `optimistic_ptr<T> static_pointer_cast(const optimistic_ptr<U>&)` - static cast for optimistic
+  - [ ] `optimistic_ptr<T> const_pointer_cast(const optimistic_ptr<U>&)` - const cast for optimistic
+  - [ ] `optimistic_ptr<T> reinterpret_pointer_cast(const optimistic_ptr<U>&)` - reinterpret cast for optimistic
+  - [ ] `optimistic_ptr<T> dynamic_pointer_cast(const optimistic_ptr<U>&)` - dynamic cast using local query_interface
+
+- [ ] **Optional async casting functions (BUILD_COROUTINE only, for explicit remote calls)**:
+  - [ ] `CORO_TASK(shared_ptr<T>) dynamic_cast_shared(const shared_ptr<U>&)` - explicit async with remote query_interface fallback
+  - [ ] `CORO_TASK(optimistic_ptr<T>) dynamic_cast_optimistic(const optimistic_ptr<U>&)` - explicit async for optimistic pointers
+
+**Key Design Principles**:
+1. ✅ **Signature compatibility**: All classes have identical signatures with/without BUILD_COROUTINE
+2. ✅ **STL compliance**: When TEST_STL_COMPLIANCE=ON, no optimistic_ptr code exists
+3. ✅ **Standard semantics**: Heterogeneous assignments work exactly like std::shared_ptr (Derived→Base works)
+4. ✅ **Local query_interface**: Existing `dynamic_pointer_cast` uses local query_interface for casting_interface types
+5. ✅ **Optional async**: Async versions are additive, for when you explicitly want remote query_interface
+6. ✅ **Non-coroutine builds**: All standard operations work identically without BUILD_COROUTINE
+
+**Usage Examples**:
 ```cpp
-optimistic_ptr<T> opt_ptr = shared_ptr_instance;  // Copy from shared_ptr
-shared_ptr<T> shared_ptr_instance = opt_ptr;      // Convert to shared_ptr
-optimistic_ptr<T> opt_ptr2 = weak_ptr_instance;   // Copy from weak_ptr
+// Standard shared_ptr semantics - all synchronous
+rpc::shared_ptr<Foo> sp1 = get_foo();
+rpc::shared_ptr<Foo> sp2 = sp1;  // ✅ Copy - same type
+
+rpc::shared_ptr<Derived> derived = get_derived();
+rpc::shared_ptr<Base> base = derived;  // ✅ Upcast - works synchronously
+
+// Dynamic cast using local query_interface (synchronous)
+rpc::shared_ptr<Base> base2 = get_base();
+rpc::shared_ptr<Derived> derived2 = rpc::dynamic_pointer_cast<Derived>(base2);  // ✅ Uses local query_interface
+if (derived2) {
+    // Successfully cast
+}
+
+// OPTIONAL: Explicit async for remote query_interface (BUILD_COROUTINE only)
+#ifdef BUILD_COROUTINE
+rpc::shared_ptr<Base> remote_base = get_remote_base();
+rpc::shared_ptr<Derived> remote_derived = CO_AWAIT rpc::dynamic_cast_shared<Derived>(remote_base);  // ✅ Explicit remote query
+#endif
+
+// Static casting (synchronous)
+rpc::shared_ptr<void> void_ptr = get_void_ptr();
+rpc::shared_ptr<Foo> foo_ptr = rpc::static_pointer_cast<Foo>(void_ptr);
+
+// Optimistic pointers work identically
+rpc::optimistic_ptr<Derived> opt_derived = get_opt_derived();
+rpc::optimistic_ptr<Base> opt_base = opt_derived;  // ✅ Upcast works
+
+// Dynamic cast with optimistic_ptr
+rpc::optimistic_ptr<Base> opt_base2 = get_opt_base();
+auto opt_derived2 = rpc::dynamic_pointer_cast<Derived>(opt_base2);  // ✅ Local query_interface
+
+// LOCAL OPTIMISTIC POINTER - Making optimistic pointers callable
+// IMPORTANT: Stack use only - never as class member
+void process_data(rpc::optimistic_ptr<IService> service_ptr) {
+    // Create temporary RAII lock for local objects
+    rpc::local_optimistic_ptr<IService> local_service(service_ptr);
+
+    if (local_service) {
+        // operator-> works for both local (locked) and remote (proxy) objects
+        auto result = local_service->process();  // ✅ Makes RPC call
+
+        // If local: local_lock_ keeps object alive during this scope
+        // If remote: calls through remote proxy (no locking needed)
+    }
+    // RAII: local object automatically unlocked when local_service destroyed
+}
+
+// Alternative: assignment
+void another_example(rpc::optimistic_ptr<IService> service_ptr) {
+    rpc::local_optimistic_ptr<IService> local_service;
+    local_service = service_ptr;  // Assign optimistic to local
+
+    if (local_service) {
+        local_service->do_work();
+    }
+}
+
+// Check if local or remote
+void inspect_locality(rpc::optimistic_ptr<IService> service_ptr) {
+    rpc::local_optimistic_ptr<IService> local_service(service_ptr);
+
+    if (local_service.is_local()) {
+        // Object is local and currently RAII-locked
+    } else {
+        // Object is remote (using proxy)
+    }
+}
 ```
+
+**Rationale**:
+1. **Standard semantics**: Works exactly like std::shared_ptr - developers don't need to learn new patterns
+2. **Local query_interface**: Synchronous dynamic_cast uses local query_interface (all casting_interface types support it)
+3. **Optional async**: Async versions are additive - use them when you explicitly need remote query_interface
+4. **Signature stability**: Classes have same signatures with/without BUILD_COROUTINE
+5. **STL compliance**: When TEST_STL_COMPLIANCE=ON, optimistic_ptr doesn't exist and shared_ptr behaves like std::shared_ptr
+6. **casting_interface requirement**: When !TEST_STL_COMPLIANCE, all types must derive from casting_interface for query_interface support
+
+### Phase 4b: Dynamic Cast Implementation Details
+
+**Synchronous dynamic_pointer_cast (works with/without BUILD_COROUTINE)**:
+```cpp
+namespace rpc {
+
+// Synchronous dynamic cast - uses local query_interface
+template<typename T, typename U>
+shared_ptr<T> dynamic_pointer_cast(const shared_ptr<U>& from) noexcept {
+    if (!from) {
+        return shared_ptr<T>();
+    }
+
+#ifdef TEST_STL_COMPLIANCE
+    // STL mode: standard C++ dynamic_cast
+    if (T* ptr = dynamic_cast<T*>(from.get())) {
+        return shared_ptr<T>(from, ptr);  // Aliasing constructor
+    }
+    return shared_ptr<T>();
+#else
+    // RPC mode: try local query_interface first
+    if constexpr (__rpc_internal::is_casting_interface_derived<T>::value) {
+        // Try local interface query
+        T* iface = const_cast<T*>(static_cast<const T*>(
+            from->query_interface(T::get_id(VERSION_2))));
+        if (iface) {
+            return shared_ptr<T>(from, iface);  // Aliasing constructor
+        }
+    }
+
+    // Fallback to standard C++ dynamic_cast for non-interface types
+    if (T* ptr = dynamic_cast<T*>(from.get())) {
+        return shared_ptr<T>(from, ptr);
+    }
+
+    return shared_ptr<T>();
+#endif
+}
+
+// Synchronous dynamic cast for optimistic_ptr
+template<typename T, typename U>
+optimistic_ptr<T> dynamic_pointer_cast(const optimistic_ptr<U>& from) noexcept {
+    // Similar implementation using local query_interface
+}
+
+#ifdef BUILD_COROUTINE
+// OPTIONAL: Async dynamic cast with explicit remote query_interface
+template<typename T, typename U>
+CORO_TASK(shared_ptr<T>) dynamic_cast_shared(const shared_ptr<U>& from) noexcept {
+    if (!from) {
+        CO_RETURN shared_ptr<T>();
+    }
+
+    // Try local query_interface first
+    if constexpr (__rpc_internal::is_casting_interface_derived<T>::value) {
+        T* iface = const_cast<T*>(static_cast<const T*>(
+            from->query_interface(T::get_id(VERSION_2))));
+        if (iface) {
+            CO_RETURN shared_ptr<T>(from, iface);
+        }
+
+        // Local failed - try remote query_interface through object_proxy
+        auto obj_proxy = from->get_object_proxy();
+        if (obj_proxy) {
+            shared_ptr<T> result;
+            CO_AWAIT obj_proxy->template query_interface<T>(result);
+            CO_RETURN result;
+        }
+    }
+
+    CO_RETURN shared_ptr<T>();
+}
+
+// OPTIONAL: Async for optimistic_ptr
+template<typename T, typename U>
+CORO_TASK(optimistic_ptr<T>) dynamic_cast_optimistic(const optimistic_ptr<U>& from) noexcept;
+#endif // BUILD_COROUTINE
+
+} // namespace rpc
+```
+
+**Key Design Decisions**:
+1. **Signature stability**: Same signatures with/without BUILD_COROUTINE
+2. **Local query_interface**: Synchronous dynamic_cast uses local query_interface for all casting_interface types
+3. **STL compliance**: TEST_STL_COMPLIANCE mode uses standard C++ dynamic_cast only
+4. **Optional async**: Async versions (dynamic_cast_shared/dynamic_cast_optimistic) available only with BUILD_COROUTINE
+5. **Explicit remote calls**: Developers must explicitly use async versions when they want remote query_interface
+6. **Null checks**: All functions check for null input and return null output
 
 ### Phase 5: Standard Container Support
 **Deliverables**:
@@ -368,18 +1014,67 @@ bool operator==(const optimistic_ptr<T>& a, const optimistic_ptr<U>& b) noexcept
 
 ### Phase 7: Testing & Validation
 **Deliverables**:
-- [ ] Unit tests for locality checking and exception throwing
+- [ ] Unit tests for locality detection (local vs remote objects)
 - [ ] Multi-threaded safety tests for optimistic reference counting
 - [ ] Interoperability tests between optimistic_ptr, shared_ptr, and weak_ptr
-- [ ] Exception safety tests for `bad_local_object` scenarios
+- [ ] Transparent operation tests for both local and remote objects
 - [ ] Service layer integration tests with optimistic reference counting
 - [ ] `OBJECT_GONE` error code testing for optimistic RPC scenarios
 - [ ] Telemetry validation for per-zone optimistic reference tracking
 - [ ] Integration tests with existing RPC scenarios ensuring no STL test compilation
+- [ ] **local_optimistic_ptr specific tests**:
+  - [ ] RAII locking tests for local objects
+  - [ ] Passthrough tests for remote objects (no locking)
+  - [ ] Move semantics tests (move constructor/assignment)
+  - [ ] Copy prevention tests (deleted copy constructor/assignment)
+  - [ ] Thread safety tests (concurrent access with RAII locking)
+  - [ ] Scope-based lifetime tests (object deletion deferred until local_optimistic_ptr destroyed)
+  - [ ] Circular dependency resolution tests (child→host calls with no RAII ownership)
+- [ ] **Critical Race Condition Tests**:
+  - [ ] **RC1**: Concurrent increment_optimistic vs control block destruction
+    - Thread 1: Creating first optimistic_ptr from expired weak_ptr
+    - Thread 2: Destroying last shared_ptr/weak_ptr simultaneously
+    - Expected: try_increment_optimistic() returns false, control block safely destroyed
+  - [ ] **RC2**: Concurrent increment_optimistic vs decrement_optimistic
+    - Thread 1: Creating optimistic_ptr (increment)
+    - Thread 2: Destroying last optimistic_ptr (decrement to 0)
+    - Expected: Control block stays alive during both operations
+  - [ ] **RC3**: Multiple threads creating first optimistic_ptr
+    - Threads 1-N: All try to create first optimistic_ptr from shared_ptr simultaneously
+    - Expected: Only one weak_owners increment, no weak_owners leak
+  - [ ] **RC4**: Concurrent decrement_shared vs increment_optimistic
+    - Thread 1: Destroying last shared_ptr (object disposal)
+    - Thread 2: Creating optimistic_ptr from that shared_ptr
+    - Expected: Either optimistic_ptr succeeds before disposal, or fails safely after
+  - [ ] **RC5**: Concurrent weak_ptr::lock vs optimistic_ptr creation
+    - Thread 1: weak_ptr::lock() attempting to create shared_ptr
+    - Thread 2: Creating optimistic_ptr from same control block
+    - Expected: Both succeed or both fail consistently
+  - [ ] **RC6**: Control block destruction race
+    - Thread 1: Destroying last optimistic_ptr (decrement weak_owners)
+    - Thread 2: Destroying last weak_ptr (decrement weak_owners)
+    - Thread 3: Creating new optimistic_ptr via try_increment_optimistic
+    - Expected: Control block destroyed exactly once, Thread 3 fails safely
+  - [ ] **RC7**: Local object disposal during optimistic_ptr copy
+    - Thread 1: Copying local optimistic_ptr (increment_optimistic_no_lock)
+    - Thread 2: Destroying last shared_ptr to local object (object disposal)
+    - Expected: Copy succeeds, object may be deleted, control block stays alive
+  - [ ] **RC8**: Remote proxy cleanup during optimistic reference increment
+    - Thread 1: Creating first optimistic_ptr (calling add_ref on object_proxy)
+    - Thread 2: Destroying last shared_ptr (calling release on object_proxy)
+    - Expected: Object_proxy operations properly serialized, no use-after-free
+  - [ ] **RC9**: optimistic_owners wrap-around (stress test)
+    - Create/destroy billions of optimistic_ptrs rapidly across threads
+    - Expected: No counter overflow, no control block leaks
+  - [ ] **RC10**: Interleaved pointer type transitions
+    - Thread 1: shared_ptr → optimistic_ptr conversion
+    - Thread 2: optimistic_ptr → shared_ptr conversion
+    - Thread 3: weak_ptr → optimistic_ptr conversion
+    - Expected: All reference counts consistent, no leaks
 
 **Test Coverage Requirements**:
-- Local object access patterns (should succeed)
-- Remote object access patterns (should throw `bad_local_object`)
+- Local object access patterns (should work transparently)
+- Remote object access patterns (should work transparently through proxy)
 - Reference counting correctness across pointer type conversions
 - Thread-safe concurrent access to optimistic_owners
 - Service layer optimistic reference counting with add_ref/release options
@@ -387,8 +1082,36 @@ bool operator==(const optimistic_ptr<T>& a, const optimistic_ptr<U>& b) noexcept
 - Global optimistic reference counters per zone (telemetry validation)
 - Control block to object_proxy lifecycle management
 - Conditional compilation verification (`!TEST_STL_COMPLIANCE` only)
+- **local_optimistic_ptr coverage**:
+  - RAII lock acquisition/release for local objects
+  - No locking for remote objects (just proxy pointer storage)
+  - Move-only semantics enforcement
+  - Concurrent access with proper RAII locking preventing premature deletion
+  - Stack-only usage (not as class member)
 
 ## Technical Specifications
+
+### API Design Principles
+
+**Synchronous vs Asynchronous Operations**:
+- **Synchronous (no CO_AWAIT)**:
+  - Same-type copy/move constructors and assignments
+  - Synchronous pointer casts (`static_pointer_cast`, `const_pointer_cast`, `reinterpret_pointer_cast`)
+  - Basic operations (`get()`, `use_count()`, `operator bool()`, `reset()`, `swap()`)
+
+- **Asynchronous (requires CO_AWAIT)**:
+  - Heterogeneous type conversions (`convert_to_shared<T, U>`, `convert_to_optimistic<T, U>`)
+  - Pointer type conversions (shared ↔ optimistic)
+  - Dynamic casting with remote type checking (`dynamic_cast_shared`, `dynamic_cast_optimistic`)
+
+**Changes from Traditional std::shared_ptr**:
+- ✅ **No breaking changes**: All std::shared_ptr operations work identically
+- ✅ **Added**: `optimistic_ptr<T>` class (only when !TEST_STL_COMPLIANCE)
+- ✅ **Enhanced**: `dynamic_pointer_cast` uses local `query_interface` for casting_interface types (when !TEST_STL_COMPLIANCE)
+- ✅ **Added**: Optional async `dynamic_cast_shared`/`dynamic_cast_optimistic` for explicit remote queries (BUILD_COROUTINE only)
+- ✅ **Kept**: All heterogeneous constructors/assignments work synchronously
+- ✅ **Kept**: All casting operations work synchronously using local query_interface
+- ✅ **Requirement**: All types must derive from casting_interface (when !TEST_STL_COMPLIANCE)
 
 ### Memory Layout
 ```cpp
@@ -493,6 +1216,68 @@ class service {
     void report_optimistic_stats() {
         for (auto& [zone_id, count] : optimistic_refs_per_zone_) {
             log_telemetry("Zone {} has {} optimistic references", zone_id, count.load());
+        }
+    }
+};
+```
+
+**Scenario 4: local_optimistic_ptr for Callable Optimistic Pointers**
+```cpp
+// Child object holds optimistic_ptr to host (no RAII ownership - prevents circular dependency)
+class ChildNode {
+    rpc::optimistic_ptr<IHost> host_;  // Weak reference to host
+
+public:
+    void process_task() {
+        // Temporarily lock host if local, or use remote proxy if remote
+        rpc::local_optimistic_ptr<IHost> local_host(host_);
+
+        if (local_host) {
+            // Safe to call - local object is RAII-locked during this scope
+            // OR remote object uses proxy (no locking needed)
+            auto config = local_host->get_configuration();
+            local_host->report_progress(42);
+
+            // If host is local and gets deleted by another thread,
+            // the deletion waits until local_host scope ends
+        }
+        // RAII: local lock released, host can be deleted if no other references
+    }
+};
+
+// Host manages children with shared_ptr (RAII ownership)
+class Host {
+    std::vector<rpc::shared_ptr<ChildNode>> children_;  // Host owns children
+
+public:
+    void add_child(rpc::shared_ptr<ChildNode> child) {
+        children_.push_back(child);
+        // Children can call back to host using optimistic_ptr + local_optimistic_ptr
+        // No circular dependency: children don't hold RAII references to host
+    }
+};
+```
+
+**Scenario 5: Stateless Service Calls with local_optimistic_ptr**
+```cpp
+// REST-like service where object lifetime is not client-managed
+class ApiClient {
+    rpc::optimistic_ptr<IRestService> service_;  // No RAII ownership
+
+public:
+    void make_request(const std::string& endpoint) {
+        // Create temporary lock for call duration
+        rpc::local_optimistic_ptr<IRestService> locked_service(service_);
+
+        if (locked_service) {
+            // Call works for both local and remote services
+            auto response = locked_service->http_get(endpoint);
+
+            // If service is local and deleted during this call,
+            // RAII lock prevents deletion until scope ends
+        } else {
+            // Service no longer available (returned OBJECT_GONE)
+            handle_service_unavailable();
         }
     }
 };
