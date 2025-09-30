@@ -4,6 +4,8 @@
 ]]
 cmake_minimum_required(VERSION 3.24)
 
+include(CTest)
+
 # Build individual shared_ptr/weak_ptr tests with resolved dependencies
 # These tests now have access to test infrastructure headers
 
@@ -83,6 +85,8 @@ foreach(test_name ${BUILDABLE_TESTS})
             set_tests_properties(${test_name} PROPERTIES
                 ENVIRONMENT "ASAN_OPTIONS=detect_leaks=0;LSAN_OPTIONS=detect_leaks=0"
             )
+            
+            gtest_discover_tests(${test_name})
         endif()
     endif()
 endforeach()

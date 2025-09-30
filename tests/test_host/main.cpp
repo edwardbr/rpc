@@ -59,7 +59,7 @@ namespace
         }
         catch (const args::ParseError& e)
         {
-            std::cout << "Continuing to pass all arguments to Google Test: " << e.what() << std::endl;
+            // std::cout << "Continuing to pass all arguments to Google Test: " << e.what() << std::endl;
         }
         catch (const std::exception& e)
         {

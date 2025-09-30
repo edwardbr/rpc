@@ -657,6 +657,9 @@ namespace rpc
         using element_type = element_type_impl;
         using weak_type = weak_ptr<T>;
 
+        // Tag type for internal construction (for use by friends)
+        struct internal_construct_tag {};
+
         constexpr shared_ptr() noexcept = default;
         constexpr shared_ptr(std::nullptr_t) noexcept { }
 
@@ -953,6 +956,17 @@ namespace rpc
         __rpc_internal::__shared_ptr_control_block::control_block_base* internal_get_cb() const { return cb_; }
         element_type_impl* internal_get_ptr() const { return ptr_; }
 
+    private:
+        // Private constructor for constructing from existing control block (for friends only)
+        shared_ptr(__rpc_internal::__shared_ptr_control_block::control_block_base* cb,
+                   element_type_impl* ptr,
+                   internal_construct_tag) noexcept
+            : ptr_(ptr), cb_(cb)
+        {
+            // Caller is responsible for having already incremented the control block
+        }
+
+    public:
         template<typename U> friend class weak_ptr;
         template<typename U>
         friend class shared_ptr; // Allow different template instantiations to access private members
@@ -965,6 +979,10 @@ namespace rpc
         template<class T1_cast, class T2_cast>
         friend shared_ptr<T1_cast> dynamic_pointer_cast(const shared_ptr<T2_cast>& from) noexcept;
         template<typename U> friend class enable_shared_from_this;
+#ifndef TEST_STL_COMPLIANCE
+        template<typename U> friend class optimistic_ptr;
+        template<typename U> friend class local_optimistic_ptr;
+#endif
     };
 
     template<typename T> class weak_ptr
@@ -1686,13 +1704,25 @@ namespace rpc
         void acquire_this() noexcept
         {
             if (cb_)
-                cb_->increment_optimistic_no_lock();
+            {
+                // Weak semantics for local objects, shared semantics for remote proxies
+                if (cb_->is_local)
+                    cb_->increment_optimistic_no_lock();
+                else
+                    cb_->increment_shared();  // Keep remote proxies alive
+            }
         }
 
         void release_this() noexcept
         {
             if (cb_)
-                cb_->decrement_optimistic_and_dispose_if_zero();
+            {
+                // Weak semantics for local objects, shared semantics for remote proxies
+                if (cb_->is_local)
+                    cb_->decrement_optimistic_and_dispose_if_zero();
+                else
+                    cb_->decrement_shared_and_dispose_if_zero();  // Release remote proxies
+            }
         }
 
     public:
@@ -1742,10 +1772,16 @@ namespace rpc
             : ptr_(nullptr)
             , cb_(nullptr)
         {
-            if (sp && sp.cb_ && sp.cb_->try_increment_optimistic())
+            auto cb = sp.internal_get_cb();
+            if (sp && cb)
             {
-                cb_ = sp.cb_;
-                ptr_ = sp.ptr_;
+                // Weak semantics for local objects, shared semantics for remote proxies
+                bool success = cb->is_local ? cb->try_increment_optimistic() : cb->try_increment_shared();
+                if (success)
+                {
+                    cb_ = cb;
+                    ptr_ = sp.internal_get_ptr();
+                }
             }
         }
 
@@ -1756,10 +1792,15 @@ namespace rpc
         {
             // weak_ptr has cb_ member we can access via friend
             auto cb = wp.cb_;
-            if (cb && cb->try_increment_optimistic())
+            if (cb)
             {
-                cb_ = cb;
-                ptr_ = wp.ptr_;
+                // Weak semantics for local objects, shared semantics for remote proxies
+                bool success = cb->is_local ? cb->try_increment_optimistic() : cb->try_increment_shared();
+                if (success)
+                {
+                    cb_ = cb;
+                    ptr_ = wp.ptr_;
+                }
             }
         }
 
@@ -1836,10 +1877,14 @@ namespace rpc
         __rpc_internal::__shared_ptr_control_block::control_block_base* internal_get_cb() const noexcept { return cb_; }
         element_type_impl* internal_get_ptr() const noexcept { return ptr_; }
 
-        template<typename Y> friend class optimistic_ptr;
+    public:
+
         template<typename Y> friend class shared_ptr;
         template<typename Y> friend class weak_ptr;
+#ifndef TEST_STL_COMPLIANCE
+        template<typename Y> friend class optimistic_ptr;
         template<typename Y> friend class local_optimistic_ptr;
+#endif
     };
 
     // local_optimistic_ptr<T> - Temporary RAII lock for calling through optimistic_ptr
@@ -1869,9 +1914,9 @@ namespace rpc
                 // Try to increment shared_owners
                 if (cb->try_increment_shared())
                 {
-                    local_lock_.ptr_ = opt.internal_get_ptr();
-                    local_lock_.cb_ = cb;
-                    ptr_ = local_lock_.ptr_;
+                    // Construct shared_ptr using private constructor (we already incremented)
+                    local_lock_ = shared_ptr<T>(cb, opt.internal_get_ptr(), typename shared_ptr<T>::internal_construct_tag{});
+                    ptr_ = local_lock_.get();
                 }
             }
             else
