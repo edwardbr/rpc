@@ -365,8 +365,7 @@ CORO_TASK(bool) optimistic_ptr_remote_shared_semantics_test(T& lib)
     CORO_ASSERT_NE(baz, nullptr);
 
     // Check if the object is local or remote
-    auto cb = baz.internal_get_cb();
-    bool is_local = cb && cb->is_local;
+    bool is_local = baz->is_local();
 
     // Create optimistic_ptr
     rpc::optimistic_ptr<xxx::i_baz> opt_baz(baz);
@@ -435,8 +434,7 @@ CORO_TASK(bool) local_optimistic_ptr_remote_passthrough_test(T& lib)
     CORO_ASSERT_NE(baz, nullptr);
 
     // Check if the object is local or remote
-    auto cb = baz.internal_get_cb();
-    bool is_local = cb && cb->is_local;
+    bool is_local = baz->is_local();
 
     // Create optimistic_ptr
     rpc::optimistic_ptr<xxx::i_baz> opt_baz(baz);
@@ -702,6 +700,65 @@ CORO_TASK(bool) optimistic_ptr_multiple_refs_test(T& lib)
 TYPED_TEST(type_test, optimistic_ptr_multiple_refs_test)
 {
     run_coro_test(*this, [](auto& lib) { return optimistic_ptr_multiple_refs_test(lib); });
+}
+
+// Test 11: optimistic_ptr OBJECT_GONE behavior when remote stub is deleted
+template<class T>
+CORO_TASK(bool) optimistic_ptr_object_gone_test(T& lib)
+{
+    // Get example object (local or remote depending on setup)
+    auto example = lib.get_example();
+    CORO_ASSERT_NE(example, nullptr);
+
+    // Create foo through example (will be local or marshalled depending on setup)
+    rpc::shared_ptr<xxx::i_foo> f;
+    CORO_ASSERT_EQ(CO_AWAIT example->create_foo(f), 0);
+    CORO_ASSERT_NE(f, nullptr);
+
+    // Create baz interface (local or marshalled depending on setup)
+    rpc::shared_ptr<xxx::i_baz> baz;
+    CORO_ASSERT_EQ(CO_AWAIT f->create_baz_interface(baz), 0);
+    CORO_ASSERT_NE(baz, nullptr);
+
+    // Check if the object is local or remote
+    bool is_local = baz->is_local();
+
+    if (!is_local)
+    {
+        // Test OBJECT_GONE for REMOTE objects only
+        // Create optimistic_ptr from shared_ptr
+        rpc::optimistic_ptr<xxx::i_baz> opt_baz(baz);
+        CORO_ASSERT_NE(opt_baz, nullptr);
+
+        // First call should work - shared_ptr keeps stub alive
+        auto error1 = CO_AWAIT opt_baz->callback(42);
+        CORO_ASSERT_EQ(error1, 0);
+
+        // Release the shared_ptr - this should delete the stub on the remote side
+        // because optimistic references don't hold stub lifetime
+        baz.reset();
+        f.reset();
+
+        // Second call through optimistic_ptr should fail with OBJECT_GONE
+        // The optimistic_ptr still exists but the remote stub has been deleted
+        auto error2 = CO_AWAIT opt_baz->callback(43);
+        CORO_ASSERT_EQ(error2, rpc::error::OBJECT_GONE());
+
+        // The optimistic_ptr itself remains valid (pointer not null)
+        CORO_ASSERT_NE(opt_baz, nullptr);
+    }
+    else
+    {
+        // For local objects, optimistic_ptr has weak semantics
+        // Skip the OBJECT_GONE test as it's specific to remote stub lifetime
+    }
+
+    CO_RETURN true;
+}
+
+TYPED_TEST(type_test, optimistic_ptr_object_gone_test)
+{
+    run_coro_test(*this, [](auto& lib) { return optimistic_ptr_object_gone_test(lib); });
 }
 
 #endif // TEST_STL_COMPLIANCE

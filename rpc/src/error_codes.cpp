@@ -103,16 +103,21 @@ namespace rpc
         [[nodiscard]] int CALL_CANCELLED()
         {
             return offset_val + (offset_val_is_negative ? -22 : 22);
+        }        
+        [[nodiscard]] int OBJECT_GONE()
+        {
+            return offset_val + (offset_val_is_negative ? -23 : 23);
         }
+        
         // dont forget to update MIN & MAX if new values
 
         [[nodiscard]] int MIN()
         {
-            return offset_val + (offset_val_is_negative ? -20 : 1);
+            return offset_val + (offset_val_is_negative ? -23 : 1);
         }
         [[nodiscard]] int MAX()
         {
-            return offset_val + (offset_val_is_negative ? -1 : 20);
+            return offset_val + (offset_val_is_negative ? -1 : 23);
         }
 
         void set_OK_val(int val)
@@ -217,6 +222,10 @@ namespace rpc
             if (err == CALL_CANCELLED())
             {
                 return "Service proxy remote call is cancelled";
+            }
+            if (err == OBJECT_GONE())
+            {
+                return "The service no longer has an object of that id, perhaps an optimistic pointer call attempt is happining";
             }
             return "invalid error code";
         }

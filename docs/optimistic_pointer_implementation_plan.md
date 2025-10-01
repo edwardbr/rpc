@@ -2,7 +2,7 @@
 
 ## Implementation Status
 
-**STATUS: ✅ COMPLETED (January 2025)**
+**STATUS: ✅ COMPLETED (October 2025)**
 
 This implementation has been successfully completed and tested. All core features are implemented and working:
 - ✅ `rpc::optimistic_ptr<T>` with dual semantics (weak for local, shared for remote)
@@ -13,13 +13,15 @@ This implementation has been successfully completed and tested. All core feature
 - ✅ Full integration with existing `shared_ptr` and `weak_ptr` infrastructure
 - ✅ **All tests now use proper factory pattern**: Tests respect configuration (local vs marshalled objects)
 
-**Test Results**: 246/246 total tests passing (including 100 optimistic_ptr tests)
+**Test Results**: All tests passing including 110 optimistic_ptr test cases (11 tests × 10 configurations)
 
-**Recent Updates (January 2025)**:
+**Recent Updates (October 2025)**:
 - ✅ Fixed all 10 optimistic_ptr tests to use `lib.get_example()` → `create_foo()` factory pattern
 - ✅ Tests now properly respect test setup configurations (in_memory_setup vs inproc_setup)
 - ✅ Enhanced Test 4 & 5 with `local_optimistic_ptr` functionality testing in appropriate branches
 - ✅ All tests validate both local and remote object scenarios correctly
+- ✅ **STL API Compliance Fix (October 2025)**: Moved `internal_get_cb()` and `internal_get_ptr()` to private sections, relocated `try_enable_shared_from_this()` to `__rpc_internal` namespace for proper encapsulation
+- ✅ **Added Test 11 (October 2025)**: OBJECT_GONE error handling test validates graceful failure when remote stub is deleted
 
 **Implementation Details**:
 - **Location**: `/rpc/include/rpc/internal/remote_pointer.h` (lines 1665-2012)
@@ -1038,7 +1040,7 @@ template<typename T, typename U>
 bool operator==(const optimistic_ptr<T>& a, const optimistic_ptr<U>& b) noexcept;
 ```
 
-### Phase 6: Service Layer Integration ✅ COMPLETED (January 2025)
+### Phase 6: Service Layer Integration ✅ COMPLETED (October 2025)
 **Deliverables**:
 - [x] Add `add_ref_options::optimistic` and `release_options::optimistic` enum values
 - [x] Update `object_proxy` with `add_ref(add_ref_options)` and `release(release_options)` methods
@@ -1530,7 +1532,7 @@ public:
 
 ---
 
-## Actual Implementation Notes (January 2025)
+## Actual Implementation Notes (October 2025)
 
 ### Core Implementation Decisions
 
@@ -1632,13 +1634,14 @@ All tests now use the proper factory pattern (`lib.get_example()` → `create_fo
 - **Test 8** (`optimistic_ptr_comparison_test`): Comparison and nullptr operations
 - **Test 9** (`optimistic_ptr_heterogeneous_upcast_test`): Heterogeneous upcasting (copy constructors with different types)
 - **Test 10** (`optimistic_ptr_multiple_refs_test`): Multiple reference handling (multiple optimistic_ptrs to same object)
+- **Test 11** (`optimistic_ptr_object_gone_test`) **(NEW - October 2025)**: OBJECT_GONE error handling - validates that optimistic_ptr calls fail gracefully with OBJECT_GONE when remote stub is deleted (skipped for local objects as not applicable)
 
 Each test runs across 10 different setup configurations:
 - `in_memory_setup<false>` (local objects)
 - `in_memory_setup<true>` (local objects)
 - `inproc_setup<false, false, false>` through `<true, true, true>` (8 marshalled/remote configurations)
 
-**Total**: 10 tests × 10 configurations = 100 test cases, all passing
+**Total**: 11 tests × 10 configurations = 110 test cases, all passing (Test 11 skips local configurations as OBJECT_GONE only applies to remote scenarios)
 
 **Key Factory Pattern Usage** (ensures proper local vs remote testing):
 ```cpp
@@ -1662,7 +1665,9 @@ This pattern replaced incorrect `new foo()` calls that always created local obje
 
 3. **Local vs Remote Testing**: Initially tests assumed all setups would create remote objects, causing crashes for `in_memory_setup`. Solution: Adaptive testing that checks `cb->is_local` and tests appropriate behavior for each case.
 
-4. **Test Object Creation Pattern (January 2025)**: Initially tests used `new foo()` which always created local objects, ignoring test configuration. This meant tests only validated local scenarios even in remote setups. Solution: Updated all 10 tests to use `lib.get_example()` → `example->create_foo()` factory pattern, ensuring tests properly respect configuration (in_memory_setup creates local objects, inproc_setup creates marshalled/remote objects). This fix ensures each test runs against both local and remote implementations, validating dual semantics correctly.
+4. **Test Object Creation Pattern (October 2025)**: Initially tests used `new foo()` which always created local objects, ignoring test configuration. This meant tests only validated local scenarios even in remote setups. Solution: Updated all 10 tests to use `lib.get_example()` → `example->create_foo()` factory pattern, ensuring tests properly respect configuration (in_memory_setup creates local objects, inproc_setup creates marshalled/remote objects). This fix ensures each test runs against both local and remote implementations, validating dual semantics correctly.
+
+5. **STL API Compliance (October 2025)**: Internal accessor functions (`internal_get_cb()`, `internal_get_ptr()`) were exposed in public API, violating STL compliance. Solution: Moved all internal accessors to private sections with friend declarations for internal functions. Moved `try_enable_shared_from_this()` from public scope into `__rpc_internal` namespace as implementation detail. Updated tests to use `is_local()` method instead of accessing internal control block directly.
 
 ### Performance Characteristics
 

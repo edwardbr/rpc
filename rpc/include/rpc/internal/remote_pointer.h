@@ -647,6 +647,10 @@ namespace rpc
             shared_ptr<T> make_shared_with_value_alloc(const ValueAlloc&, Args&&...);
         }
 
+        // Forward declaration - definition moved after enable_shared_from_this
+        template<typename T, typename Y>
+        void try_enable_shared_from_this(shared_ptr<T>& sp, Y* ptr) noexcept;
+
     } // namespace __rpc_internal
 
     template<typename T> class shared_ptr
@@ -735,7 +739,7 @@ namespace rpc
             }
             acquire_this();
             if (ptr_)
-                try_enable_shared_from_this(*this, p);
+                __rpc_internal::try_enable_shared_from_this(*this, p);
         }
 
         template<typename Y, typename Deleter, typename = std::enable_if_t<is_ptr_convertible<Y>::value>>
@@ -760,7 +764,7 @@ namespace rpc
             }
             acquire_this();
             if (ptr_)
-                try_enable_shared_from_this(*this, p);
+                __rpc_internal::try_enable_shared_from_this(*this, p);
         }
 
         template<typename Deleter>
@@ -831,7 +835,7 @@ namespace rpc
             }
             acquire_this();
             if (ptr_)
-                try_enable_shared_from_this(*this, p);
+                __rpc_internal::try_enable_shared_from_this(*this, p);
         }
 
         template<typename Deleter, typename Alloc>
@@ -1005,10 +1009,10 @@ namespace rpc
             return cb_ < other.internal_get_cb();
         }
 
+    private:
+        // Internal accessors - NOT part of STL shared_ptr API
         __rpc_internal::__shared_ptr_control_block::control_block_base* internal_get_cb() const { return cb_; }
         element_type_impl* internal_get_ptr() const { return ptr_; }
-
-    private:
         // Private constructor for constructing from existing control block (for friends only)
         shared_ptr(__rpc_internal::__shared_ptr_control_block::control_block_base* cb,
                    element_type_impl* ptr,
@@ -1031,6 +1035,9 @@ namespace rpc
         template<class T1_cast, class T2_cast>
         friend shared_ptr<T1_cast> dynamic_pointer_cast(const shared_ptr<T2_cast>& from) noexcept;
         template<typename U> friend class enable_shared_from_this;
+        template<typename T2, typename Y2>
+        friend void __rpc_internal::try_enable_shared_from_this(shared_ptr<T2>& sp, Y2* ptr) noexcept;
+        template<typename Deleter, typename U> friend Deleter* get_deleter(const shared_ptr<U>& p) noexcept;
 #ifndef TEST_STL_COMPLIANCE
         template<typename U> friend class optimistic_ptr;
         template<typename U> friend class local_optimistic_ptr;
@@ -1298,8 +1305,11 @@ namespace rpc
 
         template<typename Y> bool owner_before(const weak_ptr<Y>& other) const noexcept { return cb_ < other.cb_; }
 
+    private:
+        // Internal accessors - NOT part of STL weak_ptr API
         __rpc_internal::__shared_ptr_control_block::control_block_base* internal_get_cb() const { return cb_; }
 
+        template<typename U> friend class shared_ptr;
         template<typename U> friend class enable_shared_from_this;
         template<typename U> friend class weak_ptr;
     };
@@ -1448,7 +1458,7 @@ namespace rpc
                 using result_element_type = typename shared_ptr<T>::element_type;
                 shared_ptr<T> result(static_cast<__shared_ptr_control_block::control_block_base*>(cb_ptr),
                     static_cast<result_element_type*>(cb_ptr->get_managed_object_ptr()));
-                try_enable_shared_from_this(result, static_cast<result_element_type*>(cb_ptr->get_managed_object_ptr()));
+                __rpc_internal::try_enable_shared_from_this(result, static_cast<result_element_type*>(cb_ptr->get_managed_object_ptr()));
                 return result;
             }
         } // namespace __shared_ptr_make_support
@@ -1587,17 +1597,21 @@ namespace rpc
         template<typename U> friend class shared_ptr;
         template<typename U> friend class weak_ptr;
         template<typename T2, typename Y2>
-        friend void try_enable_shared_from_this(shared_ptr<T2>& sp, Y2* ptr) noexcept;
+        friend void __rpc_internal::try_enable_shared_from_this(shared_ptr<T2>& sp, Y2* ptr) noexcept;
     };
 
-    // Helper function to initialize enable_shared_from_this
-    template<typename T, typename Y> void try_enable_shared_from_this(shared_ptr<T>& sp, Y* ptr) noexcept
+    // Internal helper function to initialize enable_shared_from_this - definition
+    namespace __rpc_internal
     {
-        if constexpr (std::is_base_of_v<enable_shared_from_this<Y>, Y>)
+        template<typename T, typename Y>
+        void try_enable_shared_from_this(shared_ptr<T>& sp, Y* ptr) noexcept
         {
-            if (ptr && sp.internal_get_cb())
+            if constexpr (std::is_base_of_v<RPC_MEMORY::enable_shared_from_this<Y>, Y>)
             {
-                static_cast<enable_shared_from_this<Y>*>(ptr)->internal_set_weak_this(sp.internal_get_cb(), ptr);
+                if (ptr && sp.internal_get_cb())
+                {
+                    static_cast<RPC_MEMORY::enable_shared_from_this<Y>*>(ptr)->internal_set_weak_this(sp.internal_get_cb(), ptr);
+                }
             }
         }
     }
@@ -1925,11 +1939,10 @@ namespace rpc
             return use_count() == 1;
         }
 
-        // Internal access for friends
+    private:
+        // Internal accessors - NOT part of public API
         __rpc_internal::__shared_ptr_control_block::control_block_base* internal_get_cb() const noexcept { return cb_; }
         element_type_impl* internal_get_ptr() const noexcept { return ptr_; }
-
-    public:
 
         template<typename Y> friend class shared_ptr;
         template<typename Y> friend class weak_ptr;
