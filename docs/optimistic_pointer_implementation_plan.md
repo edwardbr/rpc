@@ -675,12 +675,12 @@ enum class object_locality {
 | **Phase 3b**: Access Operations | ✅ COMPLETED | 100% |
 | **Phase 4**: Pointer Conversions/Casting | ⚠️ PARTIAL | 60% |
 | **Phase 5**: Container Support | ✅ COMPLETED | 100% |
-| **Phase 6**: Service Layer Integration | ✅ COMPLETED | 100% |
+| **Phase 6**: Service Layer Integration | ✅ COMPLETED (Stub Layer) | 100% |
 | **Phase 7**: Testing & Validation | ✅ MOSTLY COMPLETE | 85% |
 
 **Core Functionality**: ✅ **Fully Operational** - All essential features working and tested (100 tests passing)
 
-**Service Integration**: ✅ **Complete** - Phase 6 service layer integration finished (January 2025). Optimistic and shared reference counting fully wired through all transport layers.
+**Service Integration**: ✅ **Complete with Stub Layer** - Phase 6 service layer integration finished (January 2025). Optimistic and shared reference counting fully wired from `remote_pointer.h` control blocks through to `object_stub` dual counters. Achieves true "remote weak pointer" semantics where optimistic references don't hold stub lifetime.
 
 **Future Work**: Remaining Phase 4 casting functions and advanced Phase 6 features (OBJECT_GONE error handling, telemetry counters) are planned enhancements that don't impact current functionality.
 
@@ -1044,11 +1044,23 @@ bool operator==(const optimistic_ptr<T>& a, const optimistic_ptr<U>& b) noexcept
 - [x] Update `object_proxy` with `add_ref(add_ref_options)` and `release(release_options)` methods
 - [x] Move cleanup logic from `object_proxy` destructor to `release()` method
 - [x] Update `service_proxy` to relay shared/optimistic information in add_ref/release calls
+- [x] Update `service_proxy::sp_release` to accept and pass through `release_options` parameter
+- [x] Update `service_proxy::sp_add_ref` to accept and use `add_ref_options` parameter (already had correct parameter)
+- [x] Update `service_proxy::get_or_create_object_proxy` to accept `is_optimistic` parameter
 - [x] Update `i_marshaller` to handle optimistic reference counting events with `release_options` parameter
 - [x] Wire `add_ref_options` and `release_options` through all transport layers (EDL, TCP, SPSC)
 - [x] Update `cleanup_after_object` to handle both inherited shared and optimistic reference counts separately
+- [x] Fix `cleanup_after_object` to ONLY release inherited references (removed extra normal release)
 - [x] Implement optimistic-first release strategy (release optimistic references before shared)
 - [x] Add `inherit_optimistic_reference()` method to object_proxy for race condition handling
+- [x] **Split `object_stub` reference counting into dual counters**:
+  - [x] `shared_count` - holds stub lifetime (triggers cleanup on 0)
+  - [x] `optimistic_count` - does NOT hold stub lifetime (can be >0 while stub exists)
+- [x] **Update `object_stub::add_ref(bool is_optimistic)` to increment correct counter**
+- [x] **Update `object_stub::release(bool is_optimistic)` to decrement correct counter**
+- [x] **Update `service::release_local_stub()` to only cleanup on shared_count == 0**
+- [x] **Wire `is_optimistic` from service layer through to stub operations**
+- [x] **Update all binding layer calls to use shared semantics (false for is_optimistic)**
 - [ ] Add `error_code::OBJECT_GONE` for optimistic RPC scenarios (DEFERRED - not needed for current functionality)
 - [ ] Implement global optimistic reference counters per zone in `service` (telemetry only) (DEFERRED - future enhancement)
 - [ ] Add `handle_optimistic_rpc_call()` with local `shared_ptr` creation and `OBJECT_GONE` fallback (DEFERRED - future enhancement)
@@ -1057,8 +1069,13 @@ bool operator==(const optimistic_ptr<T>& a, const optimistic_ptr<U>& b) noexcept
 - `/rpc/include/rpc/internal/marshaller.h` - Added `release_options` enum with `optimistic` flag
 - `/rpc/include/rpc/internal/object_proxy.h` - Added `add_ref/release` methods, `inherit_optimistic_reference()`
 - `/rpc/src/object_proxy.cpp` - Implemented reference counting methods, moved cleanup to `release()`
-- `/rpc/include/rpc/internal/service_proxy.h` - Updated `on_object_proxy_released` and `cleanup_after_object` signatures
-- `/rpc/src/service_proxy.cpp` - Implemented dual reference count cleanup with optimistic-first strategy
+- `/rpc/include/rpc/internal/service_proxy.h` - Updated `sp_release` signature, `cleanup_after_object`, `get_or_create_object_proxy`
+- `/rpc/src/service_proxy.cpp` - Implemented dual reference count cleanup, fixed to only release inherited references
+- `/rpc/include/rpc/internal/service.h` - Updated `release_local_stub()` signature with `is_optimistic` parameter
+- `/rpc/src/service.cpp` - Wire `is_optimistic` to stub layer, cleanup only on `shared_count == 0`
+- `/rpc/include/rpc/internal/stub.h` - Split `reference_count` into `shared_count` and `optimistic_count`
+- `/rpc/src/stub.cpp` - Implement dual counter logic in `add_ref/release`
+- `/rpc/include/rpc/internal/bindings.h` - Updated all binding calls to use `false` (shared semantics)
 - `/rpc/include/rpc/internal/remote_pointer.h` - Wired control block to call object_proxy methods with correct options
 - `/tests/edl/enclave_marshal_test.edl` - Added `options` parameter to `add_ref_enclave/host` and `release_enclave/host`
 - `/tests/idls/tcp/tcp.idl` - Added `release_options` enum and field to `release_send` struct
@@ -1115,6 +1132,67 @@ CORO_TASK(void) cleanup_after_object(
 - **TCP/SPSC**: Added `release_options` enum and field to message structs
 - **Channel managers**: Extract and pass options to service layer
 
+**5. Stub Layer Integration - Dual Reference Counting** (stub.h/stub.cpp):
+
+The critical achievement is separating stub lifetime management from optimistic reference tracking:
+
+```cpp
+// OLD: Single reference counter
+std::atomic<uint64_t> reference_count = 0;
+
+// NEW: Dual counters with different lifetime semantics
+std::atomic<uint64_t> shared_count = 0;      // Holds stub lifetime
+std::atomic<uint64_t> optimistic_count = 0;  // Does NOT hold stub lifetime
+```
+
+**Stub Operations**:
+```cpp
+uint64_t object_stub::add_ref(bool is_optimistic)
+{
+    if (is_optimistic)
+        ret = ++optimistic_count;  // Increment optimistic (doesn't hold lifetime)
+    else
+        ret = ++shared_count;      // Increment shared (holds lifetime)
+}
+
+uint64_t object_stub::release(bool is_optimistic)
+{
+    if (is_optimistic)
+        count = --optimistic_count;  // Decrement optimistic
+    else
+        count = --shared_count;      // Decrement shared
+}
+```
+
+**Stub Cleanup Logic** (service.cpp):
+```cpp
+uint64_t service::release_local_stub(const std::shared_ptr<object_stub>& stub, bool is_optimistic)
+{
+    uint64_t count = stub->release(is_optimistic);
+
+    // KEY: Only cleanup when shared_count reaches 0, NOT optimistic_count
+    if (!is_optimistic && !count)
+    {
+        stubs.erase(stub->get_id());
+        wrapped_object_to_stub.erase(pointer);
+        stub->reset();
+    }
+    return count;
+}
+```
+
+**This achieves the "remote weak pointer" semantics**:
+- ✅ `optimistic_count` can be > 0 while stub exists (weak-like behavior)
+- ✅ `shared_count == 0` triggers stub cleanup regardless of optimistic_count
+- ✅ Optimistic references don't prevent stub deletion
+- ✅ Shared references maintain stub lifetime as expected
+
+**Service Layer Wiring** (service.cpp line 1296):
+```cpp
+// Wire is_optimistic flag from add_ref_options to stub layer
+reference_count = stub->add_ref(!!(build_out_param_channel & add_ref_options::optimistic));
+```
+
 **Thread Safety**:
 - All reference counting uses atomic operations with appropriate memory ordering
 - Race conditions handled by transferring inherited references to existing proxies
@@ -1122,10 +1200,11 @@ CORO_TASK(void) cleanup_after_object(
 - Cleanup decision protected by checking both counters atomically
 
 **Service-side Behavior Changes**:
-- **Dual Reference Tracking**: Both shared and optimistic references tracked independently
+- **Dual Reference Tracking**: Both shared and optimistic references tracked independently at stub level
 - **Optimistic-First Cleanup**: Optimistic references released before shared (lighter weight first)
 - **High Count Support**: Loop-based release handles arbitrarily high inherited counts
 - **Race Condition Mitigation**: Inherited references properly transferred during concurrent cleanup
+- **Stub Lifetime Separation**: Only shared_count affects stub lifetime, optimistic_count can exist independently
 
 ### Phase 7: Testing & Validation ✅ COMPLETED (Core Tests)
 **Deliverables**:

@@ -36,7 +36,8 @@ namespace rpc
         mutable std::mutex map_control;
         std::unordered_map<interface_ordinal, std::shared_ptr<rpc::i_interface_stub>> stub_map;
         std::shared_ptr<object_stub> p_this;
-        std::atomic<uint64_t> reference_count = 0;
+        std::atomic<uint64_t> shared_count = 0;
+        std::atomic<uint64_t> optimistic_count = 0;
         service& zone_;
 
         void add_interface(const std::shared_ptr<rpc::i_interface_stub>& iface);
@@ -68,8 +69,8 @@ namespace rpc
 
         std::shared_ptr<rpc::i_interface_stub> get_interface(interface_ordinal interface_id);
 
-        uint64_t add_ref();
-        uint64_t release();
+        uint64_t add_ref(bool is_optimistic);
+        uint64_t release(bool is_optimistic);
         void release_from_service();
     };
 

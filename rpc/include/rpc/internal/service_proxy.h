@@ -107,7 +107,7 @@ namespace rpc
             known_direction_zone known_direction_zone_id,
             uint64_t& ref_count);
 
-        CORO_TASK(int) sp_release(object object_id, uint64_t& ref_count);
+        CORO_TASK(int) sp_release(object object_id, release_options options, uint64_t& ref_count);
 
         CORO_TASK(void)
         cleanup_after_object(std::shared_ptr<rpc::service> svc,
@@ -153,7 +153,8 @@ namespace rpc
         get_or_create_object_proxy(object object_id,
             object_proxy_creation_rule rule,
             bool new_proxy_added,
-            known_direction_zone known_direction_zone_id);
+            known_direction_zone known_direction_zone_id,
+            bool is_optimistic);
 
         friend service;
         friend child_service;

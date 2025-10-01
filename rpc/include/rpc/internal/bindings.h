@@ -105,7 +105,7 @@ namespace rpc
             std::shared_ptr<rpc::object_proxy> op = CO_AWAIT service_proxy->get_or_create_object_proxy(encap.object_id,
                 service_proxy::object_proxy_creation_rule::ADD_REF_IF_NEW,
                 new_proxy_added,
-                caller_zone_id.as_known_direction_zone());
+                caller_zone_id.as_known_direction_zone(), false);
             RPC_ASSERT(op != nullptr);
             if (!op)
             {
@@ -141,7 +141,7 @@ namespace rpc
                 CO_RETURN rpc::error::OBJECT_NOT_FOUND();
             }
 
-            auto count = serv->release_local_stub(ob);
+            auto count = serv->release_local_stub(ob, false);
             RPC_ASSERT(count);
             if (!count || count == std::numeric_limits<uint64_t>::max())
             {
@@ -180,7 +180,7 @@ namespace rpc
         }
 
         std::shared_ptr<rpc::object_proxy> op = CO_AWAIT service_proxy->get_or_create_object_proxy(
-            encap.object_id, service_proxy::object_proxy_creation_rule::RELEASE_IF_NOT_NEW, false, {});
+            encap.object_id, service_proxy::object_proxy_creation_rule::RELEASE_IF_NOT_NEW, false, {}, false);
         if (!op)
         {
             RPC_ERROR("Object not found in proxy_bind_out_param");
@@ -251,7 +251,7 @@ namespace rpc
             service_proxy->add_external_ref();
 
         std::shared_ptr<rpc::object_proxy> op = CO_AWAIT service_proxy->get_or_create_object_proxy(
-            encap.object_id, service_proxy::object_proxy_creation_rule::DO_NOTHING, false, {});
+            encap.object_id, service_proxy::object_proxy_creation_rule::DO_NOTHING, false, {}, false);
         if (!op)
         {
             RPC_ERROR("Object not found in demarshall_interface_proxy");

@@ -280,7 +280,7 @@ namespace rpc
         CO_RETURN last_error;
     }
 
-    CORO_TASK(int) service_proxy::sp_release(object object_id, uint64_t& ref_count)
+    CORO_TASK(int) service_proxy::sp_release(object object_id, release_options options, uint64_t& ref_count)
     {
 #ifdef USE_RPC_TELEMETRY
         if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
@@ -296,7 +296,7 @@ namespace rpc
         int last_error = rpc::error::INVALID_VERSION();
         while (version >= min_version)
         {
-            auto ret = CO_AWAIT release(version, destination_zone_id_, object_id, caller_zone_id_, release_options::normal, ref_count);
+            auto ret = CO_AWAIT release(version, destination_zone_id_, object_id, caller_zone_id_, options, ref_count);
             if (ret != rpc::error::INVALID_VERSION() && ret != rpc::error::INCOMPATIBLE_SERVICE())
             {
                 if (original_version != version)
@@ -334,17 +334,7 @@ namespace rpc
             inherited_optimistic_reference_count);
 
         auto caller_zone_id = get_zone_id().as_caller();
-
-        // Handle normal reference release
         uint64_t ref_count = 0;
-        auto ret = CO_AWAIT release(version_.load(), destination_zone_id_, object_id, caller_zone_id, release_options::normal, ref_count);
-        if (ret != rpc::error::OK())
-        {
-            RPC_ERROR("cleanup_after_object release failed");
-            RPC_ASSERT(false);
-            CO_RETURN;
-        }
-        inner_release_external_ref();
 
         // Handle inherited optimistic references first (as recommended)
         for (int i = 0; i < inherited_optimistic_reference_count; i++)
@@ -487,7 +477,8 @@ namespace rpc
 
     CORO_TASK(std::shared_ptr<rpc::object_proxy>)
     service_proxy::get_or_create_object_proxy(
-        object object_id, object_proxy_creation_rule rule, bool new_proxy_added, known_direction_zone known_direction_zone_id)
+        object object_id, object_proxy_creation_rule rule, bool new_proxy_added, known_direction_zone known_direction_zone_id,
+            bool is_optimistic)
     {
         RPC_DEBUG("get_or_create_object_proxy service zone: {} destination_zone={}, caller_zone={}, object_id = {}",
             zone_id_.get_val(),
@@ -539,7 +530,7 @@ namespace rpc
 #endif
             uint64_t ref_count = 0;
             auto ret
-                = CO_AWAIT sp_add_ref(object_id, {0}, rpc::add_ref_options::normal, known_direction_zone_id, ref_count);
+                = CO_AWAIT sp_add_ref(object_id, {0}, is_optimistic ? rpc::add_ref_options::optimistic : rpc::add_ref_options::normal, known_direction_zone_id, ref_count);
             if (ret != error::OK())
             {
                 RPC_ERROR("sp_add_ref failed");
@@ -561,7 +552,7 @@ namespace rpc
             // found we can do a release
             RPC_ASSERT(!new_proxy_added);
             uint64_t ref_count = 0;
-            auto ret = CO_AWAIT sp_release(object_id, ref_count);
+            auto ret = CO_AWAIT sp_release(object_id, is_optimistic ? rpc::release_options::optimistic : rpc::release_options::normal, ref_count);
             if (ret == error::OK())
             {
                 // This is now safe because self_ref keeps us alive

@@ -229,7 +229,7 @@ namespace rpc
             release_options options,
             uint64_t& reference_count) override;
 
-        uint64_t release_local_stub(const std::shared_ptr<object_stub>& stub);
+        uint64_t release_local_stub(const std::shared_ptr<object_stub>& stub, bool is_optimistic);
 
         virtual void add_zone_proxy(const std::shared_ptr<rpc::service_proxy>& zone);
         virtual std::shared_ptr<rpc::service_proxy> get_zone_proxy(caller_channel_zone caller_channel_zone_id,

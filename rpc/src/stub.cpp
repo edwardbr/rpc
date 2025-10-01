@@ -94,9 +94,13 @@ namespace rpc
         return ret;
     }
 
-    uint64_t object_stub::add_ref()
+    uint64_t object_stub::add_ref(bool is_optimistic)
     {
-        uint64_t ret = ++reference_count;
+        uint64_t ret = 0;
+        if(is_optimistic)
+            ret = ++optimistic_count;
+        else
+            ret = ++shared_count;
 #ifdef USE_RPC_TELEMETRY
         if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
             telemetry_service->on_stub_add_ref(zone_.get_zone_id(), id_, {}, ret, {});
@@ -106,9 +110,13 @@ namespace rpc
         return ret;
     }
 
-    uint64_t object_stub::release()
+    uint64_t object_stub::release(bool is_optimistic)
     {
-        uint64_t count = --reference_count;
+        uint64_t count = 0;
+        if(is_optimistic)
+            count = --optimistic_count;
+        else
+            count = --shared_count;
 #ifdef USE_RPC_TELEMETRY
         if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
             telemetry_service->on_stub_release(zone_.get_zone_id(), id_, {}, count, {});
@@ -119,7 +127,7 @@ namespace rpc
 
     void object_stub::release_from_service()
     {
-        zone_.release_local_stub(p_this);
+        zone_.release_local_stub(p_this, false);
     }
 
 }

@@ -369,7 +369,7 @@ namespace rpc
         {
             auto object_id = casting_interface::get_object_id(*input_interface);
             uint64_t ref_count = 0;
-            auto ret = CO_AWAIT destination_zone->sp_release(object_id, ref_count);
+            auto ret = CO_AWAIT destination_zone->sp_release(object_id, release_options::normal, ref_count);
             if (ret == error::OK())
             {
                 destination_zone->release_external_ref();
@@ -694,7 +694,7 @@ namespace rpc
                     stub = item->second.lock();
                     // Don't mask the race condition - if stub is null here, we have a serious problem
                     RPC_ASSERT(stub != nullptr);
-                    stub->add_ref();
+                    stub->add_ref(false);
                 }
                 else
                 {
@@ -706,7 +706,7 @@ namespace rpc
                     wrapped_object_to_stub[pointer] = stub;
                     stubs[id] = stub;
                     stub->on_added_to_zone(stub);
-                    stub->add_ref();
+                    stub->add_ref(false);
                 }
             }
 
@@ -1293,16 +1293,16 @@ namespace rpc
                 reference_count = 0;
                 CO_RETURN rpc::error::OBJECT_NOT_FOUND();
             }
-            reference_count = stub->add_ref();
+            reference_count = stub->add_ref(!!(build_out_param_channel & add_ref_options::optimistic));
             CO_RETURN rpc::error::OK();
         }
     }
 
-    uint64_t service::release_local_stub(const std::shared_ptr<rpc::object_stub>& stub)
+    uint64_t service::release_local_stub(const std::shared_ptr<rpc::object_stub>& stub, bool is_optimistic)
     {
         std::lock_guard l(stub_control);
-        uint64_t count = stub->release();
-        if (!count)
+        uint64_t count = stub->release(is_optimistic);
+        if (!is_optimistic && !count)
         {
             {
                 stubs.erase(stub->get_id());
@@ -1419,7 +1419,7 @@ namespace rpc
                 telemetry_service->on_service_release(
                     zone_id_, other_zone->get_destination_channel_zone_id(), destination_zone_id, object_id, caller_zone_id);
 #endif
-            auto ret = CO_AWAIT other_zone->sp_release(object_id, reference_count);
+            auto ret = CO_AWAIT other_zone->sp_release(object_id, options, reference_count);
             if (ret == error::OK())
             {
                 cleanup_service_proxy(other_zone);
@@ -1471,7 +1471,7 @@ namespace rpc
                     CO_RETURN rpc::error::OBJECT_NOT_FOUND();
                 }
                 // this guy needs to live outside of the mutex or deadlocks may happen
-                count = stub->release();
+                count = stub->release(false);
                 if (!count)
                 {
                     {
