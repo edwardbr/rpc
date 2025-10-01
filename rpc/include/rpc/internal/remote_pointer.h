@@ -2078,6 +2078,59 @@ namespace rpc
         return static_cast<bool>(rhs);
     }
 
+    // Pointer cast functions for optimistic_ptr
+    template<typename T, typename U>
+    optimistic_ptr<T> static_pointer_cast(const optimistic_ptr<U>& r) noexcept
+    {
+        auto p = static_cast<T*>(r.get());
+        return optimistic_ptr<T>(r, p);
+    }
+
+    template<typename T, typename U>
+    optimistic_ptr<T> const_pointer_cast(const optimistic_ptr<U>& r) noexcept
+    {
+        auto p = const_cast<T*>(r.get());
+        return optimistic_ptr<T>(r, p);
+    }
+
+    template<typename T, typename U>
+    optimistic_ptr<T> reinterpret_pointer_cast(const optimistic_ptr<U>& r) noexcept
+    {
+        auto p = reinterpret_cast<T*>(r.get());
+        return optimistic_ptr<T>(r, p);
+    }
+
+    // Dynamic pointer cast for optimistic_ptr (uses local query_interface)
+    template<typename T, typename U>
+    CORO_TASK(optimistic_ptr<T>) dynamic_pointer_cast(const optimistic_ptr<U>& from) noexcept
+    {
+        if (!from)
+            CO_RETURN optimistic_ptr<T>();
+
+        T* ptr = nullptr;
+
+        // First try local interface casting
+        ptr = const_cast<T*>(static_cast<const T*>(from->query_interface(T::get_id(VERSION_2))));
+        if (ptr)
+            CO_RETURN optimistic_ptr<T>(from, ptr);
+
+        // Then try remote interface casting through object_proxy
+        auto ob = from->get_object_proxy();
+        if (!ob)
+        {
+            CO_RETURN optimistic_ptr<T>();
+        }
+
+        optimistic_ptr<T> ret;
+        // This magic function will return an optimistic pointer to a new interface proxy
+        // Its reference count will not be the same as the "from" pointer's value, semantically it
+        // behaves the same as with normal dynamic_pointer_cast in that you can use this function to
+        // cast back to the original. However static_pointer_cast in this case will not work for
+        // remote interfaces.
+        CO_AWAIT ob->template query_interface<T, optimistic_ptr<T>, true>(ret);
+        CO_RETURN ret;
+    }
+
 #endif // !TEST_STL_COMPLIANCE
 
     // NAMESPACE_INLINE_END  // Commented out to simplify
