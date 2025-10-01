@@ -280,6 +280,7 @@ namespace rpc::spsc
         destination_zone destination_zone_id,
         object object_id,
         caller_zone caller_zone_id,
+        rpc::release_options options,
         uint64_t& reference_count)
     {
         RPC_DEBUG("release zone: {}", get_zone_id().get_val());
@@ -296,6 +297,7 @@ namespace rpc::spsc
                 .destination_zone_id = destination_zone_id.get_val(),
                 .object_id = object_id.get_val(),
                 .caller_zone_id = caller_zone_id.get_val(),
+                .options = static_cast<release_options>(options),
             },
             response_data);
         if (ret != rpc::error::OK())

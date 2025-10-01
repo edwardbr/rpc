@@ -296,7 +296,7 @@ namespace rpc
         int last_error = rpc::error::INVALID_VERSION();
         while (version >= min_version)
         {
-            auto ret = CO_AWAIT release(version, destination_zone_id_, object_id, caller_zone_id_, ref_count);
+            auto ret = CO_AWAIT release(version, destination_zone_id_, object_id, caller_zone_id_, release_options::normal, ref_count);
             if (ret != rpc::error::INVALID_VERSION() && ret != rpc::error::INCOMPATIBLE_SERVICE())
             {
                 if (original_version != version)
@@ -320,20 +320,24 @@ namespace rpc
     service_proxy::cleanup_after_object(std::shared_ptr<rpc::service> svc,
         std::shared_ptr<rpc::service_proxy> self,
         object object_id,
-        int inherited_reference_count)
+        int inherited_shared_reference_count,
+        int inherited_optimistic_reference_count)
     {
         // self is needed to keep the service proxy alive in the async destruction of the service_proxy
-        RPC_DEBUG("cleanup_after_object service zone: {} destination_zone={}, caller_zone={}, object_id = {}",
+        RPC_DEBUG("cleanup_after_object service zone: {} destination_zone={}, caller_zone={}, object_id = {} "
+                  "(inherited: shared={}, optimistic={})",
             get_zone_id().get_val(),
             destination_zone_id_.get_val(),
             caller_zone_id_.get_val(),
-            object_id.get_val());
+            object_id.get_val(),
+            inherited_shared_reference_count,
+            inherited_optimistic_reference_count);
 
         auto caller_zone_id = get_zone_id().as_caller();
 
         // Handle normal reference release
         uint64_t ref_count = 0;
-        auto ret = CO_AWAIT release(version_.load(), destination_zone_id_, object_id, caller_zone_id, ref_count);
+        auto ret = CO_AWAIT release(version_.load(), destination_zone_id_, object_id, caller_zone_id, release_options::normal, ref_count);
         if (ret != rpc::error::OK())
         {
             RPC_ERROR("cleanup_after_object release failed");
@@ -342,18 +346,36 @@ namespace rpc
         }
         inner_release_external_ref();
 
-        // Handle inherited references from race conditions
-        for (int i = 0; i < inherited_reference_count; i++)
+        // Handle inherited optimistic references first (as recommended)
+        for (int i = 0; i < inherited_optimistic_reference_count; i++)
         {
-            RPC_DEBUG("Releasing inherited reference {}/{} for object {}",
+            RPC_DEBUG("Releasing inherited optimistic reference {}/{} for object {}",
                 (i + 1),
-                inherited_reference_count,
+                inherited_optimistic_reference_count,
                 object_id.get_val());
 
-            auto ret = CO_AWAIT release(version_.load(), destination_zone_id_, object_id, caller_zone_id, ref_count);
+            auto ret = CO_AWAIT release(version_.load(), destination_zone_id_, object_id, caller_zone_id, release_options::optimistic, ref_count);
             if (ret != rpc::error::OK())
             {
-                RPC_ERROR("cleanup_after_object release failed");
+                RPC_ERROR("cleanup_after_object optimistic release failed");
+                RPC_ASSERT(false);
+                CO_RETURN;
+            }
+            inner_release_external_ref();
+        }
+
+        // Handle inherited shared references from race conditions
+        for (int i = 0; i < inherited_shared_reference_count; i++)
+        {
+            RPC_DEBUG("Releasing inherited shared reference {}/{} for object {}",
+                (i + 1),
+                inherited_shared_reference_count,
+                object_id.get_val());
+
+            auto ret = CO_AWAIT release(version_.load(), destination_zone_id_, object_id, caller_zone_id, release_options::normal, ref_count);
+            if (ret != rpc::error::OK())
+            {
+                RPC_ERROR("cleanup_after_object shared release failed");
                 RPC_ASSERT(false);
                 CO_RETURN;
             }
@@ -364,13 +386,16 @@ namespace rpc
         CO_RETURN;
     }
 
-    void service_proxy::on_object_proxy_released(object object_id, int inherited_reference_count)
+    void service_proxy::on_object_proxy_released(object object_id, int inherited_shared_reference_count, int inherited_optimistic_reference_count)
     {
-        RPC_DEBUG("on_object_proxy_released service zone: {} destination_zone={}, caller_zone={}, object_id = {}",
+        RPC_DEBUG("on_object_proxy_released service zone: {} destination_zone={}, caller_zone={}, object_id = {} "
+                  "(inherited: shared={}, optimistic={})",
             get_zone_id().get_val(),
             destination_zone_id_.get_val(),
             caller_zone_id_.get_val(),
-            object_id.get_val());
+            object_id.get_val(),
+            inherited_shared_reference_count,
+            inherited_optimistic_reference_count);
 
         // this keeps the underlying service alive while the service proxy is released
         auto current_service = get_operating_zone_service();
@@ -396,13 +421,26 @@ namespace rpc
                 if (existing_proxy != nullptr)
                 {
                     // Check if there are other proxies that need to handle the cleanup
-                    if (inherited_reference_count > 0)
+                    int total_inherited = inherited_shared_reference_count + inherited_optimistic_reference_count;
+                    if (total_inherited > 0)
                     {
-                        // There are other proxies - we need to create a new entry to handle the remaining references
-                        RPC_DEBUG("Race condition avoided - transferring reference Object ID: {}, transferring to new "
-                                  "proxy entry, skipping remote release calls",
+                        // There are other proxies - we need to transfer references to the existing proxy
+                        RPC_DEBUG("Race condition avoided - transferring {} inherited references (shared={}, optimistic={}) "
+                                  "for object {}, skipping remote release calls",
+                            total_inherited,
+                            inherited_shared_reference_count,
+                            inherited_optimistic_reference_count,
                             object_id.get_val());
-                        existing_proxy->inherit_extra_reference();
+
+                        // Transfer all inherited references to the existing proxy
+                        for (int i = 0; i < inherited_shared_reference_count; i++)
+                        {
+                            existing_proxy->inherit_shared_reference();
+                        }
+                        for (int i = 0; i < inherited_optimistic_reference_count; i++)
+                        {
+                            existing_proxy->inherit_optimistic_reference();
+                        }
                         return;
                     }
                 }
@@ -414,9 +452,9 @@ namespace rpc
         // Schedule the coroutine work asynchronously
 #ifdef BUILD_COROUTINE
         current_service->schedule(
-            cleanup_after_object(current_service, shared_from_this(), object_id, inherited_reference_count));
+            cleanup_after_object(current_service, shared_from_this(), object_id, inherited_shared_reference_count, inherited_optimistic_reference_count));
 #else
-        cleanup_after_object(current_service, shared_from_this(), object_id, inherited_reference_count);
+        cleanup_after_object(current_service, shared_from_this(), object_id, inherited_shared_reference_count, inherited_optimistic_reference_count);
 #endif
     }
 

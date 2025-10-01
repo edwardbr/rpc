@@ -385,7 +385,7 @@ namespace rpc::tcp
         std::vector<char> out_buf;
         uint64_t ref_count = 0;
         auto ret = co_await service_->release(
-            prefix.version, {request.destination_zone_id}, {request.object_id}, {request.caller_zone_id}, ref_count);
+            prefix.version, {request.destination_zone_id}, {request.object_id}, {request.caller_zone_id}, static_cast<rpc::release_options>(request.options), ref_count);
 
         if (ret != rpc::error::OK())
         {

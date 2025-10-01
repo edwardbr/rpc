@@ -15,11 +15,13 @@ namespace rpc
 {
     enum class add_ref_options : std::uint8_t
     {
-        normal = 1,
+        normal = 0,
         // when unidirectionally addreffing the destination
-        build_destination_route = 2,
+        build_destination_route = 1,
         // when unidirectionally addreffing the caller which prepares refcounts etc in the reverse direction
-        build_caller_route = 4
+        build_caller_route = 2,
+        // when the add_ref is from optimistic_ptr reference (assumed shared if not set)
+        optimistic = 4
     };
 
     inline add_ref_options operator|(add_ref_options lhs, add_ref_options rhs)
@@ -46,6 +48,39 @@ namespace rpc
     inline bool operator!(add_ref_options e)
     {
         return e == static_cast<add_ref_options>(0);
+    }
+
+    enum class release_options : std::uint8_t
+    {
+        normal = 0,
+        // when the release is from optimistic_ptr reference (assumed shared if not set)
+        optimistic = 1
+    };
+
+    inline release_options operator|(release_options lhs, release_options rhs)
+    {
+        return static_cast<release_options>(static_cast<std::underlying_type<release_options>::type>(lhs)
+                                            | static_cast<std::underlying_type<release_options>::type>(rhs));
+    }
+    inline release_options operator&(release_options lhs, release_options rhs)
+    {
+        return static_cast<release_options>(static_cast<std::underlying_type<release_options>::type>(lhs)
+                                            & static_cast<std::underlying_type<release_options>::type>(rhs));
+    }
+    inline release_options operator^(release_options lhs, release_options rhs)
+    {
+        return static_cast<release_options>(static_cast<std::underlying_type<release_options>::type>(lhs)
+                                            ^ static_cast<std::underlying_type<release_options>::type>(rhs));
+    }
+
+    inline release_options operator~(release_options lhs)
+    {
+        return static_cast<release_options>(~static_cast<std::underlying_type<release_options>::type>(lhs));
+    }
+
+    inline bool operator!(release_options e)
+    {
+        return e == static_cast<release_options>(0);
     }
 
     // the used for marshalling data between zones
@@ -83,6 +118,7 @@ namespace rpc
             destination_zone destination_zone_id,
             object object_id,
             caller_zone caller_zone_id,
+            release_options options,
             uint64_t& reference_count)
             = 0;
     };

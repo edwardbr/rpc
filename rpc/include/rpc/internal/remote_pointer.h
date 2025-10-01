@@ -284,11 +284,16 @@ namespace rpc
 
         namespace __shared_ptr_control_block
         {
+#ifndef TEST_STL_COMPLIANCE
+            // forward declarations implemented in object_proxy.cpp
+            void object_proxy_add_ref(const std::shared_ptr<rpc::object_proxy>& ob, rpc::add_ref_options options);
+            void object_proxy_release(const std::shared_ptr<rpc::object_proxy>& ob, rpc::release_options options);
+#endif
+
             template<typename T> class shared_ptr;
             template<typename T> class weak_ptr;
 
             // NAMESPACE_INLINE_BEGIN  // Commented out to simplify
-
             struct control_block_base
             {
                 std::atomic<long> shared_owners{0};
@@ -324,7 +329,17 @@ namespace rpc
 
                 void* get_managed_object_ptr() const { return managed_object_ptr_; }
 
-                void increment_shared() { shared_owners.fetch_add(1, std::memory_order_relaxed); }
+                void increment_shared()
+                {
+                    long prev = shared_owners.fetch_add(1, std::memory_order_relaxed);
+#ifndef TEST_STL_COMPLIANCE
+                    // Call object_proxy add_ref on 0→1 transition for remote objects
+                    if (prev == 0)
+                    {
+                        control_block_call_add_ref(add_ref_options::normal);
+                    }
+#endif
+                }
                 void increment_weak() { weak_owners.fetch_add(1, std::memory_order_relaxed); }
 
                 // Try to increment shared count only if it's not zero (thread-safe)
@@ -345,6 +360,10 @@ namespace rpc
                 {
                     if (shared_owners.fetch_sub(1, std::memory_order_acq_rel) == 1)
                     {
+#ifndef TEST_STL_COMPLIANCE
+                        // Call object_proxy release on 1→0 transition for remote objects
+                        control_block_call_release(release_options::normal);
+#endif
                         dispose_object_actual();
                         decrement_weak_and_destroy_if_zero();
                     }
@@ -365,7 +384,12 @@ namespace rpc
                 // Fast increment when control block is guaranteed alive (e.g., copying from valid optimistic_ptr)
                 void increment_optimistic_no_lock() noexcept
                 {
-                    optimistic_owners.fetch_add(1, std::memory_order_relaxed);
+                    long prev = optimistic_owners.fetch_add(1, std::memory_order_relaxed);
+                    // Call object_proxy add_ref on 0→1 transition for remote objects
+                    if (prev == 0)
+                    {
+                        control_block_call_add_ref(add_ref_options::optimistic);
+                    }
                 }
 
                 // Safe increment when control block lifetime is uncertain (e.g., converting from shared_ptr/weak_ptr)
@@ -394,7 +418,8 @@ namespace rpc
                     {
                         // First optimistic_ptr: weak_owners already incremented above
                         // This increment becomes the "optimistic_ptr weak_owner"
-                        // No need to call add_ref here - that will be done by the caller if needed
+                        // Call object_proxy add_ref on 0→1 transition for remote objects
+                        control_block_call_add_ref(add_ref_options::optimistic);
                     }
                     else
                     {
@@ -409,19 +434,46 @@ namespace rpc
                 void decrement_optimistic_and_dispose_if_zero() noexcept
                 {
                     long prev = optimistic_owners.fetch_sub(1, std::memory_order_acq_rel);
-                    // Note: No remote proxy release here - that's handled by optimistic_ptr destructor
 
                     // If this was the last optimistic_ptr, decrement weak_owners
                     // CRITICAL: This must be done last to prevent control block destruction
                     // while other threads might be incrementing optimistic_owners
                     if (prev == 1)
                     {
+                        // Call object_proxy release on 1→0 transition for remote objects
+                        control_block_call_release(release_options::optimistic);
+
                         // Last optimistic_ptr: decrement the weak_owners that was added by first optimistic_ptr
                         decrement_weak_and_destroy_if_zero();
                     }
                 }
+                
+                inline void control_block_call_add_ref(rpc::add_ref_options options) noexcept
+                {
+                    if (managed_object_ptr_ && !is_local)
+                    {
+                        auto ci = reinterpret_cast<::rpc::casting_interface*>(managed_object_ptr_);
+                        if (auto obj_proxy = ci->get_object_proxy())
+                        {
+                            object_proxy_add_ref(obj_proxy, options);
+                        }
+                    }
+                }
+
+                inline void control_block_call_release(::rpc::release_options options) noexcept
+                {
+                    if (managed_object_ptr_ && !is_local)
+                    {
+                        auto ci = reinterpret_cast<::rpc::casting_interface*>(managed_object_ptr_);
+                        if (auto obj_proxy = ci->get_object_proxy())
+                        {
+                            object_proxy_release(obj_proxy, options);
+                        }
+                    }
+                }
 #endif
             };
+            
 
             template<typename T> static void* to_void_ptr(T* p)
             {
@@ -1569,11 +1621,11 @@ namespace rpc
 
 #else
 
-    template<typename T, typename U> shared_ptr<T> dynamic_pointer_cast(const shared_ptr<U>& from) noexcept
-    {        
+    template<typename T, typename U> CORO_TASK(shared_ptr<T>) dynamic_pointer_cast(const shared_ptr<U>& from) noexcept
+    {
         if (!from)
             CO_RETURN shared_ptr<T>();
-            
+
         T* ptr = nullptr;
 
         // First try local interface casting

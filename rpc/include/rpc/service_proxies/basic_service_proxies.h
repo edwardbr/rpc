@@ -118,10 +118,11 @@ namespace rpc
             destination_zone destination_zone_id,
             object object_id,
             caller_zone caller_zone_id,
+            release_options options,
             uint64_t& reference_count) override
         {
             auto ret = CO_AWAIT parent_service_.lock()->release(
-                protocol_version, destination_zone_id, object_id, caller_zone_id, reference_count);
+                protocol_version, destination_zone_id, object_id, caller_zone_id, options, reference_count);
             CO_RETURN ret;
         }
 
@@ -272,6 +273,7 @@ namespace rpc
             destination_zone destination_zone_id,
             object object_id,
             caller_zone caller_zone_id,
+            release_options options,
             uint64_t& reference_count) override
         {
             auto child_service = child_service_.get_nullable();
@@ -283,7 +285,7 @@ namespace rpc
             }
 
             auto ret = CO_AWAIT child_service->release(
-                protocol_version, destination_zone_id, object_id, caller_zone_id, reference_count);
+                protocol_version, destination_zone_id, object_id, caller_zone_id, options, reference_count);
             CO_RETURN ret;
         }
 

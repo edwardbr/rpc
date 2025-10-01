@@ -68,6 +68,7 @@ namespace rpc
             destination_zone destination_zone_id,
             object object_id,
             caller_zone caller_zone_id,
+            rpc::release_options options,
             uint64_t& reference_count) override;
 
         std::shared_ptr<enclave_owner> enclave_owner_;

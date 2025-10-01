@@ -14,24 +14,108 @@ namespace rpc
     {
     }
 
-    object_proxy::~object_proxy()
+    void object_proxy::add_ref(add_ref_options options)
     {
-        // Get service_proxy once for the entire destructor to ensure consistency
-        auto service_proxy = service_proxy_.get_nullable();
-
-        // Add detailed logging to track object_proxy destruction
-#ifdef USE_RPC_LOGGING
-        if (service_proxy)
+        // Increment appropriate counter based on reference type
+        bool is_optimistic = static_cast<bool>(options & add_ref_options::optimistic);
+        if (is_optimistic)
         {
-            RPC_DEBUG("object_proxy destructor: service zone={} destination_zone={} caller_zone={} object_id={}",
-                service_proxy->get_zone_id().get_val(),
-                service_proxy->get_destination_zone_id().get_val(),
-                service_proxy->get_caller_zone_id().get_val(),
-                object_id_.get_val());
+            inherited_optimistic_count_.fetch_add(1, std::memory_order_relaxed);
         }
         else
         {
-            RPC_DEBUG("object_proxy destructor: service_proxy_ is nullptr for object_id={}", object_id_.get_val());
+            inherited_shared_count_.fetch_add(1, std::memory_order_relaxed);
+        }
+
+        // Get service_proxy once for consistency
+        auto service_proxy = service_proxy_.get_nullable();
+
+#ifdef USE_RPC_LOGGING
+        if (service_proxy)
+        {
+            RPC_DEBUG("object_proxy::add_ref: {} reference for service zone={} destination_zone={} object_id={} "
+                      "(shared={}, optimistic={})",
+                is_optimistic ? "optimistic" : "shared",
+                service_proxy->get_zone_id().get_val(),
+                service_proxy->get_destination_zone_id().get_val(),
+                object_id_.get_val(),
+                inherited_shared_count_.load(),
+                inherited_optimistic_count_.load());
+        }
+#endif
+    }
+
+    void object_proxy::release(release_options options)
+    {
+        // Decrement appropriate counter based on reference type
+        bool is_optimistic = static_cast<bool>(options & release_options::optimistic);
+        int prev_count;
+        if (is_optimistic)
+        {
+            prev_count = inherited_optimistic_count_.fetch_sub(1, std::memory_order_acq_rel);
+        }
+        else
+        {
+            prev_count = inherited_shared_count_.fetch_sub(1, std::memory_order_acq_rel);
+        }
+
+        // Get service_proxy once for consistency
+        auto service_proxy = service_proxy_.get_nullable();
+
+#ifdef USE_RPC_LOGGING
+        if (service_proxy)
+        {
+            RPC_DEBUG("object_proxy::release: {} reference for service zone={} destination_zone={} object_id={} "
+                      "(shared={}, optimistic={})",
+                is_optimistic ? "optimistic" : "shared",
+                service_proxy->get_zone_id().get_val(),
+                service_proxy->get_destination_zone_id().get_val(),
+                object_id_.get_val(),
+                inherited_shared_count_.load(),
+                inherited_optimistic_count_.load());
+        }
+#endif
+
+        // Perform cleanup only when BOTH shared and optimistic counts reach zero
+        // This ensures object_proxy stays alive as long as any references exist
+        if (prev_count == 1) // We just decremented to 0
+        {
+            int shared_count = inherited_shared_count_.load(std::memory_order_acquire);
+            int optimistic_count = inherited_optimistic_count_.load(std::memory_order_acquire);
+
+            if (shared_count == 0 && optimistic_count == 0)
+            {
+                // Final release - perform cleanup that was previously in destructor
+                if (service_proxy)
+                {
+#ifdef USE_RPC_LOGGING
+                    RPC_DEBUG("object_proxy::release: final cleanup for object_id={}", object_id_.get_val());
+#endif
+                    service_proxy->on_object_proxy_released(object_id_, 0, 0);
+                }
+            }
+        }
+    }
+
+    object_proxy::~object_proxy()
+    {
+        // Cleanup has been moved to release() method
+        // Destructor now only handles final telemetry and cleanup of any remaining inherited references
+        auto service_proxy = service_proxy_.get_nullable();
+
+#ifdef USE_RPC_LOGGING
+        if (service_proxy)
+        {
+            int shared_count = inherited_shared_count_.load();
+            int optimistic_count = inherited_optimistic_count_.load();
+            RPC_DEBUG("object_proxy destructor: service zone={} destination_zone={} object_id={} (remaining: "
+                      "shared={}, optimistic={})",
+                service_proxy->get_zone_id().get_val(),
+                service_proxy->get_destination_zone_id().get_val(),
+                service_proxy->get_caller_zone_id().get_val(),
+                object_id_.get_val(),
+                shared_count,
+                optimistic_count);
         }
 #endif
 
@@ -43,19 +127,24 @@ namespace rpc
         }
 #endif
 
-        // Handle additional references inherited from concurrent proxy destruction
-        int inherited_count = inherited_reference_count_.load();
-#ifdef USE_RPC_LOGGING
-        if (inherited_count > 0)
-        {
-            RPC_DEBUG("object_proxy destructor: {} inherited references will be handled by on_object_proxy_released "
-                      "for object {}",
-                inherited_count,
-                object_id_.get_val());
-        }
-#endif
+        // Handle any remaining inherited references (race condition cleanup)
+        int inherited_shared = inherited_shared_count_.load();
+        int inherited_optimistic = inherited_optimistic_count_.load();
+        int total_inherited = inherited_shared + inherited_optimistic;
 
-        service_proxy->on_object_proxy_released(object_id_, inherited_count);
+        if (total_inherited > 0 && service_proxy)
+        {
+#ifdef USE_RPC_LOGGING
+            RPC_DEBUG("object_proxy destructor: {} inherited references (shared={}, optimistic={}) will be handled by "
+                      "on_object_proxy_released for object {}",
+                total_inherited,
+                inherited_shared,
+                inherited_optimistic,
+                object_id_.get_val());
+#endif
+            service_proxy->on_object_proxy_released(object_id_, inherited_shared, inherited_optimistic);
+        }
+
         service_proxy_ = nullptr;
     }
 
@@ -99,5 +188,22 @@ namespace rpc
     {
         std::lock_guard guard(insert_control_);
         proxy_map[interface_id] = value;
+    }
+
+    namespace __rpc_internal
+    {
+        namespace __shared_ptr_control_block
+        {
+            // forward declarations implemented in object_proxy.cpp
+            void object_proxy_add_ref(const std::shared_ptr<rpc::object_proxy>& ob, rpc::add_ref_options options)
+            {
+                ob->add_ref(options);
+            }
+            
+            void object_proxy_release(const std::shared_ptr<rpc::object_proxy>& ob, rpc::release_options options)
+            {
+                ob->release(options);
+            }
+        }
     }
 }

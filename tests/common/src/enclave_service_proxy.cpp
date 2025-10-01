@@ -303,6 +303,7 @@ namespace rpc
         destination_zone destination_zone_id,
         object object_id,
         caller_zone caller_zone_id,
+        rpc::release_options options,
         uint64_t& reference_count)
     {
         int err_code = 0;
@@ -312,6 +313,7 @@ namespace rpc
             destination_zone_id.get_val(),
             object_id.get_val(),
             caller_zone_id.get_val(),
+            static_cast<char>(options),
             &reference_count);
         if (status == SGX_ERROR_ECALL_NOT_ALLOWED)
         {
@@ -324,6 +326,7 @@ namespace rpc
                         destination_zone_id.get_val(),
                         object_id.get_val(),
                         caller_zone_id.get_val(),
+                        static_cast<char>(options),
                         &reference_count);
                 });
             task.join();

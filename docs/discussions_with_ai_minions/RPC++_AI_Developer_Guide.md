@@ -205,7 +205,7 @@ void on_object_proxy_released(object object_id)
 class object_proxy {
     std::atomic<int> inherited_reference_count_{0};
 public:
-    void inherit_extra_reference() {
+    void inherit_shared_reference() {
         inherited_reference_count_.fetch_add(1);
     }
 };

@@ -121,12 +121,19 @@ namespace rpc
             uint64_t ref_count;
             int err_code;
         };
-        
+
+        enum release_options : uint8_t
+        {
+            normal = 1,
+            optimistic = 2
+        };
+
         struct release_send
         {
             uint64_t destination_zone_id;
             uint64_t object_id;
             uint64_t  caller_zone_id;
+            release_options options;
         };
             
         struct release_receive

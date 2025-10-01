@@ -135,6 +135,7 @@ extern "C"
         uint64_t zone_id,
         uint64_t object_id,
         uint64_t caller_zone_id,
+        char options,
         uint64_t* reference_count)
     {
         auto root_service = current_host_service.lock();
@@ -144,7 +145,7 @@ extern "C"
             CO_RETURN rpc::error::TRANSPORT_ERROR();
         }
         CO_RETURN CO_AWAIT root_service->release(
-            protocol_version, {zone_id}, {object_id}, {caller_zone_id}, *reference_count);
+            protocol_version, {zone_id}, {object_id}, {caller_zone_id}, static_cast<rpc::release_options>(options), *reference_count);
     }
     // #endif
 

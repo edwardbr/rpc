@@ -5,6 +5,9 @@
 // this is the legacy rpc implementation kept for win32 for now
 
 #include <rpc/rpc.h>
+#include <rpc/internal/remote_pointer.h>
+#include <rpc/internal/object_proxy.h>
+#include <rpc/internal/casting_interface.h>
 
 namespace rpc
 {
@@ -30,5 +33,6 @@ namespace rpc
     // {
     //     return nullptr;
     // }
+
 
 }

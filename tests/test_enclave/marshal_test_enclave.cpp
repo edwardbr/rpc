@@ -193,14 +193,14 @@ int add_ref_enclave(uint64_t protocol_version,
 }
 
 int release_enclave(
-    uint64_t protocol_version, uint64_t zone_id, uint64_t object_id, uint64_t caller_zone_id, uint64_t* reference_count)
+    uint64_t protocol_version, uint64_t zone_id, uint64_t object_id, uint64_t caller_zone_id, char options, uint64_t* reference_count)
 {
     if (protocol_version > rpc::get_version())
     {
         *reference_count = 0;
         return rpc::error::INCOMPATIBLE_SERVICE();
     }
-    auto err_code = rpc_server->release(protocol_version, {zone_id}, {object_id}, {caller_zone_id}, *reference_count);
+    auto err_code = rpc_server->release(protocol_version, {zone_id}, {object_id}, {caller_zone_id}, static_cast<rpc::release_options>(options), *reference_count);
     return err_code;
 }
 

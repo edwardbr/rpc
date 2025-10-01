@@ -226,6 +226,7 @@ namespace rpc
             destination_zone destination_zone_id,
             object object_id,
             caller_zone caller_zone_id,
+            release_options options,
             uint64_t& reference_count) override;
 
         uint64_t release_local_stub(const std::shared_ptr<object_stub>& stub);
