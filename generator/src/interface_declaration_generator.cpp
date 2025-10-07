@@ -39,10 +39,10 @@ namespace interface_declaration_generator
     };
 
     // Polymorphic renderer adapter that implements base_renderer interface
-    class polymorphic_renderer : public rpc_generator::base_renderer
+    class interface_renderer : public rpc_generator::base_renderer
     {
     public:
-        polymorphic_renderer() = default;
+        interface_renderer() = default;
 
         // Implement pure virtual functions from base_renderer
         std::string render_by_value(int option,
@@ -344,7 +344,7 @@ namespace interface_declaration_generator
         std::string& output)
     {
         // UNIFIED: Use polymorphic renderer with print_type option
-        polymorphic_renderer r;
+        interface_renderer r;
         return rpc_generator::do_in_param_unified(
             r, static_cast<int>(option), false, lib, name, type, attribs, count, output);
     }
@@ -358,7 +358,7 @@ namespace interface_declaration_generator
         std::string& output)
     {
         // UNIFIED: Use polymorphic renderer with print_type option
-        polymorphic_renderer r;
+        interface_renderer r;
         return rpc_generator::do_out_param_unified(
             r, static_cast<int>(option), false, lib, name, type, attribs, count, output);
     }
@@ -681,6 +681,7 @@ namespace interface_declaration_generator
         header("}}");
         header("");
         header("static std::vector<rpc::function_info> get_function_info();");
+        header("static std::shared_ptr<rpc::local_proxy<{0}>> create_local_proxy(const rpc::weak_ptr<{0}>& ptr);", interface_name);
         header("");
         header("virtual ~{}() = default;", interface_name);
         header("");

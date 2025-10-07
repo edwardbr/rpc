@@ -198,30 +198,30 @@ CORO_TASK(bool) optimistic_ptr_basic_lifecycle_test(std::shared_ptr<rpc::service
 
     // Create optimistic_ptr from shared_ptr
     rpc::optimistic_ptr<xxx::i_foo> opt_f(f);
-    CORO_ASSERT_NE(opt_f, nullptr);
-    CORO_ASSERT_EQ(opt_f.get(), f.get());
+    CORO_ASSERT_NE(opt_f.get_unsafe_only_for_testing(), nullptr);
+    CORO_ASSERT_EQ(opt_f.get_unsafe_only_for_testing(), f.get());
 
     // Test copy constructor
     rpc::optimistic_ptr<xxx::i_foo> opt_f_copy(opt_f);
-    CORO_ASSERT_NE(opt_f_copy, nullptr);
-    CORO_ASSERT_EQ(opt_f_copy.get(), opt_f.get());
+    CORO_ASSERT_NE(opt_f_copy.get_unsafe_only_for_testing(), nullptr);
+    CORO_ASSERT_EQ(opt_f_copy.get_unsafe_only_for_testing(), opt_f.get_unsafe_only_for_testing());
 
     // Test move constructor
     rpc::optimistic_ptr<xxx::i_foo> opt_f_move(std::move(opt_f_copy));
-    CORO_ASSERT_NE(opt_f_move, nullptr);
-    CORO_ASSERT_EQ(opt_f_move.get(), f.get());
-    CORO_ASSERT_EQ(opt_f_copy, nullptr); // Moved-from should be null
+    CORO_ASSERT_NE(opt_f_move.get_unsafe_only_for_testing(), nullptr);
+    CORO_ASSERT_EQ(opt_f_move.get_unsafe_only_for_testing(), opt_f.get_unsafe_only_for_testing()); // Should point to same local_proxy
+    CORO_ASSERT_EQ(opt_f_copy.get_unsafe_only_for_testing(), nullptr); // Moved-from should be null
 
     // Test assignment
     rpc::optimistic_ptr<xxx::i_foo> opt_f_assigned;
-    CORO_ASSERT_EQ(opt_f_assigned, nullptr);
+    CORO_ASSERT_EQ(opt_f_assigned.get_unsafe_only_for_testing(), nullptr);
     opt_f_assigned = opt_f_move;
-    CORO_ASSERT_NE(opt_f_assigned, nullptr);
-    CORO_ASSERT_EQ(opt_f_assigned.get(), f.get());
+    CORO_ASSERT_NE(opt_f_assigned.get_unsafe_only_for_testing(), nullptr);
+    CORO_ASSERT_EQ(opt_f_assigned.get_unsafe_only_for_testing(), f.get());
 
     // Test reset
     opt_f_move.reset();
-    CORO_ASSERT_EQ(opt_f_move, nullptr);
+    CORO_ASSERT_EQ(opt_f_move.get_unsafe_only_for_testing(), nullptr);
 
     CO_RETURN true;
 }
@@ -250,19 +250,18 @@ CORO_TASK(bool) optimistic_ptr_weak_semantics_local_test(std::shared_ptr<rpc::se
 
         // Create optimistic_ptr from shared_ptr
         opt_f = rpc::optimistic_ptr<xxx::i_foo>(f);
-        CORO_ASSERT_NE(opt_f, nullptr);
+        CORO_ASSERT_NE(opt_f.get_unsafe_only_for_testing(), nullptr);
 
         // Verify object is accessible
-        CORO_ASSERT_EQ(opt_f.get(), f.get());
-
+        CORO_ASSERT_EQ(opt_f.get_unsafe_only_for_testing(), f.get());
         // f goes out of scope - object should be deleted
         // (optimistic_ptr has weak semantics for local objects)
     }
 
-    // opt_f still exists but points to deleted object
+    // opt_f still exists and points to local_proxy (which is still alive via shared_ptr)
+    // The local_proxy internally has a weak_ptr which will fail to lock
     // This is valid behavior per spec - optimistic_ptr has weak semantics
-    // Accessing would be undefined behavior, but the pointer can exist
-    CORO_ASSERT_NE(opt_f, nullptr); // Control block still exists
+    CORO_ASSERT_NE(opt_f.get_unsafe_only_for_testing(), nullptr); // local_proxy still exists
 
     CO_RETURN true;
 }
@@ -279,62 +278,41 @@ TYPED_TEST(type_test, optimistic_ptr_weak_semantics_local_test)
         });
 }
 
-// Test 3: local_optimistic_ptr RAII locking for local objects
-CORO_TASK(bool) local_optimistic_ptr_raii_lock_test(std::shared_ptr<rpc::service> root_service)
+// Test 3: optimistic_ptr local_proxy pattern test
+CORO_TASK(bool) optimistic_ptr_local_proxy_test(std::shared_ptr<rpc::service> root_service)
 {
     rpc::shared_ptr<xxx::i_foo> f;
     rpc::optimistic_ptr<xxx::i_foo> opt_f;
 
-    {
-        // Create a shared_ptr to a local object
-        f = rpc::shared_ptr<xxx::i_foo>(new foo());
-        CORO_ASSERT_NE(f, nullptr);
-
-        // Create optimistic_ptr from shared_ptr
-        opt_f = rpc::optimistic_ptr<xxx::i_foo>(f);
-        CORO_ASSERT_NE(opt_f, nullptr);
-
-        // Clear the shared_ptr (but optimistic_ptr remains)
-        f.reset();
-        CORO_ASSERT_EQ(f, nullptr);
-
-        // Object should be deleted now (weak semantics)
-    }
-
-    // Create local_optimistic_ptr - this would try to RAII lock
-    // but object is already gone (this is a demonstration of the pattern)
-    rpc::local_optimistic_ptr<xxx::i_foo> local_opt_f(opt_f);
-
-    // For a valid use case, we need to keep the shared_ptr alive:
+    // Create a shared_ptr to a local object
     f = rpc::shared_ptr<xxx::i_foo>(new foo());
+    CORO_ASSERT_NE(f, nullptr);
+
+    // Create optimistic_ptr from shared_ptr
+    // optimistic_ptr should automatically create a local_proxy
     opt_f = rpc::optimistic_ptr<xxx::i_foo>(f);
+    CORO_ASSERT_NE(opt_f.get_unsafe_only_for_testing(), nullptr);
 
-    {
-        // Create local_optimistic_ptr with valid object
-        rpc::local_optimistic_ptr<xxx::i_foo> local_opt_f2(opt_f);
-        CORO_ASSERT_EQ(static_cast<bool>(local_opt_f2), true);
-        CORO_ASSERT_EQ(local_opt_f2.is_local(), true); // Should be local
+    // Test calling through the optimistic_ptr while object is alive
+    auto err = CO_AWAIT opt_f->do_something_in_val(42);
+    CORO_ASSERT_EQ(err, rpc::error::OK());
 
-        // Can safely access object through local_optimistic_ptr
-        CORO_ASSERT_EQ(local_opt_f2.get(), f.get());
+    // Clear the shared_ptr - object will be deleted
+    f.reset();
+    CORO_ASSERT_EQ(f, nullptr);
 
-        // local_optimistic_ptr holds RAII lock, so object stays alive
-        // even if we clear the shared_ptr
-        f.reset();
+    // optimistic_ptr still points to the local_proxy
+    // but calling through it should return OBJECT_GONE
+    err = CO_AWAIT opt_f->do_something_in_val(42);
+    CORO_ASSERT_EQ(err, rpc::error::OBJECT_GONE());
 
-        // Object still alive because local_optimistic_ptr holds RAII lock
-        CORO_ASSERT_EQ(static_cast<bool>(local_opt_f2), true);
-        CORO_ASSERT_NE(local_opt_f2.get(), nullptr);
-
-        // local_optimistic_ptr goes out of scope, releasing RAII lock
-    }
-
-    // Now object is deleted
+    // The local_proxy is still valid (weak_ptr failed to lock)
+    CORO_ASSERT_NE(opt_f.get_unsafe_only_for_testing(), nullptr);
 
     CO_RETURN true;
 }
 
-TYPED_TEST(type_test, local_optimistic_ptr_raii_lock_test)
+TYPED_TEST(type_test, optimistic_ptr_local_proxy_test)
 {
     auto& lib = this->get_lib();
     auto root_service = lib.get_root_service();
@@ -342,7 +320,7 @@ TYPED_TEST(type_test, local_optimistic_ptr_raii_lock_test)
         [root_service](auto& lib)
         {
             (void)lib;
-            return local_optimistic_ptr_raii_lock_test(root_service);
+            return optimistic_ptr_local_proxy_test(root_service);
         });
 }
 
@@ -364,48 +342,27 @@ CORO_TASK(bool) optimistic_ptr_remote_shared_semantics_test(T& lib)
     CORO_ASSERT_EQ(CO_AWAIT f->create_baz_interface(baz), 0);
     CORO_ASSERT_NE(baz, nullptr);
 
-    // Check if the object is local or remote
-    bool is_local = baz->is_local();
+    // Store raw pointer for later comparison
+    auto* raw_ptr = baz.get();
 
     // Create optimistic_ptr
     rpc::optimistic_ptr<xxx::i_baz> opt_baz(baz);
-    CORO_ASSERT_NE(opt_baz, nullptr);
+    CORO_ASSERT_NE(opt_baz.get_unsafe_only_for_testing(), nullptr);
 
-    // Clear the shared_ptr
-    auto* raw_ptr = baz.get();
+    // Can call through optimistic_ptr directly (local_proxy handles weak semantics)
+    auto error2 = CO_AWAIT opt_baz->callback(42);
+    CORO_ASSERT_EQ(error2, 0);
+
+    // Clear the shared_ptr (raw_ptr already captured above)
     baz.reset();
 
-    if (is_local)
-    {
-        // For LOCAL objects: optimistic_ptr has WEAK semantics
-        // The object is deleted when the last shared_ptr goes away
-        // opt_baz pointer remains non-null but object is deleted
-        CORO_ASSERT_NE(opt_baz, nullptr);  // Pointer still exists
-        // Cannot safely call methods - object is deleted (this is expected behavior)
-        // (local_optimistic_ptr RAII locking is tested separately in test 3)
-    }
-    else
-    {
-        // For REMOTE objects: optimistic_ptr has SHARED semantics
-        // opt_baz keeps the remote proxy alive
-        CORO_ASSERT_NE(opt_baz, nullptr);
-        CORO_ASSERT_EQ(opt_baz.get(), raw_ptr);
+    // The object is deleted when the last shared_ptr goes away
+    // local_proxy pointer is still valid but weak_ptr inside will fail to lock
+    CORO_ASSERT_NE(opt_baz.get_unsafe_only_for_testing(), nullptr);  // local_proxy still exists
 
-        // Can call through optimistic_ptr directly (shared semantics keep proxy alive)
-        auto error = CO_AWAIT opt_baz->callback(42);
-        CORO_ASSERT_EQ(error, 0);
-
-        // Also test with local_optimistic_ptr (should passthrough for remote)
-        {
-            rpc::local_optimistic_ptr<xxx::i_baz> local_opt_baz(opt_baz);
-            CORO_ASSERT_EQ(static_cast<bool>(local_opt_baz), true);
-            CORO_ASSERT_EQ(local_opt_baz.is_local(), false);  // Remote passthrough
-
-            // Can call through local_optimistic_ptr (just a passthrough)
-            auto error2 = CO_AWAIT local_opt_baz->callback(43);
-            CORO_ASSERT_EQ(error2, 0);
-        }
-    }
+    // Calling through optimistic_ptr should return OBJECT_GONE (weak_ptr failed to lock)
+    auto error = CO_AWAIT opt_baz->callback(42);
+    CORO_ASSERT_EQ(error, rpc::error::OBJECT_GONE());
 
     CO_RETURN true;
 }
@@ -415,86 +372,7 @@ TYPED_TEST(type_test, optimistic_ptr_remote_shared_semantics_test)
     run_coro_test(*this, [](auto& lib) { return optimistic_ptr_remote_shared_semantics_test(lib); });
 }
 
-// Test 5: local_optimistic_ptr behavior (RAII lock for local, passthrough for remote)
-template<class T>
-CORO_TASK(bool) local_optimistic_ptr_remote_passthrough_test(T& lib)
-{
-    // Get example object (local or remote depending on setup)
-    auto example = lib.get_example();
-    CORO_ASSERT_NE(example, nullptr);
-
-    // Create foo through example (will be local or marshalled depending on setup)
-    rpc::shared_ptr<xxx::i_foo> f;
-    CORO_ASSERT_EQ(CO_AWAIT example->create_foo(f), 0);
-    CORO_ASSERT_NE(f, nullptr);
-
-    // Create baz interface (local or marshalled depending on setup)
-    rpc::shared_ptr<xxx::i_baz> baz;
-    CORO_ASSERT_EQ(CO_AWAIT f->create_baz_interface(baz), 0);
-    CORO_ASSERT_NE(baz, nullptr);
-
-    // Check if the object is local or remote
-    bool is_local = baz->is_local();
-
-    // Create optimistic_ptr
-    rpc::optimistic_ptr<xxx::i_baz> opt_baz(baz);
-    CORO_ASSERT_NE(opt_baz, nullptr);
-
-    if (is_local)
-    {
-        // Test local_optimistic_ptr RAII locking for LOCAL objects
-        // Keep baz alive initially so we can test with local_optimistic_ptr
-        {
-            // Create local_optimistic_ptr - this should create RAII lock
-            rpc::local_optimistic_ptr<xxx::i_baz> local_opt_baz(opt_baz);
-            CORO_ASSERT_EQ(static_cast<bool>(local_opt_baz), true);
-            CORO_ASSERT_EQ(local_opt_baz.is_local(), true);
-
-            // Clear the shared_ptr - but local_optimistic_ptr has RAII lock
-            baz.reset();
-
-            // Object is locked - can safely call methods even though shared_ptr is gone
-            auto error = CO_AWAIT local_opt_baz->callback(43);
-            CORO_ASSERT_EQ(error, 0);
-        } // RAII lock released here
-
-        // After local_optimistic_ptr destroyed, object may be deleted
-        // (if no other references exist)
-    }
-    else
-    {
-        // Test local_optimistic_ptr PASSTHROUGH for REMOTE objects
-        // Clear the shared_ptr - opt_baz keeps proxy alive via shared semantics
-        baz.reset();
-
-        {
-            // Create local_optimistic_ptr from remote optimistic_ptr
-            rpc::local_optimistic_ptr<xxx::i_baz> local_opt_baz(opt_baz);
-            CORO_ASSERT_EQ(static_cast<bool>(local_opt_baz), true);
-            CORO_ASSERT_EQ(local_opt_baz.is_local(), false); // Should NOT be local
-
-            // Should just passthrough to the remote proxy (no RAII lock)
-            CORO_ASSERT_EQ(local_opt_baz.get(), opt_baz.get());
-
-            // Can call through local_optimistic_ptr (passthrough)
-            auto error = CO_AWAIT local_opt_baz->callback(43);
-            CORO_ASSERT_EQ(error, 0);
-        }
-
-        // Remote proxy still accessible through opt_baz after local_optimistic_ptr destroyed
-        auto error = CO_AWAIT opt_baz->callback(44);
-        CORO_ASSERT_EQ(error, 0);
-    }
-
-    CO_RETURN true;
-}
-
-TYPED_TEST(type_test, local_optimistic_ptr_remote_passthrough_test)
-{
-    run_coro_test(*this, [](auto& lib) { return local_optimistic_ptr_remote_passthrough_test(lib); });
-}
-
-// Test 6: Optimistic pointer transparent operator-> for both local and remote
+// Test 5: Optimistic pointer transparent operator-> for both local and remote
 template<class T>
 CORO_TASK(bool) optimistic_ptr_transparent_access_test(T& lib)
 {
@@ -510,8 +388,8 @@ CORO_TASK(bool) optimistic_ptr_transparent_access_test(T& lib)
 
         // operator-> works transparently for local object
         CORO_ASSERT_NE(opt_f_local.operator->(), nullptr);
-        CORO_ASSERT_NE(opt_f_local.get(), nullptr);
-        CORO_ASSERT_EQ(opt_f_local.get(), f_local.get());
+        CORO_ASSERT_NE(opt_f_local.get_unsafe_only_for_testing(), nullptr);
+        CORO_ASSERT_EQ(opt_f_local.get_unsafe_only_for_testing(), f_local.get());
     }
 
     // Test 2: Remote object access
@@ -525,8 +403,7 @@ CORO_TASK(bool) optimistic_ptr_transparent_access_test(T& lib)
 
         // operator-> works transparently for remote proxy
         CORO_ASSERT_NE(opt_baz.operator->(), nullptr);
-        CORO_ASSERT_NE(opt_baz.get(), nullptr);
-        CORO_ASSERT_EQ(opt_baz.get(), baz.get());
+        CORO_ASSERT_EQ(opt_baz.get_unsafe_only_for_testing(), baz.get());
 
         // No bad_local_object exception - works transparently
         auto error = CO_AWAIT opt_baz->callback(45);
@@ -564,7 +441,7 @@ CORO_TASK(bool) optimistic_ptr_circular_dependency_test(T& lib)
 
     // Child could hold optimistic_ptr back to host (breaking circular RAII ownership)
     rpc::optimistic_ptr<xxx::i_foo> opt_host(host);
-    CORO_ASSERT_NE(opt_host, nullptr);
+    CORO_ASSERT_NE(opt_host.get_unsafe_only_for_testing(), nullptr);
 
     // If we delete host (last shared_ptr), object is destroyed
     // even though optimistic_ptr exists (weak semantics)
@@ -572,7 +449,7 @@ CORO_TASK(bool) optimistic_ptr_circular_dependency_test(T& lib)
 
     // opt_host still exists but points to deleted object
     // This is correct behavior - circular dependency is broken
-    CORO_ASSERT_NE(opt_host, nullptr); // Control block remains
+    CORO_ASSERT_NE(opt_host.get_unsafe_only_for_testing(), nullptr); // Control block remains
 
     CO_RETURN true;
 }
@@ -603,13 +480,13 @@ CORO_TASK(bool) optimistic_ptr_comparison_test(T& lib)
     rpc::optimistic_ptr<xxx::i_foo> opt_f2(f2);
     rpc::optimistic_ptr<xxx::i_foo> opt_null;
 
-    // Test equality
-    CORO_ASSERT_NE(opt_f1, opt_f2);
-    CORO_ASSERT_EQ(opt_f1, opt_f1);
+    // Test equality using get_unsafe_only_for_testing()
+    CORO_ASSERT_NE(opt_f1.get_unsafe_only_for_testing(), opt_f2.get_unsafe_only_for_testing());
+    CORO_ASSERT_EQ(opt_f1.get_unsafe_only_for_testing(), opt_f1.get_unsafe_only_for_testing());
 
     // Test nullptr comparison
-    CORO_ASSERT_EQ(opt_null, nullptr);
-    CORO_ASSERT_NE(opt_f1, nullptr);
+    CORO_ASSERT_EQ(opt_null.get_unsafe_only_for_testing(), nullptr);
+    CORO_ASSERT_NE(opt_f1.get_unsafe_only_for_testing(), nullptr);
 
     // Test bool operator
     CORO_ASSERT_EQ(static_cast<bool>(opt_null), false);
@@ -617,7 +494,7 @@ CORO_TASK(bool) optimistic_ptr_comparison_test(T& lib)
 
     // Test assignment to nullptr
     opt_f1 = nullptr;
-    CORO_ASSERT_EQ(opt_f1, nullptr);
+    CORO_ASSERT_EQ(opt_f1.get_unsafe_only_for_testing(), nullptr);
 
     CO_RETURN true;
 }
@@ -647,14 +524,14 @@ CORO_TASK(bool) optimistic_ptr_heterogeneous_upcast_test(T& lib)
 
     // Create optimistic_ptr<i_baz>
     rpc::optimistic_ptr<xxx::i_baz> opt_baz(baz);
-    CORO_ASSERT_NE(opt_baz, nullptr);
+    CORO_ASSERT_NE(opt_baz.get_unsafe_only_for_testing(), nullptr);
 
     // Upcast to i_bar (statically verifiable - should compile)
     // Note: This requires i_baz to properly derive from i_bar
     // For now, test with same type conversion
     rpc::optimistic_ptr<xxx::i_baz> opt_baz2(opt_baz);
-    CORO_ASSERT_NE(opt_baz2, nullptr);
-    CORO_ASSERT_EQ(opt_baz2.get(), opt_baz.get());
+    CORO_ASSERT_NE(opt_baz2.get_unsafe_only_for_testing(), nullptr);
+    CORO_ASSERT_EQ(opt_baz2.get_unsafe_only_for_testing(), opt_baz.get_unsafe_only_for_testing());
 
     CO_RETURN true;
 }
@@ -684,15 +561,15 @@ CORO_TASK(bool) optimistic_ptr_multiple_refs_test(T& lib)
     rpc::optimistic_ptr<xxx::i_foo> opt_f4 = opt_f2;
 
     // All should point to same object
-    CORO_ASSERT_EQ(opt_f1.get(), f.get());
-    CORO_ASSERT_EQ(opt_f2.get(), f.get());
-    CORO_ASSERT_EQ(opt_f3.get(), f.get());
-    CORO_ASSERT_EQ(opt_f4.get(), f.get());
+    CORO_ASSERT_EQ(opt_f1.get_unsafe_only_for_testing(), f.get());
+    CORO_ASSERT_EQ(opt_f2.get_unsafe_only_for_testing(), f.get());
+    CORO_ASSERT_EQ(opt_f3.get_unsafe_only_for_testing(), f.get());
+    CORO_ASSERT_EQ(opt_f4.get_unsafe_only_for_testing(), f.get());
 
     // All should be equal
-    CORO_ASSERT_EQ(opt_f1, opt_f2);
-    CORO_ASSERT_EQ(opt_f2, opt_f3);
-    CORO_ASSERT_EQ(opt_f3, opt_f4);
+    CORO_ASSERT_EQ(opt_f1.get_unsafe_only_for_testing(), opt_f2.get_unsafe_only_for_testing());
+    CORO_ASSERT_EQ(opt_f2.get_unsafe_only_for_testing(), opt_f3.get_unsafe_only_for_testing());
+    CORO_ASSERT_EQ(opt_f3.get_unsafe_only_for_testing(), opt_f4.get_unsafe_only_for_testing());
 
     CO_RETURN true;
 }
@@ -720,38 +597,27 @@ CORO_TASK(bool) optimistic_ptr_object_gone_test(T& lib)
     CORO_ASSERT_EQ(CO_AWAIT f->create_baz_interface(baz), 0);
     CORO_ASSERT_NE(baz, nullptr);
 
-    // Check if the object is local or remote
-    bool is_local = baz->is_local();
+    // Test OBJECT_GONE for REMOTE objects only
+    // Create optimistic_ptr from shared_ptr
+    rpc::optimistic_ptr<xxx::i_baz> opt_baz(baz);
+    CORO_ASSERT_NE(opt_baz.get_unsafe_only_for_testing(), nullptr);
 
-    if (!is_local)
-    {
-        // Test OBJECT_GONE for REMOTE objects only
-        // Create optimistic_ptr from shared_ptr
-        rpc::optimistic_ptr<xxx::i_baz> opt_baz(baz);
-        CORO_ASSERT_NE(opt_baz, nullptr);
+    // First call should work - shared_ptr keeps stub alive
+    auto error1 = CO_AWAIT opt_baz->callback(42);
+    CORO_ASSERT_EQ(error1, 0);
 
-        // First call should work - shared_ptr keeps stub alive
-        auto error1 = CO_AWAIT opt_baz->callback(42);
-        CORO_ASSERT_EQ(error1, 0);
+    // Release the shared_ptr - this should delete the stub on the remote side
+    // because optimistic references don't hold stub lifetime
+    baz.reset();
+    f.reset();
 
-        // Release the shared_ptr - this should delete the stub on the remote side
-        // because optimistic references don't hold stub lifetime
-        baz.reset();
-        f.reset();
+    // Second call through optimistic_ptr should fail with OBJECT_GONE
+    // The optimistic_ptr still exists but the remote stub has been deleted
+    auto error2 = CO_AWAIT opt_baz->callback(43);
+    CORO_ASSERT_EQ(error2, rpc::error::OBJECT_GONE());
 
-        // Second call through optimistic_ptr should fail with OBJECT_GONE
-        // The optimistic_ptr still exists but the remote stub has been deleted
-        auto error2 = CO_AWAIT opt_baz->callback(43);
-        CORO_ASSERT_EQ(error2, rpc::error::OBJECT_GONE());
-
-        // The optimistic_ptr itself remains valid (pointer not null)
-        CORO_ASSERT_NE(opt_baz, nullptr);
-    }
-    else
-    {
-        // For local objects, optimistic_ptr has weak semantics
-        // Skip the OBJECT_GONE test as it's specific to remote stub lifetime
-    }
+    // The optimistic_ptr itself remains valid (pointer not null)
+    CORO_ASSERT_NE(opt_baz.get_unsafe_only_for_testing(), nullptr);
 
     CO_RETURN true;
 }

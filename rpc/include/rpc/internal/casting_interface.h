@@ -38,7 +38,7 @@ namespace rpc
         virtual bool is_local() const { return true; }
         virtual std::shared_ptr<rpc::object_proxy> get_object_proxy() const { return nullptr; }
 
-        // in bindings.h        
+        // in bindings.h
         template<class T>
         CORO_TASK(interface_descriptor)
         proxy_bind_in_param(
@@ -51,7 +51,7 @@ namespace rpc
             caller_channel_zone caller_channel_zone_id,
             caller_zone caller_zone_id,
             const rpc::shared_ptr<T>& iface);
-            
+
         static object get_object_id(const casting_interface& iface);
         static std::shared_ptr<rpc::service_proxy> get_service_proxy(const casting_interface& iface);
         static std::shared_ptr<rpc::service> get_service(const casting_interface& iface);
@@ -67,8 +67,12 @@ namespace rpc
     {
     protected:
         stdex::member_ptr<object_proxy> object_proxy_;
+
     public:
-        interface_proxy(std::shared_ptr<rpc::object_proxy> object_proxy) : object_proxy_(object_proxy){}
+        interface_proxy(std::shared_ptr<rpc::object_proxy> object_proxy)
+            : object_proxy_(object_proxy)
+        {
+        }
         virtual ~interface_proxy() = default;
 
         void* get_address() const override { return (void*)this; }
@@ -80,10 +84,7 @@ namespace rpc
         }
 
         bool is_local() const override { return false; }
-        std::shared_ptr<rpc::object_proxy> get_object_proxy() const override
-        {
-            return object_proxy_.get_nullable();
-        }
+        std::shared_ptr<rpc::object_proxy> get_object_proxy() const override { return object_proxy_.get_nullable(); }
     };
 
     // do not use directly it is for the interface generator use rpc::create_interface_proxy if you want to get a proxied pointer to a remote implementation

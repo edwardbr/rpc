@@ -42,10 +42,10 @@ namespace yas_generator
     };
 
     // Polymorphic renderer adapter that implements base_renderer interface
-    class polymorphic_renderer : public rpc_generator::base_renderer
+    class yas_renderer : public rpc_generator::base_renderer
     {
     public:
-        polymorphic_renderer() = default;
+        yas_renderer() = default;
 
         // Implement pure virtual functions from base_renderer
         std::string render_by_value(int option,
@@ -381,7 +381,7 @@ namespace yas_generator
         std::string& output)
     {
         // UNIFIED: Use polymorphic renderer with print_type option
-        polymorphic_renderer r;
+        yas_renderer r;
         return rpc_generator::do_in_param_unified(
             r, static_cast<int>(option), from_host, lib, name, type, attribs, count, output);
     }
@@ -396,7 +396,7 @@ namespace yas_generator
         std::string& output)
     {
         // UNIFIED: Use polymorphic renderer with print_type option
-        polymorphic_renderer r;
+        yas_renderer r;
         return rpc_generator::do_out_param_unified(
             r, static_cast<int>(option), from_host, lib, name, type, attribs, count, output);
     }

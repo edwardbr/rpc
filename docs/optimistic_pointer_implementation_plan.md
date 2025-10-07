@@ -5,10 +5,10 @@
 **STATUS: ⚠️ MOSTLY COMPLETE - OBJECT_GONE Issue Pending (October 2025)**
 
 This implementation has been successfully completed and tested. All core features are implemented and working:
-- ✅ `rpc::optimistic_ptr<T>` with dual semantics (weak for local, shared for remote)
-- ✅ `rpc::local_optimistic_ptr<T>` RAII wrapper for temporary locking
+- ✅ `rpc::optimistic_ptr<T>` with automatic local_proxy for local objects and optimistic refs for remote
+- ✅ Generated `__i_xxx_local_proxy` classes for safe local object access
 - ✅ Control block enhancements with `optimistic_owners` counter and `is_local` flag
-- ✅ Friend class integration with private constructor pattern
+- ✅ Static `create_local_proxy()` method generated for each interface
 - ✅ Comprehensive test suite: 100 tests across 10 configurations, all passing
 - ✅ Full integration with existing `shared_ptr` and `weak_ptr` infrastructure
 - ✅ **All tests now use proper factory pattern**: Tests respect configuration (local vs marshalled objects)
@@ -16,13 +16,13 @@ This implementation has been successfully completed and tested. All core feature
 **Test Results**: ⚠️ 102/110 optimistic_ptr tests passing - Test 11 (OBJECT_GONE) fails for 8/10 remote configurations (see critical issue below)
 
 **Recent Updates (October 2025)**:
-- ✅ Fixed all 10 optimistic_ptr tests to use `lib.get_example()` → `create_foo()` factory pattern
+- ✅ **Removed local_optimistic_ptr wrapper class**: Simplified to single optimistic_ptr class with automatic local_proxy
+- ✅ Fixed all optimistic_ptr tests to use `lib.get_example()` → `create_foo()` factory pattern
 - ✅ Tests now properly respect test setup configurations (in_memory_setup vs inproc_setup)
-- ✅ Enhanced Test 4 & 5 with `local_optimistic_ptr` functionality testing in appropriate branches
-- ✅ All tests validate both local and remote object scenarios correctly
-- ✅ **STL API Compliance Fix (October 2025)**: Moved `internal_get_cb()` and `internal_get_ptr()` to private sections, relocated `try_enable_shared_from_this()` to `__rpc_internal` namespace for proper encapsulation
-- ✅ **Added Test 11 (October 2025)**: OBJECT_GONE error handling test validates graceful failure when remote stub is deleted
-- ✅ **Casting Functions Completed (October 2025)**: Implemented all optimistic_ptr casting functions (static_pointer_cast, const_pointer_cast, reinterpret_pointer_cast, dynamic_pointer_cast)
+- ✅ Tests validate both local_proxy and remote interface_proxy scenarios correctly
+- ✅ **STL API Compliance Fix**: Moved `internal_get_cb()` and `internal_get_ptr()` to private sections
+- ✅ **Added Test 11**: OBJECT_GONE error handling test validates graceful failure when remote stub is deleted
+- ✅ **Casting Functions Completed**: Implemented all optimistic_ptr casting functions
 
 **Implementation Details**:
 - **Location**: `/rpc/include/rpc/internal/remote_pointer.h` (lines 1665-2012)
@@ -33,19 +33,19 @@ This implementation has been successfully completed and tested. All core feature
 
 ## Overview
 
-This document outlines the plan for implementing `rpc::optimistic_ptr<T>` - a smart pointer optimized for RPC scenarios where objects are expected to be remote most of the time but may occasionally be local. The optimistic pointer is a callable non-RAII pointer that provides a non-locking alternative to `rpc::shared_ptr<T>`. It works transparently for both local and remote objects through their interface proxies.
+This document outlines the plan for implementing `rpc::optimistic_ptr<T>` - a smart pointer optimized for RPC scenarios where objects are expected to be remote most of the time but may occasionally be local. The optimistic pointer is a callable non-RAII pointer that provides a non-locking alternative to `rpc::shared_ptr<T>`. It works transparently for both local and remote objects through different mechanisms.
 
 **Key Features**:
-- **Weak semantics for local objects**: Does not keep local objects alive (optimistic_owners doesn't prevent deletion)
+- **Local proxy for local objects**: Uses generated `__i_xxx_local_proxy` class that wraps a `weak_ptr`, returns `OBJECT_GONE` if object deleted
 - **Shared semantics for remote proxies**: Keeps remote interface_proxy objects alive to prevent premature cleanup
-- **Direct callable**: `operator->` works for both local objects and remote proxies without exceptions
-- **Non-locking calls**: Locking happens remotely only if the destination object exists
+- **Direct callable**: `operator->` works for both local and remote objects through unified interface
+- **Non-locking calls for local**: Local proxy locks weak_ptr on each call, returns `OBJECT_GONE` if unavailable
 - **Circular dependency resolution**: Children can hold optimistic_ptr to host without RAII ownership
 
 **Use Cases**:
 - **Stateless services**: e.g., REST services where object lifetime is not client-managed
 - **Circular dependencies**: Host owns children (shared_ptr), children call host (optimistic_ptr)
-- **Optional RAII locking**: Use `local_optimistic_ptr` for temporary RAII lock on local objects during call scope
+- **Automatic failsafe access**: Local objects return `OBJECT_GONE` when deleted, no dangling pointer exceptions
 
 ## Design Goals
 
@@ -53,10 +53,11 @@ This document outlines the plan for implementing `rpc::optimistic_ptr<T>` - a sm
 1. **Non-Locking Remote Calls**: Enable RPC calls without locking on the caller's side - locking happens remotely only if destination object exists
 2. **Stateless Service Support**: Optimize for stateless services (e.g., REST services) where object lifetime is not client-managed
 3. **Circular Dependency Resolution**: Handle scenarios where children should not hold RAII pointers to their owner (e.g., host owns children, children call host without locking)
-4. **Weak Pointer Semantics for Local Objects**: Local objects can be deleted regardless of optimistic reference count
+4. **Generated Local Proxy Pattern**: Use code-generated `__i_xxx_local_proxy` classes for local object access with automatic `OBJECT_GONE` error handling
 5. **Shared Pointer Semantics for Remote Objects**: Remote object proxies are kept alive by optimistic references to prevent premature cleanup
 6. **Type Safety**: Preserve strong typing and casting_interface requirements
 7. **Thread Safety**: Safe concurrent access in multi-threaded RPC scenarios
+8. **Unified Interface**: Both local proxies and remote proxies present the same interface through `operator->`
 
 ### Performance Targets
 - **Local Access**: Near-native pointer performance (single indirection)
@@ -64,6 +65,43 @@ This document outlines the plan for implementing `rpc::optimistic_ptr<T>` - a sm
 - **Memory Footprint**: Minimal overhead compared to raw pointers
 
 ## Architecture Design
+
+### Design Summary: Local Proxy Pattern
+
+**Revolutionary Change**: The `optimistic_ptr` no longer needs `local_optimistic_ptr` as a separate wrapper. Instead, when an `optimistic_ptr` is constructed from a local object's `shared_ptr`, it automatically allocates a generated `__i_xxx_local_proxy` instance that wraps a `weak_ptr` to the actual object.
+
+**Key Behavior**:
+1. **Local Objects**: `ptr_` points to generated `__i_xxx_local_proxy`, `cb_` is nullptr (no control block needed)
+2. **Remote Objects**: `ptr_` points to `interface_proxy`, `cb_` manages reference counting
+3. **Nullptr Construction**: Both `ptr_` and `cb_` are nullptr, follows standard nullptr semantics
+4. **Unified operator->**: Works transparently for both local_proxy and remote interface_proxy
+
+**Generated Local Proxy** (example from `/build/generated/src/example_import/example_import_proxy.cpp`):
+```cpp
+class __i_zzz_local_proxy : public i_zzz {
+    rpc::weak_ptr<i_zzz> ptr_;
+public:
+    __i_zzz_local_proxy(const rpc::weak_ptr<i_zzz>& ptr) : ptr_(ptr) {}
+
+    CORO_TASK(error_code) add(int a, int b, int& c) override {
+        auto ptr = ptr_.lock();
+        if(!ptr) {
+            CO_RETURN rpc::error::OBJECT_GONE();  // Safe error when object deleted
+        }
+        CO_RETURN ptr->add(a, b, c);
+    }
+};
+
+// Factory function called by optimistic_ptr constructor
+i_zzz* create_local_proxy(const rpc::weak_ptr<i_zzz>& ptr) {
+    return new __i_zzz_local_proxy(ptr);
+}
+```
+
+**RAII Responsibilities**:
+- Local proxy lifetime is managed by optimistic_ptr (deleted in destructor)
+- Weak_ptr inside local proxy does NOT hold object lifetime
+- Returns OBJECT_GONE automatically when weak_ptr fails to lock
 
 ### Core Components
 
@@ -73,8 +111,8 @@ This document outlines the plan for implementing `rpc::optimistic_ptr<T>` - a sm
 template<typename T>
 class optimistic_ptr {
 private:
-    element_type_impl* ptr_{nullptr};           // Same structure as shared_ptr
-    __rpc_internal::__shared_ptr_control_block::control_block_base* cb_{nullptr};
+    element_type_impl* ptr_{nullptr};           // Points to local_proxy (local) or interface_proxy (remote)
+    __rpc_internal::__shared_ptr_control_block::control_block_base* cb_{nullptr};  // Only used for remote objects
 
     // No public raw pointer constructor (except void specialization)
     template<typename Y, typename = std::enable_if_t<std::is_same_v<Y, void>>>
@@ -134,82 +172,9 @@ public:
     template<typename U> friend class shared_ptr;
 };
 
-// Note: No bad_local_object exception needed
-// optimistic_ptr works transparently for both local and remote objects
-
-// Local optimistic pointer - temporary RAII lock for making optimistic calls
-template<typename T>
-class local_optimistic_ptr {
-private:
-    T* ptr_{nullptr};
-    shared_ptr<T> local_lock_;  // Only set if object is local (RAII lock)
-
-    // MUST NOT be a member of another class - stack-only usage
-    static_assert(true, "local_optimistic_ptr is for stack use only");
-
-public:
-    // Constructor from optimistic_ptr
-    explicit local_optimistic_ptr(const optimistic_ptr<T>& opt) noexcept {
-        if (!opt) {
-            ptr_ = nullptr;
-            return;
-        }
-
-        auto cb = opt.internal_get_cb();
-        if (cb && cb->is_local) {
-            // Local object - create temporary shared_ptr to RAII lock it
-            local_lock_ = shared_ptr<T>(cb, opt.internal_get_ptr());
-            local_lock_.internal_get_cb()->increment_shared();
-            ptr_ = local_lock_.get();
-        } else {
-            // Remote object - just store the pointer (no RAII lock needed)
-            ptr_ = opt.internal_get_ptr();
-        }
-    }
-
-    // Assignment from optimistic_ptr
-    local_optimistic_ptr& operator=(const optimistic_ptr<T>& opt) noexcept {
-        local_optimistic_ptr temp(opt);
-        swap(temp);
-        return *this;
-    }
-
-    // Move constructor
-    local_optimistic_ptr(local_optimistic_ptr&& other) noexcept
-        : ptr_(other.ptr_)
-        , local_lock_(std::move(other.local_lock_))
-    {
-        other.ptr_ = nullptr;
-    }
-
-    // Move assignment
-    local_optimistic_ptr& operator=(local_optimistic_ptr&& other) noexcept {
-        local_optimistic_ptr temp(std::move(other));
-        swap(temp);
-        return *this;
-    }
-
-    // Delete copy constructor and assignment (prevent accidental copies)
-    local_optimistic_ptr(const local_optimistic_ptr&) = delete;
-    local_optimistic_ptr& operator=(const local_optimistic_ptr&) = delete;
-
-    ~local_optimistic_ptr() = default;  // RAII: local_lock_ releases automatically
-
-    // Access operators - return valid pointer to local object or remote proxy
-    T* operator->() const noexcept { return ptr_; }
-    T& operator*() const noexcept { return *ptr_; }
-    T* get() const noexcept { return ptr_; }
-
-    explicit operator bool() const noexcept { return ptr_ != nullptr; }
-
-    void swap(local_optimistic_ptr& other) noexcept {
-        std::swap(ptr_, other.ptr_);
-        std::swap(local_lock_, other.local_lock_);
-    }
-
-    // Check if this is a local object (has RAII lock)
-    bool is_local() const noexcept { return local_lock_.operator bool(); }
-};
+// Note: optimistic_ptr works transparently for both local and remote objects
+// Local objects use generated __i_xxx_local_proxy that wraps weak_ptr
+// Remote objects use interface_proxy with optimistic reference counting
 
 // Async conversion functions (REQUIRED for type conversions)
 template<typename T, typename U>
@@ -674,8 +639,8 @@ enum class object_locality {
 |-------|--------|------------|
 | **Phase 1**: Control Block Extensions | ✅ COMPLETED | 100% |
 | **Phase 2**: optimistic_ptr Class Structure | ✅ COMPLETED | 100% |
-| **Phase 3**: local_optimistic_ptr RAII Wrapper | ✅ COMPLETED | 100% |
-| **Phase 3b**: Access Operations | ✅ COMPLETED | 100% |
+| **Phase 3**: Local Proxy Integration | ✅ REDESIGNED & COMPLETED | 100% |
+| **Phase 3b**: Access Operations | ✅ REDESIGNED & COMPLETED | 100% |
 | **Phase 4**: Pointer Conversions/Casting | ✅ COMPLETED | 95% |
 | **Phase 5**: Container Support | ✅ COMPLETED | 100% |
 | **Phase 6**: Service Layer Integration | ✅ COMPLETED (Stub Layer) | 100% |
@@ -766,53 +731,49 @@ optimistic_ptr(const weak_ptr<T>& wp) {
 **Key Files**:
 - `/rpc/include/rpc/internal/remote_pointer.h` (add optimistic_ptr class)
 
-### Phase 3: local_optimistic_ptr - Callable Optimistic Pointer ✅ COMPLETED
+### Phase 3: Local Proxy Integration ✅ REDESIGNED
 **Deliverables**:
-- [x] `local_optimistic_ptr<T>` class with temporary RAII locking for local objects
-- [x] Constructor from `optimistic_ptr<T>` with locality detection
-- [x] Assignment operator from `optimistic_ptr<T>`
-- [x] Move constructor and move assignment
-- [x] Deleted copy constructor and copy assignment (prevent accidental copies)
-- [x] `operator->()` returns valid pointer to local object or remote proxy
-- [x] `operator*()` and `get()` methods for dereferencing
-- [x] `is_local()` method to check if object is local (has RAII lock)
-- [x] `operator bool()` to check for null
+- [x] Generator produces `__i_xxx_local_proxy` class for each interface
+- [x] Generator produces `create_local_proxy(weak_ptr)` factory function per namespace
+- [x] `optimistic_ptr<T>` constructor detects local vs remote and allocates local_proxy accordingly
+- [x] `optimistic_ptr<T>` destructor deletes local_proxy when appropriate
+- [x] `operator->()` works transparently for both local_proxy and remote interface_proxy
+- [x] Local proxy returns `OBJECT_GONE` when weak_ptr fails to lock
+- [x] No control block needed for local objects (cb_ is nullptr)
 
-**Key Design Constraints**:
-- **Stack use only**: MUST NOT be a member of another class
-- **Temporary RAII lock**: For local objects, creates temporary `shared_ptr` to prevent deletion during scope
-- **Remote proxy passthrough**: For remote objects, simply stores pointer without locking
-- **Move-only semantics**: Prevents accidental copies that would create multiple RAII locks
+**Key Design**:
+- **No separate wrapper class**: Local proxy is managed directly by optimistic_ptr
+- **Generated code**: Each interface gets its own type-safe local proxy implementation
+- **RAII inside local_proxy**: weak_ptr is locked on each method call, not held for duration
+- **Automatic error handling**: OBJECT_GONE returned when object is deleted
+- **Memory management**: optimistic_ptr deletes local_proxy in destructor
 
-**RAII Behavior**:
+**Usage Behavior**:
 ```cpp
-void example(optimistic_ptr<IService> service) {
-    {
-        local_optimistic_ptr<IService> locked(service);
-        // If local: shared_owners incremented, object locked
-        // If remote: no locking, just proxy pointer
+// Create optimistic_ptr from local shared_ptr
+rpc::shared_ptr<i_service> service = rpc::make_shared<service_impl>();
+rpc::optimistic_ptr<i_service> opt_service(service);  // Allocates __i_service_local_proxy
 
-        locked->do_work();  // Safe to call
+// Use transparently
+auto error = CO_AWAIT opt_service->do_work();  // Locks weak_ptr, calls method
+// Returns OBJECT_GONE if service was deleted
 
-    } // locked destroyed here
-    // If local: shared_owners decremented, object may be deleted
-    // If remote: no reference count change
-}
+// No need for local_optimistic_ptr wrapper anymore!
 ```
 
-### Phase 3b: Access Operations for optimistic_ptr (Works for Both Local and Remote) ✅ COMPLETED
+### Phase 3b: Access Operations for optimistic_ptr (Works for Both Local and Remote) ✅ REDESIGNED
 **Deliverables**:
-- [x] `operator->()` returns pointer to local object or remote proxy (no exceptions)
-- [x] `operator*()` returns reference to local object or remote proxy (no exceptions)
-- [x] `get()` method returns pointer to local object or remote proxy (no exceptions)
-- [x] `use_count()`, `unique()`, `operator bool()` identical to shared_ptr
+- [x] `operator->()` returns pointer to local_proxy or interface_proxy (no exceptions)
+- [x] `operator*()` returns reference to local_proxy or interface_proxy (no exceptions)
+- [x] `get()` returns pointer to local_proxy or interface_proxy (no exceptions)
+- [x] `operator bool()` checks if ptr_ is not nullptr
 
 **Behavior**:
-- All access operations work transparently for both local and remote objects
-- For local objects: returns pointer to actual local object
-- For remote objects: returns pointer to remote proxy (interface_proxy)
-- No exceptions thrown - operates like standard shared_ptr
-- `bad_local_object` exception removed (not needed with this design)
+- All access operations work transparently for both local_proxy and interface_proxy
+- For local objects: returns pointer to generated `__i_xxx_local_proxy`
+- For remote objects: returns pointer to `interface_proxy`
+- No exceptions thrown - operates uniformly
+- Local_proxy handles OBJECT_GONE internally on each method call
 
 ### Phase 4: Pointer Conversions and Casting ⚠️ PARTIALLY COMPLETED
 **Design Principle**: Maintain standard `shared_ptr` semantics for all operations. Heterogeneous constructors/assignments work synchronously. Dynamic casting uses local `query_interface` when available, with optional async versions for explicit remote calls.
@@ -886,40 +847,22 @@ rpc::optimistic_ptr<Base> opt_base = opt_derived;  // ✅ Upcast works
 rpc::optimistic_ptr<Base> opt_base2 = get_opt_base();
 auto opt_derived2 = rpc::dynamic_pointer_cast<Derived>(opt_base2);  // ✅ Local query_interface
 
-// LOCAL OPTIMISTIC POINTER - Making optimistic pointers callable
-// IMPORTANT: Stack use only - never as class member
+// OPTIMISTIC POINTER - Directly callable for both local and remote
 void process_data(rpc::optimistic_ptr<IService> service_ptr) {
-    // Create temporary RAII lock for local objects
-    rpc::local_optimistic_ptr<IService> local_service(service_ptr);
+    if (service_ptr) {
+        // operator-> works for both local_proxy and remote interface_proxy
+        auto result = service_ptr->process();  // ✅ Makes call
 
-    if (local_service) {
-        // operator-> works for both local (locked) and remote (proxy) objects
-        auto result = local_service->process();  // ✅ Makes RPC call
-
-        // If local: local_lock_ keeps object alive during this scope
-        // If remote: calls through remote proxy (no locking needed)
+        // If local: calls through generated __i_service_local_proxy (wraps weak_ptr)
+        //           Returns OBJECT_GONE if object was deleted
+        // If remote: calls through remote interface_proxy
     }
-    // RAII: local object automatically unlocked when local_service destroyed
 }
 
-// Alternative: assignment
+// Direct usage - no wrapper needed
 void another_example(rpc::optimistic_ptr<IService> service_ptr) {
-    rpc::local_optimistic_ptr<IService> local_service;
-    local_service = service_ptr;  // Assign optimistic to local
-
-    if (local_service) {
-        local_service->do_work();
-    }
-}
-
-// Check if local or remote
-void inspect_locality(rpc::optimistic_ptr<IService> service_ptr) {
-    rpc::local_optimistic_ptr<IService> local_service(service_ptr);
-
-    if (local_service.is_local()) {
-        // Object is local and currently RAII-locked
-    } else {
-        // Object is remote (using proxy)
+    if (service_ptr) {
+        service_ptr->do_work();  // Direct call
     }
 }
 ```
@@ -1221,14 +1164,13 @@ reference_count = stub->add_ref(!!(build_out_param_channel & add_ref_options::op
 - [x] `OBJECT_GONE` error code testing for optimistic RPC scenarios (COMPLETED - Test 11: optimistic_ptr_object_gone_test)
 - [ ] Telemetry validation for per-zone optimistic reference tracking (DEFERRED - future enhancement)
 - [x] Integration tests with existing RPC scenarios ensuring no STL test compilation
-- [x] **local_optimistic_ptr specific tests**:
-  - [x] RAII locking tests for local objects
-  - [x] Passthrough tests for remote objects (no locking)
-  - [x] Move semantics tests (move constructor/assignment)
-  - [x] Copy prevention tests (deleted copy constructor/assignment)
-  - [x] Thread safety tests (concurrent access with RAII locking)
-  - [x] Scope-based lifetime tests (object deletion deferred until local_optimistic_ptr destroyed)
-  - [x] Circular dependency resolution tests (child→host calls with no RAII ownership)
+- [x] **local_proxy specific tests**:
+  - [x] OBJECT_GONE return tests when local object deleted
+  - [x] Generated local_proxy method forwarding tests
+  - [x] weak_ptr locking tests within local_proxy
+  - [x] Direct optimistic_ptr calling tests (no wrapper needed)
+  - [x] Local vs remote transparent behavior tests
+  - [x] Circular dependency resolution tests (child→host calls without RAII ownership)
 - [ ] **Critical Race Condition Tests**:
   - [ ] **RC1**: Concurrent increment_optimistic vs control block destruction
     - Thread 1: Creating first optimistic_ptr from expired weak_ptr
@@ -1281,12 +1223,12 @@ reference_count = stub->add_ref(!!(build_out_param_channel & add_ref_options::op
 - Global optimistic reference counters per zone (telemetry validation)
 - Control block to object_proxy lifecycle management
 - Conditional compilation verification (`!TEST_STL_COMPLIANCE` only)
-- **local_optimistic_ptr coverage**:
-  - RAII lock acquisition/release for local objects
-  - No locking for remote objects (just proxy pointer storage)
-  - Move-only semantics enforcement
-  - Concurrent access with proper RAII locking preventing premature deletion
-  - Stack-only usage (not as class member)
+- **Generated local_proxy coverage**:
+  - Automatic local_proxy allocation/deallocation by optimistic_ptr
+  - weak_ptr locking on each method call
+  - OBJECT_GONE error returns when object deleted
+  - No control block overhead for local objects (cb_ is nullptr)
+  - Transparent behavior alongside remote interface_proxy
 
 ## Technical Specifications
 
@@ -1420,7 +1362,7 @@ class service {
 };
 ```
 
-**Scenario 4: local_optimistic_ptr for Callable Optimistic Pointers**
+**Scenario 4: Direct Callable Optimistic Pointers**
 ```cpp
 // Child object holds optimistic_ptr to host (no RAII ownership - prevents circular dependency)
 class ChildNode {
@@ -1428,19 +1370,17 @@ class ChildNode {
 
 public:
     void process_task() {
-        // Temporarily lock host if local, or use remote proxy if remote
-        rpc::local_optimistic_ptr<IHost> local_host(host_);
+        if (host_) {
+            // Direct call - works for both local and remote
+            // Local: uses generated __i_host_local_proxy (returns OBJECT_GONE if deleted)
+            // Remote: uses interface_proxy
+            auto config = host_->get_configuration();
+            auto error = host_->report_progress(42);
 
-        if (local_host) {
-            // Safe to call - local object is RAII-locked during this scope
-            // OR remote object uses proxy (no locking needed)
-            auto config = local_host->get_configuration();
-            local_host->report_progress(42);
-
-            // If host is local and gets deleted by another thread,
-            // the deletion waits until local_host scope ends
+            if (error == rpc::error::OBJECT_GONE()) {
+                // Handle gracefully - object was deleted
+            }
         }
-        // RAII: local lock released, host can be deleted if no other references
     }
 };
 
@@ -1451,13 +1391,13 @@ class Host {
 public:
     void add_child(rpc::shared_ptr<ChildNode> child) {
         children_.push_back(child);
-        // Children can call back to host using optimistic_ptr + local_optimistic_ptr
+        // Children can call back to host using optimistic_ptr directly
         // No circular dependency: children don't hold RAII references to host
     }
 };
 ```
 
-**Scenario 5: Stateless Service Calls with local_optimistic_ptr**
+**Scenario 5: Stateless Service Calls with optimistic_ptr**
 ```cpp
 // REST-like service where object lifetime is not client-managed
 class ApiClient {
@@ -1465,10 +1405,7 @@ class ApiClient {
 
 public:
     void make_request(const std::string& endpoint) {
-        // Create temporary lock for call duration
-        rpc::local_optimistic_ptr<IRestService> locked_service(service_);
-
-        if (locked_service) {
+        if (service_) {
             // Call works for both local and remote services
             auto response = locked_service->http_get(endpoint);
 
@@ -1563,44 +1500,46 @@ void release_this() noexcept {
 }
 ```
 
-#### 2. `local_optimistic_ptr` RAII Implementation
-Uses a private constructor pattern to build `shared_ptr` from control block:
+#### 2. Generated Local Proxy Integration
+The generator creates local proxy classes and static factory methods for each interface:
 
 ```cpp
-// In shared_ptr class (line ~660):
-struct internal_construct_tag {};
+// Generated in *_proxy.cpp by synchronous_generator.cpp:
+class __i_foo_local_proxy : public i_foo {
+    rpc::weak_ptr<i_foo> ptr_;
+public:
+    __i_foo_local_proxy(const rpc::weak_ptr<i_foo>& ptr) : ptr_(ptr) {}
 
-// Private constructor for friends:
-shared_ptr(__rpc_internal::__shared_ptr_control_block::control_block_base* cb,
-           element_type_impl* ptr,
-           internal_construct_tag) noexcept
-    : ptr_(ptr), cb_(cb)
-{
-    // Caller already incremented reference count
-}
-
-// In local_optimistic_ptr constructor:
-if (cb && cb->is_local) {
-    if (cb->try_increment_shared()) {
-        local_lock_ = shared_ptr<T>(cb, opt.internal_get_ptr(),
-                                    typename shared_ptr<T>::internal_construct_tag{});
-        ptr_ = local_lock_.get();
+    CORO_TASK(error_code) method(int a) override {
+        auto ptr = ptr_.lock();
+        if (!ptr) {
+            CO_RETURN rpc::error::OBJECT_GONE();
+        }
+        CO_RETURN ptr->method(a);
     }
-} else {
-    // Remote - just passthrough
-    ptr_ = opt.internal_get_ptr();
+};
+
+// Static method (declared in interface header):
+i_foo* i_foo::create_local_proxy(const rpc::weak_ptr<i_foo>& ptr) {
+    return new __i_foo_local_proxy(ptr);
 }
 ```
 
-#### 3. Friend Class Integration
-Added friend declarations in `shared_ptr` class to allow `local_optimistic_ptr` access:
+#### 3. optimistic_ptr Automatic Local Proxy Allocation
+optimistic_ptr detects local objects and automatically creates local_proxy:
 
 ```cpp
-// In shared_ptr class (line ~982):
-#ifndef TEST_STL_COMPLIANCE
-template<typename U> friend class optimistic_ptr;
-template<typename U> friend class local_optimistic_ptr;
-#endif
+// In optimistic_ptr constructor from shared_ptr:
+if (cb->is_local) {
+    weak_ptr<T> wp(sp);
+    ptr_ = T::create_local_proxy(wp);  // Calls generated static method
+    // cb_ remains nullptr - no control block for local objects
+} else {
+    // Remote: use optimistic reference counting
+    cb->try_increment_optimistic();
+    cb_ = cb;
+    ptr_ = sp.internal_get_ptr();
+}
 ```
 
 ### Test Suite Implementation
@@ -1629,9 +1568,9 @@ All tests now use the proper factory pattern (`lib.get_example()` → `create_fo
 
 - **Test 1** (`optimistic_ptr_basic_lifecycle_test`): Basic lifecycle (construction, copy, move, assignment)
 - **Test 2** (`optimistic_ptr_weak_semantics_local_test`): Weak semantics for local objects
-- **Test 3** (`local_optimistic_ptr_raii_lock_test`): `local_optimistic_ptr` RAII locking for local objects
-- **Test 4** (`optimistic_ptr_remote_shared_semantics_test`): Dual semantics (weak for local, shared for remote) + `local_optimistic_ptr` passthrough testing in remote branch
-- **Test 5** (`local_optimistic_ptr_remote_passthrough_test`): `local_optimistic_ptr` behavior (RAII lock for local, passthrough for remote)
+- **Test 3** (`optimistic_ptr_local_proxy_test`): Local proxy behavior with OBJECT_GONE error handling
+- **Test 4** (`optimistic_ptr_remote_shared_semantics_test`): Dual semantics (local_proxy for local, optimistic refs for remote)
+- **Test 5** (`optimistic_ptr_transparent_behavior_test`): Direct calling through optimistic_ptr for both local and remote
 - **Test 6** (`optimistic_ptr_transparent_access_test`): Transparent operator-> access for both scenarios
 - **Test 7** (`optimistic_ptr_circular_dependency_test`): Circular dependency resolution (host/child pattern)
 - **Test 8** (`optimistic_ptr_comparison_test`): Comparison and nullptr operations
@@ -1662,7 +1601,7 @@ This pattern replaced incorrect `new foo()` calls that always created local obje
 
 ### Key Challenges Resolved
 
-1. **Friend Class Access Issue**: Initially attempted to access `shared_ptr` private members from `local_optimistic_ptr`, but friend template parameter mismatch prevented access. Solution: Created private constructor with tag dispatch pattern.
+1. **Local Proxy Integration**: Replaced the `local_optimistic_ptr` wrapper class with automatic local_proxy allocation. Generated `__i_xxx_local_proxy` classes now handle local object access with weak_ptr wrapping and OBJECT_GONE error returns.
 
 2. **Constructor Placement Error**: Initially placed the private constructor inside `optimistic_ptr` class instead of `shared_ptr` class, causing "deduction guide" errors. Fixed by moving to correct location before `shared_ptr` class closing brace.
 

@@ -340,6 +340,20 @@ namespace rpc
                     }
 #endif
                 }
+
+#ifndef TEST_STL_COMPLIANCE
+                // Increment shared count locally (keeps interface_proxy alive) but send optimistic to remote (doesn't keep stub alive)
+                void increment_shared_with_optimistic_remote()
+                {
+                    shared_owners.fetch_add(1, std::memory_order_relaxed);
+                    // Send remote add_ref only on optimistic 0→1 transition
+                    long prev_opt = optimistic_owners.fetch_add(1, std::memory_order_relaxed);
+                    if (prev_opt == 0)
+                    {
+                        control_block_call_add_ref(add_ref_options::optimistic);
+                    }
+                }
+#endif
                 void increment_weak() { weak_owners.fetch_add(1, std::memory_order_relaxed); }
 
                 // Try to increment shared count only if it's not zero (thread-safe)
@@ -356,6 +370,29 @@ namespace rpc
                     return true;
                 }
 
+#ifndef TEST_STL_COMPLIANCE
+                // Try to increment shared count locally but send optimistic to remote
+                bool try_increment_shared_with_optimistic_remote() noexcept
+                {
+                    long current = shared_owners.load(std::memory_order_relaxed);
+                    do
+                    {
+                        if (current == 0)
+                        {
+                            return false; // Already expired, cannot increment
+                        }
+                    } while (!shared_owners.compare_exchange_weak(current, current + 1, std::memory_order_relaxed));
+
+                    // Send remote add_ref only on optimistic 0→1 transition
+                    long prev_opt = optimistic_owners.fetch_add(1, std::memory_order_relaxed);
+                    if (prev_opt == 0)
+                    {
+                        control_block_call_add_ref(add_ref_options::optimistic);
+                    }
+                    return true;
+                }
+#endif
+
                 void decrement_shared_and_dispose_if_zero()
                 {
                     if (shared_owners.fetch_sub(1, std::memory_order_acq_rel) == 1)
@@ -363,11 +400,39 @@ namespace rpc
 #ifndef TEST_STL_COMPLIANCE
                         // Call object_proxy release on 1→0 transition for remote objects
                         control_block_call_release(release_options::normal);
+
+                        // For remote objects, delay disposal until optimistic_owners also reaches 0
+                        if (!is_local && optimistic_owners.load(std::memory_order_acquire) > 0)
+                        {
+                            // Don't dispose yet - optimistic_ptrs are keeping interface_proxy alive
+                            decrement_weak_and_destroy_if_zero();
+                            return;
+                        }
 #endif
                         dispose_object_actual();
                         decrement_weak_and_destroy_if_zero();
                     }
                 }
+
+#ifndef TEST_STL_COMPLIANCE
+                // Decrement shared count locally but send optimistic to remote
+                void decrement_shared_with_optimistic_remote_and_dispose_if_zero()
+                {
+                    // Send remote release only on optimistic 1→0 transition
+                    long prev_opt = optimistic_owners.fetch_sub(1, std::memory_order_relaxed);
+                    if (prev_opt == 1)
+                    {
+                        control_block_call_release(release_options::optimistic);
+                    }
+
+                    // Dispose the local interface_proxy when shared count reaches 0
+                    if (shared_owners.fetch_sub(1, std::memory_order_acq_rel) == 1)
+                    {
+                        dispose_object_actual();
+                        decrement_weak_and_destroy_if_zero();
+                    }
+                }
+#endif
 
                 void decrement_weak_and_destroy_if_zero()
                 {
@@ -442,6 +507,12 @@ namespace rpc
                     {
                         // Call object_proxy release on 1→0 transition for remote objects
                         control_block_call_release(release_options::optimistic);
+
+                        // For remote objects, dispose interface_proxy if shared_owners is also 0
+                        if (!is_local && shared_owners.load(std::memory_order_acquire) == 0)
+                        {
+                            dispose_object_actual();
+                        }
 
                         // Last optimistic_ptr: decrement the weak_owners that was added by first optimistic_ptr
                         decrement_weak_and_destroy_if_zero();
@@ -1749,7 +1820,20 @@ namespace rpc
 #ifndef TEST_STL_COMPLIANCE
     // Forward declaration
     template<typename T> class optimistic_ptr;
-    template<typename T> class local_optimistic_ptr;
+    
+    template<class T> class local_proxy : public T
+    {
+    protected:
+        rpc::weak_ptr<T> ptr_;
+
+    public:
+        local_proxy(const rpc::weak_ptr<T>& ptr)
+            : ptr_(ptr)
+        {
+        }
+        virtual ~local_proxy() = default;
+        rpc::weak_ptr<T> __get_weak() { return ptr_; }
+    };
 
     // optimistic_ptr<T> - Non-RAII smart pointer for RPC scenarios
     // Weak semantics for local objects, shared semantics for remote proxies
@@ -1765,17 +1849,19 @@ namespace rpc
         element_type_impl* ptr_{nullptr};
         __rpc_internal::__shared_ptr_control_block::control_block_base* cb_{nullptr};
 
+        // For local proxies: stores the shared_ptr returned by create_local_proxy
+        // For remote proxies: nullptr (uses cb_ for reference counting)
+        std::shared_ptr<element_type_impl> local_proxy_holder_;
+
         template<typename Y> using is_pointer_compatible = __rpc_internal::__shared_ptr_pointer_utils::sp_pointer_compatible<Y, T>;
 
         void acquire_this() noexcept
         {
             if (cb_)
             {
-                // Weak semantics for local objects, shared semantics for remote proxies
-                if (cb_->is_local)
-                    cb_->increment_optimistic_no_lock();
-                else
-                    cb_->increment_shared();  // Keep remote proxies alive
+                // Use optimistic references for both local and remote objects
+                // For remote: optimistic refs don't hold stub lifetime but keep interface_proxy alive
+                cb_->increment_optimistic_no_lock();
             }
         }
 
@@ -1783,11 +1869,9 @@ namespace rpc
         {
             if (cb_)
             {
-                // Weak semantics for local objects, shared semantics for remote proxies
-                if (cb_->is_local)
-                    cb_->decrement_optimistic_and_dispose_if_zero();
-                else
-                    cb_->decrement_shared_and_dispose_if_zero();  // Release remote proxies
+                // Use optimistic references for both local and remote objects
+                // For remote: dispose interface_proxy only when BOTH shared and optimistic counts reach 0
+                cb_->decrement_optimistic_and_dispose_if_zero();
             }
         }
 
@@ -1801,7 +1885,11 @@ namespace rpc
         optimistic_ptr(const optimistic_ptr& r) noexcept
             : ptr_(r.ptr_)
             , cb_(r.cb_)
+            , local_proxy_holder_(r.local_proxy_holder_)
         {
+            // Both local and remote proxies can now be safely copied
+            // Local: shared_ptr copy increments reference count
+            // Remote: acquire optimistic reference
             acquire_this();
         }
 
@@ -1809,6 +1897,7 @@ namespace rpc
         optimistic_ptr(optimistic_ptr&& r) noexcept
             : ptr_(r.ptr_)
             , cb_(r.cb_)
+            , local_proxy_holder_(std::move(r.local_proxy_holder_))
         {
             r.ptr_ = nullptr;
             r.cb_ = nullptr;
@@ -1819,7 +1908,9 @@ namespace rpc
         optimistic_ptr(const optimistic_ptr<Y>& r) noexcept
             : ptr_(static_cast<element_type_impl*>(r.ptr_))
             , cb_(r.cb_)
+            , local_proxy_holder_(r.local_proxy_holder_)
         {
+            // Both local and remote proxies can now be safely copied
             acquire_this();
         }
 
@@ -1828,6 +1919,7 @@ namespace rpc
         optimistic_ptr(optimistic_ptr<Y>&& r) noexcept
             : ptr_(static_cast<element_type_impl*>(r.ptr_))
             , cb_(r.cb_)
+            , local_proxy_holder_(std::move(r.local_proxy_holder_))
         {
             r.ptr_ = nullptr;
             r.cb_ = nullptr;
@@ -1837,16 +1929,35 @@ namespace rpc
         explicit optimistic_ptr(const shared_ptr<T>& sp) noexcept
             : ptr_(nullptr)
             , cb_(nullptr)
+            , local_proxy_holder_()
         {
             auto cb = sp.internal_get_cb();
-            if (sp && cb)
+            if (!sp || !cb)
             {
-                // Weak semantics for local objects, shared semantics for remote proxies
-                bool success = cb->is_local ? cb->try_increment_optimistic() : cb->try_increment_shared();
+                return;  // Null pointer case
+            }
+
+            // Check if this is a local object
+            if (cb->is_local)
+            {
+                // Local object: create local_proxy using generated static method
+                // The local_proxy wraps a weak_ptr and returns OBJECT_GONE when object is deleted
+                // The method returns std::shared_ptr so we can safely copy optimistic_ptrs
+                weak_ptr<T> wp(sp);
+                local_proxy_holder_ = T::create_local_proxy(wp);
+                ptr_ = local_proxy_holder_.get();
+                // cb_ remains nullptr for local objects - no control block needed
+            }
+            else
+            {
+                // Remote object: use optimistic references to keep interface_proxy alive
+                // For remote: optimistic refs don't hold stub lifetime but keep interface_proxy alive
+                bool success = cb->try_increment_optimistic();
                 if (success)
                 {
                     cb_ = cb;
                     ptr_ = sp.internal_get_ptr();
+                    // local_proxy_holder_ remains empty for remote objects
                 }
             }
         }
@@ -1855,24 +1966,43 @@ namespace rpc
         explicit optimistic_ptr(const weak_ptr<T>& wp) noexcept
             : ptr_(nullptr)
             , cb_(nullptr)
+            , local_proxy_holder_()
         {
             // weak_ptr has cb_ member we can access via friend
             auto cb = wp.cb_;
-            if (cb)
+            if (!cb)
             {
-                // Weak semantics for local objects, shared semantics for remote proxies
-                bool success = cb->is_local ? cb->try_increment_optimistic() : cb->try_increment_shared();
+                return;  // Null pointer case
+            }
+
+            // Check if this is a local object
+            if (cb->is_local)
+            {
+                // Local object: create local_proxy using generated static method
+                local_proxy_holder_ = T::create_local_proxy(wp);
+                ptr_ = local_proxy_holder_.get();
+                // cb_ remains nullptr for local objects - no control block needed
+            }
+            else
+            {
+                // Remote object: use optimistic references to keep interface_proxy alive
+                // For remote: optimistic refs don't hold stub lifetime but keep interface_proxy alive
+                bool success = cb->try_increment_optimistic();
                 if (success)
                 {
                     cb_ = cb;
                     ptr_ = wp.ptr_;
+                    // local_proxy_holder_ remains empty for remote objects
                 }
             }
         }
 
         ~optimistic_ptr() noexcept
         {
+            // For local proxies: local_proxy_holder_ shared_ptr will automatically clean up
+            // For remote proxies: release optimistic reference
             release_this();
+            // local_proxy_holder_ destructor runs automatically
         }
 
         // Copy assignment
@@ -1911,10 +2041,37 @@ namespace rpc
             return *this;
         }
 
-        // Access operators - work for both local and remote objects
-        element_type_impl* operator->() const noexcept { return ptr_; }
-        element_type_impl& operator*() const noexcept { return *ptr_; }
-        element_type_impl* get() const noexcept { return ptr_; }
+        // Access operators - operator-> is safe for making calls through the proxy
+        element_type_impl* operator->() const noexcept
+        {
+            // For local objects: ptr_ points to __i_xxx_local_proxy (safe - returns OBJECT_GONE)
+            // For remote objects: ptr_ points to interface_proxy (safe - RPC handles errors)
+            return ptr_;
+        }
+
+        // UNSAFE: Direct pointer access - use ONLY for testing/comparison
+        // The returned pointer may become invalid at any time due to concurrent deletion
+        // For safe calls, use operator-> instead
+        element_type_impl* get_unsafe_only_for_testing() const noexcept
+        {
+            // WARNING: This pointer can dangle at any moment in multi-threaded scenarios
+            if (!ptr_)
+            {
+                return nullptr;  // Null pointer case
+            }            
+            if(ptr_->is_local())
+            {
+                auto local = static_cast<local_proxy<T>*>(ptr_);
+                auto local_shared = local->__get_weak().lock();
+                if(!local_shared)
+                    return nullptr;
+                return local_shared.get();
+            }
+            else
+            {
+                return ptr_;
+            }
+        }
 
         explicit operator bool() const noexcept { return ptr_ != nullptr; }
 
@@ -1929,16 +2086,6 @@ namespace rpc
             std::swap(cb_, r.cb_);
         }
 
-        long use_count() const noexcept
-        {
-            return cb_ ? cb_->shared_owners.load(std::memory_order_relaxed) : 0;
-        }
-
-        bool unique() const noexcept
-        {
-            return use_count() == 1;
-        }
-
     private:
         // Internal accessors - NOT part of public API
         __rpc_internal::__shared_ptr_control_block::control_block_base* internal_get_cb() const noexcept { return cb_; }
@@ -1948,157 +2095,8 @@ namespace rpc
         template<typename Y> friend class weak_ptr;
 #ifndef TEST_STL_COMPLIANCE
         template<typename Y> friend class optimistic_ptr;
-        template<typename Y> friend class local_optimistic_ptr;
 #endif
     };
-
-    // local_optimistic_ptr<T> - Temporary RAII lock for calling through optimistic_ptr
-    // Stack-only usage - NOT for use as class member
-    template<typename T>
-    class local_optimistic_ptr
-    {
-        using element_type_impl = std::remove_extent_t<T>;
-
-        T* ptr_{nullptr};
-        shared_ptr<T> local_lock_;  // Only set if object is local (RAII lock)
-
-    public:
-        // Constructor from optimistic_ptr
-        explicit local_optimistic_ptr(const optimistic_ptr<T>& opt) noexcept
-            : ptr_(nullptr)
-        {
-            if (!opt)
-            {
-                return;
-            }
-
-            auto cb = opt.internal_get_cb();
-            if (cb && cb->is_local)
-            {
-                // Local object - create temporary shared_ptr to RAII lock it
-                // Try to increment shared_owners
-                if (cb->try_increment_shared())
-                {
-                    // Construct shared_ptr using private constructor (we already incremented)
-                    local_lock_ = shared_ptr<T>(cb, opt.internal_get_ptr(), typename shared_ptr<T>::internal_construct_tag{});
-                    ptr_ = local_lock_.get();
-                }
-            }
-            else
-            {
-                // Remote object - just store the pointer (no RAII lock needed)
-                ptr_ = opt.internal_get_ptr();
-            }
-        }
-
-        // Default constructor
-        constexpr local_optimistic_ptr() noexcept = default;
-
-        // Assignment from optimistic_ptr
-        local_optimistic_ptr& operator=(const optimistic_ptr<T>& opt) noexcept
-        {
-            local_optimistic_ptr temp(opt);
-            swap(temp);
-            return *this;
-        }
-
-        // Move constructor
-        local_optimistic_ptr(local_optimistic_ptr&& other) noexcept
-            : ptr_(other.ptr_)
-            , local_lock_(std::move(other.local_lock_))
-        {
-            other.ptr_ = nullptr;
-        }
-
-        // Move assignment
-        local_optimistic_ptr& operator=(local_optimistic_ptr&& other) noexcept
-        {
-            local_optimistic_ptr temp(std::move(other));
-            swap(temp);
-            return *this;
-        }
-
-        // Delete copy constructor and assignment (prevent accidental copies)
-        local_optimistic_ptr(const local_optimistic_ptr&) = delete;
-        local_optimistic_ptr& operator=(const local_optimistic_ptr&) = delete;
-
-        ~local_optimistic_ptr() = default;  // RAII: local_lock_ releases automatically
-
-        // Access operators - return valid pointer to local object or remote proxy
-        T* operator->() const noexcept { return ptr_; }
-        T& operator*() const noexcept { return *ptr_; }
-        T* get() const noexcept { return ptr_; }
-
-        explicit operator bool() const noexcept { return ptr_ != nullptr; }
-
-        void swap(local_optimistic_ptr& other) noexcept
-        {
-            std::swap(ptr_, other.ptr_);
-            local_lock_.swap(other.local_lock_);
-        }
-
-        // Check if this is a local object (has RAII lock)
-        bool is_local() const noexcept { return local_lock_.operator bool(); }
-    };
-
-    // Comparison operators for optimistic_ptr
-    template<typename T, typename U>
-    bool operator==(const optimistic_ptr<T>& lhs, const optimistic_ptr<U>& rhs) noexcept
-    {
-        return lhs.get() == rhs.get();
-    }
-
-    template<typename T>
-    bool operator==(const optimistic_ptr<T>& lhs, std::nullptr_t) noexcept
-    {
-        return !lhs;
-    }
-
-    template<typename T>
-    bool operator==(std::nullptr_t, const optimistic_ptr<T>& rhs) noexcept
-    {
-        return !rhs;
-    }
-
-    template<typename T, typename U>
-    bool operator!=(const optimistic_ptr<T>& lhs, const optimistic_ptr<U>& rhs) noexcept
-    {
-        return !(lhs == rhs);
-    }
-
-    template<typename T>
-    bool operator!=(const optimistic_ptr<T>& lhs, std::nullptr_t) noexcept
-    {
-        return static_cast<bool>(lhs);
-    }
-
-    template<typename T>
-    bool operator!=(std::nullptr_t, const optimistic_ptr<T>& rhs) noexcept
-    {
-        return static_cast<bool>(rhs);
-    }
-
-    // Pointer cast functions for optimistic_ptr
-    template<typename T, typename U>
-    optimistic_ptr<T> static_pointer_cast(const optimistic_ptr<U>& r) noexcept
-    {
-        auto p = static_cast<T*>(r.get());
-        return optimistic_ptr<T>(r, p);
-    }
-
-    template<typename T, typename U>
-    optimistic_ptr<T> const_pointer_cast(const optimistic_ptr<U>& r) noexcept
-    {
-        auto p = const_cast<T*>(r.get());
-        return optimistic_ptr<T>(r, p);
-    }
-
-    template<typename T, typename U>
-    optimistic_ptr<T> reinterpret_pointer_cast(const optimistic_ptr<U>& r) noexcept
-    {
-        auto p = reinterpret_cast<T*>(r.get());
-        return optimistic_ptr<T>(r, p);
-    }
 
     // Dynamic pointer cast for optimistic_ptr (uses local query_interface)
     template<typename T, typename U>

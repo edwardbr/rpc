@@ -61,14 +61,16 @@ namespace synchronous_generator
         STUB_PARAM_CAST,
         STUB_ADD_REF_OUT_PREDECLARE,
         STUB_ADD_REF_OUT,
-        STUB_MARSHALL_OUT
+        STUB_MARSHALL_OUT,
+
+        LOCAL_OPTIMISTIC_PTR_CALL
     };
 
     // Polymorphic renderer adapter that implements base_renderer interface
-    class polymorphic_renderer : public rpc_generator::base_renderer
+    class calling_renderer : public rpc_generator::base_renderer
     {
     public:
-        polymorphic_renderer() = default;
+        calling_renderer() = default;
 
         // Implement pure virtual functions from base_renderer
         std::string render_by_value(int option,
@@ -152,8 +154,8 @@ namespace synchronous_generator
             uint64_t& count) override;
     };
 
-    // Implementation functions for polymorphic_renderer
-    std::string polymorphic_renderer::render_by_value(int option,
+    // Implementation functions for calling_renderer
+    std::string calling_renderer::render_by_value(int option,
         bool from_host,
         const class_entity& lib,
         const std::string& name,
@@ -185,12 +187,15 @@ namespace synchronous_generator
             return fmt::format("{}_", name);
         case STUB_MARSHALL_OUT:
             return fmt::format("{0}_, ", name);
+            
+        case LOCAL_OPTIMISTIC_PTR_CALL:
+            return fmt::format("{}", name);
         default:
             return "";
         }
     }
 
-    std::string polymorphic_renderer::render_reference(int option,
+    std::string calling_renderer::render_reference(int option,
         bool from_host,
         const class_entity& lib,
         const std::string& name,
@@ -223,13 +228,15 @@ namespace synchronous_generator
         case STUB_MARSHALL_IN:
             return fmt::format("{}_, ", name);
         case STUB_PARAM_CAST:
-            return fmt::format("{}_", name);
+            return fmt::format("{}_", name);            
+        case LOCAL_OPTIMISTIC_PTR_CALL:
+            return fmt::format("{}", name);
         default:
             return "";
         }
     }
 
-    std::string polymorphic_renderer::render_move(int option,
+    std::string calling_renderer::render_move(int option,
         bool from_host,
         const class_entity& lib,
         const std::string& name,
@@ -267,13 +274,15 @@ namespace synchronous_generator
         case STUB_PARAM_CAST:
             return fmt::format("std::move({}_)", name);
         case STUB_MARSHALL_OUT:
-            return fmt::format("{0}_, ", name);
+            return fmt::format("{0}_, ", name);            
+        case LOCAL_OPTIMISTIC_PTR_CALL:
+            return fmt::format("std::move({})", name);
         default:
             return "";
         }
     }
 
-    std::string polymorphic_renderer::render_pointer(int option,
+    std::string calling_renderer::render_pointer(int option,
         bool from_host,
         const class_entity& lib,
         const std::string& name,
@@ -306,12 +315,14 @@ namespace synchronous_generator
             return fmt::format("{}_, ", name);
         case STUB_PARAM_CAST:
             return fmt::format("({}*){}_", object_type, name);
+        case LOCAL_OPTIMISTIC_PTR_CALL:
+            return fmt::format("{}", name);
         default:
             return "";
         }
     }
 
-    std::string polymorphic_renderer::render_pointer_reference(int option,
+    std::string calling_renderer::render_pointer_reference(int option,
         bool from_host,
         const class_entity& lib,
         const std::string& name,
@@ -347,12 +358,14 @@ namespace synchronous_generator
             return fmt::format("(uint64_t){}_, ", name);
         case PROXY_VALUE_RETURN:
             return fmt::format("{} = ({}*){}_;", name, object_type, name);
+        case LOCAL_OPTIMISTIC_PTR_CALL:
+            return fmt::format("{}", name);
         default:
             return "";
         }
     }
 
-    std::string polymorphic_renderer::render_pointer_pointer(int option,
+    std::string calling_renderer::render_pointer_pointer(int option,
         bool from_host,
         const class_entity& lib,
         const std::string& name,
@@ -386,12 +399,14 @@ namespace synchronous_generator
             return fmt::format("uint64_t {}_ = 0;", name);
         case STUB_MARSHALL_OUT:
             return fmt::format("(uint64_t){}_, ", name);
+        case LOCAL_OPTIMISTIC_PTR_CALL:
+            return fmt::format("{}", name);
         default:
             return "";
         }
     }
 
-    std::string polymorphic_renderer::render_interface(int option,
+    std::string calling_renderer::render_interface(int option,
         bool from_host,
         const class_entity& lib,
         const std::string& name,
@@ -472,12 +487,15 @@ namespace synchronous_generator
         case PROXY_VALUE_RETURN:
         case PROXY_OUT_DECLARATION:
             return fmt::format("  rpc::interface_descriptor {}_;", name);
+            
+        case LOCAL_OPTIMISTIC_PTR_CALL:
+            return fmt::format("{}", name);
         default:
             return "";
         }
     }
 
-    std::string polymorphic_renderer::render_interface_reference(int option,
+    std::string calling_renderer::render_interface_reference(int option,
         bool from_host,
         const class_entity& lib,
         const std::string& name,
@@ -534,6 +552,9 @@ namespace synchronous_generator
                 name);
         case STUB_MARSHALL_OUT:
             return fmt::format("{}_, ", name);
+            
+        case LOCAL_OPTIMISTIC_PTR_CALL:
+            return fmt::format("{}", name);
         default:
             return "";
         }
@@ -549,7 +570,7 @@ namespace synchronous_generator
         std::string& output)
     {
         // UNIFIED: Use polymorphic renderer with print_type option
-        polymorphic_renderer r;
+        calling_renderer r;
         return rpc_generator::do_in_param_unified(
             r, static_cast<int>(option), from_host, lib, name, type, attribs, count, output);
     }
@@ -564,7 +585,7 @@ namespace synchronous_generator
         std::string& output)
     {
         // UNIFIED: Use polymorphic renderer with print_type option
-        polymorphic_renderer r;
+        calling_renderer r;
         return rpc_generator::do_out_param_unified(
             r, static_cast<int>(option), from_host, lib, name, type, attribs, count, output);
     }
@@ -1119,6 +1140,118 @@ namespace synchronous_generator
                 function_count++;
             }
             proxy("return functions;");
+            proxy("}}");
+        }
+        
+        {
+            proxy("class __{0}_local_proxy : public rpc::local_proxy<{0}>", interface_name);
+            proxy("{{");
+            proxy("public:");
+            proxy("__{0}_local_proxy(const rpc::weak_ptr<{0}>& ptr)", interface_name);
+            proxy(": rpc::local_proxy<{0}>(ptr)", interface_name);
+            proxy("{{}}");
+            proxy("virtual ~__{0}_local_proxy() = default;", interface_name);
+            
+            proxy("void* get_address() const override");
+            proxy("{{");
+                proxy("auto ptr = ptr_.lock();");
+                proxy("if(!ptr)");
+                proxy("{{");
+                    proxy("return (void*)this;");
+                proxy("}}");
+                proxy("return ptr->get_address();");
+            proxy("}}");
+            
+            proxy("const rpc::casting_interface* query_interface(rpc::interface_ordinal interface_id) const override");
+            proxy("{{");
+                proxy("return nullptr;");
+            proxy("}}");
+            
+            for (auto& function : m_ob.get_functions())
+            {
+                if (function->get_entity_type() != entity_type::FUNCTION_METHOD)
+                    continue;
+
+                std::string scoped_namespace;
+                interface_declaration_generator::build_scoped_name(&m_ob, scoped_namespace);
+
+                proxy.print_tabs();
+                proxy.raw("CORO_TASK({}) {}(", function->get_return_type(), function->get_name());
+                bool has_parameter = false;
+                for (auto& parameter : function->get_parameters())
+                {
+                    if (has_parameter)
+                    {
+                        proxy.raw(", ");
+                    }
+                    has_parameter = true;
+                    
+                    render_parameter(proxy, m_ob, parameter);
+                }
+                bool function_is_const = false;
+                if (function->has_value("const"))
+                    function_is_const = true;
+                if (function_is_const)
+                {
+                    proxy.raw(") const override\n");
+                }
+                else
+                {
+                    proxy.raw(") override\n");
+                }
+                
+                proxy("{{");
+                proxy("auto ptr = ptr_.lock();");
+                proxy("if(!ptr)");
+                proxy("{{");
+                    proxy("CO_RETURN rpc::error::OBJECT_GONE();");
+                proxy("}}");                    
+                
+                proxy.print_tabs();
+                proxy.raw("CO_RETURN ptr->{}(", function->get_name());
+                
+                has_parameter = false;
+                uint64_t count = 1;
+                for (auto& parameter : function->get_parameters())
+                {
+                    if (has_parameter)
+                    {
+                        proxy.raw(", ");
+                        count++;
+                    }
+                    has_parameter = true;
+                    
+                    std::string output;
+                    if (do_in_param(LOCAL_OPTIMISTIC_PTR_CALL,
+                            from_host,
+                            m_ob,
+                            parameter.get_name(),
+                            parameter.get_type(),
+                            parameter,
+                            count,
+                            output))
+                        ;
+                    else
+                        do_out_param(LOCAL_OPTIMISTIC_PTR_CALL,
+                            from_host,
+                            m_ob,
+                            parameter.get_name(),
+                            parameter.get_type(),
+                            parameter,
+                            count,
+                            output);
+                    proxy.raw("{}", output);
+                }
+                
+                proxy.raw(");\n");
+                proxy("}}");
+            }
+            proxy("}};");
+
+            proxy("//RAII responsibilities are managed by the optimistic_ptr");
+            proxy("std::shared_ptr<rpc::local_proxy<{0}>> {0}::create_local_proxy(const rpc::weak_ptr<{0}>& ptr)", interface_name);
+            proxy("{{");
+            proxy("return std::make_shared<__{}_local_proxy>(ptr);", interface_name);
             proxy("}}");
         }
 

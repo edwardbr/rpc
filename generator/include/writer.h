@@ -63,7 +63,7 @@ public:
     {
         std::string buffer;
         fmt::vformat_to(std::back_inserter(buffer), format_str, fmt::make_format_args(args...));
-        strm_ << buffer << "\n";
+        strm_ << buffer;
     }
     void write_buffer(const std::string& str) { strm_ << str; }
     void print_tabs()

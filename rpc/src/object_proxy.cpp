@@ -76,22 +76,24 @@ namespace rpc
         }
 #endif
 
-        // Perform cleanup only when BOTH shared and optimistic counts reach zero
-        // This ensures object_proxy stays alive as long as any references exist
-        if (prev_count == 1) // We just decremented to 0
+        // When a specific reference type count reaches zero, notify the server immediately
+        // This allows the server to delete the stub when shared_count=0 even if optimistic_count>0
+        if (prev_count == 1) // We just decremented this specific counter to 0
         {
-            int shared_count = inherited_shared_count_.load(std::memory_order_acquire);
-            int optimistic_count = inherited_optimistic_count_.load(std::memory_order_acquire);
-
-            if (shared_count == 0 && optimistic_count == 0)
+            if (service_proxy)
             {
-                // Final release - perform cleanup that was previously in destructor
-                if (service_proxy)
-                {
 #ifdef USE_RPC_LOGGING
-                    RPC_DEBUG("object_proxy::release: final cleanup for object_id={}", object_id_.get_val());
+                RPC_DEBUG("object_proxy::release: final cleanup for object_id={}", object_id_.get_val());
 #endif
-                    service_proxy->on_object_proxy_released(object_id_, 0, 0);
+                if (is_optimistic)
+                {
+                    // All optimistic references released - send 1 to indicate the 1→0 transition
+                    service_proxy->on_object_proxy_released(object_id_, 0, 1);
+                }
+                else
+                {
+                    // All shared references released - send 1 to indicate the 1→0 transition
+                    service_proxy->on_object_proxy_released(object_id_, 1, 0);
                 }
             }
         }
@@ -99,23 +101,24 @@ namespace rpc
 
     object_proxy::~object_proxy()
     {
-        // Cleanup has been moved to release() method
-        // Destructor now only handles final telemetry and cleanup of any remaining inherited references
+        // Destructor is called when BOTH counters are 0
+        // All releases have already been handled by release() method when each counter hit 0
+        // But we MUST notify service_proxy to remove this proxy from the map
         auto service_proxy = service_proxy_.get_nullable();
+
+        int inherited_shared = inherited_shared_count_.load();
+        int inherited_optimistic = inherited_optimistic_count_.load();
 
 #ifdef USE_RPC_LOGGING
         if (service_proxy)
         {
-            int shared_count = inherited_shared_count_.load();
-            int optimistic_count = inherited_optimistic_count_.load();
-            RPC_DEBUG("object_proxy destructor: service zone={} destination_zone={} object_id={} (remaining: "
-                      "shared={}, optimistic={})",
+            RPC_DEBUG("object_proxy destructor: service zone={} destination_zone={} object_id={} "
+                      "(inherited: shared={}, optimistic={})",
                 service_proxy->get_zone_id().get_val(),
                 service_proxy->get_destination_zone_id().get_val(),
-                service_proxy->get_caller_zone_id().get_val(),
                 object_id_.get_val(),
-                shared_count,
-                optimistic_count);
+                inherited_shared,
+                inherited_optimistic);
         }
 #endif
 
@@ -127,22 +130,11 @@ namespace rpc
         }
 #endif
 
-        // Handle any remaining inherited references (race condition cleanup)
-        int inherited_shared = inherited_shared_count_.load();
-        int inherited_optimistic = inherited_optimistic_count_.load();
-        int total_inherited = inherited_shared + inherited_optimistic;
-
-        if (total_inherited > 0 && service_proxy)
+        // Always notify service_proxy so it can remove this proxy from the map
+        // Pass being_destroyed=true to enable race condition handling and map cleanup
+        if (service_proxy)
         {
-#ifdef USE_RPC_LOGGING
-            RPC_DEBUG("object_proxy destructor: {} inherited references (shared={}, optimistic={}) will be handled by "
-                      "on_object_proxy_released for object {}",
-                total_inherited,
-                inherited_shared,
-                inherited_optimistic,
-                object_id_.get_val());
-#endif
-            service_proxy->on_object_proxy_released(object_id_, inherited_shared, inherited_optimistic);
+            service_proxy->on_object_proxy_released(object_id_, inherited_shared, inherited_optimistic, true);
         }
 
         service_proxy_ = nullptr;

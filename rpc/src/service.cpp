@@ -343,8 +343,8 @@ namespace rpc
             auto stub = weak_stub.lock();
             if (stub == nullptr)
             {
-                RPC_ERROR("Invalid data - stub is null in send");
-                CO_RETURN rpc::error::INVALID_DATA();
+                RPC_ERROR("Object gone - stub has been deleted");
+                CO_RETURN rpc::error::OBJECT_GONE();
             }
 
             auto ret = CO_AWAIT stub->call(protocol_version,
@@ -766,8 +766,7 @@ namespace rpc
         auto item = stubs.find(object_id);
         if (item == stubs.end())
         {
-            // we need a test if we get here
-            RPC_ASSERT(false);
+            // Stub has been deleted - can happen with optimistic_ptr when shared_ptr is released
             return std::weak_ptr<object_stub>();
         }
 
@@ -1456,7 +1455,7 @@ namespace rpc
                     auto item = stubs.find(object_id);
                     if (item == stubs.end())
                     {
-                        RPC_ASSERT(false);
+                        // Stub has been deleted - can happen with optimistic_ptr when shared_ptr is released
                         reference_count = 0;
                         CO_RETURN rpc::error::OBJECT_NOT_FOUND();
                     }

@@ -347,9 +347,18 @@ namespace rpc
             auto ret = CO_AWAIT release(version_.load(), destination_zone_id_, object_id, caller_zone_id, release_options::optimistic, ref_count);
             if (ret != rpc::error::OK())
             {
-                RPC_ERROR("cleanup_after_object optimistic release failed");
-                RPC_ASSERT(false);
-                CO_RETURN;
+                // OBJECT_NOT_FOUND is normal for optimistic_ptr when stub has been deleted
+                if (ret == rpc::error::OBJECT_NOT_FOUND())
+                {
+                    RPC_DEBUG("Object {} not found - stub already deleted (normal for optimistic_ptr)", object_id.get_val());
+                    break; // Exit loop, continue with cleanup
+                }
+                else
+                {
+                    RPC_ERROR("cleanup_after_object optimistic release failed with error {}", ret);
+                    RPC_ASSERT(false);
+                    CO_RETURN;
+                }
             }
             inner_release_external_ref();
         }
@@ -365,8 +374,12 @@ namespace rpc
             auto ret = CO_AWAIT release(version_.load(), destination_zone_id_, object_id, caller_zone_id, release_options::normal, ref_count);
             if (ret != rpc::error::OK())
             {
-                RPC_ERROR("cleanup_after_object shared release failed");
-                RPC_ASSERT(false);
+                // OBJECT_NOT_FOUND is expected when stub has been deleted (optimistic_ptr scenario)
+                if (ret != rpc::error::OBJECT_NOT_FOUND())
+                {
+                    RPC_ERROR("cleanup_after_object shared release failed with error {}", ret);
+                    RPC_ASSERT(false);
+                }
                 CO_RETURN;
             }
             inner_release_external_ref();
@@ -376,16 +389,17 @@ namespace rpc
         CO_RETURN;
     }
 
-    void service_proxy::on_object_proxy_released(object object_id, int inherited_shared_reference_count, int inherited_optimistic_reference_count)
+    void service_proxy::on_object_proxy_released(object object_id, int inherited_shared_reference_count, int inherited_optimistic_reference_count, bool object_proxy_being_destroyed)
     {
         RPC_DEBUG("on_object_proxy_released service zone: {} destination_zone={}, caller_zone={}, object_id = {} "
-                  "(inherited: shared={}, optimistic={})",
+                  "(inherited: shared={}, optimistic={}, being_destroyed={})",
             get_zone_id().get_val(),
             destination_zone_id_.get_val(),
             caller_zone_id_.get_val(),
             object_id.get_val(),
             inherited_shared_reference_count,
-            inherited_optimistic_reference_count);
+            inherited_optimistic_reference_count,
+            object_proxy_being_destroyed);
 
         // this keeps the underlying service alive while the service proxy is released
         auto current_service = get_operating_zone_service();
@@ -401,7 +415,8 @@ namespace rpc
         }
 #endif
 
-        // Handle proxy map cleanup - use only insert_control_ to avoid deadlocks
+        // Handle proxy map cleanup - only when object_proxy is being destroyed
+        if (object_proxy_being_destroyed)
         {
             std::lock_guard proxy_lock(insert_control_);
             auto item = proxies_.find(object_id);
@@ -410,7 +425,7 @@ namespace rpc
                 auto existing_proxy = item->second.lock();
                 if (existing_proxy != nullptr)
                 {
-                    // Check if there are other proxies that need to handle the cleanup
+                    // Check for race conditions - another proxy exists for same object
                     int total_inherited = inherited_shared_reference_count + inherited_optimistic_reference_count;
                     if (total_inherited > 0)
                     {
@@ -434,7 +449,8 @@ namespace rpc
                         return;
                     }
                 }
-                // Always remove this entry from the map since this object proxy is being released
+                // Remove from map since object_proxy is being destroyed
+                RPC_DEBUG("Removing object_id={} from proxy map (object_proxy being destroyed)", object_id.get_val());
                 proxies_.erase(item);
             }
         }
