@@ -1111,7 +1111,6 @@ namespace rpc
         template<typename Deleter, typename U> friend Deleter* get_deleter(const shared_ptr<U>& p) noexcept;
 #ifndef TEST_STL_COMPLIANCE
         template<typename U> friend class optimistic_ptr;
-        template<typename U> friend class local_optimistic_ptr;
 #endif
     };
 
@@ -1383,6 +1382,9 @@ namespace rpc
         template<typename U> friend class shared_ptr;
         template<typename U> friend class enable_shared_from_this;
         template<typename U> friend class weak_ptr;
+#ifndef TEST_STL_COMPLIANCE
+        template<typename U> friend class optimistic_ptr;
+#endif
     };
 
     template<typename T = void> struct owner_less;
@@ -1846,12 +1848,12 @@ namespace rpc
         static_assert(__rpc_internal::is_casting_interface_derived<T>::value,
                      "optimistic_ptr can only manage casting_interface-derived types");
 
+        // For local proxies: local_proxy_holder_ holds the local_proxy (callable target), ptr_ and cb_ are nullptr
+        // For remote proxies: ptr_ points to interface_proxy (callable target), cb_ for refcounting, local_proxy_holder_ is nullptr
+        // Note: local_proxy_holder_ uses conditional forwarding - it IS the callable proxy, not the underlying object
         element_type_impl* ptr_{nullptr};
         __rpc_internal::__shared_ptr_control_block::control_block_base* cb_{nullptr};
-
-        // For local proxies: stores the shared_ptr returned by create_local_proxy
-        // For remote proxies: nullptr (uses cb_ for reference counting)
-        std::shared_ptr<element_type_impl> local_proxy_holder_;
+        std::shared_ptr<local_proxy<T>> local_proxy_holder_;
 
         template<typename Y> using is_pointer_compatible = __rpc_internal::__shared_ptr_pointer_utils::sp_pointer_compatible<Y, T>;
 
@@ -1945,8 +1947,7 @@ namespace rpc
                 // The method returns std::shared_ptr so we can safely copy optimistic_ptrs
                 weak_ptr<T> wp(sp);
                 local_proxy_holder_ = T::create_local_proxy(wp);
-                ptr_ = local_proxy_holder_.get();
-                // cb_ remains nullptr for local objects - no control block needed
+                // ptr_ and cb_ remain nullptr for local objects
             }
             else
             {
@@ -1980,8 +1981,7 @@ namespace rpc
             {
                 // Local object: create local_proxy using generated static method
                 local_proxy_holder_ = T::create_local_proxy(wp);
-                ptr_ = local_proxy_holder_.get();
-                // cb_ remains nullptr for local objects - no control block needed
+                // ptr_ and cb_ remain nullptr for local objects
             }
             else
             {
@@ -2046,6 +2046,8 @@ namespace rpc
         {
             // For local objects: ptr_ points to __i_xxx_local_proxy (safe - returns OBJECT_GONE)
             // For remote objects: ptr_ points to interface_proxy (safe - RPC handles errors)
+            if(local_proxy_holder_)
+                return local_proxy_holder_.get();
             return ptr_;
         }
 
@@ -2055,25 +2057,22 @@ namespace rpc
         element_type_impl* get_unsafe_only_for_testing() const noexcept
         {
             // WARNING: This pointer can dangle at any moment in multi-threaded scenarios
-            if (!ptr_)
+
+            // For local objects: local_proxy_holder_ is set, ptr_ is nullptr
+            if (local_proxy_holder_)
             {
-                return nullptr;  // Null pointer case
-            }            
-            if(ptr_->is_local())
-            {
-                auto local = static_cast<local_proxy<T>*>(ptr_);
-                auto local_shared = local->__get_weak().lock();
-                if(!local_shared)
-                    return nullptr;
-                return local_shared.get();
+                auto local_shared = local_proxy_holder_->__get_weak();
+                return local_shared.ptr_for_lock_;
             }
-            else
-            {
-                return ptr_;
-            }
+
+            // For remote objects: ptr_ is set
+            return ptr_;
         }
 
-        explicit operator bool() const noexcept { return ptr_ != nullptr; }
+        explicit operator bool() const noexcept
+        {
+            return local_proxy_holder_ != nullptr || ptr_ != nullptr;
+        }
 
         void reset() noexcept
         {
@@ -2084,6 +2083,7 @@ namespace rpc
         {
             std::swap(ptr_, r.ptr_);
             std::swap(cb_, r.cb_);
+            std::swap(local_proxy_holder_, r.local_proxy_holder_);
         }
 
     private:
