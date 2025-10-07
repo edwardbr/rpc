@@ -82,8 +82,7 @@ extern bool enable_multithreaded_tests;
 // Type list for local type_test instantiations.
 // Requires the various setup helpers to be included before this header.
 
-using local_implementations = ::testing::Types<
-    in_memory_setup<false>,
+using local_implementations = ::testing::Types<in_memory_setup<false>,
     in_memory_setup<true>,
     inproc_setup<false, false, false>,
     inproc_setup<false, false, true>,
@@ -209,7 +208,8 @@ CORO_TASK(bool) optimistic_ptr_basic_lifecycle_test(std::shared_ptr<rpc::service
     // Test move constructor
     rpc::optimistic_ptr<xxx::i_foo> opt_f_move(std::move(opt_f_copy));
     CORO_ASSERT_NE(opt_f_move.get_unsafe_only_for_testing(), nullptr);
-    CORO_ASSERT_EQ(opt_f_move.get_unsafe_only_for_testing(), opt_f.get_unsafe_only_for_testing()); // Should point to same local_proxy
+    CORO_ASSERT_EQ(opt_f_move.get_unsafe_only_for_testing(),
+        opt_f.get_unsafe_only_for_testing());                          // Should point to same local_proxy
     CORO_ASSERT_EQ(opt_f_copy.get_unsafe_only_for_testing(), nullptr); // Moved-from should be null
 
     // Test assignment
@@ -324,9 +324,73 @@ TYPED_TEST(type_test, optimistic_ptr_local_proxy_test)
         });
 }
 
+// Helper class to wait for object deletion notification and run continuation
+class object_deletion_waiter : public rpc::service_event, public std::enable_shared_from_this<object_deletion_waiter>
+{
+    rpc::object expected_object_id_;
+    std::function<CORO_TASK(void)()> continuation_;
+    bool continuation_scheduled_ = false;
+
+public:
+    object_deletion_waiter(rpc::object object_id)
+        : expected_object_id_(object_id)
+    {
+    }
+
+    // Schedule the verification to run - either immediately (local) or after async cleanup (remote)
+    template<typename Service, typename Lambda>
+    void schedule(Service& service, const rpc::shared_ptr<rpc::casting_interface>& obj, Lambda&& verification_lambda)
+    {
+        bool is_local = obj.get()->is_local();
+
+        if (is_local)
+        {
+            // For local objects, cleanup is synchronous - set continuation to run immediately
+            continuation_ = std::forward<Lambda>(verification_lambda);
+        }
+        else
+        {
+            // For remote objects, wrap verification in cleanup logic
+            auto self = shared_from_this();
+            continuation_ = [&service, self, verification_lambda]() -> CORO_TASK(void)
+            {
+                CO_AWAIT verification_lambda();
+                // Remove event listener after verification
+                service.remove_service_event(self);
+                CO_RETURN;
+            };
+            // Register for async notification
+            service.add_service_event(shared_from_this());
+        }
+    }
+
+    // Call this after reset() to run local verification immediately
+    CORO_TASK(void) run_if_local()
+    {
+        if (continuation_ && !continuation_scheduled_)
+        {
+            continuation_scheduled_ = true;
+            CO_AWAIT continuation_();
+        }
+        CO_RETURN;
+    }
+
+    CORO_TASK(void) on_object_released(rpc::object object_id, rpc::destination_zone destination) override
+    {
+        if (object_id == expected_object_id_ && !continuation_scheduled_)
+        {
+            continuation_scheduled_ = true;
+            // Schedule the continuation to run
+            CO_AWAIT continuation_();
+        }
+        CO_RETURN;
+    }
+
+    bool has_continuation_run() const { return continuation_scheduled_; }
+};
+
 // Test 4: Optimistic pointer semantics (weak for local, shared for remote)
-template<class T>
-CORO_TASK(bool) optimistic_ptr_remote_shared_semantics_test(T& lib)
+template<class T> CORO_TASK(bool) optimistic_ptr_remote_shared_semantics_test(T& lib)
 {
     // Get example object (local or remote depending on setup)
     auto example = lib.get_example();
@@ -345,6 +409,9 @@ CORO_TASK(bool) optimistic_ptr_remote_shared_semantics_test(T& lib)
     // Store raw pointer for later comparison
     auto* raw_ptr = baz.get();
 
+    // Get object_id directly from the interface (avoids service mutex)
+    auto baz_object_id = rpc::casting_interface::get_object_id(*baz);
+
     // Create optimistic_ptr
     rpc::optimistic_ptr<xxx::i_baz> opt_baz(baz);
     CORO_ASSERT_NE(opt_baz.get_unsafe_only_for_testing(), nullptr);
@@ -353,16 +420,29 @@ CORO_TASK(bool) optimistic_ptr_remote_shared_semantics_test(T& lib)
     auto error2 = CO_AWAIT opt_baz->callback(42);
     CORO_ASSERT_EQ(error2, 0);
 
-    // Clear the shared_ptr (raw_ptr already captured above)
+    // Register for object deletion notification with continuation for verification
+    auto waiter = std::make_shared<object_deletion_waiter>(baz_object_id);
+
+    // Schedule verification - handles both local (immediate) and remote (async) cases
+    waiter->schedule(*lib.get_root_service(), baz, [&]() -> CORO_TASK(void)
+    {
+        // This runs after the object is deleted
+        // The object is deleted when the last shared_ptr goes away
+        // local_proxy pointer is still valid but weak_ptr inside will fail to lock
+        EXPECT_NE(opt_baz.get_unsafe_only_for_testing(), nullptr); // local_proxy still exists
+
+        // Calling through optimistic_ptr should return OBJECT_GONE (weak_ptr failed to lock)
+        auto error = CO_AWAIT opt_baz->callback(42);
+        EXPECT_EQ(error, rpc::error::OBJECT_GONE());
+
+        CO_RETURN;
+    });
+
+    // Clear the shared_ptr - for remote this triggers async cleanup, for local it's immediate
     baz.reset();
 
-    // The object is deleted when the last shared_ptr goes away
-    // local_proxy pointer is still valid but weak_ptr inside will fail to lock
-    CORO_ASSERT_NE(opt_baz.get_unsafe_only_for_testing(), nullptr);  // local_proxy still exists
-
-    // Calling through optimistic_ptr should return OBJECT_GONE (weak_ptr failed to lock)
-    auto error = CO_AWAIT opt_baz->callback(42);
-    CORO_ASSERT_EQ(error, rpc::error::OBJECT_GONE());
+    // For local objects, run verification immediately; for remote, it runs via async callback
+    CO_AWAIT waiter->run_if_local();
 
     CO_RETURN true;
 }
@@ -373,8 +453,7 @@ TYPED_TEST(type_test, optimistic_ptr_remote_shared_semantics_test)
 }
 
 // Test 5: Optimistic pointer transparent operator-> for both local and remote
-template<class T>
-CORO_TASK(bool) optimistic_ptr_transparent_access_test(T& lib)
+template<class T> CORO_TASK(bool) optimistic_ptr_transparent_access_test(T& lib)
 {
     auto example = lib.get_example();
     // Test 1: Local object access
@@ -383,7 +462,7 @@ CORO_TASK(bool) optimistic_ptr_transparent_access_test(T& lib)
         rpc::shared_ptr<xxx::i_foo> f_local;
         CORO_ASSERT_EQ(CO_AWAIT example->create_foo(f_local), 0);
         CORO_ASSERT_NE(f_local, nullptr);
-            
+
         rpc::optimistic_ptr<xxx::i_foo> opt_f_local(f_local);
 
         // operator-> works transparently for local object
@@ -394,11 +473,11 @@ CORO_TASK(bool) optimistic_ptr_transparent_access_test(T& lib)
 
     // Test 2: Remote object access
     {
-                // Create interface (local or remote depending on setup)
+        // Create interface (local or remote depending on setup)
         rpc::shared_ptr<xxx::i_baz> baz;
         CORO_ASSERT_EQ(CO_AWAIT example->create_baz(baz), 0);
         CORO_ASSERT_NE(baz, nullptr);
-            
+
         rpc::optimistic_ptr<xxx::i_baz> opt_baz(baz);
 
         // operator-> works transparently for remote proxy
@@ -419,8 +498,7 @@ TYPED_TEST(type_test, optimistic_ptr_transparent_access_test)
 }
 
 // Test 7: Circular dependency resolution use case
-template<class T>
-CORO_TASK(bool) optimistic_ptr_circular_dependency_test(T& lib)
+template<class T> CORO_TASK(bool) optimistic_ptr_circular_dependency_test(T& lib)
 {
     // Simulate circular dependency scenario:
     // - Host owns children (shared_ptr)
@@ -460,8 +538,7 @@ TYPED_TEST(type_test, optimistic_ptr_circular_dependency_test)
 }
 
 // Test 8: Comparison and nullptr operations
-template<class T>
-CORO_TASK(bool) optimistic_ptr_comparison_test(T& lib)
+template<class T> CORO_TASK(bool) optimistic_ptr_comparison_test(T& lib)
 {
     // Get example object (local or remote depending on setup)
     auto example = lib.get_example();
@@ -505,8 +582,7 @@ TYPED_TEST(type_test, optimistic_ptr_comparison_test)
 }
 
 // Test 9: Heterogeneous upcast (statically verifiable)
-template<class T>
-CORO_TASK(bool) optimistic_ptr_heterogeneous_upcast_test(T& lib)
+template<class T> CORO_TASK(bool) optimistic_ptr_heterogeneous_upcast_test(T& lib)
 {
     // Get example object (local or remote depending on setup)
     auto example = lib.get_example();
@@ -542,8 +618,7 @@ TYPED_TEST(type_test, optimistic_ptr_heterogeneous_upcast_test)
 }
 
 // Test 10: Multiple optimistic_ptr instances to same object
-template<class T>
-CORO_TASK(bool) optimistic_ptr_multiple_refs_test(T& lib)
+template<class T> CORO_TASK(bool) optimistic_ptr_multiple_refs_test(T& lib)
 {
     // Get example object (local or remote depending on setup)
     auto example = lib.get_example();
@@ -580,8 +655,7 @@ TYPED_TEST(type_test, optimistic_ptr_multiple_refs_test)
 }
 
 // Test 11: optimistic_ptr OBJECT_GONE behavior when remote stub is deleted
-template<class T>
-CORO_TASK(bool) optimistic_ptr_object_gone_test(T& lib)
+template<class T> CORO_TASK(bool) optimistic_ptr_object_gone_test(T& lib)
 {
     // Get example object (local or remote depending on setup)
     auto example = lib.get_example();
@@ -597,6 +671,9 @@ CORO_TASK(bool) optimistic_ptr_object_gone_test(T& lib)
     CORO_ASSERT_EQ(CO_AWAIT f->create_baz_interface(baz), 0);
     CORO_ASSERT_NE(baz, nullptr);
 
+    // Get object_id directly from the interface (avoids service mutex)
+    auto baz_object_id = rpc::casting_interface::get_object_id(*baz);
+
     // Test OBJECT_GONE for REMOTE objects only
     // Create optimistic_ptr from shared_ptr
     rpc::optimistic_ptr<xxx::i_baz> opt_baz(baz);
@@ -606,18 +683,30 @@ CORO_TASK(bool) optimistic_ptr_object_gone_test(T& lib)
     auto error1 = CO_AWAIT opt_baz->callback(42);
     CORO_ASSERT_EQ(error1, 0);
 
-    // Release the shared_ptr - this should delete the stub on the remote side
-    // because optimistic references don't hold stub lifetime
+    // Register for object deletion notification with continuation for verification
+    auto waiter = std::make_shared<object_deletion_waiter>(baz_object_id);
+
+    // Schedule verification - handles both local (immediate) and remote (async) cases
+    waiter->schedule(*lib.get_root_service(), baz, [&]() -> CORO_TASK(void)
+    {
+        // This runs after the object is deleted
+        // Second call through optimistic_ptr should fail with OBJECT_GONE
+        // The optimistic_ptr still exists but the remote stub has been deleted
+        auto error2 = CO_AWAIT opt_baz->callback(43);
+        EXPECT_EQ(error2, rpc::error::OBJECT_GONE());
+
+        // The optimistic_ptr itself remains valid (pointer not null)
+        EXPECT_NE(opt_baz.get_unsafe_only_for_testing(), nullptr);
+
+        CO_RETURN;
+    });
+
+    // Release the shared_ptr - for remote this triggers async cleanup, for local it's immediate
     baz.reset();
     f.reset();
 
-    // Second call through optimistic_ptr should fail with OBJECT_GONE
-    // The optimistic_ptr still exists but the remote stub has been deleted
-    auto error2 = CO_AWAIT opt_baz->callback(43);
-    CORO_ASSERT_EQ(error2, rpc::error::OBJECT_GONE());
-
-    // The optimistic_ptr itself remains valid (pointer not null)
-    CORO_ASSERT_NE(opt_baz.get_unsafe_only_for_testing(), nullptr);
+    // For local objects, run verification immediately; for remote, it runs via async callback
+    CO_AWAIT waiter->run_if_local();
 
     CO_RETURN true;
 }

@@ -1208,7 +1208,7 @@ namespace synchronous_generator
                 proxy("}}");                    
                 
                 proxy.print_tabs();
-                proxy.raw("CO_RETURN ptr->{}(", function->get_name());
+                proxy.raw("CO_RETURN CO_AWAIT ptr->{}(", function->get_name());
                 
                 has_parameter = false;
                 uint64_t count = 1;

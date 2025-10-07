@@ -72,6 +72,13 @@ namespace rpc
             const std::vector<char>& out_buf_)
             = 0;
     };
+    
+    class service_event
+    {
+    public:
+        virtual ~service_event() = default;
+        virtual CORO_TASK(void) on_object_released(object object_id, destination_zone destination) = 0;
+    };
 
     // responsible for all object lifetimes created within the zone
     class service : public i_marshaller, public std::enable_shared_from_this<rpc::service>
@@ -90,6 +97,9 @@ namespace rpc
         // map wrapped objects pointers to stubs
         std::map<void*, std::weak_ptr<object_stub>> wrapped_object_to_stub;
         std::string name_;
+        
+        mutable std::mutex service_events_control;
+        std::set<std::weak_ptr<service_event>, std::owner_less<std::weak_ptr<service_event>>> service_events_;
 
 #ifdef BUILD_COROUTINE
         std::shared_ptr<coro::io_scheduler> io_scheduler_;
@@ -168,6 +178,28 @@ namespace rpc
         void set_zone_id(zone zone_id) { zone_id_ = zone_id; }
         virtual destination_zone get_parent_zone_id() const { return {0}; }
         virtual std::shared_ptr<rpc::service_proxy> get_parent() const { return nullptr; }
+        
+        void add_service_event(const std::weak_ptr<service_event>& event)
+        {
+            std::lock_guard g(service_events_control);
+            service_events_.insert(event);
+        }
+        void remove_service_event(const std::weak_ptr<service_event>& event)
+        {
+            std::lock_guard g(service_events_control);
+            service_events_.erase(event);
+        }        
+        CORO_TASK(void) notify_object_gone_event(object object_id, destination_zone destination)
+        {
+            for(auto se : service_events_)
+            {
+                auto se_handler = se.lock();
+                if(se_handler)
+                    CO_AWAIT se_handler->on_object_released(object_id, destination);
+            }
+            CO_RETURN;
+        }
+        
         virtual bool set_parent_proxy(const std::shared_ptr<rpc::service_proxy>&)
         {
             RPC_ASSERT(false);

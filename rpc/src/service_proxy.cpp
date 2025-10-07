@@ -384,6 +384,10 @@ namespace rpc
             }
             inner_release_external_ref();
         }
+
+        // Notify that object is gone after all cleanup is complete
+        CO_AWAIT svc->notify_object_gone_event(object_id, destination_zone_id_);
+
         self = nullptr; // just so it does not get optimised out
         svc = nullptr;  // this needs to hang around a bit longer than the service proxy
         CO_RETURN;

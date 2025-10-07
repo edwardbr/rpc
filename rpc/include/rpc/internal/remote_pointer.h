@@ -2061,8 +2061,10 @@ namespace rpc
             // For local objects: local_proxy_holder_ is set, ptr_ is nullptr
             if (local_proxy_holder_)
             {
-                auto local_shared = local_proxy_holder_->__get_weak();
-                return local_shared.ptr_for_lock_;
+                // Access the weak_ptr's underlying pointer directly (we're a friend)
+                // This is unsafe - the pointer may be dangling
+                rpc::weak_ptr<T> weak = local_proxy_holder_->__get_weak();
+                return weak.ptr_for_lock_;
             }
 
             // For remote objects: ptr_ is set
@@ -2100,23 +2102,48 @@ namespace rpc
 
     // Dynamic pointer cast for optimistic_ptr (uses local query_interface)
     template<typename T, typename U>
-    CORO_TASK(optimistic_ptr<T>) dynamic_pointer_cast(const optimistic_ptr<U>& from) noexcept
+    CORO_TASK(int) dynamic_pointer_cast(const optimistic_ptr<U>& from, optimistic_ptr<T>& to) noexcept
     {
+        if constexpr (std::is_same<T,U>::value)
+        {
+            to = from;
+            CO_RETURN error::OK();
+        }
+
         if (!from)
-            CO_RETURN optimistic_ptr<T>();
+        {
+            to = optimistic_ptr<T>();
+            CO_RETURN error::OK();
+        }
 
-        T* ptr = nullptr;
+        if (from.local_proxy_holder_)
+        {
+            auto local_shared = from.local_proxy_holder_->__get_weak().lock();
+            if(!local_shared)
+            {
+                to = nullptr;
+                CO_RETURN error::OK();
+            }
 
-        // First try local interface casting
-        ptr = const_cast<T*>(static_cast<const T*>(from->query_interface(T::get_id(VERSION_2))));
-        if (ptr)
-            CO_RETURN optimistic_ptr<T>(from, ptr);
+            auto ptr = const_cast<T*>(static_cast<const T*>(local_shared->query_interface(T::get_id(VERSION_2))));
+            if (ptr)
+            {
+                to = optimistic_ptr<T>(from, ptr);
+                CO_RETURN error::OK();
+            }
+            else
+            {
+                to = optimistic_ptr<T>();
+                CO_RETURN error::OK();
+            }
+        }
 
         // Then try remote interface casting through object_proxy
         auto ob = from->get_object_proxy();
         if (!ob)
         {
-            CO_RETURN optimistic_ptr<T>();
+            to = optimistic_ptr<T>();
+            CO_RETURN error::OK();
         }
 
         optimistic_ptr<T> ret;
