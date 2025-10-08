@@ -388,22 +388,34 @@ namespace rpc
         // Notify that object is gone after all cleanup is complete
         CO_AWAIT svc->notify_object_gone_event(object_id, destination_zone_id_);
 
+        
+        {
+            std::lock_guard proxy_lock(insert_control_);
+            auto item = proxies_.find(object_id);
+            RPC_ASSERT(item != proxies_.end());
+            if (item != proxies_.end())
+            {
+                // Remove from map since object_proxy is being destroyed
+                RPC_DEBUG("Removing object_id={} from proxy map (object_proxy being destroyed)", object_id.get_val());
+                proxies_.erase(item);
+            }
+        }
+
         self = nullptr; // just so it does not get optimised out
         svc = nullptr;  // this needs to hang around a bit longer than the service proxy
         CO_RETURN;
     }
 
-    void service_proxy::on_object_proxy_released(object object_id, int inherited_shared_reference_count, int inherited_optimistic_reference_count, bool object_proxy_being_destroyed)
+    void service_proxy::on_object_proxy_released(object object_id, int inherited_shared_reference_count, int inherited_optimistic_reference_count)
     {
         RPC_DEBUG("on_object_proxy_released service zone: {} destination_zone={}, caller_zone={}, object_id = {} "
-                  "(inherited: shared={}, optimistic={}, being_destroyed={})",
+                  "(inherited: shared={}, optimistic={})",
             get_zone_id().get_val(),
             destination_zone_id_.get_val(),
             caller_zone_id_.get_val(),
             object_id.get_val(),
             inherited_shared_reference_count,
-            inherited_optimistic_reference_count,
-            object_proxy_being_destroyed);
+            inherited_optimistic_reference_count);
 
         // this keeps the underlying service alive while the service proxy is released
         auto current_service = get_operating_zone_service();
@@ -418,46 +430,6 @@ namespace rpc
                 get_zone_id(), destination_zone_id_, destination_channel_zone_, caller_zone_id, object_id);
         }
 #endif
-
-        // Handle proxy map cleanup - only when object_proxy is being destroyed
-        if (object_proxy_being_destroyed)
-        {
-            std::lock_guard proxy_lock(insert_control_);
-            auto item = proxies_.find(object_id);
-            if (item != proxies_.end())
-            {
-                auto existing_proxy = item->second.lock();
-                if (existing_proxy != nullptr)
-                {
-                    // Check for race conditions - another proxy exists for same object
-                    int total_inherited = inherited_shared_reference_count + inherited_optimistic_reference_count;
-                    if (total_inherited > 0)
-                    {
-                        // There are other proxies - we need to transfer references to the existing proxy
-                        RPC_DEBUG("Race condition avoided - transferring {} inherited references (shared={}, optimistic={}) "
-                                  "for object {}, skipping remote release calls",
-                            total_inherited,
-                            inherited_shared_reference_count,
-                            inherited_optimistic_reference_count,
-                            object_id.get_val());
-
-                        // Transfer all inherited references to the existing proxy
-                        for (int i = 0; i < inherited_shared_reference_count; i++)
-                        {
-                            existing_proxy->inherit_shared_reference();
-                        }
-                        for (int i = 0; i < inherited_optimistic_reference_count; i++)
-                        {
-                            existing_proxy->inherit_optimistic_reference();
-                        }
-                        return;
-                    }
-                }
-                // Remove from map since object_proxy is being destroyed
-                RPC_DEBUG("Removing object_id={} from proxy map (object_proxy being destroyed)", object_id.get_val());
-                proxies_.erase(item);
-            }
-        }
 
         // Schedule the coroutine work asynchronously
 #ifdef BUILD_COROUTINE

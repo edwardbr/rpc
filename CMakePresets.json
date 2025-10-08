@@ -58,7 +58,7 @@
         "BUILD_COROUTINE": "ON",
         "BUILD_TYPE": "debug",
         "CMAKE_BUILD_TYPE": "Debug",
-        "USE_RPC_LOGGING": "OFF",
+        "USE_RPC_LOGGING": "ON",
         "USE_RPC_TELEMETRY": "OFF",
         "USE_CONSOLE_TELEMETRY": "OFF"
       }

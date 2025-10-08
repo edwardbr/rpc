@@ -191,11 +191,15 @@ namespace rpc
         }        
         CORO_TASK(void) notify_object_gone_event(object object_id, destination_zone destination)
         {
-            for(auto se : service_events_)
+            if(!service_events_.empty())
             {
-                auto se_handler = se.lock();
-                if(se_handler)
-                    CO_AWAIT se_handler->on_object_released(object_id, destination);
+                auto service_events_copy = service_events_;
+                for(auto se : service_events_copy)
+                {
+                    auto se_handler = se.lock();
+                    if(se_handler)
+                        CO_AWAIT se_handler->on_object_released(object_id, destination);
+                }
             }
             CO_RETURN;
         }

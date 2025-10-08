@@ -32,8 +32,10 @@ namespace rpc
         stdex::member_ptr<service_proxy> service_proxy_;
         std::unordered_map<interface_ordinal, rpc::weak_ptr<casting_interface>> proxy_map;
         std::mutex insert_control_;
-        std::atomic<int> inherited_shared_count_{0};     // Track shared references from control block transitions
-        std::atomic<int> inherited_optimistic_count_{0}; // Track optimistic references from control block transitions
+        // Track shared references from control block transitions (public for telemetry)
+        std::atomic<int> shared_count_{0};
+        // Track optimistic references from control block transitions (public for telemetry)
+        std::atomic<int> optimistic_count_{0};
 
         object_proxy(object object_id, std::shared_ptr<rpc::service_proxy> service_proxy);
 
@@ -45,18 +47,26 @@ namespace rpc
         friend service_proxy;
 
     public:
+        // Track shared references from control block transitions (public for telemetry)
+        int get_shared_count() const {return shared_count_.load(std::memory_order_acquire);}
+        // Track optimistic references from control block transitions (public for telemetry)
+        int get_optimistic_count() const {return optimistic_count_.load(std::memory_order_acquire);}
+
         ~object_proxy();
 
         // Reference counting methods for control block integration
-        void add_ref(add_ref_options options);
+        // add_ref is async because on 0→1 transitions it must call service_proxy->sp_add_ref()
+        // to establish remote reference immediately and sequentially
+        CORO_TASK(int) add_ref(add_ref_options options);
+        // release is synchronous - just decrements local counters, cleanup happens in destructor
         void release(release_options options);
 
         // Called when this object_proxy inherits a shared reference from a race condition during the destruction of a proxy
         // but the service other_zones collection still has a record of it
-        void inherit_shared_reference() { inherited_shared_count_.fetch_add(1, std::memory_order_relaxed); }
+        void add_ref_shared() { shared_count_.fetch_add(1, std::memory_order_relaxed); }
 
         // Called when this object_proxy inherits an optimistic reference from a race condition during the destruction of a proxy
-        void inherit_optimistic_reference() { inherited_optimistic_count_.fetch_add(1, std::memory_order_relaxed); }
+        void add_ref_optimistic() { optimistic_count_.fetch_add(1, std::memory_order_relaxed); }
 
         std::shared_ptr<rpc::service_proxy> get_service_proxy() const { return service_proxy_.get_nullable(); }
         object get_object_id() const { return {object_id_}; }

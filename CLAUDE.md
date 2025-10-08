@@ -5,6 +5,18 @@ All rights reserved.
 
 # RPC++ Codebase Analysis for Claude Code
 
+## Git Policy
+
+**IMPORTANT: DO NOT perform any git operations in this project.**
+
+- **DO NOT** create git commits
+- **DO NOT** run `git add`, `git commit`, `git push`, or any other git commands
+- **DO NOT** modify the git staging area
+- **DO NOT** create pull requests
+- The user will handle all git operations manually
+
+If the user asks you to commit changes or create a PR, politely decline and remind them of this policy.
+
 ## Overview
 RPC++ is a Remote Procedure Call library for modern C++ that enables type-safe communication across different execution contexts (in-process, inter-process, remote machines, embedded devices, SGX enclaves). The system uses Interface Definition Language (IDL) files to generate C++ proxy/stub code with full JSON schema generation capabilities.
 

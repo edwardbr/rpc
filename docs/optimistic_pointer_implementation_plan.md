@@ -297,7 +297,7 @@ struct control_block_base {
 
         // If this was the last optimistic_ptr, call release (decrements local counter only)
         if (prev == 1 && !is_local) {
-            // object_proxy::release() just decrements inherited_optimistic_count_
+            // object_proxy::release() just decrements optimistic_count_
             // Actual remote RPC happens later in cleanup_after_object()
             get_object_proxy_from_interface()->release(release_options::optimistic);
         }
@@ -337,7 +337,7 @@ struct control_block_base {
         long prev = shared_owners.fetch_sub(1, std::memory_order_acq_rel);
 
         if (prev == 1 && !is_local) {
-            // object_proxy::release() just decrements inherited_shared_count_
+            // object_proxy::release() just decrements shared_count_
             // Actual remote RPC happens later in cleanup_after_object()
             get_object_proxy_from_interface()->release(release_options::shared);
         }
@@ -568,8 +568,8 @@ enum class error_code {
 ```cpp
 class object_proxy {
 private:
-    std::atomic<int> inherited_shared_count_{0};      // Tracks local shared_ptr references
-    std::atomic<int> inherited_optimistic_count_{0};  // Tracks local optimistic_ptr references
+    std::atomic<int> shared_count_{0};      // Tracks local shared_ptr references
+    std::atomic<int> optimistic_count_{0};  // Tracks local optimistic_ptr references
 
 public:
     // ASYNC add_ref: On 0→1 transitions, MUST call service_proxy->sp_add_ref() immediately
@@ -592,9 +592,9 @@ CORO_TASK(error_code) object_proxy::add_ref(add_ref_options options) {
 
     int prev_count;
     if (is_optimistic) {
-        prev_count = inherited_optimistic_count_.fetch_add(1, std::memory_order_relaxed);
+        prev_count = optimistic_count_.fetch_add(1, std::memory_order_relaxed);
     } else {
-        prev_count = inherited_shared_count_.fetch_add(1, std::memory_order_relaxed);
+        prev_count = shared_count_.fetch_add(1, std::memory_order_relaxed);
     }
 
     // CRITICAL: On 0→1 transition, establish remote reference IMMEDIATELY
@@ -607,9 +607,9 @@ CORO_TASK(error_code) object_proxy::add_ref(add_ref_options options) {
             if (err) {
                 // Rollback local counter on failure
                 if (is_optimistic) {
-                    inherited_optimistic_count_.fetch_sub(1, std::memory_order_relaxed);
+                    optimistic_count_.fetch_sub(1, std::memory_order_relaxed);
                 } else {
-                    inherited_shared_count_.fetch_sub(1, std::memory_order_relaxed);
+                    shared_count_.fetch_sub(1, std::memory_order_relaxed);
                 }
                 CO_RETURN err;
             }
@@ -627,9 +627,9 @@ void object_proxy::release(release_options options) {
     bool is_optimistic = static_cast<bool>(options & release_options::optimistic);
 
     if (is_optimistic) {
-        inherited_optimistic_count_.fetch_sub(1, std::memory_order_acq_rel);
+        optimistic_count_.fetch_sub(1, std::memory_order_acq_rel);
     } else {
-        inherited_shared_count_.fetch_sub(1, std::memory_order_acq_rel);
+        shared_count_.fetch_sub(1, std::memory_order_acq_rel);
     }
 
     // No immediate remote call - destructor schedules cleanup_after_object()
@@ -1283,7 +1283,7 @@ bool operator==(const optimistic_ptr<T>& a, const optimistic_ptr<U>& b) noexcept
 - [x] Update `cleanup_after_object` to handle both inherited shared and optimistic reference counts separately
 - [x] Fix `cleanup_after_object` to ONLY release inherited references (removed extra normal release)
 - [x] Implement optimistic-first release strategy (release optimistic references before shared)
-- [x] Add `inherit_optimistic_reference()` method to object_proxy for race condition handling
+- [x] Add `add_ref_optimistic()` method to object_proxy for race condition handling
 - [x] **Split `object_stub` reference counting into dual counters**:
   - [x] `shared_count` - holds stub lifetime (triggers cleanup on 0)
   - [x] `optimistic_count` - does NOT hold stub lifetime (can be >0 while stub exists)
@@ -1298,7 +1298,7 @@ bool operator==(const optimistic_ptr<T>& a, const optimistic_ptr<U>& b) noexcept
 
 **Key Files Modified**:
 - `/rpc/include/rpc/internal/marshaller.h` - Added `release_options` enum with `optimistic` flag
-- `/rpc/include/rpc/internal/object_proxy.h` - Added `add_ref/release` methods, `inherit_optimistic_reference()`
+- `/rpc/include/rpc/internal/object_proxy.h` - Added `add_ref/release` methods, `add_ref_optimistic()`
 - `/rpc/src/object_proxy.cpp` - Implemented reference counting methods, moved cleanup to `release()`
 - `/rpc/include/rpc/internal/service_proxy.h` - Updated `sp_release` signature, `cleanup_after_object`, `get_or_create_object_proxy`
 - `/rpc/src/service_proxy.cpp` - Implemented dual reference count cleanup, fixed to only release inherited references
