@@ -406,6 +406,9 @@ template<class T> CORO_TASK(bool) optimistic_ptr_remote_shared_semantics_test(T&
     CORO_ASSERT_EQ(CO_AWAIT f->create_baz_interface(baz), 0);
     CORO_ASSERT_NE(baz, nullptr);
 
+    // Release f to ensure it's not holding any references to baz via cached_ member
+    f.reset();
+
     // Store raw pointer for later comparison
     auto* raw_ptr = baz.get();
 
