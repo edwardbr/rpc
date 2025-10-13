@@ -165,10 +165,6 @@ public:
         i_example_ptr_ = nullptr;
         i_host_ptr_ = nullptr;
         local_host_ptr_.reset();
-        while (peer_service_->has_service_proxies())
-            co_await io_scheduler_->schedule();
-        while (root_service_->has_service_proxies())
-            co_await io_scheduler_->schedule();
 
         // has_stopped_ = true;
         CO_RETURN;

@@ -144,10 +144,6 @@ public:
         local_host_ptr_.reset();
         CO_AWAIT peer_listener_->stop_listening();
         peer_listener_.reset();
-        while (peer_service_->has_service_proxies())
-            co_await io_scheduler_->schedule();
-        while (root_service_->has_service_proxies())
-            co_await io_scheduler_->schedule();
         peer_service_.reset();
         root_service_.reset();
         zone_gen = nullptr;
