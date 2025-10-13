@@ -83,10 +83,9 @@ namespace rpc
         CO_RETURN error::OK();
     }
 
-    void object_proxy::release(release_options options)
+    void object_proxy::release(bool is_optimistic)
     {
         // Decrement appropriate counter based on reference type
-        bool is_optimistic = static_cast<bool>(options & release_options::optimistic);
         int prev_count;
         if (is_optimistic)
         {
@@ -121,18 +120,9 @@ namespace rpc
             if (service_proxy)
             {
 #ifdef USE_RPC_LOGGING
-                RPC_DEBUG("object_proxy::release: final cleanup for object_id={}", object_id_.get_val());
+                RPC_DEBUG("object_proxy::release: {} on_object_proxy_released cleanup for object_id={}", is_optimistic ? "optimistic" : "shared", object_id_.get_val());
 #endif
-                if (is_optimistic)
-                {
-                    // All optimistic references released - send 1 to indicate the 1→0 transition
-                    service_proxy->on_object_proxy_released(object_id_, 0, 1);
-                }
-                else
-                {
-                    // All shared references released - send 1 to indicate the 1→0 transition
-                    service_proxy->on_object_proxy_released(object_id_, 1, 0);
-                }
+                service_proxy->on_object_proxy_released(this->shared_from_this(), is_optimistic);
             }
         }
     }
@@ -225,9 +215,9 @@ namespace rpc
             }
 
             // release remains synchronous
-            void object_proxy_release(const std::shared_ptr<rpc::object_proxy>& ob, rpc::release_options options)
+            void object_proxy_release(const std::shared_ptr<rpc::object_proxy>& ob, bool is_optimistic)
             {
-                ob->release(options);
+                ob->release(is_optimistic);
             }
             
             void get_object_proxy_reference_counts(const std::shared_ptr<rpc::object_proxy>& ob, int& shared_count, int& optimistic_count)

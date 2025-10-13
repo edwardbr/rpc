@@ -112,11 +112,10 @@ namespace rpc
         CORO_TASK(void)
         cleanup_after_object(std::shared_ptr<rpc::service> svc,
             std::shared_ptr<rpc::service_proxy> self,
-            object object_id,
-            int inherited_shared_reference_count,
-            int inherited_optimistic_reference_count);
+            std::shared_ptr<object_proxy> op,
+            bool is_optimistic);
 
-        void on_object_proxy_released(object object_id, int inherited_shared_reference_count, int inherited_optimistic_reference_count);
+        void on_object_proxy_released(const std::shared_ptr<object_proxy>& op, bool optimistic);
 
         std::unordered_map<object, std::weak_ptr<object_proxy>> get_proxies() { return proxies_; }
         int get_lifetime_lock_count() const { return lifetime_lock_count_.load(); }

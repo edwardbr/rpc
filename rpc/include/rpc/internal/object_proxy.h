@@ -59,7 +59,7 @@ namespace rpc
         // to establish remote reference immediately and sequentially
         CORO_TASK(int) add_ref(add_ref_options options);
         // release is synchronous - just decrements local counters, cleanup happens in destructor
-        void release(release_options options);
+        void release(bool is_optimistic);
 
         // Called when this object_proxy inherits a shared reference from a race condition during the destruction of a proxy
         // but the service other_zones collection still has a record of it

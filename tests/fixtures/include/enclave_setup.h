@@ -40,7 +40,9 @@ public:
     bool is_enclave_setup() const { return true; }
     rpc::shared_ptr<yyy::i_host> get_local_host_ptr() { return local_host_ptr_.lock(); }
     rpc::shared_ptr<yyy::i_example> get_example() const { return i_example_ptr_; }
+    void set_example(const rpc::shared_ptr<yyy::i_example>& example) { i_example_ptr_ = example; }
     rpc::shared_ptr<yyy::i_host> get_host() const { return i_host_ptr_; }
+    void set_host(const rpc::shared_ptr<yyy::i_host>& host) { i_host_ptr_ = host; }
     bool get_use_host_in_child() const { return use_host_in_child_; }
 
     bool error_has_occured() const { return error_has_occured_; }

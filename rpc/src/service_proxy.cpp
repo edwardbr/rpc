@@ -59,21 +59,14 @@ namespace rpc
             }
 #endif
         }
-        RPC_ASSERT(proxies_.empty());
-        if (is_responsible_for_cleaning_up_service_)
-        {
-            auto svc = service_.lock();
-            if (svc)
-            {
-                svc->remove_zone_proxy(destination_zone_id_, caller_zone_id_);
-            }
-        }
+
 #ifdef USE_RPC_TELEMETRY
         if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
         {
             telemetry_service->on_service_proxy_deletion(get_zone_id(), destination_zone_id_, caller_zone_id_);
         }
 #endif
+        RPC_ASSERT(proxies_.empty());
     }
 
     void service_proxy::set_parent_channel(bool val)
@@ -319,106 +312,67 @@ namespace rpc
     CORO_TASK(void)
     service_proxy::cleanup_after_object(std::shared_ptr<rpc::service> svc,
         std::shared_ptr<rpc::service_proxy> self,
-        object object_id,
-        int inherited_shared_reference_count,
-        int inherited_optimistic_reference_count)
+        std::shared_ptr<object_proxy> op,
+        bool is_optimistic)
     {
+        auto object_id = op->get_object_id();
         // self is needed to keep the service proxy alive in the async destruction of the service_proxy
         RPC_DEBUG("cleanup_after_object service zone: {} destination_zone={}, caller_zone={}, object_id = {} "
-                  "(inherited: shared={}, optimistic={})",
+                  "decrement={}",
             get_zone_id().get_val(),
             destination_zone_id_.get_val(),
             caller_zone_id_.get_val(),
             object_id.get_val(),
-            inherited_shared_reference_count,
-            inherited_optimistic_reference_count);
+            is_optimistic ? "optimistic" : "shared");
 
         auto caller_zone_id = get_zone_id().as_caller();
+        int inner_count = -1;
+
         uint64_t ref_count = 0;
-
-        // Handle inherited optimistic references first (as recommended)
-        for (int i = 0; i < inherited_optimistic_reference_count; i++)
+        auto ret = CO_AWAIT release(version_.load(), destination_zone_id_, object_id, caller_zone_id, is_optimistic ? release_options::optimistic : release_options::normal, ref_count);
+        inner_count = inner_release_external_ref();
+        RPC_DEBUG("inner count = {} for object {}", inner_count, object_id.get_val());
+        if(inner_count == 0 && is_responsible_for_cleaning_up_service_)
         {
-            RPC_DEBUG("Releasing inherited optimistic reference {}/{} for object {}",
-                (i + 1),
-                inherited_optimistic_reference_count,
-                object_id.get_val());
-
-            auto ret = CO_AWAIT release(version_.load(), destination_zone_id_, object_id, caller_zone_id, release_options::optimistic, ref_count);
-            if (ret != rpc::error::OK())
-            {
-                // OBJECT_NOT_FOUND is normal for optimistic_ptr when stub has been deleted
-                if (ret == rpc::error::OBJECT_NOT_FOUND())
-                {
-                    RPC_DEBUG("Object {} not found - stub already deleted (normal for optimistic_ptr)", object_id.get_val());
-                    break; // Exit loop, continue with cleanup
-                }
-                else
-                {
-                    RPC_ERROR("cleanup_after_object optimistic release failed with error {}", ret);
-                    RPC_ASSERT(false);
-                    CO_RETURN;
-                }
-            }
-            inner_release_external_ref();
+            svc->remove_zone_proxy(destination_zone_id_, zone_id_.as_caller());
         }
 
-        // Handle inherited shared references from race conditions
-        for (int i = 0; i < inherited_shared_reference_count; i++)
-        {
-            RPC_DEBUG("Releasing inherited shared reference {}/{} for object {}",
-                (i + 1),
-                inherited_shared_reference_count,
-                object_id.get_val());
-
-            auto ret = CO_AWAIT release(version_.load(), destination_zone_id_, object_id, caller_zone_id, release_options::normal, ref_count);
-            if (ret != rpc::error::OK())
-            {
-                // OBJECT_NOT_FOUND is expected when stub has been deleted (optimistic_ptr scenario)
-                if (ret != rpc::error::OBJECT_NOT_FOUND())
-                {
-                    RPC_ERROR("cleanup_after_object shared release failed with error {}", ret);
-                    RPC_ASSERT(false);
-                }
-                CO_RETURN;
-            }
-            inner_release_external_ref();
-        }
+        op.reset();
+        self.reset(); // just so it does not get optimised out
 
         // Notify that object is gone after all cleanup is complete
         CO_AWAIT svc->notify_object_gone_event(object_id, destination_zone_id_);
-
         
-        {
-            std::lock_guard proxy_lock(insert_control_);
-            auto item = proxies_.find(object_id);
-            RPC_ASSERT(item != proxies_.end());
-            if (item != proxies_.end())
-            {
-                // Remove from map since object_proxy is being destroyed
-                RPC_DEBUG("Removing object_id={} from proxy map (object_proxy being destroyed)", object_id.get_val());
-                proxies_.erase(item);
-            }
-        }
+        svc.reset();  // this needs to hang around a bit longer than the service proxy
 
-        self = nullptr; // just so it does not get optimised out
-        svc = nullptr;  // this needs to hang around a bit longer than the service proxy
+        //error handling here as the cleanup needs to happen anyway
+        if (ret == rpc::error::OK())
+        {
+            RPC_DEBUG("Remote {} count = {} for object {}", is_optimistic ? "optimistic" : "shared", ref_count, object_id.get_val());
+        }
+        else if (is_optimistic && ret == rpc::error::OBJECT_NOT_FOUND())
+        {
+            RPC_DEBUG("Object {} not found - stub already deleted (normal for optimistic_ptr)", object_id.get_val());
+        }
+        else 
+        {
+            RPC_ERROR("cleanup_after_object optimistic release failed with error {}", ret);
+            RPC_ASSERT(false);
+        }
         CO_RETURN;
     }
 
-    void service_proxy::on_object_proxy_released(object object_id, int inherited_shared_reference_count, int inherited_optimistic_reference_count)
+    void service_proxy::on_object_proxy_released(const std::shared_ptr<object_proxy>& op, bool is_optimistic)
     {
+        auto object_id = op->get_object_id();
+        
         RPC_DEBUG("on_object_proxy_released service zone: {} destination_zone={}, caller_zone={}, object_id = {} "
-                  "(inherited: shared={}, optimistic={})",
+                  "decrement={})",
             get_zone_id().get_val(),
             destination_zone_id_.get_val(),
             caller_zone_id_.get_val(),
             object_id.get_val(),
-            inherited_shared_reference_count,
-            inherited_optimistic_reference_count);
-
-        // this keeps the underlying service alive while the service proxy is released
-        auto current_service = get_operating_zone_service();
+            is_optimistic ? "optimistic" : "shared");
 
         auto caller_zone_id = get_zone_id().as_caller();
         RPC_ASSERT(caller_zone_id == get_caller_zone_id());
@@ -427,16 +381,37 @@ namespace rpc
         if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
         {
             telemetry_service->on_service_proxy_release(
-                get_zone_id(), destination_zone_id_, destination_channel_zone_, caller_zone_id, object_id);
+                get_zone_id(), destination_zone_id_, destination_channel_zone_, caller_zone_id, object_id.get_val());
         }
 #endif
+
+        {
+            // as there are no more refcounts on the object proxy remove it from the proxies_ map now
+            // it is not possible to know if it is time to remove the proxies_ map deterministically once we 
+            // schedule the call to cleanup_after_object
+            std::lock_guard proxy_lock(insert_control_);
+            if(op->get_shared_count() == 0 && op->get_optimistic_count() == 0)
+            {
+                auto item = proxies_.find(object_id);
+                RPC_ASSERT(item != proxies_.end());
+                if (item != proxies_.end())
+                {
+                    // Remove from map since object_proxy is being destroyed
+                    RPC_DEBUG("Removing object_id={} from proxy map (object_proxy being destroyed)", object_id.get_val());
+                    proxies_.erase(item);
+                }
+            }
+        }
+
+        // this keeps the underlying service alive while the service proxy is released
+        auto current_service = get_operating_zone_service();
 
         // Schedule the coroutine work asynchronously
 #ifdef BUILD_COROUTINE
         current_service->schedule(
-            cleanup_after_object(current_service, shared_from_this(), object_id, inherited_shared_reference_count, inherited_optimistic_reference_count));
+            cleanup_after_object(current_service, shared_from_this(), op, is_optimistic));
 #else
-        cleanup_after_object(current_service, shared_from_this(), object_id, inherited_shared_reference_count, inherited_optimistic_reference_count);
+        cleanup_after_object(current_service, shared_from_this(), op, is_optimistic);
 #endif
     }
 

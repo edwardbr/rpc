@@ -7,6 +7,11 @@
 
 namespace rpc
 {
+    // Global telemetry service definition for enclave builds
+#ifdef USE_RPC_TELEMETRY
+    std::shared_ptr<i_telemetry_service> telemetry_service_ = nullptr;
+#endif
+
     enclave_telemetry_service::enclave_telemetry_service() { }
 
     void enclave_telemetry_service::on_service_creation(

@@ -37,7 +37,9 @@ public:
     std::shared_ptr<rpc::service> get_root_service() const { return nullptr; }
     bool get_has_enclave() const { return has_enclave_; }
     rpc::shared_ptr<yyy::i_example> get_example() const { return i_example_ptr_; }
+    void set_example(const rpc::shared_ptr<yyy::i_example>& example) { i_example_ptr_ = example; }
     rpc::shared_ptr<yyy::i_host> get_host() const { return i_host_ptr_; }
+    void set_host(const rpc::shared_ptr<yyy::i_host>& host) { i_host_ptr_ = host; }
     rpc::shared_ptr<yyy::i_host> get_local_host_ptr() { return local_host_ptr_.lock(); }
     bool get_use_host_in_child() const { return use_host_in_child_; }
 

@@ -292,7 +292,7 @@ namespace rpc
             // add_ref is async because object_proxy::add_ref() makes RPC calls on 0→1 transitions
             CORO_TASK(int) object_proxy_add_ref(const std::shared_ptr<rpc::object_proxy>& ob, rpc::add_ref_options options);
             // release is synchronous - just decrements local counters
-            void object_proxy_release(const std::shared_ptr<rpc::object_proxy>& ob, rpc::release_options options);
+            void object_proxy_release(const std::shared_ptr<rpc::object_proxy>& ob, bool is_optimistic);
             void get_object_proxy_reference_counts(const std::shared_ptr<rpc::object_proxy>& ob, int& shared_count, int& optimistic_count);
             // Synchronous direct increment for control block construction (no remote calls)
             void object_proxy_add_ref_shared(const std::shared_ptr<rpc::object_proxy>& ob);
@@ -394,7 +394,7 @@ namespace rpc
                     {
 #ifndef TEST_STL_COMPLIANCE
                         // Call object_proxy release on 1→0 transition for remote objects
-                        control_block_call_release(release_options::normal);
+                        control_block_call_release(false);
 
                         // For remote objects, delay disposal until optimistic_owners also reaches 0
                         if (!is_local && optimistic_owners.load(std::memory_order_acquire) > 0)
@@ -507,7 +507,7 @@ namespace rpc
                     if (prev == 1)
                     {
                         // Call object_proxy release on 1→0 transition for remote objects
-                        control_block_call_release(release_options::optimistic);
+                        control_block_call_release(true);
 
                         // For remote objects, dispose interface_proxy if shared_owners is also 0
                         if (!is_local && shared_owners.load(std::memory_order_acquire) == 0)
@@ -534,14 +534,14 @@ namespace rpc
                     CO_RETURN error::OK();
                 }
 
-                inline void control_block_call_release(::rpc::release_options options) noexcept
+                inline void control_block_call_release(bool is_optimistic) noexcept
                 {
                     if (managed_object_ptr_ && !is_local)
                     {
                         auto ci = reinterpret_cast<::rpc::casting_interface*>(managed_object_ptr_);
                         if (auto obj_proxy = ci->get_object_proxy())
                         {
-                            object_proxy_release(obj_proxy, options);
+                            object_proxy_release(obj_proxy, is_optimistic);
                         }
                     }
                 }

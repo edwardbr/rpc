@@ -104,7 +104,7 @@ namespace calculator {
 #include "generated/calculator/calculator.h"
 
 // Create root service
-auto root_service = rpc::make_shared<rpc::service>("root", rpc::zone{1});
+auto root_service = std::make_shared<rpc::service>("root", rpc::zone{1});
 
 // Create child zone with calculator implementation
 rpc::shared_ptr<calculator::v1::i_calculator> calc_proxy;
@@ -206,7 +206,7 @@ CO_RETURN result;
 ```cpp
 // This code works in both blocking and coroutine modes
 CORO_TASK(int) setup_calculator_service() {
-    auto root_service = rpc::make_shared<rpc::service>("root", rpc::zone{1});
+    auto root_service = std::make_shared<rpc::service>("root", rpc::zone{1});
 
     // CRITICAL: Keep output interface alive to prevent zone destruction
     rpc::shared_ptr<i_calculator> calc;
@@ -469,11 +469,11 @@ The root service is instantiated directly:
 
 ```cpp
 // Create root service (only service class instantiated directly)
-auto root_service = rpc::make_shared<rpc::service>("root_service", rpc::zone{1});
+auto root_service = std::make_shared<rpc::service>("root_service", rpc::zone{1});
 
 // With coroutine support
 #ifdef BUILD_COROUTINE
-auto root_service = rpc::make_shared<rpc::service>("root_service", rpc::zone{1}, io_scheduler);
+auto root_service = std::make_shared<rpc::service>("root_service", rpc::zone{1}, io_scheduler);
 #endif
 ```
 

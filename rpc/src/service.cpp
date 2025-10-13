@@ -343,7 +343,7 @@ namespace rpc
             auto stub = weak_stub.lock();
             if (stub == nullptr)
             {
-                RPC_ERROR("Object gone - stub has been deleted");
+                RPC_INFO("Object gone - stub has already been released");
                 CO_RETURN rpc::error::OBJECT_GONE();
             }
 
@@ -1470,8 +1470,8 @@ namespace rpc
                     CO_RETURN rpc::error::OBJECT_NOT_FOUND();
                 }
                 // this guy needs to live outside of the mutex or deadlocks may happen
-                count = stub->release(false);
-                if (!count)
+                count = stub->release(!!(release_options::optimistic & options));
+                if (!count && !(release_options::optimistic & options))
                 {
                     {
                         // a scoped lock

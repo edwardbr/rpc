@@ -82,7 +82,7 @@ namespace calculator {
 #include "generated/calculator/calculator.h"
 
 // Create service and connect to calculator zone
-auto root_service = rpc::make_shared<rpc::service>("root", rpc::zone{1});
+auto root_service = std::make_shared<rpc::service>("root", rpc::zone{1});
 rpc::shared_ptr<calculator::v1::i_calculator> calc;
 
 auto error = CO_AWAIT root_service->connect_to_zone<...>(
@@ -135,7 +135,7 @@ Applications are organized into **zones** that communicate through service proxi
 
 ```cpp
 // Root service
-auto root = rpc::make_shared<rpc::service>("root", rpc::zone{1});
+auto root = std::make_shared<rpc::service>("root", rpc::zone{1});
 
 // Child zone with automatic lifecycle management
 rpc::shared_ptr<i_service> service_proxy;

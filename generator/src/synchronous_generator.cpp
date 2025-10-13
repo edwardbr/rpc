@@ -808,7 +808,7 @@ namespace synchronous_generator
             proxy("}}");
             proxy("}}");
 
-            proxy("if(__rpc_ret >= rpc::error::MIN() && __rpc_ret <= rpc::error::MAX())");
+            proxy("if(__rpc_ret >= rpc::error::MIN() && __rpc_ret <= rpc::error::MAX() && __rpc_ret != rpc::error::OBJECT_GONE())");
             proxy("{{");
             proxy("//if you fall into this rabbit hole ensure that you have added any error offsets compatible with "
                   "your error code system to the rpc library");
@@ -1257,8 +1257,8 @@ namespace synchronous_generator
 
         proxy("class {0}_proxy : public rpc::interface_proxy<{0}>", interface_name);
         proxy("{{");
-        proxy("{}_proxy(std::shared_ptr<rpc::object_proxy> object_proxy) : ", interface_name);
-        proxy("  rpc::interface_proxy<{}>(object_proxy)", interface_name);
+        proxy("{}_proxy(std::shared_ptr<rpc::object_proxy>&& object_proxy) : ", interface_name);
+        proxy("  rpc::interface_proxy<{}>(std::move(object_proxy))", interface_name);
         proxy("{{");
         proxy("#ifdef USE_RPC_TELEMETRY");
         proxy("auto __rpc_op = object_proxy_.get_nullable();");
@@ -1291,11 +1291,11 @@ namespace synchronous_generator
         proxy("}}");
         proxy("#endif");
         proxy("}}");
-        proxy("[[nodiscard]] static rpc::shared_ptr<{}> create(const std::shared_ptr<rpc::object_proxy>& "
+        proxy("[[nodiscard]] static rpc::shared_ptr<{}> create(std::shared_ptr<rpc::object_proxy>&& "
               "object_proxy)",
             interface_name);
         proxy("{{");
-        proxy("auto __rpc_ret = rpc::shared_ptr<{0}_proxy>(new {0}_proxy(object_proxy));", interface_name);
+        proxy("auto __rpc_ret = rpc::shared_ptr<{0}_proxy>(new {0}_proxy(std::move(object_proxy)));", interface_name);
         proxy("__rpc_ret->weak_this_ = __rpc_ret;", interface_name);
         proxy("return rpc::static_pointer_cast<{}>(__rpc_ret);", interface_name);
         proxy("}}");
@@ -1879,7 +1879,7 @@ namespace synchronous_generator
             ns,
             interface_name);
         proxy("{{");
-        proxy("inface = ::{1}{0}_proxy::create(shared_from_this());", interface_name, ns);
+        proxy("inface = ::{1}{0}_proxy::create(std::move(shared_from_this()));", interface_name, ns);
         proxy("}}");
         proxy("");
 
