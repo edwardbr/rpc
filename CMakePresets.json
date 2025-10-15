@@ -59,8 +59,8 @@
         "BUILD_TYPE": "debug",
         "CMAKE_BUILD_TYPE": "Debug",
         "USE_RPC_LOGGING": "ON",
-        "USE_RPC_TELEMETRY": "OFF",
-        "USE_CONSOLE_TELEMETRY": "OFF"
+        "USE_RPC_TELEMETRY": "ON",
+        "USE_CONSOLE_TELEMETRY": "ON"
       }
     },
     {
@@ -101,6 +101,7 @@
       "name": "Debug_SGX_Sim",
       "inherits": "Debug",
       "cacheVariables": {
+        "USE_RPC_TELEMETRY": "ON",
         "BUILD_COROUTINE": "OFF",
         "BUILD_ENCLAVE": "ON",
         "SGX_HW": "OFF",

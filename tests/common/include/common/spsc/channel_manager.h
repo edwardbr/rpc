@@ -17,8 +17,8 @@ namespace rpc::spsc
 {
     class channel_manager;
 
-    using message_blob = std::array<uint8_t, 1024>;
-    using queue_type = ::spsc::queue<message_blob, 1024>;
+    using message_blob = std::array<uint8_t, 10024>;
+    using queue_type = ::spsc::queue<message_blob, 10024>;
 
     class channel_manager
     {
@@ -58,7 +58,12 @@ namespace rpc::spsc
 
         bool cancel_sent_ = false;
         bool cancel_confirmed_ = false;
-        bool peer_cancel_received_ = false;
+        std::atomic<bool> peer_cancel_received_{false};
+        std::atomic<bool> close_ack_queued_{false};
+
+        // Reference counting for service proxies and task completion
+        std::atomic<int> service_proxy_ref_count_{0};
+        std::atomic<int> tasks_completed_{0};
 
         channel_manager(std::chrono::milliseconds timeout,
             std::shared_ptr<rpc::service> service,
@@ -66,8 +71,11 @@ namespace rpc::spsc
             queue_type* receive_spsc_queue,
             connection_handler handler);
 
-        CORO_TASK(void)
-        pump_messages(std::function<CORO_TASK(int)(envelope_prefix, envelope_payload)> incoming_message_handler);
+        // New producer/consumer pattern coroutines
+        CORO_TASK(void) receive_consumer_task(
+            std::function<void(envelope_prefix, envelope_payload)> incoming_message_handler);
+        CORO_TASK(void) send_producer_task();
+
         CORO_TASK(int) flush_send_queue();
 
         CORO_TASK(void) stub_handle_send(envelope_prefix prefix, envelope_payload payload);
@@ -85,9 +93,13 @@ namespace rpc::spsc
             queue_type* receive_spsc_queue,
             connection_handler handler);
 
-        bool pump_send_and_receive();
+        CORO_TASK(void) pump_send_and_receive();
 
         CORO_TASK(void) shutdown();
+
+        // Service proxy lifecycle management
+        void attach_service_proxy();
+        CORO_TASK(void) detach_service_proxy();
 
         // send a message to a peer
         template<class SendPayload>
@@ -125,7 +137,13 @@ namespace rpc::spsc
         CORO_TASK(int)
         call_peer(std::uint64_t protocol_version, SendPayload&& sendPayload, ReceivePayload& receivePayload)
         {
-            // this should never happen as the service proxy is dieing
+            // If peer has initiated shutdown, we're disconnected - return immediately
+            if (peer_cancel_received_)
+            {
+                RPC_DEBUG("call_peer: peer_cancel_received=true, returning CALL_CANCELLED for zone {}",
+                    service_->get_zone_id().get_val());
+                CO_RETURN rpc::error::CALL_CANCELLED();
+            }
 
             auto sequence_number = ++sequence_number_;
 

@@ -118,7 +118,9 @@ public:
             &receive_spsc_queue_, // these two parameters are reversed for the receiver
             &send_spsc_queue_,    // these two parameters are reversed for the receiver
             handler);
-        channel->pump_send_and_receive(); // get the receiver pump going
+
+        // Schedule the pump coroutine - it will coordinate send/receive tasks
+        peer_service_->get_scheduler()->schedule(channel->pump_send_and_receive());
 
         rpc::shared_ptr<yyy::i_host> hst(new host());
         local_host_ptr_ = hst; // assign to weak ptr
@@ -172,11 +174,32 @@ public:
 
     virtual void tear_down()
     {
-        io_scheduler_->schedule(CoroTearDown());
-        while (!io_scheduler_->empty())
+        bool shutdown_complete = false;
+        auto shutdown_task = [&]() -> coro::task<void> {
+            CO_AWAIT CoroTearDown();
+            // Give time for service_proxy destructors to schedule detach coroutines
+            // and for shutdown sequence to complete
+            CO_AWAIT io_scheduler_->schedule();
+            CO_AWAIT io_scheduler_->schedule();
+            shutdown_complete = true;
+            CO_RETURN;
+        };
+
+        io_scheduler_->schedule(shutdown_task());
+
+        // Process events until shutdown completes
+        // This allows: CoroTearDown -> ~service_proxy -> detach_service_proxy -> shutdown
+        while (!shutdown_complete)
         {
-            io_scheduler_->process_events(std::chrono::milliseconds(10));
+            io_scheduler_->process_events(std::chrono::milliseconds(1));
         }
+
+        // Continue processing to allow shutdown to finish and pump tasks to exit
+        for (int i = 0; i < 100; ++i)
+        {
+            io_scheduler_->process_events(std::chrono::milliseconds(1));
+        }
+
         peer_service_.reset();
         root_service_.reset();
         zone_gen = nullptr;

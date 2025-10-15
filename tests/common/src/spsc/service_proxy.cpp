@@ -30,10 +30,20 @@ namespace rpc::spsc
 
     service_proxy::~service_proxy()
     {
+        RPC_DEBUG("~service_proxy() called for zone {}", get_zone_id().get_val());
 #ifdef BUILD_COROUTINE
-        get_operating_zone_service()->get_scheduler()->schedule(channel_manager_->shutdown());
+        if (channel_manager_)
+        {
+            RPC_DEBUG("~service_proxy() scheduling detach for zone {}", get_zone_id().get_val());
+            get_operating_zone_service()->get_scheduler()->schedule(channel_manager_->detach_service_proxy());
+        }
 #else
-        channel_manager_->shutdown();
+        if (channel_manager_)
+        {
+            // Non-coroutine version would need synchronous detach - not implemented yet
+            // For now, this path should not be taken in SPSC tests which always use coroutines
+            RPC_ASSERT(false && "Non-coroutine SPSC not supported");
+        }
 #endif
     }
 
@@ -71,6 +81,12 @@ namespace rpc::spsc
         auto ret = std::shared_ptr<rpc::service_proxy>(new service_proxy(
             name, destination_zone_id, svc, channel, std::chrono::milliseconds(0), send_spsc_queue, receive_spsc_queue));
 
+        // Attach this service_proxy to the channel manager
+        if (channel)
+        {
+            channel->attach_service_proxy();
+        }
+
         CO_RETURN ret;
     }
 
@@ -91,13 +107,13 @@ namespace rpc::spsc
 
             channel_manager_ = rpc::spsc::channel_manager::create(
                 timeout_, get_operating_zone_service(), send_spsc_queue_, receive_spsc_queue_, nullptr);
+
+            // Attach this service_proxy to the channel manager
+            channel_manager_->attach_service_proxy();
         }
 
-        if (!channel_manager_->pump_send_and_receive())
-        {
-            RPC_ERROR("unable to pump_send_and_receive proxy");
-            CO_RETURN rpc::error::SERVICE_PROXY_LOST_CONNECTION();
-        }
+        // Schedule the pump coroutine - it will coordinate send/receive tasks
+        service->get_scheduler()->schedule(channel_manager_->pump_send_and_receive());
 
         {
             // register the proxy connection

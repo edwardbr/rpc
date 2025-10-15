@@ -34,11 +34,14 @@ namespace rpc::spsc
     }
 
     // this method sends queued requests to other peers and receives responses notifying the proxy when complete
-    bool channel_manager::pump_send_and_receive()
+    CORO_TASK(void) channel_manager::pump_send_and_receive()
     {
         RPC_DEBUG("pump_send_and_receive {}", service_->get_zone_id().get_val());
 
-        auto foo = [this](envelope_prefix prefix, envelope_payload payload) -> coro::task<int>
+        // Message handler lambda that processes incoming messages
+        // Stub calls are scheduled to run independently (allowing reentrant calls)
+        // Response messages are processed inline to wake up waiting callers
+        auto incoming_message_handler = [this](envelope_prefix prefix, envelope_payload payload) -> void
         {
             // do a call
             if (payload.payload_fingerprint == rpc::id<call_send>::get(prefix.version))
@@ -69,17 +72,32 @@ namespace rpc::spsc
                 assert(!peer_cancel_received_);
                 service_->get_scheduler()->schedule(create_stub(std::move(prefix), std::move(payload)));
             }
-            // create the service proxy
+            // handle close connection
             else if (payload.payload_fingerprint == rpc::id<close_connection_send>::get(prefix.version))
             {
-                std::ignore = CO_AWAIT send_payload(
-                    rpc::get_version(), message_direction::receive, close_connection_received{}, prefix.sequence_number);
-                peer_cancel_received_ = true;
+                // This is a stub call that needs to send a response
+                // The acknowledgment is queued for sending by send_producer_task
+                // NOTE: Do NOT capture keep_alive_ here - it would create a reference cycle
+                // The channel_manager is kept alive by keep_alive_ until both tasks complete
+                auto response_task = [this, seq = prefix.sequence_number]() -> coro::task<void> {
+                    RPC_DEBUG("close_connection: sending response for zone {}", service_->get_zone_id().get_val());
+                    std::ignore = CO_AWAIT send_payload(
+                        rpc::get_version(), message_direction::receive, close_connection_received{}, seq);
+
+                    // Mark that acknowledgment is queued (will be flushed by send_producer)
+                    close_ack_queued_ = true;
+                    peer_cancel_received_ = true;
+
+                    RPC_DEBUG("close_connection: response queued, close_ack_queued=true peer_cancel_received=true for zone {}",
+                              service_->get_zone_id().get_val());
+                    CO_RETURN;
+                };
+                service_->get_scheduler()->schedule(response_task());
             }
-            // do a try cast
+            // handle response messages
             else
             {
-                // now find the relevant event handler and set its values before triggering it
+                // Process responses inline to immediately wake up waiting callers
                 result_listener* result = nullptr;
                 {
                     std::scoped_lock lock(pending_transmits_mtx_);
@@ -104,191 +122,316 @@ namespace rpc::spsc
                 result->error_code = rpc::error::OK();
                 result->event.set();
             }
-            co_return rpc::error::OK();
         };
 
-        return service_->get_scheduler()->schedule(pump_messages(foo));
+        // Schedule both producer and consumer tasks independently
+        // They will run concurrently via the scheduler, yielding when blocked
+        // This function returns immediately - the tasks run in the background until shutdown
+        service_->get_scheduler()->schedule(receive_consumer_task(incoming_message_handler));
+        service_->get_scheduler()->schedule(send_producer_task());
+
+        RPC_DEBUG("pump_send_and_receive: scheduled tasks for zone {}", service_->get_zone_id().get_val());
+        CO_RETURN;
+    }
+
+    void channel_manager::attach_service_proxy()
+    {
+        int new_count = ++service_proxy_ref_count_;
+        RPC_DEBUG("attach_service_proxy: zone={} ref_count={}",
+                  service_->get_zone_id().get_val(), new_count);
+    }
+
+    CORO_TASK(void) channel_manager::detach_service_proxy()
+    {
+        int new_count = --service_proxy_ref_count_;
+        RPC_DEBUG("detach_service_proxy: zone={} ref_count={} peer_cancel_received={}",
+                  service_->get_zone_id().get_val(), new_count, peer_cancel_received_.load());
+
+        if (new_count == 0)
+        {
+            // Last service_proxy detached
+            // Only initiate shutdown if peer hasn't already done so
+            if (!peer_cancel_received_)
+            {
+                RPC_DEBUG("Last service_proxy detached, initiating shutdown for zone {}",
+                          service_->get_zone_id().get_val());
+                CO_AWAIT shutdown();
+            }
+            else
+            {
+                RPC_DEBUG("Last service_proxy detached, but peer already initiated shutdown for zone {} - no action needed",
+                          service_->get_zone_id().get_val());
+            }
+        }
+        CO_RETURN;
     }
 
     CORO_TASK(void) channel_manager::shutdown()
     {
+        if (cancel_sent_)
+        {
+            // Already shutting down, just wait for completion
+            RPC_DEBUG("shutdown() already in progress for zone {}, waiting for completion",
+                      service_->get_zone_id().get_val());
+            CO_AWAIT shutdown_event_;
+            CO_RETURN;
+        }
+
+        RPC_DEBUG("shutdown() initiating for zone {}", service_->get_zone_id().get_val());
         cancel_sent_ = true;
+
         close_connection_received received{};
         auto err = CO_AWAIT call_peer(rpc::get_version(), close_connection_send{}, received);
+        RPC_DEBUG("shutdown() received response for zone {}, err={}",
+                  service_->get_zone_id().get_val(), err);
+
         cancel_confirmed_ = true;
+        RPC_DEBUG("shutdown() set cancel_confirmed=true for zone {}",
+                  service_->get_zone_id().get_val());
+
         if (err != rpc::error::OK())
         {
             // Something has gone wrong on the other side so pretend that it has succeeded
             peer_cancel_received_ = true;
         }
-        co_await shutdown_event_;
+
+        // Wait for both tasks to complete
+        CO_AWAIT shutdown_event_;
+        RPC_DEBUG("shutdown() completed for zone {}", service_->get_zone_id().get_val());
+        CO_RETURN;
     }
 
-    CORO_TASK(void)
-    channel_manager::pump_messages(std::function<CORO_TASK(int)(envelope_prefix, envelope_payload)> incoming_message_handler)
+    // Receive consumer task - continuously reads from receive_spsc_queue_ and processes messages
+    // This runs as an independent coroutine, completely decoupled from send_producer_task
+    // Like io_uring: polls shared buffer, remote zone's sender writes independently
+    CORO_TASK(void) channel_manager::receive_consumer_task(
+        std::function<void(envelope_prefix, envelope_payload)> incoming_message_handler)
     {
         static auto envelope_prefix_saved_size = rpc::yas_binary_saved_size(envelope_prefix());
 
         std::vector<uint8_t> prefix_buf(envelope_prefix_saved_size);
         std::vector<uint8_t> buf;
 
-        auto zone = service_->get_zone_id().get_val();
-        std::ignore = zone;
-
         bool receiving_prefix = true;
         std::span<uint8_t> receive_data;
-        std::span<uint8_t> send_data;
-        message_blob send_blob;
-        bool retry_send_blob = false;
-        bool no_pending_send = false;
-        bool incoming_queue_empty = false;
 
-        while (peer_cancel_received_ == false || cancel_confirmed_ == false || send_queue_.empty() == false
-               || send_data.empty() == false)
+        RPC_DEBUG("receive_consumer_task started for zone {}", service_->get_zone_id().get_val());
+
+        while (!peer_cancel_received_ && !cancel_confirmed_)
         {
-            no_pending_send = false;
-            if (retry_send_blob)
+            envelope_prefix prefix{};
+
+            // Receive prefix chunks
+            if (receiving_prefix)
             {
-                if (send_spsc_queue_->push(send_blob))
+                if (receive_data.empty())
                 {
-                    retry_send_blob = false;
-                    if (send_data.empty())
+                    receive_data = {prefix_buf.begin(), prefix_buf.end()};
+                }
+
+                // Poll SPSC queue until we have the complete prefix
+                bool received_any = false;
+                while (!receive_data.empty())
+                {
+                    message_blob blob;
+                    if (!receive_spsc_queue_->pop(blob))
                     {
-                        send_queue_.pop();
+                        // Queue is empty
+                        if (!received_any)
+                        {
+                            // No progress made, yield to scheduler
+                            // Remote sender writing to this buffer will add data
+                            CO_AWAIT service_->get_scheduler()->schedule();
+                        }
+                        break;
                     }
+
+                    received_any = true;
+                    size_t copy_size = std::min(receive_data.size(), blob.size());
+                    std::copy_n(blob.begin(), copy_size, receive_data.begin());
+
+                    if (receive_data.size() <= blob.size())
+                    {
+                        receive_data = {receive_data.end(), receive_data.end()};
+                    }
+                    else
+                    {
+                        receive_data = receive_data.subspan(blob.size(), receive_data.size() - blob.size());
+                    }
+                }
+
+                if (receive_data.empty())
+                {
+                    // Successfully received complete prefix
+                    auto str_err = rpc::from_yas_binary(rpc::span(prefix_buf), prefix);
+                    if (!str_err.empty())
+                    {
+                        RPC_ERROR("failed invalid prefix");
+                        break;
+                    }
+                    assert(prefix.direction);
+                    receiving_prefix = false;
+                }
+                else
+                {
+                    // Still need more data, continue outer loop
+                    continue;
                 }
             }
 
-            if (!retry_send_blob)
+            // Receive payload chunks
+            if (!receiving_prefix)
             {
+                if (receive_data.empty())
+                {
+                    buf = std::vector<uint8_t>(prefix.payload_size);
+                    receive_data = {buf.begin(), buf.end()};
+                }
+
+                // Poll SPSC queue until we have the complete payload
+                bool received_any = false;
+                while (!receive_data.empty())
+                {
+                    message_blob blob;
+                    if (!receive_spsc_queue_->pop(blob))
+                    {
+                        // Queue is empty
+                        if (!received_any)
+                        {
+                            // No progress made, yield to scheduler
+                            // Remote sender writing to this buffer will add data
+                            CO_AWAIT service_->get_scheduler()->schedule();
+                        }
+                        break;
+                    }
+
+                    received_any = true;
+                    size_t copy_size = std::min(receive_data.size(), blob.size());
+                    std::copy_n(blob.begin(), copy_size, receive_data.begin());
+
+                    if (receive_data.size() <= blob.size())
+                    {
+                        receive_data = {receive_data.end(), receive_data.end()};
+                    }
+                    else
+                    {
+                        receive_data = receive_data.subspan(blob.size(), receive_data.size() - blob.size());
+                    }
+                }
+
+                if (receive_data.empty())
+                {
+                    // Successfully received complete payload
+                    envelope_payload payload;
+                    auto str_err = rpc::from_yas_binary(rpc::span(buf), payload);
+                    if (!str_err.empty())
+                    {
+                        RPC_ERROR("failed bad payload format");
+                        break;
+                    }
+
+                    // Process the message by calling the handler (non-blocking)
+                    // The handler schedules stub handlers (async) and processes responses inline (sync)
+                    // This allows reentrant calls to work since stub handlers run independently
+                    incoming_message_handler(std::move(prefix), std::move(payload));
+
+                    receiving_prefix = true;
+                }
+                // else: Still need more data, continue outer loop
+            }
+        }
+
+        RPC_DEBUG("receive_consumer_task exiting for zone {}", service_->get_zone_id().get_val());
+
+        // Increment task completion counter
+        int completed = ++tasks_completed_;
+        RPC_DEBUG("receive_consumer_task: tasks_completed={} for zone {}", completed, service_->get_zone_id().get_val());
+
+        if (completed == 2)
+        {
+            // Both tasks completed, release keep_alive and signal shutdown
+            RPC_DEBUG("Both tasks completed, releasing keep_alive and signaling shutdown for zone {}",
+                      service_->get_zone_id().get_val());
+            keep_alive_ = nullptr;
+            shutdown_event_.set();
+        }
+
+        CO_RETURN;
+    }
+
+    // Send producer task - continuously reads from send_queue_ and writes to send_spsc_queue_
+    // This runs as an independent coroutine, completely decoupled from receive_consumer_task
+    // Like io_uring: writes to shared buffer, remote zone's receiver polls independently
+    CORO_TASK(void) channel_manager::send_producer_task()
+    {
+        std::span<uint8_t> send_data;
+
+        RPC_DEBUG("send_producer_task started for zone {}", service_->get_zone_id().get_val());
+
+        // Exit when:
+        // - We've queued acknowledgment for peer's cancel (close_ack_queued_) OR our shutdown is confirmed (cancel_confirmed_)
+        // - AND all queued data has been sent
+        while ((!close_ack_queued_ && !cancel_confirmed_) || !send_queue_.empty() || !send_data.empty())
+        {
+            // RPC_DEBUG("send_producer_task loop: zone={} close_ack_queued={} cancel_confirmed={} send_queue_size={} send_data_size={}",
+            //     service_->get_zone_id().get_val(),
+            //     close_ack_queued_.load(),
+            //     cancel_confirmed_,
+            //     send_queue_.size(),
+            //     send_data.size());
+
+            // Get next item from send_queue_ if needed
+            if (send_data.empty())
+            {
+                auto scoped_lock = co_await send_queue_mtx_.lock();
+                if (send_queue_.empty())
+                {
+                    // No data to send, yield to allow other coroutines to run
+                    scoped_lock.unlock();
+                    CO_AWAIT service_->get_scheduler()->schedule();
+                    continue;
+                }
+
+                auto& item = send_queue_.front();
+                send_data = {item.begin(), item.end()};
+                scoped_lock.unlock();
+            }
+
+            // Chunk the data into message_blob size
+            message_blob send_blob;
+            if (send_data.size() < send_blob.size())
+            {
+                std::copy(send_data.begin(), send_data.end(), send_blob.begin());
+                send_data = {send_data.end(), send_data.end()};
+            }
+            else
+            {
+                std::copy_n(send_data.begin(), send_blob.size(), send_blob.begin());
+                send_data = send_data.subspan(send_blob.size(), send_data.size() - send_blob.size());
+            }
+
+            // Try to push to SPSC queue - remote zone's receiver will poll this buffer
+            if (send_spsc_queue_->push(send_blob))
+            {
+                // Successfully pushed - remote receiver will discover this independently
                 if (send_data.empty())
                 {
-                    if (send_queue_.empty())
-                    {
-                        no_pending_send = true;
-                    }
-                    else
-                    {
-                        auto& item = send_queue_.front();
-                        send_data = {item.begin(), item.end()};
-                    }
-                }
-                if (!send_data.empty())
-                {
-                    if (send_data.size() < send_blob.size())
-                    {
-                        std::copy(send_data.begin(), send_data.end(), send_blob.begin());
-                        send_data = {send_data.end(), send_data.end()};
-                    }
-                    else
-                    {
-                        std::copy_n(send_data.begin(), send_blob.size(), send_blob.begin());
-                        send_data = send_data.subspan(send_blob.size(), send_data.size() - send_blob.size());
-                    }
-                    if (send_spsc_queue_->push(send_blob))
-                    {
-                        if (send_data.empty())
-                        {
-                            send_queue_.pop();
-                        }
-                    }
-                    else
-                    {
-                        retry_send_blob = true;
-                    }
+                    // Finished sending current item, remove it from queue
+                    auto scoped_lock = co_await send_queue_mtx_.lock();
+                    send_queue_.pop();
                 }
             }
-
+            else
             {
-                envelope_prefix prefix{};
-
-                if (receiving_prefix)
-                {
-                    if (receive_data.empty())
-                    {
-                        receive_data = {prefix_buf.begin(), prefix_buf.end()};
-                    }
-                    do
-                    {
-                        message_blob blob;
-                        if (!receive_spsc_queue_->pop(blob))
-                        {
-                            incoming_queue_empty = true;
-                            break;
-                        }
-                        std::copy_n(blob.begin(), std::min(receive_data.size(), blob.size()), receive_data.begin());
-                        if (receive_data.size() <= blob.size())
-                        {
-                            receive_data = {receive_data.end(), receive_data.end()};
-                            break;
-                        }
-                        receive_data = receive_data.subspan(blob.size(), receive_data.size() - blob.size());
-                    } while (true);
-
-                    if (!incoming_queue_empty)
-                    {
-                        auto str_err = rpc::from_yas_binary(rpc::span(prefix_buf), prefix);
-                        if (!str_err.empty())
-                        {
-                            RPC_ERROR("failed invalid prefix");
-                            break;
-                        }
-                        assert(prefix.direction);
-
-                        receiving_prefix = false;
-                    }
-                }
-
-                if (!incoming_queue_empty)
-                {
-                    if (receive_data.empty())
-                    {
-                        buf = std::vector<uint8_t>(prefix.payload_size);
-                        receive_data = {buf.begin(), buf.end()};
-                    }
-                    do
-                    {
-                        message_blob blob;
-                        if (!receive_spsc_queue_->pop(blob))
-                        {
-                            incoming_queue_empty = true;
-                            break;
-                        }
-                        std::copy_n(blob.begin(), std::min(receive_data.size(), blob.size()), receive_data.begin());
-                        if (receive_data.size() <= blob.size())
-                        {
-                            receive_data = {receive_data.end(), receive_data.end()};
-                            break;
-                        }
-                        receive_data = receive_data.subspan(blob.size(), receive_data.size() - blob.size());
-                    } while (true);
-
-                    if (!incoming_queue_empty)
-                    {
-                        envelope_payload payload;
-                        auto str_err = rpc::from_yas_binary(rpc::span(buf), payload);
-                        if (!str_err.empty())
-                        {
-                            RPC_ERROR("failed bad payload format");
-                            break;
-                        }
-                        auto ret = co_await incoming_message_handler(std::move(prefix), std::move(payload));
-                        if (ret != rpc::error::OK())
-                        {
-                            RPC_ERROR("failed incoming_message_handler");
-                            break;
-                        }
-                        receiving_prefix = true;
-                    }
-                }
-            }
-
-            if ((retry_send_blob || no_pending_send) && incoming_queue_empty)
+                // Queue is full, yield to scheduler
+                // Remote receiver consuming from this buffer will free up space
                 CO_AWAIT service_->get_scheduler()->schedule();
-            incoming_queue_empty = false;
+            }
         }
 
         CO_AWAIT service_->get_scheduler()->schedule_after(std::chrono::milliseconds(100));
+
+        RPC_DEBUG("send_producer_task completed sending for zone {}", service_->get_zone_id().get_val());
 
         {
             std::scoped_lock lock(pending_transmits_mtx_);
@@ -298,9 +441,24 @@ namespace rpc::spsc
                 it.second->event.set();
             }
         }
-        shutdown_event_.set();
-        keep_alive_ = nullptr;
+
+        // Increment task completion counter
+        int completed = ++tasks_completed_;
+        RPC_DEBUG("send_producer_task: tasks_completed={} for zone {}", completed, service_->get_zone_id().get_val());
+
+        if (completed == 2)
+        {
+            // Both tasks completed, release keep_alive and signal shutdown
+            RPC_DEBUG("Both tasks completed, releasing keep_alive and signaling shutdown for zone {}",
+                      service_->get_zone_id().get_val());
+            keep_alive_ = nullptr;
+            shutdown_event_.set();
+        }
+
+        RPC_DEBUG("send_producer_task exiting for zone {}", service_->get_zone_id().get_val());
+        CO_RETURN;
     }
+
     // do a try cast
     CORO_TASK(void) channel_manager::stub_handle_send(envelope_prefix prefix, envelope_payload payload)
     {
