@@ -21,13 +21,14 @@ namespace rpc
         if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
             telemetry_service->on_stub_deletion(zone_.get_zone_id(), id_);
 #endif
+        RPC_ASSERT(shared_count_ == 0);
     }
 
     rpc::shared_ptr<rpc::casting_interface> object_stub::get_castable_interface() const
     {
-        std::lock_guard g(map_control);
-        RPC_ASSERT(!stub_map.empty());
-        auto& iface = stub_map.begin()->second;
+        std::lock_guard g(map_control_);
+        RPC_ASSERT(!stub_map_.empty());
+        auto& iface = stub_map_.begin()->second;
         return iface->get_castable_interface();
     }
 
@@ -35,14 +36,14 @@ namespace rpc
     // or by an internal call by this class
     void object_stub::add_interface(const std::shared_ptr<rpc::i_interface_stub>& iface)
     {
-        stub_map[iface->get_interface_id(rpc::VERSION_2)] = iface;
+        stub_map_[iface->get_interface_id(rpc::VERSION_2)] = iface;
     }
 
     std::shared_ptr<rpc::i_interface_stub> object_stub::get_interface(interface_ordinal interface_id)
     {
-        std::lock_guard g(map_control);
-        auto res = stub_map.find(interface_id);
-        if (res == stub_map.end())
+        std::lock_guard g(map_control_);
+        auto res = stub_map_.find(interface_id);
+        if (res == stub_map_.end())
             return nullptr;
         return res->second;
     }
@@ -60,9 +61,9 @@ namespace rpc
     {
         std::shared_ptr<rpc::i_interface_stub> stub;
         {
-            std::lock_guard g(map_control);
-            auto item = stub_map.find(interface_id);
-            if (item != stub_map.end())
+            std::lock_guard g(map_control_);
+            auto item = stub_map_.find(interface_id);
+            if (item != stub_map_.end())
             {
                 stub = item->second;
             }
@@ -78,13 +79,13 @@ namespace rpc
 
     int object_stub::try_cast(interface_ordinal interface_id)
     {
-        std::lock_guard g(map_control);
+        std::lock_guard g(map_control_);
         int ret = rpc::error::OK();
-        auto item = stub_map.find(interface_id);
-        if (item == stub_map.end())
+        auto item = stub_map_.find(interface_id);
+        if (item == stub_map_.end())
         {
             std::shared_ptr<rpc::i_interface_stub> new_stub;
-            std::shared_ptr<rpc::i_interface_stub> stub = stub_map.begin()->second;
+            std::shared_ptr<rpc::i_interface_stub> stub = stub_map_.begin()->second;
             ret = stub->cast(interface_id, new_stub);
             if (ret == rpc::error::OK() && new_stub)
             {
@@ -98,9 +99,9 @@ namespace rpc
     {
         uint64_t ret = 0;
         if(is_optimistic)
-            ret = ++optimistic_count;
+            ret = ++optimistic_count_;
         else
-            ret = ++shared_count;
+            ret = ++shared_count_;
 #ifdef USE_RPC_TELEMETRY
         if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
             telemetry_service->on_stub_add_ref(zone_.get_zone_id(), id_, {}, ret, {});
@@ -114,9 +115,9 @@ namespace rpc
     {
         uint64_t count = 0;
         if(is_optimistic)
-            count = --optimistic_count;
+            count = --optimistic_count_;
         else
-            count = --shared_count;
+            count = --shared_count_;
 #ifdef USE_RPC_TELEMETRY
         if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
             telemetry_service->on_stub_release(zone_.get_zone_id(), id_, {}, count, {});
@@ -127,7 +128,7 @@ namespace rpc
 
     void object_stub::release_from_service()
     {
-        zone_.release_local_stub(p_this, false);
+        zone_.release_local_stub(p_this_, false);
     }
 
 }

@@ -59,7 +59,17 @@ namespace rpc
             }
 #endif
         }
-
+        
+        RPC_ASSERT(proxies_.empty());
+        if (is_responsible_for_cleaning_up_service_)
+        {
+            auto svc = service_.lock();
+            if (get_zone_id().as_caller() != caller_zone_id_)
+            {
+                svc->remove_zone_proxy(destination_zone_id_, caller_zone_id_);
+            }
+        }
+        
 #ifdef USE_RPC_TELEMETRY
         if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
         {
@@ -501,6 +511,8 @@ namespace rpc
             if (ret != error::OK())
             {
                 RPC_ERROR("sp_add_ref failed");
+                std::lock_guard l(insert_control_);
+                proxies_.erase(object_id);
                 RPC_ASSERT(false);
                 CO_RETURN nullptr;
             }

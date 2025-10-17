@@ -33,11 +33,11 @@ namespace rpc
     {
         object id_ = {0};
         // stubs have stong pointers
-        mutable std::mutex map_control;
-        std::unordered_map<interface_ordinal, std::shared_ptr<rpc::i_interface_stub>> stub_map;
-        std::shared_ptr<object_stub> p_this;
-        std::atomic<uint64_t> shared_count = 0;
-        std::atomic<uint64_t> optimistic_count = 0;
+        mutable std::mutex map_control_;
+        std::unordered_map<interface_ordinal, std::shared_ptr<rpc::i_interface_stub>> stub_map_;
+        std::shared_ptr<object_stub> p_this_;
+        std::atomic<uint64_t> shared_count_ = 0;
+        std::atomic<uint64_t> optimistic_count_ = 0;
         service& zone_;
 
         void add_interface(const std::shared_ptr<rpc::i_interface_stub>& iface);
@@ -48,10 +48,10 @@ namespace rpc
         ~object_stub();
         object get_id() const { return id_; }
         rpc::shared_ptr<rpc::casting_interface> get_castable_interface() const;
-        void reset() { p_this.reset(); }
+        void reset() { p_this_.reset(); }
 
         // this is called once the lifetime management needs to be activated
-        void on_added_to_zone(std::shared_ptr<object_stub> stub) { p_this = stub; }
+        void on_added_to_zone(std::shared_ptr<object_stub> stub) { p_this_ = stub; }
 
         service& get_zone() const { return zone_; }
 

@@ -588,6 +588,293 @@ worker->process_object(obj);  // add_ref/release handled automatically
 
 ---
 
+## Reference Counting and Object Lifecycle
+
+RPC++ implements a sophisticated distributed reference counting system that manages object lifetimes across multiple zones. Understanding this system is crucial for debugging distributed object lifecycle issues.
+
+### Architecture Components
+
+The reference counting system consists of four main layers working together:
+
+#### 1. Interface Proxies (`i_example_proxy`, etc.)
+- **Purpose**: Type-safe client-side proxies for specific interfaces (e.g., `i_calculator_proxy`, `i_user_service_proxy`)
+- **Location**: Lives in the client zone where the smart pointer is held
+- **User View**: What developers interact with through `rpc::shared_ptr<i_example>` or `rpc::optimistic_ptr<i_example>`
+- **Creation**: Interface proxies are automatically generated and managed by the RPC subsystem - developers never directly instantiate them
+- **Lifetime Management**:
+  - Developers create `rpc::shared_ptr<i_example>` or `rpc::optimistic_ptr<i_example>` to hold interface proxies
+  - The lifetime of the interface proxy (or local object) is controlled by these smart pointers
+  - These smart pointers automatically control the remote reference count of the destination stub
+  - **Both `rpc::shared_ptr` and `rpc::optimistic_ptr` keep the communication channel open** (service proxy remains alive)
+  - `rpc::shared_ptr` keeps the remote stub alive (strong reference semantics)
+  - `rpc::optimistic_ptr` does NOT keep the remote stub alive (weak reference semantics)
+  - **Key insight**: An `rpc::optimistic_ptr` in Zone A can successfully call a remote object in Zone C that is kept alive by an `rpc::shared_ptr` in Zone B - the communication channel remains open even though Zone A doesn't own the object
+- **Responsibilities**:
+  - Provides type-safe method calls matching the interface definition
+  - Delegates to underlying object proxy for actual RPC communication
+  - Multiple interface proxies can point to the same remote object (fake multiple inheritance)
+
+*Note: Interface proxies are backed by control blocks that track local `rpc::shared_ptr` and `rpc::weak_ptr` reference counts, but these details are typically transparent to application code.*
+
+#### 2. Object Proxy (`object_proxy`)
+- **Purpose**: Aggregates ALL interface proxies pointing to the same remote object in a given zone
+- **Location**: One per zone per remote object
+- **Counters**:
+  - `shared_count_`: Aggregate count of shared references across all interfaces for this object
+  - `optimistic_count_`: Aggregate count of optimistic references across all interfaces for this object
+- **Responsibilities**:
+  - Pools multiple interface types to same object (supports "fake multiple inheritance")
+  - Sends `sp_add_ref()` / `sp_release()` to service proxies only on 0→1 and 1→0 aggregate transitions
+  - Manages relationship with `service_proxy` for remote communication
+- **Critical Behavior**: When a reference type count (shared or optimistic) goes from 0→1, must call `service_proxy->sp_add_ref()` to establish remote reference **immediately and sequentially** to ensure remote count ≥ 1
+
+#### 3. Service Proxies (Relay Layer)
+- **Purpose**: Relay reference counting operations between zones (caller → intermediates → destination)
+- **Location**: One per (source zone, destination zone, caller zone) triplet
+- **Counters**:
+  - `lifetime_lock_count_`: External references keeping this service_proxy alive
+  - Incremented by `add_external_ref()`, decremented by `inner_release_external_ref()`
+- **Reference Relay Behavior**:
+  - **Owning Proxies** (zone_id == caller_zone_id): Directly manage objects in the destination zone
+  - **Routing Proxies** (zone_id != caller_zone_id): Act as intermediaries, relaying reference counts between zones
+  - Service proxies forward `sp_add_ref()` and `sp_release()` calls through the zone hierarchy
+  - Reference counts accumulate at the destination stub from all calling zones
+- **Lifecycle**:
+  - Created via `service::inner_add_zone_proxy()` which calls `add_external_ref()` (count = 1)
+  - Each object_proxy 0→1 transition calls `add_external_ref()` again
+  - Destructor removes from `other_zones` map if `is_responsible_for_cleaning_up_service_` is true
+- **Critical Fix**: Routing service_proxies don't have `cleanup_after_object()` called, so destructor must check this condition and call `remove_zone_proxy()` to prevent null `weak_ptr` lookups
+
+**Multi-Zone Reference Relay Example**:
+```
+Zone A (Caller) → Zone B (Intermediate) → Zone C (Destination)
+     │                    │                       │
+Interface Proxy      Routing Proxy          Owning Proxy
+shared_count_=1    (relays ref counts)     shared_count_=1
+     │                    │                       │
+     └───── sp_add_ref() ─┴──── sp_add_ref() ────┴──→ Remote Stub
+                                                      shared_count_=1
+```
+
+#### 4. Remote Stub (`object_stub`)
+- **Purpose**: Represents the actual object implementation in the service zone
+- **Location**: Lives in the zone where the actual object implementation exists
+- **Counters**:
+  - `shared_count_`: Total shared references from ALL zones combined (relayed through service proxies)
+  - `optimistic_count`: Total optimistic references from ALL zones combined
+- **Deletion Rule**: Stub is deleted when `shared_count_` reaches 0, **regardless** of `optimistic_count` value (weak semantics)
+
+### Reference Counting Flow
+
+#### Creating a Remote Object Reference
+
+When `rpc::shared_ptr<i_foo> foo_proxy` is created to a remote object:
+
+1. **Interface Proxy Creation**:
+   - Application creates `rpc::shared_ptr<i_foo>` pointing to remote object
+   - Interface proxy (e.g., `i_foo_proxy`) is instantiated with backing control block
+   - Control block delegates to object proxy for distributed reference management
+
+2. **Object Proxy Aggregation**:
+   - Object proxy's `shared_count_` increments from 0→1
+   - Detects 0→1 transition (first reference to this object in this zone)
+   - Calls `service_proxy->add_external_ref()` (keeps service_proxy alive)
+   - Calls `CO_AWAIT service_proxy->sp_add_ref(object_id, options::normal, ref_count)`
+
+3. **Service Proxy Relay** (Caller → Intermediates → Destination):
+   - Service proxies relay `sp_add_ref()` through zone hierarchy
+   - **Routing Proxies** (intermediates): Forward call to next zone without owning the object
+   - **Owning Proxy** (destination): Makes final call to local stub
+   - Each intermediate zone's service proxy remains alive to maintain relay path
+
+4. **Remote Stub Update**:
+   - Destination zone's `object_stub->add_ref(is_optimistic=false)` increments `shared_count_`
+   - Stub remains alive as long as `shared_count_ > 0`
+   - Reference count represents total from ALL calling zones combined
+
+#### Destroying a Remote Object Reference
+
+When `rpc::shared_ptr<i_foo> foo_proxy` is destroyed:
+
+1. **Interface Proxy Destruction**:
+   - Application destroys `rpc::shared_ptr<i_foo>`
+   - Control block reference count decrements
+   - When count reaches 0, delegates to object proxy for cleanup
+
+2. **Object Proxy Cleanup**:
+   - Object proxy's `shared_count_` decrements from 1→0
+   - Detects 1→0 transition (last reference in this zone)
+   - Calls `service_proxy->on_object_proxy_released(shared_from_this(), is_optimistic=false)`
+
+3. **Service Proxy Cleanup** (`cleanup_after_object`):
+   - Calls `CO_AWAIT service_proxy->sp_release(object_id, release_options::normal, ref_count)`
+   - Service proxies relay `sp_release()` through zone hierarchy to destination
+   - Calls `inner_release_external_ref()` (decrements `lifetime_lock_count_`)
+   - If `inner_count == 0 && is_responsible_for_cleaning_up_service_`, calls `svc->remove_zone_proxy()`
+   - Removes object_proxy from `proxies_` map (done in `on_object_proxy_released` before scheduling cleanup)
+
+4. **Remote Stub Cleanup**:
+   - Destination stub's `shared_count_` decrements
+   - When `shared_count_ == 0 && !is_optimistic`, stub is deleted from service
+   - Stub memory is freed regardless of `optimistic_count` value
+   - Intermediate routing service proxies remain alive as long as other objects use them
+
+### Dual Reference Counting (Shared vs Optimistic)
+
+RPC++ supports two reference types with different lifetime semantics:
+
+**Shared References** (`rpc::shared_ptr`):
+- Keep remote stubs alive (RAII semantics)
+- Stub deleted when aggregate `shared_count_` across all zones reaches 0
+- Use for ownership semantics
+
+**Optimistic References** (`rpc::optimistic_ptr` - Future Feature):
+- Do NOT keep remote stubs alive (weak semantics)
+- Stub can be deleted even if `optimistic_count > 0`
+- Calling through optimistic_ptr after stub deletion returns `OBJECT_GONE`
+- Use for circular dependencies, stateless services, or non-owning access
+
+**Key Invariant**: Both reference types are tracked independently through the entire stack:
+- Control block has `shared_count_` and `optimistic_count_`
+- Object proxy has `shared_count_` and `optimistic_count_`
+- Remote stub has `shared_count_` and `optimistic_count`
+
+**Critical Requirement**: `sp_add_ref()` is called **once for each type** when going 0→1:
+- First shared reference: calls `sp_add_ref(..., normal)`
+- First optimistic reference: calls `sp_add_ref(..., optimistic)`
+- This ensures remote service tracks both types independently
+
+### Common Debugging Scenarios
+
+#### Scenario 1: "tmp is null" Assertion Failures
+
+**Symptom**: Crash with error "tmp is null zone: X destination_zone=Y"
+
+**Root Cause**: Service proxy was destroyed but its `weak_ptr` entry remains in `other_zones` map
+
+**Diagnosis Steps**:
+1. Check if service_proxy destructor was called (add logging/telemetry)
+2. Verify if `remove_zone_proxy()` was called in destructor
+3. For routing proxies (`zone_id != caller_zone_id`), verify destructor checks this condition
+4. Check if `is_responsible_for_cleaning_up_service_` is set correctly
+
+**Fix Pattern** (from recent debugging):
+```cpp
+// In service_proxy destructor
+if (is_responsible_for_cleaning_up_service_)
+{
+    auto svc = service_.lock();
+    if (get_zone_id().as_caller() != caller_zone_id_)  // Routing proxy check
+    {
+        svc->remove_zone_proxy(destination_zone_id_, caller_zone_id_);
+    }
+}
+```
+
+**Key Lesson**: When encountering null `weak_ptr` lookups, check if the object's destructor properly removed the `weak_ptr` from all relevant collections.
+
+#### Scenario 2: Premature Object Deletion
+
+**Symptom**: Remote calls fail with `OBJECT_NOT_FOUND` or `OBJECT_GONE` even though references should exist
+
+**Diagnosis**:
+1. Enable telemetry logging for reference counts
+2. Trace `sp_add_ref` and `sp_release` calls for the object
+3. Check if reference counts balance (adds == releases)
+4. Verify no double-release bugs (releasing same reference twice)
+
+**Common Causes**:
+- Missing `add_external_ref()` call when creating service_proxy
+- Extra `inner_release_external_ref()` call in cleanup path
+- Factory return path not properly balanced
+- Control block calling release without corresponding add_ref
+
+#### Scenario 3: Service Proxy Lifecycle Issues
+
+**Symptom**: Service proxy prematurely removed from `other_zones` map, causing routing failures
+
+**Root Cause**: External ref count reaching 0 while objects still need the proxy for routing
+
+**Key Understanding**:
+- Service proxy should be removed when `lifetime_lock_count_ == 0 && is_responsible_for_cleaning_up_service_`
+- For routing proxies (middle nodes in multi-zone topology), `cleanup_after_object()` is never called
+- Destructor MUST handle cleanup for routing proxies
+
+**Prevention**:
+- Ensure `add_external_ref()` / `release_external_ref()` calls balance
+- Don't call `remove_zone_proxy()` in `cleanup_after_object()` for routing proxies
+- Destructor handles cleanup for proxies where `zone_id != caller_zone_id`
+
+### Multi-Zone Reference Aggregation
+
+**Important**: Remote stub deletion is based on **aggregate** shared reference count across **ALL zones**:
+
+```
+Zone A: rpc::shared_ptr<i_foo> obj_a → shared_count_a = 1
+Zone B: rpc::shared_ptr<i_foo> obj_b → shared_count_b = 1
+Stub (Zone C): shared_count_ = 2 (1 from A + 1 from B)
+
+If Zone A releases: shared_count_ = 1 → stub still alive
+If Zone B releases: shared_count_ = 0 → stub DELETED
+```
+
+This means stub lifetime depends on references from all zones combined, not just a single zone.
+
+### Best Practices
+
+1. **Enable Telemetry for Debugging**:
+   ```bash
+   cmake --preset Debug -DUSE_RPC_TELEMETRY=ON
+   ./build/output/debug/rpc_test --telemetry-console
+   ```
+
+2. **Check Reference Balance**:
+   - Every `add_external_ref()` must have corresponding `release_external_ref()`
+   - Every `sp_add_ref()` must have corresponding `sp_release()`
+   - Imbalanced references cause premature or delayed cleanup
+
+3. **Understand Proxy Lifecycle**:
+   - Routing proxies (middle nodes) need special destructor handling
+   - `cleanup_after_object()` only called for proxies owning objects
+   - Destructor must check `zone_id != caller_zone_id` for routing proxy cleanup
+
+4. **Debugging Null Weak Pointers**:
+   - Always check if destructor was called
+   - Verify destructor removed weak_ptr from all collections
+   - Check for routing proxy condition in cleanup code
+
+### Reference Counting State Diagram
+
+```
+[Create shared_ptr]
+    ↓
+[Control Block: shared_count_=1]
+    ↓
+[Object Proxy: shared_count_ 0→1]
+    ↓
+[Service Proxy: add_external_ref(), lifetime_lock_count_++]
+    ↓
+[Remote Stub: sp_add_ref(), shared_count_++]
+    ↓
+[Object Alive, RPC Calls Succeed]
+    ↓
+[Destroy shared_ptr]
+    ↓
+[Control Block: shared_count_ 1→0]
+    ↓
+[Object Proxy: shared_count_ 1→0, triggers cleanup]
+    ↓
+[Service Proxy: sp_release(), inner_release_external_ref()]
+    ↓
+[Remote Stub: shared_count_--, delete if == 0]
+    ↓
+[Object Deleted, RPC Calls Return OBJECT_GONE]
+```
+
+This system ensures proper distributed object lifecycle management across all zones while supporting complex multi-zone topologies and circular reference scenarios.
+
+---
+
 ## Error Code System
 
 RPC++ implements a flexible error code system designed for seamless integration with legacy applications. The system allows error codes to be offset to prevent conflicts with existing application error codes.

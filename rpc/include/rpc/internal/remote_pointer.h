@@ -304,15 +304,15 @@ namespace rpc
             // NAMESPACE_INLINE_BEGIN  // Commented out to simplify
             struct control_block_base
             {
-                std::atomic<long> shared_owners{0};
-                std::atomic<long> weak_owners{1};
+                std::atomic<long> shared_count_{0};
+                std::atomic<long> weak_count_{1};
 #ifndef TEST_STL_COMPLIANCE
-                std::atomic<long> optimistic_owners{0};
-                bool is_local = false;
+                std::atomic<long> optimistic_count_{0};
+                bool is_local_ = false;
 #endif
 
             protected:
-                void* managed_object_ptr_{nullptr};
+                void* managed_object_ptr_{nullptr}; // Already has trailing underscore
 
             public:
                 control_block_base(void* obj_ptr)
@@ -322,13 +322,13 @@ namespace rpc
                     rpc::casting_interface* ptr = reinterpret_cast<rpc::casting_interface*>(managed_object_ptr_);
                     if(ptr)
                     {
-                        is_local = ptr->is_local();
+                        is_local_ = ptr->is_local();
                         // CRITICAL: Initialize object_proxy counters to match control block's initial state.
-                        // The control block starts with shared_owners=0, then immediately increments to 1.
+                        // The control block starts with shared_count_=0, then immediately increments to 1.
                         // We need object_proxy to track this so that when control block decrements 1→0,
                         // the object_proxy can aggregate across all interface types and send sp_release
                         // when the total count reaches 0.
-                        if (!is_local)
+                        if (!is_local_)
                         {
                             auto obj_proxy = ptr->get_object_proxy();
                             if (obj_proxy)
@@ -355,39 +355,39 @@ namespace rpc
                 // Synchronous because shared_ptr operations don't need async on shared 0→1 transitions
                 // Called in these scenarios:
                 // 1. Copy from existing shared_ptr (already > 0) - synchronous copy
-                // 2. Construct from weak_ptr (only succeeds if shared_owners > 0) - synchronous lock
+                // 2. Construct from weak_ptr (only succeeds if shared_count_ > 0) - synchronous lock
                 // 3. Construct from raw pointer via acquire_this() (0→1 transition) - synchronous, single-threaded constructor context
                 // 4. Aliasing constructor (already > 0) - synchronous copy
                 //
-                // NOTE: For interface proxies wrapping REMOTE objects (is_local==false), the 0→1 transition happens
+                // NOTE: For interface proxies wrapping REMOTE objects (is_local_==false), the 0→1 transition happens
                 // during shared_ptr<T>(T*) constructor, which is single-threaded and doesn't need async remote call
                 // because the object hasn't been marshalled yet (no remote stub exists).
-                void increment_shared() { shared_owners.fetch_add(1, std::memory_order_relaxed); }
-                void increment_weak() { weak_owners.fetch_add(1, std::memory_order_relaxed); }
+                void increment_shared() { shared_count_.fetch_add(1, std::memory_order_relaxed); }
+                void increment_weak() { weak_count_.fetch_add(1, std::memory_order_relaxed); }
 
                 // Try to increment shared count only if it's not zero (thread-safe)
                 bool try_increment_shared() noexcept
                 {
-                    long current = shared_owners.load(std::memory_order_relaxed);
+                    long current = shared_count_.load(std::memory_order_relaxed);
                     do
                     {
                         if (current == 0)
                         {
                             return false; // Already expired, cannot increment
                         }
-                    } while (!shared_owners.compare_exchange_weak(current, current + 1, std::memory_order_relaxed));
+                    } while (!shared_count_.compare_exchange_weak(current, current + 1, std::memory_order_relaxed));
                     return true;
                 }
 
                 void decrement_shared_and_dispose_if_zero()
                 {
-                    long prev_opt = shared_owners.fetch_sub(1, std::memory_order_relaxed);
+                    long prev_opt = shared_count_.fetch_sub(1, std::memory_order_relaxed);
 
                     if (prev_opt <= 0)
                     {
-                        RPC_ERROR("decrement_shared_and_dispose_if_zero: shared_owners was {} before decrement (now {})",
-                                  prev_opt, shared_owners.load());
-                        RPC_ASSERT(false && "Negative shared_owners count detected");
+                        RPC_ERROR("decrement_shared_and_dispose_if_zero: shared_count_ was {} before decrement (now {})",
+                                  prev_opt, shared_count_.load());
+                        RPC_ASSERT(false && "Negative shared_count_ count detected");
                     }
 
                     if (prev_opt == 1)
@@ -396,8 +396,8 @@ namespace rpc
                         // Call object_proxy release on 1→0 transition for remote objects
                         control_block_call_release(false);
 
-                        // For remote objects, delay disposal until optimistic_owners also reaches 0
-                        if (!is_local && optimistic_owners.load(std::memory_order_acquire) > 0)
+                        // For remote objects, delay disposal until optimistic_count_ also reaches 0
+                        if (!is_local_ && optimistic_count_.load(std::memory_order_acquire) > 0)
                         {
                             // Don't dispose yet - optimistic_ptrs are keeping interface_proxy alive
                             decrement_weak_and_destroy_if_zero();
@@ -411,18 +411,18 @@ namespace rpc
 
                 void decrement_weak_and_destroy_if_zero()
                 {
-                    long prev_weak = weak_owners.fetch_sub(1, std::memory_order_acq_rel);
+                    long prev_weak = weak_count_.fetch_sub(1, std::memory_order_acq_rel);
 
                     if (prev_weak <= 0)
                     {
-                        RPC_ERROR("decrement_weak_and_destroy_if_zero: weak_owners was {} before decrement (now {})",
-                                  prev_weak, weak_owners.load());
-                        RPC_ASSERT(false && "Negative weak_owners count detected");
+                        RPC_ERROR("decrement_weak_and_destroy_if_zero: weak_count_ was {} before decrement (now {})",
+                                  prev_weak, weak_count_.load());
+                        RPC_ASSERT(false && "Negative weak_count_ count detected");
                     }
 
                     if (prev_weak == 1)
                     {
-                        if (shared_owners.load(std::memory_order_acquire) == 0)
+                        if (shared_count_.load(std::memory_order_acquire) == 0)
                         {
                             destroy_self_actual();
                         }
@@ -435,7 +435,7 @@ namespace rpc
                 // Synchronous - no remote calls needed, just local reference counting
                 void increment_optimistic_no_lock() noexcept
                 {
-                    optimistic_owners.fetch_add(1, std::memory_order_relaxed);
+                    optimistic_count_.fetch_add(1, std::memory_order_relaxed);
                 }
 
                 // Safe increment when control block lifetime is uncertain (e.g., converting from shared_ptr/weak_ptr)
@@ -444,7 +444,7 @@ namespace rpc
                 CORO_TASK(int) try_increment_optimistic()
                 {
                     // First, ensure control block stays alive during our operation
-                    long weak_count = weak_owners.load(std::memory_order_relaxed);
+                    long weak_count = weak_count_.load(std::memory_order_relaxed);
 
                     do
                     {
@@ -453,13 +453,13 @@ namespace rpc
                         {
                             CO_RETURN error::OBJECT_GONE();
                         }
-                        // Try to increment weak_owners to keep control block alive
-                    } while (!weak_owners.compare_exchange_weak(weak_count, weak_count + 1,
+                        // Try to increment weak_count_ to keep control block alive
+                    } while (!weak_count_.compare_exchange_weak(weak_count, weak_count + 1,
                                                                  std::memory_order_acquire,
                                                                  std::memory_order_relaxed));
 
-                    // Control block is now guaranteed alive, safe to check optimistic_owners
-                    long prev = optimistic_owners.fetch_add(1, std::memory_order_relaxed);
+                    // Control block is now guaranteed alive, safe to check optimistic_count_
+                    long prev = optimistic_count_.fetch_add(1, std::memory_order_relaxed);
 
                     if (prev == 0)
                     {
@@ -470,11 +470,11 @@ namespace rpc
                         if (err)
                         {
                             // Failed - rollback local state
-                            long prev_rollback = optimistic_owners.fetch_sub(1, std::memory_order_relaxed);
+                            long prev_rollback = optimistic_count_.fetch_sub(1, std::memory_order_relaxed);
                             if (prev_rollback <= 0)
                             {
-                                RPC_ERROR("try_increment_optimistic rollback: optimistic_owners was {} before rollback", prev_rollback);
-                                RPC_ASSERT(false && "Negative optimistic_owners in rollback");
+                                RPC_ERROR("try_increment_optimistic rollback: optimistic_count_ was {} before rollback", prev_rollback);
+                                RPC_ASSERT(false && "Negative optimistic_count_ in rollback");
                             }
                             decrement_weak_and_destroy_if_zero();
                             CO_RETURN err;
@@ -482,8 +482,8 @@ namespace rpc
                     }
                     else
                     {
-                        // Not the first optimistic_ptr: we pre-emptively incremented weak_owners
-                        // Undo that increment since weak_owners is only for control block lifetime
+                        // Not the first optimistic_ptr: we pre-emptively incremented weak_count_
+                        // Undo that increment since weak_count_ is only for control block lifetime
                         decrement_weak_and_destroy_if_zero();
                     }
 
@@ -492,30 +492,30 @@ namespace rpc
 
                 void decrement_optimistic_and_dispose_if_zero() noexcept
                 {
-                    long prev = optimistic_owners.fetch_sub(1, std::memory_order_acq_rel);
+                    long prev = optimistic_count_.fetch_sub(1, std::memory_order_acq_rel);
 
                     if (prev <= 0)
                     {
-                        RPC_ERROR("decrement_optimistic_and_dispose_if_zero: optimistic_owners was {} before decrement (now {})",
-                                  prev, optimistic_owners.load());
-                        RPC_ASSERT(false && "Negative optimistic_owners count detected");
+                        RPC_ERROR("decrement_optimistic_and_dispose_if_zero: optimistic_count_ was {} before decrement (now {})",
+                                  prev, optimistic_count_.load());
+                        RPC_ASSERT(false && "Negative optimistic_count_ count detected");
                     }
 
-                    // If this was the last optimistic_ptr, decrement weak_owners
+                    // If this was the last optimistic_ptr, decrement weak_count_
                     // CRITICAL: This must be done last to prevent control block destruction
-                    // while other threads might be incrementing optimistic_owners
+                    // while other threads might be incrementing optimistic_count_
                     if (prev == 1)
                     {
                         // Call object_proxy release on 1→0 transition for remote objects
                         control_block_call_release(true);
 
-                        // For remote objects, dispose interface_proxy if shared_owners is also 0
-                        if (!is_local && shared_owners.load(std::memory_order_acquire) == 0)
+                        // For remote objects, dispose interface_proxy if shared_count_ is also 0
+                        if (!is_local_ && shared_count_.load(std::memory_order_acquire) == 0)
                         {
                             dispose_object_actual();
                         }
 
-                        // Last optimistic_ptr: decrement the weak_owners that was added by first optimistic_ptr
+                        // Last optimistic_ptr: decrement the weak_count_ that was added by first optimistic_ptr
                         decrement_weak_and_destroy_if_zero();
                     }
                 }
@@ -523,7 +523,7 @@ namespace rpc
                 // Async because object_proxy_add_ref() is async
                 inline CORO_TASK(int) control_block_call_add_ref(rpc::add_ref_options options)
                 {
-                    if (managed_object_ptr_ && !is_local)
+                    if (managed_object_ptr_ && !is_local_)
                     {
                         auto ci = reinterpret_cast<::rpc::casting_interface*>(managed_object_ptr_);
                         if (auto obj_proxy = ci->get_object_proxy())
@@ -536,7 +536,7 @@ namespace rpc
 
                 inline void control_block_call_release(bool is_optimistic) noexcept
                 {
-                    if (managed_object_ptr_ && !is_local)
+                    if (managed_object_ptr_ && !is_local_)
                     {
                         auto ci = reinterpret_cast<::rpc::casting_interface*>(managed_object_ptr_);
                         if (auto obj_proxy = ci->get_object_proxy())
@@ -584,7 +584,7 @@ namespace rpc
 
             template<typename T, typename Deleter> struct control_block_impl_with_deleter : public control_block_base
             {
-                Deleter object_deleter_;
+                Deleter object_deleter_; // Already has trailing underscore
                 control_block_impl_with_deleter(T* p, Deleter d)
                     : control_block_base(to_void_ptr(p))
                     , object_deleter_(std::move(d))
@@ -624,8 +624,8 @@ namespace rpc
             template<typename T, typename Deleter, typename Alloc>
             struct control_block_impl_with_deleter_alloc : public control_block_base
             {
-                Deleter object_deleter_;
-                Alloc control_block_allocator_;
+                Deleter object_deleter_; // Already has trailing underscore
+                Alloc control_block_allocator_; // Already has trailing underscore
                 control_block_impl_with_deleter_alloc(T* p, Deleter d, Alloc a)
                     : control_block_base(to_void_ptr(p))
                     , object_deleter_(std::move(d))
@@ -673,10 +673,10 @@ namespace rpc
             template<typename T, typename Alloc, typename... Args>
             struct control_block_make_shared : public control_block_base
             {
-                Alloc allocator_instance_;
+                Alloc allocator_instance_; // Already has trailing underscore
                 union
                 {
-                    T object_instance_;
+                    T object_instance_; // Already has trailing underscore
                 };
 
                 template<typename... ConcreteArgs>
@@ -1009,7 +1009,15 @@ namespace rpc
             this->swap(temp_T);
         }
 
-        ~shared_ptr() { release_this(); }
+        ~shared_ptr()
+        {
+            release_this();
+#ifdef _MSVC_STL_DESTRUCTOR_TOMBSTONES
+            // Write tombstone markers to detect use-after-destruction
+            ptr_ = reinterpret_cast<T*>(static_cast<uintptr_t>(0xDEADBEEFDEADBEEFULL));
+            cb_ = reinterpret_cast<__rpc_internal::__shared_ptr_control_block::control_block_base*>(static_cast<uintptr_t>(0xDEADBEEFDEADBEEFULL));
+#endif
+        }
         shared_ptr& operator=(const shared_ptr& r) noexcept
         {
             shared_ptr(r).swap(*this);
@@ -1069,7 +1077,7 @@ namespace rpc
             using result_type = std::remove_extent_t<U>;
             return static_cast<result_type*>(ptr_);
         }
-        long use_count() const noexcept { return cb_ ? cb_->shared_owners.load(std::memory_order_relaxed) : 0; }
+        long use_count() const noexcept { return cb_ ? cb_->shared_count_.load(std::memory_order_relaxed) : 0; }
         bool unique() const noexcept { return use_count() == 1; }
         explicit operator bool() const noexcept { return ptr_ != nullptr; }
 
@@ -1316,6 +1324,10 @@ namespace rpc
         {
             if (cb_)
                 cb_->decrement_weak_and_destroy_if_zero();
+#ifdef _MSVC_STL_DESTRUCTOR_TOMBSTONES
+            // Write tombstone markers to detect use-after-destruction
+            cb_ = reinterpret_cast<__rpc_internal::__shared_ptr_control_block::control_block_base*>(static_cast<uintptr_t>(0xDEADBEEFDEADBEEFULL));
+#endif
         }
 
         weak_ptr& operator=(const weak_ptr& r) noexcept
@@ -1351,16 +1363,16 @@ namespace rpc
         {
             if (!cb_)
                 return {};
-            long c = cb_->shared_owners.load(std::memory_order_relaxed);
+            long c = cb_->shared_count_.load(std::memory_order_relaxed);
             while (c > 0)
             {
-                if (cb_->shared_owners.compare_exchange_weak(
+                if (cb_->shared_count_.compare_exchange_weak(
                         c, c + 1, std::memory_order_acq_rel, std::memory_order_relaxed))
                     return shared_ptr<T>(cb_, ptr_for_lock_);
             }
             return {};
         }
-        long use_count() const noexcept { return cb_ ? cb_->shared_owners.load(std::memory_order_relaxed) : 0; }
+        long use_count() const noexcept { return cb_ ? cb_->shared_count_.load(std::memory_order_relaxed) : 0; }
         bool expired() const noexcept
         {
             if (!cb_)
@@ -2122,7 +2134,7 @@ namespace rpc
         }
 
         // Check if this is a local object
-        if (cb->is_local)
+        if (cb->is_local_)
         {
             // Local object: create local_proxy using generated static method
             weak_ptr<T> wp(in);
@@ -2135,8 +2147,8 @@ namespace rpc
             // Remote object: establish optimistic reference (0→1 transition, async!)
 #ifdef USE_RPC_LOGGING
             // TELEMETRY: Check reference counts BEFORE establishing optimistic reference
-            long cb_shared_before = cb->shared_owners.load(std::memory_order_acquire);
-            long cb_optimistic_before = cb->optimistic_owners.load(std::memory_order_acquire);
+            long cb_shared_before = cb->shared_count_.load(std::memory_order_acquire);
+            long cb_optimistic_before = cb->optimistic_count_.load(std::memory_order_acquire);
 
             // Get object_proxy to check inherited counts (service-level stub counts)
             auto casting_iface = reinterpret_cast<rpc::casting_interface*>(in.internal_get_ptr());
@@ -2178,8 +2190,8 @@ namespace rpc
 
 #ifdef USE_RPC_LOGGING
             // TELEMETRY: Check reference counts AFTER establishing optimistic reference
-            long cb_shared_after = cb->shared_owners.load(std::memory_order_acquire);
-            long cb_optimistic_after = cb->optimistic_owners.load(std::memory_order_acquire);
+            long cb_shared_after = cb->shared_count_.load(std::memory_order_acquire);
+            long cb_optimistic_after = cb->optimistic_count_.load(std::memory_order_acquire);
             int inherited_shared_after = 0;
             int inherited_optimistic_after = 0;
             if (obj_proxy)
@@ -2232,7 +2244,7 @@ namespace rpc
         }
 
         // Check if this is a local object
-        if (cb->is_local)
+        if (cb->is_local_)
         {
             // Local object: create local_proxy using generated static method
             out.local_proxy_holder_ = T::create_local_proxy(in);
@@ -2244,8 +2256,8 @@ namespace rpc
             // Remote object: establish optimistic reference (0→1 transition, async!)
 #ifdef USE_RPC_LOGGING
             // TELEMETRY: Check reference counts BEFORE establishing optimistic reference
-            long cb_shared_before = cb->shared_owners.load(std::memory_order_acquire);
-            long cb_optimistic_before = cb->optimistic_owners.load(std::memory_order_acquire);
+            long cb_shared_before = cb->shared_count_.load(std::memory_order_acquire);
+            long cb_optimistic_before = cb->optimistic_count_.load(std::memory_order_acquire);
 
             // Get object_proxy to check inherited counts (service-level stub counts)
             auto casting_iface = reinterpret_cast<rpc::casting_interface*>(in.ptr_);
@@ -2283,8 +2295,8 @@ namespace rpc
 
 #ifdef USE_RPC_LOGGING
             // TELEMETRY: Check reference counts AFTER establishing optimistic reference
-            long cb_shared_after = cb->shared_owners.load(std::memory_order_acquire);
-            long cb_optimistic_after = cb->optimistic_owners.load(std::memory_order_acquire);
+            long cb_shared_after = cb->shared_count_.load(std::memory_order_acquire);
+            long cb_optimistic_after = cb->optimistic_count_.load(std::memory_order_acquire);
             int inherited_shared_after = 0;
             int inherited_optimistic_after = 0;
             if (obj_proxy)

@@ -67,6 +67,11 @@ foreach(test_name ${BUILDABLE_TESTS})
                 TEST_STL_COMPLIANCE
             )
 
+            # Enable destructor tombstones for GH_005315 test
+            if(test_name STREQUAL "GH_005315_destructor_tombstones")
+                target_compile_definitions(${test_name} PRIVATE _MSVC_STL_DESTRUCTOR_TOMBSTONES=1)
+            endif()
+
             # Force include compatibility headers for Microsoft-specific functions
             if(NOT MSVC)
                 target_compile_options(${test_name} PRIVATE
