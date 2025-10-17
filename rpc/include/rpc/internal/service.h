@@ -37,56 +37,8 @@ namespace rpc
     class child_service;
     class service_proxy;
     class casting_interface;
-    struct current_service_tracker;
 
     const object dummy_object_id = {std::numeric_limits<uint64_t>::max()};
-
-    template<class T>
-    CORO_TASK(int)
-    demarshall_interface_proxy(uint64_t protocol_version,
-        const std::shared_ptr<rpc::service_proxy>& sp,
-        const rpc::interface_descriptor& encap,
-        caller_zone caller_zone_id,
-        rpc::shared_ptr<T>& val);
-
-    template<class T>
-    CORO_TASK(rpc::interface_descriptor)
-    create_interface_stub(rpc::service& serv, const rpc::shared_ptr<T>& iface);
-
-    template<class T>
-    CORO_TASK(rpc::interface_descriptor)
-    stub_bind_out_param(rpc::service& zone,
-        uint64_t protocol_version,
-        rpc::caller_channel_zone caller_channel_zone_id,
-        rpc::caller_zone caller_zone_id,
-        const rpc::shared_ptr<T>& iface);
-
-    template<class T>
-    CORO_TASK(rpc::interface_descriptor)
-    proxy_bind_in_param(std::shared_ptr<rpc::object_proxy> object_p,
-        uint64_t protocol_version,
-        const rpc::shared_ptr<T>& iface,
-        std::shared_ptr<rpc::object_stub>& stub);
-
-    class service_logger
-    {
-    public:
-        virtual ~service_logger() = default;
-        virtual void before_send(caller_zone caller_zone_id,
-            object object_id,
-            interface_ordinal interface_id,
-            method method_id,
-            size_t in_size_,
-            const char* in_buf_)
-            = 0;
-        virtual void after_send(caller_zone caller_zone_id,
-            object object_id,
-            interface_ordinal interface_id,
-            method method_id,
-            int ret,
-            const std::vector<char>& out_buf_)
-            = 0;
-    };
 
     class service_event
     {
@@ -134,65 +86,6 @@ namespace rpc
 
         mutable std::mutex zone_control;
         std::map<zone_route, std::weak_ptr<service_proxy>> other_zones;
-        
-        
-         /////////////////////////////////
-        // PRIVATE FUNCTIONS
-        /////////////////////////////////
-        
-        rpc::shared_ptr<casting_interface> get_castable_interface(object object_id, interface_ordinal interface_id);
-
-        void inner_add_zone_proxy(const std::shared_ptr<rpc::service_proxy>& service_proxy);
-        void cleanup_service_proxy(const std::shared_ptr<rpc::service_proxy>& other_zone);
-
-        CORO_TASK(interface_descriptor)
-        prepare_remote_input_interface(caller_channel_zone caller_channel_zone_id,
-            caller_zone caller_zone_id,
-            rpc::casting_interface* base,
-            std::shared_ptr<rpc::service_proxy>& destination_zone);
-
-        CORO_TASK(interface_descriptor)
-        prepare_out_param(uint64_t protocol_version,
-            caller_channel_zone caller_channel_zone_id,
-            caller_zone caller_zone_id,
-            rpc::casting_interface* base);
-
-        CORO_TASK(void)
-        clean_up_on_failed_connection(const std::shared_ptr<rpc::service_proxy>& destination_zone,
-            rpc::shared_ptr<rpc::casting_interface> input_interface);
-
-        friend service_proxy;
-        
-        template<class T>
-        friend CORO_TASK(int) rpc::proxy_bind_out_param(const std::shared_ptr<rpc::service_proxy>& sp,
-            const rpc::interface_descriptor& encap,
-            rpc::caller_zone caller_zone_id,
-            rpc::shared_ptr<T>& val);
-
-        template<class T>
-        friend CORO_TASK(int) rpc::stub_bind_in_param(uint64_t protocol_version,
-            rpc::service& serv,
-            rpc::caller_channel_zone caller_channel_zone_id,
-            rpc::caller_zone caller_zone_id,
-            const rpc::interface_descriptor& encap,
-            rpc::shared_ptr<T>& iface);
-
-        template<class T>
-        friend CORO_TASK(rpc::interface_descriptor)
-            rpc::create_interface_stub(rpc::service& serv, const rpc::shared_ptr<T>& iface);
-
-        template<class T>
-        friend CORO_TASK(rpc::interface_descriptor) rpc::stub_bind_out_param(rpc::service& zone,
-            uint64_t protocol_version,
-            rpc::caller_channel_zone caller_channel_zone_id,
-            rpc::caller_zone caller_zone_id,
-            const rpc::shared_ptr<T>& iface);
-
-        template<class T>
-        friend CORO_TASK(rpc::interface_descriptor) rpc::proxy_bind_in_param(std::shared_ptr<rpc::object_proxy> object_p,
-            uint64_t protocol_version,
-            const rpc::shared_ptr<T>& iface,
-            std::shared_ptr<rpc::object_stub>& stub);
 
     protected:
         struct child_service_tag
@@ -427,7 +320,7 @@ namespace rpc
 
     protected:
         virtual void add_zone_proxy(const std::shared_ptr<rpc::service_proxy>& zone);
-
+    private:
         virtual std::shared_ptr<rpc::service_proxy> get_zone_proxy(caller_channel_zone caller_channel_zone_id,
             caller_zone caller_zone_id,
             destination_zone destination_zone_id,
@@ -462,18 +355,68 @@ namespace rpc
             std::function<std::shared_ptr<rpc::i_interface_stub>(std::shared_ptr<object_stub>)> fn,
             bool outcall,
             std::shared_ptr<object_stub>& stub);
-    };
+            
+        /////////////////////////////////
+        // PRIVATE FUNCTIONS
+        /////////////////////////////////
 
-    // protect the current service local pointer
-    struct current_service_tracker
-    {
-        service* old_service_ = nullptr;
-        current_service_tracker(service* current_service)
-        {
-            old_service_ = service::get_current_service();
-            service::set_current_service(current_service);
-        }
-        ~current_service_tracker() { service::set_current_service(old_service_); }
+        rpc::shared_ptr<casting_interface> get_castable_interface(object object_id, interface_ordinal interface_id);
+
+        void inner_add_zone_proxy(const std::shared_ptr<rpc::service_proxy>& service_proxy);
+        void cleanup_service_proxy(const std::shared_ptr<rpc::service_proxy>& other_zone);
+
+        CORO_TASK(interface_descriptor)
+        prepare_remote_input_interface(caller_channel_zone caller_channel_zone_id,
+            caller_zone caller_zone_id,
+            rpc::casting_interface* base,
+            std::shared_ptr<rpc::service_proxy>& destination_zone);
+
+        CORO_TASK(interface_descriptor)
+        prepare_out_param(uint64_t protocol_version,
+            caller_channel_zone caller_channel_zone_id,
+            caller_zone caller_zone_id,
+            rpc::casting_interface* base);
+
+        CORO_TASK(void)
+        clean_up_on_failed_connection(const std::shared_ptr<rpc::service_proxy>& destination_zone,
+            rpc::shared_ptr<rpc::casting_interface> input_interface);
+            
+        /////////////////////////////////
+        // FRIENDS FUNCTIONS
+        /////////////////////////////////
+
+        friend service_proxy;
+
+        template<class T>
+        friend CORO_TASK(int) rpc::proxy_bind_out_param(const std::shared_ptr<rpc::service_proxy>& sp,
+            const rpc::interface_descriptor& encap,
+            rpc::caller_zone caller_zone_id,
+            rpc::shared_ptr<T>& val);
+
+        template<class T>
+        friend CORO_TASK(int) rpc::stub_bind_in_param(uint64_t protocol_version,
+            rpc::service& serv,
+            rpc::caller_channel_zone caller_channel_zone_id,
+            rpc::caller_zone caller_zone_id,
+            const rpc::interface_descriptor& encap,
+            rpc::shared_ptr<T>& iface);
+
+        template<class T>
+        friend CORO_TASK(rpc::interface_descriptor) rpc::create_interface_stub(
+            rpc::service& serv, const rpc::shared_ptr<T>& iface);
+
+        template<class T>
+        friend CORO_TASK(rpc::interface_descriptor) rpc::stub_bind_out_param(rpc::service& zone,
+            uint64_t protocol_version,
+            rpc::caller_channel_zone caller_channel_zone_id,
+            rpc::caller_zone caller_zone_id,
+            const rpc::shared_ptr<T>& iface);
+
+        template<class T>
+        friend CORO_TASK(rpc::interface_descriptor) rpc::proxy_bind_in_param(std::shared_ptr<rpc::object_proxy> object_p,
+            uint64_t protocol_version,
+            const rpc::shared_ptr<T>& iface,
+            std::shared_ptr<rpc::object_stub>& stub);            
     };
 
     // Child services need to maintain the lifetime of the root object in its zone
@@ -579,28 +522,15 @@ namespace rpc
         };
     };
 
-    template<class T>
-    CORO_TASK(rpc::interface_descriptor)
-    create_interface_stub(rpc::service& serv, const rpc::shared_ptr<T>& iface)
+    // protect the current service local pointer
+    struct current_service_tracker
     {
-        caller_channel_zone empty_caller_channel_zone = {};
-        caller_zone caller_zone_id = serv.get_zone_id().as_caller();
-
-        if (!iface)
+        service* old_service_ = nullptr;
+        current_service_tracker(service* current_service)
         {
-            RPC_ASSERT(false);
-            CO_RETURN{{0}, {0}};
+            old_service_ = service::get_current_service();
+            service::set_current_service(current_service);
         }
-        std::shared_ptr<object_stub> stub;
-        auto factory = serv.create_interface_stub(iface);
-        CO_RETURN CO_AWAIT serv.get_proxy_stub_descriptor(
-            rpc::get_version(), empty_caller_channel_zone, caller_zone_id, iface.get(), factory, false, stub);
-    }
-
-    struct retry_buffer
-    {
-        std::vector<char> data;
-        int return_value;
+        ~current_service_tracker() { service::set_current_service(old_service_); }
     };
-
 }

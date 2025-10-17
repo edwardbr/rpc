@@ -74,32 +74,6 @@ namespace rpc
         std::shared_ptr<rpc::object_proxy> get_object_proxy() const override { return object_proxy_.get_nullable(); }
     };
 
-    // do not use directly it is for the interface generator use rpc::create_interface_proxy if you want to get a proxied pointer to a remote implementation
-    template<class T>
-    CORO_TASK(int)
-    stub_bind_in_param(uint64_t protocol_version,
-        rpc::service& serv,
-        caller_channel_zone caller_channel_zone_id,
-        caller_zone caller_zone_id,
-        const rpc::interface_descriptor& encap,
-        rpc::shared_ptr<T>& iface);
-
-    // do not use directly it is for the interface generator use rpc::create_interface_proxy if you want to get a proxied pointer to a remote implementation
-    template<class T>
-    CORO_TASK(int)
-    proxy_bind_out_param(const std::shared_ptr<rpc::service_proxy>& sp,
-        const rpc::interface_descriptor& encap,
-        caller_zone caller_zone_id,
-        rpc::shared_ptr<T>& val);
-
-    template<class T>
-    CORO_TASK(int)
-    demarshall_interface_proxy(uint64_t protocol_version,
-        const std::shared_ptr<rpc::service_proxy>& sp,
-        const rpc::interface_descriptor& encap,
-        caller_zone caller_zone_id,
-        rpc::shared_ptr<T>& val);
-
     // the route to all fingerprinting
     template<typename T> class id
     {

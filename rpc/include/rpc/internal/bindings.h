@@ -234,4 +234,21 @@ namespace rpc
         CO_RETURN CO_AWAIT op->query_interface(val, false);
     }
 
+    template<class T>
+    CORO_TASK(rpc::interface_descriptor)
+    create_interface_stub(rpc::service& serv, const rpc::shared_ptr<T>& iface)
+    {
+        caller_channel_zone empty_caller_channel_zone = {};
+        caller_zone caller_zone_id = serv.get_zone_id().as_caller();
+
+        if (!iface)
+        {
+            RPC_ASSERT(false);
+            CO_RETURN{{0}, {0}};
+        }
+        std::shared_ptr<object_stub> stub;
+        auto factory = serv.create_interface_stub(iface);
+        CO_RETURN CO_AWAIT serv.get_proxy_stub_descriptor(
+            rpc::get_version(), empty_caller_channel_zone, caller_zone_id, iface.get(), factory, false, stub);
+    }
 }

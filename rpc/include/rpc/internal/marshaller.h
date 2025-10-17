@@ -123,6 +123,12 @@ namespace rpc
             = 0;
     };
 
+    struct retry_buffer
+    {
+        std::vector<char> data;
+        int return_value;
+    };
+
     struct interface_descriptor
     {
         interface_descriptor()
