@@ -76,19 +76,6 @@ namespace rpc
 
     class i_interface_stub
     {
-    protected:
-        // here to be able to call private function
-        template<class T>
-        CORO_TASK(interface_descriptor)
-        stub_bind_out_param(rpc::service& zone,
-            uint64_t protocol_version,
-            caller_channel_zone caller_channel_zone_id,
-            caller_zone caller_zone_id,
-            const shared_ptr<T>& iface)
-        {
-            CO_RETURN CO_AWAIT zone.bind_out_stub(protocol_version, caller_channel_zone_id, caller_zone_id, iface);
-        }
-
     public:
         virtual ~i_interface_stub() = default;
         virtual interface_ordinal get_interface_id(uint64_t rpc_version) const = 0;
@@ -106,5 +93,4 @@ namespace rpc
         virtual void* get_pointer() const = 0;
         virtual rpc::shared_ptr<rpc::casting_interface> get_castable_interface() const = 0;
     };
-
 }

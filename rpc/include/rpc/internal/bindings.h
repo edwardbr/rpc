@@ -4,7 +4,6 @@
  */
 #pragma once
 
-
 #include <rpc/internal/service.h>
 #include <rpc/internal/service_proxy.h>
 
@@ -12,17 +11,18 @@ namespace rpc
 {
     template<class T>
     CORO_TASK(interface_descriptor)
-    casting_interface::proxy_bind_in_param(
-        uint64_t protocol_version, const rpc::shared_ptr<T>& iface, std::shared_ptr<rpc::object_stub>& stub)
+    proxy_bind_in_param(std::shared_ptr<rpc::object_proxy> object_p,
+        uint64_t protocol_version,
+        const rpc::shared_ptr<T>& iface,
+        std::shared_ptr<rpc::object_stub>& stub)
     {
         if (!iface)
             CO_RETURN interface_descriptor();
 
-        auto object_proxy = get_object_proxy();
-        RPC_ASSERT(object_proxy);
-        if (!object_proxy)
+        RPC_ASSERT(object_p);
+        if (!object_p)
             CO_RETURN interface_descriptor();
-        auto operating_service = object_proxy->get_service_proxy()->get_operating_zone_service();
+        auto operating_service = object_p->get_service_proxy()->get_operating_zone_service();
 
         // this is to check that an interface is belonging to another zone and not the operating zone
         if (!iface->is_local()
@@ -34,32 +34,16 @@ namespace rpc
         // else encapsulate away
         CO_RETURN CO_AWAIT operating_service->bind_in_proxy(protocol_version, iface, stub);
     }
-
-    // declared here as object_proxy and service_proxy is not fully defined in the body of interface_proxy
+    
     template<class T>
     CORO_TASK(interface_descriptor)
-    casting_interface::stub_bind_out_param(uint64_t protocol_version,
+    stub_bind_out_param(rpc::service& zone,
+        uint64_t protocol_version,
         caller_channel_zone caller_channel_zone_id,
         caller_zone caller_zone_id,
-        const rpc::shared_ptr<T>& iface)
+        const shared_ptr<T>& iface)
     {
-        if (!iface)
-            CO_RETURN{{0}, {0}};
-
-        auto object_proxy = get_object_proxy();
-        RPC_ASSERT(object_proxy);
-        if (!object_proxy)
-            CO_RETURN{{0}, {0}};
-        auto operating_service = object_proxy->get_service_proxy()->get_operating_zone_service();
-
-        // this is to check that an interface is belonging to another zone and not the operating zone
-        if (!is_local() && casting_interface::get_zone(*iface) != operating_service->get_zone_id())
-        {
-            CO_RETURN{iface->get_object_proxy()->get_object_id(), casting_interface::get_zone(*iface)};
-        }
-
-        // else encapsulate away
-        CO_RETURN operating_service->bind_out_stub(protocol_version, caller_channel_zone_id, caller_zone_id, iface);
+        CO_RETURN CO_AWAIT zone.bind_out_stub(protocol_version, caller_channel_zone_id, caller_zone_id, iface);
     }
 
     // do not use directly it is for the interface generator use rpc::create_interface_proxy if you want to get a proxied pointer to a remote implementation
@@ -80,7 +64,7 @@ namespace rpc
         // if it is local to this service then just get the relevant stub
         else if (serv.get_zone_id().as_destination() == encap.destination_zone_id)
         {
-            iface = serv.template get_local_interface<T>(protocol_version, encap.object_id);
+            iface = rpc::static_pointer_cast<T>(serv.get_castable_interface(encap.object_id, T::get_id(protocol_version)));
             if (!iface)
             {
                 RPC_ERROR("Object not found in local interface lookup");
@@ -105,7 +89,8 @@ namespace rpc
             std::shared_ptr<rpc::object_proxy> op = CO_AWAIT service_proxy->get_or_create_object_proxy(encap.object_id,
                 service_proxy::object_proxy_creation_rule::ADD_REF_IF_NEW,
                 new_proxy_added,
-                caller_zone_id.as_known_direction_zone(), false);
+                caller_zone_id.as_known_direction_zone(),
+                false);
             RPC_ASSERT(op != nullptr);
             if (!op)
             {
@@ -223,10 +208,6 @@ namespace rpc
             RPC_ASSERT(false);
             RPC_ERROR("Invalid data in demarshall_interface_proxy");
             CO_RETURN rpc::error::INVALID_DATA();
-            // val = serv->get_local_interface<T>(protocol_version, encap.object_id);
-            // if(!val)
-            //     return rpc::error::OBJECT_NOT_FOUND();
-            // return rpc::error::OK();
         }
 
         // get the right  service proxy
@@ -237,14 +218,6 @@ namespace rpc
             RPC_ASSERT(false);
             RPC_ERROR("Invalid data in demarshall_interface_proxy");
             CO_RETURN rpc::error::INVALID_DATA();
-
-            // //if the zone is different lookup or clone the right proxy
-            // service_proxy = serv->get_zone_proxy(
-            //     {0},
-            //     caller_zone_id,
-            //     encap.destination_zone_id,
-            //     caller_zone_id,
-            //     new_proxy_added);
         }
 
         if (serv->get_parent_zone_id() == service_proxy->get_destination_zone_id())

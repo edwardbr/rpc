@@ -38,19 +38,6 @@ namespace rpc
         virtual bool is_local() const { return true; }
         virtual std::shared_ptr<rpc::object_proxy> get_object_proxy() const { return nullptr; }
 
-        // in bindings.h
-        template<class T>
-        CORO_TASK(interface_descriptor)
-        proxy_bind_in_param(
-            uint64_t protocol_version, const rpc::shared_ptr<T>& iface, std::shared_ptr<rpc::object_stub>& stub);
-
-        // declared here as object_proxy and service_proxy is not fully defined in the body of interface_proxy
-        template<class T>
-        CORO_TASK(interface_descriptor)
-        stub_bind_out_param(uint64_t protocol_version,
-            caller_channel_zone caller_channel_zone_id,
-            caller_zone caller_zone_id,
-            const rpc::shared_ptr<T>& iface);
 
         static object get_object_id(const casting_interface& iface);
         static std::shared_ptr<rpc::service_proxy> get_service_proxy(const casting_interface& iface);

@@ -53,6 +53,21 @@ namespace rpc
     CORO_TASK(rpc::interface_descriptor)
     create_interface_stub(rpc::service& serv, const rpc::shared_ptr<T>& iface);
 
+    template<class T>
+    CORO_TASK(rpc::interface_descriptor)
+    stub_bind_out_param(rpc::service& zone,
+        uint64_t protocol_version,
+        rpc::caller_channel_zone caller_channel_zone_id,
+        rpc::caller_zone caller_zone_id,
+        const rpc::shared_ptr<T>& iface);
+
+    template<class T>
+    CORO_TASK(rpc::interface_descriptor)
+    proxy_bind_in_param(std::shared_ptr<rpc::object_proxy> object_p,
+        uint64_t protocol_version,
+        const rpc::shared_ptr<T>& iface,
+        std::shared_ptr<rpc::object_stub>& stub);
+
     class service_logger
     {
     public:
@@ -72,7 +87,7 @@ namespace rpc
             const std::vector<char>& out_buf_)
             = 0;
     };
-    
+
     class service_event
     {
     public:
@@ -81,7 +96,7 @@ namespace rpc
     };
 
     // responsible for all object lifetimes created within the zone
-    class service : public i_marshaller, public std::enable_shared_from_this<rpc::service>
+    class service : protected i_marshaller, public std::enable_shared_from_this<rpc::service>
     {
     protected:
         static std::atomic<uint64_t> zone_id_generator;
@@ -97,7 +112,7 @@ namespace rpc
         // map wrapped objects pointers to stubs
         std::map<void*, std::weak_ptr<object_stub>> wrapped_object_to_stub;
         std::string name_;
-        
+
         mutable std::mutex service_events_control;
         std::set<std::weak_ptr<service_event>, std::owner_less<std::weak_ptr<service_event>>> service_events_;
 
@@ -119,25 +134,65 @@ namespace rpc
 
         mutable std::mutex zone_control;
         std::map<zone_route, std::weak_ptr<service_proxy>> other_zones;
-
+        
+        
+         /////////////////////////////////
+        // PRIVATE FUNCTIONS
+        /////////////////////////////////
+        
         rpc::shared_ptr<casting_interface> get_castable_interface(object object_id, interface_ordinal interface_id);
-
-        template<class T>
-        CORO_TASK(interface_descriptor)
-        bind_in_proxy(uint64_t protocol_version, const shared_ptr<T>& iface, std::shared_ptr<rpc::object_stub>& stub);
-        template<class T>
-        CORO_TASK(interface_descriptor)
-        bind_out_stub(uint64_t protocol_version,
-            caller_channel_zone caller_channel_zone_id,
-            caller_zone caller_zone_id,
-            const shared_ptr<T>& iface);
 
         void inner_add_zone_proxy(const std::shared_ptr<rpc::service_proxy>& service_proxy);
         void cleanup_service_proxy(const std::shared_ptr<rpc::service_proxy>& other_zone);
 
-        friend casting_interface;
-        friend i_interface_stub;
-        friend current_service_tracker;
+        CORO_TASK(interface_descriptor)
+        prepare_remote_input_interface(caller_channel_zone caller_channel_zone_id,
+            caller_zone caller_zone_id,
+            rpc::casting_interface* base,
+            std::shared_ptr<rpc::service_proxy>& destination_zone);
+
+        CORO_TASK(interface_descriptor)
+        prepare_out_param(uint64_t protocol_version,
+            caller_channel_zone caller_channel_zone_id,
+            caller_zone caller_zone_id,
+            rpc::casting_interface* base);
+
+        CORO_TASK(void)
+        clean_up_on_failed_connection(const std::shared_ptr<rpc::service_proxy>& destination_zone,
+            rpc::shared_ptr<rpc::casting_interface> input_interface);
+
+        friend service_proxy;
+        
+        template<class T>
+        friend CORO_TASK(int) rpc::proxy_bind_out_param(const std::shared_ptr<rpc::service_proxy>& sp,
+            const rpc::interface_descriptor& encap,
+            rpc::caller_zone caller_zone_id,
+            rpc::shared_ptr<T>& val);
+
+        template<class T>
+        friend CORO_TASK(int) rpc::stub_bind_in_param(uint64_t protocol_version,
+            rpc::service& serv,
+            rpc::caller_channel_zone caller_channel_zone_id,
+            rpc::caller_zone caller_zone_id,
+            const rpc::interface_descriptor& encap,
+            rpc::shared_ptr<T>& iface);
+
+        template<class T>
+        friend CORO_TASK(rpc::interface_descriptor)
+            rpc::create_interface_stub(rpc::service& serv, const rpc::shared_ptr<T>& iface);
+
+        template<class T>
+        friend CORO_TASK(rpc::interface_descriptor) rpc::stub_bind_out_param(rpc::service& zone,
+            uint64_t protocol_version,
+            rpc::caller_channel_zone caller_channel_zone_id,
+            rpc::caller_zone caller_zone_id,
+            const rpc::shared_ptr<T>& iface);
+
+        template<class T>
+        friend CORO_TASK(rpc::interface_descriptor) rpc::proxy_bind_in_param(std::shared_ptr<rpc::object_proxy> object_p,
+            uint64_t protocol_version,
+            const rpc::shared_ptr<T>& iface,
+            std::shared_ptr<rpc::object_stub>& stub);
 
     protected:
         struct child_service_tag
@@ -178,32 +233,15 @@ namespace rpc
         void set_zone_id(zone zone_id) { zone_id_ = zone_id; }
         virtual destination_zone get_parent_zone_id() const { return {0}; }
         virtual std::shared_ptr<rpc::service_proxy> get_parent() const { return nullptr; }
-        
-        void add_service_event(const std::weak_ptr<service_event>& event)
-        {
-            std::lock_guard g(service_events_control);
-            service_events_.insert(event);
-        }
-        void remove_service_event(const std::weak_ptr<service_event>& event)
-        {
-            std::lock_guard g(service_events_control);
-            service_events_.erase(event);
-        }        
-        CORO_TASK(void) notify_object_gone_event(object object_id, destination_zone destination)
-        {
-            if(!service_events_.empty())
-            {
-                auto service_events_copy = service_events_;
-                for(auto se : service_events_copy)
-                {
-                    auto se_handler = se.lock();
-                    if(se_handler)
-                        CO_AWAIT se_handler->on_object_released(object_id, destination);
-                }
-            }
-            CO_RETURN;
-        }
-        
+
+        /////////////////////////////////
+        // NOTIFICATION LOGIC
+        /////////////////////////////////
+        void add_service_event(const std::weak_ptr<service_event>& event);
+        void remove_service_event(const std::weak_ptr<service_event>& event);
+        CORO_TASK(void) notify_object_gone_event(object object_id, destination_zone destination);
+
+        // not implemented in the base service class only for child_service
         virtual bool set_parent_proxy(const std::shared_ptr<rpc::service_proxy>&)
         {
             RPC_ASSERT(false);
@@ -212,85 +250,6 @@ namespace rpc
 
         // passed by value implementing an implicit lock on the life time of ptr
         object get_object_id(const shared_ptr<casting_interface>& ptr) const;
-
-        CORO_TASK(interface_descriptor)
-        prepare_out_param(uint64_t protocol_version,
-            caller_channel_zone caller_channel_zone_id,
-            caller_zone caller_zone_id,
-            rpc::casting_interface* base);
-        CORO_TASK(interface_descriptor)
-        get_proxy_stub_descriptor(uint64_t protocol_version,
-            caller_channel_zone caller_channel_zone_id,
-            caller_zone caller_zone_id,
-            rpc::casting_interface* pointer,
-            std::function<std::shared_ptr<rpc::i_interface_stub>(std::shared_ptr<object_stub>)> fn,
-            bool outcall,
-            std::shared_ptr<object_stub>& stub);
-
-        std::weak_ptr<object_stub> get_object(object object_id) const;
-
-        CORO_TASK(int)
-        send(uint64_t protocol_version,
-            encoding encoding,
-            uint64_t tag,
-            caller_channel_zone caller_channel_zone_id,
-            caller_zone caller_zone_id,
-            destination_zone destination_zone_id,
-            object object_id,
-            interface_ordinal interface_id,
-            method method_id,
-            size_t in_size_,
-            const char* in_buf_,
-            std::vector<char>& out_buf_) override;
-        CORO_TASK(int)
-        try_cast(uint64_t protocol_version,
-            destination_zone destination_zone_id,
-            object object_id,
-            interface_ordinal interface_id) override;
-        CORO_TASK(int)
-        add_ref(uint64_t protocol_version,
-            destination_channel_zone destination_channel_zone_id,
-            destination_zone destination_zone_id,
-            object object_id,
-            caller_channel_zone caller_channel_zone_id,
-            caller_zone caller_zone_id,
-            known_direction_zone known_direction_zone_id,
-            add_ref_options build_out_param_channel,
-            uint64_t& reference_count) override;
-        CORO_TASK(int)
-        release(uint64_t protocol_version,
-            destination_zone destination_zone_id,
-            object object_id,
-            caller_zone caller_zone_id,
-            release_options options,
-            uint64_t& reference_count) override;
-
-        uint64_t release_local_stub(const std::shared_ptr<object_stub>& stub, bool is_optimistic);
-
-        virtual void add_zone_proxy(const std::shared_ptr<rpc::service_proxy>& zone);
-        virtual std::shared_ptr<rpc::service_proxy> get_zone_proxy(caller_channel_zone caller_channel_zone_id,
-            caller_zone caller_zone_id,
-            destination_zone destination_zone_id,
-            caller_zone new_caller_zone_id,
-            bool& new_proxy_added);
-        virtual void remove_zone_proxy(destination_zone destination_zone_id, caller_zone caller_zone_id);
-        virtual void remove_zone_proxy_if_not_used(destination_zone destination_zone_id, caller_zone caller_zone_id);
-        template<class T> rpc::shared_ptr<T> get_local_interface(uint64_t protocol_version, object object_id)
-        {
-            return rpc::static_pointer_cast<T>(get_castable_interface(object_id, T::get_id(protocol_version)));
-        }
-
-        CORO_TASK(interface_descriptor)
-        prepare_remote_input_interface(caller_channel_zone caller_channel_zone_id,
-            caller_zone caller_zone_id,
-            rpc::casting_interface* base,
-            std::shared_ptr<rpc::service_proxy>& destination_zone);
-
-        CORO_TASK(void)
-        clean_up_on_failed_connection(const std::shared_ptr<rpc::service_proxy>& destination_zone,
-            rpc::shared_ptr<rpc::casting_interface> input_interface);
-
-        // int decrement_reference_count(const std::shared_ptr<rpc::service_proxy>& proxy, int ref_count);
 
         template<class proxy_class, class in_param_type, class out_param_type, typename... Args>
         CORO_TASK(int)
@@ -400,20 +359,109 @@ namespace rpc
             CO_RETURN rpc::error::OK();
         }
 
-        template<class T>
-        std::function<std::shared_ptr<rpc::i_interface_stub>(const std::shared_ptr<object_stub>& stub)>
-        create_interface_stub(const shared_ptr<T>& iface);
-        int create_interface_stub(rpc::interface_ordinal interface_id,
-            std::function<interface_ordinal(uint8_t)> original_interface_id,
-            const std::shared_ptr<rpc::i_interface_stub>& original,
-            std::shared_ptr<rpc::i_interface_stub>& new_stub);
+        // protected:
+        /////////////////////////////////
+        // i_marshaller LOGIC
+        /////////////////////////////////
+
+        CORO_TASK(int)
+        send(uint64_t protocol_version,
+            encoding encoding,
+            uint64_t tag,
+            caller_channel_zone caller_channel_zone_id,
+            caller_zone caller_zone_id,
+            destination_zone destination_zone_id,
+            object object_id,
+            interface_ordinal interface_id,
+            method method_id,
+            size_t in_size_,
+            const char* in_buf_,
+            std::vector<char>& out_buf_) override;
+        CORO_TASK(int)
+        try_cast(uint64_t protocol_version,
+            destination_zone destination_zone_id,
+            object object_id,
+            interface_ordinal interface_id) override;
+        CORO_TASK(int)
+        add_ref(uint64_t protocol_version,
+            destination_channel_zone destination_channel_zone_id,
+            destination_zone destination_zone_id,
+            object object_id,
+            caller_channel_zone caller_channel_zone_id,
+            caller_zone caller_zone_id,
+            known_direction_zone known_direction_zone_id,
+            add_ref_options build_out_param_channel,
+            uint64_t& reference_count) override;
+        CORO_TASK(int)
+        release(uint64_t protocol_version,
+            destination_zone destination_zone_id,
+            object object_id,
+            caller_zone caller_zone_id,
+            release_options options,
+            uint64_t& reference_count) override;
+
+    public:
+        /////////////////////////////////
+        // STUB LOGIC
+        /////////////////////////////////
 
         // note this function is not thread safe!  Use it before using the service class for normal operation
         void add_interface_stub_factory(std::function<interface_ordinal(uint8_t)> id_getter,
             std::shared_ptr<std::function<std::shared_ptr<rpc::i_interface_stub>(const std::shared_ptr<rpc::i_interface_stub>&)>>
                 factory);
 
-        friend service_proxy;
+        template<class T>
+        std::function<std::shared_ptr<rpc::i_interface_stub>(const std::shared_ptr<object_stub>& stub)>
+        create_interface_stub(const shared_ptr<T>& iface);
+
+        int create_interface_stub(rpc::interface_ordinal interface_id,
+            std::function<interface_ordinal(uint8_t)> original_interface_id,
+            const std::shared_ptr<rpc::i_interface_stub>& original,
+            std::shared_ptr<rpc::i_interface_stub>& new_stub);
+
+        uint64_t release_local_stub(const std::shared_ptr<object_stub>& stub, bool is_optimistic);
+
+        /////////////////////////////////
+        // SERVICE PROXY LOGIC
+        /////////////////////////////////
+
+    protected:
+        virtual void add_zone_proxy(const std::shared_ptr<rpc::service_proxy>& zone);
+
+        virtual std::shared_ptr<rpc::service_proxy> get_zone_proxy(caller_channel_zone caller_channel_zone_id,
+            caller_zone caller_zone_id,
+            destination_zone destination_zone_id,
+            caller_zone new_caller_zone_id,
+            bool& new_proxy_added);
+        virtual void remove_zone_proxy(destination_zone destination_zone_id, caller_zone caller_zone_id);
+
+        virtual void remove_zone_proxy_if_not_used(destination_zone destination_zone_id, caller_zone caller_zone_id);
+
+        /////////////////////////////////
+        // BINDING LOGIC
+        /////////////////////////////////
+
+        std::weak_ptr<object_stub> get_object(object object_id) const;
+
+        template<class T>
+        CORO_TASK(interface_descriptor)
+        bind_in_proxy(uint64_t protocol_version, const shared_ptr<T>& iface, std::shared_ptr<rpc::object_stub>& stub);
+
+        template<class T>
+        CORO_TASK(interface_descriptor)
+        bind_out_stub(uint64_t protocol_version,
+            caller_channel_zone caller_channel_zone_id,
+            caller_zone caller_zone_id,
+            const shared_ptr<T>& iface);
+
+        CORO_TASK(interface_descriptor)
+        get_proxy_stub_descriptor(uint64_t protocol_version,
+            caller_channel_zone caller_channel_zone_id,
+            caller_zone caller_zone_id,
+            rpc::casting_interface* pointer,
+            std::function<std::shared_ptr<rpc::i_interface_stub>(std::shared_ptr<object_stub>)> fn,
+            bool outcall,
+            std::shared_ptr<object_stub>& stub);
     };
 
     // protect the current service local pointer

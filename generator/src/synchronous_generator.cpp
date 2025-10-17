@@ -435,7 +435,7 @@ namespace synchronous_generator
         case PROXY_PREPARE_IN_INTERFACE_ID:
             return fmt::format(
                 "RPC_ASSERT(rpc::are_in_same_zone(this, {0}.get()));\n"
-                "\t\t\tauto {0}_stub_id_ = CO_AWAIT proxy_bind_in_param(__rpc_sp->get_remote_rpc_version(), "
+                "\t\t\tauto {0}_stub_id_ = CO_AWAIT rpc::proxy_bind_in_param(get_object_proxy(), __rpc_sp->get_remote_rpc_version(), "
                 "{0}, {0}_stub_);",
                 name);
         case PROXY_MARSHALL_IN:
@@ -519,7 +519,7 @@ namespace synchronous_generator
         case PROXY_PREPARE_IN_INTERFACE_ID:
             return fmt::format(
                 "RPC_ASSERT(rpc::are_in_same_zone(this, {0}.get()));\n"
-                "\t\t\tauto {0}_stub_id_ = CO_AWAIT proxy_bind_in_param(__rpc_sp->get_remote_rpc_version(), "
+                "\t\t\tauto {0}_stub_id_ = CO_AWAIT rpc::proxy_bind_in_param(get_object_proxy(), __rpc_sp->get_remote_rpc_version(), "
                 "{0}, {0}_stub_);",
                 name);
         case PROXY_MARSHALL_IN:
@@ -547,7 +547,7 @@ namespace synchronous_generator
         case STUB_ADD_REF_OUT_PREDECLARE:
             return fmt::format("rpc::interface_descriptor {0}_;", name);
         case STUB_ADD_REF_OUT:
-            return fmt::format("{0}_ = CO_AWAIT stub_bind_out_param(zone_, protocol_version, "
+            return fmt::format("{0}_ = CO_AWAIT rpc::stub_bind_out_param(zone_, protocol_version, "
                                "caller_channel_zone_id, caller_zone_id, {0});",
                 name);
         case STUB_MARSHALL_OUT:

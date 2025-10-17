@@ -1677,7 +1677,32 @@ namespace rpc
             return nullptr;
         return interface_stub->get_castable_interface();
     }
-
+    
+    void service::add_service_event(const std::weak_ptr<service_event>& event)
+    {
+        std::lock_guard g(service_events_control);
+        service_events_.insert(event);
+    }
+    void service::remove_service_event(const std::weak_ptr<service_event>& event)
+    {
+        std::lock_guard g(service_events_control);
+        service_events_.erase(event);
+    }        
+    CORO_TASK(void) service::notify_object_gone_event(object object_id, destination_zone destination)
+    {
+        if(!service_events_.empty())
+        {
+            auto service_events_copy = service_events_;
+            for(auto se : service_events_copy)
+            {
+                auto se_handler = se.lock();
+                if(se_handler)
+                    CO_AWAIT se_handler->on_object_released(object_id, destination);
+            }
+        }
+        CO_RETURN;
+    }
+     
     child_service::~child_service()
     {
         if (parent_service_proxy_)
