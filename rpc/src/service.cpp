@@ -127,12 +127,6 @@ namespace rpc
         return {};
     }
 
-    bool service::has_service_proxies() const
-    {
-        std::lock_guard l(zone_control);
-        return !other_zones.empty();
-    }
-
     bool service::check_is_empty() const
     {
         std::lock_guard l(stub_control);

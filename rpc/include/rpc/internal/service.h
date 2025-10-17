@@ -117,15 +117,16 @@ namespace rpc
         // we are using a pointer as this is a thread local variable it will not change mid stream, only use this function when servicing an rpc call
         static service* get_current_service();
         static void set_current_service(service* svc);
+        
         object generate_new_object_id() const;
+        
         std::string get_name() const { return name_; }
+        zone get_zone_id() const { return zone_id_; }
 
         virtual bool check_is_empty() const;
-        virtual bool has_service_proxies() const;
-        zone get_zone_id() const { return zone_id_; }
-        void set_zone_id(zone zone_id) { zone_id_ = zone_id; }
-        virtual destination_zone get_parent_zone_id() const { return {0}; }
+        
         virtual std::shared_ptr<rpc::service_proxy> get_parent() const { return nullptr; }
+        virtual destination_zone get_parent_zone_id() const { return {0}; }
 
         /////////////////////////////////
         // NOTIFICATION LOGIC
@@ -428,6 +429,10 @@ namespace rpc
         std::shared_ptr<rpc::service_proxy> parent_service_proxy_;
         destination_zone parent_zone_id_;
 
+        std::shared_ptr<rpc::service_proxy> get_parent() const override { return parent_service_proxy_; }
+        destination_zone get_parent_zone_id() const override { return parent_zone_id_; }
+        bool set_parent_proxy(const std::shared_ptr<rpc::service_proxy>& parent_service_proxy) override;
+
     public:
 #ifdef BUILD_COROUTINE
         explicit child_service(const char* name,
@@ -447,11 +452,6 @@ namespace rpc
 #endif
 
         virtual ~child_service();
-
-        std::shared_ptr<rpc::service_proxy> get_parent() const override { return parent_service_proxy_; }
-        bool set_parent_proxy(const std::shared_ptr<rpc::service_proxy>& parent_service_proxy) override;
-
-        destination_zone get_parent_zone_id() const override { return parent_zone_id_; }
 
         template<class SERVICE_PROXY, class PARENT_INTERFACE, class CHILD_INTERFACE, typename... Args>
         static CORO_TASK(int) create_child_zone(const char* name,
