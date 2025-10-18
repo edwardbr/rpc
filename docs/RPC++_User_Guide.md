@@ -21,10 +21,11 @@ All rights reserved.
 6. [Error Code System](#error-code-system)
 7. [Wire Protocol and Backward Compatibility](#wire-protocol-and-backward-compatibility)
 8. [Transport Layer](#transport-layer)
-9. [Build System and Configuration](#build-system-and-configuration)
-10. [Logging and Telemetry](#logging-and-telemetry)
-11. [Advanced Features](#advanced-features)
-12. [Best Practices](#best-practices)
+9. [Child Services and Service Proxy Architecture](#child-services-and-service-proxy-architecture)
+10. [Build System and Configuration](#build-system-and-configuration)
+11. [Logging and Telemetry](#logging-and-telemetry)
+12. [Advanced Features](#advanced-features)
+13. [Best Practices](#best-practices)
 
 ---
 
@@ -1398,6 +1399,467 @@ public:
                            caller_zone caller_zone_id) = 0;
 };
 ```
+
+---
+
+## Child Services and Service Proxy Architecture
+
+### Child Service Lifecycle and Parent Relationships
+
+**Child services** (`rpc::child_service`) are zones that have a parent-child relationship with their creating service. Understanding their lifecycle management is critical for proper resource cleanup and preventing DLL unloading issues.
+
+#### Parent Service Proxy Keepalive
+
+**Critical Design Principle**: Child services maintain a `shared_ptr` to a **parent service proxy** (`local_service_proxy`) that keeps the parent service alive for the entire lifetime of the child zone.
+
+```cpp
+class child_service {
+    // Keeps parent service alive
+    std::shared_ptr<local_service_proxy> parent_service_proxy_;
+
+    // Child's own service instance
+    std::shared_ptr<rpc::service> service_;
+};
+```
+
+**Why This Matters**:
+- Child zone must ensure parent remains alive while child is active
+- Parent service proxy provides communication channel back to parent
+- Prevents premature parent service destruction
+- **DLL Safety**: Critical for preventing parent DLL unload while child threads are active
+
+#### Child Service Shutdown Sequence
+
+A child service shuts itself down and releases the parent service proxy when **ALL** of the following conditions are met:
+
+1. **No External Shared References**: All external shared references to objects in the child zone == 0
+   - **Note**: Incoming optimistic references do NOT prevent shutdown
+2. **No Internal References**: All internal references (both shared and optimistic) from the child to objects in other zones == 0
+   - **Critical**: Outgoing optimistic references DO prevent shutdown
+3. **No Routing Links**: The child is not acting as an intermediate routing node between other services
+
+**Critical Distinction - Reference Directionality**:
+- **Incoming optimistic references** (other zones holding optimistic pointers TO this service): Do NOT prevent shutdown. The service may die even if external zones hold optimistic references to its objects.
+- **Outgoing optimistic references** (this service holding optimistic pointers TO remote objects): DO prevent shutdown. If the service has active optimistic pointers to remote objects, it may not shut down.
+
+**Shutdown Trigger**:
+```cpp
+// Child service monitors reference counts in both directions
+if (all_external_shared_refs_to_child == 0 &&  // Incoming shared only (optimistic don't matter)
+    all_internal_refs_from_child == 0 &&       // Outgoing (shared + optimistic) - MUST be 0!
+    !is_routing_intermediary)
+{
+    // Safe to shut down
+    // Service may die even if other zones hold optimistic refs TO it
+    // But CANNOT die if it holds optimistic refs TO other zones
+    // 1. Complete all pending operations
+    // 2. Release all resources
+    // 3. Release parent_service_proxy_ (may trigger parent cleanup)
+    // 4. Destroy child service
+}
+```
+
+#### DLL Unloading Safety
+
+**Critical Requirement**: If a child zone is implemented in a DLL or shared object, the parent service **MUST NOT** unload that DLL until:
+
+1. Child service has completed shutdown
+2. Child service garbage collection is complete
+3. **All threads have returned from the DLL code**
+
+**Reference Implementation**: The `enclave_service_proxy` already has cleanup logic for similar scenarios (waiting for threads to exit enclave, ensuring all ecalls/ocalls complete, graceful cleanup before destroying enclave). This pattern should be adapted for DLL service proxies.
+
+**Implementation Pattern**:
+```cpp
+// Parent service holding child in DLL
+class parent_service_manager {
+    std::shared_ptr<rpc::child_service> dll_child_;
+    void* dll_handle_;  // DLL/SO handle
+
+    ~parent_service_manager() {
+        // 1. Release child service reference
+        dll_child_.reset();
+
+        // 2. Wait for child garbage collection
+        //    (child destructor completes, threads return)
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+        // 3. Ensure no threads are in DLL code
+        //    (implementation-specific synchronization)
+
+        // 4. NOW safe to unload DLL
+        if (dll_handle_) {
+            dlclose(dll_handle_);  // or FreeLibrary() on Windows
+        }
+    }
+};
+```
+
+**Thread Safety**:
+- Parent must not call `dlclose()` / `FreeLibrary()` while child threads may be active
+- Child service destructor must complete before DLL unload
+- Race condition if DLL unloads before threads return from child code
+- May require explicit synchronization (barriers, join points)
+
+### Service Proxy Type Classification
+
+RPC++ provides different service proxy types optimized for specific transport scenarios. Understanding their characteristics is essential for choosing the correct proxy type.
+
+#### Local Service Proxies (In-Process, Bi-Modal)
+
+**`local_service_proxy`**: Child → Parent communication
+**`local_child_service_proxy`**: Parent → Child communication
+
+**Key Characteristics**:
+- **Simplest proxies**: Minimal wiring, direct function calls
+- **Bi-modal execution**: Work in both synchronous (`BUILD_COROUTINE=OFF`) and coroutine (`BUILD_COROUTINE=ON`) modes
+- **In-process only**: Both zones must be in the same process
+- **No channel object**: Direct communication without intermediate transport layer
+- **Parent-child relationship**: Managed lifecycle with automatic cleanup
+
+**Usage Example**:
+```cpp
+// Parent creates child zone
+rpc::shared_ptr<i_calculator> child_calc;
+auto error = CO_AWAIT parent_service->connect_to_zone<
+    rpc::local_child_service_proxy<i_parent, i_calculator>>(
+    "calc_zone",
+    rpc::zone{2},
+    rpc::shared_ptr<i_parent>(),  // No parent interface passed to child
+    child_calc,                    // Child returns calculator interface
+    setup_callback);
+
+// Child can access parent through local_service_proxy (implicit)
+```
+
+**When to Use**:
+- In-process communication between parent and child zones
+- Testing and debugging (simpler than network transports)
+- Embedded systems or constrained environments
+- When coroutines are not available
+
+#### SPSC Service Proxies (Inter-Process, Coroutine-Only)
+
+**`spsc::service_proxy`**: Single Producer Single Consumer queue-based transport
+
+**Key Characteristics**:
+- **Coroutine-only**: Requires `BUILD_COROUTINE=ON`
+- **High-performance**: Lock-free queues for inter-process communication
+- **Channel object required**: Uses `spsc::channel_manager` to manage bidirectional queues
+- **Sender/receiver pairs**: Dedicated sender and receiver threads/tasks pumping queues
+- **Unreliable transport handling**: Must handle connection loss and recovery
+
+**Channel Manager Architecture**:
+```cpp
+class spsc::channel_manager {
+    // Bidirectional SPSC queues
+    queue_type* send_spsc_queue_;     // This zone → Remote zone
+    queue_type* receive_spsc_queue_;  // Remote zone → This zone
+
+    // Async pump tasks
+    coro::task<void> send_pump_task();
+    coro::task<void> receive_pump_task();
+
+    // Service proxy registration
+    std::atomic<int> service_proxy_ref_count_{0};
+    void attach_service_proxy();
+    coro::task<void> detach_service_proxy();
+};
+```
+
+**Usage Example**:
+```cpp
+#ifdef BUILD_COROUTINE
+// Create bidirectional SPSC queues
+auto send_queue = create_spsc_queue();
+auto receive_queue = create_spsc_queue();
+
+// Attach to peer zone
+auto error = CO_AWAIT service->attach_remote_zone<
+    rpc::spsc::service_proxy, i_host, i_remote>(
+    "peer_zone",
+    input_descriptor,
+    output_descriptor,
+    setup_callback,
+    timeout_ms,
+    &send_queue,
+    &receive_queue);
+#endif
+```
+
+**When to Use**:
+- High-throughput inter-process communication
+- Shared memory transport between processes
+- When coroutines are available
+- Performance-critical message passing
+
+**Channel Object Responsibilities**:
+- Manage bidirectional queue pair
+- Pump messages between queues and RPC layer
+- Handle connection lifecycle (setup, teardown, error recovery)
+- Coordinate shutdown between both directions
+
+#### TCP Service Proxies (Network, Coroutine-Only)
+
+**`tcp::service_proxy`**: Network-based TCP transport
+
+**Key Characteristics**:
+- **Coroutine-only**: Requires `BUILD_COROUTINE=ON`
+- **Network communication**: TCP sockets for remote machine communication
+- **Channel object required**: Manages socket I/O and message framing
+- **Sender/receiver pairs**: Async send/receive tasks for non-blocking I/O
+- **Unreliable transport**: Must handle network disconnects, timeouts, retries
+
+**Channel Manager Pattern** (similar to SPSC):
+```cpp
+class tcp::channel_manager {
+    // Socket and I/O state
+    int socket_fd_;
+    std::vector<char> send_buffer_;
+    std::vector<char> receive_buffer_;
+
+    // Async I/O tasks
+    coro::task<void> send_pump_task();
+    coro::task<void> receive_pump_task();
+
+    // Connection management
+    coro::task<void> handle_disconnect();
+    coro::task<void> reconnect();
+};
+```
+
+**Usage Example**:
+```cpp
+#ifdef BUILD_COROUTINE
+// Connect to remote host over TCP
+auto error = CO_AWAIT service->connect_to_zone<rpc::tcp::service_proxy>(
+    "remote_host",
+    remote_zone_id,
+    local_interface,
+    remote_interface,
+    "192.168.1.100",  // IP address
+    8080,              // Port
+    timeout_ms);
+#endif
+```
+
+**When to Use**:
+- Communication across network boundaries
+- Remote machine RPC calls
+- Distributed systems
+- Cloud deployments
+
+**Channel Object Responsibilities**:
+- Manage TCP socket lifecycle (connect, disconnect, reconnect)
+- Frame and deframe messages over byte stream
+- Handle send/receive queuing and flow control
+- Coordinate graceful shutdown with pending I/O
+
+#### SGX Enclave Service Proxies (Secure Enclaves, Hybrid Mode)
+
+**`enclave_service_proxy`**: Host → Enclave communication
+**`host_service_proxy`**: Enclave → Host communication
+
+**Synchronous Mode** (`BUILD_COROUTINE=OFF`):
+- **Direct SGX EDL calls**: Uses `ecall` (host→enclave) and `ocall` (enclave→host)
+- **Inefficient**: Each call crosses enclave boundary synchronously
+- **Thread limitations**: Limited number of threads can exist in enclave simultaneously
+- **Simple**: No channel object needed, direct calls
+
+**Coroutine Mode** (`BUILD_COROUTINE=ON`):
+- **Hybrid approach**: Initial `ecall` to set up executor and SPSC channel
+- **SPSC transport**: After setup, uses `spsc::channel_manager` for communication
+- **Thread pool**: Enclave creates its own executor with thread pool
+- **Shared channel**: `host_service_proxy` shares the `enclave_service_proxy`'s channel
+
+**Setup Sequence (Coroutine Mode)**:
+```cpp
+#ifdef BUILD_COROUTINE
+// 1. Host makes initial ecall into enclave
+auto error = CO_AWAIT service->connect_to_zone<rpc::enclave_service_proxy>(
+    "secure_enclave",
+    rpc::zone{enclave_zone_id},
+    host_interface,
+    enclave_interface,
+    enclave_path);
+
+// 2. Inside enclave (setup callback):
+//    - Create enclave service with its own executor/thread pool
+//    - Set up SPSC channel manager (shared memory queues)
+//    - Create enclave_service_proxy (host→enclave) using channel
+//    - Create host_service_proxy (enclave→host) sharing the SAME channel
+//    - Return enclave interface to host
+
+// 3. After setup:
+//    - All communication flows through SPSC channel
+//    - No more ecalls/ocalls for RPC (only for setup/teardown)
+//    - Enclave thread pool services requests asynchronously
+#endif
+```
+
+**Why Coroutine Mode Uses SPSC**:
+- **Efficiency**: Avoids repeated expensive ecall/ocall overhead
+- **Concurrency**: Enclave thread pool can handle multiple requests
+- **Thread limits**: SGX enclave thread limits don't block host threads
+- **Performance**: SPSC queue is much faster than enclave boundary crossing
+
+**Synchronous Mode Limitations**:
+```cpp
+// Each call crosses enclave boundary
+auto result = enclave->calculate(a, b);  // ecall overhead
+auto data = enclave->get_data();         // another ecall
+auto status = enclave->process(data);    // another ecall
+// Hundreds of microseconds per call
+```
+
+**Coroutine Mode Benefits**:
+```cpp
+#ifdef BUILD_COROUTINE
+// Calls queued in SPSC, processed by enclave thread pool
+auto result = CO_AWAIT enclave->calculate(a, b);  // SPSC queue
+auto data = CO_AWAIT enclave->get_data();         // SPSC queue
+auto status = CO_AWAIT enclave->process(data);    // SPSC queue
+// Microseconds per call (no ecall overhead)
+#endif
+```
+
+**When to Use**:
+- Intel SGX secure enclaves
+- Trusted execution environments
+- Hardware-protected computation
+- Security-critical operations
+
+**Channel Sharing Architecture**:
+```
+Host Zone                Enclave Zone
+    │                         │
+    ├─ enclave_service_proxy  │
+    │  (uses channel_manager) │
+    │         │                │
+    │         ▼                │
+    │    SPSC Channel ◄────────┼─ Shared by both proxies
+    │         ▲                │
+    │         │                │
+    │         └────────────────┼─ host_service_proxy
+    │                          │  (shares channel_manager)
+    │                         │
+```
+
+### Service Proxy Type Comparison Matrix
+
+| Feature | Local | SPSC | TCP | Enclave (Sync) | Enclave (Coro) |
+|---------|-------|------|-----|----------------|----------------|
+| **Coroutine Requirement** | Optional | Required | Required | Optional | Required |
+| **Channel Object** | ❌ No | ✅ Yes | ✅ Yes | ❌ No | ✅ Yes (SPSC) |
+| **Transport** | Direct calls | Shared memory queues | TCP sockets | SGX ecall/ocall | SPSC + initial ecall |
+| **Sender/Receiver Pairs** | ❌ No | ✅ Yes | ✅ Yes | ❌ No | ✅ Yes |
+| **Reliability** | Always reliable | Reliable (in-process) | Unreliable (network) | Reliable | Reliable |
+| **Performance** | Highest (direct) | Very high (lock-free) | Network latency | Low (ecall overhead) | High (SPSC) |
+| **Thread Pool** | Not needed | Not needed | Not needed | Limited | Enclave executor |
+| **Use Case** | Parent-child zones | Inter-process | Remote machines | Simple enclave | Efficient enclave |
+
+### Channel Object Design Patterns
+
+Services proxies that require **channel objects** (`spsc::service_proxy`, `tcp::service_proxy`, and `enclave_service_proxy` in coroutine mode) follow a common architectural pattern:
+
+#### Channel Manager Responsibilities
+
+1. **Bidirectional Communication**:
+   - Manage send and receive paths independently
+   - Coordinate message framing and deframing
+   - Handle flow control and backpressure
+
+2. **Async I/O Pump Tasks**:
+   - Sender task: Pull messages from RPC layer, write to transport
+   - Receiver task: Read from transport, push messages to RPC layer
+   - Run as coroutines scheduled on executor
+
+3. **Service Proxy Registration**:
+   - Track how many service proxies are using the channel
+   - Keep channel alive while any proxy references it
+   - Initiate shutdown when last proxy detaches
+
+4. **Graceful Shutdown**:
+   - Wait for in-flight operations to complete
+   - Flush pending messages
+   - Close transport cleanly
+   - Release resources
+
+#### Channel Lifecycle Pattern
+
+```cpp
+class channel_manager {
+    // Reference counting for service proxies
+    std::atomic<int> service_proxy_ref_count_{0};
+    std::atomic<int> operations_in_flight_{0};
+
+    // Attach service proxy (called when proxy created)
+    void attach_service_proxy() {
+        ++service_proxy_ref_count_;
+    }
+
+    // Detach service proxy (called when proxy destroyed)
+    CORO_TASK(void) detach_service_proxy() {
+        if (--service_proxy_ref_count_ == 0) {
+            // Last proxy detached - initiate shutdown
+            CO_AWAIT shutdown();
+        }
+    }
+
+    // Graceful shutdown sequence
+    CORO_TASK(void) shutdown() {
+        // 1. Stop accepting new operations
+        shutting_down_ = true;
+
+        // 2. Wait for in-flight operations
+        while (operations_in_flight_ > 0) {
+            CO_AWAIT scheduler_->schedule();  // Yield
+        }
+
+        // 3. Flush pending messages
+        CO_AWAIT flush_pending();
+
+        // 4. Close transport
+        close_transport();
+
+        // 5. Release resources
+        cleanup();
+    }
+};
+```
+
+### Best Practices for Service Proxy Selection
+
+#### Use `local_child_service_proxy` when:
+- ✅ Communication is within the same process
+- ✅ Parent-child relationship with managed lifecycle
+- ✅ Simplicity is more important than async I/O
+- ✅ Coroutines may not be available
+- ✅ Debugging and testing
+
+#### Use `spsc::service_proxy` when:
+- ✅ High-performance inter-process communication needed
+- ✅ Shared memory transport is available
+- ✅ Coroutines are available (`BUILD_COROUTINE=ON`)
+- ✅ Lock-free queues provide performance benefits
+
+#### Use `tcp::service_proxy` when:
+- ✅ Communication across network boundaries
+- ✅ Remote machine RPC calls
+- ✅ Distributed systems or cloud deployments
+- ✅ Coroutines are available
+
+#### Use `enclave_service_proxy` (sync mode) when:
+- ✅ Simple SGX enclave integration
+- ✅ Low call volume (ecall overhead acceptable)
+- ✅ Coroutines not available
+- ✅ Simplicity over performance
+
+#### Use `enclave_service_proxy` (coroutine mode) when:
+- ✅ High-performance enclave communication
+- ✅ High call volume (ecall overhead unacceptable)
+- ✅ Coroutines available
+- ✅ Enclave can manage its own thread pool
 
 ---
 
