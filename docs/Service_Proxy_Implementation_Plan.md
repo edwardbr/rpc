@@ -21,12 +21,22 @@ The refactoring addresses critical issues identified in the problem statement:
 1. **Y-Topology Race Condition** - Eliminate on-demand proxy creation
 2. **Transport Abstraction** - Separate transport from routing logic
 3. **Symmetrical Service Proxy Pairs** - Bidirectional creation and lifecycle
-4. **Service Sink Architecture** - Unified receiver-side abstraction
+4. **Pass-Through Architecture** - Three alternative designs:
+   - **Plan A**: Service Sink + Service Proxy (4-object circular dependency)
+   - **Plan B**: Single Pass-Through object (simplest - 75% fewer objects)
+   - **Plan C**: Unified Service Proxy with Polymorphic Handler (**RECOMMENDED**)
 5. **Explicit Lifecycle Management** - Clear ownership and destruction order
 6. **Fire-and-Forget Messaging** - Post method with optimistic ref cleanup
 7. **Child Service Lifecycle** - Safe shutdown and DLL unloading
 
-**Impact**: Eliminates race conditions, reduces code complexity by ~40%, provides foundation for future transport implementations, enables fire-and-forget messaging with optimistic reference cleanup, and ensures safe child service shutdown with DLL unloading safety.
+**Impact**: Eliminates race conditions, reduces code complexity by ~40-50%, provides foundation for future transport implementations, enables fire-and-forget messaging with optimistic reference cleanup, and ensures safe child service shutdown with DLL unloading safety.
+
+**Plan C (Unified Service Proxy)** recommended for:
+- **Reuses existing infrastructure**: No new service_sink class needed
+- **Clean lifetime management**: No self-reference_ or is_routing_proxy_ flags
+- **Polymorphic routing**: Handler can be service or pass_through
+- **Transport flexibility**: Derived classes (SPSC, TCP, local, SGX) own their transport
+- **Natural fit**: Works with existing service_proxy architecture
 
 ---
 
@@ -161,8 +171,8 @@ struct adjacent_zone {
 │ - other_zones: map<zone_route, weak_ptr<service_proxy>>     │
 │   zone_route = {destination_zone, caller_zone}               │
 │                                                              │
-│ Note: Routing proxies (zero objects) hold self-reference    │
-│       to prevent destruction despite zero ref counts         │
+│ Note: Routing proxies (zero objects) kept alive by          │
+│       circular dependency when counts > 0 (Plan A)           │
 └──────────────────────────────────────────────────────────────┘
        │ *
        │ owns (indirectly via service_proxy ownership)
@@ -276,7 +286,7 @@ Key Relationships:
 - Service_sink kept alive by transport (service doesn't know about sinks)
 - Service_proxy kept alive by:
   - Normal proxy: object reference counts (shared + optimistic)
-  - Routing proxy: holds self-reference (prevents destruction at zero objects)
+  - Routing proxy: circular dependency when counts > 0 (Plan A)
 - Service_sink holds shared_ptr to opposite service_proxy ONLY when counts > 0
 - Service_sink always holds weak_ptr for potential promotion
 
@@ -532,7 +542,11 @@ auto connection = service_a->connect_to_zone<transport_type>(
 
 ---
 
-### Change 3: Service Sink Architecture
+### Change 3A: Service Sink Architecture (Plan A - Original Design)
+
+**Note**: See Change 3B below for a simpler alternative design using a single `pass_through` object.
+
+---
 
 **Objective**: Introduce `service_sink` as a receiver-side counterpart to `service_proxy`, providing a unified architecture for both direct local calls and channel-based async communication.
 
@@ -693,37 +707,15 @@ class service {
 
 class service_proxy {
 private:
-    std::shared_ptr<transport> transport_;  // Hidden from service
-
-    // For routing proxies: hold self-reference to prevent destruction
-    std::shared_ptr<service_proxy> self_reference_;  // nullptr for normal proxies
-
-    bool is_routing_proxy_ = false;
+    // Transport ownership in derived classes (not shown here)
 
 public:
-    void mark_as_routing_proxy() {
-        is_routing_proxy_ = true;
-        // Hold self-reference to prevent destruction when object refs = 0
-        self_reference_ = shared_from_this();
-    }
-
-    void unmark_as_routing_proxy() {
-        is_routing_proxy_ = false;
-        // Release self-reference, allow destruction
-        self_reference_.reset();
-    }
-
     ~service_proxy() {
-        // Routing proxies should not be destroyed while marked
-        if (is_routing_proxy_) {
-            RPC_ASSERT(self_reference_ == nullptr &&
-                      "Routing proxy destroyed while still marked");
-        }
-
-        // Regular proxies must have zero ref counts
-        if (!is_routing_proxy_) {
-            RPC_ASSERT(get_aggregate_ref_count() == 0);
-        }
+        // Clean destructor - no special checks needed
+        // Destroyed when:
+        // - Object proxies release it (normal case), OR
+        // - Service sink circular chain releases it (routing case when counts > 0)
+        // No assertions needed - lifetime naturally managed
     }
 };
 ```
@@ -742,8 +734,8 @@ public:
 
 **Service Proxies**:
 - Normal proxies: Kept alive by object reference counts (shared + optimistic)
-- Routing proxies: Hold self-reference (prevents destruction despite zero objects)
-- In pass-through mode: also kept alive by circular dependency when counts > 0
+- Routing proxies: Kept alive by circular dependency when counts > 0
+- In pass-through mode: circular shared_ptr chain forms (sink→proxy→sink→proxy)
 - Found via `other_zones` map (weak_ptr lookup)
 
 **Transports**:
@@ -767,7 +759,7 @@ sink.receive_call(msg);  // → dispatches to service_->dispatch_to_stub(msg)
 // - Sink: Transport holds reference to sink (service doesn't know about sinks)
 // - Proxy: Kept alive by object reference counts
 //   - If proxy has objects: aggregate ref count keeps it alive
-//   - If routing proxy (zero objects): holds self_reference_ to stay alive
+//   - If routing proxy (zero objects): kept alive by circular dependency when counts > 0
 // - Service only tracks proxies via other_zones map (weak_ptr)
 // - Minimal locking: only one mutex for other_zones map
 ```
@@ -786,6 +778,720 @@ sink.receive_call(msg);  // → forwards to opposite_proxy->send(msg)
 // - When counts == 0: chain breaks, all objects can be destroyed
 // - Service may still hold shared_ptr for routing purposes
 ```
+
+---
+
+### Change 3B: Pass-Through Object (Plan B - Simplified Alternative)
+
+**Objective**: Replace the 4-object circular dependency (2 sinks + 2 proxies) with a single `pass_through` object that handles bidirectional routing for a zone pair.
+
+#### Motivation
+
+The Plan A design (service_sink + service_proxy) creates complexity:
+- 4 objects per zone pair in pass-through scenarios
+- Circular dependency that forms/breaks based on reference counts
+- Alternating chain: sink → proxy → sink → proxy
+- Potential race conditions in count management across 4 objects
+
+**Plan B simplifies to ONE object per zone pair.**
+
+#### Pass-Through Design
+
+```cpp
+class pass_through : public i_marshaller {
+private:
+    // Keep service alive
+    std::shared_ptr<service> service_;
+
+    // Bidirectional transports (one to each zone)
+    std::shared_ptr<transport> transport_to_zone_a_;  // Send to A, receive from A
+    std::shared_ptr<transport> transport_to_zone_c_;  // Send to C, receive from C
+
+    // Reference counts for BOTH directions
+    std::atomic<uint64_t> shared_count_a_to_c_{0};      // A→C direction
+    std::atomic<uint64_t> optimistic_count_a_to_c_{0};  // A→C direction
+    std::atomic<uint64_t> shared_count_c_to_a_{0};      // C→A direction
+    std::atomic<uint64_t> optimistic_count_c_to_a_{0};  // C→A direction
+
+    zone zone_a_;
+    zone zone_c_;
+
+    // Self-reference for lifetime management
+    std::shared_ptr<pass_through> self_reference_;
+
+public:
+    pass_through(std::shared_ptr<service> service,
+                 std::shared_ptr<transport> transport_a,
+                 std::shared_ptr<transport> transport_c,
+                 zone zone_a,
+                 zone zone_c)
+        : service_(std::move(service))
+        , transport_to_zone_a_(std::move(transport_a))
+        , transport_to_zone_c_(std::move(transport_c))
+        , zone_a_(zone_a)
+        , zone_c_(zone_c)
+    {
+        // Hold self-reference initially
+        self_reference_ = shared_from_this();
+
+        // Register with transports to receive messages via i_marshaller interface
+        // Transport will call send(), post(), add_ref(), release(), try_cast() directly
+        transport_to_zone_a_->set_receive_handler(weak_from_this());
+        transport_to_zone_c_->set_receive_handler(weak_from_this());
+    }
+
+    // i_marshaller implementation - destination_zone determines direction
+    CORO_TASK(int) send(
+        uint64_t protocol_version,
+        encoding encoding,
+        uint64_t tag,
+        caller_channel_zone caller_channel_zone_id,
+        caller_zone caller_zone_id,
+        destination_zone destination_zone_id,  // ← KEY: Determines which transport!
+        object object_id,
+        interface_ordinal interface_id,
+        method method_id,
+        size_t in_size_,
+        const char* in_buf_,
+        std::vector<char>& out_buf_,
+        size_t in_back_channel_size_,
+        const char* in_back_channel_buf_,
+        std::vector<char>& out_back_channel_buf_
+    ) override {
+        // Determine direction based on destination_zone
+        if (destination_zone_id.get_val() == zone_c_.get_val()) {
+            // A→C direction: use transport to Zone C
+            CO_RETURN CO_AWAIT transport_to_zone_c_->send(
+                protocol_version, encoding, tag,
+                caller_channel_zone_id, caller_zone_id, destination_zone_id,
+                object_id, interface_id, method_id,
+                in_size_, in_buf_, out_buf_,
+                in_back_channel_size_, in_back_channel_buf_, out_back_channel_buf_
+            );
+        } else if (destination_zone_id.get_val() == zone_a_.get_val()) {
+            // C→A direction: use transport to Zone A
+            CO_RETURN CO_AWAIT transport_to_zone_a_->send(
+                protocol_version, encoding, tag,
+                caller_channel_zone_id, caller_zone_id, destination_zone_id,
+                object_id, interface_id, method_id,
+                in_size_, in_buf_, out_buf_,
+                in_back_channel_size_, in_back_channel_buf_, out_back_channel_buf_
+            );
+        } else {
+            CO_RETURN error_codes::invalid_zone;
+        }
+    }
+
+    // Similar implementation for post(), try_cast(), add_ref(), release()
+    CORO_TASK(int) post(
+        uint64_t protocol_version,
+        encoding encoding,
+        uint64_t tag,
+        caller_channel_zone caller_channel_zone_id,
+        caller_zone caller_zone_id,
+        destination_zone destination_zone_id,  // ← Determines direction
+        object object_id,
+        interface_ordinal interface_id,
+        method method_id,
+        post_options options,
+        size_t in_size_,
+        const char* in_buf_,
+        size_t in_back_channel_size_,
+        const char* in_back_channel_buf_
+    ) override {
+        if (destination_zone_id.get_val() == zone_c_.get_val()) {
+            CO_RETURN CO_AWAIT transport_to_zone_c_->post(...);
+        } else if (destination_zone_id.get_val() == zone_a_.get_val()) {
+            CO_RETURN CO_AWAIT transport_to_zone_a_->post(...);
+        } else {
+            CO_RETURN error_codes::invalid_zone;
+        }
+    }
+
+    // Note: No special receive methods needed - transport calls i_marshaller methods directly
+    // (send, post, try_cast, add_ref, release) based on incoming messages
+
+    // add_ref may need special handling - TO BE INVESTIGATED
+    // If special forking is required, may need to delegate to service instead of routing
+    CORO_TASK(error_code) add_ref(
+        uint64_t protocol_version,
+        encoding encoding,
+        uint64_t tag,
+        caller_channel_zone caller_channel_zone_id,
+        caller_zone caller_zone_id,
+        destination_zone destination_zone_id,
+        object object_id,
+        add_ref_options build_out_param_options,
+        uint64_t& out_param,
+        size_t in_back_channel_size_,
+        const char* in_back_channel_buf_,
+        std::vector<char>& out_back_channel_buf_
+    ) override {
+        // TODO: Investigate if add_ref needs special forking logic
+        // For now, route same as send()/post()
+        if (destination_zone_id.get_val() == zone_c_.get_val()) {
+            CO_RETURN CO_AWAIT transport_to_zone_c_->add_ref(
+                protocol_version, encoding, tag,
+                caller_channel_zone_id, caller_zone_id, destination_zone_id,
+                object_id, build_out_param_options, out_param,
+                in_back_channel_size_, in_back_channel_buf_, out_back_channel_buf_
+            );
+        } else if (destination_zone_id.get_val() == zone_a_.get_val()) {
+            CO_RETURN CO_AWAIT transport_to_zone_a_->add_ref(
+                protocol_version, encoding, tag,
+                caller_channel_zone_id, caller_zone_id, destination_zone_id,
+                object_id, build_out_param_options, out_param,
+                in_back_channel_size_, in_back_channel_buf_, out_back_channel_buf_
+            );
+        } else {
+            CO_RETURN error_codes::invalid_zone;
+        }
+    }
+
+    // Update reference counts for one direction
+    void update_counts(destination_zone dest, uint64_t shared_count, uint64_t optimistic_count) {
+        if (dest.get_val() == zone_c_.get_val()) {
+            // A→C direction
+            shared_count_a_to_c_ = shared_count;
+            optimistic_count_a_to_c_ = optimistic_count;
+        } else if (dest.get_val() == zone_a_.get_val()) {
+            // C→A direction
+            shared_count_c_to_a_ = shared_count;
+            optimistic_count_c_to_a_ = optimistic_count;
+        }
+
+        update_self_reference();
+    }
+
+    uint64_t get_total_ref_count() const {
+        return shared_count_a_to_c_.load() + optimistic_count_a_to_c_.load() +
+               shared_count_c_to_a_.load() + optimistic_count_c_to_a_.load();
+    }
+
+private:
+    void update_self_reference() {
+        if (get_total_ref_count() > 0) {
+            // Keep alive
+            if (!self_reference_) {
+                self_reference_ = shared_from_this();
+            }
+        } else {
+            // Allow destruction
+            self_reference_.reset();
+        }
+    }
+};
+```
+
+#### Service Integration
+
+```cpp
+class service {
+    // Simple! Just one collection for pass-through objects
+    std::map<zone_pair, std::weak_ptr<pass_through>> pass_throughs_;
+
+    struct zone_pair {
+        zone zone_a;
+        zone zone_c;
+
+        bool operator<(const zone_pair& other) const {
+            // Normalize: always zone_a < zone_c
+            auto [min_a, max_a] = std::minmax(zone_a.get_val(), zone_c.get_val());
+            auto [min_b, max_b] = std::minmax(other.zone_a.get_val(), other.zone_c.get_val());
+            return std::tie(min_a, max_a) < std::tie(min_b, max_b);
+        }
+    };
+
+    void create_pass_through(zone zone_a, zone zone_c,
+                            std::shared_ptr<transport> transport_a,
+                            std::shared_ptr<transport> transport_c) {
+        auto pt = std::make_shared<pass_through>(
+            shared_from_this(),
+            transport_a,
+            transport_c,
+            zone_a,
+            zone_c
+        );
+
+        pass_throughs_[{zone_a, zone_c}] = pt;
+    }
+};
+```
+
+#### Benefits of Plan B
+
+**Simplicity**:
+- **1 object** instead of 4 (2 sinks + 2 proxies)
+- **No circular dependency** to manage
+- **No alternating chain** complexity
+- **Single point of lifetime management**
+
+**Performance**:
+- **Fewer allocations**: 1 object vs 4
+- **Atomic operations**: All counts in same object, easier to manage atomically
+- **No race conditions**: Single object manages both directions
+- **Less locking**: One object = simpler synchronization
+
+**Correctness**:
+- **Uses existing i_marshaller interface**: No new abstractions needed
+- **destination_zone parameter**: Already present in all methods, naturally determines direction
+- **Total ref count**: Destroyed when sum of ALL direction counts == 0
+- **Generic stub+proxy**: Acts as both stub (receives) and proxy (sends) for both directions
+
+**Comparison**:
+
+| Aspect | Plan A (Sink+Proxy) | Plan B (Pass-Through) |
+|--------|---------------------|----------------------|
+| Objects per zone pair | 4 (2 sinks + 2 proxies) | 1 |
+| Circular dependency | Yes (complex) | No |
+| Reference count management | Across 4 objects | Single object |
+| Direction determination | Object type (sink vs proxy) | destination_zone parameter |
+| Race condition potential | Higher (4-object coordination) | Lower (atomic in 1 object) |
+| Complexity | High | Low |
+| LOC estimate | ~800 lines | ~400 lines |
+
+#### When to Use Each Plan
+
+**Plan A (Service Sink)**:
+- When receive and send sides need different behavior
+- When fine-grained control over each direction is needed
+- When integrating with existing code expecting separate sink/proxy
+
+**Plan B (Pass-Through)**:
+- When simplicity and correctness are priorities (recommended)
+- For new implementations
+- When pass-through routing is the primary use case
+- When minimizing race conditions is critical
+
+**Recommendation**: Start with Plan B for new code. The simplicity and reduced race condition potential make it the better choice for most scenarios.
+
+---
+
+### Change 3C: Unified Service Proxy with Polymorphic Handler (Plan C - Recommended)
+
+**Objective**: Unify service_proxy to act as both sink (receives from transport) and proxy (sends to handler), using polymorphic `i_marshaller` handler that can be either service or pass_through.
+
+#### Motivation
+
+Both Plan A and Plan B have complexity:
+- **Plan A**: 4 objects with circular dependency
+- **Plan B**: Still needs separate pass_through class
+
+**Plan C insight**: Service proxy already exists and implements `i_marshaller`. Why not make it universal?
+
+**Key principles**:
+1. Service proxy has `weak_ptr<i_marshaller>` pointing to service OR pass_through
+2. Uses `destination_zone` parameter to route: local (handler) vs remote (transport)
+3. Transport ownership in derived classes (spsc_service_proxy, tcp_service_proxy, etc.)
+4. No `self_reference_` needed - kept alive by object proxies or pass_through
+5. No `is_routing_proxy_` flag needed - lifetime naturally managed
+
+#### Base Service Proxy Design
+
+```cpp
+class service_proxy : public i_marshaller {
+private:
+    std::weak_ptr<i_marshaller> local_handler_;  // Service or pass_through
+    zone this_zone_;  // The zone this proxy belongs to
+
+public:
+    service_proxy(std::weak_ptr<i_marshaller> handler, zone this_zone)
+        : local_handler_(std::move(handler))
+        , this_zone_(this_zone)
+    {}
+
+    // i_marshaller implementation - routes based on destination_zone
+    CORO_TASK(int) send(
+        uint64_t protocol_version,
+        encoding encoding,
+        uint64_t tag,
+        caller_channel_zone caller_channel_zone_id,
+        caller_zone caller_zone_id,
+        destination_zone destination_zone_id,  // ← KEY: Routing decision
+        object object_id,
+        interface_ordinal interface_id,
+        method method_id,
+        size_t in_size_,
+        const char* in_buf_,
+        std::vector<char>& out_buf_,
+        size_t in_back_channel_size_,
+        const char* in_back_channel_buf_,
+        std::vector<char>& out_back_channel_buf_
+    ) override {
+        // Check if destination is local to this zone
+        if (destination_zone_id.get_val() == this_zone_.get_val()) {
+            // LOCAL: Destination is in this zone
+            // Delegate to service or pass_through
+            if (auto handler = local_handler_.lock()) {
+                CO_RETURN CO_AWAIT handler->send(
+                    protocol_version, encoding, tag,
+                    caller_channel_zone_id, caller_zone_id, destination_zone_id,
+                    object_id, interface_id, method_id,
+                    in_size_, in_buf_, out_buf_,
+                    in_back_channel_size_, in_back_channel_buf_, out_back_channel_buf_
+                );
+            } else {
+                // Handler (service/pass_through) is shutting down
+                CO_RETURN error_codes::zone_shutting_down;
+            }
+        } else {
+            // REMOTE: Destination is in another zone
+            // Delegate to derived class (which owns transport)
+            CO_RETURN CO_AWAIT send_remote(
+                protocol_version, encoding, tag,
+                caller_channel_zone_id, caller_zone_id, destination_zone_id,
+                object_id, interface_id, method_id,
+                in_size_, in_buf_, out_buf_,
+                in_back_channel_size_, in_back_channel_buf_, out_back_channel_buf_
+            );
+        }
+    }
+
+    // Similar for post(), try_cast(), add_ref(), release()
+
+    ~service_proxy() {
+        // Clean destructor - no special checks needed
+        // Destroyed when:
+        // - Object proxies release it (normal case), OR
+        // - Pass-through releases it (routing case)
+    }
+
+protected:
+    // Derived classes implement remote sending via their transport
+    virtual CORO_TASK(int) send_remote(
+        uint64_t protocol_version,
+        encoding encoding,
+        uint64_t tag,
+        caller_channel_zone caller_channel_zone_id,
+        caller_zone caller_zone_id,
+        destination_zone destination_zone_id,
+        object object_id,
+        interface_ordinal interface_id,
+        method method_id,
+        size_t in_size_,
+        const char* in_buf_,
+        std::vector<char>& out_buf_,
+        size_t in_back_channel_size_,
+        const char* in_back_channel_buf_,
+        std::vector<char>& out_back_channel_buf_
+    ) = 0;
+
+    virtual CORO_TASK(int) post_remote(...) = 0;
+    virtual CORO_TASK(error_code) try_cast_remote(...) = 0;
+    virtual CORO_TASK(error_code) add_ref_remote(...) = 0;
+    virtual CORO_TASK(error_code) release_remote(...) = 0;
+};
+```
+
+#### Derived Classes Own Transport
+
+```cpp
+// SPSC service proxy
+class spsc_service_proxy : public service_proxy {
+private:
+    std::shared_ptr<spsc_transport> transport_;
+    zone remote_zone_;  // Zone this transport connects to
+
+protected:
+    CORO_TASK(int) send_remote(
+        uint64_t protocol_version,
+        encoding encoding,
+        uint64_t tag,
+        caller_channel_zone caller_channel_zone_id,
+        caller_zone caller_zone_id,
+        destination_zone destination_zone_id,
+        object object_id,
+        interface_ordinal interface_id,
+        method method_id,
+        size_t in_size_,
+        const char* in_buf_,
+        std::vector<char>& out_buf_,
+        size_t in_back_channel_size_,
+        const char* in_back_channel_buf_,
+        std::vector<char>& out_back_channel_buf_
+    ) override {
+        // Validate destination matches our transport
+        if (destination_zone_id.get_val() != remote_zone_.get_val()) {
+            // ERROR: Message routed to wrong proxy!
+            RPC_ERROR("Invalid routing: proxy to zone {} received message for zone {}",
+                     remote_zone_.get_val(), destination_zone_id.get_val());
+            CO_RETURN error_codes::invalid_routing;
+        }
+
+        // Send via SPSC transport
+        CO_RETURN CO_AWAIT transport_->send(
+            protocol_version, encoding, tag,
+            caller_channel_zone_id, caller_zone_id, destination_zone_id,
+            object_id, interface_id, method_id,
+            in_size_, in_buf_, out_buf_,
+            in_back_channel_size_, in_back_channel_buf_, out_back_channel_buf_
+        );
+    }
+
+public:
+    spsc_service_proxy(std::weak_ptr<i_marshaller> handler,
+                      zone this_zone,
+                      std::shared_ptr<spsc_transport> transport,
+                      zone remote_zone)
+        : service_proxy(handler, this_zone)
+        , transport_(std::move(transport))
+        , remote_zone_(remote_zone)
+    {}
+};
+
+// Local service proxy (direct calls, no serialization)
+class local_service_proxy : public service_proxy {
+private:
+    std::weak_ptr<service> remote_service_;
+    zone remote_zone_;
+
+protected:
+    CORO_TASK(int) send_remote(..., destination_zone destination_zone_id, ...) override {
+        // Validate destination
+        if (destination_zone_id.get_val() != remote_zone_.get_val()) {
+            RPC_ERROR("Invalid routing: proxy to zone {} received message for zone {}",
+                     remote_zone_.get_val(), destination_zone_id.get_val());
+            CO_RETURN error_codes::invalid_routing;
+        }
+
+        // Direct call to remote service (no serialization)
+        if (auto svc = remote_service_.lock()) {
+            CO_RETURN CO_AWAIT svc->send(...);
+        } else {
+            CO_RETURN error_codes::zone_shutting_down;
+        }
+    }
+
+public:
+    local_service_proxy(std::weak_ptr<i_marshaller> handler,
+                       zone this_zone,
+                       std::weak_ptr<service> remote_service,
+                       zone remote_zone)
+        : service_proxy(handler, this_zone)
+        , remote_service_(std::move(remote_service))
+        , remote_zone_(remote_zone)
+    {}
+};
+
+// TCP, SGX service proxies follow same pattern
+```
+
+#### Service as i_marshaller Handler
+
+```cpp
+class service : public i_marshaller {
+private:
+    std::map<zone_route, std::weak_ptr<service_proxy>> other_zones;
+
+public:
+    // i_marshaller implementation - for local dispatch
+    CORO_TASK(int) send(..., destination_zone destination_zone_id, ...) override {
+        // Dispatch to local object stub
+        CO_RETURN CO_AWAIT dispatch_to_stub(
+            destination_zone_id, object_id, interface_id, method_id,
+            in_buf_, out_buf_
+        );
+    }
+
+    // Create service proxy pointing to this service
+    std::shared_ptr<spsc_service_proxy> create_spsc_proxy(
+        std::shared_ptr<spsc_transport> transport,
+        zone remote_zone
+    ) {
+        return std::make_shared<spsc_service_proxy>(
+            weak_from_this(),  // local_handler_ points to this service
+            zone_id_,          // this_zone
+            transport,
+            remote_zone
+        );
+    }
+};
+```
+
+#### Pass-Through as i_marshaller Handler
+
+```cpp
+class pass_through : public i_marshaller {
+private:
+    std::shared_ptr<service> service_;  // Keep service alive
+
+    // Service proxies that use this pass_through as handler
+    std::shared_ptr<spsc_service_proxy> proxy_from_a_;
+    std::shared_ptr<spsc_service_proxy> proxy_from_c_;
+
+    zone zone_a_;
+    zone zone_c_;
+    zone this_zone_;  // Zone B (where pass_through lives)
+
+    // Reference counts for BOTH directions
+    std::atomic<uint64_t> shared_count_a_to_c_{0};
+    std::atomic<uint64_t> optimistic_count_a_to_c_{0};
+    std::atomic<uint64_t> shared_count_c_to_a_{0};
+    std::atomic<uint64_t> optimistic_count_c_to_a_{0};
+
+public:
+    pass_through(std::shared_ptr<service> service,
+                 std::shared_ptr<spsc_transport> transport_to_a,
+                 std::shared_ptr<spsc_transport> transport_to_c,
+                 zone zone_a,
+                 zone zone_c,
+                 zone this_zone)
+        : service_(std::move(service))
+        , zone_a_(zone_a)
+        , zone_c_(zone_c)
+        , this_zone_(this_zone)
+    {
+        // Create service proxies that use THIS pass_through as handler
+        proxy_from_a_ = std::make_shared<spsc_service_proxy>(
+            weak_from_this(),  // local_handler_ points to this pass_through
+            this_zone,
+            transport_to_a,
+            zone_a
+        );
+
+        proxy_from_c_ = std::make_shared<spsc_service_proxy>(
+            weak_from_this(),  // local_handler_ points to this pass_through
+            this_zone,
+            transport_to_c,
+            zone_c
+        );
+
+        // Register service proxies with transports to receive messages
+        // Transport calls proxy's i_marshaller methods (send, post, add_ref, etc.)
+        // Proxy then routes to local_handler_ (this pass_through) or remote transport
+        transport_to_a->set_receive_handler(proxy_from_a_);
+        transport_to_c->set_receive_handler(proxy_from_c_);
+    }
+
+    // i_marshaller implementation - routes based on destination
+    CORO_TASK(int) send(..., destination_zone destination_zone_id, ...) override {
+        // Route to appropriate proxy's transport
+        if (destination_zone_id.get_val() == zone_a_.get_val()) {
+            // Forward to Zone A via proxy_from_a_'s transport
+            CO_RETURN CO_AWAIT proxy_from_a_->send(...);
+        } else if (destination_zone_id.get_val() == zone_c_.get_val()) {
+            // Forward to Zone C via proxy_from_c_'s transport
+            CO_RETURN CO_AWAIT proxy_from_c_->send(...);
+        } else if (destination_zone_id.get_val() == this_zone_.get_val()) {
+            // ERROR: Pass-through doesn't host objects locally
+            RPC_ERROR("Pass-through received call for local zone {} but has no objects",
+                     this_zone_.get_val());
+            CO_RETURN error_codes::invalid_routing;
+        } else {
+            // ERROR: Unknown destination
+            CO_RETURN error_codes::invalid_zone;
+        }
+    }
+
+    // add_ref may need special handling - TO BE INVESTIGATED
+    // If special forking is required, may need to delegate to service instead of routing
+    CORO_TASK(error_code) add_ref(..., destination_zone destination_zone_id, ...) override {
+        // TODO: Investigate if add_ref needs special forking logic
+        // For now, route same as send()
+        if (destination_zone_id.get_val() == zone_a_.get_val()) {
+            CO_RETURN CO_AWAIT proxy_from_a_->add_ref(...);
+        } else if (destination_zone_id.get_val() == zone_c_.get_val()) {
+            CO_RETURN CO_AWAIT proxy_from_c_->add_ref(...);
+        } else {
+            CO_RETURN error_codes::invalid_zone;
+        }
+    }
+
+    // Update reference counts - determines lifetime
+    void update_counts(destination_zone dest, uint64_t shared_count, uint64_t optimistic_count) {
+        if (dest.get_val() == zone_c_.get_val()) {
+            shared_count_a_to_c_ = shared_count;
+            optimistic_count_a_to_c_ = optimistic_count;
+        } else if (dest.get_val() == zone_a_.get_val()) {
+            shared_count_c_to_a_ = shared_count;
+            optimistic_count_c_to_a_ = optimistic_count;
+        }
+
+        // Pass-through destroyed when total ref count == 0
+        // When destroyed, releases proxy_from_a_ and proxy_from_c_
+    }
+
+    uint64_t get_total_ref_count() const {
+        return shared_count_a_to_c_.load() + optimistic_count_a_to_c_.load() +
+               shared_count_c_to_a_.load() + optimistic_count_c_to_a_.load();
+    }
+};
+```
+
+#### Lifetime Management
+
+**Service Proxy kept alive by**:
+1. **Object proxies**: When aggregate ref count > 0
+2. **Pass-through**: Holds `shared_ptr<service_proxy>` for routing
+3. **NOT by service**: Service has `weak_ptr` only
+
+**Scenarios**:
+```cpp
+// Normal proxy with objects:
+object_proxy_1 holds shared_ptr<service_proxy>
+object_proxy_2 holds shared_ptr<service_proxy>
+// When all object proxies destroyed -> service_proxy destroyed ✓
+
+// Routing proxy (no objects, used by pass_through):
+pass_through holds shared_ptr<service_proxy> (proxy_from_a_, proxy_from_c_)
+// When pass_through destroyed -> service_proxies destroyed ✓
+
+// Service never holds strong reference:
+service.other_zones has weak_ptr<service_proxy>
+// Service can lookup but doesn't keep alive ✓
+```
+
+**No self_reference_ needed**: Object proxies or pass_through keep proxy alive
+
+**No is_routing_proxy_ flag needed**: Lifetime naturally managed by whoever holds it
+
+#### Benefits of Plan C
+
+**Simplicity**:
+- **Reuses existing service_proxy**: No new sink class
+- **Polymorphic handler**: Service or pass_through via `i_marshaller`
+- **Clean lifetime**: No self-reference tricks, no special flags
+- **Natural routing**: `destination_zone` determines local vs remote
+
+**Flexibility**:
+- **Multiple transports**: Each derived class (SPSC, TCP, local, SGX)
+- **Validation**: Derived class validates destination matches transport
+- **Graceful shutdown**: `weak_ptr.lock()` returns nullptr when shutting down
+
+**Performance**:
+- **Fewer objects**: Service proxy already exists, just extend it
+- **No circular dependency**: Clean ownership model
+- **Service outlives proxies**: Service always valid (strong guarantee)
+
+**Comparison Table**:
+
+| Aspect | Plan A (Sink+Proxy) | Plan B (Pass-Through) | Plan C (Unified Proxy) |
+|--------|---------------------|----------------------|------------------------|
+| Objects per zone pair | 4 (2 sinks + 2 proxies) | 1 (pass_through) | 2 (2 proxies) + 1 pass_through |
+| Circular dependency | Yes (complex) | No | No |
+| New classes needed | service_sink | pass_through | None (extend existing) |
+| Handler polymorphism | No | No | Yes (service or pass_through) |
+| Transport ownership | Service proxy | Pass-through | Derived service_proxy |
+| Lifetime management | Circular ref + counts | Self-reference | Object proxies or pass_through |
+| Complexity | High | Medium | Low |
+| Reuses existing code | Partial | No | Yes (service_proxy) |
+
+#### When to Use Each Plan
+
+**Plan A (Service Sink + Service Proxy)**:
+- Legacy code expecting separate sink/proxy
+- Fine-grained control over receive vs send sides
+
+**Plan B (Single Pass-Through Object)**:
+- Minimal object count priority
+- Simple pass-through routing
+
+**Plan C (Unified Service Proxy)** - **RECOMMENDED**:
+- Reuse existing service_proxy infrastructure
+- Polymorphic handler (service or pass_through)
+- Clean lifetime without self-reference or flags
+- Natural fit with existing codebase
+- Derived classes own transport (SPSC, TCP, local, SGX)
 
 ---
 
@@ -1044,51 +1750,23 @@ class parent_service_manager {
 
 Service proxies may act as pure routing nodes without hosting any objects. These need to stay alive even with zero object references.
 
-**Solution: Self-Reference Pattern for Routing Proxies**
+**Solution: Natural Lifetime Management**
 
 ```cpp
-class service_proxy : public std::enable_shared_from_this<service_proxy>
+class service_proxy
 {
 private:
-    std::shared_ptr<transport> transport_;  // Keeps transport alive
+    std::shared_ptr<transport> transport_;  // Keeps transport alive (in derived classes)
     std::unordered_map<object, std::weak_ptr<object_proxy>> proxies_;
 
-    // NEW: Self-reference for routing proxies
-    std::shared_ptr<service_proxy> self_reference_;  // nullptr for normal proxies
-    bool is_routing_proxy_ = false;  // True if proxy is for routing only
-
 public:
-    void mark_as_routing_proxy()
-    {
-        is_routing_proxy_ = true;
-        // Hold self-reference to prevent destruction when object refs = 0
-        self_reference_ = shared_from_this();
-    }
-
-    void unmark_as_routing_proxy()
-    {
-        is_routing_proxy_ = false;
-        // Release self-reference, allow destruction
-        self_reference_.reset();
-    }
-
-    // Destructor logic
+    // Clean destructor - no special checks needed
     ~service_proxy()
     {
-        // Routing proxies should not be destroyed while marked
-        if (is_routing_proxy_)
-        {
-            RPC_ASSERT(self_reference_ == nullptr &&
-                      "Routing proxy destroyed while still marked");
-        }
-
-        // Regular proxies must have zero ref counts
-        if (!is_routing_proxy_)
-        {
-            RPC_ASSERT(get_aggregate_ref_count() == 0);
-        }
-
-        // Transport released via shared_ptr destructor
+        // Destroyed when:
+        // - Object proxies release it (normal case), OR
+        // - Pass-through releases it (routing case)
+        // No assertions needed - lifetime naturally managed
     }
 
     int get_aggregate_ref_count() const
@@ -1114,39 +1792,54 @@ private:
     std::map<zone_route, std::weak_ptr<service_proxy>> other_zones;
 
     // No separate routing_proxies_ collection needed!
-    // Routing proxies keep themselves alive via self_reference_
+    // Routing proxies kept alive by pass_through object
 
 public:
-    void create_routing_proxy(destination_zone dest, caller_zone caller)
+    void register_proxy(destination_zone dest, caller_zone caller,
+                       std::shared_ptr<service_proxy> proxy)
     {
-        auto proxy = std::make_shared<service_proxy>(...);
-        proxy->mark_as_routing_proxy();  // Sets self_reference_
-
-        // Register in same collection as normal proxies
+        // Register in same collection (normal and routing proxies)
         other_zones[{dest, caller}] = proxy;
     }
 
-    void remove_routing_proxy(destination_zone dest, caller_zone caller)
+    std::shared_ptr<service_proxy> lookup_proxy(destination_zone dest, caller_zone caller)
     {
-        // Find proxy
         if (auto found = other_zones.find({dest, caller}); found != other_zones.end())
         {
-            if (auto proxy = found->second.lock())
-            {
-                // Unmark allows destruction
-                proxy->unmark_as_routing_proxy();
-            }
+            return found->second.lock();  // Returns nullptr if destroyed
         }
+        return nullptr;
     }
 };
 ```
 
-**Benefits of Self-Reference Pattern**:
+**Lifetime Management**:
+
+**Normal Proxy (has objects)**:
+```cpp
+object_proxy_1 holds shared_ptr<service_proxy>
+object_proxy_2 holds shared_ptr<service_proxy>
+// When all object proxies destroyed -> service_proxy destroyed ✓
+```
+
+**Routing Proxy (no objects, used by pass_through)**:
+```cpp
+pass_through holds shared_ptr<service_proxy> (proxy_from_a_, proxy_from_c_)
+// When pass_through destroyed -> service_proxies destroyed ✓
+```
+
+**Service never holds strong reference**:
+```cpp
+service.other_zones has weak_ptr<service_proxy>
+// Service can lookup but doesn't keep alive ✓
+```
+
+**Benefits**:
 - **One collection**: Service only has `other_zones` map
 - **One mutex**: Minimal locking overhead
-- **Self-managing**: Routing proxies manage their own lifetime
+- **Natural lifetime**: No self-reference or flags needed
 - **Simple lookup**: Same weak_ptr pattern for all proxies
-- **No extra tracking**: No separate routing_proxies_ vector needed
+- **Clean code**: No special-case lifetime management
 
 ### Scenario 2: Concurrent add_ref/release Through Bridge
 
@@ -1732,7 +2425,8 @@ sink_c_to_a->set_pass_through(proxy_c_to_a);  // Receives from C, forwards to A
 | **Transport Identification** | Transport identified by adjacent zone ID |
 | **Pass-Through Mode** | Service sink forwards traffic to opposite service_proxy |
 | **Local Dispatch Mode** | Service sink delivers traffic to local service |
-| **Circular Dependency** | 4-object cycle: sink→proxy→sink→proxy when counts > 0 |
+| **Circular Dependency** | 4-object cycle: sink→proxy→sink→proxy when counts > 0 (Plan A only) |
+| **Pass-Through Object** | Single object handling bidirectional routing for zone pair (Plan B) |
 | **Fire-and-Forget** | One-way message sent via `post()` with no response expected |
 | **post_options::fire_and_forget** | Send one-way message to object method |
 | **post_options::release** | Notify service proxy chain to clean up optimistic reference |

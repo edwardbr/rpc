@@ -896,7 +896,49 @@ CORO_TASK(void) receive_call(const marshalled_message& msg) {
 11. **OpenTelemetry Integration**: Native support for distributed tracing context propagation
 12. **Security Infrastructure**: Certificate chain transmission and authentication token support built into protocol
 
-### Problem 7: No Receiver-Side Abstraction (Service Sink Missing)
+### Problem 7: Pass-Through Routing via i_marshaller Interface
+
+**Current State**:
+- Pass-through objects receive calls through standard `i_marshaller` interface methods
+- No special `receive_from_zone_x()` methods should exist
+- Transport calls `send()`, `post()`, `add_ref()`, `release()`, `try_cast()` directly on the handler
+
+**Architectural Requirement**:
+```cpp
+// Pass-through implements i_marshaller
+class pass_through : public i_marshaller {
+public:
+    // Transport calls these methods directly
+    CORO_TASK(int) send(..., destination_zone dest, ...) override {
+        // Route based on destination_zone parameter
+        if (dest == zone_a) {
+            CO_RETURN CO_AWAIT transport_to_a->send(...);
+        } else if (dest == zone_c) {
+            CO_RETURN CO_AWAIT transport_to_c->send(...);
+        }
+    }
+
+    // Similar for post(), try_cast(), release()
+};
+
+// Transport registration uses i_marshaller handler
+transport_to_zone_a->set_receive_handler(weak_ptr<i_marshaller>(this));
+transport_to_zone_c->set_receive_handler(weak_ptr<i_marshaller>(this));
+```
+
+**Critical Design Principle**:
+- Transport demarshalls incoming message
+- Transport calls appropriate `i_marshaller` method on handler
+- Handler (pass_through or service) implements routing logic
+- No custom receive methods - everything through standard interface
+
+**Impact on add_ref**:
+- **Investigation Required**: `add_ref()` may need special handling for forking scenarios
+- Current assumption: Route same as `send()`
+- Potential issue: Special forking logic might require delegation to service instead of simple routing
+- **TODO**: Investigate if `add_ref` needs to call service for special forking behavior
+
+### Problem 8: No Receiver-Side Abstraction (Service Sink Missing)
 
 **Current State**:
 - Channel-based transports (SPSC, TCP) use sender/receiver design pattern suitable for async calls
@@ -1562,9 +1604,10 @@ struct destination_channel_zone {
 4. **Lifetime Confusion** - Service proxy lifetime vs transport lifetime mismatch
 5. **No Transport Abstraction** - Only SPSC has emergent pattern, others ad-hoc
 6. **No Fire-and-Forget Messaging** - Missing `post()` method for one-way messages and optimistic reference cleanup
-7. **No Receiver-Side Abstraction** - Missing service_sink counterpart to service_proxy
-8. **Child Service Lifecycle** - No explicit synchronization for DLL unloading safety
-9. **Transport Type Requirements** - Different transports have incompatible requirements (bi-modal vs coroutine-only, channel vs no channel)
+7. **Pass-Through Routing** - Must use i_marshaller interface, no custom receive methods, add_ref may need special handling
+8. **No Receiver-Side Abstraction** - Missing service_sink counterpart to service_proxy
+9. **Child Service Lifecycle** - No explicit synchronization for DLL unloading safety
+10. **Transport Type Requirements** - Different transports have incompatible requirements (bi-modal vs coroutine-only, channel vs no channel)
 
 ### Race Conditions Documented
 
@@ -1647,6 +1690,9 @@ struct destination_channel_zone {
 | **post_options::adhoc** | Service-to-service maintenance messages (certificates, pings, config) - type controlled by interface_id |
 | **Cascading Cleanup** | Zone termination triggers cleanup that propagates across zone topology |
 | **Ad-hoc Message** | Service-level protocol message not tied to specific objects (keepalive, certificates, etc.) |
+| **i_marshaller Interface** | Standard interface for routing - all handlers (service, pass_through, service_proxy) implement this |
+| **Handler** | Object implementing i_marshaller that receives calls from transport (can be service or pass_through) |
+| **Transport Receive Handler** | weak_ptr<i_marshaller> registered with transport to receive incoming demarshalled calls |
 
 ---
 
