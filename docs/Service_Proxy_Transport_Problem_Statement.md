@@ -25,6 +25,7 @@ This document analyzes the current architecture of service proxies, services, an
 4. [Critical Problems](#critical-problems)
 5. [Race Conditions Analysis](#race-conditions-analysis)
 6. [Complexity Analysis](#complexity-analysis)
+7. [Related Protocols and Prior Art](#related-protocols-and-prior-art)
 
 ---
 
@@ -1258,6 +1259,129 @@ A call from A to C through B must use:
 ### Invariant 6: Mutex Discipline (Not Enforced)
 **Should be**: All mutexes released before RPC calls or `CO_AWAIT`.
 **Actually**: Manual verification required, violations possible.
+
+---
+
+## Related Protocols and Prior Art
+
+### DCOM (Distributed Component Object Model)
+
+**Relevance**: DCOM provides distributed object lifetime management similar to RPC++'s `rpc::shared_ptr` wire protocol implementation.
+
+**Key Concepts**:
+- **Remote Reference Counting**: DCOM uses reference counting across network boundaries
+- **AddRef/Release Protocol**: Similar to RPC++'s add_ref/release mechanism
+- **Distributed Garbage Collection**: DCOM manages object lifetimes across machines
+- **Ping Protocol**: DCOM clients ping servers to maintain object references
+
+**Security Vulnerabilities**:
+- DCOM is known to be insecure with multiple CVEs
+- Authentication weaknesses
+- Network exposure risks
+- Legacy protocol with known attack vectors
+
+**Wire Protocol Similarities**:
+- Reference counting semantics similar to RPC++'s shared_ptr marshalling
+- Remote object lifetime tied to reference counts
+- Client-server reference tracking across network boundaries
+
+**Resources to Investigate**:
+- https://wirexsystems.com/resource/protocols/dcom/
+- https://wiki.wireshark.org/DCE/RPC
+- https://pubs.opengroup.org/onlinepubs/009629399 (DCE/RPC specifications)
+- https://storage.googleapis.com/google-code-archive-source/v2/code.google.com/tangramcom/source-archive.zip (Tangram DCOM implementation)
+
+**Lessons for RPC++**:
+- DCOM's reference counting approach validates RPC++'s design
+- Security must be explicit concern (authentication, encryption)
+- Ping/keepalive mechanisms may be needed for long-lived connections
+- Consider security implications of distributed reference counting
+
+### CORBA (Common Object Request Broker Architecture)
+
+**Relevance**: Alternative OO RPC with different lifetime management philosophy.
+
+**Key Differences from DCOM/RPC++**:
+- **Optimistic Lifetime Management**: No explicit reference counting in common implementations
+- **No Guaranteed Lifetimes**: Objects may be destroyed without client notification
+- **Simpler Protocol**: Less wire protocol overhead
+- **Different Philosophy**: Assumes objects managed by server-side policies
+
+**Wire Protocol**:
+- GIOP (General Inter-ORB Protocol)
+- IIOP (Internet Inter-ORB Protocol - GIOP over TCP/IP)
+- Simpler than DCOM's reference counting approach
+
+**Resources to Investigate**:
+- http://www.ciaranmchale.com/corba-explained-simply/on-the-wire-protocols.html
+
+**Lessons for RPC++**:
+- RPC++ chose DCOM-style explicit lifetime management over CORBA's optimistic approach
+- Trade-off: More wire protocol complexity for guaranteed lifetime semantics
+- RPC++'s optimistic references provide middle ground (keep transport alive but not stub)
+
+### TCP/IP and Network Routing
+
+**Relevance**: TCP/IP routing provides proven patterns for pass-through node implementations.
+
+**Key Concepts**:
+- **Packet Forwarding**: Intermediate routers forward packets without application-level knowledge
+- **Transparent Routing**: Pass-through nodes don't modify packet semantics
+- **Routing Tables**: Efficient lookup of next hop based on destination
+- **TTL (Time To Live)**: Prevents infinite routing loops
+
+**Parallels to RPC++ Service Proxies**:
+- **Pass-Through Zones**: Similar to IP routers forwarding packets
+- **destination_zone**: Similar to destination IP address
+- **destination_channel_zone**: Similar to next-hop routing
+- **Zone Routing Tables**: service's `other_zones` map similar to routing table
+
+**Resources to Investigate**:
+- TCP/IP routing algorithms and implementations
+- BGP (Border Gateway Protocol) for inter-zone routing patterns
+- MPLS (Multi-Protocol Label Switching) for efficient forwarding
+
+**Lessons for RPC++**:
+- Proven routing patterns for pass-through scenarios
+- Separation of routing (control plane) from forwarding (data plane)
+- Routing table lookup efficiency matters for performance
+- Need mechanisms to prevent routing loops (similar to TTL)
+
+### Comparative Analysis
+
+| Aspect | DCOM | CORBA | RPC++ |
+|--------|------|-------|-------|
+| **Lifetime Management** | Explicit ref counting | Optimistic | Explicit (shared) + Optimistic |
+| **Wire Protocol** | AddRef/Release | Simpler IIOP | add_ref/release + optimistic |
+| **Security** | Known vulnerabilities | Implementation-dependent | To be designed |
+| **Pass-Through** | Limited | Limited | First-class support |
+| **Complexity** | High | Medium | High (combines both approaches) |
+
+### Research Action Items
+
+**DCOM Investigation** (Priority: High):
+1. Study DCOM's AddRef/Release wire protocol details
+2. Document known security vulnerabilities and mitigations
+3. Understand ping protocol for connection keepalive
+4. Extract lessons for RPC++'s reference counting implementation
+
+**CORBA Investigation** (Priority: Medium):
+1. Understand IIOP wire protocol simplicity
+2. Study optimistic lifetime management trade-offs
+3. Compare performance characteristics vs DCOM-style approach
+4. Evaluate if RPC++ should offer CORBA-style optimistic-only mode
+
+**TCP/IP Investigation** (Priority: Medium):
+1. Study efficient routing table implementations
+2. Understand loop prevention mechanisms (TTL equivalent)
+3. Extract patterns for multi-hop RPC routing
+4. Consider control plane / data plane separation
+
+**Security Investigation** (Priority: High):
+1. Document all DCOM security vulnerabilities
+2. Design authentication and encryption for RPC++
+3. Consider security implications of distributed reference counting
+4. Plan secure channel establishment and certificate management
 
 ---
 
