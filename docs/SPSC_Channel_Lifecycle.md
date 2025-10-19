@@ -1,7 +1,13 @@
 # SPSC Channel Manager Lifecycle Design
 
+**Version**: 2.0
+**Date**: 2025-01-19
+**Status**: Corrected to align with Problem Statement and Q&A
+
 ## Overview
 The SPSC channel manager coordinates bidirectional communication between two zones using lock-free single-producer-single-consumer queues. It manages multiple service proxies that share the same communication channel.
+
+**CRITICAL CLARIFICATION**: The channel manager is an **SPSC-specific implementation detail**, NOT a core RPC++ abstraction. Other transports (TCP, Local, SGX) may have different internal implementations.
 
 ## Architecture Components
 
@@ -30,9 +36,18 @@ std::function<void(envelope_prefix, envelope_payload)> incoming_message_handler
   - **Response messages (sync)**: Processed inline to immediately wake up waiting callers
 - **No reference cycle risk**: Handler does NOT capture `keep_alive_` - channel is kept alive by member variable
 
+**IMPORTANT**: The message handler calls **i_marshaller methods** on the registered handler (service or pass_through). The handler is NOT aware of whether it's calling service or pass_through - it's polymorphic via i_marshaller interface.
+
 ### Two Independent Reference Counts
 
-#### 1. `service_proxy_ref_count_` (Service Proxy Lifecycle)
+**WARNING FROM Q&A**: The `service_proxy_ref_count_` reference counting mechanism is **subject to change** in future designs. Do not rely on this pattern being permanent.
+
+#### 1. `service_proxy_ref_count_` (Service Proxy Lifecycle) - SUBJECT TO CHANGE
+
+**From Q&A Q2**:
+> `channel_manager.service_proxy_ref_count_` tracks how many service_proxies share this channel
+> - **Note**: This reference counting mechanism is **subject to change** in future designs
+
 Tracks how many service_proxies are actively using this channel.
 
 - **Incremented:** When a service_proxy is assigned a channel_manager
@@ -42,6 +57,8 @@ Tracks how many service_proxies are actively using this channel.
 - **When reaches 0:** Triggers `shutdown()` to initiate graceful connection close
 
 **Purpose:** Determines when no more service proxies need the channel and shutdown should begin.
+
+**FUTURE DESIGN NOTE**: Pass-through architecture may eliminate this reference counting pattern. Pass-through will control lifecycle of service_proxies instead.
 
 #### 2. `tasks_completed_` (Task Lifecycle)
 Tracks when both pump tasks have finished execution.
@@ -73,7 +90,13 @@ service_proxy construction
 └─ Channel now actively used
 ```
 
-Multiple service_proxies can attach to the same channel (ref count can be 2, 3, etc.)
+**CRITICAL FROM Q&A Q2**: Multiple service_proxies can attach to the same channel (ref count can be 2, 3, etc.). This is the **transport sharing** pattern - multiple service_proxies share ONE transport/channel.
+
+**From Q&A Q2**:
+> **Transport Sharing:**
+> - **Multiple service proxies can share ONE transport**
+> - Example: Zone A might have service_proxy(A→B, caller=A) and service_proxy(A→B, caller=C) both using same TCP socket
+> - Sink on receiving side disambiguates which (destination, caller) pair the message is for
 
 ### 3. Pump Tasks Running
 ```
@@ -100,6 +123,8 @@ Tasks run independently, yielding to scheduler when idle.
 
 **Important**: `detach_service_proxy()` only initiates shutdown if the peer hasn't already done so. This prevents double shutdown attempts when both sides disconnect simultaneously.
 
+**FUTURE CONSIDERATION**: With pass-through architecture, this lifecycle may change. Pass-through will manage service_proxy lifetime instead of reference counting to zero.
+
 ### 5. Shutdown Process
 ```
 shutdown()
@@ -111,6 +136,27 @@ shutdown()
 ├─ Set shutdown_event_
 └─ Await shutdown_event_ (wait for tasks to complete)
 ```
+
+**CRITICAL ADDITION FROM Q&A Q9**: Shutdown must also handle **zone_terminating** notification:
+
+```cpp
+shutdown()
+├─ If graceful shutdown:
+│   ├─ Send close_connection_send to peer (current behavior)
+│   └─ Await acknowledgment
+├─ If zone_terminating event received:
+│   ├─ Transport detects zone termination
+│   ├─ Broadcast zone_terminating to:
+│   │   ├─ Service (for local cleanup)
+│   │   └─ Pass-through (if exists, for routing cleanup)
+│   └─ Skip waiting for peer acknowledgment (peer is dead)
+└─ Continue with shutdown sequence
+```
+
+**From Q&A Q9**:
+> **Transport responsibility**:
+> - Transport must pass Zone Termination notification to service AND to any relevant pass-throughs
+> - A service may have **multiple transports** (e.g., several SGX enclaves, several TCP connections)
 
 ### 6. Peer Receives Close Request
 ```
@@ -124,6 +170,24 @@ receive_consumer_task receives close_connection_send
 ```
 
 **Reference Cycle Prevention**: The response task deliberately does NOT capture `keep_alive_`. The channel_manager is kept alive by its member `keep_alive_` variable until both tasks complete. Capturing it in the lambda would create a reference cycle.
+
+**ADDITION FOR ZONE TERMINATION**:
+```
+receive_consumer_task receives zone_terminating message
+├─ Schedules zone termination handler:
+│   ├─ Mark zone as terminated
+│   ├─ Notify service via i_marshaller::post(post_options::zone_terminating)
+│   ├─ Notify pass-through (if exists) via same method
+│   ├─ Set peer_cancel_received_ = true (zone is dead)
+│   └─ Clean up all service_proxies to that zone
+└─ Continue receiving until peer_cancel_received_ OR cancel_confirmed_
+```
+
+**From Problem Statement (Lines 666-683)**:
+> **Transport Responsibility for Zone Termination**:
+> - **Transport must pass Zone Termination notification** to:
+>   - Service (for local cleanup)
+>   - Any relevant pass-throughs (for routing cleanup)
 
 ### 7. Tasks Complete
 ```
@@ -216,6 +280,34 @@ CORO_TASK(void) receive_consumer_task(...)
 - Yields to scheduler when no data available
 - Processes complete messages via handler
 
+**CRITICAL CLARIFICATION**: The `incoming_message_handler` unpacks the message and calls the registered `i_marshaller` handler (service or pass_through). The handler signature is:
+
+```cpp
+// Channel manager calls this after unpacking envelope
+void incoming_message_handler(envelope_prefix prefix, envelope_payload payload)
+{
+    // Unpack prefix to get: protocol_version, encoding, tag, zones, object, interface, method, etc.
+
+    // Call appropriate i_marshaller method on registered handler
+    if (prefix.message_type == message_type::send)
+    {
+        handler_->send(protocol_version, encoding, tag,
+                      caller_channel_zone, caller_zone, destination_zone,
+                      object, interface, method,
+                      in_buf, out_buf,
+                      in_back_channel, out_back_channel);
+    }
+    else if (prefix.message_type == message_type::post)
+    {
+        handler_->post(protocol_version, encoding, tag,
+                      caller_channel_zone, caller_zone, destination_zone,
+                      object, interface, method, post_options,
+                      in_buf, in_back_channel);
+    }
+    // ... other message types
+}
+```
+
 ### Lock-Free Communication
 Each zone has two SPSC queues:
 - **send_spsc_queue_**: This zone writes, remote zone reads
@@ -305,6 +397,7 @@ Protected by atomic `tasks_completed_`:
 2. **`service_proxy_ref_count_` independent of `tasks_completed_`**
    - Service proxies can be destroyed before tasks finish
    - Tasks continue running until proper shutdown sequence completes
+   - **WARNING**: This mechanism is **subject to change** (Q&A Q2)
 
 3. **`shutdown()` is idempotent**
    - Can be called multiple times safely
@@ -318,16 +411,26 @@ Protected by atomic `tasks_completed_`:
    - send_producer_task continues until all queues are empty
    - Ensures in-flight messages are delivered
 
+6. **Transport notifies service AND pass-through on zone termination** (NEW)
+   - Required for proper cleanup of routing infrastructure
+   - Service cleans up local stubs and proxies
+   - Pass-through cleans up routing state
+
+7. **Multiple service_proxies can share one channel_manager** (CLARIFIED)
+   - This is the transport sharing pattern from Q&A Q2
+   - Reference count can be > 2 (not just bidirectional pair)
+   - Channel disambiguates messages by (destination, caller) zones
+
 ## Member Variables Summary
 
 ### Reference Counting
-- `std::atomic<int> service_proxy_ref_count_{0}` - Number of active service proxies
+- `std::atomic<int> service_proxy_ref_count_{0}` - Number of active service proxies (SUBJECT TO CHANGE)
 - `std::atomic<int> tasks_completed_{0}` - Number of completed pump tasks (0-2)
 
 ### Shutdown Coordination
 - `bool cancel_sent_{false}` - We initiated shutdown (sent close_connection_send)
 - `bool cancel_confirmed_{false}` - We received close_connection_received ack
-- `std::atomic<bool> peer_cancel_received_{false}` - Peer initiated shutdown
+- `std::atomic<bool> peer_cancel_received_{false}` - Peer initiated shutdown OR zone terminated
 - `std::atomic<bool> close_ack_queued_{false}` - Acknowledgment queued for sending
 
 ### Lifecycle Management
@@ -339,6 +442,12 @@ Protected by atomic `tasks_completed_`:
 - `queue_type* receive_spsc_queue_` - Lock-free queue for receiving from peer
 - `std::queue<std::vector<uint8_t>> send_queue_` - Internal queue for messages to send
 - `coro::mutex send_queue_mtx_` - Protects send_queue_ access
+
+### Handler Registration (NEW ADDITION)
+- `std::weak_ptr<i_marshaller> handler_` - Service or pass_through that handles incoming messages
+  - Polymorphic handler via i_marshaller interface
+  - Transport does NOT know if it's service or pass_through
+  - Transport calls handler methods after unpacking envelopes
 
 ## Comparison with Old `pump_messages`
 
@@ -406,3 +515,60 @@ for (int i = 0; i < 100; ++i)
 - Allows 2 scheduler cycles after teardown for destructors to schedule detach coroutines
 - Continues processing events for 100ms to allow shutdown sequence and pump task exit
 - Does NOT wait for empty scheduler as pump tasks keep it busy until shutdown triggers
+
+## Synchronous Mode Considerations (NEW SECTION)
+
+**From Q&A Q13**:
+> **Synchronous Mode (BUILD_COROUTINE=OFF):**
+> - All i_marshaller methods become BLOCKING
+> - Fire-and-forget `post()` becomes **blocking call**
+> - This is why async is valuable - posts are not scalable in synchronous mode
+
+**SPSC in Synchronous Mode**: SPSC transport is **COROUTINE-ONLY** and cannot be used in synchronous builds.
+
+**From Q&A Q13**:
+> | Transport | Sync Mode | Async Mode |
+> |-----------|-----------|------------|
+> | SPSC | ❌ No | ✅ Yes |
+
+**Reason**: SPSC requires async pump tasks to poll queues. Without coroutines, no mechanism to pump messages.
+
+**Impact**: This document only applies to `BUILD_COROUTINE=ON` builds. SPSC is unavailable in synchronous mode.
+
+## Future Architecture Changes (NEW SECTION)
+
+### Pass-Through Integration
+
+**From Q&A Q3**:
+> **Pass-Through Reference Counting Responsibility:**
+> The **pass-through should be responsible** for reference counting. This design has important implications:
+> 1. **Pass-through controls lifetime of its service_proxies**
+> 2. **Pass-through maintains single reference count to service**
+> 3. **service_proxy may not need lifetime_lock_**
+
+**Potential Changes to SPSC Channel Manager**:
+1. **service_proxy_ref_count_ may be eliminated**
+   - Pass-through will control service_proxy lifetime instead
+   - Channel lifetime tied to pass-through, not individual proxies
+
+2. **Handler registration will use pass_through**
+   - Instead of service as handler, pass_through becomes handler
+   - Pass-through implements i_marshaller for routing
+
+3. **Both-or-Neither Guarantee Required**
+   - **From Q&A Q3**: Pass-through guarantees BOTH or NEITHER service_proxies operational
+   - Channel manager must refuse operations if transport not operational
+   - Prevents asymmetric states
+
+**From Q&A Q3**:
+> **Transport Viability Check**:
+> - **If transport is NOT operational**, `clone_for_zone()` function **must refuse** to create new service_proxies for that transport
+
+**SPSC Implementation Impact**: SPSC channel_manager will need to expose `is_operational()` method that checks:
+- `!peer_cancel_received_` (peer hasn't terminated)
+- `!cancel_sent_` (we haven't initiated shutdown)
+- Tasks are still running
+
+---
+
+**End of Document**

@@ -650,7 +650,7 @@ if (optimistic_count > 0) {
 
 **3. Zone Termination (Emergency Shutdown)**:
 ```cpp
-// Service is shutting down (even in emergency) - notify ALL service proxies/sinks
+// Service is shutting down (even in emergency) - notify ALL service proxies
 for (auto& [zone_id, proxy] : all_service_proxies) {
     CO_AWAIT proxy->post(
         protocol_version,
@@ -670,8 +670,16 @@ for (auto& [zone_id, proxy] : all_service_proxies) {
 
 // After sending zone_terminating:
 // - NO MORE MESSAGES transmitted except cleanup
-// - All service_sinks cleanup their service_proxies and services
+// - Transport passes zone terminating notification to service AND to any relevant pass-throughs
+// - Service and pass-throughs cleanup their service_proxies
 ```
+
+**Transport Responsibility for Zone Termination**:
+- **Transport must pass Zone Termination notification** to:
+  - Service (for local cleanup)
+  - Any relevant pass-throughs (for routing cleanup)
+- A service may have **multiple transports** (e.g., several SGX enclaves, several TCP connections)
+- Each transport independently handles zone termination for its connections
 
 **Critical Behavior for `post_options::zone_terminating`**:
 
@@ -960,7 +968,7 @@ transport_to_zone_c->set_receive_handler(weak_ptr<i_marshaller>(this));
 - Potential issue: Special forking logic might require delegation to service instead of simple routing
 - **TODO**: Investigate if `add_ref` needs to call service for special forking behavior
 
-### Problem 8: No Receiver-Side Abstraction (Service Sink - Design TBD)
+### Problem 8: No Receiver-Side Abstraction (Service Sink - Transport-Internal)
 
 **Current State**:
 - Channel-based transports (SPSC, TCP) use sender/receiver design pattern suitable for async calls
@@ -971,13 +979,29 @@ transport_to_zone_c->set_receive_handler(weak_ptr<i_marshaller>(this));
 
 **Problem**: No clear separation between receiving and routing concerns.
 
-**Potential Architecture** (one possibility, design TBD):
+**Clarification on Service Sink**:
+Service Sink is a concept that may **only exist within the implementation of a particular transport**. It is NOT a separate core RPC++ class.
+
+**How it works**:
+1. Transport unpacks message from wire
+2. Transport calls `i_marshaller` interface (either directly OR via transport-internal service_sink helper)
+3. That `i_marshaller` is one of:
+   - **service** (for local dispatch) - derives from i_marshaller (no i_service interface exists)
+   - **pass_through** (for routing to opposite service_proxy) - also implements i_marshaller
+
+**Service Sink Ownership** (if it exists as transport-internal helper):
+- If a service_proxy has a service sink implementation, that sink's **lifetime is maintained by the service_proxy**
+- Or service sink is **part of that service_proxy's implementation**
+- Service_proxy owns/manages its associated sink
+
+**Actual Architecture**:
 ```
-Sender Side:     service_proxy (routes and sends)
-Receiver Side:   service_sink (receives and dispatches)  ← DOES NOT EXIST YET
+Sender Side:     service_proxy (implements i_marshaller, routes and sends)
+Receiver Side:   service or pass_through (both implement i_marshaller)
+Transport:       Calls i_marshaller (may use internal service_sink helper)
 ```
 
-**Design Question**: Whether to introduce explicit "service_sink" class is **undecided** - this is one potential approach, not the only option.
+**Design Principle**: Service_sink is **transport-specific implementation concern**, not a core RPC++ abstraction.
 
 **Impact on Local Calls**:
 - Direct local calls may not need full sender/receiver pattern
@@ -993,23 +1017,40 @@ Zone B needs to:
 2. Receive from C → Either dispatch to local service OR forward to A
 
 Current: Complex conditional logic in service::send()
-Needed: service_sink that can:
-  - Dispatch to local service when endpoint
-  - Forward to opposite service_proxy when intermediary
+Solution: pass_through class that:
+  - Implements i_marshaller
+  - Routes to opposite service_proxy for intermediary forwarding
+  - Dispatches to service for local endpoint
 ```
 
-**Lifecycle Problem**:
-```cpp
-// Non-pass-through case:
-service_sink receives from channel → dispatches to service
-Problem: No circular reference to keep service_proxy alive
-Solution: Service MUST hold shared_ptr to service_proxy
+**Pass-Through Reference Counting and Lifecycle**:
 
-// Pass-through case:
-service_sink receives from channel → forwards to opposite_proxy
-Problem: Creates 4-object circular dependency
-Solution: Conditional shared_ptr based on reference counts
-```
+**Key Design Principle**: The **pass-through is responsible** for reference counting of its service_proxies.
+
+**Pass-Through Responsibilities**:
+1. **Controls lifetime of BOTH service_proxies** it routes between
+2. **Controls all method execution** (send, add_ref, release, try_cast, post) through pass-through
+3. **Maintains single reference count to service** (simplified service ref management)
+4. **Service has weak_ptr to pass-through** (for cloning service_proxy when needed)
+
+**Critical Operational Guarantees**:
+1. **Both-or-Neither**: Pass-through **guarantees that BOTH or NEITHER** of its service_proxies are operational
+   - Cannot have asymmetric state (one proxy operational, other destroyed)
+   - Ensures bidirectional communication always possible or completely unavailable
+   - Prevents partial failure modes where only one direction works
+
+2. **Transport Viability Check**:
+   - **If transport is NOT operational**, `clone_for_zone()` function **must refuse** to create new service_proxies for that transport
+   - Prevents creating service_proxies that cannot communicate
+   - Ensures newly cloned proxies are viable from creation
+   - Avoids race condition where proxy created during transport shutdown
+
+**Implication for service_proxy**:
+- **lifetime_lock_ mechanism may be unnecessary** with pass-through managing lifecycle
+- Service_proxy lifetime controlled by:
+  - **object_proxies** (objects referencing this proxy)
+  - **pass_throughs** (routing proxies using this proxy)
+  - **shutdown lambdas** (cleanup callbacks)
 
 **Missing Features**:
 1. **Unified receiver abstraction** for all transport types
@@ -1758,14 +1799,15 @@ struct destination_channel_zone {
 
 1. **Y-Topology Race** (service.cpp:239) - On-demand proxy creation causes races
 2. **Mixed Responsibilities** - Service proxy does routing + transport + lifecycle
-3. **Asymmetric Creation** - Forward explicit, reverse on-demand (unpredictable)
-4. **Lifetime Confusion** - Service proxy lifetime vs transport lifetime mismatch
+3. **Asymmetric Creation** - Forward explicit, reverse on-demand (unpredictable) - **Solution**: Pass-through guarantees both-or-neither operational
+4. **Lifetime Confusion** - Service proxy lifetime vs transport lifetime mismatch - **Solution**: Pass-through manages lifecycle, lifetime_lock_ may be unnecessary
 5. **No Transport Abstraction** - Only SPSC has emergent pattern, others ad-hoc
 6. **No Fire-and-Forget Messaging** - Missing `post()` method for one-way messages and optimistic reference cleanup
-7. **Pass-Through Routing** - Must use i_marshaller interface, no custom receive methods, add_ref may need special handling
-8. **No Receiver-Side Abstraction** - Missing service_sink counterpart to service_proxy
+7. **Pass-Through Routing** - Must use i_marshaller interface, pass-through responsible for reference counting
+8. **Service Sink is Transport-Internal** - Service derives from i_marshaller (no i_service interface), service_sink is transport-specific
 9. **Child Service Lifecycle** - No explicit synchronization for DLL unloading safety
 10. **Transport Type Requirements** - Different transports have incompatible requirements (bi-modal vs coroutine-only, channel vs no channel)
+11. **clone_for_zone() Safety** - Must refuse to create proxies if transport not operational
 
 ### Race Conditions Documented
 
@@ -1824,7 +1866,8 @@ struct destination_channel_zone {
 | **Zone** | Execution context (process, thread, enclave) with own service |
 | **Service** | Manages object stubs and routes calls within a zone |
 | **Service Proxy** | Routes calls to remote zone (currently also handles transport) |
-| **Service Sink** | Receiver-side counterpart to service_proxy (missing in current architecture) |
+| **Service Sink** | Transport-internal helper (if exists) that calls i_marshaller after unpacking - owned by service_proxy, NOT a core RPC++ class |
+| **Pass-Through** | Implements i_marshaller, routes between service_proxies, responsible for reference counting of paired proxies |
 | **Transport** | Bidirectional communication between adjacent zones (emerging concept) |
 | **Channel Manager** | SPSC's transport implementation (pattern to replicate) |
 | **Channel Object** | Manages sender/receiver pairs for async transports (SPSC, TCP, Enclave-coroutine) |
