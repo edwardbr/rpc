@@ -1071,7 +1071,7 @@ Zone B has routing/pass-through proxy: `service_proxy(destination=3, caller=1)` 
 3. **Blurred Responsibilities**: Service doing both local dispatch and pass-through routing
 4. **Missing Abstractions**: No explicit transport layer, no service_sink, no pass_through class
 
-### Questions Answered (14 total):
+### Questions Answered (15 total):
 
 - ✅ Q1-Q2: Transport creation and ownership model
 - ✅ Q3-Q4: Service sink concept and current message flow
@@ -1085,12 +1085,158 @@ Zone B has routing/pass-through proxy: `service_proxy(destination=3, caller=1)` 
 - ✅ Q12: i_marshaller interface current state
 - ✅ Q13a-b: Bi-modal sync/async support
 - ✅ Q14: Routing proxy lifetime
+- ✅ Q15: SPSC channel manager requirements and constraints
+
+---
+
+## Q15: SPSC Channel Manager Requirements and Constraints
+
+**Question**: What are the specific requirements and constraints discovered from SPSC channel manager implementation?
+
+**Source**: SPSC_Channel_Lifecycle.md analysis
+
+### Answer:
+
+**SPSC as Transport-Specific Implementation:**
+
+The SPSC channel manager is an **SPSC-specific implementation detail**, NOT a core RPC++ abstraction. Other transports (TCP, Local, SGX) may have completely different internal implementations.
+
+**Key Architecture Points:**
+
+1. **Handler Registration Pattern**:
+   - Channel manager has `std::weak_ptr<i_marshaller> handler_`
+   - Handler can be service OR pass_through (polymorphic via i_marshaller)
+   - Transport does NOT know which it is - just calls i_marshaller methods
+   - After unpacking envelope, transport calls: `handler_->send()`, `handler_->post()`, `handler_->add_ref()`, etc.
+
+2. **Message Handler Architecture**:
+   ```cpp
+   std::function<void(envelope_prefix, envelope_payload)> incoming_message_handler
+   ```
+   - Non-coroutine signature (`void` not `CORO_TASK(int)`) - intentional design
+   - Dual processing strategy:
+     - **Stub calls**: Scheduled asynchronously via `get_scheduler()->schedule()` (enables reentrant calls)
+     - **Response messages**: Processed inline to immediately wake waiting callers
+   - Does NOT capture `keep_alive_` (prevents reference cycle)
+
+3. **Transport Sharing Pattern (CRITICAL)**:
+   - **Multiple service_proxies can share ONE channel_manager**
+   - Reference count can be 2, 3, or higher (not just bidirectional pair)
+   - Channel disambiguates messages by `(destination_zone, caller_zone)` tuple
+   - Confirms Q&A Q2 finding about transport sharing
+
+4. **Zone Termination Requirements**:
+   - Transport must broadcast `zone_terminating` to:
+     - Service (for local cleanup)
+     - Pass-through (if exists, for routing cleanup)
+   - Two scenarios:
+     - **Graceful**: Send `close_connection_send`, await acknowledgment
+     - **Forced**: Detect connection failure, broadcast `zone_terminating`, skip waiting for peer
+   - Sets `peer_cancel_received_ = true` when zone terminated
+
+5. **Operational State Check (NEW REQUIREMENT)**:
+   - SPSC channel_manager needs `is_operational()` method
+   - Checks:
+     - `!peer_cancel_received_` (peer hasn't terminated)
+     - `!cancel_sent_` (we haven't initiated shutdown)
+     - Tasks are still running (`tasks_completed_ < 2`)
+   - **Purpose**: Support both-or-neither guarantee from Q&A Q3
+   - **Usage**: `clone_for_zone()` must check operational state before creating new proxies
+
+6. **Reference Counting Lifecycle (SUBJECT TO CHANGE)**:
+   - `service_proxy_ref_count_` tracks how many proxies share channel
+   - When reaches 0: triggers `shutdown()`
+   - **WARNING**: This mechanism is **subject to change** per Q&A Q2
+   - **Future**: Pass-through architecture may eliminate this pattern
+   - Pass-through will control service_proxy lifetime instead
+
+7. **Task Lifecycle Guarantees**:
+   - `tasks_completed_` tracks when both pump tasks finished
+   - `keep_alive_` released ONLY after `tasks_completed_ == 2`
+   - Prevents crashes from accessing member variables during shutdown
+   - Independent of `service_proxy_ref_count_` (proxies can be destroyed before tasks finish)
+
+8. **Shutdown Idempotency**:
+   - `shutdown()` can be called multiple times safely
+   - First call initiates shutdown, subsequent calls wait on `shutdown_event_`
+   - Protected by `cancel_sent_` flag
+
+9. **No Data Loss During Shutdown**:
+   - `send_producer_task` continues until:
+     - (`close_ack_queued_` OR `cancel_confirmed_`) is true, AND
+     - All queues empty (send_queue_ and send_data empty)
+   - Ensures in-flight messages delivered before transport closes
+
+10. **Reentrant Call Support**:
+    - Stub calls scheduled asynchronously (not awaited inline)
+    - Allows RPC methods to make reentrant calls back to caller
+    - Critical for complex call patterns (e.g., callbacks, bidirectional protocols)
+
+**SPSC-Specific Constraints:**
+
+1. **Coroutine-Only Transport**:
+   - SPSC requires `BUILD_COROUTINE=ON`
+   - Cannot be used in synchronous mode
+   - Reason: Requires async pump tasks to poll queues
+   - Without coroutines: no mechanism to pump messages
+
+2. **Lock-Free Queue Requirements**:
+   - Each zone has TWO SPSC queues (send and receive)
+   - Exactly one producer and one consumer per queue
+   - Producer and consumer in different zones (no shared state)
+   - Atomic operations ensure visibility
+
+3. **Message Chunking**:
+   - Message blob size: 10KB (`std::array<uint8_t, 10024>`)
+   - Queue size: 10024 entries
+   - Messages larger than blob size automatically chunked across multiple blobs
+
+4. **Reference Cycle Prevention**:
+   - Response task deliberately does NOT capture `keep_alive_`
+   - Channel kept alive by member variable until tasks complete
+   - Capturing in lambda would create reference cycle
+
+**Key Invariants:**
+
+1. `keep_alive_` valid while tasks running (released after `tasks_completed_ == 2`)
+2. `service_proxy_ref_count_` independent of `tasks_completed_`
+3. `shutdown()` idempotent (can call multiple times safely)
+4. Acknowledgment flushed before exit (`close_ack_queued_`)
+5. No data loss during shutdown (queues flushed)
+6. Transport notifies service AND pass-through on zone termination
+7. Multiple service_proxies can share one channel_manager (transport sharing)
+
+**New Requirements for Pass-Through Integration:**
+
+1. **Handler Polymorphism**:
+   - Transport registers `i_marshaller` handler (service or pass_through)
+   - Transport unaware of handler type
+   - Enables clean separation: transport handles wire protocol, handler handles logic
+
+2. **Operational State Visibility**:
+   - Transport must expose `is_operational()` for both-or-neither guarantee
+   - `clone_for_zone()` must check before creating proxies
+   - Prevents creating proxies on dying transport
+
+3. **Zone Termination Broadcast**:
+   - Transport must call `handler_->post(post_options::zone_terminating)` on failure
+   - Handler can be service (for local cleanup) or pass_through (for routing cleanup)
+   - One message per transport (not per object) for efficiency
+
+**Impact on Core Architecture:**
+
+- **Transport-Specific Implementation**: Each transport (SPSC, TCP, Local, SGX) can have completely different internal architectures
+- **Common Interface**: All transports register `i_marshaller` handler and call its methods
+- **No Standardization Needed**: SPSC uses channel_manager with pump tasks, but TCP might use async I/O, Local might use direct calls
+- **Flexibility**: Transport implementation details hidden from core RPC++ classes
+
+**Status**: SPSC-specific requirements documented. Other transports may have different implementations with same external interface.
 
 ---
 
 ## Next Steps
 
-1. ✅ **Requirements Gathering Complete** - 14 questions answered
+1. ✅ **Requirements Gathering Complete** - 15 questions answered (added Q15 for SPSC specifics)
 2. **Review Problem Statement** - Identify which problems are real vs based on misconceptions
 3. **Update Problem Statement** - Incorporate findings and clarify requirements
 4. **Identify Design Constraints** - Document must-haves vs nice-to-haves
