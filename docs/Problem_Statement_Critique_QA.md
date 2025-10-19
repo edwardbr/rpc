@@ -76,6 +76,7 @@ This document captures a Q&A session to identify and fill knowledge gaps in the 
 - Queue addresses passed privately inside transport mechanism (hidden from user)
 - Each zone has its own `channel_manager` object pointing to the shared queues
 - `channel_manager.service_proxy_ref_count_` tracks how many service_proxies share this channel
+  - **Note**: This reference counting mechanism is **subject to change** in future designs
 
 ---
 
@@ -90,26 +91,94 @@ This document captures a Q&A session to identify and fill knowledge gaps in the 
 - Service acts as universal sink (receives everything) AND manages local objects AND manages outgoing proxies
 - Designation is "blurred" - unclear separation of concerns
 
-**Service Sink Concept (Vague/Undecided):**
-- Represents component that:
-  1. Deserializes call from transport (perhaps with channel manager)
-  2. Routes to either:
-     - **Service** (if destination is local object in this zone)
-     - **Another service proxy** (if pass-through to different zone)
+**Service Sink Concept (Transport-Specific Implementation Detail):**
+
+With further thought: Service Sink is a concept that may **only exist within the implementation of a particular transport**. It is NOT a separate class in the RPC++ core architecture.
+
+**How it works:**
+1. Transport unpacks message from wire
+2. Transport calls `i_marshaller` interface (either directly OR via some form of service_sink helper)
+3. That `i_marshaller` is one of:
+   - **service** (for local dispatch)
+   - **pass_through** (for routing to opposite service_proxy)
+
+**Service Sink Ownership:**
+- **If a service_proxy has a service sink implementation**, that sink's lifetime should be **maintained by the service_proxy**
+- Or service sink should be **part of that service_proxy's implementation**
+- Service_proxy owns/manages its associated sink (if it exists)
 
 **Relationship Between Components:**
 
-- **Transport**: Low-level communication (TCP sockets, SPSC queues) - should be abstracted away
-- **Channel Manager**: Manages instance of communication layer (transport-specific, e.g., pairs of sender/receiver queues)
-- **Service Sink** (potential): Demarshalls → routes to service OR service_proxy (doesn't exist yet - design TBD)
-- **Service**: Represents the zone - manages object stubs (sinks for local objects) and service_proxies (for outgoing calls)
+- **Transport**: Low-level communication (TCP sockets, SPSC queues) - implementation hidden
+- **Channel Manager**: Manages transport instance (e.g., pairs of sender/receiver queues) - transport-specific
+- **Service Sink** (if exists): Transport-internal helper that calls i_marshaller after unpacking - owned by service_proxy OR part of service_proxy implementation
+- **i_marshaller Interface**: THE interface all handlers implement (service OR pass_through)
+- **Service**: Represents the zone - derives from i_marshaller, manages object stubs and service_proxies
+  - **Note**: There is NO `i_service` interface - just `service` class that derives from `i_marshaller`
+- **Pass-through**: Routes between service_proxies - also implements i_marshaller
 
-**Key Issue**:
-- Within a single zone, a sink might need to call another sink to reach next destination
-- Current code has service doing too many responsibilities
-- Whether to introduce explicit "service_sink" abstraction is **still undecided** - part of design question
+**Pass-Through Purpose:**
+- Calls opposite service_proxy (routing function)
+- Maintains reference counts and lifetimes of BOTH service proxies within one set of reference counts
+- Pass-through maintains positive reference count to both its service_proxies AND the service
+- Service has `weak_ptr` to pass-through (for cloning service_proxy for local object proxy or new pass-through)
 
-**Status**: Service_sink does **NOT exist today** - it's one potential design idea under evaluation
+**Pass-Through Reference Counting Responsibility:**
+
+**Critical Design Question**: How is reference counting maintained in a pass-through?
+
+**Answer**: The **pass-through should be responsible** for reference counting. This design has important implications:
+
+1. **Pass-through controls lifetime of its service_proxies**
+   - Pass-through owns/manages reference counts for both service_proxies it routes between
+   - Controls when service_proxies are kept alive vs destroyed
+
+2. **Pass-through controls all method execution**
+   - All i_marshaller methods (send, add_ref, release, try_cast, post) go through pass-through
+   - Pass-through can intercept, track, and manage all operations
+
+3. **Pass-through maintains single reference count to service**
+   - Service doesn't need to track individual pass-through reference counts
+   - Simplified service reference management
+
+4. **service_proxy may not need lifetime_lock_**
+   - Current `lifetime_lock_` mechanism may be unnecessary
+   - Service_proxy lifetime potentially controlled by:
+     - **object_proxies** (objects referencing this proxy)
+     - **pass_throughs** (routing proxies using this proxy)
+     - **shutdown lambdas** (cleanup callbacks)
+   - No need for separate lifetime lock mechanism if these handle lifecycle
+
+**Critical Operational Guarantees:**
+
+1. **Both-or-Neither Service Proxy Operational State**
+   - Pass-through **guarantees that BOTH or NEITHER** of its service_proxies are operational
+   - Cannot have asymmetric state (one proxy operational, other destroyed)
+   - Ensures bidirectional communication always possible or completely unavailable
+   - Prevents partial failure modes where only one direction works
+
+2. **Transport Operational Check for clone_for_zone()**
+   - **If transport is NOT operational**, `clone_for_zone()` function should **refuse to create new service_proxies** for that transport
+   - Prevents creating service_proxies that cannot communicate
+   - Ensures newly cloned proxies are viable from creation
+   - Avoids race condition where proxy created during transport shutdown
+
+**Implication**: Pass-through becomes the central point for:
+- Reference count aggregation
+- Lifecycle management of paired service_proxies
+- Routing decision enforcement
+- Cleanup coordination
+- **Operational state enforcement** (both-or-neither guarantee)
+- **Transport viability checking** (for clone operations)
+
+**Key Architecture Points**:
+- Service derives from i_marshaller (not i_service - no such interface exists)
+- Pass-through also implements i_marshaller
+- Transport routes to i_marshaller (could be service OR pass-through)
+- Service_sink is transport-internal implementation detail, NOT core abstraction
+- **Pass-through is responsible for reference counting** of its service_proxies
+
+**Status**: Service_sink is **transport-specific implementation concern**, not a core RPC++ class
 
 ---
 
@@ -232,7 +301,7 @@ Timeline:
 
 **What Makes add_ref Special:**
 
-- **send() and add_ref are actually the SAME** (`call` and `send` are different names for same purpose)
+- **send() and add_ref() are not the SAME** (`call` and `send` are different names for same purpose)
 - The "forking" happens when **object references are passed across zones**
 - Root doesn't know about Zone 7, but needs to establish routing when object is returned
 
@@ -254,8 +323,8 @@ Timeline:
 - **send/call** are the same (different names for RPC method invocation)
 - **add_ref** has different purpose: increment shared/optimistic reference count
   - Mode 1: Add +1 to existing service proxy/sink for known object
-  - Mode 2: Share object reference to WHOLE NEW ZONE (complex operation)
-  - Mode 3: Three modes defined by `add_ref_options` (build_caller_route, etc.)
+  - Mode 2: Share object reference to a different ZONE (complex operation) caller A may pass an object referece from zone B to zone C
+  - Mode 3: Three modes defined by `add_ref_options` (build_caller_route, etc.) either a +1, passing the caller ref passing the destination ref if the count splits in a fork
 
 ---
 
@@ -427,6 +496,13 @@ Root (1) → Branch A (2) → Leaf A1 (3)
 - Propagation: adjacent zones relay to all impacted zones
 - Cascading: dying zone takes down all pass-through routes
 - Configuration: timeout/failure detection is transport-specific
+- **Transport responsibility**: Transport must pass Zone Termination notification to service AND to any relevant pass-throughs
+
+**Multiple Transports Per Service:**
+A service may have **multiple transports**. Examples:
+- A zone may have several different SGX enclaves (one transport each, with each having several service proxies)
+- Several TCP transports to other zones (with each having several service proxies)
+- Mix of local, SGX, and TCP transports simultaneously
 
 **Design Status**: Zone termination messaging is **new feature under review**
 
@@ -694,20 +770,17 @@ struct back_channel_entry {
 **Transport Compatibility:**
 
 **Synchronous Mode Support:**
-- ❌ **Local (in-process)**: Async only
-- ❌ **SGX enclave**: Async only
-- ❌ **DLL calls** (not implemented here): Async only
-- ❌ **SPSC**: Async only
-- ❌ **TCP**: Async only
+- ✅ **Local (in-process)**: Supports both sync and async modes
+- ✅ **SGX enclave**: Supports both sync and async modes
+- ✅ **DLL calls** (not implemented here): Supports both sync and async modes
+- ❌ **SPSC**: Async only (coroutine-only)
+- ❌ **TCP**: Async only (coroutine-only)
 
-**Key Insight**: ALL transports are **async only** - they do NOT work in synchronous mode.
+**Important Clarification**: When `BUILD_COROUTINE=ON`, ALL transports run in async mode. When `BUILD_COROUTINE=OFF`, only Local/SGX/DLL can run (SPSC/TCP unavailable).
 
 **Bi-Modal Design Implications:**
 
-**Question**: If all transports are async-only, what runs in synchronous mode?
-- Is synchronous mode only for unit testing with mocked transports?
-- Or is there a synchronous local transport not mentioned?
-- **Clarification needed on synchronous mode use case**
+**Clarified**: Local, SGX, and DLL transports work in synchronous mode. SPSC and TCP require async.
 
 **Test Handling:**
 - Tests must handle different behavior between modes:
@@ -748,7 +821,9 @@ struct back_channel_entry {
 **Transport Correction:**
 
 - **Local service proxies CAN support both modes** (documentation error identified)
-- Other transports (SGX, SPSC, TCP) are async-only
+- **SGX enclave proxies CAN support both modes** (bi-modal)
+- **DLL calls (future) CAN support both modes** (bi-modal)
+- **SPSC and TCP are async-only** (require coroutines)
 
 **Synchronous Mode Value Proposition:**
 
@@ -871,30 +946,55 @@ Zone B has routing/pass-through proxy: `service_proxy(destination=3, caller=1)` 
    - Multiple service proxies can share ONE transport (many logical connections over one physical channel)
    - Transport created by service proxy specialized code (hidden from user)
    - Parent creates transport for child in hierarchical scenarios
+   - **A service may have multiple transports** (e.g., several SGX enclaves, several TCP connections)
 
-2. **Service Sink Does NOT Exist Yet**:
+2. **Service Sink is Transport-Internal Concept**:
+   - Service Sink may **only exist within transport implementation** - NOT a core RPC++ class
+   - Transport unpacks message → calls i_marshaller (directly OR via internal service_sink helper)
+   - **Ownership**: If service_proxy has service sink, sink's lifetime maintained by service_proxy (or part of its implementation)
    - Current state: service acts as universal receiver (receives everything)
    - Service does BOTH local dispatch AND pass-through routing (blurred responsibilities)
-   - Whether to introduce explicit "service_sink" abstraction is still undecided
-   - Part of receiver-side design question
+   - Service_sink is transport-specific implementation concern, not core abstraction
 
 3. **i_marshaller as Universal Interface**:
    - THE interface for all inter-zone and pass-through communication
-   - Currently implemented by: service_proxy (remote representative) and service (local zone)
-   - Future: pass_through object would ALSO implement i_marshaller
+   - **service class derives from i_marshaller** (no i_service interface exists)
+   - service_proxy also implements i_marshaller (remote representative)
+   - pass_through also implements i_marshaller (routes between service_proxies)
    - All methods need back-channel parameters added (breaking change)
 
-4. **Pass-Through Requirements**:
+4. **Pass-Through Architecture and Reference Counting**:
+   - Purpose: Call opposite service_proxy for routing
+   - **Pass-through is responsible for reference counting** of its service_proxies
+   - Controls lifetime of BOTH service proxies it routes between
+   - Controls all method execution (send, add_ref, release, try_cast, post)
+   - Maintains single reference count to service (simplified service ref management)
+   - Service has weak_ptr to pass-through (for cloning service_proxy when needed)
+   - **Critical Operational Guarantees**:
+     - **Both-or-Neither**: Pass-through guarantees BOTH or NEITHER service_proxies operational (no asymmetric state)
+     - **Transport viability**: clone_for_zone() refuses to create proxies if transport NOT operational
+   - **Implication**: service_proxy may not need lifetime_lock_ mechanism
+     - Lifetime controlled by: object_proxies, pass_throughs, shutdown lambdas
+     - Pass-through becomes central point for lifecycle, cleanup, and operational state enforcement
+
+5. **Pass-Through Requirements**:
    - NOT pure relay - needs correlation tracking for request/response
    - Complex add_ref logic when forwarding remote object references
    - Y-topology workaround creates reverse proxies on-demand (inefficient)
    - Better approach: maintain bidirectional/symmetrical links upfront
 
-5. **Reference Counting Semantics**:
+6. **Reference Counting Semantics**:
    - Optimistic pointers: maintain channel open WITHOUT strong object ownership
    - Incoming optimistic refs: do NOT prevent service shutdown
    - Outgoing optimistic refs: DO prevent service shutdown (object needs service alive)
    - Zone can die when: no objects + no pass-throughs + no external shared_ptrs
+   - **Note**: channel_manager.service_proxy_ref_count_ is subject to change in future designs
+
+7. **Bi-Modal Transport Support**:
+   - **Local, SGX, DLL**: Support both sync and async modes (bi-modal)
+   - **SPSC, TCP**: Async-only (require coroutines)
+   - When BUILD_COROUTINE=ON: ALL transports run in async mode
+   - When BUILD_COROUTINE=OFF: Only Local/SGX/DLL available (SPSC/TCP unavailable)
 
 ### Critical Requirements Identified:
 
@@ -943,9 +1043,12 @@ Zone B has routing/pass-through proxy: `service_proxy(destination=3, caller=1)` 
    - Selective notification vs broadcast TBD
 
 2. **Pass-Through Architecture**:
-   - Should there be explicit pass_through class implementing i_marshaller?
-   - Or refactor service to separate concerns?
-   - Or different approach entirely?
+   - Should there be explicit pass_through class implementing i_marshaller? **YES - requirements gathered**
+   - Pass-through responsible for reference counting of its service_proxies
+   - Controls lifetime and all method execution for paired proxies
+   - Maintains single reference count to service
+   - **Must guarantee both-or-neither operational state** for paired service_proxies
+   - **Must check transport operational status** before allowing clone_for_zone() to create new proxies
 
 3. **Routing Proxy Definition**:
    - Need precise definition of "routing proxy" vs "pass-through proxy"
@@ -955,6 +1058,11 @@ Zone B has routing/pass-through proxy: `service_proxy(destination=3, caller=1)` 
 4. **Post Messaging in Sync Mode**:
    - How should fire-and-forget work when calls are blocking?
    - May need curtailment or different implementation
+
+5. **service_proxy Lifetime Management**:
+   - Can lifetime_lock_ mechanism be eliminated?
+   - Lifetime controlled by: object_proxies + pass_throughs + shutdown lambdas
+   - Simplified lifecycle if pass-through manages reference counting
 
 ### Known Issues to Address in New Design:
 
