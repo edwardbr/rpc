@@ -221,7 +221,9 @@ namespace rpc
         method method_id,
         size_t in_size_,
         const char* in_buf_,
-        std::vector<char>& out_buf_)
+        std::vector<char>& out_buf_,
+        const std::vector<back_channel_entry>& in_back_channel,
+        std::vector<back_channel_entry>& out_back_channel)
     {
         current_service_tracker tracker(this);
         if (destination_zone_id != zone_id_.as_destination())
@@ -320,7 +322,9 @@ namespace rpc
                 method_id,
                 in_size_,
                 in_buf_,
-                out_buf_);
+                out_buf_,
+                in_back_channel,
+                out_back_channel);
 
             cleanup_service_proxy(opposite_direction_proxy);
 
@@ -426,6 +430,8 @@ namespace rpc
         // the fork is here so we need to add ref the destination normally with caller info
         // note the caller_channel_zone_id is is this zones id as the caller came from a route via this node
         uint64_t temp_ref_count;
+        std::vector<back_channel_entry> empty_in;
+        std::vector<back_channel_entry> empty_out;
         int err = CO_AWAIT destination_zone->add_ref(rpc::get_version(),
             destination_channel_zone_id,
             destination_zone_id,
@@ -434,7 +440,9 @@ namespace rpc
             caller_zone_id,
             known_direction_zone(zone_id_),
             rpc::add_ref_options::build_destination_route,
-            temp_ref_count);
+            temp_ref_count,
+            empty_in,
+            empty_out);
         if (temp_ref_count == 0)
             std::ignore = temp_ref_count; // do some checks here
 
@@ -484,6 +492,8 @@ namespace rpc
             }
 #endif
             uint64_t temp_ref_count;
+            std::vector<back_channel_entry> empty_in;
+            std::vector<back_channel_entry> empty_out;
             uint64_t err = CO_AWAIT object_service_proxy->add_ref(protocol_version,
                 {0},
                 destination_zone_id,
@@ -492,7 +502,9 @@ namespace rpc
                 caller_zone_id,
                 known_direction_zone(zone_id_),
                 rpc::add_ref_options::build_caller_route | rpc::add_ref_options::build_destination_route,
-                temp_ref_count);
+                temp_ref_count,
+                empty_in,
+                empty_out);
             RPC_ASSERT(err == error::OK());
             std::ignore = temp_ref_count;
         }
@@ -606,6 +618,8 @@ namespace rpc
             if (destination_service_proxy)
             {
                 uint64_t temp_ref_count;
+                std::vector<back_channel_entry> empty_in;
+                std::vector<back_channel_entry> empty_out;
                 refcount = CO_AWAIT destination_service_proxy->add_ref(protocol_version,
                     {0},
                     destination_zone_id,
@@ -614,7 +628,9 @@ namespace rpc
                     caller_zone_id,
                     known_direction_zone(zone_id_),
                     rpc::add_ref_options::build_destination_route,
-                    temp_ref_count);
+                    temp_ref_count,
+                    empty_in,
+                    empty_out);
             }
             else
             {
@@ -637,6 +653,8 @@ namespace rpc
 
             // note the caller_channel_zone_id is 0 as the caller came from this route
             uint64_t temp_ref_count;
+            std::vector<back_channel_entry> empty_in;
+            std::vector<back_channel_entry> empty_out;
             auto err_code = CO_AWAIT caller->add_ref(protocol_version,
                 zone_id_.as_destination_channel(),
                 destination_zone_id,
@@ -645,7 +663,9 @@ namespace rpc
                 caller_zone_id,
                 known_direction_zone(zone_id_),
                 rpc::add_ref_options::build_caller_route,
-                temp_ref_count);
+                temp_ref_count,
+                empty_in,
+                empty_out);
             std::ignore = err_code;
             RPC_ASSERT(err_code == error::OK());
         }
@@ -740,6 +760,8 @@ namespace rpc
 #endif
             // note the caller_channel_zone_id is 0 as the caller came from this route
             uint64_t temp_ref_count;
+            std::vector<back_channel_entry> empty_in;
+            std::vector<back_channel_entry> empty_out;
             auto err = CO_AWAIT caller->add_ref(protocol_version,
                 {0},
                 zone_id_.as_destination(),
@@ -748,7 +770,9 @@ namespace rpc
                 caller_zone_id,
                 known_direction_zone(zone_id_),
                 rpc::add_ref_options::build_caller_route,
-                temp_ref_count);
+                temp_ref_count,
+                empty_in,
+                empty_out);
             std::ignore = err;
         }
         CO_RETURN{stub->get_id(), zone_id_.as_destination()};
@@ -768,7 +792,9 @@ namespace rpc
     }
     CORO_TASK(int)
     service::try_cast(
-        uint64_t protocol_version, destination_zone destination_zone_id, object object_id, interface_ordinal interface_id)
+        uint64_t protocol_version, destination_zone destination_zone_id, object object_id, interface_ordinal interface_id,
+        const std::vector<back_channel_entry>& in_back_channel,
+        std::vector<back_channel_entry>& out_back_channel)
     {
         current_service_tracker tracker(this);
         if (destination_zone_id != zone_id_.as_destination())
@@ -795,7 +821,7 @@ namespace rpc
             }
 #endif
             other_zone->add_external_ref();
-            auto result = CO_AWAIT other_zone->try_cast(protocol_version, destination_zone_id, object_id, interface_id);
+            auto result = CO_AWAIT other_zone->try_cast(protocol_version, destination_zone_id, object_id, interface_id, in_back_channel, out_back_channel);
             // Balance external ref taken when building route; then drop unused proxies
             other_zone->release_external_ref();
             CO_RETURN result;
@@ -827,7 +853,9 @@ namespace rpc
         caller_zone caller_zone_id,
         known_direction_zone known_direction_zone_id,
         add_ref_options build_out_param_channel,
-        uint64_t& reference_count)
+        uint64_t& reference_count,
+        const std::vector<back_channel_entry>& in_back_channel,
+        std::vector<back_channel_entry>& out_back_channel)
     {
         // note if known_direction_zone_id is always 0 test_y_topology_and_set_host_with_prong_object will fail.
         // known_direction_zone_id.get_val() = 0;
@@ -900,6 +928,8 @@ namespace rpc
                         zone_id_, destination_zone_id, {0}, caller_zone_id, object_id, build_out_param_channel);
                 }
 #endif
+                std::vector<back_channel_entry> empty_in;
+                std::vector<back_channel_entry> empty_out;
                 CO_RETURN CO_AWAIT destination->add_ref(protocol_version,
                     {0},
                     destination_zone_id,
@@ -908,7 +938,9 @@ namespace rpc
                     caller_zone_id,
                     known_direction_zone_id,
                     build_out_param_channel,
-                    reference_count);
+                    reference_count,
+                    empty_in,
+                    empty_out);
             }
             else if (build_channel)
             {
@@ -1025,6 +1057,8 @@ namespace rpc
                                 }
 #endif
 
+                                std::vector<back_channel_entry> empty_in;
+                                std::vector<back_channel_entry> empty_out;
                                 auto ret = CO_AWAIT destination->add_ref(protocol_version,
                                     {0},
                                     destination_zone_id,
@@ -1033,7 +1067,9 @@ namespace rpc
                                     caller_zone_id,
                                     known_direction_zone_id,
                                     build_out_param_channel,
-                                    reference_count);
+                                    reference_count,
+                                    empty_in,
+                                    empty_out);
                                 destination->release_external_ref(); // perhaps this could be optimised
                                 if (ret != rpc::error::OK())
                                 {
@@ -1059,6 +1095,8 @@ namespace rpc
                             }
 #endif
                             uint64_t temp_ref_count;
+                            std::vector<back_channel_entry> empty_in;
+                            std::vector<back_channel_entry> empty_out;
                             auto err = CO_AWAIT destination->add_ref(protocol_version,
                                 {0},
                                 destination_zone_id,
@@ -1067,7 +1105,9 @@ namespace rpc
                                 caller_zone_id,
                                 known_direction_zone_id,
                                 add_ref_options::build_destination_route,
-                                temp_ref_count);
+                                temp_ref_count,
+                                empty_in,
+                                empty_out);
                             RPC_ASSERT(err == error::OK());
                         }
                         // back fill the ref count to the caller
@@ -1086,6 +1126,8 @@ namespace rpc
 #endif
 
                             uint64_t temp_ref_count;
+                            std::vector<back_channel_entry> empty_in;
+                            std::vector<back_channel_entry> empty_out;
                             auto err = CO_AWAIT caller->add_ref(protocol_version,
                                 zone_id_.as_destination_channel(),
                                 destination_zone_id,
@@ -1094,7 +1136,9 @@ namespace rpc
                                 caller_zone_id,
                                 known_direction_zone_id,
                                 add_ref_options::build_caller_route,
-                                temp_ref_count);
+                                temp_ref_count,
+                                empty_in,
+                                empty_out);
                             std::ignore = err;
                         }
                     } while (false);
@@ -1201,6 +1245,8 @@ namespace rpc
                 }
 #endif
 
+                std::vector<back_channel_entry> empty_in;
+                std::vector<back_channel_entry> empty_out;
                 CO_RETURN CO_AWAIT other_zone->add_ref(protocol_version,
                     {0},
                     destination_zone_id,
@@ -1209,7 +1255,9 @@ namespace rpc
                     caller_zone_id,
                     known_direction_zone_id,
                     build_out_param_channel,
-                    reference_count);
+                    reference_count,
+                    empty_in,
+                    empty_out);
             }
         }
         else
@@ -1261,7 +1309,9 @@ namespace rpc
                 }
 #endif
                 uint64_t temp_ref_count;
-                auto err = caller->add_ref(protocol_version,
+                std::vector<back_channel_entry> empty_in;
+                std::vector<back_channel_entry> empty_out;
+                auto err = CO_AWAIT caller->add_ref(protocol_version,
                     {0},
                     destination_zone_id,
                     object_id,
@@ -1269,7 +1319,9 @@ namespace rpc
                     caller_zone_id,
                     known_direction_zone_id,
                     add_ref_options::build_caller_route,
-                    temp_ref_count);
+                    temp_ref_count,
+                    empty_in,
+                    empty_out);
                 std::ignore = err;
             }
             if (object_id == dummy_object_id)
@@ -1383,7 +1435,9 @@ namespace rpc
         object object_id,
         caller_zone caller_zone_id,
         release_options options,
-        uint64_t& reference_count)
+        uint64_t& reference_count,
+        const std::vector<back_channel_entry>& in_back_channel,
+        std::vector<back_channel_entry>& out_back_channel)
     {
         current_service_tracker tracker(this);
 

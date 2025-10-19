@@ -111,7 +111,9 @@ namespace rpc
         method method_id,
         size_t in_size_,
         const char* in_buf_,
-        std::vector<char>& out_buf_)
+        std::vector<char>& out_buf_,
+        const std::vector<back_channel_entry>& in_back_channel,
+        std::vector<back_channel_entry>& out_back_channel)
     {
         if (destination_zone_id != get_destination_zone_id())
         {
@@ -194,8 +196,41 @@ namespace rpc
         return err_code;
     }
 
+    void enclave_service_proxy::post(uint64_t protocol_version,
+        encoding encoding,
+        uint64_t tag,
+        caller_channel_zone caller_channel_zone_id,
+        caller_zone caller_zone_id,
+        destination_zone destination_zone_id,
+        object object_id,
+        interface_ordinal interface_id,
+        method method_id,
+        post_options options,
+        size_t in_size_,
+        const char* in_buf_,
+        const std::vector<back_channel_entry>& in_back_channel)
+    {
+        // Stub implementation for Milestone 1 - ignore back-channel and options for now
+        std::ignore = protocol_version;
+        std::ignore = encoding;
+        std::ignore = tag;
+        std::ignore = caller_channel_zone_id;
+        std::ignore = caller_zone_id;
+        std::ignore = destination_zone_id;
+        std::ignore = object_id;
+        std::ignore = interface_id;
+        std::ignore = method_id;
+        std::ignore = options;
+        std::ignore = in_size_;
+        std::ignore = in_buf_;
+        std::ignore = in_back_channel;
+        RPC_ERROR("post() not implemented for enclave_service_proxy");
+    }
+
     int enclave_service_proxy::try_cast(
-        uint64_t protocol_version, destination_zone destination_zone_id, object object_id, interface_ordinal interface_id)
+        uint64_t protocol_version, destination_zone destination_zone_id, object object_id, interface_ordinal interface_id,
+        const std::vector<back_channel_entry>& in_back_channel,
+        std::vector<back_channel_entry>& out_back_channel)
     {
         int err_code = 0;
         sgx_status_t status = ::try_cast_enclave(
@@ -238,7 +273,9 @@ namespace rpc
         caller_zone caller_zone_id,
         known_direction_zone known_direction_zone_id,
         add_ref_options build_out_param_channel,
-        uint64_t& reference_count)
+        uint64_t& reference_count,
+        const std::vector<back_channel_entry>& in_back_channel,
+        std::vector<back_channel_entry>& out_back_channel)
     {
 #ifdef USE_RPC_TELEMETRY
         if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
@@ -304,7 +341,9 @@ namespace rpc
         object object_id,
         caller_zone caller_zone_id,
         rpc::release_options options,
-        uint64_t& reference_count)
+        uint64_t& reference_count,
+        const std::vector<back_channel_entry>& in_back_channel,
+        std::vector<back_channel_entry>& out_back_channel)
     {
         int err_code = 0;
         sgx_status_t status = ::release_enclave(eid_,

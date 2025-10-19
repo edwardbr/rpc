@@ -467,6 +467,24 @@ namespace rpc
         template<typename Ar> void serialize(Ar& ar) { ar& YAS_OBJECT_NVP("id", ("id", id)); }
     };
 
+    // Back-channel entry for passing metadata alongside RPC calls
+    struct back_channel_entry
+    {
+        uint64_t type_id;              // IDL-generated fingerprint for type identification
+        std::vector<uint8_t> payload;  // Binary payload (application-defined)
+
+        back_channel_entry() = default;
+        back_channel_entry(uint64_t tid, std::vector<uint8_t> p)
+            : type_id(tid), payload(std::move(p))
+        {
+        }
+
+        template<typename Ar> void serialize(Ar& ar)
+        {
+            ar& YAS_OBJECT_NVP("back_channel_entry", ("type_id", type_id), ("payload", payload));
+        }
+    };
+
     struct function_info
     {
         std::string full_name;

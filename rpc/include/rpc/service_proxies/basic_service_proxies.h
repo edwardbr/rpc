@@ -58,7 +58,9 @@ namespace rpc
             method method_id,
             size_t in_size_,
             const char* in_buf_,
-            std::vector<char>& out_buf_) override
+            std::vector<char>& out_buf_,
+            const std::vector<back_channel_entry>& in_back_channel,
+            std::vector<back_channel_entry>& out_back_channel) override
         {
             CO_RETURN CO_AWAIT parent_service_.lock()->send(protocol_version,
                 encoding,
@@ -71,17 +73,21 @@ namespace rpc
                 method_id,
                 in_size_,
                 in_buf_,
-                out_buf_);
+                out_buf_,
+                in_back_channel,
+                out_back_channel);
         }
 
         CORO_TASK(int)
         try_cast(uint64_t protocol_version,
             destination_zone destination_zone_id,
             object object_id,
-            interface_ordinal interface_id) override
+            interface_ordinal interface_id,
+            const std::vector<back_channel_entry>& in_back_channel,
+            std::vector<back_channel_entry>& out_back_channel) override
         {
             CO_RETURN CO_AWAIT parent_service_.lock()->try_cast(
-                protocol_version, destination_zone_id, object_id, interface_id);
+                protocol_version, destination_zone_id, object_id, interface_id, in_back_channel, out_back_channel);
         }
 
         CORO_TASK(int)
@@ -93,7 +99,9 @@ namespace rpc
             caller_zone caller_zone_id,
             known_direction_zone known_direction_zone_id,
             add_ref_options build_out_param_channel,
-            uint64_t& reference_count) override
+            uint64_t& reference_count,
+            const std::vector<back_channel_entry>& in_back_channel,
+            std::vector<back_channel_entry>& out_back_channel) override
         {
             RPC_ASSERT(((std::uint8_t)build_out_param_channel & (std::uint8_t)rpc::add_ref_options::build_caller_route)
                        || destination_channel_zone_id == 0u
@@ -107,7 +115,9 @@ namespace rpc
                 caller_zone_id,
                 known_direction_zone_id,
                 build_out_param_channel,
-                reference_count);
+                reference_count,
+                in_back_channel,
+                out_back_channel);
 
             // auto svc = std::static_pointer_cast<child_service>(get_operating_zone_service());
             CO_RETURN ret;
@@ -119,11 +129,43 @@ namespace rpc
             object object_id,
             caller_zone caller_zone_id,
             release_options options,
-            uint64_t& reference_count) override
+            uint64_t& reference_count,
+            const std::vector<back_channel_entry>& in_back_channel,
+            std::vector<back_channel_entry>& out_back_channel) override
         {
             auto ret = CO_AWAIT parent_service_.lock()->release(
-                protocol_version, destination_zone_id, object_id, caller_zone_id, options, reference_count);
+                protocol_version, destination_zone_id, object_id, caller_zone_id, options, reference_count, in_back_channel, out_back_channel);
             CO_RETURN ret;
+        }
+
+        CORO_TASK(void)
+        post(uint64_t protocol_version,
+            encoding encoding,
+            uint64_t tag,
+            caller_channel_zone caller_channel_zone_id,
+            caller_zone caller_zone_id,
+            destination_zone destination_zone_id,
+            object object_id,
+            interface_ordinal interface_id,
+            method method_id,
+            post_options options,
+            size_t in_size_,
+            const char* in_buf_,
+            const std::vector<back_channel_entry>& in_back_channel) override
+        {
+            CO_RETURN CO_AWAIT parent_service_.lock()->post(protocol_version,
+                encoding,
+                tag,
+                caller_channel_zone_id,
+                caller_zone_id,
+                destination_zone_id,
+                object_id,
+                interface_id,
+                method_id,
+                options,
+                in_size_,
+                in_buf_,
+                in_back_channel);
         }
 
         friend rpc::child_service;
@@ -205,7 +247,9 @@ namespace rpc
             method method_id,
             size_t in_size_,
             const char* in_buf_,
-            std::vector<char>& out_buf_) override
+            std::vector<char>& out_buf_,
+            const std::vector<back_channel_entry>& in_back_channel,
+            std::vector<back_channel_entry>& out_back_channel) override
         {
             auto child_service = child_service_.get_nullable();
             RPC_ASSERT(child_service);
@@ -222,22 +266,24 @@ namespace rpc
                 method_id,
                 in_size_,
                 in_buf_,
-                out_buf_);
+                out_buf_,
+                in_back_channel,
+                out_back_channel);
         }
 
         CORO_TASK(int)
-        try_cast(uint64_t protocol_version
-
-            ,
+        try_cast(uint64_t protocol_version,
             destination_zone destination_zone_id,
             object object_id,
-            interface_ordinal interface_id) override
+            interface_ordinal interface_id,
+            const std::vector<back_channel_entry>& in_back_channel,
+            std::vector<back_channel_entry>& out_back_channel) override
         {
             auto child_service = child_service_.get_nullable();
             RPC_ASSERT(child_service);
             if (!child_service)
                 CO_RETURN rpc::error::ZONE_NOT_INITIALISED();
-            CO_RETURN CO_AWAIT child_service->try_cast(protocol_version, destination_zone_id, object_id, interface_id);
+            CO_RETURN CO_AWAIT child_service->try_cast(protocol_version, destination_zone_id, object_id, interface_id, in_back_channel, out_back_channel);
         }
         CORO_TASK(int)
         add_ref(uint64_t protocol_version,
@@ -248,7 +294,9 @@ namespace rpc
             caller_zone caller_zone_id,
             known_direction_zone known_direction_zone_id,
             add_ref_options build_out_param_channel,
-            uint64_t& reference_count) override
+            uint64_t& reference_count,
+            const std::vector<back_channel_entry>& in_back_channel,
+            std::vector<back_channel_entry>& out_back_channel) override
         {
             auto child_service = child_service_.get_nullable();
             RPC_ASSERT(child_service);
@@ -265,7 +313,9 @@ namespace rpc
                 caller_zone_id,
                 known_direction_zone_id,
                 build_out_param_channel,
-                reference_count);
+                reference_count,
+                in_back_channel,
+                out_back_channel);
             CO_RETURN ret;
         }
         CORO_TASK(int)
@@ -274,7 +324,9 @@ namespace rpc
             object object_id,
             caller_zone caller_zone_id,
             release_options options,
-            uint64_t& reference_count) override
+            uint64_t& reference_count,
+            const std::vector<back_channel_entry>& in_back_channel,
+            std::vector<back_channel_entry>& out_back_channel) override
         {
             auto child_service = child_service_.get_nullable();
             RPC_ASSERT(child_service);
@@ -285,8 +337,42 @@ namespace rpc
             }
 
             auto ret = CO_AWAIT child_service->release(
-                protocol_version, destination_zone_id, object_id, caller_zone_id, options, reference_count);
+                protocol_version, destination_zone_id, object_id, caller_zone_id, options, reference_count, in_back_channel, out_back_channel);
             CO_RETURN ret;
+        }
+
+        CORO_TASK(void)
+        post(uint64_t protocol_version,
+            encoding encoding,
+            uint64_t tag,
+            caller_channel_zone caller_channel_zone_id,
+            caller_zone caller_zone_id,
+            destination_zone destination_zone_id,
+            object object_id,
+            interface_ordinal interface_id,
+            method method_id,
+            post_options options,
+            size_t in_size_,
+            const char* in_buf_,
+            const std::vector<back_channel_entry>& in_back_channel) override
+        {
+            auto child_service = child_service_.get_nullable();
+            RPC_ASSERT(child_service);
+            if (!child_service)
+                CO_RETURN;
+            CO_RETURN CO_AWAIT child_service->post(protocol_version,
+                encoding,
+                tag,
+                caller_channel_zone_id,
+                caller_zone_id,
+                destination_zone_id,
+                object_id,
+                interface_id,
+                method_id,
+                options,
+                in_size_,
+                in_buf_,
+                in_back_channel);
         }
 
     public:
