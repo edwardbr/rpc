@@ -26,13 +26,37 @@ enclave {
             size_t sz_out,                                      // size of out buffer
             [out, size=sz_out] char* data_out,                  // output buffer
             [out] size_t* data_out_sz,                          // size that buffer should be if too small
-            [user_check] void** retry_buffer                    // enclave pointer to serialised data to be copied to the output buffer once it is big enough
+            [user_check] void** retry_buffer                   // enclave pointer to serialised data to be copied to the output buffer once it is big enough
         );
+        
+        public int post_enclave(
+            uint64_t protocol_version,                          // version of the rpc call protocol
+            uint64_t encoding,                                  // format of the serialised data
+            uint64_t tag,                                       // info on the type of the call passed from the idl generator
+            uint64_t caller_channel_zone_id,                    // last zone where the call came from
+            uint64_t caller_zone_id,                            // zone where the call originated from
+            uint64_t destination_zone_id,                       // zone where the call is going to
+            uint64_t object_id,                                 // rpc object index
+            uint64_t interface_id,                              // interface to be called
+            uint64_t method_id,                                 // method to be called
+            size_t sz_in,                                       // size of incoming payload
+            [in, size=sz_in] const char* data_in,               // incoming payload
+            size_t sz_out,                                      // size of out buffer
+            [out, size=sz_out] char* data_out,                  // output buffer
+            [out] size_t* data_out_sz,                          // size that buffer should be if too small
+            [user_check] void** retry_buffer                   // enclave pointer to serialised data to be copied to the output buffer once it is big enough
+        );
+        
         public int try_cast_enclave(
             uint64_t protocol_version,                          // version of the rpc call protocol
             uint64_t destination_zone_id,                       // zone where the call is going to
             uint64_t object_id,                                 // rpc object index
-            uint64_t interface_id                               // interface to be called
+            uint64_t interface_id,                              // interface to be called
+            size_t sz_in_back_channel,                          // size of incoming back-channel data
+            [in, size=sz_in_back_channel] const char* in_back_channel,  // incoming back-channel data
+            size_t sz_out_back_channel,                         // size of out back-channel buffer
+            [out, size=sz_out_back_channel] char* out_back_channel,     // output back-channel buffer
+            [out] size_t* out_back_channel_sz                   // actual size of out back-channel data
         );
         public int add_ref_enclave(
             uint64_t protocol_version,                          // version of the rpc call protocol
@@ -43,7 +67,12 @@ enclave {
             uint64_t caller_zone_id,                            // the original zone where the call came from
             uint64_t known_direction_zone_id,                   // the last zone where the call came from,
             char build_out_param_channel,                       // an rpc add_ref_options flag
-            [out] uint64_t* reference_count                     // reference count output
+            [out] uint64_t* reference_count,                    // reference count output
+            size_t sz_in_back_channel,                          // size of incoming back-channel data
+            [in, size=sz_in_back_channel] const char* in_back_channel,  // incoming back-channel data
+            size_t sz_out_back_channel,                         // size of out back-channel buffer
+            [out, size=sz_out_back_channel] char* out_back_channel,     // output back-channel buffer
+            [out] size_t* out_back_channel_sz                   // actual size of out back-channel data
         );
         public int release_enclave(
             uint64_t protocol_version,                          // version of the rpc call protocol
@@ -51,7 +80,12 @@ enclave {
             uint64_t object_id,                                 // rpc object index
             uint64_t caller_zone_id,                            // the original zone where the call came from
             char options,                                       // an rpc release_options flag
-            [out] uint64_t* reference_count                     // reference count output
+            [out] uint64_t* reference_count,                    // reference count output
+            size_t sz_in_back_channel,                          // size of incoming back-channel data
+            [in, size=sz_in_back_channel] const char* in_back_channel,  // incoming back-channel data
+            size_t sz_out_back_channel,                         // size of out back-channel buffer
+            [out, size=sz_out_back_channel] char* out_back_channel,     // output back-channel buffer
+            [out] size_t* out_back_channel_sz                   // actual size of out back-channel data
         );
     };
 
@@ -70,15 +104,38 @@ enclave {
             [in, size=sz_in] const char* data_in,               // incoming payload
             size_t sz_out,                                      // size of out buffer
             [out, size=sz_out] char* data_out,                  // output buffer
-            [out] size_t* data_out_sz                           // size that buffer should be if too small
+            [out] size_t* data_out_sz                          // size that buffer should be if too small
             );
+            
+
+        int post_host(
+            uint64_t protocol_version,                          // version of the rpc call protocol
+            uint64_t encoding,                                  // format of the serialised data
+            uint64_t tag,                                       // info on the type of the call
+            uint64_t caller_channel_zone_id,                    // last zone where the call came from
+            uint64_t caller_zone_id,                            // the original zone where the call came from,
+            uint64_t destination_zone_id,                       // zone where the call is going to
+            uint64_t object_id,                                 // rpc object index
+            uint64_t interface_id,                              // interface to be called
+            uint64_t method_id,                                 // method to be called
+            size_t sz_in,                                       // size of incoming payload
+            [in, size=sz_in] const char* data_in,               // incoming payload
+            size_t sz_out,                                      // size of out buffer
+            [out, size=sz_out] char* data_out,                  // output buffer
+            [out] size_t* data_out_sz                          // size that buffer should be if too small
+            );            
 
         // for casting interfaces
         int try_cast_host(
             uint64_t protocol_version,                          // version of the rpc call protocol
             uint64_t destination_zone_id,                       // zone where the call is going to
             uint64_t object_id,                                 // rpc object index
-            uint64_t interface_id                               // interface to be called
+            uint64_t interface_id,                              // interface to be called
+            size_t sz_in_back_channel,                          // size of incoming back-channel data
+            [in, size=sz_in_back_channel] const char* in_back_channel,  // incoming back-channel data
+            size_t sz_out_back_channel,                         // size of out back-channel buffer
+            [out, size=sz_out_back_channel] char* out_back_channel,     // output back-channel buffer
+            [out] size_t* out_back_channel_sz                   // actual size of out back-channel data
             );
 
         // for adding reference count
@@ -91,7 +148,12 @@ enclave {
             uint64_t caller_zone_id,                            // the original zone where the call came from,
             uint64_t known_direction_zone_id,                   // the last zone where the call came from,
             char build_out_param_channel,                       // an rpc add_ref_options flag
-            [out] uint64_t* reference_count                     // reference count output
+            [out] uint64_t* reference_count,                    // reference count output
+            size_t sz_in_back_channel,                          // size of incoming back-channel data
+            [in, size=sz_in_back_channel] const char* in_back_channel,  // incoming back-channel data
+            size_t sz_out_back_channel,                         // size of out back-channel buffer
+            [out, size=sz_out_back_channel] char* out_back_channel,     // output back-channel buffer
+            [out] size_t* out_back_channel_sz                   // actual size of out back-channel data
             );
 
         // for decrementing reference counts
@@ -101,7 +163,12 @@ enclave {
             uint64_t object_id,                                 // rpc object index
             uint64_t caller_zone_id,                            // the original zone where the call came from
             char options,                                       // an rpc release_options flag
-            [out] uint64_t* reference_count                     // reference count output
+            [out] uint64_t* reference_count,                    // reference count output
+            size_t sz_in_back_channel,                          // size of incoming back-channel data
+            [in, size=sz_in_back_channel] const char* in_back_channel,  // incoming back-channel data
+            size_t sz_out_back_channel,                         // size of out back-channel buffer
+            [out, size=sz_out_back_channel] char* out_back_channel,     // output back-channel buffer
+            [out] size_t* out_back_channel_sz                   // actual size of out back-channel data
             );
 
         void rpc_log(int level, [in, size=sz] const char* str, size_t sz);

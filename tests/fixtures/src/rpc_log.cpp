@@ -57,6 +57,8 @@ extern "C"
         if (retry_buf.data.empty())
         {
             std::vector<char> out_data(sz_out);
+            std::vector<rpc::back_channel_entry> in_back_channel;
+            std::vector<rpc::back_channel_entry> out_back_channel;
             retry_buf.return_value = CO_AWAIT root_service->send(protocol_version,
                 rpc::encoding(encoding),
                 tag,
@@ -68,7 +70,9 @@ extern "C"
                 {method_id},
                 sz_int,
                 data_in,
-                out_data);
+                out_data,
+                in_back_channel,
+                out_back_channel);
             if (retry_buf.return_value >= rpc::error::MIN() && retry_buf.return_value <= rpc::error::MAX())
             {
                 CO_RETURN retry_buf.return_value;
@@ -96,7 +100,9 @@ extern "C"
             RPC_ERROR("Transport error - no root service in try_cast_host");
             CO_RETURN rpc::error::TRANSPORT_ERROR();
         }
-        int ret = CO_AWAIT root_service->try_cast(protocol_version, {zone_id}, {object_id}, {interface_id});
+        std::vector<rpc::back_channel_entry> in_back_channel;
+        std::vector<rpc::back_channel_entry> out_back_channel;
+        int ret = CO_AWAIT root_service->try_cast(protocol_version, {zone_id}, {object_id}, {interface_id}, in_back_channel, out_back_channel);
         CO_RETURN ret;
     }
 
@@ -118,6 +124,8 @@ extern "C"
             RPC_ERROR("Transport error - no root service in add_ref_host");
             CO_RETURN rpc::error::TRANSPORT_ERROR();
         }
+        std::vector<rpc::back_channel_entry> in_back_channel;
+        std::vector<rpc::back_channel_entry> out_back_channel;
         CO_RETURN CO_AWAIT root_service->add_ref(protocol_version,
             {destination_channel_zone_id},
             {destination_zone_id},
@@ -126,7 +134,9 @@ extern "C"
             {caller_zone_id},
             {known_direction_zone_id}, // known_direction_zone - using 0 for unknown
             static_cast<rpc::add_ref_options>(build_out_param_channel),
-            *reference_count);
+            *reference_count,
+            in_back_channel,
+            out_back_channel);
     }
 
     CORO_TASK(int)
@@ -144,8 +154,10 @@ extern "C"
             RPC_ERROR("Transport error - no root service in release_host");
             CO_RETURN rpc::error::TRANSPORT_ERROR();
         }
+        std::vector<rpc::back_channel_entry> in_back_channel;
+        std::vector<rpc::back_channel_entry> out_back_channel;
         CO_RETURN CO_AWAIT root_service->release(
-            protocol_version, {zone_id}, {object_id}, {caller_zone_id}, static_cast<rpc::release_options>(options), *reference_count);
+            protocol_version, {zone_id}, {object_id}, {caller_zone_id}, static_cast<rpc::release_options>(options), *reference_count, in_back_channel, out_back_channel);
     }
     // #endif
 

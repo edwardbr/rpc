@@ -360,6 +360,90 @@ namespace rpc
     }
 
     CORO_TASK(void)
+    service::post(uint64_t protocol_version,
+        encoding encoding,
+        uint64_t tag,
+        caller_channel_zone caller_channel_zone_id,
+        caller_zone caller_zone_id,
+        destination_zone destination_zone_id,
+        object object_id,
+        interface_ordinal interface_id,
+        method method_id,
+        post_options options,
+        size_t in_size_,
+        const char* in_buf_,
+        const std::vector<back_channel_entry>& in_back_channel)
+    {
+        current_service_tracker tracker(this);
+        if (destination_zone_id != zone_id_.as_destination())
+        {
+            std::shared_ptr<rpc::service_proxy> other_zone;
+            {
+                std::lock_guard g(zone_control);
+                if (auto found = other_zones.find({destination_zone_id, caller_zone_id}); found != other_zones.end())
+                {
+                    other_zone = found->second.lock();
+                }
+            }
+
+            if (!other_zone)
+            {
+                RPC_ERROR("service::post zone not found: {} destination_zone={}, caller_zone={}",
+                    std::to_string(zone_id_),
+                    std::to_string(destination_zone_id),
+                    std::to_string(caller_zone_id));
+                CO_RETURN;
+            }
+
+            CO_AWAIT other_zone->post(protocol_version,
+                encoding,
+                tag,
+                zone_id_.as_caller_channel(),
+                caller_zone_id,
+                destination_zone_id,
+                object_id,
+                interface_id,
+                method_id,
+                options,
+                in_size_,
+                in_buf_,
+                in_back_channel);
+
+            CO_RETURN;
+        }
+        else
+        {
+            if (protocol_version < rpc::LOWEST_SUPPORTED_VERSION || protocol_version > rpc::HIGHEST_SUPPORTED_VERSION)
+            {
+                RPC_ERROR("Unsupported service version {} in post", protocol_version);
+                CO_RETURN;
+            }
+            std::weak_ptr<object_stub> weak_stub = get_object(object_id);
+            auto stub = weak_stub.lock();
+            if (stub == nullptr)
+            {
+                RPC_INFO("Object gone - stub has already been released");
+                CO_RETURN;
+            }
+
+            // For local post, we just call the stub without waiting for a response
+            // Note: back-channel is not applicable for post operations (fire-and-forget)
+            std::vector<char> out_buf_dummy;
+            CO_AWAIT stub->call(protocol_version,
+                encoding,
+                caller_channel_zone_id,
+                caller_zone_id,
+                interface_id,
+                method_id,
+                in_size_,
+                in_buf_,
+                out_buf_dummy);
+
+            CO_RETURN;
+        }
+    }
+
+    CORO_TASK(void)
     service::clean_up_on_failed_connection(const std::shared_ptr<rpc::service_proxy>& destination_zone,
         rpc::shared_ptr<rpc::casting_interface> input_interface)
     {
