@@ -254,6 +254,8 @@ namespace rpc::tcp
         }
 
         std::vector<char> out_buf;
+        std::vector<rpc::back_channel_entry> in_back_channel;
+        std::vector<rpc::back_channel_entry> out_back_channel;
         auto ret = co_await service_->send(prefix.version,
             request.encoding,
             request.tag,
@@ -265,7 +267,9 @@ namespace rpc::tcp
             {request.method_id},
             request.payload.size(),
             request.payload.data(),
-            out_buf);
+            out_buf,
+            in_back_channel,
+            out_back_channel);
 
         if (ret != rpc::error::OK())
         {
@@ -305,8 +309,11 @@ namespace rpc::tcp
         }
 
         std::vector<char> out_buf;
+        std::vector<rpc::back_channel_entry> in_back_channel;
+        std::vector<rpc::back_channel_entry> out_back_channel;
         auto ret = co_await service_->try_cast(
-            prefix.version, {request.destination_zone_id}, {request.object_id}, {request.interface_id});
+            prefix.version, {request.destination_zone_id}, {request.object_id}, {request.interface_id},
+            in_back_channel, out_back_channel);
         if (ret != rpc::error::OK())
         {
             RPC_ERROR("failed try_cast");
@@ -340,6 +347,8 @@ namespace rpc::tcp
 
         std::vector<char> out_buf;
         uint64_t ref_count = 0;
+        std::vector<rpc::back_channel_entry> in_back_channel;
+        std::vector<rpc::back_channel_entry> out_back_channel;
         auto ret = co_await service_->add_ref(prefix.version,
             {request.destination_channel_zone_id},
             {request.destination_zone_id},
@@ -348,7 +357,9 @@ namespace rpc::tcp
             {request.caller_zone_id},
             {request.known_direction_zone_id},
             (rpc::add_ref_options)request.build_out_param_channel,
-            ref_count);
+            ref_count,
+            in_back_channel,
+            out_back_channel);
 
         if (ret != rpc::error::OK())
         {
@@ -384,8 +395,11 @@ namespace rpc::tcp
 
         std::vector<char> out_buf;
         uint64_t ref_count = 0;
+        std::vector<rpc::back_channel_entry> in_back_channel;
+        std::vector<rpc::back_channel_entry> out_back_channel;
         auto ret = co_await service_->release(
-            prefix.version, {request.destination_zone_id}, {request.object_id}, {request.caller_zone_id}, static_cast<rpc::release_options>(request.options), ref_count);
+            prefix.version, {request.destination_zone_id}, {request.object_id}, {request.caller_zone_id}, static_cast<rpc::release_options>(request.options), ref_count,
+            in_back_channel, out_back_channel);
 
         if (ret != rpc::error::OK())
         {

@@ -56,8 +56,23 @@ extern "C"
         }
         if (retry_buf.data.empty())
         {
-            std::vector<char> out_data(sz_out);
+            // Split combined input buffer into payload + back-channel
+            size_t payload_size = 0;
+            std::vector<char> payload;
             std::vector<rpc::back_channel_entry> in_back_channel;
+
+            if (sz_int > 0)
+            {
+                yas::mem_istream is(data_in, sz_int);
+                yas::binary_iarchive<yas::mem_istream, yas::binary | yas::no_header> ia(is);
+                ia& payload_size;  // Read payload size
+                payload.resize(payload_size);
+                if (payload_size > 0)
+                    ia.read(payload.data(), payload_size);  // Read payload data
+                ia& in_back_channel;  // Read back-channel
+            }
+
+            std::vector<char> out_data(sz_out);
             std::vector<rpc::back_channel_entry> out_back_channel;
             retry_buf.return_value = CO_AWAIT root_service->send(protocol_version,
                 rpc::encoding(encoding),
@@ -68,8 +83,8 @@ extern "C"
                 {object_id},
                 {interface_id},
                 {method_id},
-                sz_int,
-                data_in,
+                payload_size,
+                payload.data(),
                 out_data,
                 in_back_channel,
                 out_back_channel);
@@ -77,7 +92,16 @@ extern "C"
             {
                 CO_RETURN retry_buf.return_value;
             }
-            retry_buf.data.swap(out_data);
+
+            // Combine output payload + back-channel into single buffer
+            yas::mem_ostream os;
+            yas::binary_oarchive<yas::mem_ostream, yas::binary | yas::no_header> oa(os);
+            oa& out_data.size();  // Write payload size
+            if (out_data.size() > 0)
+                oa.write(out_data.data(), out_data.size());  // Write payload
+            oa& out_back_channel;  // Write back-channel
+            auto yas_buf = os.get_shared_buffer();
+            retry_buf.data.assign(yas_buf.data.get(), yas_buf.data.get() + yas_buf.size);
         }
         *data_out_sz = retry_buf.data.size();
         if (*data_out_sz > sz_out)
@@ -85,6 +109,66 @@ extern "C"
         memcpy(data_out, retry_buf.data.data(), retry_buf.data.size());
         retry_buf.data.clear();
         CO_RETURN retry_buf.return_value;
+    }
+
+    CORO_TASK(int)
+    post_host(uint64_t protocol_version // version of the rpc call protocol
+        ,
+        uint64_t encoding // format of the serialised data
+        ,
+        uint64_t tag // info on the type of the call
+        ,
+        uint64_t caller_channel_zone_id,
+        uint64_t caller_zone_id,
+        uint64_t destination_zone_id,
+        uint64_t object_id,
+        uint64_t interface_id,
+        uint64_t method_id,
+        uint64_t post_options_val,
+        size_t sz_int,
+        const char* data_in,
+        size_t* data_out_sz)
+    {
+        auto root_service = current_host_service.lock();
+        if (!root_service)
+        {
+            RPC_ERROR("Transport error - no root service in post_host");
+            CO_RETURN rpc::error::TRANSPORT_ERROR();
+        }
+
+        // Split combined input buffer into payload + back-channel
+        size_t payload_size = 0;
+        std::vector<char> payload;
+        std::vector<rpc::back_channel_entry> in_back_channel;
+
+        if (sz_int > 0)
+        {
+            yas::mem_istream is(data_in, sz_int);
+            yas::binary_iarchive<yas::mem_istream, yas::binary | yas::no_header> ia(is);
+            ia& payload_size;  // Read payload size
+            payload.resize(payload_size);
+            if (payload_size > 0)
+                ia.read(payload.data(), payload_size);  // Read payload data
+            ia& in_back_channel;  // Read back-channel
+        }
+
+        CO_AWAIT root_service->post(protocol_version,
+            rpc::encoding(encoding),
+            tag,
+            {caller_channel_zone_id},
+            {caller_zone_id},
+            {destination_zone_id},
+            {object_id},
+            {interface_id},
+            {method_id},
+            static_cast<rpc::post_options>(post_options_val),
+            payload_size,
+            payload.data(),
+            in_back_channel);
+
+        // Fire and forget - no output
+        *data_out_sz = 0;
+        CO_RETURN rpc::error::OK();
     }
 
     CORO_TASK(int)

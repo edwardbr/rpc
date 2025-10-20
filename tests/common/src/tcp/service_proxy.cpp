@@ -146,7 +146,9 @@ namespace rpc::tcp
         method method_id,
         size_t in_size_,
         const char* in_buf_,
-        std::vector<char>& out_buf_)
+        std::vector<char>& out_buf_,
+        const std::vector<back_channel_entry>& in_back_channel,
+        std::vector<back_channel_entry>& out_back_channel)
     {
         // RPC_DEBUG("send {}", get_zone_id());
 
@@ -187,9 +189,45 @@ namespace rpc::tcp
         CO_RETURN call_receive.err_code;
     }
 
+    CORO_TASK(void)
+    service_proxy::post(uint64_t protocol_version,
+        encoding encoding,
+        uint64_t tag,
+        caller_channel_zone caller_channel_zone_id,
+        caller_zone caller_zone_id,
+        destination_zone destination_zone_id,
+        object object_id,
+        interface_ordinal interface_id,
+        method method_id,
+        post_options options,
+        size_t in_size_,
+        const char* in_buf_,
+        const std::vector<back_channel_entry>& in_back_channel)
+    {
+        // Fire-and-forget - just send, don't wait for response
+        if (destination_zone_id != get_destination_zone_id())
+        {
+            RPC_ERROR("failed service_proxy::post ZONE_NOT_SUPPORTED");
+            CO_RETURN;
+        }
+
+        if (!connection_)
+        {
+            RPC_ERROR("failed service_proxy::post SERVICE_PROXY_LOST_CONNECTION");
+            CO_RETURN;
+        }
+
+        // For now, TCP post is not implemented - would need fire-and-forget message type
+        // This is a placeholder that logs the attempt
+        RPC_WARNING("TCP post() not yet implemented - falling back to fire-and-forget behavior");
+        CO_RETURN;
+    }
+
     CORO_TASK(int)
     service_proxy::try_cast(
-        uint64_t protocol_version, destination_zone destination_zone_id, object object_id, interface_ordinal interface_id)
+        uint64_t protocol_version, destination_zone destination_zone_id, object object_id, interface_ordinal interface_id,
+        const std::vector<back_channel_entry>& in_back_channel,
+        std::vector<back_channel_entry>& out_back_channel)
     {
         // RPC_DEBUG("try_cast {}", get_zone_id());
 
@@ -227,7 +265,9 @@ namespace rpc::tcp
         caller_zone caller_zone_id,
         known_direction_zone known_direction_zone_id,
         rpc::add_ref_options build_out_param_channel,
-        uint64_t& reference_count)
+        uint64_t& reference_count,
+        const std::vector<back_channel_entry>& in_back_channel,
+        std::vector<back_channel_entry>& out_back_channel)
     {
         // RPC_DEBUG("add_ref {}", get_zone_id());
 
@@ -289,7 +329,9 @@ namespace rpc::tcp
         object object_id,
         caller_zone caller_zone_id,
         rpc::release_options options,
-        uint64_t& reference_count)
+        uint64_t& reference_count,
+        const std::vector<back_channel_entry>& in_back_channel,
+        std::vector<back_channel_entry>& out_back_channel)
     {
         RPC_ERROR("release zone: {}", get_zone_id().get_val());
 

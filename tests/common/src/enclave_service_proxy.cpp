@@ -121,6 +121,22 @@ namespace rpc
             return rpc::error::ZONE_NOT_SUPPORTED();
         }
 
+        // Combine payload + back-channel into single buffer using YAS serialization
+        std::vector<char> combined_in;
+        {
+            yas::mem_ostream os;
+            yas::binary_oarchive<yas::mem_ostream, yas::binary | yas::no_header> oa(os);
+            oa& in_size_;  // First write payload size
+            if (in_size_ > 0)
+                oa.write(in_buf_, in_size_);  // Then payload data
+            oa& in_back_channel;  // Then back-channel vector
+            auto yas_buf = os.get_shared_buffer();
+            combined_in.assign(yas_buf.data.get(), yas_buf.data.get() + yas_buf.size);
+        }
+
+        // Prepare combined output buffer (will be split later)
+        std::vector<char> combined_out(out_buf_.size() + 4096);  // Add space for back-channel
+
         int err_code = 0;
         size_t data_out_sz = 0;
         void* tls = nullptr;
@@ -135,10 +151,10 @@ namespace rpc
             object_id.get_val(),
             interface_id.get_val(),
             method_id.get_val(),
-            in_size_,
-            in_buf_,
-            out_buf_.size(),
-            out_buf_.data(),
+            combined_in.size(),
+            combined_in.data(),
+            combined_out.size(),
+            combined_out.data(),
             &data_out_sz,
             &tls);
 
@@ -159,7 +175,7 @@ namespace rpc
         if (err_code == rpc::error::NEED_MORE_MEMORY())
         {
             // data too small reallocate memory and try again
-            out_buf_.resize(data_out_sz);
+            combined_out.resize(data_out_sz);
 
             status = ::call_enclave(eid_,
                 &err_code,
@@ -172,10 +188,10 @@ namespace rpc
                 object_id.get_val(),
                 interface_id.get_val(),
                 method_id.get_val(),
-                in_size_,
-                in_buf_,
-                out_buf_.size(),
-                out_buf_.data(),
+                combined_in.size(),
+                combined_in.data(),
+                combined_out.size(),
+                combined_out.data(),
                 &data_out_sz,
                 &tls);
             if (status)
@@ -191,6 +207,19 @@ namespace rpc
                 RPC_ASSERT(false);
                 return rpc::error::TRANSPORT_ERROR();
             }
+        }
+
+        // Split combined output back into payload + back-channel
+        if (err_code == rpc::error::OK() && data_out_sz > 0)
+        {
+            yas::mem_istream is(combined_out.data(), data_out_sz);
+            yas::binary_iarchive<yas::mem_istream, yas::binary | yas::no_header> ia(is);
+            size_t payload_size = 0;
+            ia& payload_size;  // Read payload size
+            out_buf_.resize(payload_size);
+            if (payload_size > 0)
+                ia.read(out_buf_.data(), payload_size);  // Read payload
+            ia& out_back_channel;  // Read back-channel
         }
 
         return err_code;
@@ -210,21 +239,58 @@ namespace rpc
         const char* in_buf_,
         const std::vector<back_channel_entry>& in_back_channel)
     {
-        // Stub implementation for Milestone 1 - ignore back-channel and options for now
-        std::ignore = protocol_version;
-        std::ignore = encoding;
-        std::ignore = tag;
-        std::ignore = caller_channel_zone_id;
-        std::ignore = caller_zone_id;
-        std::ignore = destination_zone_id;
-        std::ignore = object_id;
-        std::ignore = interface_id;
-        std::ignore = method_id;
-        std::ignore = options;
-        std::ignore = in_size_;
-        std::ignore = in_buf_;
-        std::ignore = in_back_channel;
-        RPC_ERROR("post() not implemented for enclave_service_proxy");
+        if (destination_zone_id != get_destination_zone_id())
+        {
+            RPC_ERROR("Zone not supported");
+            return;
+        }
+
+        // Combine payload + back-channel into single buffer using YAS serialization
+        std::vector<char> combined_in;
+        {
+            yas::mem_ostream os;
+            yas::binary_oarchive<yas::mem_ostream, yas::binary | yas::no_header> oa(os);
+            oa& in_size_;  // First write payload size
+            if (in_size_ > 0)
+                oa.write(in_buf_, in_size_);  // Then payload data
+            oa& in_back_channel;  // Then back-channel vector
+            auto yas_buf = os.get_shared_buffer();
+            combined_in.assign(yas_buf.data.get(), yas_buf.data.get() + yas_buf.size);
+        }
+
+        size_t data_out_sz = 0;
+        void* tls = nullptr;
+
+        int err_code = 0;
+        sgx_status_t status = ::post_enclave(eid_,
+            &err_code,
+            protocol_version,
+            (uint64_t)encoding,
+            tag,
+            caller_channel_zone_id.get_val(),
+            caller_zone_id.get_val(),
+            destination_zone_id.get_val(),
+            object_id.get_val(),
+            interface_id.get_val(),
+            method_id.get_val(),
+            (uint64_t)options,
+            combined_in.size(),
+            combined_in.data(),
+            &data_out_sz,
+            &tls);
+
+        if (status)
+        {
+#ifdef USE_RPC_TELEMETRY
+            if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
+            {
+                auto error_message = std::string("post_enclave failed ") + std::to_string(status);
+                telemetry_service->message(rpc::i_telemetry_service::err, error_message.c_str());
+            }
+#endif
+            RPC_ERROR("post_enclave gave an enclave error {}", (int)status);
+        }
+        // Fire and forget - ignore err_code for post
     }
 
     int enclave_service_proxy::try_cast(
@@ -232,20 +298,31 @@ namespace rpc
         const std::vector<back_channel_entry>& in_back_channel,
         std::vector<back_channel_entry>& out_back_channel)
     {
+        // Serialize back-channel for EDL
+        std::vector<char> in_bc_buf, out_bc_buf(1024);
+        {
+            yas::mem_ostream os;
+            yas::binary_oarchive<yas::mem_ostream, yas::binary | yas::no_header> oa(os);
+            oa& in_back_channel;
+            auto yas_buf = os.get_shared_buffer();
+            in_bc_buf.assign(yas_buf.data.get(), yas_buf.data.get() + yas_buf.size);
+        }
+
         int err_code = 0;
-        sgx_status_t status = ::try_cast_enclave(
-            eid_, &err_code, protocol_version, destination_zone_id.get_val(), object_id.get_val(), interface_id.get_val());
+        size_t out_bc_sz = 0;
+        sgx_status_t status = ::try_cast_enclave(eid_, &err_code, protocol_version,
+            destination_zone_id.get_val(), object_id.get_val(), interface_id.get_val(),
+            in_bc_buf.size(), in_bc_buf.data(),
+            out_bc_buf.size(), out_bc_buf.data(), &out_bc_sz);
         if (status == SGX_ERROR_ECALL_NOT_ALLOWED)
         {
             auto task = std::thread(
                 [&]()
                 {
-                    status = ::try_cast_enclave(eid_,
-                        &err_code,
-                        protocol_version,
-                        destination_zone_id.get_val(),
-                        object_id.get_val(),
-                        interface_id.get_val());
+                    status = ::try_cast_enclave(eid_, &err_code, protocol_version,
+                        destination_zone_id.get_val(), object_id.get_val(), interface_id.get_val(),
+                        in_bc_buf.size(), in_bc_buf.data(),
+                        out_bc_buf.size(), out_bc_buf.data(), &out_bc_sz);
                 });
             task.join();
         }
@@ -261,6 +338,14 @@ namespace rpc
             RPC_ERROR("try_cast_enclave gave an enclave error {}", (int)status);
             RPC_ASSERT(false);
             return rpc::error::TRANSPORT_ERROR();
+        }
+
+        // Deserialize output back-channel
+        if (err_code == rpc::error::OK() && out_bc_sz > 0)
+        {
+            yas::mem_istream is(out_bc_buf.data(), out_bc_sz);
+            yas::binary_iarchive<yas::mem_istream, yas::binary | yas::no_header> ia(is);
+            ia& out_back_channel;
         }
         return err_code;
     }
@@ -288,7 +373,18 @@ namespace rpc
                 build_out_param_channel);
         }
 #endif
+        // Serialize back-channel
+        std::vector<char> in_bc_buf, out_bc_buf(1024);
+        {
+            yas::mem_ostream os;
+            yas::binary_oarchive<yas::mem_ostream, yas::binary | yas::no_header> oa(os);
+            oa& in_back_channel;
+            auto yas_buf = os.get_shared_buffer();
+            in_bc_buf.assign(yas_buf.data.get(), yas_buf.data.get() + yas_buf.size);
+        }
+
         int err_code = 0;
+        size_t out_bc_sz = 0;
         sgx_status_t status = ::add_ref_enclave(eid_,
             &err_code,
             protocol_version,
@@ -299,7 +395,9 @@ namespace rpc
             caller_zone_id.get_val(),
             known_direction_zone_id.get_val(),
             (uint8_t)build_out_param_channel,
-            &reference_count);
+            &reference_count,
+            in_bc_buf.size(), in_bc_buf.data(),
+            out_bc_buf.size(), out_bc_buf.data(), &out_bc_sz);
         if (status == SGX_ERROR_ECALL_NOT_ALLOWED)
         {
             auto task = std::thread(
@@ -315,7 +413,9 @@ namespace rpc
                         caller_zone_id.get_val(),
                         known_direction_zone_id.get_val(),
                         (uint8_t)build_out_param_channel,
-                        &reference_count);
+                        &reference_count,
+                        in_bc_buf.size(), in_bc_buf.data(),
+                        out_bc_buf.size(), out_bc_buf.data(), &out_bc_sz);
                 });
             task.join();
         }
@@ -333,6 +433,13 @@ namespace rpc
             reference_count = 0;
             return rpc::error::ZONE_NOT_FOUND();
         }
+        // Deserialize output back-channel
+        if (err_code == rpc::error::OK() && out_bc_sz > 0)
+        {
+            yas::mem_istream is(out_bc_buf.data(), out_bc_sz);
+            yas::binary_iarchive<yas::mem_istream, yas::binary | yas::no_header> ia(is);
+            ia& out_back_channel;
+        }
         return err_code;
     }
 
@@ -345,7 +452,18 @@ namespace rpc
         const std::vector<back_channel_entry>& in_back_channel,
         std::vector<back_channel_entry>& out_back_channel)
     {
+        // Serialize back-channel
+        std::vector<char> in_bc_buf, out_bc_buf(1024);
+        {
+            yas::mem_ostream os;
+            yas::binary_oarchive<yas::mem_ostream, yas::binary | yas::no_header> oa(os);
+            oa& in_back_channel;
+            auto yas_buf = os.get_shared_buffer();
+            in_bc_buf.assign(yas_buf.data.get(), yas_buf.data.get() + yas_buf.size);
+        }
+
         int err_code = 0;
+        size_t out_bc_sz = 0;
         sgx_status_t status = ::release_enclave(eid_,
             &err_code,
             protocol_version,
@@ -353,7 +471,9 @@ namespace rpc
             object_id.get_val(),
             caller_zone_id.get_val(),
             static_cast<char>(options),
-            &reference_count);
+            &reference_count,
+            in_bc_buf.size(), in_bc_buf.data(),
+            out_bc_buf.size(), out_bc_buf.data(), &out_bc_sz);
         if (status == SGX_ERROR_ECALL_NOT_ALLOWED)
         {
             auto task = std::thread(
@@ -366,7 +486,9 @@ namespace rpc
                         object_id.get_val(),
                         caller_zone_id.get_val(),
                         static_cast<char>(options),
-                        &reference_count);
+                        &reference_count,
+                        in_bc_buf.size(), in_bc_buf.data(),
+                        out_bc_buf.size(), out_bc_buf.data(), &out_bc_sz);
                 });
             task.join();
         }
@@ -383,6 +505,13 @@ namespace rpc
             RPC_ASSERT(false);
             reference_count = 0;
             return rpc::error::ZONE_NOT_FOUND();
+        }
+        // Deserialize output back-channel
+        if (err_code == rpc::error::OK() && out_bc_sz > 0)
+        {
+            yas::mem_istream is(out_bc_buf.data(), out_bc_sz);
+            yas::binary_iarchive<yas::mem_istream, yas::binary | yas::no_header> ia(is);
+            ia& out_back_channel;
         }
         return err_code;
     }

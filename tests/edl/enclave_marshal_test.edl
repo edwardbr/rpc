@@ -21,10 +21,10 @@ enclave {
             uint64_t object_id,                                 // rpc object index
             uint64_t interface_id,                              // interface to be called
             uint64_t method_id,                                 // method to be called
-            size_t sz_in,                                       // size of incoming payload
-            [in, size=sz_in] const char* data_in,               // incoming payload
-            size_t sz_out,                                      // size of out buffer
-            [out, size=sz_out] char* data_out,                  // output buffer
+            size_t sz_in,                                       // size of incoming combined payload + back-channel
+            [in, size=sz_in] const char* data_in,               // incoming combined payload + back-channel
+            size_t sz_out,                                      // size of out buffer for combined output + back-channel
+            [out, size=sz_out] char* data_out,                  // output buffer for combined output + back-channel
             [out] size_t* data_out_sz,                          // size that buffer should be if too small
             [user_check] void** retry_buffer                   // enclave pointer to serialised data to be copied to the output buffer once it is big enough
         );
@@ -39,10 +39,9 @@ enclave {
             uint64_t object_id,                                 // rpc object index
             uint64_t interface_id,                              // interface to be called
             uint64_t method_id,                                 // method to be called
-            size_t sz_in,                                       // size of incoming payload
-            [in, size=sz_in] const char* data_in,               // incoming payload
-            size_t sz_out,                                      // size of out buffer
-            [out, size=sz_out] char* data_out,                  // output buffer
+            uint64_t post_options_val,                          // post_options flags
+            size_t sz_in,                                       // size of incoming combined payload + back-channel
+            [in, size=sz_in] const char* data_in,               // incoming combined payload + back-channel
             [out] size_t* data_out_sz,                          // size that buffer should be if too small
             [user_check] void** retry_buffer                   // enclave pointer to serialised data to be copied to the output buffer once it is big enough
         );
@@ -100,10 +99,10 @@ enclave {
             uint64_t object_id,                                 // rpc object index
             uint64_t interface_id,                              // interface to be called
             uint64_t method_id,                                 // method to be called
-            size_t sz_in,                                       // size of incoming payload
-            [in, size=sz_in] const char* data_in,               // incoming payload
-            size_t sz_out,                                      // size of out buffer
-            [out, size=sz_out] char* data_out,                  // output buffer
+            size_t sz_in,                                       // size of incoming combined payload + back-channel
+            [in, size=sz_in] const char* data_in,               // incoming combined payload + back-channel
+            size_t sz_out,                                      // size of out buffer for combined output + back-channel
+            [out, size=sz_out] char* data_out,                  // output buffer for combined output + back-channel
             [out] size_t* data_out_sz                          // size that buffer should be if too small
             );
             
@@ -118,10 +117,9 @@ enclave {
             uint64_t object_id,                                 // rpc object index
             uint64_t interface_id,                              // interface to be called
             uint64_t method_id,                                 // method to be called
-            size_t sz_in,                                       // size of incoming payload
-            [in, size=sz_in] const char* data_in,               // incoming payload
-            size_t sz_out,                                      // size of out buffer
-            [out, size=sz_out] char* data_out,                  // output buffer
+            uint64_t post_options_val,                          // post_options flags
+            size_t sz_in,                                       // size of incoming combined payload + back-channel
+            [in, size=sz_in] const char* data_in,               // incoming combined payload + back-channel
             [out] size_t* data_out_sz                          // size that buffer should be if too small
             );            
 
