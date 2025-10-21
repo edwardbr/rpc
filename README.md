@@ -109,3 +109,7 @@ Currently tested on Compilers:
 Though strongly suggest upgrading to the latest version of these compilers
 
 SHA3 Credit to: https://github.com/brainhub/SHA3IUF
+
+Me talking about this library: https://youtu.be/Jj9YTd3PBrs?si=frO4hDyxHxHljmK2
+
+And the powerpoint that came with it: [RPC++_Remote_Procedure_Calls_for_the_Modern_Era.pptx](https://github.com/user-attachments/files/23019652/RPC%2B%2B_Remote_Procedure_Calls_for_the_Modern_Era.pptx)
