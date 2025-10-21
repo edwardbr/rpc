@@ -23,7 +23,7 @@
 
 // RPC headers
 #include <rpc/rpc.h>
-#include "rpc/service_proxies/basic_service_proxies.h"
+#include "rpc/service_proxies/local/basic_service_proxies.h"
 #ifdef USE_RPC_TELEMETRY
 #include <rpc/telemetry/i_telemetry_service.h>
 #include <rpc/telemetry/multiplexing_telemetry_service.h>

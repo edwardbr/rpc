@@ -17,6 +17,7 @@
 #include <rpc/internal/serialiser.h>
 #include <rpc/internal/marshaller.h>
 #include <rpc/internal/version.h>
+#include <rpc/internal/transport.h>
 
 #ifdef USE_RPC_TELEMETRY
 #include <rpc/telemetry/i_telemetry_service.h>
@@ -29,6 +30,7 @@ namespace rpc
     class child_service;
     class object_proxy;
     class i_marshaller;
+    class transport;
 
     // the class that encapsulates an environment or zone
     // only host code can use this class directly other enclaves *may* have access to the i_service_proxy derived interface
@@ -45,6 +47,9 @@ namespace rpc
         // if this service proxy represents a child service, hold a strong reference to the parent service to prevent premature destruction
         stdex::member_ptr<service> parent_service_ref_;
         bool is_responsible_for_cleaning_up_service_ = true;
+
+        // Transport for routing calls to remote zones
+        stdex::member_ptr<transport> transport_;
 
         stdex::member_ptr<service_proxy> lifetime_lock_;
         std::atomic<int> lifetime_lock_count_ = 0;
@@ -154,6 +159,66 @@ namespace rpc
             bool new_proxy_added,
             known_direction_zone known_direction_zone_id,
             bool is_optimistic);
+
+        // i_marshaller interface implementation
+        // Routes to transport_ for remote zones or service_ for local zone
+        CORO_TASK(int) send(uint64_t protocol_version,
+            encoding encoding,
+            uint64_t tag,
+            caller_channel_zone caller_channel_zone_id,
+            caller_zone caller_zone_id,
+            destination_zone destination_zone_id,
+            object object_id,
+            interface_ordinal interface_id,
+            method method_id,
+            size_t in_size_,
+            const char* in_buf_,
+            std::vector<char>& out_buf_,
+            const std::vector<rpc::back_channel_entry>& in_back_channel,
+            std::vector<rpc::back_channel_entry>& out_back_channel) override;
+
+        CORO_TASK(void) post(uint64_t protocol_version,
+            encoding encoding,
+            uint64_t tag,
+            caller_channel_zone caller_channel_zone_id,
+            caller_zone caller_zone_id,
+            destination_zone destination_zone_id,
+            object object_id,
+            interface_ordinal interface_id,
+            method method_id,
+            post_options options,
+            size_t in_size_,
+            const char* in_buf_,
+            const std::vector<rpc::back_channel_entry>& in_back_channel) override;
+
+        CORO_TASK(int) try_cast(
+            uint64_t protocol_version,
+            destination_zone destination_zone_id,
+            object object_id,
+            interface_ordinal interface_id,
+            const std::vector<rpc::back_channel_entry>& in_back_channel,
+            std::vector<rpc::back_channel_entry>& out_back_channel) override;
+
+        CORO_TASK(int) add_ref(uint64_t protocol_version,
+            destination_channel_zone destination_channel_zone_id,
+            destination_zone destination_zone_id,
+            object object_id,
+            caller_channel_zone caller_channel_zone_id,
+            caller_zone caller_zone_id,
+            known_direction_zone known_direction_zone_id,
+            add_ref_options build_out_param_channel,
+            uint64_t& reference_count,
+            const std::vector<rpc::back_channel_entry>& in_back_channel,
+            std::vector<rpc::back_channel_entry>& out_back_channel) override;
+
+        CORO_TASK(int) release(uint64_t protocol_version,
+            destination_zone destination_zone_id,
+            object object_id,
+            caller_zone caller_zone_id,
+            release_options options,
+            uint64_t& reference_count,
+            const std::vector<rpc::back_channel_entry>& in_back_channel,
+            std::vector<rpc::back_channel_entry>& out_back_channel) override;
 
         friend service;
         friend child_service;

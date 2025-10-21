@@ -622,7 +622,7 @@ namespace stdex {
 - `/rpc/include/rpc/internal/service_proxy.h` - Service proxy class
 - `/rpc/include/rpc/internal/object_proxy.h` - Object proxy class
 - `/rpc/include/rpc/internal/member_ptr.h` - Added stdex::member_ptr
-- `/rpc/include/rpc/service_proxies/basic_service_proxies.h` - Local service proxies
+- `/rpc/include/rpc/service_proxies/local/basic_service_proxies.h` - Local service proxies
 
 **Generator**:
 - `/generator/src/synchronous_generator.cpp` - Updated generated constructor signatures

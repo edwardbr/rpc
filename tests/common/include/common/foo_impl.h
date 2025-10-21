@@ -10,7 +10,7 @@
 #ifdef USE_RPC_TELEMETRY
 #include <rpc/telemetry/i_telemetry_service.h>
 #endif
-#include <rpc/service_proxies/basic_service_proxies.h>
+#include <rpc/service_proxies/local/basic_service_proxies.h>
 
 #include <example_shared/example_shared_stub.h>
 #include <example_import/example_import_stub.h>
