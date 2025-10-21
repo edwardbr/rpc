@@ -155,8 +155,8 @@ namespace rpc::spsc
         size_t in_size_,
         const char* in_buf_,
         std::vector<char>& out_buf_,
-        const std::vector<back_channel_entry>& in_back_channel,
-        std::vector<back_channel_entry>& out_back_channel)
+        const std::vector<rpc::back_channel_entry>& in_back_channel,
+        std::vector<rpc::back_channel_entry>& out_back_channel)
     {
         RPC_DEBUG("send {}", get_zone_id().get_val());
 
@@ -182,7 +182,8 @@ namespace rpc::spsc
                 .object_id = object_id.get_val(),
                 .interface_id = interface_id.get_val(),
                 .method_id = method_id.get_val(),
-                .payload = std::vector<char>(in_buf_, in_buf_ + in_size_)},
+                .payload = std::vector<char>(in_buf_, in_buf_ + in_size_),
+                .back_channel = in_back_channel},
             call_receive);
         if (ret != rpc::error::OK())
         {
@@ -191,6 +192,7 @@ namespace rpc::spsc
         }
 
         out_buf_.swap(call_receive.payload);
+        out_back_channel.swap(call_receive.back_channel);
 
         RPC_DEBUG("send complete {}", get_zone_id().get_val());
 
@@ -210,7 +212,7 @@ namespace rpc::spsc
         post_options options,
         size_t in_size_,
         const char* in_buf_,
-        const std::vector<back_channel_entry>& in_back_channel)
+        const std::vector<rpc::back_channel_entry>& in_back_channel)
     {
         // Fire-and-forget - just send, don't wait for response
         RPC_DEBUG("post {}", get_zone_id().get_val());
@@ -227,17 +229,37 @@ namespace rpc::spsc
             CO_RETURN;
         }
 
-        // For now, SPSC post is not implemented - would need fire-and-forget message type
-        // This is a placeholder that logs the attempt
-        RPC_WARNING("SPSC post() not yet implemented - falling back to fire-and-forget behavior");
+        // Send the post message using the channel manager
+        // Since this is fire-and-forget, we don't wait for a response
+        int ret = CO_AWAIT channel_manager_->send_payload(
+            protocol_version,
+            spsc::message_direction::one_way,  // Use one_way for fire-and-forget
+            spsc::post_send{.encoding = encoding,
+                .tag = tag,
+                .caller_channel_zone_id = caller_channel_zone_id.get_val(),
+                .caller_zone_id = caller_zone_id.get_val(),
+                .destination_zone_id = destination_zone_id.get_val(),
+                .object_id = object_id.get_val(),
+                .interface_id = interface_id.get_val(),
+                .method_id = method_id.get_val(),
+                .options = options,
+                .payload = std::vector<char>(in_buf_, in_buf_ + in_size_),
+                .back_channel = in_back_channel},
+            0);  // sequence number 0 for one-way messages
+        
+        if (ret != rpc::error::OK())
+        {
+            RPC_ERROR("failed service_proxy::post send_payload");
+        }
+
         CO_RETURN;
     }
 
     CORO_TASK(int)
     service_proxy::try_cast(
         uint64_t protocol_version, destination_zone destination_zone_id, object object_id, interface_ordinal interface_id,
-        const std::vector<back_channel_entry>& in_back_channel,
-        std::vector<back_channel_entry>& out_back_channel)
+        const std::vector<rpc::back_channel_entry>& in_back_channel,
+        std::vector<rpc::back_channel_entry>& out_back_channel)
     {
         RPC_DEBUG("try_cast {}", get_zone_id().get_val());
 
@@ -247,14 +269,15 @@ namespace rpc::spsc
             CO_RETURN rpc::error::SERVICE_PROXY_LOST_CONNECTION();
         }
 
-        try_cast_receive try_cast_receive;
+        try_cast_receive response_data;
         int ret = CO_AWAIT channel_manager_->call_peer(protocol_version,
             try_cast_send{
                 .destination_zone_id = destination_zone_id.get_val(),
                 .object_id = object_id.get_val(),
                 .interface_id = interface_id.get_val(),
+                .back_channel = in_back_channel
             },
-            try_cast_receive);
+            response_data);
         if (ret != rpc::error::OK())
         {
             RPC_ERROR("failed try_cast call_peer");
@@ -263,7 +286,8 @@ namespace rpc::spsc
 
         RPC_DEBUG("try_cast complete {}", get_zone_id().get_val());
 
-        CO_RETURN try_cast_receive.err_code;
+        out_back_channel.swap(response_data.back_channel);
+        CO_RETURN response_data.err_code;
     }
 
     CORO_TASK(int)
@@ -276,8 +300,8 @@ namespace rpc::spsc
         known_direction_zone known_direction_zone_id,
         rpc::add_ref_options build_out_param_channel,
         uint64_t& reference_count,
-        const std::vector<back_channel_entry>& in_back_channel,
-        std::vector<back_channel_entry>& out_back_channel)
+        const std::vector<rpc::back_channel_entry>& in_back_channel,
+        std::vector<rpc::back_channel_entry>& out_back_channel)
     {
         RPC_DEBUG("add_ref {}", get_zone_id().get_val());
 
@@ -306,7 +330,8 @@ namespace rpc::spsc
                 .caller_channel_zone_id = caller_channel_zone_id.get_val(),
                 .caller_zone_id = caller_zone_id.get_val(),
                 .known_direction_zone_id = known_direction_zone_id.get_val(),
-                .build_out_param_channel = (add_ref_options)build_out_param_channel},
+                .build_out_param_channel = build_out_param_channel,
+                .back_channel = in_back_channel},
             response_data);
         if (ret != rpc::error::OK())
         {
@@ -315,6 +340,7 @@ namespace rpc::spsc
         }
 
         reference_count = response_data.ref_count;
+        out_back_channel.swap(response_data.back_channel);
         if (response_data.err_code != rpc::error::OK())
         {
             RPC_ERROR("failed addref_receive.err_code failed");
@@ -340,8 +366,8 @@ namespace rpc::spsc
         caller_zone caller_zone_id,
         rpc::release_options options,
         uint64_t& reference_count,
-        const std::vector<back_channel_entry>& in_back_channel,
-        std::vector<back_channel_entry>& out_back_channel)
+        const std::vector<rpc::back_channel_entry>& in_back_channel,
+        std::vector<rpc::back_channel_entry>& out_back_channel)
     {
         RPC_DEBUG("release zone: {}", get_zone_id().get_val());
 
@@ -357,7 +383,8 @@ namespace rpc::spsc
                 .destination_zone_id = destination_zone_id.get_val(),
                 .object_id = object_id.get_val(),
                 .caller_zone_id = caller_zone_id.get_val(),
-                .options = static_cast<release_options>(options),
+                .options = options,
+                .back_channel = in_back_channel
             },
             response_data);
         if (ret != rpc::error::OK())
@@ -383,6 +410,7 @@ namespace rpc::spsc
         RPC_DEBUG("release complete zone: {}", get_zone_id().get_val());
 
         reference_count = response_data.ref_count;
+        out_back_channel.swap(response_data.back_channel);
         CO_RETURN rpc::error::OK();
     }
 }

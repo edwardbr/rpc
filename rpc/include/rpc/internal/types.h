@@ -483,8 +483,12 @@ namespace rpc
         {
             ar& YAS_OBJECT_NVP("back_channel_entry", ("type_id", type_id), ("payload", payload));
         }
+        
+        // compare
+        constexpr bool operator==(const back_channel_entry& val) const { return type_id == val.type_id && payload == val.payload; }
+        constexpr bool operator!=(const back_channel_entry& val) const { return type_id != val.type_id || payload != val.payload; }
     };
-
+    
     struct function_info
     {
         std::string full_name;

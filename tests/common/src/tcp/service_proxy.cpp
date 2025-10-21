@@ -147,8 +147,8 @@ namespace rpc::tcp
         size_t in_size_,
         const char* in_buf_,
         std::vector<char>& out_buf_,
-        const std::vector<back_channel_entry>& in_back_channel,
-        std::vector<back_channel_entry>& out_back_channel)
+        const std::vector<rpc::back_channel_entry>& in_back_channel,
+        std::vector<rpc::back_channel_entry>& out_back_channel)
     {
         // RPC_DEBUG("send {}", get_zone_id());
 
@@ -164,7 +164,7 @@ namespace rpc::tcp
             CO_RETURN rpc::error::SERVICE_PROXY_LOST_CONNECTION();
         }
 
-        tcp::call_receive call_receive;
+        tcp::call_receive response;
         int ret = CO_AWAIT connection_->channel_manager_->call_peer(protocol_version,
             tcp::call_send{.encoding = encoding,
                 .tag = tag,
@@ -174,19 +174,21 @@ namespace rpc::tcp
                 .object_id = object_id.get_val(),
                 .interface_id = interface_id.get_val(),
                 .method_id = method_id.get_val(),
-                .payload = std::vector<char>(in_buf_, in_buf_ + in_size_)},
-            call_receive);
+                .payload = std::vector<char>(in_buf_, in_buf_ + in_size_),
+                .back_channel = in_back_channel},
+            response);
         if (ret != rpc::error::OK())
         {
             RPC_ERROR("failed service_proxy::send call_send");
             CO_RETURN ret;
         }
 
-        out_buf_.swap(call_receive.payload);
+        out_buf_.swap(response.payload);        
+        out_back_channel.swap(response.back_channel);
 
         // RPC_DEBUG("send complete {}", get_zone_id());
 
-        CO_RETURN call_receive.err_code;
+        CO_RETURN response.err_code;
     }
 
     CORO_TASK(void)
@@ -202,7 +204,7 @@ namespace rpc::tcp
         post_options options,
         size_t in_size_,
         const char* in_buf_,
-        const std::vector<back_channel_entry>& in_back_channel)
+        const std::vector<rpc::back_channel_entry>& in_back_channel)
     {
         // Fire-and-forget - just send, don't wait for response
         if (destination_zone_id != get_destination_zone_id())
@@ -217,17 +219,37 @@ namespace rpc::tcp
             CO_RETURN;
         }
 
-        // For now, TCP post is not implemented - would need fire-and-forget message type
-        // This is a placeholder that logs the attempt
-        RPC_WARNING("TCP post() not yet implemented - falling back to fire-and-forget behavior");
+        // Send the post message using the channel manager
+        // Since this is fire-and-forget, we don't wait for a response
+        int ret = CO_AWAIT connection_->channel_manager_->send_payload(
+            protocol_version,
+            tcp::message_direction::one_way,  // Use one_way for fire-and-forget
+            tcp::post_send{.encoding = encoding,
+                .tag = tag,
+                .caller_channel_zone_id = caller_channel_zone_id.get_val(),
+                .caller_zone_id = caller_zone_id.get_val(),
+                .destination_zone_id = destination_zone_id.get_val(),
+                .object_id = object_id.get_val(),
+                .interface_id = interface_id.get_val(),
+                .method_id = method_id.get_val(),
+                .options = options,
+                .payload = std::vector<char>(in_buf_, in_buf_ + in_size_),
+                .back_channel = in_back_channel},
+            0);  // sequence number 0 for one-way messages
+        
+        if (ret != rpc::error::OK())
+        {
+            RPC_ERROR("failed service_proxy::post send_payload");
+        }
+
         CO_RETURN;
     }
 
     CORO_TASK(int)
     service_proxy::try_cast(
         uint64_t protocol_version, destination_zone destination_zone_id, object object_id, interface_ordinal interface_id,
-        const std::vector<back_channel_entry>& in_back_channel,
-        std::vector<back_channel_entry>& out_back_channel)
+        const std::vector<rpc::back_channel_entry>& in_back_channel,
+        std::vector<rpc::back_channel_entry>& out_back_channel)
     {
         // RPC_DEBUG("try_cast {}", get_zone_id());
 
@@ -237,14 +259,15 @@ namespace rpc::tcp
             CO_RETURN rpc::error::SERVICE_PROXY_LOST_CONNECTION();
         }
 
-        tcp::try_cast_receive try_cast_receive;
+        tcp::try_cast_receive response;
         int ret = CO_AWAIT connection_->channel_manager_->call_peer(protocol_version,
             tcp::try_cast_send{
                 .destination_zone_id = destination_zone_id.get_val(),
                 .object_id = object_id.get_val(),
                 .interface_id = interface_id.get_val(),
+                .back_channel = in_back_channel
             },
-            try_cast_receive);
+            response);
         if (ret != rpc::error::OK())
         {
             RPC_ERROR("failed try_cast call_peer");
@@ -253,7 +276,8 @@ namespace rpc::tcp
 
         // RPC_DEBUG("try_cast complete {}", get_zone_id());
 
-        CO_RETURN try_cast_receive.err_code;
+        out_back_channel.swap(response.back_channel);
+        CO_RETURN response.err_code;
     }
 
     CORO_TASK(int)
@@ -266,8 +290,8 @@ namespace rpc::tcp
         known_direction_zone known_direction_zone_id,
         rpc::add_ref_options build_out_param_channel,
         uint64_t& reference_count,
-        const std::vector<back_channel_entry>& in_back_channel,
-        std::vector<back_channel_entry>& out_back_channel)
+        const std::vector<rpc::back_channel_entry>& in_back_channel,
+        std::vector<rpc::back_channel_entry>& out_back_channel)
     {
         // RPC_DEBUG("add_ref {}", get_zone_id());
 
@@ -296,7 +320,8 @@ namespace rpc::tcp
                 .caller_channel_zone_id = caller_channel_zone_id.get_val(),
                 .caller_zone_id = caller_zone_id.get_val(),
                 .known_direction_zone_id = known_direction_zone_id.get_val(),
-                .build_out_param_channel = (tcp::add_ref_options)build_out_param_channel},
+                .build_out_param_channel = build_out_param_channel,
+                .back_channel = in_back_channel},
             response);
         if (ret != rpc::error::OK())
         {
@@ -305,6 +330,7 @@ namespace rpc::tcp
         }
 
         reference_count = response.ref_count;
+        out_back_channel.swap(response.back_channel);
         if (response.err_code != rpc::error::OK())
         {
             RPC_ERROR("failed response.err_code failed");
@@ -330,8 +356,8 @@ namespace rpc::tcp
         caller_zone caller_zone_id,
         rpc::release_options options,
         uint64_t& reference_count,
-        const std::vector<back_channel_entry>& in_back_channel,
-        std::vector<back_channel_entry>& out_back_channel)
+        const std::vector<rpc::back_channel_entry>& in_back_channel,
+        std::vector<rpc::back_channel_entry>& out_back_channel)
     {
         RPC_ERROR("release zone: {}", get_zone_id().get_val());
 
@@ -347,7 +373,8 @@ namespace rpc::tcp
                 .destination_zone_id = destination_zone_id.get_val(),
                 .object_id = object_id.get_val(),
                 .caller_zone_id = caller_zone_id.get_val(),
-                .options = static_cast<tcp::release_options>(options),
+                .options = options,
+                .back_channel = in_back_channel
             },
             response);
         if (ret != rpc::error::OK())
@@ -373,6 +400,7 @@ namespace rpc::tcp
         RPC_ERROR("release complete zone: {}", get_zone_id().get_val());
 
         reference_count = response.ref_count;
+        out_back_channel.swap(response.back_channel);
         CO_RETURN rpc::error::OK();
     }
 }

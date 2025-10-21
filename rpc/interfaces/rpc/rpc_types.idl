@@ -16,4 +16,29 @@ namespace rpc
         // flat_buffers = 32,
         // mpi = 64
     };
+    
+    enum add_ref_options : uint8_t
+    {
+        normal = 0,
+        // when unidirectionally addreffing the destination
+        build_destination_route = 1,
+        // when unidirectionally addreffing the caller which prepares refcounts etc in the reverse direction
+        build_caller_route = 2,
+        // when the add_ref is from optimistic_ptr reference (assumed shared if not set)
+        optimistic = 4
+    };
+    
+    enum release_options : uint8_t
+    {
+        normal = 0,
+        // when the release is from optimistic_ptr reference (assumed shared if not set)
+        optimistic = 1
+    };
+        
+    enum post_options : uint8_t
+    {
+        normal = 1,
+        zone_terminating = 2,
+        release_optimistic = 4
+    };
 }

@@ -144,7 +144,7 @@ The Q12 answer clarifies this is the **service class**, not an i_service interfa
 > };
 >
 > // Back-channel is vector of entries
-> std::vector<back_channel_entry> back_channel_data;
+> std::vector<rpc::back_channel_entry> back_channel_data;
 > ```
 >
 > **Key Properties**:
@@ -152,7 +152,7 @@ The Q12 answer clarifies this is the **service class**, not an i_service interfa
 > - **Pass-Through Semantics**: RPC++ transports back-channel data without interpreting payload contents
 > - **Binary Safe**: Payload can contain any binary data
 
-**Correction**: Use `vector<back_channel_entry>` structure, NOT HTTP headers.
+**Correction**: Use `vector<rpc::back_channel_entry>` structure, NOT HTTP headers.
 
 **Impact**: 🔴 **CRITICAL** - Wire protocol incompatibility.
 
@@ -854,7 +854,7 @@ The Q12 answer clarifies this is the **service class**, not an i_service interfa
    - Service_proxy or transport owns sinks
 
 3. **🔴 Fix Back-Channel Format**
-   - Use `vector<back_channel_entry>` structure
+   - Use `vector<rpc::back_channel_entry>` structure
    - Remove all "HTTP header" references
    - Document type_id generation from IDL
 
@@ -935,7 +935,7 @@ The Q12 answer clarifies this is the **service class**, not an i_service interfa
 | **Transport sharing** | ❌ Missing | ❌ Missing | ❌ Missing | Multiple proxies share transport | All missing |
 | **Both-or-neither** | ❌ Missing | ❌ Missing | ❌ Missing | Critical requirement | All missing |
 | **add_ref design** | ❌ "TODO" | ❌ "TODO" | ❌ "TODO" | Must design, not defer | All incomplete |
-| **Back-channel format** | ❌ HTTP headers | ❌ HTTP headers | ❌ HTTP headers | vector<back_channel_entry> | All wrong |
+| **Back-channel format** | ❌ HTTP headers | ❌ HTTP headers | ❌ HTTP headers | vector<rpc::back_channel_entry> | All wrong |
 | **Sync mode post()** | ❌ Missing | ❌ Missing | ❌ Missing | May need curtailment | All missing |
 
 **Recommendation**: **None of the plans are currently implementable** due to critical errors. Plan C has the best foundation but needs major corrections per above.

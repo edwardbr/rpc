@@ -58,6 +58,7 @@ namespace rpc::tcp
         CORO_TASK(void) stub_handle_try_cast(envelope_prefix prefix, envelope_payload payload);
         CORO_TASK(void) stub_handle_add_ref(envelope_prefix prefix, envelope_payload payload);
         CORO_TASK(void) stub_handle_release(envelope_prefix prefix, envelope_payload payload);
+        CORO_TASK(void) stub_handle_post(envelope_prefix prefix, envelope_payload payload);
 
         void kill_connection() { }
 

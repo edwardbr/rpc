@@ -518,8 +518,8 @@ public:
         std::vector<char>& out_buf_,
 
         // NEW: Back-channel parameters
-        const std::vector<back_channel_entry>& in_back_channel,
-        std::vector<back_channel_entry>& out_back_channel
+        const std::vector<rpc::back_channel_entry>& in_back_channel,
+        std::vector<rpc::back_channel_entry>& out_back_channel
     ) = 0;
 
     // NEW: post() method (fire-and-forget, uni-directional - no out_back_channel)
@@ -538,7 +538,7 @@ public:
         const char* in_buf_,
 
         // NEW: Back-channel parameter (send only, no receive)
-        const std::vector<back_channel_entry>& in_back_channel
+        const std::vector<rpc::back_channel_entry>& in_back_channel
     ) = 0;
 
     // UPDATED: try_cast() with back-channel support
@@ -546,8 +546,8 @@ public:
         // ... existing parameters ...
 
         // NEW: Back-channel parameters
-        const std::vector<back_channel_entry>& in_back_channel,
-        std::vector<back_channel_entry>& out_back_channel
+        const std::vector<rpc::back_channel_entry>& in_back_channel,
+        std::vector<rpc::back_channel_entry>& out_back_channel
     ) = 0;
 
     // UPDATED: add_ref() with back-channel support
@@ -555,8 +555,8 @@ public:
         // ... existing parameters ...
 
         // NEW: Back-channel parameters
-        const std::vector<back_channel_entry>& in_back_channel,
-        std::vector<back_channel_entry>& out_back_channel
+        const std::vector<rpc::back_channel_entry>& in_back_channel,
+        std::vector<rpc::back_channel_entry>& out_back_channel
     ) = 0;
 
     // UPDATED: release() with back-channel support
@@ -564,8 +564,8 @@ public:
         // ... existing parameters ...
 
         // NEW: Back-channel parameters
-        const std::vector<back_channel_entry>& in_back_channel,
-        std::vector<back_channel_entry>& out_back_channel
+        const std::vector<rpc::back_channel_entry>& in_back_channel,
+        std::vector<rpc::back_channel_entry>& out_back_channel
     ) = 0;
 };
 
@@ -588,7 +588,7 @@ struct back_channel_entry {
 };
 
 // Back-channel parameter in i_marshaller methods
-std::vector<back_channel_entry> back_channel_data;
+std::vector<rpc::back_channel_entry> back_channel_data;
 ```
 
 **Key Properties**:

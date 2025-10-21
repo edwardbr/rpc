@@ -9,21 +9,12 @@
 #include <unordered_map>
 #include <mutex>
 
+#include <rpc/rpc_types.h>
+
 // types.h, error_codes.h, and serialiser.h are included by rpc.h
 
 namespace rpc
 {
-    enum class add_ref_options : std::uint8_t
-    {
-        normal = 0,
-        // when unidirectionally addreffing the destination
-        build_destination_route = 1,
-        // when unidirectionally addreffing the caller which prepares refcounts etc in the reverse direction
-        build_caller_route = 2,
-        // when the add_ref is from optimistic_ptr reference (assumed shared if not set)
-        optimistic = 4
-    };
-
     inline add_ref_options operator|(add_ref_options lhs, add_ref_options rhs)
     {
         return static_cast<add_ref_options>(static_cast<std::underlying_type<add_ref_options>::type>(lhs)
@@ -49,13 +40,6 @@ namespace rpc
     {
         return e == static_cast<add_ref_options>(0);
     }
-
-    enum class release_options : std::uint8_t
-    {
-        normal = 0,
-        // when the release is from optimistic_ptr reference (assumed shared if not set)
-        optimistic = 1
-    };
 
     inline release_options operator|(release_options lhs, release_options rhs)
     {
@@ -83,14 +67,6 @@ namespace rpc
         return e == static_cast<release_options>(0);
     }
 
-    enum class post_options : std::uint8_t
-    {
-        normal = 0,
-        // when posting a zone termination notification
-        zone_terminating = 1,
-        // when posting a release for optimistic_ptr
-        release_optimistic = 2
-    };
 
     inline post_options operator|(post_options lhs, post_options rhs)
     {
@@ -135,8 +111,8 @@ namespace rpc
             size_t in_size_,
             const char* in_buf_,
             std::vector<char>& out_buf_,
-            const std::vector<back_channel_entry>& in_back_channel,
-            std::vector<back_channel_entry>& out_back_channel)
+            const std::vector<rpc::back_channel_entry>& in_back_channel,
+            std::vector<rpc::back_channel_entry>& out_back_channel)
             = 0;
         virtual CORO_TASK(void) post(uint64_t protocol_version,
             encoding encoding,
@@ -150,12 +126,12 @@ namespace rpc
             post_options options,
             size_t in_size_,
             const char* in_buf_,
-            const std::vector<back_channel_entry>& in_back_channel)
+            const std::vector<rpc::back_channel_entry>& in_back_channel)
             = 0;
         virtual CORO_TASK(int) try_cast(
             uint64_t protocol_version, destination_zone destination_zone_id, object object_id, interface_ordinal interface_id,
-            const std::vector<back_channel_entry>& in_back_channel,
-            std::vector<back_channel_entry>& out_back_channel)
+            const std::vector<rpc::back_channel_entry>& in_back_channel,
+            std::vector<rpc::back_channel_entry>& out_back_channel)
             = 0;
         virtual CORO_TASK(int) add_ref(uint64_t protocol_version,
             destination_channel_zone destination_channel_zone_id,
@@ -166,8 +142,8 @@ namespace rpc
             known_direction_zone known_direction_zone_id,
             add_ref_options build_out_param_channel,
             uint64_t& reference_count,
-            const std::vector<back_channel_entry>& in_back_channel,
-            std::vector<back_channel_entry>& out_back_channel)
+            const std::vector<rpc::back_channel_entry>& in_back_channel,
+            std::vector<rpc::back_channel_entry>& out_back_channel)
             = 0;
         virtual CORO_TASK(int) release(uint64_t protocol_version,
             destination_zone destination_zone_id,
@@ -175,8 +151,8 @@ namespace rpc
             caller_zone caller_zone_id,
             release_options options,
             uint64_t& reference_count,
-            const std::vector<back_channel_entry>& in_back_channel,
-            std::vector<back_channel_entry>& out_back_channel)
+            const std::vector<rpc::back_channel_entry>& in_back_channel,
+            std::vector<rpc::back_channel_entry>& out_back_channel)
             = 0;
     };
 

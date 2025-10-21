@@ -72,6 +72,12 @@ namespace rpc::spsc
                 assert(!peer_cancel_received_);
                 service_->get_scheduler()->schedule(create_stub(std::move(prefix), std::move(payload)));
             }
+            // handle post (fire-and-forget)
+            else if (payload.payload_fingerprint == rpc::id<post_send>::get(prefix.version))
+            {
+                assert(!peer_cancel_received_);
+                service_->get_scheduler()->schedule(stub_handle_post(std::move(prefix), std::move(payload)));
+            }
             // handle close connection
             else if (payload.payload_fingerprint == rpc::id<close_connection_send>::get(prefix.version))
             {
@@ -529,6 +535,41 @@ namespace rpc::spsc
         CO_RETURN;
     }
 
+    // do a post (fire-and-forget)
+    CORO_TASK(void) channel_manager::stub_handle_post(envelope_prefix prefix, envelope_payload payload)
+    {
+        RPC_DEBUG("post request");
+
+        post_send request;
+        auto str_err = rpc::from_yas_compressed_binary(rpc::span(payload.payload), request);
+        if (!str_err.empty())
+        {
+            RPC_ERROR("failed post_send from_yas_compressed_binary");
+            kill_connection();
+            CO_RETURN;
+        }
+
+        // Fire-and-forget operation - call the service's post method, no response needed
+        std::vector<rpc::back_channel_entry> in_back_channel;
+        co_await service_->post(prefix.version,
+            request.encoding,
+            request.tag,
+            {request.caller_channel_zone_id},
+            {request.caller_zone_id},
+            {request.destination_zone_id},
+            {request.object_id},
+            {request.interface_id},
+            {request.method_id},
+            static_cast<rpc::post_options>(request.options),
+            request.payload.size(),
+            request.payload.data(),
+            in_back_channel);
+
+        // No response needed for post operations (fire-and-forget)
+        RPC_DEBUG("post request complete");
+        CO_RETURN;
+    }
+
     // do a try cast
     CORO_TASK(void)
     channel_manager::stub_handle_try_cast(envelope_prefix prefix, envelope_payload payload)
@@ -634,7 +675,7 @@ namespace rpc::spsc
         std::vector<rpc::back_channel_entry> in_back_channel;
         std::vector<rpc::back_channel_entry> out_back_channel;
         auto ret = co_await service_->release(
-            prefix.version, {request.destination_zone_id}, {request.object_id}, {request.caller_zone_id}, static_cast<rpc::release_options>(request.options), ref_count,
+            prefix.version, {request.destination_zone_id}, {request.object_id}, {request.caller_zone_id}, request.options, ref_count,
             in_back_channel, out_back_channel);
 
         if (ret != rpc::error::OK())

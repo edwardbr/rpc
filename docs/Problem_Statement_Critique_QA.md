@@ -529,7 +529,7 @@ struct back_channel_entry {
 };
 
 // Back-channel is vector of entries
-std::vector<back_channel_entry> back_channel_data;
+std::vector<rpc::back_channel_entry> back_channel_data;
 ```
 
 **Type ID Generation:**
@@ -704,7 +704,7 @@ struct back_channel_entry {
     uint64_t type_id;          // IDL-generated fingerprint
     std::vector<uint8_t> payload;  // Arbitrary data
 };
-// Parameter: std::vector<back_channel_entry> back_channel
+// Parameter: std::vector<rpc::back_channel_entry> back_channel
 ```
 
 **Pass-Through Design Implication:**

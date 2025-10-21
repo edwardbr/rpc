@@ -180,8 +180,8 @@ namespace rpc
             version_.store(protocol_version);
         }
 
-        std::vector<back_channel_entry> empty_in;
-        std::vector<back_channel_entry> empty_out;
+        std::vector<rpc::back_channel_entry> empty_in;
+        std::vector<rpc::back_channel_entry> empty_out;
         CO_RETURN CO_AWAIT send(protocol_version,
             encoding,
             tag,
@@ -215,8 +215,8 @@ namespace rpc
                     get_zone_id(), destination_zone_id, get_caller_zone_id(), object_id, if_id);
             }
 #endif
-            std::vector<back_channel_entry> empty_in;
-            std::vector<back_channel_entry> empty_out;
+            std::vector<rpc::back_channel_entry> empty_in;
+            std::vector<rpc::back_channel_entry> empty_out;
             auto ret = CO_AWAIT try_cast(version, destination_zone_id, object_id, if_id, empty_in, empty_out);
             if (ret != rpc::error::INVALID_VERSION() && ret != rpc::error::INCOMPATIBLE_SERVICE())
             {
@@ -261,8 +261,8 @@ namespace rpc
         int last_error = rpc::error::INVALID_VERSION();
         while (version >= min_version)
         {
-            std::vector<back_channel_entry> empty_in;
-            std::vector<back_channel_entry> empty_out;
+            std::vector<rpc::back_channel_entry> empty_in;
+            std::vector<rpc::back_channel_entry> empty_out;
             auto attempt = CO_AWAIT add_ref(version,
                 destination_channel_zone_,
                 destination_zone_id_,
@@ -309,8 +309,8 @@ namespace rpc
         int last_error = rpc::error::INVALID_VERSION();
         while (version >= min_version)
         {
-            std::vector<back_channel_entry> empty_in;
-            std::vector<back_channel_entry> empty_out;
+            std::vector<rpc::back_channel_entry> empty_in;
+            std::vector<rpc::back_channel_entry> empty_out;
             auto ret = CO_AWAIT release(version, destination_zone_id_, object_id, caller_zone_id_, options, ref_count, empty_in, empty_out);
             if (ret != rpc::error::INVALID_VERSION() && ret != rpc::error::INCOMPATIBLE_SERVICE())
             {
@@ -351,8 +351,8 @@ namespace rpc
         int inner_count = -1;
 
         uint64_t ref_count = 0;
-        std::vector<back_channel_entry> empty_in;
-        std::vector<back_channel_entry> empty_out;
+        std::vector<rpc::back_channel_entry> empty_in;
+        std::vector<rpc::back_channel_entry> empty_out;
         auto ret = CO_AWAIT release(version_.load(), destination_zone_id_, object_id, caller_zone_id, is_optimistic ? release_options::optimistic : release_options::normal, ref_count, empty_in, empty_out);
         inner_count = inner_release_external_ref();
         RPC_DEBUG("inner count = {} for object {}", inner_count, object_id.get_val());

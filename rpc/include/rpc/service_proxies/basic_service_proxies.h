@@ -59,8 +59,8 @@ namespace rpc
             size_t in_size_,
             const char* in_buf_,
             std::vector<char>& out_buf_,
-            const std::vector<back_channel_entry>& in_back_channel,
-            std::vector<back_channel_entry>& out_back_channel) override
+            const std::vector<rpc::back_channel_entry>& in_back_channel,
+            std::vector<rpc::back_channel_entry>& out_back_channel) override
         {
             CO_RETURN CO_AWAIT parent_service_.lock()->send(protocol_version,
                 encoding,
@@ -83,8 +83,8 @@ namespace rpc
             destination_zone destination_zone_id,
             object object_id,
             interface_ordinal interface_id,
-            const std::vector<back_channel_entry>& in_back_channel,
-            std::vector<back_channel_entry>& out_back_channel) override
+            const std::vector<rpc::back_channel_entry>& in_back_channel,
+            std::vector<rpc::back_channel_entry>& out_back_channel) override
         {
             CO_RETURN CO_AWAIT parent_service_.lock()->try_cast(
                 protocol_version, destination_zone_id, object_id, interface_id, in_back_channel, out_back_channel);
@@ -100,8 +100,8 @@ namespace rpc
             known_direction_zone known_direction_zone_id,
             add_ref_options build_out_param_channel,
             uint64_t& reference_count,
-            const std::vector<back_channel_entry>& in_back_channel,
-            std::vector<back_channel_entry>& out_back_channel) override
+            const std::vector<rpc::back_channel_entry>& in_back_channel,
+            std::vector<rpc::back_channel_entry>& out_back_channel) override
         {
             RPC_ASSERT(((std::uint8_t)build_out_param_channel & (std::uint8_t)rpc::add_ref_options::build_caller_route)
                        || destination_channel_zone_id == 0u
@@ -130,8 +130,8 @@ namespace rpc
             caller_zone caller_zone_id,
             release_options options,
             uint64_t& reference_count,
-            const std::vector<back_channel_entry>& in_back_channel,
-            std::vector<back_channel_entry>& out_back_channel) override
+            const std::vector<rpc::back_channel_entry>& in_back_channel,
+            std::vector<rpc::back_channel_entry>& out_back_channel) override
         {
             auto ret = CO_AWAIT parent_service_.lock()->release(
                 protocol_version, destination_zone_id, object_id, caller_zone_id, options, reference_count, in_back_channel, out_back_channel);
@@ -151,7 +151,7 @@ namespace rpc
             post_options options,
             size_t in_size_,
             const char* in_buf_,
-            const std::vector<back_channel_entry>& in_back_channel) override
+            const std::vector<rpc::back_channel_entry>& in_back_channel) override
         {
             CO_RETURN CO_AWAIT parent_service_.lock()->post(protocol_version,
                 encoding,
@@ -248,8 +248,8 @@ namespace rpc
             size_t in_size_,
             const char* in_buf_,
             std::vector<char>& out_buf_,
-            const std::vector<back_channel_entry>& in_back_channel,
-            std::vector<back_channel_entry>& out_back_channel) override
+            const std::vector<rpc::back_channel_entry>& in_back_channel,
+            std::vector<rpc::back_channel_entry>& out_back_channel) override
         {
             auto child_service = child_service_.get_nullable();
             RPC_ASSERT(child_service);
@@ -276,8 +276,8 @@ namespace rpc
             destination_zone destination_zone_id,
             object object_id,
             interface_ordinal interface_id,
-            const std::vector<back_channel_entry>& in_back_channel,
-            std::vector<back_channel_entry>& out_back_channel) override
+            const std::vector<rpc::back_channel_entry>& in_back_channel,
+            std::vector<rpc::back_channel_entry>& out_back_channel) override
         {
             auto child_service = child_service_.get_nullable();
             RPC_ASSERT(child_service);
@@ -295,8 +295,8 @@ namespace rpc
             known_direction_zone known_direction_zone_id,
             add_ref_options build_out_param_channel,
             uint64_t& reference_count,
-            const std::vector<back_channel_entry>& in_back_channel,
-            std::vector<back_channel_entry>& out_back_channel) override
+            const std::vector<rpc::back_channel_entry>& in_back_channel,
+            std::vector<rpc::back_channel_entry>& out_back_channel) override
         {
             auto child_service = child_service_.get_nullable();
             RPC_ASSERT(child_service);
@@ -325,8 +325,8 @@ namespace rpc
             caller_zone caller_zone_id,
             release_options options,
             uint64_t& reference_count,
-            const std::vector<back_channel_entry>& in_back_channel,
-            std::vector<back_channel_entry>& out_back_channel) override
+            const std::vector<rpc::back_channel_entry>& in_back_channel,
+            std::vector<rpc::back_channel_entry>& out_back_channel) override
         {
             auto child_service = child_service_.get_nullable();
             RPC_ASSERT(child_service);
@@ -354,7 +354,7 @@ namespace rpc
             post_options options,
             size_t in_size_,
             const char* in_buf_,
-            const std::vector<back_channel_entry>& in_back_channel) override
+            const std::vector<rpc::back_channel_entry>& in_back_channel) override
         {
             auto child_service = child_service_.get_nullable();
             RPC_ASSERT(child_service);

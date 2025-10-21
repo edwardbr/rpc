@@ -36,8 +36,8 @@ namespace rpc
             size_t in_size_,
             const char* in_buf_,
             std::vector<char>& out_buf_,
-            const std::vector<back_channel_entry>& in_back_channel,
-            std::vector<back_channel_entry>& out_back_channel) override;
+            const std::vector<rpc::back_channel_entry>& in_back_channel,
+            std::vector<rpc::back_channel_entry>& out_back_channel) override;
         void post(uint64_t protocol_version,
             encoding encoding,
             uint64_t tag,
@@ -50,13 +50,13 @@ namespace rpc
             post_options options,
             size_t in_size_,
             const char* in_buf_,
-            const std::vector<back_channel_entry>& in_back_channel) override;
+            const std::vector<rpc::back_channel_entry>& in_back_channel) override;
         int try_cast(uint64_t protocol_version,
             destination_zone destination_zone_id,
             object object_id,
             interface_ordinal interface_id,
-            const std::vector<back_channel_entry>& in_back_channel,
-            std::vector<back_channel_entry>& out_back_channel) override;
+            const std::vector<rpc::back_channel_entry>& in_back_channel,
+            std::vector<rpc::back_channel_entry>& out_back_channel) override;
         int add_ref(uint64_t protocol_version,
             destination_channel_zone destination_channel_zone_id,
             destination_zone destination_zone_id,
@@ -66,16 +66,16 @@ namespace rpc
             known_direction_zone known_direction_zone_id,
             add_ref_options build_out_param_channel,
             uint64_t& reference_count,
-            const std::vector<back_channel_entry>& in_back_channel,
-            std::vector<back_channel_entry>& out_back_channel) override;
+            const std::vector<rpc::back_channel_entry>& in_back_channel,
+            std::vector<rpc::back_channel_entry>& out_back_channel) override;
         int release(uint64_t protocol_version,
             destination_zone destination_zone_id,
             object object_id,
             caller_zone caller_zone_id,
             rpc::release_options options,
             uint64_t& reference_count,
-            const std::vector<back_channel_entry>& in_back_channel,
-            std::vector<back_channel_entry>& out_back_channel) override;
+            const std::vector<rpc::back_channel_entry>& in_back_channel,
+            std::vector<rpc::back_channel_entry>& out_back_channel) override;
 
         friend rpc::child_service;
 

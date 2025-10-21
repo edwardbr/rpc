@@ -37,8 +37,8 @@ namespace rpc
         size_t in_size_,
         const char* in_buf_,
         std::vector<char>& out_buf_,
-        const std::vector<back_channel_entry>& in_back_channel,
-        std::vector<back_channel_entry>& out_back_channel)
+        const std::vector<rpc::back_channel_entry>& in_back_channel,
+        std::vector<rpc::back_channel_entry>& out_back_channel)
     {
         if (destination_zone_id != get_destination_zone_id())
         {
@@ -154,7 +154,7 @@ namespace rpc
         post_options options,
         size_t in_size_,
         const char* in_buf_,
-        const std::vector<back_channel_entry>& in_back_channel)
+        const std::vector<rpc::back_channel_entry>& in_back_channel)
     {
         if (destination_zone_id != get_destination_zone_id())
         {
@@ -208,8 +208,8 @@ namespace rpc
 
     int host_service_proxy::try_cast(
         uint64_t protocol_version, destination_zone destination_zone_id, object object_id, interface_ordinal interface_id,
-        const std::vector<back_channel_entry>& in_back_channel,
-        std::vector<back_channel_entry>& out_back_channel)
+        const std::vector<rpc::back_channel_entry>& in_back_channel,
+        std::vector<rpc::back_channel_entry>& out_back_channel)
     {
         RPC_ASSERT(destination_zone_id == get_destination_zone_id());
         // Serialize back-channel
@@ -257,10 +257,10 @@ namespace rpc
         caller_channel_zone caller_channel_zone_id,
         caller_zone caller_zone_id,
         known_direction_zone known_direction_zone_id,
-        add_ref_options build_out_param_channel,
+        rpc::add_ref_options build_out_param_channel,
         uint64_t& reference_count,
-        const std::vector<back_channel_entry>& in_back_channel,
-        std::vector<back_channel_entry>& out_back_channel)
+        const std::vector<rpc::back_channel_entry>& in_back_channel,
+        std::vector<rpc::back_channel_entry>& out_back_channel)
     {
 #ifdef USE_RPC_TELEMETRY
         if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
@@ -329,8 +329,8 @@ namespace rpc
         caller_zone caller_zone_id,
         rpc::release_options options,
         uint64_t& reference_count,
-        const std::vector<back_channel_entry>& in_back_channel,
-        std::vector<back_channel_entry>& out_back_channel)
+        const std::vector<rpc::back_channel_entry>& in_back_channel,
+        std::vector<rpc::back_channel_entry>& out_back_channel)
     {
         // Serialize back-channel
         std::vector<char> in_bc_buf, out_bc_buf(1024);

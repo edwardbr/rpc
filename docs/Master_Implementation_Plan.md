@@ -75,7 +75,7 @@ This master plan distills all requirements, critiques, and proposals into a conc
    - `clone_for_zone()` must refuse if transport NOT operational
 
 6. **✅ Back-Channel Format**
-   - Use `vector<back_channel_entry>` structure
+   - Use `vector<rpc::back_channel_entry>` structure
    - Each entry: `uint64_t type_id` + `vector<uint8_t> payload`
    - Type IDs from IDL-generated fingerprints
 
@@ -247,8 +247,8 @@ public:
         size_t in_size_,
         const char* in_buf_,
         std::vector<char>& out_buf_,
-        const std::vector<back_channel_entry>& in_back_channel,   // NEW
-        std::vector<back_channel_entry>& out_back_channel          // NEW
+        const std::vector<rpc::back_channel_entry>& in_back_channel,   // NEW
+        std::vector<rpc::back_channel_entry>& out_back_channel          // NEW
     ) = 0;
 
     virtual CORO_TASK(void) post(
@@ -264,7 +264,7 @@ public:
         post_options options,
         size_t in_size_,
         const char* in_buf_,
-        const std::vector<back_channel_entry>& in_back_channel   // NEW
+        const std::vector<rpc::back_channel_entry>& in_back_channel   // NEW
     ) = 0;
 
     virtual CORO_TASK(int) add_ref(
@@ -277,8 +277,8 @@ public:
         known_direction_zone known_direction_zone_id,
         add_ref_options options,
         uint64_t& reference_count,
-        const std::vector<back_channel_entry>& in_back_channel,   // NEW
-        std::vector<back_channel_entry>& out_back_channel          // NEW
+        const std::vector<rpc::back_channel_entry>& in_back_channel,   // NEW
+        std::vector<rpc::back_channel_entry>& out_back_channel          // NEW
     ) = 0;
 
     virtual CORO_TASK(int) release(
@@ -288,8 +288,8 @@ public:
         caller_zone caller_zone_id,
         release_options options,
         uint64_t& reference_count,
-        const std::vector<back_channel_entry>& in_back_channel,   // NEW
-        std::vector<back_channel_entry>& out_back_channel          // NEW
+        const std::vector<rpc::back_channel_entry>& in_back_channel,   // NEW
+        std::vector<rpc::back_channel_entry>& out_back_channel          // NEW
     ) = 0;
 
     virtual CORO_TASK(int) try_cast(
@@ -297,8 +297,8 @@ public:
         destination_zone destination_zone_id,
         object object_id,
         interface_ordinal interface_id,
-        const std::vector<back_channel_entry>& in_back_channel,   // NEW
-        std::vector<back_channel_entry>& out_back_channel          // NEW
+        const std::vector<rpc::back_channel_entry>& in_back_channel,   // NEW
+        std::vector<rpc::back_channel_entry>& out_back_channel          // NEW
     ) = 0;
 };
 ```
@@ -343,7 +343,7 @@ public:
 
 ---
 
-### Milestone 2: post() Fire-and-Forget Messaging (Week 3-4)
+### Milestone 2: post() Fire-and-Forget Messaging (Week 3-4) - PARTIALLY COMPLETED
 
 **Objective**: Implement fire-and-forget messaging with post() method
 
@@ -443,70 +443,32 @@ TEST(post_messaging_test, "post in sync mode") {
 
 #### Implementation Tasks
 
-**Task 2.1**: Define `post_options` enum
-```cpp
-enum class post_options : uint8_t {
-    normal = 0,
-    zone_terminating = 1,
-    release_optimistic = 2
-};
-```
+**Task 2.1**: Define `post_options` enum - ✅ **COMPLETED**
+- Defined in `rpc/include/rpc/internal/marshaller.h`
+- Values: normal, zone_terminating, release_optimistic
+- Used throughout the system
 
-**Task 2.2**: Implement service::handle_post()
-```cpp
-CORO_TASK(void) service::handle_post(
-    destination_zone destination_zone_id,
-    object object_id,
-    interface_ordinal interface_id,
-    method method_id,
-    post_options options,
-    const std::vector<char>& in_buf,
-    const std::vector<back_channel_entry>& in_back_channel) {
+**Task 2.2**: Implement service::handle_post() - ⏳ **PENDING** (requires remaining components)
+- Service post method receives and processes messages with logging
+- Implementation will be completed when remaining components are in place
+- Will handle zone_terminating and release_optimistic options
 
-    if (options == post_options::zone_terminating) {
-        // Handle zone termination
-        CO_AWAIT handle_zone_termination(destination_zone_id);
-        CO_RETURN;
-    }
+**Task 2.3**: Update channel managers - ✅ **COMPLETED**
+- ✅ SPSC: Added post message type to envelope and processing
+- ✅ TCP: Added post message type to envelope and processing  
+- ✅ Local: Direct post without serialization (inherited)
 
-    if (options == post_options::release_optimistic) {
-        // Handle optimistic cleanup
-        CO_AWAIT handle_optimistic_release(object_id);
-        CO_RETURN;
-    }
-
-    // Normal post - dispatch to stub
-    CO_AWAIT dispatch_post_to_stub(object_id, interface_id, method_id, in_buf);
-}
-```
-
-**Task 2.3**: Update channel managers
-- SPSC: Add post message type to envelope
-- TCP: Implement one-way message transmission
-- Local: Direct post without serialization
-
-**Task 2.4**: Implement zone termination broadcast
-```cpp
-CORO_TASK(void) service::broadcast_zone_termination(zone terminating_zone_id) {
-    // Broadcast to all zones that have references to terminating zone
-    for (auto& [route, proxy_weak] : other_zones) {
-        if (auto proxy = proxy_weak.lock()) {
-            if (involves_zone(route, terminating_zone_id)) {
-                CO_AWAIT proxy->post(
-                    ..., post_options::zone_terminating, ...);
-            }
-        }
-    }
-}
-```
+**Task 2.4**: Implement zone termination broadcast - ⏳ **PENDING** (requires remaining components)
+- Implementation will be completed when remaining components are in place
+- Will broadcast zone_terminating notifications when zones fail
 
 #### Acceptance Criteria
 
 - ✅ post() method implemented for all i_marshaller implementations
 - ✅ post_options enum defined with required options
 - ✅ post() completes without waiting for response
-- ✅ zone_terminating notification works
-- ✅ Optimistic cleanup via post() works
+- ⏳ zone_terminating notification works (pending Task 2.2 and 2.4)
+- ⏳ Optimistic cleanup via post() works (pending Task 2.2 and 2.4)
 - ✅ Tests pass in BOTH sync and async modes
 - ✅ Telemetry tracks post messages
 

@@ -94,7 +94,7 @@ This document proposes a comprehensive redesign of the service proxy and transpo
 - Transport calls i_marshaller methods on either service OR pass_through
 
 **CLARIFICATION 4: Back-Channel Format**
-- Use `std::vector<back_channel_entry>` structure, NOT HTTP headers
+- Use `std::vector<rpc::back_channel_entry>` structure, NOT HTTP headers
 - Each entry has `uint64_t type_id` (IDL-generated fingerprint) and `std::vector<uint8_t> payload`
 - Type safety through IDL-generated type fingerprints
 
@@ -126,8 +126,8 @@ public:
         size_t in_size_,
         const char* in_buf_,
         std::vector<char>& out_buf_,
-        const std::vector<back_channel_entry>& in_back_channel,
-        std::vector<back_channel_entry>& out_back_channel
+        const std::vector<rpc::back_channel_entry>& in_back_channel,
+        std::vector<rpc::back_channel_entry>& out_back_channel
     ) = 0;
 
     virtual CORO_TASK(void) post(
@@ -143,7 +143,7 @@ public:
         post_options options,
         size_t in_size_,
         const char* in_buf_,
-        const std::vector<back_channel_entry>& in_back_channel
+        const std::vector<rpc::back_channel_entry>& in_back_channel
     ) = 0;
 
     // Transport management (internal use)
@@ -236,8 +236,8 @@ public:
         size_t in_size_,
         const char* in_buf_,
         std::vector<char>& out_buf_,
-        const std::vector<back_channel_entry>& in_back_channel,
-        std::vector<back_channel_entry>& out_back_channel
+        const std::vector<rpc::back_channel_entry>& in_back_channel,
+        std::vector<rpc::back_channel_entry>& out_back_channel
     ) override {
         return transport_ ? 
             transport_->send(protocol_version, encoding, tag,
@@ -261,7 +261,7 @@ public:
         post_options options,
         size_t in_size_,
         const char* in_buf_,
-        const std::vector<back_channel_entry>& in_back_channel
+        const std::vector<rpc::back_channel_entry>& in_back_channel
     ) override {
         if (transport_) {
             CO_AWAIT transport_->post(protocol_version, encoding, tag,
@@ -365,8 +365,8 @@ public:
         size_t in_size_,
         const char* in_buf_,
         std::vector<char>& out_buf_,
-        const std::vector<back_channel_entry>& in_back_channel,
-        std::vector<back_channel_entry>& out_back_channel
+        const std::vector<rpc::back_channel_entry>& in_back_channel,
+        std::vector<rpc::back_channel_entry>& out_back_channel
     ) override {
         // Route to appropriate service_proxy based on destination_zone
         std::shared_ptr<service_proxy> target_proxy = get_directional_proxy(destination_zone_id);
@@ -393,7 +393,7 @@ public:
         post_options options,
         size_t in_size_,
         const char* in_buf_,
-        const std::vector<back_channel_entry>& in_back_channel
+        const std::vector<rpc::back_channel_entry>& in_back_channel
     ) override {
         std::shared_ptr<service_proxy> target_proxy = get_directional_proxy(destination_zone_id);
         if (target_proxy) {
@@ -415,8 +415,8 @@ public:
         known_direction_zone known_direction_zone_id,  // CRITICAL: For Y-topology routing
         add_ref_options options,
         uint64_t& reference_count,
-        const std::vector<back_channel_entry>& in_back_channel,
-        std::vector<back_channel_entry>& out_back_channel
+        const std::vector<rpc::back_channel_entry>& in_back_channel,
+        std::vector<rpc::back_channel_entry>& out_back_channel
     ) override {
         // Build operations (build_destination_route, build_caller_route) are complex and
         // should be handled by the service which has the global view of all connections
@@ -455,8 +455,8 @@ public:
         caller_zone caller_zone_id,
         release_options options,
         uint64_t& reference_count,
-        const std::vector<back_channel_entry>& in_back_channel,
-        std::vector<back_channel_entry>& out_back_channel
+        const std::vector<rpc::back_channel_entry>& in_back_channel,
+        std::vector<rpc::back_channel_entry>& out_back_channel
     ) override {
         std::shared_ptr<service_proxy> target_proxy = get_directional_proxy(destination_zone_id);
         if (target_proxy) {
@@ -472,8 +472,8 @@ public:
         destination_zone destination_zone_id,
         object object_id,
         interface_ordinal interface_id,
-        const std::vector<back_channel_entry>& in_back_channel,
-        std::vector<back_channel_entry>& out_back_channel
+        const std::vector<rpc::back_channel_entry>& in_back_channel,
+        std::vector<rpc::back_channel_entry>& out_back_channel
     ) override {
         std::shared_ptr<service_proxy> target_proxy = get_directional_proxy(destination_zone_id);
         if (target_proxy) {
@@ -1589,7 +1589,7 @@ Following the SPSC pattern, TCP transport will implement similar features:
 - **Hidden Transport Abstraction**: Transport is implementation detail of service_proxy, not public interface
 - **Service Sink as Transport-Internal**: No core service_sink class, transport-internal only
 - **Proper Reference Counting**: Pass-through manages service_proxy lifecycles as required
-- **Back-Channel Format Corrected**: vector<back_channel_entry> with type_id and payload, not HTTP headers
+- **Back-Channel Format Corrected**: vector<rpc::back_channel_entry> with type_id and payload, not HTTP headers
 - **Bi-Modal Transport Support**: Proper handling of sync/async mode differences for all transport types
 
 ---

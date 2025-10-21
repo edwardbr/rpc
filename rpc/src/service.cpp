@@ -222,8 +222,8 @@ namespace rpc
         size_t in_size_,
         const char* in_buf_,
         std::vector<char>& out_buf_,
-        const std::vector<back_channel_entry>& in_back_channel,
-        std::vector<back_channel_entry>& out_back_channel)
+        const std::vector<rpc::back_channel_entry>& in_back_channel,
+        std::vector<rpc::back_channel_entry>& out_back_channel)
     {
         current_service_tracker tracker(this);
         if (destination_zone_id != zone_id_.as_destination())
@@ -372,9 +372,14 @@ namespace rpc
         post_options options,
         size_t in_size_,
         const char* in_buf_,
-        const std::vector<back_channel_entry>& in_back_channel)
+        const std::vector<rpc::back_channel_entry>& in_back_channel)
     {
         current_service_tracker tracker(this);
+        
+        // Log that post was received
+        RPC_INFO("service::post received for destination_zone={} object_id={}, options={}", 
+                 destination_zone_id.get_val(), object_id.get_val(), static_cast<uint8_t>(options));
+        
         if (destination_zone_id != zone_id_.as_destination())
         {
             std::shared_ptr<rpc::service_proxy> other_zone;
@@ -428,16 +433,20 @@ namespace rpc
 
             // For local post, we just call the stub without waiting for a response
             // Note: back-channel is not applicable for post operations (fire-and-forget)
-            std::vector<char> out_buf_dummy;
-            CO_AWAIT stub->call(protocol_version,
-                encoding,
-                caller_channel_zone_id,
-                caller_zone_id,
-                interface_id,
-                method_id,
-                in_size_,
-                in_buf_,
-                out_buf_dummy);
+            // std::vector<char> out_buf_dummy;
+            // CO_AWAIT stub->call(protocol_version,
+            //     encoding,
+            //     caller_channel_zone_id,
+            //     caller_zone_id,
+            //     interface_id,
+            //     method_id,
+            //     in_size_,
+            //     in_buf_,
+            //     out_buf_dummy);
+            
+            // Log that post was delivered to local stub
+            RPC_INFO("service::post delivered to local stub for object_id={} in zone={}", 
+                     object_id.get_val(), zone_id_.get_val());
 
             CO_RETURN;
         }
@@ -514,8 +523,8 @@ namespace rpc
         // the fork is here so we need to add ref the destination normally with caller info
         // note the caller_channel_zone_id is is this zones id as the caller came from a route via this node
         uint64_t temp_ref_count;
-        std::vector<back_channel_entry> empty_in;
-        std::vector<back_channel_entry> empty_out;
+        std::vector<rpc::back_channel_entry> empty_in;
+        std::vector<rpc::back_channel_entry> empty_out;
         int err = CO_AWAIT destination_zone->add_ref(rpc::get_version(),
             destination_channel_zone_id,
             destination_zone_id,
@@ -576,8 +585,8 @@ namespace rpc
             }
 #endif
             uint64_t temp_ref_count;
-            std::vector<back_channel_entry> empty_in;
-            std::vector<back_channel_entry> empty_out;
+            std::vector<rpc::back_channel_entry> empty_in;
+            std::vector<rpc::back_channel_entry> empty_out;
             uint64_t err = CO_AWAIT object_service_proxy->add_ref(protocol_version,
                 {0},
                 destination_zone_id,
@@ -702,8 +711,8 @@ namespace rpc
             if (destination_service_proxy)
             {
                 uint64_t temp_ref_count;
-                std::vector<back_channel_entry> empty_in;
-                std::vector<back_channel_entry> empty_out;
+                std::vector<rpc::back_channel_entry> empty_in;
+                std::vector<rpc::back_channel_entry> empty_out;
                 refcount = CO_AWAIT destination_service_proxy->add_ref(protocol_version,
                     {0},
                     destination_zone_id,
@@ -737,8 +746,8 @@ namespace rpc
 
             // note the caller_channel_zone_id is 0 as the caller came from this route
             uint64_t temp_ref_count;
-            std::vector<back_channel_entry> empty_in;
-            std::vector<back_channel_entry> empty_out;
+            std::vector<rpc::back_channel_entry> empty_in;
+            std::vector<rpc::back_channel_entry> empty_out;
             auto err_code = CO_AWAIT caller->add_ref(protocol_version,
                 zone_id_.as_destination_channel(),
                 destination_zone_id,
@@ -844,8 +853,8 @@ namespace rpc
 #endif
             // note the caller_channel_zone_id is 0 as the caller came from this route
             uint64_t temp_ref_count;
-            std::vector<back_channel_entry> empty_in;
-            std::vector<back_channel_entry> empty_out;
+            std::vector<rpc::back_channel_entry> empty_in;
+            std::vector<rpc::back_channel_entry> empty_out;
             auto err = CO_AWAIT caller->add_ref(protocol_version,
                 {0},
                 zone_id_.as_destination(),
@@ -877,8 +886,8 @@ namespace rpc
     CORO_TASK(int)
     service::try_cast(
         uint64_t protocol_version, destination_zone destination_zone_id, object object_id, interface_ordinal interface_id,
-        const std::vector<back_channel_entry>& in_back_channel,
-        std::vector<back_channel_entry>& out_back_channel)
+        const std::vector<rpc::back_channel_entry>& in_back_channel,
+        std::vector<rpc::back_channel_entry>& out_back_channel)
     {
         current_service_tracker tracker(this);
         if (destination_zone_id != zone_id_.as_destination())
@@ -938,8 +947,8 @@ namespace rpc
         known_direction_zone known_direction_zone_id,
         add_ref_options build_out_param_channel,
         uint64_t& reference_count,
-        const std::vector<back_channel_entry>& in_back_channel,
-        std::vector<back_channel_entry>& out_back_channel)
+        const std::vector<rpc::back_channel_entry>& in_back_channel,
+        std::vector<rpc::back_channel_entry>& out_back_channel)
     {
         // note if known_direction_zone_id is always 0 test_y_topology_and_set_host_with_prong_object will fail.
         // known_direction_zone_id.get_val() = 0;
@@ -1012,8 +1021,8 @@ namespace rpc
                         zone_id_, destination_zone_id, {0}, caller_zone_id, object_id, build_out_param_channel);
                 }
 #endif
-                std::vector<back_channel_entry> empty_in;
-                std::vector<back_channel_entry> empty_out;
+                std::vector<rpc::back_channel_entry> empty_in;
+                std::vector<rpc::back_channel_entry> empty_out;
                 CO_RETURN CO_AWAIT destination->add_ref(protocol_version,
                     {0},
                     destination_zone_id,
@@ -1141,8 +1150,8 @@ namespace rpc
                                 }
 #endif
 
-                                std::vector<back_channel_entry> empty_in;
-                                std::vector<back_channel_entry> empty_out;
+                                std::vector<rpc::back_channel_entry> empty_in;
+                                std::vector<rpc::back_channel_entry> empty_out;
                                 auto ret = CO_AWAIT destination->add_ref(protocol_version,
                                     {0},
                                     destination_zone_id,
@@ -1179,8 +1188,8 @@ namespace rpc
                             }
 #endif
                             uint64_t temp_ref_count;
-                            std::vector<back_channel_entry> empty_in;
-                            std::vector<back_channel_entry> empty_out;
+                            std::vector<rpc::back_channel_entry> empty_in;
+                            std::vector<rpc::back_channel_entry> empty_out;
                             auto err = CO_AWAIT destination->add_ref(protocol_version,
                                 {0},
                                 destination_zone_id,
@@ -1210,8 +1219,8 @@ namespace rpc
 #endif
 
                             uint64_t temp_ref_count;
-                            std::vector<back_channel_entry> empty_in;
-                            std::vector<back_channel_entry> empty_out;
+                            std::vector<rpc::back_channel_entry> empty_in;
+                            std::vector<rpc::back_channel_entry> empty_out;
                             auto err = CO_AWAIT caller->add_ref(protocol_version,
                                 zone_id_.as_destination_channel(),
                                 destination_zone_id,
@@ -1329,8 +1338,8 @@ namespace rpc
                 }
 #endif
 
-                std::vector<back_channel_entry> empty_in;
-                std::vector<back_channel_entry> empty_out;
+                std::vector<rpc::back_channel_entry> empty_in;
+                std::vector<rpc::back_channel_entry> empty_out;
                 CO_RETURN CO_AWAIT other_zone->add_ref(protocol_version,
                     {0},
                     destination_zone_id,
@@ -1393,8 +1402,8 @@ namespace rpc
                 }
 #endif
                 uint64_t temp_ref_count;
-                std::vector<back_channel_entry> empty_in;
-                std::vector<back_channel_entry> empty_out;
+                std::vector<rpc::back_channel_entry> empty_in;
+                std::vector<rpc::back_channel_entry> empty_out;
                 auto err = CO_AWAIT caller->add_ref(protocol_version,
                     {0},
                     destination_zone_id,
@@ -1520,8 +1529,8 @@ namespace rpc
         caller_zone caller_zone_id,
         release_options options,
         uint64_t& reference_count,
-        const std::vector<back_channel_entry>& in_back_channel,
-        std::vector<back_channel_entry>& out_back_channel)
+        const std::vector<rpc::back_channel_entry>& in_back_channel,
+        std::vector<rpc::back_channel_entry>& out_back_channel)
     {
         current_service_tracker tracker(this);
 
