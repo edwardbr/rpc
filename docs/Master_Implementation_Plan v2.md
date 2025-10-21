@@ -32,13 +32,23 @@ All rights reserved.
 
 ## Executive Summary
 
-This master plan distills all requirements, critiques, and proposals into a concrete, milestone-based implementation roadmap. Each milestone includes:
+This master plan distills all requirements, critiques, and proposals into a concrete, milestone-based implementation roadmap featuring an **elegant transport-centric architecture**. Each milestone includes:
 
 - **BDD Feature Specifications**: Behavior-driven scenarios describing what the feature should do
 - **TDD Test Specifications**: Test-driven unit tests defining implementation contracts
 - **Bi-Modal Test Requirements**: Tests that pass in BOTH sync and async modes
 - **Acceptance Criteria**: Clear definition of "done"
 - **Implementation Guidance**: Concrete steps with code examples
+
+### Key Architectural Innovation: Transport Base Class
+
+This plan introduces a more elegant entity relationship model:
+
+1. **Transport Base Class** (not interface) - All specialized transports (SPSC, TCP, Local, SGX) derive from `transport`
+2. **Destination Routing** - Transport owns `unordered_map<destination_zone, weak_ptr<i_marshaller>>`
+3. **Transport Status** - Enum: CONNECTING, CONNECTED, RECONNECTING, DISCONNECTED
+4. **Service_Proxy Routing** - All traffic routes through transport, uses status to refuse traffic when DISCONNECTED
+5. **Pass-Through with Dual Transports** - Holds two `shared_ptr<transport>`, auto-deletes on zero counts, monitors status for both-or-neither guarantee
 
 **Timeline**: 20 weeks (5 months) with 10 major milestones
 **Effort**: ~1 developer full-time or 2 developers part-time
@@ -54,25 +64,40 @@ This master plan distills all requirements, critiques, and proposals into a conc
    - Service class directly implements `i_marshaller`
    - Service manages local stubs and routes to service_proxies
 
-2. **✅ Transport is Hidden Implementation Detail**
-   - NOT a public interface that services interact with
-   - Owned internally by specific service_proxy implementations
-   - Multiple service_proxies can share ONE transport (transport sharing pattern)
+2. **✅ Transport Base Class Architecture (NEW - Elegant Design)**
+   - **NO i_transport interface** - use concrete `transport` base class instead
+   - Transport is a base class for all derived transport types (SPSC, TCP, Local, SGX, etc.)
+   - Transport owns an `unordered_map<destination_zone, weak_ptr<i_marshaller>>` for routing
+   - Public API:
+     - `add_destination(destination_zone, weak_ptr<i_marshaller>)` - register handler for destination
+     - `remove_destination(destination_zone)` - unregister handler
+     - `transport_status get_status()` - returns CONNECTING, CONNECTED, RECONNECTING, DISCONNECTED
+   - Specialized transport functions move to derived classes
+   - Service_proxy contains `shared_ptr<transport>` for all communication
 
-3. **✅ Service Sink is Transport-Internal**
-   - NOT a core RPC++ class
-   - If exists, owned by service_proxy or transport
-   - Service does NOT know about sinks
+3. **✅ Service_Proxy Routes ALL Traffic Through Transport**
+   - Service_proxy holds `shared_ptr<transport>`
+   - ALL traffic from transport to service goes through service_proxy
+   - ALL traffic from service to transport goes through service_proxy
+   - Service_proxy uses destination_zone to route incoming messages
+   - If transport is DISCONNECTED, service_proxy refuses all further traffic
 
-4. **✅ Pass-Through Manages Reference Counting**
-   - Pass-through controls lifecycle of both service_proxies it routes between
-   - Maintains single reference count to service
-   - service_proxy may not need lifetime_lock_ mechanism
+4. **✅ Pass-Through Implements i_marshaller**
+   - Pass-through implements `i_marshaller` interface
+   - Holds two `shared_ptr<transport>` objects (forward and reverse transports)
+   - When called, forwards to appropriate transport based on destination_zone
+   - **If either transport is DISCONNECTED**:
+     - Sends `post()` with `zone_terminating` to the other transport
+     - Transport receives notification and sets its own status to DISCONNECTED
+     - Immediately deletes itself to prevent asymmetric state
+   - **Auto-deletes when both mutual optimistic and shared counts reach zero**
+   - Releases pointers to both transports and service on deletion
 
 5. **✅ Both-or-Neither Operational Guarantee**
-   - Pass-through guarantees BOTH or NEITHER service_proxies operational
+   - Pass-through guarantees BOTH transports operational or BOTH non-operational
+   - Monitors transport status via `get_status()` method
    - No asymmetric states allowed
-   - `clone_for_zone()` must refuse if transport NOT operational
+   - `clone_for_zone()` must refuse if transport NOT CONNECTED
 
 6. **✅ Back-Channel Format**
    - Use `vector<rpc::back_channel_entry>` structure
@@ -85,7 +110,8 @@ This master plan distills all requirements, critiques, and proposals into a conc
    - All solutions must work in both modes
 
 8. **✅ Zone Termination Broadcast**
-   - Transport detects failure and broadcasts `zone_terminating`
+   - Transport detects failure and sets status to DISCONNECTED
+   - Service_proxy detects DISCONNECTED and broadcasts `zone_terminating`
    - Notification sent to service AND pass-through
    - Cascading cleanup through topology
 
@@ -474,246 +500,384 @@ TEST(post_messaging_test, "post in sync mode") {
 
 ---
 
-### Milestone 3: Transport Handler Registration (Week 5-6)
+### Milestone 3: Transport Base Class and Destination Routing (Week 5-6)
 
-**Objective**: Implement polymorphic handler registration for transports
+**Objective**: Implement transport base class with destination-based routing
 
-#### BDD Feature: Transport handler polymorphism
+#### BDD Feature: Transport base class with destination routing
 ```gherkin
-Feature: Transport handler polymorphism
-  As a transport implementation
-  I want to register an i_marshaller handler without knowing its type
-  So that I can route messages to service or pass_through
+Feature: Transport base class with destination routing
+  As a transport base class
+  I want to route messages to different destinations
+  So that service_proxy and pass_through can communicate through me
 
-  Scenario: Register service as handler
-    Given an SPSC channel_manager transport
-    When I register a service as the i_marshaller handler
-    Then incoming messages are routed to service
+  Scenario: Register destination with service handler
+    Given a transport instance (SPSC/TCP/Local)
+    When I register destination zone{1} with service as handler
+    Then incoming messages for zone{1} are routed to service
     And service dispatches to local stubs
 
-  Scenario: Register pass_through as handler
-    Given an SPSC channel_manager transport
-    When I register a pass_through as the i_marshaller handler
-    Then incoming messages are routed to pass_through
-    And pass_through routes to appropriate service_proxy
+  Scenario: Register destination with pass_through handler
+    Given a transport instance
+    When I register destination zone{3} with pass_through as handler
+    Then incoming messages for zone{3} are routed to pass_through
+    And pass_through forwards to appropriate transport
 
-  Scenario: Multiple service_proxies share one transport
+  Scenario: Multiple destinations on one transport
     Given a TCP transport connected to remote zone
-    And service_proxy A with destination=remote, caller=zone1
-    And service_proxy B with destination=remote, caller=zone2
-    When both register with the same transport
-    Then transport disambiguates by (destination, caller) tuple
-    And routes messages to correct handler
+    And destination zone{1} registered with service
+    And destination zone{3} registered with pass_through
+    When messages arrive for zone{1} and zone{3}
+    Then transport routes zone{1} messages to service
+    And transport routes zone{3} messages to pass_through
+
+  Scenario: Transport status transitions
+    Given a transport in CONNECTING state
+    When connection establishes
+    Then transport status becomes CONNECTED
+    When connection fails
+    Then transport status becomes DISCONNECTED
+    And all registered destinations are notified
 ```
 
 #### TDD Test Specifications
 
-**Test 3.1**: Handler registration
+**Test 3.1**: Transport base class instantiation
 ```cpp
-TEST_CASE("channel_manager handler registration") {
+TEST_CASE("transport base class structure") {
     // GIVEN
+    enum class transport_status { CONNECTING, CONNECTED, RECONNECTING, DISCONNECTED };
+
+    class transport {
+    protected:
+        std::unordered_map<destination_zone, std::weak_ptr<i_marshaller>> destinations_;
+        std::shared_mutex destinations_mutex_;
+        std::atomic<transport_status> status_{transport_status::CONNECTING};
+
+    public:
+        void add_destination(destination_zone dest, std::weak_ptr<i_marshaller> handler);
+        void remove_destination(destination_zone dest);
+        transport_status get_status() const;
+    };
+
+    // WHEN - create derived transport
+    class spsc_transport : public transport { /* ... */ };
+    auto spsc = std::make_shared<spsc_transport>();
+
+    // THEN - base class API available
+    REQUIRE(spsc->get_status() == transport_status::CONNECTING);
+}
+```
+
+**Test 3.2**: Add and remove destinations
+```cpp
+TEST_CASE("transport destination registration") {
+    // GIVEN
+    auto transport = create_spsc_transport();
     auto service = std::make_shared<rpc::service>("test_zone", zone{1});
-    auto channel_manager = create_spsc_channel_manager();
 
-    // WHEN
-    channel_manager->set_receive_handler(service);
+    // WHEN - register destination
+    transport->add_destination(destination_zone{1}, service);
 
-    // THEN
-    auto handler = channel_manager->get_handler();
+    // THEN - destination is registered
+    auto handler = transport->get_destination_handler(destination_zone{1});
     REQUIRE(handler.lock() == service);
+
+    // WHEN - remove destination
+    transport->remove_destination(destination_zone{1});
+
+    // THEN - destination is unregistered
+    auto removed_handler = transport->get_destination_handler(destination_zone{1});
+    REQUIRE(removed_handler.lock() == nullptr);
 }
 ```
 
-**Test 3.2**: Message routing to service
+**Test 3.3**: Message routing by destination
 ```cpp
-CORO_TYPED_TEST(handler_routing_test, "route to service") {
+CORO_TYPED_TEST(transport_routing_test, "route by destination zone") {
     // GIVEN
-    auto service = create_service("test_zone");
-    auto channel_manager = create_channel_manager();
-    channel_manager->set_receive_handler(service);
-
-    // WHEN - send message via channel
-    send_marshalled_message(channel_manager, create_test_send_message());
-
-    // THEN - service receives and processes
-    REQUIRE_EVENTUALLY(service->has_processed_message());
-}
-```
-
-**Test 3.3**: Message routing to pass_through
-```cpp
-CORO_TYPED_TEST(handler_routing_test, "route to pass_through") {
-    // GIVEN
+    auto transport = create_tcp_transport();
+    auto service = create_service("zone_a", zone{1});
     auto pass_through = create_pass_through();
-    auto channel_manager = create_channel_manager();
-    channel_manager->set_receive_handler(pass_through);
 
-    // WHEN - send message via channel
-    send_marshalled_message(channel_manager, create_test_send_message());
+    transport->add_destination(destination_zone{1}, service);
+    transport->add_destination(destination_zone{3}, pass_through);
 
-    // THEN - pass_through routes to destination service_proxy
+    // WHEN - messages arrive for different destinations
+    auto msg_for_service = create_message(dest=zone{1}, caller=zone{2});
+    auto msg_for_passthrough = create_message(dest=zone{3}, caller=zone{2});
+
+    transport->handle_incoming_message(msg_for_service);
+    transport->handle_incoming_message(msg_for_passthrough);
+
+    // THEN - transport routes to correct handlers
+    REQUIRE_EVENTUALLY(service->has_processed_message());
     REQUIRE_EVENTUALLY(pass_through->has_routed_message());
 }
 ```
 
-**Test 3.4**: Transport sharing with disambiguation
+**Test 3.4**: Transport status management
 ```cpp
-CORO_TYPED_TEST(transport_sharing_test, "multiple proxies share transport") {
+CORO_TYPED_TEST(transport_status_test, "status transitions") {
     // GIVEN
-    auto tcp_transport = create_tcp_transport("host", 8080);
-    auto proxy_A = create_service_proxy(dest=zone{2}, caller=zone{1}, tcp_transport);
-    auto proxy_B = create_service_proxy(dest=zone{2}, caller=zone{3}, tcp_transport);
+    auto transport = create_tcp_transport("host", 8080);
+    REQUIRE(transport->get_status() == transport_status::CONNECTING);
 
-    // Register both handlers with transport
-    tcp_transport->add_destination_handler(zone{1}, proxy_A);
-    tcp_transport->add_destination_handler(zone{3}, proxy_B);
+    // WHEN - connection establishes
+    CO_AWAIT transport->connect();
 
-    // WHEN - messages arrive for different callers
-    auto msg_for_A = create_message(dest=zone{1}, caller=zone{2});
-    auto msg_for_B = create_message(dest=zone{3}, caller=zone{2});
+    // THEN - status is CONNECTED
+    REQUIRE(transport->get_status() == transport_status::CONNECTED);
 
-    tcp_transport->handle_incoming(msg_for_A);
-    tcp_transport->handle_incoming(msg_for_B);
+    // WHEN - connection fails
+    simulate_connection_failure(transport);
 
-    // THEN - transport routes to correct proxy
-    REQUIRE(proxy_A->received_message());
-    REQUIRE(proxy_B->received_message());
+    // THEN - status is DISCONNECTED
+    REQUIRE(transport->get_status() == transport_status::DISCONNECTED);
+}
+```
+
+**Test 3.5**: Service_proxy refuses traffic when DISCONNECTED
+```cpp
+CORO_TYPED_TEST(transport_status_test, "refuse traffic when disconnected") {
+    // GIVEN
+    auto transport = create_connected_transport();
+    auto proxy = create_service_proxy_with_transport(transport);
+
+    // WHEN - transport becomes DISCONNECTED
+    simulate_connection_failure(transport);
+    REQUIRE(transport->get_status() == transport_status::DISCONNECTED);
+
+    // Attempt to send message
+    std::vector<char> out_buf;
+    auto error = CO_AWAIT proxy->send(
+        VERSION_3, encoding::yas_binary, tag++,
+        caller_channel_zone{1}, caller_zone{1}, destination_zone{2},
+        object{100}, interface_ordinal{1}, method{5},
+        in_size, in_buf, out_buf, {}, {});
+
+    // THEN - send refused with transport error
+    REQUIRE(error == rpc::error::TRANSPORT_ERROR());
 }
 ```
 
 #### Implementation Tasks
 
-**Task 3.1**: Add handler registration to transport interface
+**Task 3.1**: Define transport base class
 ```cpp
-class i_transport {
-public:
-    virtual void set_receive_handler(std::weak_ptr<i_marshaller> handler) = 0;
+// Header: rpc/include/rpc/transport/transport.h
+namespace rpc {
+
+enum class transport_status {
+    CONNECTING,      // Initial state, establishing connection
+    CONNECTED,       // Fully operational
+    RECONNECTING,    // Attempting to recover connection
+    DISCONNECTED     // Terminal state, no further traffic allowed
 };
-```
 
-**Task 3.2**: Update SPSC channel_manager
-```cpp
-class channel_manager : public i_transport {
-    std::weak_ptr<i_marshaller> handler_;
+class transport {
+protected:
+    // Map destination_zone to handler (service or pass_through)
+    std::unordered_map<destination_zone, std::weak_ptr<i_marshaller>> destinations_;
+    std::shared_mutex destinations_mutex_;
+    std::atomic<transport_status> status_{transport_status::CONNECTING};
 
-    void set_receive_handler(std::weak_ptr<i_marshaller> handler) override {
-        handler_ = handler;
+public:
+    virtual ~transport() = default;
+
+    // Destination management
+    void add_destination(destination_zone dest, std::weak_ptr<i_marshaller> handler) {
+        std::unique_lock lock(destinations_mutex_);
+        destinations_[dest] = handler;
     }
 
+    void remove_destination(destination_zone dest) {
+        std::unique_lock lock(destinations_mutex_);
+        destinations_.erase(dest);
+    }
+
+    // Status management
+    transport_status get_status() const {
+        return status_.load(std::memory_order_acquire);
+    }
+
+protected:
+    // Helper for derived classes to route incoming messages
+    std::shared_ptr<i_marshaller> get_destination_handler(destination_zone dest) const {
+        std::shared_lock lock(destinations_mutex_);
+        auto it = destinations_.find(dest);
+        if (it != destinations_.end()) {
+            return it->second.lock();
+        }
+        return nullptr;
+    }
+
+    void set_status(transport_status new_status) {
+        status_.store(new_status, std::memory_order_release);
+    }
+};
+
+} // namespace rpc
+```
+
+**Task 3.2**: Update SPSC transport to derive from transport base
+```cpp
+// Header: rpc/include/rpc/service_proxies/spsc/spsc_transport.h
+class spsc_transport : public transport {
+    // Existing SPSC channel_manager implementation
+    // ...
+
     void incoming_message_handler(envelope_prefix prefix, envelope_payload payload) {
-        if (auto handler = handler_.lock()) {
-            // Unpack and route to handler based on message type
-            if (prefix.message_type == message_type::send) {
+        // Extract destination_zone from message
+        destination_zone dest = extract_destination_zone(payload);
+
+        // Get handler for destination
+        auto handler = get_destination_handler(dest);
+        if (!handler) {
+            RPC_ERROR("No handler registered for destination zone {}", dest.get_val());
+            return;
+        }
+
+        // Route based on message type
+        switch (prefix.message_type) {
+            case message_type::send:
                 handler->send(...);
-            }
-            else if (prefix.message_type == message_type::post) {
+                break;
+            case message_type::post:
                 handler->post(...);
-            }
+                break;
             // ... other message types
         }
     }
+
+    // Update status on connection state changes
+    void on_peer_connected() {
+        set_status(transport_status::CONNECTED);
+    }
+
+    void on_peer_disconnected() {
+        set_status(transport_status::DISCONNECTED);
+        notify_all_destinations_of_disconnect();
+    }
 };
 ```
 
-**Task 3.3**: Implement transport sharing pattern
+**Task 3.3**: Update service_proxy to check transport status
 ```cpp
-class shared_transport {
-    // Map destination_zone to handler
-    std::unordered_map<destination_zone, std::weak_ptr<i_marshaller>> handlers_;
-    std::shared_mutex handlers_mutex_;
+// File: rpc/include/rpc/internal/service_proxy.h
+class service_proxy : public i_marshaller {
+    std::shared_ptr<transport> transport_;
 
-    void add_destination_handler(destination_zone dest, std::shared_ptr<i_marshaller> handler) {
-        std::unique_lock lock(handlers_mutex_);
-        handlers_[dest] = handler;
-    }
+    CORO_TASK(int) send(...) override {
+        // Check transport status before sending
+        if (transport_->get_status() != transport_status::CONNECTED) {
+            CO_RETURN rpc::error::TRANSPORT_ERROR();
+        }
 
-    std::shared_ptr<i_marshaller> get_handler_for_destination(destination_zone dest) {
-        std::shared_lock lock(handlers_mutex_);
-        auto it = handlers_.find(dest);
-        return (it != handlers_.end()) ? it->second.lock() : nullptr;
+        // Proceed with send...
     }
 };
+```
+
+**Task 3.4**: Create derived transport classes
+```cpp
+// TCP transport
+class tcp_transport : public transport { /* TCP-specific implementation */ };
+
+// Local transport (in-process)
+class local_transport : public transport { /* Direct call implementation */ };
+
+// SGX transport
+class sgx_transport : public transport { /* SGX enclave implementation */ };
 ```
 
 #### Acceptance Criteria
 
-- ✅ Transports can register i_marshaller handlers
-- ✅ Handler can be service or pass_through (polymorphic)
-- ✅ Message routing works for both handler types
-- ✅ Transport sharing works with disambiguation
+- ✅ Transport base class defined with destination routing
+- ✅ transport_status enum with CONNECTING, CONNECTED, RECONNECTING, DISCONNECTED
+- ✅ add_destination() and remove_destination() methods work
+- ✅ get_status() returns current transport state
+- ✅ Service_proxy refuses traffic when transport is DISCONNECTED
+- ✅ Multiple destinations can be registered on one transport
+- ✅ Message routing works by destination_zone
+- ✅ All derived transport types (SPSC, TCP, Local, SGX) inherit from base
 - ✅ Tests pass in BOTH sync and async modes
 
 ---
 
-### Milestone 4: Transport Operational State (Week 7-8)
+### Milestone 4: Transport Status Monitoring and Enforcement (Week 7-8)
 
-**Objective**: Implement is_operational() for both-or-neither guarantee
+**Objective**: Implement transport status monitoring and enforce operational guarantees
 
-#### BDD Feature: Transport operational state
+#### BDD Feature: Transport status monitoring
 ```gherkin
-Feature: Transport operational state
-  As a pass_through
-  I want to check if transport is operational
-  So that I can enforce both-or-neither guarantee
+Feature: Transport status monitoring
+  As a service_proxy or pass_through
+  I want to monitor transport status
+  So that I can enforce operational guarantees
 
-  Scenario: Transport is operational
-    Given an SPSC channel_manager with active pump tasks
+  Scenario: Transport is CONNECTED
+    Given an SPSC transport with active pump tasks
     And peer has not canceled
-    When I check is_operational()
-    Then it returns true
+    When I check get_status()
+    Then it returns CONNECTED
     And clone_for_zone() can create new proxies
 
-  Scenario: Transport is non-operational - peer canceled
-    Given an SPSC channel_manager
-    And peer has sent zone_terminating
-    When I check is_operational()
-    Then it returns false
+  Scenario: Transport becomes DISCONNECTED - peer canceled
+    Given an SPSC transport
+    And peer sends zone_terminating
+    When I check get_status()
+    Then it returns DISCONNECTED
     And clone_for_zone() refuses to create new proxies
 
-  Scenario: Transport is non-operational - local shutdown
-    Given an SPSC channel_manager
-    And local shutdown initiated
-    When I check is_operational()
-    Then it returns false
-    And new operations return TRANSPORT_ERROR
+  Scenario: Transport status RECONNECTING
+    Given a TCP transport that loses connection
+    When automatic reconnection is attempted
+    Then get_status() returns RECONNECTING
+    And new operations are queued
+    When connection re-establishes
+    Then get_status() returns CONNECTED
+    And queued operations are processed
 ```
 
 #### TDD Test Specifications
 
-**Test 4.1**: is_operational() when active
+**Test 4.1**: Status is CONNECTED when active
 ```cpp
-TEST_CASE("channel_manager is_operational when active") {
+TEST_CASE("transport status CONNECTED when active") {
     // GIVEN
-    auto channel_mgr = create_active_channel_manager();
+    auto transport = create_active_spsc_transport();
 
     // WHEN/THEN
-    REQUIRE(channel_mgr->is_operational());
+    REQUIRE(transport->get_status() == transport_status::CONNECTED);
 }
 ```
 
-**Test 4.2**: is_operational() after peer cancel
+**Test 4.2**: Status becomes DISCONNECTED after peer cancel
 ```cpp
-CORO_TYPED_TEST(operational_state_test, "not operational after peer cancel") {
+CORO_TYPED_TEST(transport_status_test, "DISCONNECTED after peer cancel") {
     // GIVEN
-    auto channel_mgr = create_active_channel_manager();
+    auto transport = create_active_spsc_transport();
+    REQUIRE(transport->get_status() == transport_status::CONNECTED);
 
     // WHEN - peer sends zone_terminating
-    CO_AWAIT simulate_peer_zone_termination(channel_mgr);
+    CO_AWAIT simulate_peer_zone_termination(transport);
 
     // THEN
-    REQUIRE(!channel_mgr->is_operational());
+    REQUIRE(transport->get_status() == transport_status::DISCONNECTED);
 }
 ```
 
-**Test 4.3**: clone_for_zone() refuses when not operational
+**Test 4.3**: clone_for_zone() refuses when DISCONNECTED
 ```cpp
-CORO_TYPED_TEST(operational_state_test, "clone refuses non-operational transport") {
+CORO_TYPED_TEST(transport_status_test, "clone refuses DISCONNECTED transport") {
     // GIVEN
-    auto channel_mgr = create_active_channel_manager();
-    auto proxy = create_service_proxy_with_transport(channel_mgr);
+    auto transport = create_active_spsc_transport();
+    auto proxy = create_service_proxy_with_transport(transport);
 
-    // WHEN - transport becomes non-operational
-    CO_AWAIT channel_mgr->shutdown();
+    // WHEN - transport becomes DISCONNECTED
+    CO_AWAIT transport->shutdown();
+    REQUIRE(transport->get_status() == transport_status::DISCONNECTED);
 
     // Attempt to clone
     auto cloned_proxy = CO_AWAIT proxy->clone_for_zone(zone{5}, zone{1});
@@ -723,93 +887,180 @@ CORO_TYPED_TEST(operational_state_test, "clone refuses non-operational transport
 }
 ```
 
+**Test 4.4**: RECONNECTING state handling
+```cpp
+CORO_TYPED_TEST(transport_status_test, "RECONNECTING state") {
+    // GIVEN
+    auto transport = create_tcp_transport("host", 8080);
+    CO_AWAIT transport->connect();
+    REQUIRE(transport->get_status() == transport_status::CONNECTED);
+
+    // WHEN - connection lost, auto-reconnect initiated
+    simulate_transient_network_failure(transport);
+
+    // THEN - status is RECONNECTING
+    REQUIRE(transport->get_status() == transport_status::RECONNECTING);
+
+    // WHEN - connection re-established
+    CO_AWAIT wait_for_reconnection(transport);
+
+    // THEN - status is CONNECTED again
+    REQUIRE(transport->get_status() == transport_status::CONNECTED);
+}
+```
+
 #### Implementation Tasks
 
-**Task 4.1**: Implement is_operational() for SPSC
+**Task 4.1**: Implement status transitions for SPSC
 ```cpp
-bool channel_manager::is_operational() const override {
-    return !peer_cancel_received_.load(std::memory_order_acquire) &&
-           !cancel_sent_ &&
-           tasks_completed_.load(std::memory_order_acquire) < 2;
-}
+class spsc_transport : public transport {
+    void on_connection_established() {
+        set_status(transport_status::CONNECTED);
+    }
+
+    void on_peer_cancel_received() {
+        set_status(transport_status::DISCONNECTED);
+        notify_all_destinations_of_disconnect();
+    }
+
+    void on_local_shutdown_initiated() {
+        set_status(transport_status::DISCONNECTED);
+    }
+};
 ```
 
-**Task 4.2**: Implement is_operational() for TCP
+**Task 4.2**: Implement status transitions for TCP
 ```cpp
-bool tcp_channel_manager::is_operational() const override {
-    return socket_connected_ &&
-           !shutdown_initiated_ &&
-           !connection_error_detected_;
-}
+class tcp_transport : public transport {
+    void on_connection_established() {
+        set_status(transport_status::CONNECTED);
+    }
+
+    void on_connection_lost() {
+        if (auto_reconnect_enabled_) {
+            set_status(transport_status::RECONNECTING);
+            initiate_reconnection();
+        } else {
+            set_status(transport_status::DISCONNECTED);
+        }
+    }
+
+    void on_reconnection_succeeded() {
+        set_status(transport_status::CONNECTED);
+        process_queued_operations();
+    }
+
+    void on_reconnection_failed() {
+        set_status(transport_status::DISCONNECTED);
+        notify_all_destinations_of_disconnect();
+    }
+};
 ```
 
-**Task 4.3**: Implement is_operational() for Local
+**Task 4.3**: Implement status for Local transport
 ```cpp
-bool local_transport::is_operational() const override {
-    return true; // Always operational for in-process
-}
+class local_transport : public transport {
+    local_transport() {
+        // Local transport is always connected
+        set_status(transport_status::CONNECTED);
+    }
+};
 ```
 
-**Task 4.4**: Add transport check to clone_for_zone()
+**Task 4.4**: Add transport status check to clone_for_zone()
 ```cpp
 CORO_TASK(std::shared_ptr<service_proxy>) service_proxy::clone_for_zone(
     destination_zone dest, caller_zone caller) {
 
-    // CRITICAL: Check transport operational before cloning
-    if (transport_ && !transport_->is_operational()) {
-        CO_RETURN nullptr; // Refuse to clone on dead transport
+    // CRITICAL: Check transport status before cloning
+    if (!transport_ || transport_->get_status() != transport_status::CONNECTED) {
+        CO_RETURN nullptr; // Refuse to clone on non-CONNECTED transport
     }
 
     // Proceed with clone...
 }
 ```
 
+**Task 4.5**: Add disconnect notification to all destinations
+```cpp
+class transport {
+protected:
+    void notify_all_destinations_of_disconnect() {
+        std::shared_lock lock(destinations_mutex_);
+        for (auto& [dest_zone, handler_weak] : destinations_) {
+            if (auto handler = handler_weak.lock()) {
+                // Send zone_terminating post to each destination
+                handler->post(
+                    VERSION_3, encoding::yas_binary, 0,
+                    caller_channel_zone{0}, caller_zone{0}, dest_zone,
+                    object{0}, interface_ordinal{0}, method{0},
+                    post_options::zone_terminating,
+                    0, nullptr, {});
+            }
+        }
+    }
+};
+```
+
 #### Acceptance Criteria
 
-- ✅ is_operational() implemented for all transports
-- ✅ Returns false when peer terminates
-- ✅ Returns false when local shutdown initiated
-- ✅ clone_for_zone() checks operational state
+- ✅ get_status() implemented for all transports
+- ✅ Status transitions work: CONNECTING → CONNECTED → DISCONNECTED
+- ✅ RECONNECTING status works for transports that support it
+- ✅ Returns DISCONNECTED when peer terminates
+- ✅ Returns DISCONNECTED when local shutdown initiated
+- ✅ clone_for_zone() refuses when status is not CONNECTED
+- ✅ All destinations notified when transport becomes DISCONNECTED
 - ✅ Tests pass in BOTH sync and async modes
 
 ---
 
 ### Milestone 5: Pass-Through Core Implementation (Week 9-11)
 
-**Objective**: Implement pass_through class with bidirectional routing
+**Objective**: Implement pass_through class with dual-transport routing
 
-#### BDD Feature: Pass-through routing
+#### BDD Feature: Pass-through dual-transport routing
 ```gherkin
-Feature: Pass-through routing
-  As a pass-through between zones
-  I want to route messages bidirectionally
+Feature: Pass-through dual-transport routing
+  As a pass_through between zones
+  I want to route messages between two transports
   So that zones can communicate through intermediaries
 
   Scenario: Forward direction routing
     Given zones A, B, C with B as intermediary
-    And pass_through routing A ↔ C via B
-    When zone A sends message to zone C
-    Then pass_through routes to forward_proxy (B→C)
+    And pass_through with forward_transport (B→C) and reverse_transport (B→A)
+    And pass_through registered as destination on both transports
+    When zone A sends message to zone C (arrives via reverse_transport)
+    Then pass_through routes to forward_transport
     And zone C receives the message
 
   Scenario: Reverse direction routing
     Given zones A, B, C with B as intermediary
-    And pass_through routing A ↔ C via B
-    When zone C sends message to zone A
-    Then pass_through routes to reverse_proxy (C→A via B)
+    And pass_through with forward_transport (B→C) and reverse_transport (B→A)
+    When zone C sends message to zone A (arrives via forward_transport)
+    Then pass_through routes to reverse_transport
     And zone A receives the message
 
   Scenario: Pass-through manages reference counting
-    Given a pass_through with two service_proxies
+    Given a pass_through with two transports
     When add_ref is called
     Then pass_through updates its internal reference count
     And maintains single count to service
-    And service_proxy does not need lifetime_lock_
+    And auto-deletes when both shared and optimistic counts reach zero
+
+  Scenario: Pass-through detects transport disconnection
+    Given a pass_through with two transports
+    When forward_transport becomes DISCONNECTED
+    Then pass_through detects the status change
+    And sends post(zone_terminating) to reverse_transport
+    And reverse_transport receives notification and sets its own status to DISCONNECTED
+    And pass_through immediately deletes itself to prevent asymmetric state
+    And releases all pointers to transports and service
 ```
 
 #### TDD Test Specifications
 
-**Test 5.1**: Forward routing
+**Test 5.1**: Forward routing via transports
 ```cpp
 CORO_TYPED_TEST(pass_through_test, "forward direction routing") {
     // GIVEN
@@ -817,13 +1068,17 @@ CORO_TYPED_TEST(pass_through_test, "forward direction routing") {
     auto service_b = create_service("zone_b", zone{2});
     auto service_c = create_service("zone_c", zone{3});
 
-    auto forward_proxy = create_proxy(zone{2}, dest=zone{3}, caller=zone{1});
-    auto reverse_proxy = create_proxy(zone{2}, dest=zone{1}, caller=zone{3});
+    auto forward_transport = create_transport(service_b, service_c);  // B→C
+    auto reverse_transport = create_transport(service_b, service_a);  // B→A
 
     auto pass_through = std::make_shared<rpc::pass_through>(
-        forward_proxy, reverse_proxy, service_b, zone{3}, zone{1});
+        forward_transport, reverse_transport, service_b, zone{3}, zone{1});
 
-    // WHEN - send from A to C (destination=3)
+    // Register pass_through as destination on both transports
+    forward_transport->add_destination(destination_zone{1}, pass_through);  // C→A messages
+    reverse_transport->add_destination(destination_zone{3}, pass_through);  // A→C messages
+
+    // WHEN - send from A to C (destination=3, arrives via reverse_transport)
     std::vector<char> out_buf;
     auto error = CO_AWAIT pass_through->send(
         VERSION_3, encoding::yas_binary, tag++,
@@ -831,28 +1086,28 @@ CORO_TYPED_TEST(pass_through_test, "forward direction routing") {
         object{100}, interface_ordinal{1}, method{5},
         in_size, in_buf, out_buf, {}, {});
 
-    // THEN - routed to forward_proxy
+    // THEN - routed to forward_transport
     REQUIRE(error == rpc::error::OK());
-    REQUIRE(forward_proxy->was_called());
+    REQUIRE(service_c->has_received_message());
 }
 ```
 
-**Test 5.2**: Reverse routing
+**Test 5.2**: Reverse routing via transports
 ```cpp
 CORO_TYPED_TEST(pass_through_test, "reverse direction routing") {
-    // GIVEN - same setup as forward test
+    // GIVEN
     auto pass_through = create_pass_through_A_to_C_via_B();
 
-    // WHEN - send from C to A (destination=1)
+    // WHEN - send from C to A (destination=1, arrives via forward_transport)
     auto error = CO_AWAIT pass_through->send(
         VERSION_3, encoding::yas_binary, tag++,
         caller_channel_zone{2}, caller_zone{3}, destination_zone{1},
         object{200}, interface_ordinal{1}, method{10},
         in_size, in_buf, out_buf, {}, {});
 
-    // THEN - routed to reverse_proxy
+    // THEN - routed to reverse_transport
     REQUIRE(error == rpc::error::OK());
-    REQUIRE(reverse_proxy->was_called());
+    REQUIRE(service_a->has_received_message());
 }
 ```
 
@@ -876,43 +1131,96 @@ CORO_TYPED_TEST(pass_through_test, "manages reference counting") {
 }
 ```
 
-**Test 5.4**: Bi-modal pass-through
+**Test 5.4**: Auto-delete on zero counts
 ```cpp
-#ifdef BUILD_COROUTINE
-CORO_TYPED_TEST(pass_through_test, "async mode routing") {
-    auto error = CO_AWAIT pass_through->send(...);
-    // Async routing with coroutines
+CORO_TYPED_TEST(pass_through_test, "auto delete on zero counts") {
+    // GIVEN
+    auto pass_through = create_pass_through_A_to_C_via_B();
+    std::weak_ptr<pass_through> weak_pt = pass_through;
+
+    // Increment then decrement shared count to 1, then to 0
+    uint64_t ref_count = 0;
+    CO_AWAIT pass_through->add_ref(..., ref_count, ...);  // shared_count = 1
+    CO_AWAIT pass_through->release(..., ref_count, ...);  // shared_count = 0
+
+    // WHEN - both shared and optimistic counts are zero
+    REQUIRE(pass_through->get_shared_count() == 0);
+    REQUIRE(pass_through->get_optimistic_count() == 0);
+
+    // Release our reference
+    pass_through.reset();
+
+    // THEN - pass_through auto-deleted
+    REQUIRE(weak_pt.expired());
 }
-#else
-TEST(pass_through_test, "sync mode routing") {
-    auto error = pass_through->send(...);
-    // Sync routing with blocking calls
+```
+
+**Test 5.5**: Detect, send zone_terminating, and delete
+```cpp
+CORO_TYPED_TEST(pass_through_test, "detect send terminating and delete") {
+    // GIVEN
+    auto pass_through = create_pass_through_A_to_C_via_B();
+    std::weak_ptr<pass_through> weak_pt = pass_through;
+
+    auto forward_transport = pass_through->get_forward_transport();
+    auto reverse_transport = pass_through->get_reverse_transport();
+
+    // Setup telemetry to capture zone_terminating post
+    auto post_monitor = setup_post_monitor(reverse_transport);
+
+    REQUIRE(forward_transport->get_status() == transport_status::CONNECTED);
+    REQUIRE(reverse_transport->get_status() == transport_status::CONNECTED);
+    REQUIRE(!weak_pt.expired());
+
+    // WHEN - forward_transport disconnects
+    simulate_transport_failure(forward_transport);
+    REQUIRE(forward_transport->get_status() == transport_status::DISCONNECTED);
+
+    // Give pass_through time to detect and respond
+    CO_AWAIT std::chrono::milliseconds(100);
+
+    // THEN - pass_through sends post(zone_terminating) to reverse_transport
+    REQUIRE(post_monitor->received_zone_terminating());
+
+    // AND reverse_transport sets its own status to DISCONNECTED upon receiving the post
+    REQUIRE(reverse_transport->get_status() == transport_status::DISCONNECTED);
+
+    // AND pass_through deletes itself
+    REQUIRE(weak_pt.expired());
+
+    // Verify destinations removed from both transports
+    REQUIRE(forward_transport->get_destination_handler(destination_zone{1}) == nullptr);
+    REQUIRE(reverse_transport->get_destination_handler(destination_zone{3}) == nullptr);
 }
-#endif
 ```
 
 #### Implementation Tasks
 
-**Task 5.1**: Create pass_through class
+**Task 5.1**: Create pass_through class with dual transports
 ```cpp
+// Header: rpc/include/rpc/internal/pass_through.h
 class pass_through : public i_marshaller,
                      public std::enable_shared_from_this<pass_through> {
-    destination_zone destination_zone_id_;
-    caller_zone caller_zone_id_;
+    destination_zone forward_destination_;  // Zone reached via forward_transport
+    destination_zone reverse_destination_;  // Zone reached via reverse_transport
 
     std::atomic<uint64_t> shared_count_{0};
     std::atomic<uint64_t> optimistic_count_{0};
 
-    std::shared_ptr<service_proxy> forward_proxy_;
-    std::shared_ptr<service_proxy> reverse_proxy_;
-    std::shared_ptr<service> service_;
+    std::shared_ptr<transport> forward_transport_;  // Transport to forward destination
+    std::shared_ptr<transport> reverse_transport_;  // Transport to reverse destination
+    std::weak_ptr<service> service_;
+
+    std::atomic<bool> monitoring_active_{true};
 
 public:
-    pass_through(std::shared_ptr<service_proxy> forward,
-                std::shared_ptr<service_proxy> reverse,
+    pass_through(std::shared_ptr<transport> forward,
+                std::shared_ptr<transport> reverse,
                 std::shared_ptr<service> service,
-                destination_zone dest,
-                caller_zone caller);
+                destination_zone forward_dest,
+                destination_zone reverse_dest);
+
+    ~pass_through();
 
     // i_marshaller implementations
     CORO_TASK(int) send(...) override;
@@ -921,68 +1229,199 @@ public:
     CORO_TASK(int) release(...) override;
     CORO_TASK(int) try_cast(...) override;
 
+    // Status monitoring
+    uint64_t get_shared_count() const { return shared_count_.load(); }
+    uint64_t get_optimistic_count() const { return optimistic_count_.load(); }
+
 private:
-    std::shared_ptr<service_proxy> get_directional_proxy(destination_zone dest);
+    std::shared_ptr<transport> get_directional_transport(destination_zone dest);
+    void monitor_transport_status();
+    void trigger_self_destruction();
 };
 ```
 
-**Task 5.2**: Implement routing logic
+**Task 5.2**: Implement routing logic via transports
 ```cpp
 CORO_TASK(int) pass_through::send(...) {
-    auto target_proxy = get_directional_proxy(destination_zone_id);
-    if (!target_proxy) {
+    // Determine target transport based on destination_zone
+    auto target_transport = get_directional_transport(destination_zone_id);
+    if (!target_transport) {
         CO_RETURN rpc::error::ZONE_NOT_FOUND();
     }
 
-    CO_RETURN CO_AWAIT target_proxy->send(...);
+    // Check transport status before routing
+    if (target_transport->get_status() != transport_status::CONNECTED) {
+        CO_RETURN rpc::error::TRANSPORT_ERROR();
+    }
+
+    // Get handler from target transport and forward the call
+    auto handler = target_transport->get_destination_handler(destination_zone_id);
+    if (!handler) {
+        CO_RETURN rpc::error::ZONE_NOT_FOUND();
+    }
+
+    CO_RETURN CO_AWAIT handler->send(...);
 }
 
-std::shared_ptr<service_proxy> pass_through::get_directional_proxy(
+std::shared_ptr<transport> pass_through::get_directional_transport(
     destination_zone dest) {
 
-    if (dest == destination_zone_id_) {
-        return forward_proxy_;
-    } else {
-        return reverse_proxy_;
+    if (dest == forward_destination_) {
+        return forward_transport_;
+    } else if (dest == reverse_destination_) {
+        return reverse_transport_;
     }
+    return nullptr;
 }
 ```
 
-**Task 5.3**: Implement reference counting
+**Task 5.3**: Implement reference counting with auto-deletion
 ```cpp
 CORO_TASK(int) pass_through::add_ref(...) {
     // Update pass_through reference count
     if (options == add_ref_options::normal) {
         shared_count_.fetch_add(1, std::memory_order_acq_rel);
+    } else if (options == add_ref_options::optimistic) {
+        optimistic_count_.fetch_add(1, std::memory_order_acq_rel);
     }
 
-    // Route to target proxy
-    auto target = get_directional_proxy(destination_zone_id);
-    CO_RETURN CO_AWAIT target->add_ref(...);
+    // Route to target transport
+    auto target = get_directional_transport(destination_zone_id);
+    if (!target) {
+        CO_RETURN rpc::error::ZONE_NOT_FOUND();
+    }
+
+    auto handler = target->get_destination_handler(destination_zone_id);
+    CO_RETURN CO_AWAIT handler->add_ref(...);
 }
 
 CORO_TASK(int) pass_through::release(...) {
     // Update pass_through reference count
+    bool should_delete = false;
+
     if (options == release_options::normal) {
         uint64_t prev = shared_count_.fetch_sub(1, std::memory_order_acq_rel);
         if (prev == 1 && optimistic_count_.load() == 0) {
-            // Trigger self-destruction
-            trigger_self_destruction();
+            should_delete = true;
+        }
+    } else if (options == release_options::optimistic) {
+        uint64_t prev = optimistic_count_.fetch_sub(1, std::memory_order_acq_rel);
+        if (prev == 1 && shared_count_.load() == 0) {
+            should_delete = true;
         }
     }
 
-    // Route to target proxy
-    auto target = get_directional_proxy(destination_zone_id);
-    CO_RETURN CO_AWAIT target->release(...);
+    // Route to target transport
+    auto target = get_directional_transport(destination_zone_id);
+    if (!target) {
+        CO_RETURN rpc::error::ZONE_NOT_FOUND();
+    }
+
+    auto handler = target->get_destination_handler(destination_zone_id);
+    auto result = CO_AWAIT handler->release(...);
+
+    // Trigger self-destruction if counts are zero
+    if (should_delete) {
+        trigger_self_destruction();
+    }
+
+    CO_RETURN result;
 }
+
+void pass_through::trigger_self_destruction() {
+    // Stop monitoring
+    monitoring_active_.store(false);
+
+    // Remove destinations from transports
+    if (forward_transport_) {
+        forward_transport_->remove_destination(reverse_destination_);
+    }
+    if (reverse_transport_) {
+        reverse_transport_->remove_destination(forward_destination_);
+    }
+
+    // Release transport and service pointers
+    forward_transport_.reset();
+    reverse_transport_.reset();
+    service_.reset();
+}
+```
+
+**Task 5.4**: Implement transport status monitoring with zone_terminating post
+```cpp
+CORO_TASK(void) pass_through::monitor_transport_status() {
+    while (monitoring_active_.load()) {
+        CO_AWAIT std::chrono::milliseconds(100);
+
+        bool forward_connected =
+            forward_transport_ &&
+            forward_transport_->get_status() == transport_status::CONNECTED;
+
+        bool reverse_connected =
+            reverse_transport_ &&
+            reverse_transport_->get_status() == transport_status::CONNECTED;
+
+        // If either transport is DISCONNECTED, send zone_terminating to the other
+        if (!forward_connected || !reverse_connected) {
+            // Step 1: Send zone_terminating post to the still-connected transport
+            if (forward_connected && reverse_transport_) {
+                // Forward is still connected but reverse is not
+                // Send zone_terminating post to forward transport
+                auto handler = forward_transport_->get_destination_handler(forward_destination_);
+                if (handler) {
+                    CO_AWAIT handler->post(
+                        VERSION_3, encoding::yas_binary, 0,
+                        caller_channel_zone{0}, caller_zone{reverse_destination_},
+                        forward_destination_,
+                        object{0}, interface_ordinal{0}, method{0},
+                        post_options::zone_terminating,
+                        0, nullptr, {});
+                }
+            }
+
+            if (reverse_connected && forward_transport_) {
+                // Reverse is still connected but forward is not
+                // Send zone_terminating post to reverse transport
+                auto handler = reverse_transport_->get_destination_handler(reverse_destination_);
+                if (handler) {
+                    CO_AWAIT handler->post(
+                        VERSION_3, encoding::yas_binary, 0,
+                        caller_channel_zone{0}, caller_zone{forward_destination_},
+                        reverse_destination_,
+                        object{0}, interface_ordinal{0}, method{0},
+                        post_options::zone_terminating,
+                        0, nullptr, {});
+                }
+            }
+
+            // Step 2: Trigger immediate self-destruction to prevent asymmetric state
+            trigger_self_destruction();
+            break;
+        }
+    }
+}
+
+// Note: The transport receiving zone_terminating post will set its own status to DISCONNECTED
+// trigger_self_destruction() removes destinations from transports, releases all pointers,
+// and causes the pass_through shared_ptr to delete
 ```
 
 #### Acceptance Criteria
 
 - ✅ pass_through class implements i_marshaller
-- ✅ Bidirectional routing works (forward and reverse)
+- ✅ Holds two `shared_ptr<transport>` objects (forward and reverse)
+- ✅ Bidirectional routing works via transports (forward and reverse)
 - ✅ Reference counting managed by pass_through
-- ✅ Single count to service maintained
+- ✅ Auto-deletes when both shared and optimistic counts reach zero
+- ✅ Detects transport disconnection (monitors both transports)
+- ✅ **Sends `post(zone_terminating)` to other transport** (not direct status setting)
+- ✅ Transport receives zone_terminating and sets its own status to DISCONNECTED
+- ✅ **Immediately deletes itself after sending zone_terminating post**
+- ✅ Removes destinations from both transports during deletion
+- ✅ Releases all pointers (transports and service) during deletion
+- ✅ Prevents asymmetric states through immediate self-destruction
+- ✅ Tests validate zone_terminating post was sent
+- ✅ Tests validate pass_through deletion via weak_ptr
 - ✅ Tests pass in BOTH sync and async modes
 
 ---
@@ -2032,12 +2471,16 @@ Each milestone must meet:
    - ✅ Memory overhead < 10% increase
    - ✅ CPU overhead < 5% increase
 
-4. **Architecture Requirements**
-   - ✅ Transport is hidden implementation detail
+4. **Architecture Requirements (NEW - Elegant Transport Model)**
+   - ✅ Transport base class (not interface) implemented
+   - ✅ Destination-based routing via `unordered_map<destination_zone, weak_ptr<i_marshaller>>`
+   - ✅ Transport status enum (CONNECTING, CONNECTED, RECONNECTING, DISCONNECTED)
+   - ✅ Service_proxy routes ALL traffic through transport
+   - ✅ Service_proxy refuses traffic when transport is DISCONNECTED
+   - ✅ Pass-through holds two `shared_ptr<transport>` objects
+   - ✅ Pass-through auto-deletes when counts reach zero
+   - ✅ Pass-through monitors both transports for both-or-neither guarantee
    - ✅ Service derives from i_marshaller (no i_service)
-   - ✅ Service_sink is transport-internal
-   - ✅ Pass-through manages reference counting
-   - ✅ Both-or-neither guarantee maintained
    - ✅ Bi-modal support preserved
 
 5. **Documentation Requirements**
@@ -2079,7 +2522,7 @@ Each milestone must meet:
 
 ## Conclusion
 
-This master plan provides a concrete, testable roadmap for implementing the service proxy and transport refactoring. Each milestone is:
+This master plan provides a concrete, testable roadmap for implementing the **elegant transport-centric architecture** for RPC++. Each milestone is:
 
 - **Well-Defined**: Clear objectives and acceptance criteria
 - **Testable**: BDD/TDD specifications with concrete tests
@@ -2087,8 +2530,27 @@ This master plan provides a concrete, testable roadmap for implementing the serv
 - **Incremental**: Each milestone builds on previous ones
 - **Validated**: Success criteria ensure quality
 
+### Key Architectural Benefits
+
+The new transport base class architecture provides:
+
+1. **Simplicity** - No `i_transport` interface, just a concrete base class
+2. **Elegance** - Transport owns destination routing, status management in one place
+3. **Flexibility** - All derived transports (SPSC, TCP, Local, SGX) inherit common functionality
+4. **Robustness** - Transport status enum enforces operational guarantees
+5. **Automatic Cleanup** - Pass-through auto-deletes when counts reach zero OR when transport disconnects
+6. **Separation of Concerns** - Pass-through sends `post(zone_terminating)`, transport sets its own status
+7. **Symmetry Enforcement** - Pass-through monitors both transports, sends zone_terminating to the other, then **immediately deletes itself**
+8. **No Asymmetric States** - Impossible to have one transport operational while the other is disconnected
+
+### Next Steps
+
 **Implementation should proceed milestone-by-milestone, with each milestone fully tested and validated before moving to the next.**
+
+The transport base class foundation (Milestone 3) is critical and must be solidly implemented before proceeding to pass-through (Milestone 5).
 
 ---
 
-**End of Master Implementation Plan**
+**End of Master Implementation Plan v2**
+
+**Last Updated**: 2025-01-21 (with elegant transport architecture refinements)
