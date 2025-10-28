@@ -5,9 +5,9 @@ All rights reserved.
 
 # RPC++ Service Proxy and Transport Refactoring - Master Implementation Plan
 
-**Version**: 1.0
-**Date**: 2025-01-19
-**Status**: Master Plan - Ready for Implementation
+**Version**: 2.0
+**Date**: 2025-10-28
+**Status**: In Progress - Milestones 1-3 Complete, Milestone 5 Next Priority
 
 **Source Documents**:
 - Problem_Statement_Critique_QA.md (15 Q&A requirements)
@@ -21,12 +21,300 @@ All rights reserved.
 
 ## Table of Contents
 
-1. [Executive Summary](#executive-summary)
-2. [Critical Architectural Principles](#critical-architectural-principles)
-3. [Milestone-Based Implementation](#milestone-based-implementation)
-4. [BDD/TDD Specification Framework](#bddtdd-specification-framework)
-5. [Bi-Modal Testing Strategy](#bi-modal-testing-strategy)
-6. [Success Criteria and Validation](#success-criteria-and-validation)
+1. [Implementation Status Report](#implementation-status-report) **NEW**
+2. [Executive Summary](#executive-summary)
+3. [Critical Architectural Principles](#critical-architectural-principles)
+4. [Milestone-Based Implementation](#milestone-based-implementation)
+5. [BDD/TDD Specification Framework](#bddtdd-specification-framework)
+6. [Bi-Modal Testing Strategy](#bi-modal-testing-strategy)
+7. [Success Criteria and Validation](#success-criteria-and-validation)
+
+---
+
+## Implementation Status Report
+
+**Last Updated**: 2025-10-28
+
+### Overview
+
+This section tracks the actual implementation status against the planned milestones. The implementation has progressed beyond initial expectations in some areas while revealing architectural improvements over the original plan.
+
+### Milestone Completion Status
+
+| Milestone | Planned Status | Actual Status | Notes |
+|-----------|---------------|---------------|-------|
+| **Milestone 1**: Back-channel Support | ✅ COMPLETED | ✅ **VERIFIED COMPLETE** | All i_marshaller methods have back_channel parameters |
+| **Milestone 2**: post() Fire-and-Forget | PARTIAL | ✅ **MOSTLY COMPLETE** | post() implemented, post_options defined, zone termination pending full integration |
+| **Milestone 3**: Transport Base Class | PLANNED | ✅ **COMPLETED** | Fully implemented with enhancements beyond plan |
+| **Milestone 4**: Transport Status Monitoring | PLANNED | 🟡 **PARTIAL** | Status management exists, needs testing |
+| **Milestone 5**: Pass-Through Core | PLANNED | ❌ **NOT STARTED** | Critical missing component - next priority |
+| **Milestone 6**: Both-or-Neither Guarantee | PLANNED | ❌ **BLOCKED** | Depends on Milestone 5 |
+| **Milestone 7**: Zone Termination Broadcast | PLANNED | 🟡 **PARTIAL** | Infrastructure exists, needs pass-through integration |
+| **Milestone 8**: Y-Topology Bidirectional | PLANNED | ❌ **BLOCKED** | Depends on Milestone 5 |
+| **Milestone 9**: SPSC Integration | PLANNED | 🟡 **PARTIAL** | Basic structure exists, needs pass-through |
+| **Milestone 10**: Full Integration | PLANNED | ❌ **PENDING** | Awaiting Milestones 5-9 |
+
+### Key Architectural Deviations and Improvements
+
+#### ✅ **IMPROVEMENT 1: Transport Implements i_marshaller**
+
+**Original Plan** (lines 665-781): Transport base class with destination routing but NOT implementing i_marshaller
+
+**Actual Implementation**:
+```cpp
+class transport : public i_marshaller {
+    std::unordered_map<destination_zone, std::weak_ptr<i_marshaller>> destinations_;
+    // Can route directly as a marshaller
+};
+```
+
+**Why This Is Better**:
+- Transport can be used directly as an i_marshaller
+- Simplified routing through `inbound_send()`, `inbound_post()`, etc.
+- Cleaner integration with service_proxy
+- No need for manual delegation from service_proxy to transport
+
+**Status**: ✅ **ACCEPT AS SUPERIOR DESIGN**
+
+---
+
+#### ✅ **IMPROVEMENT 2: Local Transport Architecture**
+
+**Original Plan** (line 961-967): Oversimplified "always connected" local transport
+
+**Actual Implementation**:
+```cpp
+namespace local {
+    class parent_transport : public rpc::transport { /* child→parent */ }
+    class child_transport : public rpc::transport { /* parent→child */ }
+}
+```
+
+**Key Characteristics** (Verified 2025-10-28):
+1. **Serialization**: Local transport DOES serialize/deserialize data
+2. **Purpose**: Type safety, consistency, zone isolation, testability
+3. **Shared Scheduler**: Parent and child zones share the same coroutine scheduler
+4. **In-Process**: Serialized data passed via shared memory within same process
+5. **Bidirectional**: Separate transports for parent→child and child→parent communication
+
+**Why This Is Better**:
+- More sophisticated than plan envisioned
+- Proper zone isolation despite in-process communication
+- Same serialization code path as remote transports (consistency)
+- Easier to move child zone to separate process later (flexibility)
+- Shared scheduler eliminates context switching overhead
+
+**Status**: ✅ **ACCEPT AS SUPERIOR DESIGN**
+
+---
+
+#### ✅ **CLARIFICATION: Transport Classification**
+
+All transports perform serialization - the difference is WHERE serialized data goes:
+
+| Transport Type | Serialization | Process Boundary | Async/Sync | Scheduler |
+|----------------|---------------|------------------|------------|-----------|
+| **Local** (parent/child) | ✅ YES | In-process, separate zones | Both | Shared |
+| **SPSC** | ✅ YES | Same or different process | Async only | Separate |
+| **TCP** | ✅ YES | Network boundary | Async only | Separate |
+| **SGX** | ✅ YES | Enclave boundary | Both | Separate |
+
+**Key Insight**: "Local" doesn't mean "no serialization" - it means "in-process with shared scheduler"
+
+---
+
+#### ❌ **CRITICAL MISSING: Pass-Through Implementation**
+
+**Plan Requirement** (Milestone 5, lines 1017-1426):
+```cpp
+class pass_through : public i_marshaller,
+                     public std::enable_shared_from_this<pass_through> {
+    std::shared_ptr<transport> forward_transport_;  // B→C
+    std::shared_ptr<transport> reverse_transport_;  // B→A
+    destination_zone forward_destination_;
+    destination_zone reverse_destination_;
+
+    // Dual-transport routing for A→B→C topology
+    // Both-or-neither operational guarantee
+    // Auto-deletion on zero counts
+    // Transport status monitoring with zone_terminating propagation
+};
+```
+
+**Actual Status**: ❌ **NOT IMPLEMENTED**
+
+**Impact**:
+- Cannot route through intermediary zones (A→B→C topology)
+- Cannot enforce both-or-neither operational guarantee
+- Y-topology race conditions remain unresolved
+- Multi-hop distributed topologies not supported
+
+**Blocking**:
+- Milestone 6 (Both-or-Neither Guarantee)
+- Milestone 8 (Y-Topology Bidirectional)
+- Full distributed topology support
+
+**Priority**: 🔴 **CRITICAL - IMPLEMENT NEXT**
+
+---
+
+#### ⚠️ **TODO: create_pass_through() Implementation**
+
+**Current State** (service.cpp:1653):
+```cpp
+std::shared_ptr<i_marshaller> service::create_pass_through(...) {
+    RPC_WARNING("create_pass_through called but not implemented - returning nullptr");
+    return nullptr;  // TODO: Implement when pass_through class exists
+}
+```
+
+**Status**: ⚠️ **Correctly marked as TODO, awaiting pass_through class**
+
+---
+
+### Milestone 3 Deep Dive: Transport Base Class ✅ COMPLETED
+
+The transport base class implementation EXCEEDS plan requirements:
+
+**Implemented Features**:
+```cpp
+// File: rpc/include/rpc/internal/transport.h
+namespace rpc {
+    enum class transport_status {
+        CONNECTING, CONNECTED, RECONNECTING, DISCONNECTED
+    };
+
+    class transport : public i_marshaller {
+    protected:
+        std::string name_;
+        zone zone_id_;
+        zone adjacent_zone_id_;
+        std::weak_ptr<rpc::service> service_;
+        std::unordered_map<destination_zone, std::weak_ptr<i_marshaller>> destinations_;
+        std::shared_mutex destinations_mutex_;
+        std::atomic<transport_status> status_{transport_status::CONNECTING};
+
+    public:
+        // Destination management
+        void add_destination(destination_zone dest, std::weak_ptr<i_marshaller> handler);
+        void remove_destination(destination_zone dest);
+
+        // Status management
+        transport_status get_status() const;
+        void set_status(transport_status new_status);
+        void notify_all_destinations_of_disconnect();
+
+        // Pure virtual for derived classes
+        virtual CORO_TASK(int) connect(
+            rpc::interface_descriptor input_descr,
+            rpc::interface_descriptor& output_descr) = 0;
+
+        // i_marshaller implementations for routing
+        CORO_TASK(int) inbound_send(...);
+        CORO_TASK(void) inbound_post(...);
+        CORO_TASK(int) inbound_add_ref(...);
+        CORO_TASK(int) inbound_release(...);
+        CORO_TASK(int) inbound_try_cast(...);
+    };
+}
+```
+
+**Verification** (2025-10-28):
+- ✅ Base class (not interface) - correct
+- ✅ Implements i_marshaller - enhancement over plan
+- ✅ Has transport_status enum with all 4 states
+- ✅ Has destination routing map with weak_ptr
+- ✅ Thread-safe with shared_mutex
+- ✅ Pure virtual connect() for derived classes
+- ✅ Status management methods present
+- ✅ Notification mechanism for disconnection
+
+**Derived Transport Classes Confirmed**:
+- ✅ `local::parent_transport` - child→parent communication
+- ✅ `local::child_transport` - parent→child communication
+- 🟡 SPSC transport - exists but needs pass-through integration
+- 🟡 TCP transport - exists but needs pass-through integration
+- 🟡 SGX transport - exists but needs verification
+
+---
+
+### Current Implementation Capabilities
+
+**What Works Now** (2025-10-28):
+1. ✅ Back-channel data transmission across all RPC operations
+2. ✅ Fire-and-forget post() messaging (needs full testing)
+3. ✅ Local child zone creation with parent↔child transports
+4. ✅ Transport base class with status management
+5. ✅ Destination-based routing within transports
+6. ✅ Service derives from i_marshaller (no i_service)
+7. ✅ Bi-modal support (sync and async modes)
+8. ✅ Serialization in all transport types including local
+
+**What Doesn't Work Yet**:
+1. ❌ Multi-hop routing through intermediaries (A→B→C)
+2. ❌ Pass-through object creation and lifecycle
+3. ❌ Both-or-neither operational guarantee enforcement
+4. ❌ Automatic zone_terminating propagation through pass-through
+5. ❌ Y-topology race condition elimination
+6. ❌ Bidirectional proxy pair creation on connect
+
+---
+
+### Critical Path Forward
+
+#### Phase 1: Milestone 5 - Pass-Through Core (NEXT PRIORITY)
+
+**Tasks**:
+1. Implement `pass_through` class with dual transport routing
+2. Implement reference counting (shared + optimistic)
+3. Implement transport status monitoring
+4. Implement zone_terminating propagation
+5. Implement auto-deletion on zero counts
+6. Add comprehensive tests
+
+**Estimated Effort**: 2-3 weeks
+
+**Blocking**: All remaining milestones
+
+---
+
+#### Phase 2: Milestone 4 Completion - Transport Status Testing
+
+**Tasks**:
+1. Comprehensive testing of status transitions
+2. clone_for_zone() refusal when DISCONNECTED
+3. RECONNECTING state handling for TCP
+4. Integration with pass_through
+
+**Estimated Effort**: 1 week
+
+**Depends On**: Milestone 5 (pass-through)
+
+---
+
+#### Phase 3: Milestones 6-8 - Operational Guarantees
+
+**Tasks**:
+1. Both-or-neither guarantee enforcement
+2. Zone termination cascade testing
+3. Y-topology bidirectional proxy pairs
+4. Complete integration testing
+
+**Estimated Effort**: 3-4 weeks
+
+**Depends On**: Milestones 4 & 5
+
+---
+
+### Recommendations
+
+1. **✅ ACCEPT** transport implements i_marshaller - superior design
+2. **✅ ACCEPT** local transport architecture - more complete than planned
+3. **🔴 PRIORITIZE** Milestone 5 (pass-through) - critical blocking issue
+4. **📝 DOCUMENT** actual local transport behavior (serialization + shared scheduler)
+5. **✅ MARK** Milestone 3 as COMPLETED in all documentation
+6. **🧪 TEST** existing transport status management thoroughly
+7. **📋 PLAN** pass-through implementation with detailed design review
 
 ---
 
@@ -64,16 +352,19 @@ This plan introduces a more elegant entity relationship model:
    - Service class directly implements `i_marshaller`
    - Service manages local stubs and routes to service_proxies
 
-2. **✅ Transport Base Class Architecture (NEW - Elegant Design)**
-   - **NO i_transport interface** - use concrete `transport` base class instead
-   - Transport is a base class for all derived transport types (SPSC, TCP, Local, SGX, etc.)
-   - Transport owns an `unordered_map<destination_zone, weak_ptr<i_marshaller>>` for routing
-   - Public API:
-     - `add_destination(destination_zone, weak_ptr<i_marshaller>)` - register handler for destination
-     - `remove_destination(destination_zone)` - unregister handler
-     - `transport_status get_status()` - returns CONNECTING, CONNECTED, RECONNECTING, DISCONNECTED
-   - Specialized transport functions move to derived classes
-   - Service_proxy contains `shared_ptr<transport>` for all communication
+2. **✅ Transport Base Class Architecture (IMPLEMENTED - Enhanced Design)**
+   - **NO i_transport interface** - use concrete `transport` base class instead ✅
+   - Transport is a base class for all derived transport types (SPSC, TCP, Local, SGX, etc.) ✅
+   - **ENHANCEMENT**: Transport implements `i_marshaller` interface (allows direct routing) ✅
+   - Transport owns an `unordered_map<destination_zone, weak_ptr<i_marshaller>>` for routing ✅
+   - Public API (all implemented):
+     - `add_destination(destination_zone, weak_ptr<i_marshaller>)` - register handler for destination ✅
+     - `remove_destination(destination_zone)` - unregister handler ✅
+     - `transport_status get_status()` - returns CONNECTING, CONNECTED, RECONNECTING, DISCONNECTED ✅
+     - `virtual connect()` - pure virtual for derived classes to implement handshake ✅
+   - Specialized transport functions move to derived classes ✅
+   - Service_proxy contains `shared_ptr<transport>` for all communication ✅
+   - **Local Transport Detail**: Performs serialization/deserialization for zone isolation, shares scheduler with parent zone ✅
 
 3. **✅ Service_Proxy Routes ALL Traffic Through Transport**
    - Service_proxy holds `shared_ptr<transport>`
@@ -500,9 +791,12 @@ TEST(post_messaging_test, "post in sync mode") {
 
 ---
 
-### Milestone 3: Transport Base Class and Destination Routing (Week 5-6)
+### Milestone 3: Transport Base Class and Destination Routing (Week 5-6) ✅ COMPLETED
 
 **Objective**: Implement transport base class with destination-based routing
+
+**Status**: ✅ **COMPLETED** - 2025-10-28
+**Implementation Notes**: Fully implemented with enhancements. Transport implements i_marshaller (improvement over plan). Local transport includes serialization and shared scheduler (more sophisticated than planned).
 
 #### BDD Feature: Transport base class with destination routing
 ```gherkin
@@ -2553,4 +2847,4 @@ The transport base class foundation (Milestone 3) is critical and must be solidl
 
 **End of Master Implementation Plan v2**
 
-**Last Updated**: 2025-01-21 (with elegant transport architecture refinements)
+**Last Updated**: 2025-10-28 (with implementation status tracking and architectural improvements documented)
