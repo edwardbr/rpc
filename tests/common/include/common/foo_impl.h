@@ -10,7 +10,7 @@
 #ifdef USE_RPC_TELEMETRY
 #include <rpc/telemetry/i_telemetry_service.h>
 #endif
-#include <rpc/service_proxies/local/basic_service_proxies.h>
+#include <rpc/service_proxies/local/transport.h>
 
 #include <example_shared/example_shared_stub.h>
 #include <example_import/example_import_stub.h>
@@ -466,14 +466,9 @@ namespace marshalled_tests
             rpc::shared_ptr<yyy::i_example>& target, uint64_t new_zone_id, const rpc::shared_ptr<yyy::i_host>& host_ptr)
         {
             auto this_service = this_service_.lock();
-
-            auto err_code
-                = CO_AWAIT this_service->connect_to_zone<rpc::local_child_service_proxy<yyy::i_example, yyy::i_host>>(
-                    "example_zone",
-                    {new_zone_id},
-                    host_ptr,
-                    target,
-                    [](const rpc::shared_ptr<yyy::i_host>& host,
+            
+            auto child_transport = std::make_shared<local::child_transport>("example_zone", this_service, rpc::zone{new_zone_id},
+                    local::parent_transport::bind<yyy::i_host, yyy::i_example>([](const rpc::shared_ptr<yyy::i_host>& host,
                         rpc::shared_ptr<yyy::i_example>& new_example,
                         const std::shared_ptr<rpc::child_service>& child_service_ptr) -> CORO_TASK(error_code)
                     {
@@ -483,7 +478,14 @@ namespace marshalled_tests
                         new_example
                             = rpc::shared_ptr<yyy::i_example>(new marshalled_tests::example(child_service_ptr, host));
                         CO_RETURN rpc::error::OK();
-                    });
+                    }));
+
+            auto err_code
+                = CO_AWAIT this_service->connect_to_zone(
+                    "example_zone",
+                    child_transport,
+                    host_ptr,
+                    target);
             if (err_code != rpc::error::OK())
                 CO_RETURN err_code;
             CO_RETURN err_code;

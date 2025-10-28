@@ -14,6 +14,7 @@ cmake_minimum_required(VERSION 3.24)
 # endif()
 
 add_subdirectory(interfaces)
+add_subdirectory(src/service_proxies/local)
 
 if(USE_RPC_TELEMETRY)
   set(RPC_ENCLAVE_TELEMETRY_SERVICE rpc::rpc_telemetry_enclave)
@@ -28,27 +29,28 @@ endif()
 if(BUILD_ENCLAVE)
   add_library(
     rpc_enclave
-    include/rpc/internal/version.h
     include/rpc/internal/assert.h
-    include/rpc/internal/error_codes.h
-    include/rpc/internal/types.h
-    include/rpc/internal/logger.h
-      include/rpc/internal/marshaller.h
     include/rpc/internal/casting_interface.h
+    include/rpc/internal/error_codes.h
+    include/rpc/internal/logger.h
+    include/rpc/internal/marshaller.h
+    include/rpc/internal/object_proxy.h
+    include/rpc/internal/pass_through.h
+    include/rpc/internal/serialiser.h
+    include/rpc/internal/service_proxy.h
     include/rpc/internal/service.h
     include/rpc/internal/stub.h
-    include/rpc/internal/object_proxy.h
-    include/rpc/internal/service_proxy.h
-    include/rpc/internal/serialiser.h
-    include/rpc/internal/pass_through.h
-    include/rpc/service_proxies/local/basic_service_proxies.h
+    include/rpc/internal/types.h
+    include/rpc/internal/transport.h
+    include/rpc/internal/version.h
     src/casting_interface.cpp
     src/error_codes.cpp
     src/object_proxy.cpp
+    src/pass_through.cpp
     src/service_proxy.cpp
     src/service.cpp
     src/stub.cpp
-    src/pass_through.cpp
+    src/transport.cpp
     src/version.cpp
     ${REMOTE_PTR_CPP})
 
@@ -74,27 +76,28 @@ endif()
 # ######################################################################################################################
 add_library(
   rpc_host
-  include/rpc/internal/version.h
   include/rpc/internal/assert.h
+  include/rpc/internal/casting_interface.h
   include/rpc/internal/error_codes.h
-  include/rpc/internal/types.h
   include/rpc/internal/logger.h
   include/rpc/internal/marshaller.h
-  include/rpc/internal/casting_interface.h
+  include/rpc/internal/object_proxy.h
+  include/rpc/internal/pass_through.h
+  include/rpc/internal/serialiser.h
+  include/rpc/internal/service_proxy.h
   include/rpc/internal/service.h
   include/rpc/internal/stub.h
-  include/rpc/internal/object_proxy.h
-  include/rpc/internal/service_proxy.h
-  include/rpc/internal/serialiser.h
-  include/rpc/internal/pass_through.h
-  include/rpc/service_proxies/local/basic_service_proxies.h
+  include/rpc/internal/transport.h
+  include/rpc/internal/types.h
+  include/rpc/internal/version.h
   src/casting_interface.cpp
   src/error_codes.cpp
   src/object_proxy.cpp
+  src/pass_through.cpp
   src/service_proxy.cpp
   src/service.cpp
   src/stub.cpp
-  src/pass_through.cpp
+  src/transport.cpp
   src/version.cpp
   ${REMOTE_PTR_CPP})
 

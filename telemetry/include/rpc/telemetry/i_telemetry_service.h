@@ -43,7 +43,7 @@ namespace rpc
         };
         virtual ~i_telemetry_service() = default;
 
-        virtual void on_service_creation(const char* name, rpc::zone zone_id, rpc::destination_zone parent_zone_id) const
+        virtual void on_service_creation(const std::string& name, rpc::zone zone_id, rpc::destination_zone parent_zone_id) const
             = 0;
         virtual void on_service_deletion(zone zone_id) const = 0;
         virtual void on_service_try_cast(zone zone_id,
@@ -67,14 +67,14 @@ namespace rpc
             caller_zone caller_zone_id) const
             = 0;
 
-        virtual void on_service_proxy_creation(const char* service_name,
-            const char* service_proxy_name,
+        virtual void on_service_proxy_creation(const std::string& service_name,
+            const std::string& service_proxy_name,
             zone zone_id,
             destination_zone destination_zone_id,
             caller_zone caller_zone_id) const
             = 0;
-        virtual void on_cloned_service_proxy_creation(const char* service_name,
-            const char* service_proxy_name,
+        virtual void on_cloned_service_proxy_creation(const std::string& service_name,
+            const std::string& service_proxy_name,
             rpc::zone zone_id,
             rpc::destination_zone destination_zone_id,
             rpc::caller_zone caller_zone_id) const
@@ -114,7 +114,7 @@ namespace rpc
             int ref_count) const
             = 0;
 
-        virtual void on_impl_creation(const char* name, uint64_t address, rpc::zone zone_id) const = 0;
+        virtual void on_impl_creation(const std::string& name, uint64_t address, rpc::zone zone_id) const = 0;
         virtual void on_impl_deletion(uint64_t address, rpc::zone zone_id) const = 0;
 
         virtual void on_stub_creation(zone zone_id, object object_id, uint64_t address) const = 0;
@@ -140,7 +140,7 @@ namespace rpc
         virtual void on_object_proxy_deletion(zone zone_id, destination_zone destination_zone_id, object object_id) const
             = 0;
 
-        virtual void on_interface_proxy_creation(const char* name,
+        virtual void on_interface_proxy_creation(const std::string& name,
             zone zone_id,
             destination_zone destination_zone_id,
             object object_id,
@@ -149,7 +149,7 @@ namespace rpc
         virtual void on_interface_proxy_deletion(
             zone zone_id, destination_zone destination_zone_id, object object_id, interface_ordinal interface_id) const
             = 0;
-        virtual void on_interface_proxy_send(const char* method_name,
+        virtual void on_interface_proxy_send(const std::string& method_name,
             zone zone_id,
             destination_zone destination_zone_id,
             object object_id,
@@ -157,7 +157,7 @@ namespace rpc
             method method_id) const
             = 0;
 
-        virtual void message(level_enum level, const char* message) const = 0;
+        virtual void message(level_enum level, const std::string& message) const = 0;
     };
 
 #if defined(USE_THREAD_LOCAL_LOGGING) && !defined(_IN_ENCLAVE)

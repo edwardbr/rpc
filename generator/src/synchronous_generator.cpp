@@ -435,8 +435,10 @@ namespace synchronous_generator
         case PROXY_PREPARE_IN_INTERFACE_ID:
             return fmt::format(
                 "RPC_ASSERT(rpc::are_in_same_zone(this, {0}.get()));\n"
-                "\t\t\tauto {0}_stub_id_ = CO_AWAIT rpc::proxy_bind_in_param(get_object_proxy(), __rpc_sp->get_remote_rpc_version(), "
-                "{0}, {0}_stub_);",
+                "\t\t\trpc::interface_descriptor {0}_stub_id_;\n"
+                "\t\t\tif(__rpc_ret == rpc::error::OK())\n"
+                "\t\t\t\t__rpc_ret = CO_AWAIT rpc::proxy_bind_in_param(get_object_proxy(), __rpc_sp->get_remote_rpc_version(), "
+                "{0}, {0}_stub_, {0}_stub_id_);",
                 name);
         case PROXY_MARSHALL_IN:
         {
@@ -519,7 +521,9 @@ namespace synchronous_generator
         case PROXY_PREPARE_IN_INTERFACE_ID:
             return fmt::format(
                 "RPC_ASSERT(rpc::are_in_same_zone(this, {0}.get()));\n"
-                "\t\t\tauto {0}_stub_id_ = CO_AWAIT rpc::proxy_bind_in_param(get_object_proxy(), __rpc_sp->get_remote_rpc_version(), "
+                "\t\t\trpc::interface_descriptor {0}_stub_id_;\n"
+                "\t\t\tif(__rpc_ret == rpc::error::OK())\n"
+                "\t\t\t\t__rpc_ret = CO_AWAIT rpc::proxy_bind_in_param(get_object_proxy(), __rpc_sp->get_remote_rpc_version(), "
                 "{0}, {0}_stub_);",
                 name);
         case PROXY_MARSHALL_IN:
@@ -547,8 +551,8 @@ namespace synchronous_generator
         case STUB_ADD_REF_OUT_PREDECLARE:
             return fmt::format("rpc::interface_descriptor {0}_;", name);
         case STUB_ADD_REF_OUT:
-            return fmt::format("{0}_ = CO_AWAIT rpc::stub_bind_out_param(zone_, protocol_version, "
-                               "caller_channel_zone_id, caller_zone_id, {0});",
+            return fmt::format("__rpc_ret = CO_AWAIT rpc::stub_bind_out_param(zone_, protocol_version, "
+                               "caller_channel_zone_id, caller_zone_id, {0}, {0}_);",
                 name);
         case STUB_MARSHALL_OUT:
             return fmt::format("{}_, ", name);
@@ -719,7 +723,7 @@ namespace synchronous_generator
                 count++;
             }
 
-            proxy("while (__rpc_version >= __rpc_min_version)");
+            proxy("while (__rpc_ret == rpc::error::OK() && __rpc_version >= __rpc_min_version)");
             proxy("{{");
             proxy("std::vector<char> __rpc_in_buf;");
 
@@ -1845,17 +1849,17 @@ namespace synchronous_generator
             interface_declaration_generator::build_scoped_name(owner, ns);
         }
 
-        header("template<> CORO_TASK(rpc::interface_descriptor) "
+        header("template<> CORO_TASK(int) "
                "rpc::service::bind_in_proxy(uint64_t protocol_version, const rpc::shared_ptr<::{}{}>& "
-               "iface, std::shared_ptr<rpc::object_stub>& stub);",
+               "iface, std::shared_ptr<rpc::object_stub>& stub, rpc::interface_descriptor& descriptor);",
             ns,
             interface_name);
-        header("template<> CORO_TASK(rpc::interface_descriptor) "
-               "rpc::service::bind_out_stub(uint64_t protocol_version, caller_channel_zone "
-               "caller_channel_zone_id, caller_zone caller_zone_id, const rpc::shared_ptr<::{}{}>& "
-               "iface);",
-            ns,
-            interface_name);
+        // header("template<> CORO_TASK(int) "
+        //        "rpc::service::bind_out_stub(uint64_t protocol_version, caller_channel_zone "
+        //        "caller_channel_zone_id, caller_zone caller_zone_id, const rpc::shared_ptr<::{}{}>& "
+        //        "iface, rpc::interface_descriptor& descriptor);",
+        //     ns,
+        //     interface_name);
     }
 
     void write_library_proxy_factory(
@@ -1895,40 +1899,40 @@ namespace synchronous_generator
         stub("}};");
         stub("}}");
 
-        stub("template<> CORO_TASK(interface_descriptor) service::bind_in_proxy(uint64_t protocol_version, "
+        stub("template<> CORO_TASK(int) service::bind_in_proxy(uint64_t protocol_version, "
              "const "
-             "rpc::shared_ptr<::{}{}>& iface, std::shared_ptr<rpc::object_stub>& stub)",
+             "rpc::shared_ptr<::{}{}>& iface, std::shared_ptr<rpc::object_stub>& stub, rpc::interface_descriptor& descriptor)",
             ns,
             interface_name);
         stub("{{");
         stub("if(!iface)");
         stub("{{");
-        stub("CO_RETURN {{{{0}},{{0}}}};");
+        stub("CO_RETURN rpc::error::INVALID_DATA();");
         stub("}}");
 
         stub("auto factory = create_interface_stub(iface);");
         stub("CO_RETURN CO_AWAIT get_proxy_stub_descriptor(protocol_version, {{0}}, {{0}}, iface.get(), factory, "
-             "false, stub);");
+             "false, stub, descriptor);");
         stub("}}");
 
-        stub("template<> CORO_TASK(interface_descriptor) service::bind_out_stub(uint64_t protocol_version, "
-             "caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, const rpc::shared_ptr<::{}{}>& "
-             "iface)",
-            ns,
-            interface_name);
-        stub("{{");
-        stub("if(!iface)");
-        stub("{{");
-        stub("CO_RETURN {{{{0}},{{0}}}};");
-        stub("}}");
+        // stub("template<> CORO_TASK(int) service::bind_out_stub(uint64_t protocol_version, "
+        //      "caller_channel_zone caller_channel_zone_id, caller_zone caller_zone_id, const rpc::shared_ptr<::{}{}>& "
+        //      "iface, rpc::interface_descriptor& descriptor)",
+        //     ns,
+        //     interface_name);
+        // stub("{{");
+        // stub("if(!iface)");
+        // stub("{{");
+        // stub("CO_RETURN rpc::error::INVALID_DATA();");
+        // stub("}}");
 
-        stub("std::shared_ptr<rpc::object_stub> stub;");
+        // stub("std::shared_ptr<rpc::object_stub> stub;");
 
-        stub("auto factory = create_interface_stub(iface);");
-        stub("CO_RETURN CO_AWAIT get_proxy_stub_descriptor(protocol_version, caller_channel_zone_id, "
-             "caller_zone_id, "
-             "iface.get(), factory, true, stub);");
-        stub("}}");
+        // stub("auto factory = create_interface_stub(iface);");
+        // stub("CO_RETURN CO_AWAIT get_proxy_stub_descriptor(protocol_version, caller_channel_zone_id, "
+        //      "caller_zone_id, "
+        //      "iface.get(), factory, true, stub, descriptor);");
+        // stub("}}");
     }
 
     void write_marshalling_logic(const class_entity& lib, writer& stub)

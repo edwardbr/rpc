@@ -44,7 +44,7 @@ namespace rpc
         static std::shared_ptr<rpc::service> get_service(const casting_interface& iface);
         static zone get_zone(const casting_interface& iface);
         static destination_zone get_destination_zone(const casting_interface& iface);
-        static destination_channel_zone get_channel_zone(const casting_interface& iface);
+        // static destination_channel_zone get_channel_zone(const casting_interface& iface);
     };
 
     bool are_in_same_zone(const casting_interface* first, const casting_interface* second);

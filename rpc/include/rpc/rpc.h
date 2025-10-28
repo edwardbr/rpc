@@ -31,8 +31,11 @@
 //remote proxy of an object
 #include <rpc/internal/object_proxy.h>
 
-//some helpre forward declarations
+//some helper forward declarations
 #include <rpc/internal/bindings_fwd.h>
+
+//transport base class
+#include <rpc/internal/transport.h>
 
 // services manage the logical zones between which data is marshalled
 #include <rpc/internal/service.h>

@@ -4,15 +4,13 @@
  */
 #include <unordered_map>
 
-#include <rpc/service_proxies/local/basic_service_proxies.h>
-
 #include <rpc/telemetry/i_telemetry_service.h>
 #include <rpc/telemetry/telemetry_handler.h>
 
 // an ocall for logging the test
 extern "C"
 {
-    void on_service_creation_host(const char* name, uint64_t zone_id, uint64_t parent_zone_id)
+    void on_service_creation_host(const std::string& name, uint64_t zone_id, uint64_t parent_zone_id)
     {
         if (auto telemetry_service = rpc::get_telemetry_service())
             telemetry_service->on_service_creation(name, {zone_id}, {parent_zone_id});
@@ -57,8 +55,8 @@ extern "C"
                 {zone_id}, {destination_channel_zone_id}, {destination_zone_id}, {object_id}, {caller_zone_id});
     }
 
-    void on_service_proxy_creation_host(const char* service_name,
-        const char* service_proxy_name,
+    void on_service_proxy_creation_host(const std::string& service_name,
+        const std::string& service_proxy_name,
         uint64_t zone_id,
         uint64_t destination_zone_id,
         uint64_t caller_zone_id)
@@ -68,8 +66,8 @@ extern "C"
                 service_name, service_proxy_name, {zone_id}, {destination_zone_id}, {caller_zone_id});
     }
 
-    void on_cloned_service_proxy_creation_host(const char* service_name,
-        const char* service_proxy_name,
+    void on_cloned_service_proxy_creation_host(const std::string& service_name,
+        const std::string& service_proxy_name,
         uint64_t zone_id,
         uint64_t destination_zone_id,
         uint64_t caller_zone_id)
@@ -138,7 +136,7 @@ extern "C"
                 {zone_id}, {destination_channel_zone_id}, {destination_zone_id}, {caller_zone_id}, ref_count);
     }
 
-    void on_impl_creation_host(const char* name, uint64_t address, uint64_t zone_id)
+    void on_impl_creation_host(const std::string& name, uint64_t address, uint64_t zone_id)
     {
         if (auto telemetry_service = rpc::get_telemetry_service())
             telemetry_service->on_impl_creation(name, address, {zone_id});
@@ -190,7 +188,7 @@ extern "C"
     }
 
     void on_interface_proxy_creation_host(
-        const char* name, uint64_t zone_id, uint64_t destination_zone_id, uint64_t object_id, uint64_t interface_id)
+        const std::string& name, uint64_t zone_id, uint64_t destination_zone_id, uint64_t object_id, uint64_t interface_id)
     {
         if (auto telemetry_service = rpc::get_telemetry_service())
             telemetry_service->on_interface_proxy_creation(
@@ -202,7 +200,7 @@ extern "C"
         if (auto telemetry_service = rpc::get_telemetry_service())
             telemetry_service->on_interface_proxy_deletion({zone_id}, {destination_zone_id}, {object_id}, {interface_id});
     }
-    void on_interface_proxy_send_host(const char* method_name,
+    void on_interface_proxy_send_host(const std::string& method_name,
         uint64_t zone_id,
         uint64_t destination_zone_id,
         uint64_t object_id,
@@ -213,7 +211,7 @@ extern "C"
             telemetry_service->on_interface_proxy_send(
                 method_name, {zone_id}, {destination_zone_id}, {object_id}, {interface_id}, {method_id});
     }
-    void message_host(uint64_t level, const char* name)
+    void message_host(uint64_t level, const std::string& name)
     {
         if (auto telemetry_service = rpc::get_telemetry_service())
             telemetry_service->message((rpc::i_telemetry_service::level_enum)level, name);

@@ -15,6 +15,7 @@ add_executable(fuzz_test_main
 target_link_libraries(fuzz_test_main
     PRIVATE
     rpc::rpc_host
+    rpc::rpc_local_transport_host
     fuzz_test_idl_host  # Our independent fuzz test IDL
     test_fixtures  # For logging functions
     args::args  # Command line argument parsing

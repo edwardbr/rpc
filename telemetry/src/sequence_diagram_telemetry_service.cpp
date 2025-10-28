@@ -211,7 +211,7 @@ namespace rpc
     }
 
     void sequence_diagram_telemetry_service::on_service_creation(
-        const char* name, rpc::zone zone_id, rpc::destination_zone parent_zone_id) const
+        const std::string& name, rpc::zone zone_id, rpc::destination_zone parent_zone_id) const
     {
         std::lock_guard g(mux);
         auto entry = services.find(zone_id);
@@ -416,8 +416,8 @@ namespace rpc
 #endif
     }
 
-    void sequence_diagram_telemetry_service::on_service_proxy_creation(const char* service_name,
-        const char* service_proxy_name,
+    void sequence_diagram_telemetry_service::on_service_proxy_creation(const std::string& service_name,
+        const std::string& service_proxy_name,
         rpc::zone zone_id,
         rpc::destination_zone destination_zone_id,
         rpc::caller_zone caller_zone_id) const
@@ -474,8 +474,8 @@ namespace rpc
 #endif
     }
 
-    void sequence_diagram_telemetry_service::on_cloned_service_proxy_creation(const char* service_name,
-        const char* service_proxy_name,
+    void sequence_diagram_telemetry_service::on_cloned_service_proxy_creation(const std::string& service_name,
+        const std::string& service_proxy_name,
         rpc::zone zone_id,
         rpc::destination_zone destination_zone_id,
         rpc::caller_zone caller_zone_id) const
@@ -829,7 +829,7 @@ namespace rpc
 #endif
     }
 
-    void sequence_diagram_telemetry_service::add_new_object(const char* name, uint64_t address, rpc::zone zone_id) const
+    void sequence_diagram_telemetry_service::add_new_object(const std::string& name, uint64_t address, rpc::zone zone_id) const
     {
         auto found = impls.find(address);
         if (found == impls.end())
@@ -854,7 +854,7 @@ namespace rpc
         fmt::println(output_, "activate {}", object_alias(address));
     }
 
-    void sequence_diagram_telemetry_service::on_impl_creation(const char* name, uint64_t address, rpc::zone zone_id) const
+    void sequence_diagram_telemetry_service::on_impl_creation(const std::string& name, uint64_t address, rpc::zone zone_id) const
     {
         std::lock_guard g(mux);
         if (historical_impls.find(address) != historical_impls.end())
@@ -1101,7 +1101,7 @@ namespace rpc
 #endif
     }
 
-    void sequence_diagram_telemetry_service::on_interface_proxy_creation(const char* name,
+    void sequence_diagram_telemetry_service::on_interface_proxy_creation(const std::string& name,
         rpc::zone zone_id,
         rpc::destination_zone destination_zone_id,
         rpc::object object_id,
@@ -1174,7 +1174,7 @@ namespace rpc
 #endif
     }
 
-    void sequence_diagram_telemetry_service::on_interface_proxy_send(const char* method_name,
+    void sequence_diagram_telemetry_service::on_interface_proxy_send(const std::string& method_name,
         rpc::zone zone_id,
         rpc::destination_zone destination_zone_id,
         rpc::object object_id,
@@ -1209,7 +1209,7 @@ namespace rpc
         fflush(output_);
     }
 
-    void sequence_diagram_telemetry_service::message(level_enum level, const char* message) const
+    void sequence_diagram_telemetry_service::message(level_enum level, const std::string& message) const
     {
         std::string colour;
         switch (level)

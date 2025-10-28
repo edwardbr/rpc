@@ -2226,19 +2226,18 @@ namespace rpc
     }
 
     void animation_telemetry_service::on_service_creation(
-        const char* name, rpc::zone zone_id, rpc::destination_zone parent_zone_id) const
+        const std::string& name, rpc::zone zone_id, rpc::destination_zone parent_zone_id) const
     {
-        std::string service_name = name ? name : "";
         double ts = timestamp_now();
         std::vector<event_field> fields;
         fields.reserve(3);
-        fields.push_back(make_string_field("serviceName", service_name));
+        fields.push_back(make_string_field("serviceName", name));
         fields.push_back(make_number_field("zone", zone_id.get_val()));
         fields.push_back(make_number_field("parentZone", parent_zone_id.get_val()));
 
         {
             std::lock_guard<std::mutex> lock(mutex_);
-            zone_names_[zone_id.get_val()] = service_name;
+            zone_names_[zone_id.get_val()] = name;
             zone_parents_[zone_id.get_val()] = parent_zone_id.get_val();
 
             event_record record;
@@ -2309,28 +2308,28 @@ namespace rpc
                 make_number_field("callerZone", caller_zone_id.get_val())});
     }
 
-    void animation_telemetry_service::on_service_proxy_creation(const char* service_name,
-        const char* service_proxy_name,
+    void animation_telemetry_service::on_service_proxy_creation(const std::string& service_name,
+        const std::string& service_proxy_name,
         rpc::zone zone_id,
         rpc::destination_zone destination_zone_id,
         rpc::caller_zone caller_zone_id) const
     {
-        std::vector<event_field> fields = {make_string_field("serviceName", service_name ? service_name : ""),
-            make_string_field("serviceProxyName", service_proxy_name ? service_proxy_name : ""),
+        std::vector<event_field> fields = {make_string_field("serviceName", service_name),
+            make_string_field("serviceProxyName", service_proxy_name),
             make_number_field("zone", zone_id.get_val()),
             make_number_field("destinationZone", destination_zone_id.get_val()),
             make_number_field("callerZone", caller_zone_id.get_val())};
         record_event("service_proxy_creation", std::move(fields));
     }
 
-    void animation_telemetry_service::on_cloned_service_proxy_creation(const char* service_name,
-        const char* service_proxy_name,
+    void animation_telemetry_service::on_cloned_service_proxy_creation(const std::string& service_name,
+        const std::string& service_proxy_name,
         rpc::zone zone_id,
         rpc::destination_zone destination_zone_id,
         rpc::caller_zone caller_zone_id) const
     {
-        std::vector<event_field> fields = {make_string_field("serviceName", service_name ? service_name : ""),
-            make_string_field("serviceProxyName", service_proxy_name ? service_proxy_name : ""),
+        std::vector<event_field> fields = {make_string_field("serviceName", service_name),
+            make_string_field("serviceProxyName", service_proxy_name),
             make_number_field("zone", zone_id.get_val()),
             make_number_field("destinationZone", destination_zone_id.get_val()),
             make_number_field("callerZone", caller_zone_id.get_val())};
@@ -2418,9 +2417,9 @@ namespace rpc
                 make_signed_field("refCount", ref_count)});
     }
 
-    void animation_telemetry_service::on_impl_creation(const char* name, uint64_t address, rpc::zone zone_id) const
+    void animation_telemetry_service::on_impl_creation(const std::string& name, uint64_t address, rpc::zone zone_id) const
     {
-        std::vector<event_field> fields = {make_string_field("name", name ? name : ""),
+        std::vector<event_field> fields = {make_string_field("name", name),
             make_number_field("address", address),
             make_number_field("zone", zone_id.get_val())};
         record_event("impl_creation", std::move(fields));
@@ -2503,13 +2502,13 @@ namespace rpc
                 make_number_field("object", object_id.get_val())});
     }
 
-    void animation_telemetry_service::on_interface_proxy_creation(const char* name,
+    void animation_telemetry_service::on_interface_proxy_creation(const std::string& name,
         rpc::zone zone_id,
         rpc::destination_zone destination_zone_id,
         rpc::object object_id,
         rpc::interface_ordinal interface_id) const
     {
-        std::vector<event_field> fields = {make_string_field("name", name ? name : ""),
+        std::vector<event_field> fields = {make_string_field("name", name),
             make_number_field("zone", zone_id.get_val()),
             make_number_field("destinationZone", destination_zone_id.get_val()),
             make_number_field("object", object_id.get_val()),
@@ -2529,14 +2528,14 @@ namespace rpc
                 make_number_field("interface", interface_id.get_val())});
     }
 
-    void animation_telemetry_service::on_interface_proxy_send(const char* method_name,
+    void animation_telemetry_service::on_interface_proxy_send(const std::string& method_name,
         rpc::zone zone_id,
         rpc::destination_zone destination_zone_id,
         rpc::object object_id,
         rpc::interface_ordinal interface_id,
         rpc::method method_id) const
     {
-        std::vector<event_field> fields = {make_string_field("methodName", method_name ? method_name : ""),
+        std::vector<event_field> fields = {make_string_field("methodName", method_name),
             make_number_field("zone", zone_id.get_val()),
             make_number_field("destinationZone", destination_zone_id.get_val()),
             make_number_field("object", object_id.get_val()),
@@ -2545,10 +2544,10 @@ namespace rpc
         record_event("interface_proxy_send", std::move(fields));
     }
 
-    void animation_telemetry_service::message(level_enum level, const char* message) const
+    void animation_telemetry_service::message(level_enum level, const std::string& message) const
     {
         std::vector<event_field> fields = {make_number_field("level", static_cast<uint64_t>(level)),
-            make_string_field("message", message ? message : "")};
+            make_string_field("message", message)};
         record_event("message", std::move(fields));
     }
 

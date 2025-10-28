@@ -10,40 +10,48 @@
 namespace rpc
 {
     template<class T>
-    CORO_TASK(interface_descriptor)
+    CORO_TASK(int)
     proxy_bind_in_param(std::shared_ptr<rpc::object_proxy> object_p,
         uint64_t protocol_version,
         const rpc::shared_ptr<T>& iface,
-        std::shared_ptr<rpc::object_stub>& stub)
+        std::shared_ptr<rpc::object_stub>& stub, interface_descriptor& descriptor)
     {
         if (!iface)
-            CO_RETURN interface_descriptor();
+            CO_RETURN error::INVALID_DATA();
 
         RPC_ASSERT(object_p);
         if (!object_p)
-            CO_RETURN interface_descriptor();
+            CO_RETURN error::INVALID_DATA();
         auto operating_service = object_p->get_service_proxy()->get_operating_zone_service();
 
         // this is to check that an interface is belonging to another zone and not the operating zone
         if (!iface->is_local()
             && casting_interface::get_destination_zone(*iface) != operating_service->get_zone_id().as_destination())
         {
-            CO_RETURN{casting_interface::get_object_id(*iface), casting_interface::get_destination_zone(*iface)};
+            descriptor = {casting_interface::get_object_id(*iface), casting_interface::get_destination_zone(*iface)};
+            CO_RETURN error::OK();
         }
 
         // else encapsulate away
-        CO_RETURN CO_AWAIT operating_service->bind_in_proxy(protocol_version, iface, stub);
+        CO_RETURN CO_AWAIT operating_service->bind_in_proxy(protocol_version, iface, stub, descriptor);
     }
     
     template<class T>
-    CORO_TASK(interface_descriptor)
+    CORO_TASK(int)
     stub_bind_out_param(rpc::service& zone,
         uint64_t protocol_version,
         caller_channel_zone caller_channel_zone_id,
         caller_zone caller_zone_id,
-        const shared_ptr<T>& iface)
+        const shared_ptr<T>& iface, interface_descriptor& descriptor)
     {
-        CO_RETURN CO_AWAIT zone.bind_out_stub(protocol_version, caller_channel_zone_id, caller_zone_id, iface);
+		if(!iface)
+		{
+			CO_RETURN rpc::error::INVALID_DATA();
+		}
+		auto factory = zone.create_interface_stub(iface);
+
+		std::shared_ptr<rpc::object_stub> stub;
+		CO_RETURN CO_AWAIT zone.get_proxy_stub_descriptor(protocol_version, caller_channel_zone_id, caller_zone_id, iface.get(), factory, true, stub, descriptor);        
     }
 
     // do not use directly it is for the interface generator use rpc::create_interface_proxy if you want to get a proxied pointer to a remote implementation
@@ -86,11 +94,17 @@ namespace rpc
                 CO_RETURN rpc::error::OBJECT_NOT_FOUND();
             }
 
-            std::shared_ptr<rpc::object_proxy> op = CO_AWAIT service_proxy->get_or_create_object_proxy(encap.object_id,
+            std::shared_ptr<rpc::object_proxy> op;
+            auto err = CO_AWAIT service_proxy->get_or_create_object_proxy(encap.object_id,
                 service_proxy::object_proxy_creation_rule::ADD_REF_IF_NEW,
                 new_proxy_added,
                 caller_zone_id.as_known_direction_zone(),
-                false);
+                false, op);
+            if(err != error::OK())
+            {
+                RPC_ERROR("get_or_create_object_proxy failed");
+                return err;
+            }
             RPC_ASSERT(op != nullptr);
             if (!op)
             {
@@ -164,8 +178,14 @@ namespace rpc
                 new_proxy_added);
         }
 
-        std::shared_ptr<rpc::object_proxy> op = CO_AWAIT service_proxy->get_or_create_object_proxy(
-            encap.object_id, service_proxy::object_proxy_creation_rule::RELEASE_IF_NOT_NEW, false, {}, false);
+        std::shared_ptr<rpc::object_proxy> op;
+        auto err = CO_AWAIT service_proxy->get_or_create_object_proxy(
+            encap.object_id, service_proxy::object_proxy_creation_rule::RELEASE_IF_NOT_NEW, false, {}, false, op);
+        if(err != error::OK())
+        {
+            RPC_ERROR("get_or_create_object_proxy failed");
+            return err;
+        }
         if (!op)
         {
             RPC_ERROR("Object not found in proxy_bind_out_param");
@@ -220,11 +240,17 @@ namespace rpc
             CO_RETURN rpc::error::INVALID_DATA();
         }
 
-        if (serv->get_parent_zone_id() == service_proxy->get_destination_zone_id())
-            service_proxy->add_external_ref();
+        // if (serv->get_parent_zone_id() == service_proxy->get_destination_zone_id())
+        //     service_proxy->add_external_ref();
 
-        std::shared_ptr<rpc::object_proxy> op = CO_AWAIT service_proxy->get_or_create_object_proxy(
-            encap.object_id, service_proxy::object_proxy_creation_rule::DO_NOTHING, false, {}, false);
+        std::shared_ptr<rpc::object_proxy> op;
+        auto err = CO_AWAIT service_proxy->get_or_create_object_proxy(
+            encap.object_id, service_proxy::object_proxy_creation_rule::DO_NOTHING, false, {}, false, op);
+        if(err != error::OK())
+        {
+            RPC_ERROR("get_or_create_object_proxy failed");
+            return err;
+        }
         if (!op)
         {
             RPC_ERROR("Object not found in demarshall_interface_proxy");
@@ -235,8 +261,8 @@ namespace rpc
     }
 
     template<class T>
-    CORO_TASK(rpc::interface_descriptor)
-    create_interface_stub(rpc::service& serv, const rpc::shared_ptr<T>& iface)
+    CORO_TASK(int)
+    create_interface_stub(rpc::service& serv, const rpc::shared_ptr<T>& iface, rpc::interface_descriptor& descriptor)
     {
         caller_channel_zone empty_caller_channel_zone = {};
         caller_zone caller_zone_id = serv.get_zone_id().as_caller();
@@ -244,11 +270,11 @@ namespace rpc
         if (!iface)
         {
             RPC_ASSERT(false);
-            CO_RETURN{{0}, {0}};
+            return error::INVALID_DATA();
         }
         std::shared_ptr<object_stub> stub;
         auto factory = serv.create_interface_stub(iface);
         CO_RETURN CO_AWAIT serv.get_proxy_stub_descriptor(
-            rpc::get_version(), empty_caller_channel_zone, caller_zone_id, iface.get(), factory, false, stub);
+            rpc::get_version(), empty_caller_channel_zone, caller_zone_id, iface.get(), factory, false, stub, descriptor);
     }
 }

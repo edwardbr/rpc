@@ -15,7 +15,7 @@ namespace rpc
     enclave_telemetry_service::enclave_telemetry_service() { }
 
     void enclave_telemetry_service::on_service_creation(
-        const char* name, rpc::zone zone_id, rpc::destination_zone parent_zone_id) const
+        const std::string& name, rpc::zone zone_id, rpc::destination_zone parent_zone_id) const
     {
         on_service_creation_host(name, zone_id.get_val(), parent_zone_id.get_val());
     }
@@ -66,8 +66,8 @@ namespace rpc
             object_id.get_val(),
             caller_zone_id.get_val());
     }
-    void enclave_telemetry_service::on_service_proxy_creation(const char* service_name,
-        const char* service_proxy_name,
+    void enclave_telemetry_service::on_service_proxy_creation(const std::string& service_name,
+        const std::string& service_proxy_name,
         rpc::zone zone_id,
         rpc::destination_zone destination_zone_id,
         rpc::caller_zone caller_zone_id) const
@@ -75,8 +75,8 @@ namespace rpc
         on_service_proxy_creation_host(
             service_name, service_proxy_name, zone_id.get_val(), destination_zone_id.get_val(), caller_zone_id.get_val());
     }
-    void enclave_telemetry_service::on_cloned_service_proxy_creation(const char* service_name,
-        const char* service_proxy_name,
+    void enclave_telemetry_service::on_cloned_service_proxy_creation(const std::string& service_name,
+        const std::string& service_proxy_name,
         rpc::zone zone_id,
         rpc::destination_zone destination_zone_id,
         rpc::caller_zone caller_zone_id) const
@@ -128,7 +128,7 @@ namespace rpc
             object_id.get_val());
     }
 
-    void enclave_telemetry_service::on_impl_creation(const char* name, uint64_t address, rpc::zone zone_id) const
+    void enclave_telemetry_service::on_impl_creation(const std::string& name, uint64_t address, rpc::zone zone_id) const
     {
         on_impl_creation_host(name, address, zone_id.get_val());
     }
@@ -180,7 +180,7 @@ namespace rpc
         on_object_proxy_deletion_host(zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val());
     }
 
-    void enclave_telemetry_service::on_interface_proxy_creation(const char* name,
+    void enclave_telemetry_service::on_interface_proxy_creation(const std::string& name,
         rpc::zone zone_id,
         rpc::destination_zone destination_zone_id,
         rpc::object object_id,
@@ -197,7 +197,7 @@ namespace rpc
         on_interface_proxy_deletion_host(
             zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), interface_id.get_val());
     }
-    void enclave_telemetry_service::on_interface_proxy_send(const char* method_name,
+    void enclave_telemetry_service::on_interface_proxy_send(const std::string& method_name,
         rpc::zone zone_id,
         rpc::destination_zone destination_zone_id,
         rpc::object object_id,
@@ -238,7 +238,7 @@ namespace rpc
             ref_count);
     }
 
-    void enclave_telemetry_service::message(rpc::i_telemetry_service::level_enum level, const char* message) const
+    void enclave_telemetry_service::message(rpc::i_telemetry_service::level_enum level, const std::string& message) const
     {
         message_host(level, message);
     }

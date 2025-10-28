@@ -98,7 +98,7 @@ namespace rpc
     std::string console_telemetry_service::get_zone_color(uint64_t zone_id) const
     {
         // ANSI color codes - cycle through 8 bright colors
-        const char* colors[] = {
+        static const char* colors[] = {
             "\033[91m", // Bright Red
             "\033[92m", // Bright Green
             "\033[93m", // Bright Yellow
@@ -207,7 +207,7 @@ namespace rpc
         }
     }
 
-    void console_telemetry_service::register_zone_name(uint64_t zone_id, const char* name, bool optional_replace) const
+    void console_telemetry_service::register_zone_name(uint64_t zone_id, const std::string& name, bool optional_replace) const
     {
         std::unique_lock<std::shared_mutex> lock(zone_names_mutex_);
         auto it = zone_names_.find(zone_id);
@@ -251,7 +251,7 @@ namespace rpc
     }
 
     void console_telemetry_service::on_service_creation(
-        const char* name, rpc::zone zone_id, rpc::destination_zone parent_zone_id) const
+        const std::string& name, rpc::zone zone_id, rpc::destination_zone parent_zone_id) const
     {
         register_zone_name(zone_id.get_val(), name, false);
         init_logger();
@@ -428,8 +428,8 @@ namespace rpc
             reset_color());
     }
 
-    void console_telemetry_service::on_service_proxy_creation(const char* service_name,
-        const char* service_proxy_name,
+    void console_telemetry_service::on_service_proxy_creation(const std::string& service_name,
+        const std::string& service_proxy_name,
         rpc::zone zone_id,
         rpc::destination_zone destination_zone_id,
         rpc::caller_zone caller_zone_id) const
@@ -448,8 +448,8 @@ namespace rpc
             reset_color());
     }
 
-    void console_telemetry_service::on_cloned_service_proxy_creation(const char* service_name,
-        const char* service_proxy_name,
+    void console_telemetry_service::on_cloned_service_proxy_creation(const std::string& service_name,
+        const std::string& service_proxy_name,
         rpc::zone zone_id,
         rpc::destination_zone destination_zone_id,
         rpc::caller_zone caller_zone_id) const
@@ -571,7 +571,7 @@ namespace rpc
             reset_color());
     }
 
-    void console_telemetry_service::on_impl_creation(const char* name, uint64_t address, rpc::zone zone_id) const
+    void console_telemetry_service::on_impl_creation(const std::string& name, uint64_t address, rpc::zone zone_id) const
     {
         init_logger();
         logger_->info("{}{} impl_creation: name={} address={}{}",
@@ -685,7 +685,7 @@ namespace rpc
             reset_color());
     }
 
-    void console_telemetry_service::on_interface_proxy_creation(const char* name,
+    void console_telemetry_service::on_interface_proxy_creation(const std::string& name,
         rpc::zone zone_id,
         rpc::destination_zone destination_zone_id,
         rpc::object object_id,
@@ -717,7 +717,7 @@ namespace rpc
             reset_color());
     }
 
-    void console_telemetry_service::on_interface_proxy_send(const char* method_name,
+    void console_telemetry_service::on_interface_proxy_send(const std::string& method_name,
         rpc::zone zone_id,
         rpc::destination_zone destination_zone_id,
         rpc::object object_id,
@@ -737,7 +737,7 @@ namespace rpc
             reset_color());
     }
 
-    void console_telemetry_service::message(level_enum level, const char* message) const
+    void console_telemetry_service::message(level_enum level, const std::string& message) const
     {
 #if defined(USE_THREAD_LOCAL_LOGGING) && !defined(_IN_ENCLAVE)
         // Also log to thread-local circular buffer for debugging

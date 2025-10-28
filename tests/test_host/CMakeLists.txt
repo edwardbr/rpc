@@ -29,6 +29,7 @@ target_link_libraries(
   -Wl,--no-whole-archive
   yas_common
   rpc::rpc_host
+  rpc::rpc_local_transport_host
   yas_common
   args::args
   fmt::fmt-header-only

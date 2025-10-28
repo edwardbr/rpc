@@ -17,7 +17,6 @@
 #include <rpc/internal/serialiser.h>
 #include <rpc/internal/marshaller.h>
 #include <rpc/internal/version.h>
-#include <rpc/internal/transport.h>
 
 #ifdef USE_RPC_TELEMETRY
 #include <rpc/telemetry/i_telemetry_service.h>
@@ -34,48 +33,55 @@ namespace rpc
 
     // the class that encapsulates an environment or zone
     // only host code can use this class directly other enclaves *may* have access to the i_service_proxy derived interface
-    class service_proxy : public i_marshaller, public std::enable_shared_from_this<rpc::service_proxy>
+    class service_proxy : 
+        // public i_marshaller, 
+        public std::enable_shared_from_this<rpc::service_proxy>
     {
         std::unordered_map<object, std::weak_ptr<object_proxy>> proxies_;
         std::mutex insert_control_;
 
         const zone zone_id_;
         destination_zone destination_zone_id_ = {0};
-        destination_channel_zone destination_channel_zone_ = {0};
-        caller_zone caller_zone_id_ = {0};
+        // destination_channel_zone destination_channel_zone_ = {0}; //perhaps we can dispence with this eventually?
+        // caller_zone caller_zone_id_ = {0};
+        // service is owned by transport, this makes it easier to break the link to the service on shutdown
         std::weak_ptr<service> service_;
-        // if this service proxy represents a child service, hold a strong reference to the parent service to prevent premature destruction
-        stdex::member_ptr<service> parent_service_ref_;
-        bool is_responsible_for_cleaning_up_service_ = true;
 
         // Transport for routing calls to remote zones
         stdex::member_ptr<transport> transport_;
 
-        stdex::member_ptr<service_proxy> lifetime_lock_;
-        std::atomic<int> lifetime_lock_count_ = 0;
+        // stdex::member_ptr<service_proxy> lifetime_lock_;
+        // std::atomic<int> lifetime_lock_count_ = 0;
+
         std::atomic<uint64_t> version_ = rpc::get_version();
         encoding enc_ = encoding::enc_default;
+
         // if a service proxy is pointing to the zones parent zone then it needs to stay alive even if there are no active references going through it
-        bool is_parent_channel_ = false;
+        // if this service proxy represents a child service, hold a strong reference to the parent service to prevent premature destruction
+        // bool is_responsible_for_cleaning_up_service_ = true;
+        // 
+        // stdex::member_ptr<service> parent_service_ref_;
+        // bool is_parent_channel_ = false;
         std::string name_;
 
     protected:
-        service_proxy(const char* name, destination_zone destination_zone_id, const std::shared_ptr<rpc::service>& svc);
 
-        service_proxy(const service_proxy& other);
-
-        // not thread safe
-        bool is_parent_channel() const { return is_parent_channel_; }
-        void set_parent_channel(bool val);
+        // // not thread safe
+        // bool is_parent_channel() const { return is_parent_channel_; }
+        // void set_parent_channel(bool val);
 
     public:
+        service_proxy(const std::string& name, destination_zone destination_zone_id, std::shared_ptr<transport> transport, const std::shared_ptr<rpc::service>& svc);
+        service_proxy(const std::string& name, destination_zone destination_zone_id, const std::shared_ptr<rpc::service_proxy>& other);
+        // service_proxy(const service_proxy& other);
+
         virtual ~service_proxy();
 
         std::string get_name() const { return name_; }
 
         uint64_t get_remote_rpc_version() const { return version_.load(); }
         void update_remote_rpc_version(uint64_t version);
-        bool is_unused() const { return lifetime_lock_count_ == 0; }
+        // bool is_unused() const { return lifetime_lock_count_ == 0; }
 
         encoding get_encoding() const { return enc_; }
 
@@ -85,13 +91,22 @@ namespace rpc
             return error::OK();
         }
 
-        virtual CORO_TASK(int) connect(rpc::interface_descriptor input_descr, rpc::interface_descriptor& output_descr);
+        // Set transport for this service_proxy
+        void set_transport(std::shared_ptr<transport> transport)
+        {
+            transport_ = transport;
+        }
 
-        void add_external_ref();
+        std::shared_ptr<transport> get_transport() const
+        {
+            return transport_.get_nullable();
+        }
 
-        int release_external_ref();
+        // void add_external_ref();
 
-        int inner_release_external_ref();
+        // int release_external_ref();
+
+        // int inner_release_external_ref();
 
         [[nodiscard]] CORO_TASK(int) send_from_this_zone(uint64_t protocol_version,
             rpc::encoding encoding,
@@ -114,34 +129,28 @@ namespace rpc
 
         CORO_TASK(int) sp_release(object object_id, release_options options, uint64_t& ref_count);
 
-        CORO_TASK(void)
-        cleanup_after_object(std::shared_ptr<rpc::service> svc,
-            std::shared_ptr<rpc::service_proxy> self,
-            std::shared_ptr<object_proxy> op,
-            bool is_optimistic);
+        void cleanup_after_object(std::shared_ptr<object_proxy> op,bool is_optimistic);
 
         void on_object_proxy_released(const std::shared_ptr<object_proxy>& op, bool optimistic);
 
         std::unordered_map<object, std::weak_ptr<object_proxy>> get_proxies() { return proxies_; }
-        int get_lifetime_lock_count() const { return lifetime_lock_count_.load(); }
+        // int get_lifetime_lock_count() const { return lifetime_lock_count_.load(); }
 
         // Set parent service reference for child service proxies to prevent premature parent destruction
-        void set_parent_service_reference(const std::shared_ptr<rpc::service>& parent_service)
-        {
-            parent_service_ref_ = parent_service;
-        }
+        // void set_parent_service_reference(const std::shared_ptr<rpc::service>& parent_service)
+        // {
+        //     parent_service_ref_ = parent_service;
+        // }
 
-        virtual std::shared_ptr<rpc::service_proxy> clone() = 0;
-        std::shared_ptr<rpc::service_proxy> clone_for_zone(
-            destination_zone destination_zone_id, caller_zone caller_zone_id);
+        std::shared_ptr<rpc::service_proxy> clone_for_zone(destination_zone destination_zone_id);
 
         // the zone where this proxy is created
         zone get_zone_id() const { return zone_id_; }
         // the ultimate zone where this proxy is calling
         destination_zone get_destination_zone_id() const { return destination_zone_id_; }
         // the intermediate zone where this proxy is calling
-        destination_channel_zone get_destination_channel_zone_id() const { return destination_channel_zone_; }
-        caller_zone get_caller_zone_id() const { return caller_zone_id_; }
+        // destination_channel_zone get_destination_channel_zone_id() const { return destination_channel_zone_; }
+        // caller_zone get_caller_zone_id() const { return caller_zone_id_; }
 
         // the service that this proxy lives in
         std::shared_ptr<rpc::service> get_operating_zone_service() const { return service_.lock(); }
@@ -153,14 +162,14 @@ namespace rpc
             RELEASE_IF_NOT_NEW,
         };
 
-        CORO_TASK(std::shared_ptr<rpc::object_proxy>)
+        CORO_TASK(int)
         get_or_create_object_proxy(object object_id,
             object_proxy_creation_rule rule,
             bool new_proxy_added,
             known_direction_zone known_direction_zone_id,
-            bool is_optimistic);
+            bool is_optimistic, std::shared_ptr<rpc::object_proxy>& op);
 
-        // i_marshaller interface implementation
+        /* // i_marshaller interface implementation
         // Routes to transport_ for remote zones or service_ for local zone
         CORO_TASK(int) send(uint64_t protocol_version,
             encoding encoding,
@@ -218,7 +227,7 @@ namespace rpc
             release_options options,
             uint64_t& reference_count,
             const std::vector<rpc::back_channel_entry>& in_back_channel,
-            std::vector<rpc::back_channel_entry>& out_back_channel) override;
+            std::vector<rpc::back_channel_entry>& out_back_channel) override;*/
 
         friend service;
         friend child_service;

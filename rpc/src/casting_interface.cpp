@@ -72,11 +72,11 @@ namespace rpc
         return proxy->get_destination_zone_id();
     }
 
-    destination_channel_zone casting_interface::get_channel_zone(const casting_interface& iface)
-    {
-        auto proxy = get_service_proxy(iface);
-        if (!proxy)
-            return {0};
-        return proxy->get_destination_channel_zone_id();
-    }
+    // destination_channel_zone casting_interface::get_channel_zone(const casting_interface& iface)
+    // {
+    //     auto proxy = get_service_proxy(iface);
+    //     if (!proxy)
+    //         return {0};
+    //     return proxy->get_destination_channel_zone_id();
+    // }
 }

@@ -20,7 +20,7 @@ namespace rpc
         }
         virtual ~enclave_telemetry_service() = default;
 
-        void on_service_creation(const char* name, rpc::zone zone_id, rpc::destination_zone parent_zone_id) const override;
+        void on_service_creation(const std::string& name, rpc::zone zone_id, rpc::destination_zone parent_zone_id) const override;
         void on_service_deletion(rpc::zone zone_id) const override;
         void on_service_try_cast(rpc::zone zone_id,
             rpc::destination_zone destination_zone_id,
@@ -40,13 +40,13 @@ namespace rpc
             rpc::object object_id,
             rpc::caller_zone caller_zone_id) const override;
 
-        void on_service_proxy_creation(const char* service_name,
-            const char* service_proxy_name,
+        void on_service_proxy_creation(const std::string& service_name,
+            const std::string& service_proxy_name,
             rpc::zone zone_id,
             rpc::destination_zone destination_zone_id,
             rpc::caller_zone caller_zone_id) const override;
-        void on_cloned_service_proxy_creation(const char* service_name,
-            const char* service_proxy_name,
+        void on_cloned_service_proxy_creation(const std::string& service_name,
+            const std::string& service_proxy_name,
             rpc::zone zone_id,
             rpc::destination_zone destination_zone_id,
             rpc::caller_zone caller_zone_id) const override;
@@ -79,7 +79,7 @@ namespace rpc
             rpc::caller_zone caller_zone_id,
             int ref_count) const override;
 
-        void on_impl_creation(const char* name, uint64_t address, rpc::zone zone_id) const override;
+        void on_impl_creation(const std::string& name, uint64_t address, rpc::zone zone_id) const override;
         void on_impl_deletion(uint64_t address, rpc::zone zone_id) const override;
 
         void on_stub_creation(rpc::zone zone_id, rpc::object object_id, uint64_t address) const override;
@@ -106,7 +106,7 @@ namespace rpc
         void on_object_proxy_deletion(
             rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::object object_id) const override;
 
-        void on_interface_proxy_creation(const char* name,
+        void on_interface_proxy_creation(const std::string& name,
             rpc::zone zone_id,
             rpc::destination_zone destination_zone_id,
             rpc::object object_id,
@@ -115,13 +115,13 @@ namespace rpc
             rpc::destination_zone destination_zone_id,
             rpc::object object_id,
             rpc::interface_ordinal interface_id) const override;
-        void on_interface_proxy_send(const char* method_name,
+        void on_interface_proxy_send(const std::string& method_name,
             rpc::zone zone_id,
             rpc::destination_zone destination_zone_id,
             rpc::object object_id,
             rpc::interface_ordinal interface_id,
             rpc::method method_id) const override;
 
-        void message(level_enum level, const char* message) const override;
+        void message(level_enum level, const std::string& message) const override;
     };
 }

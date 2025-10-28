@@ -50,7 +50,7 @@ namespace rpc
         service_configs_.emplace_back(type, output_path);
     }
 
-    void multiplexing_telemetry_service::start_test(const char* test_suite_name, const char* name)
+    void multiplexing_telemetry_service::start_test(const std::string& test_suite_name, const std::string& name)
     {
         // Clear existing children
         children_.clear();
@@ -94,7 +94,7 @@ namespace rpc
 
     // Forward all telemetry events to children
     void multiplexing_telemetry_service::on_service_creation(
-        const char* name, rpc::zone zone_id, rpc::destination_zone parent_zone_id) const
+        const std::string& name, rpc::zone zone_id, rpc::destination_zone parent_zone_id) const
     {
         for (const auto& child : children_)
         {
@@ -170,8 +170,8 @@ namespace rpc
         }
     }
 
-    void multiplexing_telemetry_service::on_service_proxy_creation(const char* service_name,
-        const char* service_proxy_name,
+    void multiplexing_telemetry_service::on_service_proxy_creation(const std::string& service_name,
+        const std::string& service_proxy_name,
         rpc::zone zone_id,
         rpc::destination_zone destination_zone_id,
         rpc::caller_zone caller_zone_id) const
@@ -186,8 +186,8 @@ namespace rpc
         }
     }
 
-    void multiplexing_telemetry_service::on_cloned_service_proxy_creation(const char* service_name,
-        const char* service_proxy_name,
+    void multiplexing_telemetry_service::on_cloned_service_proxy_creation(const std::string& service_name,
+        const std::string& service_proxy_name,
         rpc::zone zone_id,
         rpc::destination_zone destination_zone_id,
         rpc::caller_zone caller_zone_id) const
@@ -294,7 +294,7 @@ namespace rpc
         }
     }
 
-    void multiplexing_telemetry_service::on_impl_creation(const char* name, uint64_t address, rpc::zone zone_id) const
+    void multiplexing_telemetry_service::on_impl_creation(const std::string& name, uint64_t address, rpc::zone zone_id) const
     {
         for (const auto& child : children_)
         {
@@ -404,7 +404,7 @@ namespace rpc
         }
     }
 
-    void multiplexing_telemetry_service::on_interface_proxy_creation(const char* name,
+    void multiplexing_telemetry_service::on_interface_proxy_creation(const std::string& name,
         rpc::zone zone_id,
         rpc::destination_zone destination_zone_id,
         rpc::object object_id,
@@ -433,7 +433,7 @@ namespace rpc
         }
     }
 
-    void multiplexing_telemetry_service::on_interface_proxy_send(const char* method_name,
+    void multiplexing_telemetry_service::on_interface_proxy_send(const std::string& method_name,
         rpc::zone zone_id,
         rpc::destination_zone destination_zone_id,
         rpc::object object_id,
@@ -450,7 +450,7 @@ namespace rpc
         }
     }
 
-    void multiplexing_telemetry_service::message(level_enum level, const char* message) const
+    void multiplexing_telemetry_service::message(level_enum level, const std::string& message) const
     {
         for (const auto& child : children_)
         {
