@@ -17,7 +17,10 @@ namespace rpc
         std::shared_ptr<rpc::object_stub>& stub, interface_descriptor& descriptor)
     {
         if (!iface)
-            CO_RETURN error::INVALID_DATA();
+        {
+            descriptor = {0,0};
+            CO_RETURN error::OK();
+        }
 
         RPC_ASSERT(object_p);
         if (!object_p)

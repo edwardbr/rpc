@@ -293,6 +293,9 @@ namespace rpc
 
         // virtual void remove_zone_proxy_if_not_used(destination_zone destination_zone_id, caller_zone caller_zone_id);
 
+        void add_transport(destination_zone adjacent_zone_id, const std::shared_ptr<transport>& transport_ptr);
+        void remove_transport(destination_zone adjacent_zone_id);
+
         /////////////////////////////////
         // BINDING LOGIC
         /////////////////////////////////

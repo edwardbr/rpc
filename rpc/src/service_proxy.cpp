@@ -44,6 +44,15 @@ namespace rpc
         RPC_ASSERT(svc != nullptr);
     }
   */  
+
+    service_proxy::service_proxy(const std::shared_ptr<transport>& transport, destination_zone destination_zone_id) :
+        zone_id_(transport->get_service()->get_zone_id())
+        , destination_zone_id_(destination_zone_id)
+        , service_(transport->get_service())
+        , transport_(transport)
+        , name_(transport->get_name())
+    {}
+
     service_proxy::service_proxy(const std::string& name, destination_zone destination_zone_id, const std::shared_ptr<rpc::service_proxy>& other)
         : zone_id_(other->zone_id_)
         , destination_zone_id_(destination_zone_id)

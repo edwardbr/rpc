@@ -72,6 +72,7 @@ namespace rpc
 
     public:
         service_proxy(const std::string& name, const std::shared_ptr<transport>& transport, const std::shared_ptr<rpc::service>& svc);
+        service_proxy(const std::shared_ptr<transport>& transport, destination_zone destination_zone_id);
         service_proxy(const std::string& name, destination_zone destination_zone_id, const std::shared_ptr<rpc::service_proxy>& other);
         // service_proxy(const service_proxy& other);
 

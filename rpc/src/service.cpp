@@ -1448,6 +1448,28 @@ namespace rpc
         inner_add_zone_proxy(service_proxy);
     }
 
+    void service::add_transport(destination_zone adjacent_zone_id, const std::shared_ptr<transport>& transport_ptr)
+    {
+        std::lock_guard g(zone_control);
+        transports[adjacent_zone_id] = transport_ptr;
+        RPC_DEBUG("add_transport service zone: {} adjacent_zone_id={}",
+            std::to_string(zone_id_),
+            std::to_string(adjacent_zone_id));
+    }
+
+    void service::remove_transport(destination_zone adjacent_zone_id)
+    {
+        std::lock_guard g(zone_control);
+        auto it = transports.find(adjacent_zone_id);
+        if (it != transports.end())
+        {
+            transports.erase(it);
+            RPC_DEBUG("remove_transport service zone: {} adjacent_zone_id={}",
+                std::to_string(zone_id_),
+                std::to_string(adjacent_zone_id));
+        }
+    }
+
     std::shared_ptr<rpc::service_proxy> service::get_zone_proxy(caller_channel_zone caller_channel_zone_id,
         caller_zone caller_zone_id,
         destination_zone destination_zone_id,
@@ -1458,9 +1480,27 @@ namespace rpc
         std::lock_guard g(zone_control);
 
         // find if we have one
-        auto item = other_zones.find(destination_zone_id);
-        if (item != other_zones.end())
-            return item->second.lock();
+        {
+            auto item = other_zones.find(destination_zone_id);
+            if (item != other_zones.end())
+                return item->second.lock();
+        }
+
+        {
+            auto item = transports.find(caller_channel_zone_id.as_destination());
+            if(item != transports.end())
+            {
+                auto transport = item->second.lock();
+                if(transport)
+                {
+                    auto proxy = std::make_shared<service_proxy>(transport, destination_zone_id);
+                    inner_add_zone_proxy(proxy);
+                    new_proxy_added = true;
+                    return proxy;
+                }
+            }
+            return nullptr;
+        }
 
         /*item = other_zones.lower_bound(destination_zone_id});
 
