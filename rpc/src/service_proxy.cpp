@@ -444,9 +444,7 @@ namespace rpc
                 RPC_ASSERT(false);
             }
 #ifdef BUILD_COROUTINE
-        svc->schedule([svc, object_id, transport, version = version_.load(), destination_zone_id = destination_zone_id_, is_optimistic]()->CORO_TASK(void){
-        });
-        CO_RETURN;
+        }());
 #endif
     }
 

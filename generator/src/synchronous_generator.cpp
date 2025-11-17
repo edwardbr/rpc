@@ -470,7 +470,7 @@ namespace synchronous_generator
                     auto target_stub_strong = target_stub_.lock();
                     if (target_stub_strong)
                     {{
-                        auto& zone_ = target_stub_strong->get_zone();
+                        auto zone_ = target_stub_strong->get_zone();
                         __rpc_ret = CO_AWAIT rpc::stub_bind_in_param(protocol_version, zone_, caller_channel_zone_id, caller_zone_id, {1}_object_, {1});
                     }}
                     else
@@ -961,7 +961,7 @@ namespace synchronous_generator
                         stub("auto target_stub_strong = target_stub_.lock();");
                         stub("if (target_stub_strong)");
                         stub("{{");
-                        stub("auto& zone_ = target_stub_strong->get_zone();");
+                        stub("auto zone_ = target_stub_strong->get_zone();");
                         has_preamble = true;
                     }
                     stub(output);
@@ -1394,8 +1394,8 @@ namespace synchronous_generator
              "new_stub)",
             interface_name);
         stub("{{");
-        stub("auto& service = get_object_stub().lock()->get_zone();");
-        stub("int __rpc_ret = service.create_interface_stub(interface_id, {}::get_id, shared_from_this(), "
+        stub("auto service = get_object_stub().lock()->get_zone();");
+        stub("int __rpc_ret = service->create_interface_stub(interface_id, {}::get_id, shared_from_this(), "
              "new_stub);",
             interface_name);
         stub("return __rpc_ret;");

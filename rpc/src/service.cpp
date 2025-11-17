@@ -714,7 +714,7 @@ namespace rpc
                 {
                     // else create a stub
                     auto id = generate_new_object_id();
-                    stub = std::make_shared<object_stub>(id, *this, pointer);
+                    stub = std::make_shared<object_stub>(id, shared_from_this(), pointer);
                     std::shared_ptr<rpc::i_interface_stub> interface_stub = fn(stub);
                     stub->add_interface(interface_stub);
                     wrapped_object_to_stub[pointer] = stub;

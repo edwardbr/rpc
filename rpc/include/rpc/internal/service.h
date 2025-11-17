@@ -89,8 +89,15 @@ namespace rpc
         struct child_service_tag
         {
         };
-        
+
         friend transport;
+
+        // Friend declarations for binding template functions
+        template<class T>
+        friend CORO_TASK(int) stub_bind_out_param(const std::shared_ptr<rpc::service>&, uint64_t, caller_channel_zone, caller_zone, const shared_ptr<T>&, interface_descriptor&);
+
+        template<class T>
+        friend CORO_TASK(int) stub_bind_in_param(uint64_t, const std::shared_ptr<rpc::service>&, caller_channel_zone, caller_zone, const interface_descriptor&, shared_ptr<T>&);
 
     public:
 #ifdef BUILD_COROUTINE
@@ -381,13 +388,24 @@ namespace rpc
     {
         // the enclave needs to hold a hard lock to a root object that represents a runtime
         // the enclave service lifetime is managed by the transport functions
-        std::mutex parent_protect;
-        // std::shared_ptr<rpc::service_proxy> parent_service_proxy_;
+        mutable std::mutex parent_protect;
+        // Strong reference to parent transport - keeps parent zone alive
+        std::shared_ptr<transport> parent_transport_;
         destination_zone parent_zone_id_;
 
-        // std::shared_ptr<rpc::service_proxy> get_parent() const override { return parent_service_proxy_; }
-        // destination_zone get_parent_zone_id() const override { return parent_zone_id_; }
-        // bool set_parent_proxy(const std::shared_ptr<rpc::service_proxy>& parent_service_proxy) override;
+    public:
+        // Set parent transport - must be called during child zone creation
+        void set_parent_transport(const std::shared_ptr<transport>& parent_transport)
+        {
+            std::lock_guard lock(parent_protect);
+            parent_transport_ = parent_transport;
+        }
+
+        std::shared_ptr<transport> get_parent_transport() const
+        {
+            std::lock_guard lock(parent_protect);
+            return parent_transport_;
+        }
 
     public:
 #ifdef BUILD_COROUTINE
@@ -436,6 +454,10 @@ namespace rpc
 
             // Link the child to the parent via transport
             parent_transport->set_service(child_svc);
+
+            // CRITICAL: Child service must keep parent transport alive
+            // This ensures parent zone remains reachable while child exists
+            child_svc->set_parent_transport(parent_transport);
 
             auto parent_service_proxy = std::make_shared<rpc::service_proxy>(
                 "parent", parent_transport, child_svc);

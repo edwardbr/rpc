@@ -38,13 +38,13 @@ namespace rpc
         std::shared_ptr<object_stub> p_this_;
         std::atomic<uint64_t> shared_count_ = 0;
         std::atomic<uint64_t> optimistic_count_ = 0;
-        service& zone_;
+        std::shared_ptr<service> zone_;  // CHANGED: Strong reference to keep service alive while stub exists
 
         void add_interface(const std::shared_ptr<rpc::i_interface_stub>& iface);
         friend service; // so that it can call add_interface
 
     public:
-        object_stub(object id, service& zone, void* target);
+        object_stub(object id, const std::shared_ptr<service>& zone, void* target);
         ~object_stub();
         object get_id() const { return id_; }
         rpc::shared_ptr<rpc::casting_interface> get_castable_interface() const;
@@ -53,7 +53,7 @@ namespace rpc
         // this is called once the lifetime management needs to be activated
         void on_added_to_zone(std::shared_ptr<object_stub> stub) { p_this_ = stub; }
 
-        service& get_zone() const { return zone_; }
+        std::shared_ptr<service> get_zone() const { return zone_; }
 
         CORO_TASK(int)
         call(uint64_t protocol_version,

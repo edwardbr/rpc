@@ -33,11 +33,13 @@ All rights reserved.
 
 ## Implementation Status Report
 
-**Last Updated**: 2025-10-28
+**Last Updated**: 2025-01-17
 
 ### Overview
 
 This section tracks the actual implementation status against the planned milestones. The implementation has progressed beyond initial expectations in some areas while revealing architectural improvements over the original plan.
+
+**Recent Completion (2025-01-17)**: Established correct ownership model for services, transports, and stubs, resolving zone lifecycle issues and enabling reliable multi-zone distributed systems. This foundational work is critical for pass-through implementation.
 
 ### Milestone Completion Status
 
@@ -238,9 +240,150 @@ namespace rpc {
 
 ---
 
+#### ✅ **IMPROVEMENT 3: Service and Transport Ownership Model**
+
+**Implementation Date**: 2025-01-17
+
+**Problem**: Test `remote_type_test/0.create_new_zone` was failing with assertion `'!"error failed " "is_empty"'` in service destructor, indicating premature service destruction while references still existed.
+
+**Root Cause Analysis**:
+1. `object_stub` was using reference to service (`service&`) instead of strong ownership
+2. `child_service` had no strong reference to parent transport
+3. Parent zones were being destroyed while child zones still had active references
+4. Reference counting was ineffective due to incorrect ownership chain
+
+**Ownership Requirements Established**:
+1. **Parent Transport Lifetime**: Must remain alive as long as there's a positive reference count between zones in either direction
+2. **Single Parent Transport**: Only one parent transport per zone
+3. **Child Service Ownership**: Must have strong reference to parent transport to keep parent zone alive
+4. **Transport Lifetime**: All transports and service must keep parent transport alive
+5. **Stub Ownership**: Stubs instantiated in service must keep service alive via `std::shared_ptr`
+
+**Implementation Changes**:
+
+**1. object_stub → service Ownership** (stub.h, stub.cpp):
+```cpp
+// BEFORE:
+class object_stub {
+    service& zone_;  // Reference - no ownership
+    object_stub(object id, service& zone, void* target);
+};
+
+// AFTER:
+class object_stub {
+    std::shared_ptr<service> zone_;  // Strong ownership
+    object_stub(object id, const std::shared_ptr<service>& zone, void* target);
+    std::shared_ptr<service> get_zone() const { return zone_; }  // Returns shared_ptr
+};
+```
+
+**2. child_service → parent_transport Ownership** (service.h):
+```cpp
+class child_service : public service {
+    mutable std::mutex parent_protect;  // Made mutable for const getter
+    std::shared_ptr<transport> parent_transport_;  // ADDED: Strong ownership
+    destination_zone parent_zone_id_;
+
+public:
+    void set_parent_transport(const std::shared_ptr<transport>& parent_transport);
+    std::shared_ptr<transport> get_parent_transport() const;
+};
+```
+
+**3. Zone Creation Updates** (service.h:448-453):
+```cpp
+parent_transport->set_service(child_svc);
+
+// CRITICAL: Child service must keep parent transport alive
+child_svc->set_parent_transport(parent_transport);
+
+auto parent_service_proxy = std::make_shared<rpc::service_proxy>(
+    "parent", parent_transport, child_svc);
+```
+
+**4. Binding Function Signatures** (bindings.h):
+```cpp
+// Updated to accept shared_ptr instead of reference:
+template<class T>
+CORO_TASK(int) stub_bind_out_param(
+    const std::shared_ptr<rpc::service>& zone,  // CHANGED: from service&
+    uint64_t protocol_version,
+    caller_channel_zone caller_channel_zone_id,
+    caller_zone caller_zone_id,
+    const shared_ptr<T>& iface,
+    interface_descriptor& descriptor);
+
+template<class T>
+CORO_TASK(int) stub_bind_in_param(
+    uint64_t protocol_version,
+    const std::shared_ptr<rpc::service>& serv,  // CHANGED: from service&
+    caller_channel_zone caller_channel_zone_id,
+    caller_zone caller_zone_id,
+    const rpc::interface_descriptor& encap,
+    rpc::shared_ptr<T>& iface);
+```
+
+**5. Code Generator Updates** (synchronous_generator.cpp):
+```cpp
+// Line 473: Fixed rvalue binding error
+stub("auto zone_ = target_stub_strong->get_zone();");  // CHANGED: from auto&
+
+// Line 1397-1398: Updated service access
+stub("auto service = get_object_stub().lock()->get_zone();");
+stub("int __rpc_ret = service->create_interface_stub(...);");
+```
+
+**6. Friend Declarations** (service.h):
+```cpp
+// Added to service class protected section for template access:
+template<class T>
+friend CORO_TASK(int) stub_bind_out_param(const std::shared_ptr<rpc::service>&, ...);
+
+template<class T>
+friend CORO_TASK(int) stub_bind_in_param(uint64_t, const std::shared_ptr<rpc::service>&, ...);
+```
+
+**Compilation Fixes**:
+1. **Mutex const-ness**: Made `parent_protect` mutable for const getter
+2. **Rvalue binding**: Changed `auto&` to `auto` for value returns
+3. **Private access**: Added friend declarations for binding templates
+4. **Generated code**: Regenerated all IDL files with updated templates
+
+**Test Verification**:
+```bash
+./build/output/debug/rpc_test --gtest_filter="remote_type_test/0.create_new_zone"
+```
+
+**Results**:
+- ✅ Test PASSES (previously failed with assertion)
+- ✅ Proper cleanup sequence with zero reference counts
+- ✅ No premature service destruction
+- ✅ Child zones properly keep parent zones alive
+
+**Debug Output Confirms Correct Behavior**:
+```
+[DEBUG] Remote shared count = 0 for object 1
+[DEBUG] object_proxy destructor: ... (current: shared=0, optimistic=0)
+[       OK ] remote_type_test/0.create_new_zone (0 ms)
+```
+
+**Files Modified**:
+- `/rpc/include/rpc/internal/stub.h`
+- `/rpc/src/stub.cpp`
+- `/rpc/include/rpc/internal/service.h`
+- `/rpc/src/service.cpp`
+- `/rpc/include/rpc/internal/bindings.h`
+- `/generator/src/synchronous_generator.cpp`
+
+**Status**: ✅ **VERIFIED COMPLETE**
+
+**Impact**: Establishes correct ownership model for zone lifecycle management, enabling reliable multi-zone distributed systems. This is foundational work required before pass-through implementation.
+
+---
+
 ### Current Implementation Capabilities
 
-**What Works Now** (2025-10-28):
+**What Works Now** (2025-01-17):
 1. ✅ Back-channel data transmission across all RPC operations
 2. ✅ Fire-and-forget post() messaging (needs full testing)
 3. ✅ Local child zone creation with parent↔child transports
@@ -249,6 +392,7 @@ namespace rpc {
 6. ✅ Service derives from i_marshaller (no i_service)
 7. ✅ Bi-modal support (sync and async modes)
 8. ✅ Serialization in all transport types including local
+9. ✅ **Correct ownership model for services, stubs, and transports** (2025-01-17)
 
 **What Doesn't Work Yet**:
 1. ❌ Multi-hop routing through intermediaries (A→B→C)
@@ -264,6 +408,8 @@ namespace rpc {
 
 #### Phase 1: Milestone 5 - Pass-Through Core (NEXT PRIORITY)
 
+**Prerequisites**: ✅ **Ownership model established (2025-01-17)** - Services, stubs, and transports now have correct lifecycle management
+
 **Tasks**:
 1. Implement `pass_through` class with dual transport routing
 2. Implement reference counting (shared + optimistic)
@@ -275,6 +421,8 @@ namespace rpc {
 **Estimated Effort**: 2-3 weeks
 
 **Blocking**: All remaining milestones
+
+**Note**: Pass-through implementation can now proceed with confidence that the underlying ownership model is correct and tested.
 
 ---
 

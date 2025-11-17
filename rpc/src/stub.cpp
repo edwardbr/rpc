@@ -6,20 +6,20 @@
 
 namespace rpc
 {
-    object_stub::object_stub(object id, service& zone, void* target)
+    object_stub::object_stub(object id, const std::shared_ptr<service>& zone, void* target)
         : id_(id)
         , zone_(zone)
     {
 #ifdef USE_RPC_TELEMETRY
         if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
-            telemetry_service->on_stub_creation(zone_.get_zone_id(), id_, (uint64_t)target);
+            telemetry_service->on_stub_creation(zone_->get_zone_id(), id_, (uint64_t)target);
 #endif
     }
     object_stub::~object_stub()
     {
 #ifdef USE_RPC_TELEMETRY
         if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
-            telemetry_service->on_stub_deletion(zone_.get_zone_id(), id_);
+            telemetry_service->on_stub_deletion(zone_->get_zone_id(), id_);
 #endif
         RPC_ASSERT(shared_count_ == 0);
     }
@@ -104,7 +104,7 @@ namespace rpc
             ret = ++shared_count_;
 #ifdef USE_RPC_TELEMETRY
         if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
-            telemetry_service->on_stub_add_ref(zone_.get_zone_id(), id_, {}, ret, {});
+            telemetry_service->on_stub_add_ref(zone_->get_zone_id(), id_, {}, ret, {});
 #endif
         RPC_ASSERT(ret != std::numeric_limits<uint64_t>::max());
         RPC_ASSERT(ret != 0);
@@ -120,7 +120,7 @@ namespace rpc
             count = --shared_count_;
 #ifdef USE_RPC_TELEMETRY
         if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
-            telemetry_service->on_stub_release(zone_.get_zone_id(), id_, {}, count, {});
+            telemetry_service->on_stub_release(zone_->get_zone_id(), id_, {}, count, {});
 #endif
         RPC_ASSERT(count != std::numeric_limits<uint64_t>::max());
         return count;
@@ -128,7 +128,7 @@ namespace rpc
 
     void object_stub::release_from_service()
     {
-        zone_.release_local_stub(p_this_, false);
+        zone_->release_local_stub(p_this_, false);
     }
 
 }

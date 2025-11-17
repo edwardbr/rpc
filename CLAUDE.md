@@ -178,6 +178,86 @@ RPC_DEBUG("service::send zone: {} destination_zone={}, caller_zone={}",
 
 **Files Affected**: 28+ files across the codebase including core service files, generators, and test implementations
 
+### 5. Service and Transport Ownership Model (COMPLETED - January 2025)
+**Locations**:
+- `/rpc/include/rpc/internal/stub.h` - Object stub ownership changes
+- `/rpc/src/stub.cpp` - Stub implementation updates
+- `/rpc/include/rpc/internal/service.h` - Child service parent transport ownership
+- `/rpc/src/service.cpp` - Service implementation updates
+- `/rpc/include/rpc/internal/bindings.h` - Binding function signatures
+- `/generator/src/synchronous_generator.cpp` - Code generation updates
+
+**Problem Solved**:
+Test `remote_type_test/0.create_new_zone` was failing with assertion `'!"error failed " "is_empty"'` in service destructor, indicating premature service destruction while references still existed.
+
+**Root Cause**:
+- `object_stub` was using reference to service (`service&`) instead of strong ownership
+- `child_service` had no strong reference to parent transport
+- Parent zones were being destroyed while child zones still had active references
+- Reference counting was ineffective due to incorrect ownership chain
+
+**Ownership Architecture Established**:
+```cpp
+// 1. object_stub keeps service alive
+class object_stub {
+    std::shared_ptr<service> zone_;  // Strong ownership (was: service&)
+    object_stub(object id, const std::shared_ptr<service>& zone, void* target);
+    std::shared_ptr<service> get_zone() const { return zone_; }
+};
+
+// 2. child_service keeps parent_transport alive
+class child_service : public service {
+    mutable std::mutex parent_protect;
+    std::shared_ptr<transport> parent_transport_;  // Strong ownership (NEW)
+public:
+    void set_parent_transport(const std::shared_ptr<transport>& parent_transport);
+    std::shared_ptr<transport> get_parent_transport() const;
+};
+
+// 3. Zone creation establishes ownership chain
+parent_transport->set_service(child_svc);
+child_svc->set_parent_transport(parent_transport);  // Critical ownership link
+```
+
+**Key Principles**:
+1. **Parent Transport Lifetime**: Must remain alive as long as there's a positive reference count between zones in either direction
+2. **Single Parent Transport**: Only one parent transport per zone
+3. **Child Service Ownership**: Must have strong reference to parent transport to keep parent zone alive
+4. **Transport Lifetime**: All transports and service must keep parent transport alive
+5. **Stub Ownership**: Stubs instantiated in service must keep service alive via `std::shared_ptr`
+
+**Binding Function Updates**:
+- Changed from `service&` to `const std::shared_ptr<service>&` for proper ownership semantics
+- Updated `stub_bind_out_param()` and `stub_bind_in_param()` signatures
+- Added friend declarations for template binding functions to access private service methods
+
+**Code Generator Changes**:
+- Fixed generated code to avoid binding references to rvalue returns (`auto` instead of `auto&`)
+- Updated service access in generated stubs to use `get_zone()` which returns `shared_ptr`
+- Regenerated all IDL files with updated templates
+
+**Compilation Fixes**:
+1. Made `parent_protect` mutex mutable for const getter compatibility
+2. Changed `auto&` to `auto` for value returns from `get_zone()`
+3. Added friend declarations for binding template functions
+4. Regenerated all generated code after template updates
+
+**Test Verification**:
+```bash
+./build/output/debug/rpc_test --gtest_filter="remote_type_test/0.create_new_zone"
+[  PASSED  ] remote_type_test/0.create_new_zone
+```
+
+**Impact**:
+- Establishes correct ownership model for zone lifecycle management
+- Enables reliable multi-zone distributed systems
+- Proper cleanup sequence with zero reference counts on destruction
+- No premature service destruction
+- Child zones properly keep parent zones alive
+- **Foundational work required before pass-through implementation**
+
+**Files Modified**: 6 core files including headers, implementations, bindings, and code generator
+
 ## IDL System
 
 ### Parser Architecture

@@ -38,7 +38,7 @@ namespace rpc
     
     template<class T>
     CORO_TASK(int)
-    stub_bind_out_param(rpc::service& zone,
+    stub_bind_out_param(const std::shared_ptr<rpc::service>& zone,
         uint64_t protocol_version,
         caller_channel_zone caller_channel_zone_id,
         caller_zone caller_zone_id,
@@ -48,17 +48,17 @@ namespace rpc
 		{
 			CO_RETURN rpc::error::INVALID_DATA();
 		}
-		auto factory = zone.create_interface_stub(iface);
+		auto factory = zone->create_interface_stub(iface);
 
 		std::shared_ptr<rpc::object_stub> stub;
-		CO_RETURN CO_AWAIT zone.get_proxy_stub_descriptor(protocol_version, caller_channel_zone_id, caller_zone_id, iface.get(), factory, true, stub, descriptor);        
+		CO_RETURN CO_AWAIT zone->get_proxy_stub_descriptor(protocol_version, caller_channel_zone_id, caller_zone_id, iface.get(), factory, true, stub, descriptor);
     }
 
     // do not use directly it is for the interface generator use rpc::create_interface_proxy if you want to get a proxied pointer to a remote implementation
     template<class T>
     CORO_TASK(int)
     stub_bind_in_param(uint64_t protocol_version,
-        rpc::service& serv,
+        const std::shared_ptr<rpc::service>& serv,
         caller_channel_zone caller_channel_zone_id,
         caller_zone caller_zone_id,
         const rpc::interface_descriptor& encap,
@@ -70,9 +70,9 @@ namespace rpc
             CO_RETURN rpc::error::OK();
         }
         // if it is local to this service then just get the relevant stub
-        else if (serv.get_zone_id().as_destination() == encap.destination_zone_id)
+        else if (serv->get_zone_id().as_destination() == encap.destination_zone_id)
         {
-            iface = rpc::static_pointer_cast<T>(serv.get_castable_interface(encap.object_id, T::get_id(protocol_version)));
+            iface = rpc::static_pointer_cast<T>(serv->get_castable_interface(encap.object_id, T::get_id(protocol_version)));
             if (!iface)
             {
                 RPC_ERROR("Object not found in local interface lookup");
@@ -82,11 +82,11 @@ namespace rpc
         }
         else
         {
-            auto zone_id = serv.get_zone_id();
+            auto zone_id = serv->get_zone_id();
             // get the right  service proxy
             // if the zone is different lookup or clone the right proxy
             bool new_proxy_added = false;
-            auto service_proxy = serv.get_zone_proxy(
+            auto service_proxy = serv->get_zone_proxy(
                 caller_channel_zone_id, caller_zone_id, encap.destination_zone_id, zone_id.as_caller(), new_proxy_added);
             if (!service_proxy)
             {
