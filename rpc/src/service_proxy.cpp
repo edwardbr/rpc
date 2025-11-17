@@ -9,10 +9,11 @@
 namespace rpc
 {
     
-    service_proxy::service_proxy(const std::string& name, destination_zone destination_zone_id, std::shared_ptr<transport> transport, const std::shared_ptr<rpc::service>& svc)
+    service_proxy::service_proxy(const std::string& name, const std::shared_ptr<transport>& transport, const std::shared_ptr<rpc::service>& svc)
     : zone_id_(svc->get_zone_id())
-        , destination_zone_id_(destination_zone_id)
+        , destination_zone_id_(transport->get_adjacent_zone_id().as_destination())
         , service_(svc)
+        , transport_(transport)
         , name_(name)        
     {
 #ifdef USE_RPC_TELEMETRY
@@ -439,7 +440,7 @@ namespace rpc
             }
             else 
             {
-                RPC_ERROR("cleanup_after_object optimistic release failed with error {}", ret);
+                RPC_ERROR("cleanup_after_object optimistic release failed: {}", rpc::error::to_string(ret));
                 RPC_ASSERT(false);
             }
 #ifdef BUILD_COROUTINE

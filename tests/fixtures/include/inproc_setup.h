@@ -95,10 +95,10 @@ public:
         rpc::shared_ptr<yyy::i_host> hst(new host());
         local_host_ptr_ = hst; // assign to weak ptr
 
-        auto new_zone_id = ++(zone_gen_);
+        rpc::zone new_zone_id{++(zone_gen_)};
 
-        auto child_transport = std::make_shared<local::child_transport>("main child", root_service_, rpc::zone{new_zone_id},
-            local::parent_transport::bind<yyy::i_host, yyy::i_example>([&](const rpc::shared_ptr<yyy::i_host>& host,
+        auto child_transport = std::make_shared<local::child_transport>("main child", root_service_, new_zone_id,
+            local::parent_transport::bind<yyy::i_host, yyy::i_example>(new_zone_id, [&](const rpc::shared_ptr<yyy::i_host>& host,
                 rpc::shared_ptr<yyy::i_example>& new_example,
                 const std::shared_ptr<rpc::child_service>& child_service_ptr) -> CORO_TASK(int)
             {
@@ -189,10 +189,10 @@ public:
 
         rpc::shared_ptr<yyy::i_example> example_relay_ptr;
 
-        auto new_zone_id = ++(zone_gen_);
+        auto zone_id = rpc::zone{++zone_gen_};
 
-        auto child_transport = std::make_shared<local::child_transport>("main child", root_service_, rpc::zone{new_zone_id},
-            local::parent_transport::bind<yyy::i_host, yyy::i_example>([&](const rpc::shared_ptr<yyy::i_host>& host,
+        auto child_transport = std::make_shared<local::child_transport>("main child", root_service_, zone_id,
+            local::parent_transport::bind<yyy::i_host, yyy::i_example>(zone_id, [&](const rpc::shared_ptr<yyy::i_host>& host,
                 rpc::shared_ptr<yyy::i_example>& new_example,
                 const std::shared_ptr<rpc::child_service>& child_service_ptr) -> CORO_TASK(int)
             {

@@ -135,12 +135,12 @@ namespace rpc
         void remove_service_event(const std::weak_ptr<service_event>& event);
         CORO_TASK(void) notify_object_gone_event(object object_id, destination_zone destination);
 
-        // not implemented in the base service class only for child_service
-        virtual bool set_parent_proxy(const std::shared_ptr<rpc::service_proxy>&)
-        {
-            RPC_ASSERT(false);
-            return false;
-        }
+        // // not implemented in the base service class only for child_service
+        // virtual bool set_parent_proxy(const std::shared_ptr<rpc::service_proxy>&)
+        // {
+        //     RPC_ASSERT(false);
+        //     return false;
+        // }
 
         // passed by value implementing an implicit lock on the life time of ptr
         object get_object_id(const shared_ptr<casting_interface>& ptr) const;
@@ -438,14 +438,14 @@ namespace rpc
             parent_transport->set_service(child_svc);
 
             auto parent_service_proxy = std::make_shared<rpc::service_proxy>(
-                "parent", parent_zone_id, parent_transport, child_svc);
+                "parent", parent_transport, child_svc);
 
             child_svc->add_zone_proxy(parent_service_proxy);
-            if (!child_svc->set_parent_proxy(parent_service_proxy))
-            {
-                RPC_ERROR("Unable to create set_parent_proxy in create_child_service");
-                CO_RETURN rpc::error::UNABLE_TO_CREATE_SERVICE_PROXY();
-            }
+            // if (!child_svc->set_parent_proxy(parent_service_proxy))
+            // {
+            //     RPC_ERROR("Unable to create set_parent_proxy in create_child_service");
+            //     CO_RETURN rpc::error::UNABLE_TO_CREATE_SERVICE_PROXY();
+            // }
             // parent_service_proxy->set_parent_channel(true);
 
             rpc::shared_ptr<PARENT_INTERFACE> parent_ptr;
@@ -483,11 +483,8 @@ namespace rpc
         const rpc::shared_ptr<in_param_type>& input_interface,
         rpc::shared_ptr<out_param_type>& output_interface)
     {
-        // Get destination zone from transport
-        destination_zone destination_zone = child_transport->get_adjacent_zone_id().as_destination();
-
         // Create service_proxy for this connection
-        auto new_service_proxy = std::make_shared<rpc::service_proxy>(name, destination_zone, child_transport, shared_from_this());
+        auto new_service_proxy = std::make_shared<rpc::service_proxy>(name, child_transport, shared_from_this());
         
         //add the proxy to the service
         add_zone_proxy(new_service_proxy);
@@ -511,7 +508,7 @@ namespace rpc
                     
                 if(err != error::OK())
                 {
-                    remove_zone_proxy(destination_zone, zone_id_.as_caller());
+                    remove_zone_proxy(child_transport->get_adjacent_zone_id().as_destination(), zone_id_.as_caller());
                     return err;
                 }
             }

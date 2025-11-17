@@ -30,13 +30,10 @@
         "USE_RPC_LOGGING": "OFF",
         "USE_RPC_TELEMETRY": "OFF",
         "USE_CONSOLE_TELEMETRY": "OFF",
-        "USE_THREAD_LOCAL_LOGGING": "OFF"
-        // "LIBCORO_BUILD_EXAMPLES": "ON",
-        // "LIBCORO_BUILD_TESTS": "ON",
-        // "LIBCORO_FEATURE_NETWORKING": "ON",
-        // "RPC_HANG_ON_FAILED_ASSERT": "OFF"
-        // "SGX_DIR:FILEPATH": "/home/edward/repo/linux-sgx/linux/installer/bin/sgxsdk"
-        // "USE_RPC_TELEMETRY_RAII_LOGGING": "ON",,
+        "USE_THREAD_LOCAL_LOGGING": "OFF",
+        "LIBCORO_FEATURE_NETWORKING": "OFF",
+        "RPC_HANG_ON_FAILED_ASSERT": "OFF",
+        "USE_RPC_TELEMETRY_RAII_LOGGING": "OFF"
       }
     },
     {
@@ -82,8 +79,8 @@
         "BUILD_COROUTINE": "OFF",
         "BUILD_TYPE": "debug",
         "CMAKE_BUILD_TYPE": "Debug",
-        // "USE_RPC_TELEMETRY": "ON",
-        // "USE_THREAD_LOCAL_LOGGING": "ON",
+        "USE_RPC_TELEMETRY": "OFF",
+        "USE_THREAD_LOCAL_LOGGING": "OFF",
         "RPC_HANG_ON_FAILED_ASSERT": "OFF"
       }
     },

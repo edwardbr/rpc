@@ -369,7 +369,7 @@ template<class T> CORO_TASK(bool) optimistic_ptr_remote_shared_semantics_test(T&
 
     // Schedule verification - handles both local (immediate) and remote (async) cases
     // CRITICAL: Capture opt_baz BY VALUE because lambda executes asynchronously after test function returns
-    waiter->schedule(*lib.get_root_service(), baz, [opt_baz]() -> CORO_TASK(void)
+    waiter->schedule(lib.get_root_service(), baz, [opt_baz]() -> CORO_TASK(void)
     {
         // This runs after the object is deleted
         // The object is deleted when the last shared_ptr goes away
@@ -478,7 +478,7 @@ template<class T> CORO_TASK(bool) optimistic_ptr_circular_dependency_test(T& lib
 
     // Schedule verification - handles both local (immediate) and remote (async) cases
     // CRITICAL: Capture opt_host BY VALUE because lambda executes asynchronously after test function returns
-    waiter->schedule(*lib.get_root_service(), host, [opt_host]() -> CORO_TASK(void)
+    waiter->schedule(lib.get_root_service(), host, [opt_host]() -> CORO_TASK(void)
     {
         // opt_host still exists but points to deleted object
         // This is correct behavior - circular dependency is broken
@@ -668,7 +668,7 @@ template<class T> CORO_TASK(bool) optimistic_ptr_object_gone_test(T& lib)
     auto waiter = std::make_shared<object_deletion_waiter>(baz_object_id);
 
     // Schedule verification - handles both local (immediate) and remote (async) cases
-    waiter->schedule(*lib.get_root_service(), baz, [opt_baz]() -> CORO_TASK(void)
+    waiter->schedule(lib.get_root_service(), baz, [opt_baz]() -> CORO_TASK(void)
     {
         // This runs after the object is deleted
         // Second call through optimistic_ptr should fail with OBJECT_GONE

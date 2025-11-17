@@ -71,7 +71,7 @@ namespace rpc
         // void set_parent_channel(bool val);
 
     public:
-        service_proxy(const std::string& name, destination_zone destination_zone_id, std::shared_ptr<transport> transport, const std::shared_ptr<rpc::service>& svc);
+        service_proxy(const std::string& name, const std::shared_ptr<transport>& transport, const std::shared_ptr<rpc::service>& svc);
         service_proxy(const std::string& name, destination_zone destination_zone_id, const std::shared_ptr<rpc::service_proxy>& other);
         // service_proxy(const service_proxy& other);
 

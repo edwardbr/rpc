@@ -16,11 +16,12 @@ namespace local
     // Used by child to communicate with parent
     class parent_transport : public rpc::transport
     {
-        std::weak_ptr<child_transport> parent_;
+        stdex::member_ptr<child_transport> parent_;
 
     public:
 
         parent_transport(std::string name, std::shared_ptr<rpc::service> service, std::shared_ptr<child_transport> parent);
+        parent_transport(std::string name, rpc::zone zone_id, std::shared_ptr<child_transport> parent);
     
         /*parent_transport(rpc::zone zone_id,
                        std::shared_ptr<rpc::service> child_service,
@@ -50,12 +51,12 @@ namespace local
 
         template<class in_param_type, class out_param_type>
         static std::function<CORO_TASK(int)(rpc::interface_descriptor input_descr, rpc::interface_descriptor& output_descr, const std::shared_ptr<child_transport>& parent, std::shared_ptr<parent_transport>& child)> 
-            bind(std::function<CORO_TASK(int)(const rpc::shared_ptr<in_param_type>&, rpc::shared_ptr<out_param_type>&, const std::shared_ptr<rpc::child_service>&)>&& child_entry_point_fn)
+            bind(rpc::zone new_zone_id, std::function<CORO_TASK(int)(const rpc::shared_ptr<in_param_type>&, rpc::shared_ptr<out_param_type>&, const std::shared_ptr<rpc::child_service>&)>&& child_entry_point_fn)
         {
             
-            return [child_entry_point_fn = std::move(child_entry_point_fn)](rpc::interface_descriptor input_descr, rpc::interface_descriptor& output_descr, const std::shared_ptr<child_transport>& parent, std::shared_ptr<parent_transport>& child) mutable -> CORO_TASK(int)
+            return [child_entry_point_fn = std::move(child_entry_point_fn), new_zone_id](rpc::interface_descriptor input_descr, rpc::interface_descriptor& output_descr, const std::shared_ptr<child_transport>& parent, std::shared_ptr<parent_transport>& child) mutable -> CORO_TASK(int)
             {
-                child = std::make_shared<parent_transport>("child", nullptr, parent);
+                child = std::make_shared<parent_transport>("child", new_zone_id, parent);
                 
                 CO_RETURN CO_AWAIT rpc::child_service::create_child_zone<in_param_type, out_param_type>("child", child, input_descr, output_descr, std::move(child_entry_point_fn)
     #ifdef BUILD_COROUTINE

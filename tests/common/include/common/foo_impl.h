@@ -466,9 +466,10 @@ namespace marshalled_tests
             rpc::shared_ptr<yyy::i_example>& target, uint64_t new_zone_id, const rpc::shared_ptr<yyy::i_host>& host_ptr)
         {
             auto this_service = this_service_.lock();
+            rpc::zone new_zone{new_zone_id};
             
-            auto child_transport = std::make_shared<local::child_transport>("example_zone", this_service, rpc::zone{new_zone_id},
-                    local::parent_transport::bind<yyy::i_host, yyy::i_example>([](const rpc::shared_ptr<yyy::i_host>& host,
+            auto child_transport = std::make_shared<local::child_transport>("example_zone", this_service, new_zone,
+                    local::parent_transport::bind<yyy::i_host, yyy::i_example>(new_zone, [](const rpc::shared_ptr<yyy::i_host>& host,
                         rpc::shared_ptr<yyy::i_example>& new_example,
                         const std::shared_ptr<rpc::child_service>& child_service_ptr) -> CORO_TASK(error_code)
                     {

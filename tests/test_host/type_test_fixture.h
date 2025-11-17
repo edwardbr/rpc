@@ -72,8 +72,8 @@ public:
     }
 
     // Schedule the verification to run - either immediately (local) or after async cleanup (remote)
-    template<typename Service, typename Lambda>
-    void schedule(Service& service, const rpc::shared_ptr<rpc::casting_interface>& obj, Lambda&& verification_lambda)
+    template<typename Lambda>
+    void schedule(std::shared_ptr<rpc::service> service, const rpc::shared_ptr<rpc::casting_interface>& obj, Lambda&& verification_lambda)
     {
         is_local_ = obj.get()->is_local();
         continuation_scheduled_ = true;
@@ -92,16 +92,16 @@ public:
         {
             // For remote objects, wrap verification in cleanup logic
             auto self = shared_from_this();
-            continuation_ = [&service, self, verification_lambda]() -> CORO_TASK(void)
+            continuation_ = [service, self, verification_lambda]() -> CORO_TASK(void)
             {
                 CO_AWAIT verification_lambda();
                 self->continuation_completed_ = true;
                 // Remove event listener after verification
-                service.remove_service_event(self);
+                service->remove_service_event(self);
                 CO_RETURN;
             };
             // Register for async notification
-            service.add_service_event(shared_from_this());
+            service->add_service_event(shared_from_this());
         }
     }
 

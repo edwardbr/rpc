@@ -46,7 +46,7 @@ namespace rpc
     protected:
         // Constructor for derived transport classes
         transport(std::string name, std::shared_ptr<rpc::service> service, zone adjacent_zone_id);
-        // transport(std::string name, zone zone_id, zone adjacent_zone_id);
+        transport(std::string name, zone zone_id, zone adjacent_zone_id);
 
     public:
         virtual ~transport() = default;

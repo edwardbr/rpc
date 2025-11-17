@@ -161,7 +161,7 @@ namespace rpc
             }
             else
             {
-                RPC_WARNING("wrapped stub zone_id {}, wrapped_object {} has not been deregisted in the service "
+                RPC_WARNING("wrapped stub zone_id {}, wrapped_object {} has not been deregistered in the service "
                             "suspected unclean shutdown",
                     std::to_string(zone_id_),
                     std::to_string(stub->get_id()));
@@ -1458,11 +1458,11 @@ namespace rpc
         std::lock_guard g(zone_control);
 
         // find if we have one
-        /*auto item = other_zones.find(destination_zone_id);
+        auto item = other_zones.find(destination_zone_id);
         if (item != other_zones.end())
             return item->second.lock();
 
-        item = other_zones.lower_bound(destination_zone_id});
+        /*item = other_zones.lower_bound(destination_zone_id});
 
         if (item != other_zones.end() && item->first.dest != destination_zone_id)
             item = other_zones.end();

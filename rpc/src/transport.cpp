@@ -31,12 +31,12 @@ namespace rpc
         destinations_[zone_id_.as_destination()] = std::static_pointer_cast<i_marshaller>(service);
     }
     
-    // transport::transport(std::string name, zone zone_id_, zone adjacent_zone_id)
-    //     : name_(name)
-    //     , zone_id_(zone_id_)
-    //     , adjacent_zone_id_(adjacent_zone_id)
-    // {
-    // }
+    transport::transport(std::string name, zone zone_id_, zone adjacent_zone_id)
+        : name_(name)
+        , zone_id_(zone_id_)
+        , adjacent_zone_id_(adjacent_zone_id)
+    {
+    }
     
     void transport::set_service(std::shared_ptr<rpc::service> service)
     {
