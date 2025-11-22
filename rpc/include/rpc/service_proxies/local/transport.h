@@ -129,7 +129,7 @@ namespace local
     // Transport from parent zone to child zone
     // Used by parent to communicate with child
     
-    class child_transport : public rpc::transport, public std::enable_shared_from_this<child_transport>
+    class child_transport : public rpc::transport
     {
         stdex::member_ptr<parent_transport> child_;
         std::function<CORO_TASK(int)(rpc::interface_descriptor input_descr, rpc::interface_descriptor& output_descr, const std::shared_ptr<child_transport>& parent, std::shared_ptr<parent_transport>& child)> child_entry_point_fn_;
@@ -148,7 +148,7 @@ namespace local
         CORO_TASK(int) connect(rpc::interface_descriptor input_descr, rpc::interface_descriptor& output_descr) override
         {
             std::shared_ptr<parent_transport> child;
-            auto ret = CO_AWAIT child_entry_point_fn_(input_descr, output_descr, shared_from_this(), child);
+            auto ret = CO_AWAIT child_entry_point_fn_(input_descr, output_descr, std::static_pointer_cast<child_transport>(shared_from_this()), child);
             child_entry_point_fn_ = nullptr;
             if(ret == rpc::error::OK())
                 child_ = child;

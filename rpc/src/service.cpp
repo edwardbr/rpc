@@ -182,12 +182,12 @@ namespace rpc
             else
             {
                 auto transport = svcproxy->get_transport();
-                RPC_WARNING(
-                    "service proxy zone_id {}, destination_zone_id {}, destination_channel_zone_id "
-                    "{} has not been released in the service suspected unclean shutdown",
+                RPC_WARNING("service proxy zone_id {}, destination_zone_id {}, destination_channel_zone_id "
+                            "{} has not been released in the service suspected unclean shutdown",
                     std::to_string(zone_id_),
                     std::to_string(item.first),
-                    std::to_string(transport ? transport->get_adjacent_zone_id().as_destination_channel():destination_channel_zone{0}));
+                    std::to_string(transport ? transport->get_adjacent_zone_id().as_destination_channel()
+                                             : destination_channel_zone{0}));
 
                 for (auto proxy : svcproxy->get_proxies())
                 {
@@ -243,17 +243,10 @@ namespace rpc
             CO_RETURN rpc::error::OBJECT_GONE();
         }
 
-        auto ret = CO_AWAIT stub->call(protocol_version,
-                encoding,
-                caller_channel_zone_id,
-                caller_zone_id,
-                interface_id,
-                method_id,
-                in_size_,
-                in_buf_,
-                out_buf_);
+        auto ret = CO_AWAIT stub->call(
+            protocol_version, encoding, caller_channel_zone_id, caller_zone_id, interface_id, method_id, in_size_, in_buf_, out_buf_);
 
-            CO_RETURN ret;
+        CO_RETURN ret;
     }
 
     CORO_TASK(void)
@@ -339,97 +332,98 @@ namespace rpc
         }
     }
 
-//     CORO_TASK(int)
-//     service::prepare_remote_input_interface(caller_channel_zone caller_channel_zone_id,
-//         caller_zone caller_zone_id,
-//         rpc::casting_interface* base,
-//         std::shared_ptr<rpc::service_proxy>& destination_zone, interface_descriptor& descriptor)
-//     {
-//         auto object_proxy = base->get_object_proxy();
-//         auto object_service_proxy = object_proxy->get_service_proxy();
-//         RPC_ASSERT(object_service_proxy->zone_id_ == zone_id_);
-//         auto destination_zone_id = object_service_proxy->get_destination_zone_id();
-//         // auto destination_channel_zone_id = object_service_proxy->get_destination_channel_zone_id();
-//         auto object_id = object_proxy->get_object_id();
+    //     CORO_TASK(int)
+    //     service::prepare_remote_input_interface(caller_channel_zone caller_channel_zone_id,
+    //         caller_zone caller_zone_id,
+    //         rpc::casting_interface* base,
+    //         std::shared_ptr<rpc::service_proxy>& destination_zone, interface_descriptor& descriptor)
+    //     {
+    //         auto object_proxy = base->get_object_proxy();
+    //         auto object_service_proxy = object_proxy->get_service_proxy();
+    //         RPC_ASSERT(object_service_proxy->zone_id_ == zone_id_);
+    //         auto destination_zone_id = object_service_proxy->get_destination_zone_id();
+    //         // auto destination_channel_zone_id = object_service_proxy->get_destination_channel_zone_id();
+    //         auto object_id = object_proxy->get_object_id();
 
-//         RPC_ASSERT(caller_zone_id.is_set());
-//         RPC_ASSERT(destination_zone_id.is_set());
+    //         RPC_ASSERT(caller_zone_id.is_set());
+    //         RPC_ASSERT(destination_zone_id.is_set());
 
-//         uint64_t caller_channel
-//             = caller_channel_zone_id.is_set() ? caller_channel_zone_id.get_val() : caller_zone_id.get_val();
-//         RPC_ASSERT(caller_channel);
+    //         uint64_t caller_channel
+    //             = caller_channel_zone_id.is_set() ? caller_channel_zone_id.get_val() : caller_zone_id.get_val();
+    //         RPC_ASSERT(caller_channel);
 
-//         // uint64_t destination_channel = destination_channel_zone_id.is_set() ? destination_channel_zone_id.get_val()
-//         //                                                                     : destination_zone_id.get_val();
-//         // RPC_ASSERT(destination_channel);
+    //         // uint64_t destination_channel = destination_channel_zone_id.is_set() ? destination_channel_zone_id.get_val()
+    //         //                                                                     : destination_zone_id.get_val();
+    //         // RPC_ASSERT(destination_channel);
 
-//         destination_zone = object_service_proxy;
-//         {
-//             std::lock_guard g(zone_control);
-//             auto found = other_zones.find({destination_zone_id, caller_zone_id}); // we dont need to get caller id for this
-//             if (found != other_zones.end())
-//             {
-//                 destination_zone = found->second.lock();
-//                 // destination_zone->add_external_ref();
-//             }
-//             else
-//             {
-//                 destination_zone = object_service_proxy->clone_for_zone(destination_zone_id, caller_zone_id);
-//                 inner_add_zone_proxy(destination_zone);
-//             }
-//         }
+    //         destination_zone = object_service_proxy;
+    //         {
+    //             std::lock_guard g(zone_control);
+    //             auto found = other_zones.find({destination_zone_id, caller_zone_id}); // we dont need to get caller
+    //             id for this if (found != other_zones.end())
+    //             {
+    //                 destination_zone = found->second.lock();
+    //                 // destination_zone->add_external_ref();
+    //             }
+    //             else
+    //             {
+    //                 destination_zone = object_service_proxy->clone_for_zone(destination_zone_id, caller_zone_id);
+    //                 inner_add_zone_proxy(destination_zone);
+    //             }
+    //         }
 
-//         auto transport = destination_zone->get_transport();
-//         if(!transport)
-//         {
-//             CO_RETURN error::TRANSPORT_ERROR();
-//         }
-        
-// #ifdef USE_RPC_TELEMETRY
-//         if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
-//         {
-//             telemetry_service->on_service_proxy_add_ref(zone_id_,
-//                 destination_zone_id,
-//                 transport->get_adjacent_zone_id().as_destination_channel(),
-//                 caller_zone_id,
-//                 object_id,
-//                 add_ref_options::build_destination_route);
-//         }
-// #endif
+    //         auto transport = destination_zone->get_transport();
+    //         if(!transport)
+    //         {
+    //             CO_RETURN error::TRANSPORT_ERROR();
+    //         }
 
-//         // the fork is here so we need to add ref the destination normally with caller info
-//         // note the caller_channel_zone_id is is this zones id as the caller came from a route via this node
-//         uint64_t temp_ref_count;
-//         std::vector<rpc::back_channel_entry> empty_in;
-//         std::vector<rpc::back_channel_entry> empty_out;
-        
-//         int err = CO_AWAIT transport->add_ref(rpc::get_version(),
-//             transport->get_adjacent_zone_id().as_destination_channel(),
-//             destination_zone_id,
-//             object_id,
-//             zone_id_.as_caller_channel(),
-//             caller_zone_id,
-//             known_direction_zone(zone_id_),
-//             rpc::add_ref_options::build_destination_route,
-//             temp_ref_count,
-//             empty_in,
-//             empty_out);
-//         RPC_ASSERT(err == error::OK());
-//         if(err != error::OK())
-//         {
-//             CO_RETURN err;
-//         }
-//         std::ignore = temp_ref_count; // do some checks here
+    // #ifdef USE_RPC_TELEMETRY
+    //         if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
+    //         {
+    //             telemetry_service->on_service_proxy_add_ref(zone_id_,
+    //                 destination_zone_id,
+    //                 transport->get_adjacent_zone_id().as_destination_channel(),
+    //                 caller_zone_id,
+    //                 object_id,
+    //                 add_ref_options::build_destination_route);
+    //         }
+    // #endif
 
-//         descriptor = {object_id, destination_zone_id};
-//         CO_RETURN error::OK();
-//     }
+    //         // the fork is here so we need to add ref the destination normally with caller info
+    //         // note the caller_channel_zone_id is is this zones id as the caller came from a route via this node
+    //         uint64_t temp_ref_count;
+    //         std::vector<rpc::back_channel_entry> empty_in;
+    //         std::vector<rpc::back_channel_entry> empty_out;
+
+    //         int err = CO_AWAIT transport->add_ref(rpc::get_version(),
+    //             transport->get_adjacent_zone_id().as_destination_channel(),
+    //             destination_zone_id,
+    //             object_id,
+    //             zone_id_.as_caller_channel(),
+    //             caller_zone_id,
+    //             known_direction_zone(zone_id_),
+    //             rpc::add_ref_options::build_destination_route,
+    //             temp_ref_count,
+    //             empty_in,
+    //             empty_out);
+    //         RPC_ASSERT(err == error::OK());
+    //         if(err != error::OK())
+    //         {
+    //             CO_RETURN err;
+    //         }
+    //         std::ignore = temp_ref_count; // do some checks here
+
+    //         descriptor = {object_id, destination_zone_id};
+    //         CO_RETURN error::OK();
+    //     }
 
     CORO_TASK(int)
     service::prepare_out_param(uint64_t protocol_version,
         caller_channel_zone caller_channel_zone_id,
         caller_zone caller_zone_id,
-        rpc::casting_interface* base, interface_descriptor& descriptor)
+        rpc::casting_interface* base,
+        interface_descriptor& descriptor)
     {
         auto object_proxy = base->get_object_proxy();
         auto object_service_proxy = object_proxy->get_service_proxy();
@@ -468,11 +462,11 @@ namespace rpc
             std::vector<rpc::back_channel_entry> empty_in;
             std::vector<rpc::back_channel_entry> empty_out;
             auto transport = object_service_proxy->get_transport();
-            if(!transport)
+            if (!transport)
             {
                 CO_RETURN error::TRANSPORT_ERROR();
             }
-            
+
             uint64_t err = CO_AWAIT transport->add_ref(protocol_version,
                 {0},
                 destination_zone_id,
@@ -484,7 +478,7 @@ namespace rpc
                 temp_ref_count,
                 empty_in,
                 empty_out);
-            if(err != error::OK())
+            if (err != error::OK())
             {
                 CO_RETURN err;
             }
@@ -492,181 +486,179 @@ namespace rpc
         }
         else
         {
-//             std::shared_ptr<rpc::service_proxy> destination_service_proxy = object_service_proxy;
-//             std::shared_ptr<rpc::service_proxy> caller;
-//             bool need_add_ref = false;
-//             std::map<zone_route, std::weak_ptr<service_proxy>>::iterator caller_found_iter;
-//             bool need_caller_from_found = false;
-//             {
-//                 std::lock_guard g(zone_control);
-//                 {
-//                     auto found = other_zones.find(
-//                         {destination_zone_id, caller_zone_id}); // we dont need to get caller id for this
-//                     if (found != other_zones.end())
-//                     {
-//                         destination_service_proxy = found->second.lock();
-//                         need_add_ref = (destination_service_proxy != nullptr); // Mark that we need add_ref outside lock
-//                     }
-//                     else
-//                     {
-//                         destination_service_proxy
-//                             = object_service_proxy->clone_for_zone(destination_zone_id, caller_zone_id);
-//                         inner_add_zone_proxy(destination_service_proxy);
-//                     }
-//                 }
-//                 // and the caller with destination info
-//                 {
-//                     auto found = other_zones.find(
-//                         {{caller_channel}, zone_id_.as_caller()}); // we dont need to get caller id for this
-//                     if (found == other_zones.end())
-//                     {
-//                         // this is working on the premise that the caller_channel_zone_id is not known but caller_channel is
-//                         RPC_ASSERT(caller_channel == caller_channel_zone_id.get_val()
-//                                    && caller_channel != caller_zone_id.get_val());
+            //             std::shared_ptr<rpc::service_proxy> destination_service_proxy = object_service_proxy;
+            //             std::shared_ptr<rpc::service_proxy> caller;
+            //             bool need_add_ref = false;
+            //             std::map<zone_route, std::weak_ptr<service_proxy>>::iterator caller_found_iter;
+            //             bool need_caller_from_found = false;
+            //             {
+            //                 std::lock_guard g(zone_control);
+            //                 {
+            //                     auto found = other_zones.find(
+            //                         {destination_zone_id, caller_zone_id}); // we dont need to get caller id for this
+            //                     if (found != other_zones.end())
+            //                     {
+            //                         destination_service_proxy = found->second.lock();
+            //                         need_add_ref = (destination_service_proxy != nullptr); // Mark that we need add_ref outside lock
+            //                     }
+            //                     else
+            //                     {
+            //                         destination_service_proxy
+            //                             = object_service_proxy->clone_for_zone(destination_zone_id, caller_zone_id);
+            //                         inner_add_zone_proxy(destination_service_proxy);
+            //                     }
+            //                 }
+            //                 // and the caller with destination info
+            //                 {
+            //                     auto found = other_zones.find(
+            //                         {{caller_channel}, zone_id_.as_caller()}); // we dont need to get caller id for this
+            //                     if (found == other_zones.end())
+            //                     {
+            //                         // this is working on the premise that the caller_channel_zone_id is not known but caller_channel is
+            //                         RPC_ASSERT(caller_channel == caller_channel_zone_id.get_val()
+            //                                    && caller_channel != caller_zone_id.get_val());
 
-//                         auto alternative = other_zones.lower_bound({caller_zone_id.as_destination(), {0}});
-//                         if (alternative == other_zones.end() || alternative->first.dest != caller_zone_id.as_destination())
-//                         {
-//                             RPC_ASSERT(!!"alternative route to caller zone is not found");
-//                             CO_RETURN error::SERVICE_PROXY_LOST_CONNECTION();
-//                         }
+            //                         auto alternative = other_zones.lower_bound({caller_zone_id.as_destination(), {0}});
+            //                         if (alternative == other_zones.end() || alternative->first.dest != caller_zone_id.as_destination())
+            //                         {
+            //                             RPC_ASSERT(!!"alternative route to caller zone is not found");
+            //                             CO_RETURN error::SERVICE_PROXY_LOST_CONNECTION();
+            //                         }
 
-//                         auto alternative_caller_service_proxy = alternative->second.lock();
-//                         if (!alternative_caller_service_proxy)
-//                         {
-//                             RPC_ERROR(
-//                                 "alternative_caller_service_proxy is null zone: {} destination_zone={}, caller_zone={}",
-//                                 std::to_string(zone_id_),
-//                                 std::to_string(caller_zone_id.as_destination()),
-//                                 std::to_string(0));
-//                             RPC_ASSERT(alternative_caller_service_proxy);
-//                             CO_RETURN error::SERVICE_PROXY_LOST_CONNECTION();
-//                         }
+            //                         auto alternative_caller_service_proxy = alternative->second.lock();
+            //                         if (!alternative_caller_service_proxy)
+            //                         {
+            //                             RPC_ERROR(
+            //                                 "alternative_caller_service_proxy is null zone: {} destination_zone={},
+            //                                 caller_zone={}", std::to_string(zone_id_),
+            //                                 std::to_string(caller_zone_id.as_destination()),
+            //                                 std::to_string(0));
+            //                             RPC_ASSERT(alternative_caller_service_proxy);
+            //                             CO_RETURN error::SERVICE_PROXY_LOST_CONNECTION();
+            //                         }
 
-//                         // now make a copy of the original as we need it back
-//                         caller = alternative_caller_service_proxy->clone_for_zone(
-//                             {caller_channel_zone_id.get_val()}, zone_id_.as_caller());
-//                         other_zones[{{caller_channel_zone_id.get_val()}, zone_id_.as_caller()}] = caller;
-//                         RPC_DEBUG("prepare_out_param service zone: {} destination_zone={}, caller_zone={}",
-//                             std::to_string(zone_id_),
-//                             std::to_string(caller->destination_zone_id_),
-//                             std::to_string(caller->caller_zone_id_));
-//                     }
-//                     else
-//                     {
-//                         // Don't lock here - do it outside mutex to prevent TOCTOU race
-//                         caller_found_iter = found;
-//                         need_caller_from_found = true;
-//                     }
-//                 }
-//             }
+            //                         // now make a copy of the original as we need it back
+            //                         caller = alternative_caller_service_proxy->clone_for_zone(
+            //                             {caller_channel_zone_id.get_val()}, zone_id_.as_caller());
+            //                         other_zones[{{caller_channel_zone_id.get_val()}, zone_id_.as_caller()}] = caller;
+            //                         RPC_DEBUG("prepare_out_param service zone: {} destination_zone={}, caller_zone={}",
+            //                             std::to_string(zone_id_),
+            //                             std::to_string(caller->destination_zone_id_),
+            //                             std::to_string(caller->caller_zone_id_));
+            //                     }
+            //                     else
+            //                     {
+            //                         // Don't lock here - do it outside mutex to prevent TOCTOU race
+            //                         caller_found_iter = found;
+            //                         need_caller_from_found = true;
+            //                     }
+            //                 }
+            //             }
 
-//             // Lock caller outside mutex to prevent TOCTOU race
-//             if (need_caller_from_found)
-//             {
-//                 caller = caller_found_iter->second.lock();
-//                 if (!caller)
-//                 {
-//                     // caller service_proxy was destroyed - this is a race condition
-//                     RPC_ERROR("caller service_proxy was destroyed during lookup");
-//                     // Return empty interface descriptor to indicate failure
-//                     CO_RETURN error::SERVICE_PROXY_LOST_CONNECTION();
-//                 }
-//             }
+            //             // Lock caller outside mutex to prevent TOCTOU race
+            //             if (need_caller_from_found)
+            //             {
+            //                 caller = caller_found_iter->second.lock();
+            //                 if (!caller)
+            //                 {
+            //                     // caller service_proxy was destroyed - this is a race condition
+            //                     RPC_ERROR("caller service_proxy was destroyed during lookup");
+            //                     // Return empty interface descriptor to indicate failure
+            //                     CO_RETURN error::SERVICE_PROXY_LOST_CONNECTION();
+            //                 }
+            //             }
 
-//             // Verify we have a valid caller
-//             if (!caller)
-//             {
-//                 RPC_ERROR("Failed to obtain valid caller service_proxy");
-//                 CO_RETURN error::SERVICE_PROXY_LOST_CONNECTION();
-//             }
+            //             // Verify we have a valid caller
+            //             if (!caller)
+            //             {
+            //                 RPC_ERROR("Failed to obtain valid caller service_proxy");
+            //                 CO_RETURN error::SERVICE_PROXY_LOST_CONNECTION();
+            //             }
 
-//             // Call add_external_ref() outside the mutex to prevent race with service_proxy destruction
-//             if (need_add_ref && destination_service_proxy)
-//             {
-//                 destination_service_proxy->add_external_ref();
-//             }
+            //             // Call add_external_ref() outside the mutex to prevent race with service_proxy destruction
+            //             if (need_add_ref && destination_service_proxy)
+            //             {
+            //                 destination_service_proxy->add_external_ref();
+            //             }
 
-// #ifdef USE_RPC_TELEMETRY
-//             if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
-//             {
-//                 telemetry_service->on_service_proxy_add_ref(
-//                     zone_id_, destination_zone_id, {0}, caller_zone_id, object_id, rpc::add_ref_options::build_destination_route);
-//             }
-// #endif
+            // #ifdef USE_RPC_TELEMETRY
+            //             if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
+            //             {
+            //                 telemetry_service->on_service_proxy_add_ref(
+            //                     zone_id_, destination_zone_id, {0}, caller_zone_id, object_id, rpc::add_ref_options::build_destination_route);
+            //             }
+            // #endif
 
-//             // the fork is here so we need to add ref the destination normally with caller info
-//             // note the caller_channel_zone_id is is this zones id as the caller came from a route via this node
-//             int refcount = 0;
-//             if (destination_service_proxy)
-//             {
-//                 uint64_t temp_ref_count;
-//                 std::vector<rpc::back_channel_entry> empty_in;
-//                 std::vector<rpc::back_channel_entry> empty_out;
-                
-//                 auto transport = destination_service_proxy->get_transport();
-//                 if(!transport)
-//                 {
-//                     CO_RETURN error::TRANSPORT_ERROR();
-//                 }
-            
-                
-//                 refcount = CO_AWAIT transport->add_ref(protocol_version,
-//                     {0},
-//                     destination_zone_id,
-//                     object_id,
-//                     zone_id_.as_caller_channel(),
-//                     caller_zone_id,
-//                     known_direction_zone(zone_id_),
-//                     rpc::add_ref_options::build_destination_route,
-//                     temp_ref_count,
-//                     empty_in,
-//                     empty_out);
-//             }
-//             else
-//             {
-//                 RPC_ERROR("destination_zone service_proxy was destroyed during operation");
-//                 CO_RETURN error::SERVICE_PROXY_LOST_CONNECTION();
-//             }
-//             std::ignore = refcount;
+            //             // the fork is here so we need to add ref the destination normally with caller info
+            //             // note the caller_channel_zone_id is is this zones id as the caller came from a route via
+            //             this node int refcount = 0; if (destination_service_proxy)
+            //             {
+            //                 uint64_t temp_ref_count;
+            //                 std::vector<rpc::back_channel_entry> empty_in;
+            //                 std::vector<rpc::back_channel_entry> empty_out;
 
-// #ifdef USE_RPC_TELEMETRY
-//             if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
-//             {
-//                 telemetry_service->on_service_proxy_add_ref(zone_id_,
-//                     destination_zone_id,
-//                     zone_id_.as_destination_channel(),
-//                     caller_zone_id,
-//                     object_id,
-//                     rpc::add_ref_options::build_caller_route);
-//             }
-// #endif
+            //                 auto transport = destination_service_proxy->get_transport();
+            //                 if(!transport)
+            //                 {
+            //                     CO_RETURN error::TRANSPORT_ERROR();
+            //                 }
 
-//             {
-//                 auto caller_transport = caller->get_transport();
-//                 if(!caller_transport)
-//                 {
-//                     CO_RETURN error::TRANSPORT_ERROR();
-//                 }
+            //                 refcount = CO_AWAIT transport->add_ref(protocol_version,
+            //                     {0},
+            //                     destination_zone_id,
+            //                     object_id,
+            //                     zone_id_.as_caller_channel(),
+            //                     caller_zone_id,
+            //                     known_direction_zone(zone_id_),
+            //                     rpc::add_ref_options::build_destination_route,
+            //                     temp_ref_count,
+            //                     empty_in,
+            //                     empty_out);
+            //             }
+            //             else
+            //             {
+            //                 RPC_ERROR("destination_zone service_proxy was destroyed during operation");
+            //                 CO_RETURN error::SERVICE_PROXY_LOST_CONNECTION();
+            //             }
+            //             std::ignore = refcount;
 
-//                 // note the caller_channel_zone_id is 0 as the caller came from this route
-//                 uint64_t temp_ref_count;
-//                 std::vector<rpc::back_channel_entry> empty_in;
-//                 std::vector<rpc::back_channel_entry> empty_out;
-//                 auto err_code = CO_AWAIT caller_transport->add_ref(protocol_version,
-//                     zone_id_.as_destination_channel(),
-//                     destination_zone_id,
-//                     object_id,
-//                     {0},
-//                     caller_zone_id,
-//                     known_direction_zone(zone_id_),
-//                     rpc::add_ref_options::build_caller_route,
-//                     temp_ref_count,
-//                     empty_in,
-//                     empty_out);
-//                 RPC_ASSERT(err_code == error::OK());
-//                 CO_RETURN err_code;
-//             }
+            // #ifdef USE_RPC_TELEMETRY
+            //             if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
+            //             {
+            //                 telemetry_service->on_service_proxy_add_ref(zone_id_,
+            //                     destination_zone_id,
+            //                     zone_id_.as_destination_channel(),
+            //                     caller_zone_id,
+            //                     object_id,
+            //                     rpc::add_ref_options::build_caller_route);
+            //             }
+            // #endif
+
+            //             {
+            //                 auto caller_transport = caller->get_transport();
+            //                 if(!caller_transport)
+            //                 {
+            //                     CO_RETURN error::TRANSPORT_ERROR();
+            //                 }
+
+            //                 // note the caller_channel_zone_id is 0 as the caller came from this route
+            //                 uint64_t temp_ref_count;
+            //                 std::vector<rpc::back_channel_entry> empty_in;
+            //                 std::vector<rpc::back_channel_entry> empty_out;
+            //                 auto err_code = CO_AWAIT caller_transport->add_ref(protocol_version,
+            //                     zone_id_.as_destination_channel(),
+            //                     destination_zone_id,
+            //                     object_id,
+            //                     {0},
+            //                     caller_zone_id,
+            //                     known_direction_zone(zone_id_),
+            //                     rpc::add_ref_options::build_caller_route,
+            //                     temp_ref_count,
+            //                     empty_in,
+            //                     empty_out);
+            //                 RPC_ASSERT(err_code == error::OK());
+            //                 CO_RETURN err_code;
+            //             }
             assert(false);
         }
 
@@ -692,10 +684,10 @@ namespace rpc
             rpc::casting_interface* casting_interface = nullptr;
             if ((caller_channel_zone_id.is_set() || caller_zone_id.is_set()) && !iface->is_local())
             {
-                CO_RETURN CO_AWAIT prepare_out_param(protocol_version, caller_channel_zone_id, caller_zone_id, iface, descriptor);
+                CO_RETURN CO_AWAIT prepare_out_param(
+                    protocol_version, caller_channel_zone_id, caller_zone_id, iface, descriptor);
             }
         }
-
 
         {
             auto* pointer = iface->get_address();
@@ -882,206 +874,206 @@ namespace rpc
             }
             else if (build_channel)
             {
-//                 // we are here as this zone needs to send the destination addref and caller addref to different zones a fork is in progress
-//                 std::shared_ptr<rpc::service_proxy> destination;
-//                 std::shared_ptr<rpc::service_proxy> caller;
-//                 {
-//                     // bool has_called_inner_add_zone_proxy = false;
-//                     {
-//                         std::lock_guard g(zone_control);
+                //                 // we are here as this zone needs to send the destination addref and caller addref to
+                //                 different zones a fork is in progress std::shared_ptr<rpc::service_proxy>
+                //                 destination; std::shared_ptr<rpc::service_proxy> caller;
+                //                 {
+                //                     // bool has_called_inner_add_zone_proxy = false;
+                //                     {
+                //                         std::lock_guard g(zone_control);
 
-//                         auto found = other_zones.find(destination_zone_id);
-//                         if (found != other_zones.end())
-//                         {
-//                             destination = found->second.lock();
-//                             // Move add_external_ref() outside the lock to prevent TOCTOU race
-//                         }
-//                         else
-//                         {
-//                             found = other_zones.lower_bound({dest_channel});
-//                             if (found != other_zones.end() && found->first.dest.get_val() == dest_channel)
-//                             {
-//                                 auto tmp = found->second.lock();
-//                                 if (!tmp)
-//                                 {
-//                                     RPC_ERROR("tmp is null zone: {} destination_zone={}, caller_zone={}",
-//                                         std::to_string(zone_id_),
-//                                         std::to_string(dest_channel),
-//                                         std::to_string(0));
-//                                     RPC_ASSERT(tmp);
-//                                     CO_RETURN rpc::error::OBJECT_NOT_FOUND();
-//                                 }
-//                                 destination = tmp->clone_for_zone(destination_zone_id);
-//                             }
-//                             else
-//                             {
-//                                 // with the Y bug fix we should not get here under normal operation as the destination is always valid
-//                                 RPC_ASSERT(false);
-//                                 CO_RETURN error::ZONE_NOT_FOUND();
-//                                 // // get the parent to route it
-//                                 // RPC_ASSERT(get_parent() != nullptr);
-//                                 // destination = get_parent()->clone_for_zone(destination_zone_id, caller_zone_id);
-//                             }
-//                             inner_add_zone_proxy(destination);
-//                             // has_called_inner_add_zone_proxy = true;
-//                         }
+                //                         auto found = other_zones.find(destination_zone_id);
+                //                         if (found != other_zones.end())
+                //                         {
+                //                             destination = found->second.lock();
+                //                             // Move add_external_ref() outside the lock to prevent TOCTOU race
+                //                         }
+                //                         else
+                //                         {
+                //                             found = other_zones.lower_bound({dest_channel});
+                //                             if (found != other_zones.end() && found->first.dest.get_val() == dest_channel)
+                //                             {
+                //                                 auto tmp = found->second.lock();
+                //                                 if (!tmp)
+                //                                 {
+                //                                     RPC_ERROR("tmp is null zone: {} destination_zone={}, caller_zone={}",
+                //                                         std::to_string(zone_id_),
+                //                                         std::to_string(dest_channel),
+                //                                         std::to_string(0));
+                //                                     RPC_ASSERT(tmp);
+                //                                     CO_RETURN rpc::error::OBJECT_NOT_FOUND();
+                //                                 }
+                //                                 destination = tmp->clone_for_zone(destination_zone_id);
+                //                             }
+                //                             else
+                //                             {
+                //                                 // with the Y bug fix we should not get here under normal operation as the destination is always valid
+                //                                 RPC_ASSERT(false);
+                //                                 CO_RETURN error::ZONE_NOT_FOUND();
+                //                                 // // get the parent to route it
+                //                                 // RPC_ASSERT(get_parent() != nullptr);
+                //                                 // destination = get_parent()->clone_for_zone(destination_zone_id, caller_zone_id);
+                //                             }
+                //                             inner_add_zone_proxy(destination);
+                //                             // has_called_inner_add_zone_proxy = true;
+                //                         }
 
-//                         // detect if the caller is this zone, if so dont try and find a service proxy for it
-//                         if (caller_zone_id == zone_id_.as_caller())
-//                         {
-//                             build_out_param_channel
-//                                 = build_out_param_channel ^ add_ref_options::build_caller_route; // strip out this bit
-//                         }
-//                         else
-//                         {
-//                             // connect the remote sender to the destinaton
-//                             found = other_zones.lower_bound({{caller_channel}, {0}});
-//                             if (found != other_zones.end() && found->first.dest.get_val() == caller_channel)
-//                             {
-//                                 caller = found->second.lock();
-//                                 if (!caller)
-//                                 {
-//                                     RPC_ERROR("caller is null zone: {} destination_zone={}, caller_zone={}",
-//                                         std::to_string(zone_id_),
-//                                         std::to_string(caller_channel),
-//                                         std::to_string(0));
-//                                     RPC_ASSERT(caller);
-//                                     CO_RETURN rpc::error::OBJECT_NOT_FOUND();
-//                                 }
-//                             }
-//                             else
-//                             {
-//                                 // with the Y bug fix we should not get here under normal operation as the destination is always valid
-//                                 RPC_ASSERT(false);
-//                                 CO_RETURN error::ZONE_NOT_FOUND();
+                //                         // detect if the caller is this zone, if so dont try and find a service proxy for it
+                //                         if (caller_zone_id == zone_id_.as_caller())
+                //                         {
+                //                             build_out_param_channel
+                //                                 = build_out_param_channel ^ add_ref_options::build_caller_route; // strip out this bit
+                //                         }
+                //                         else
+                //                         {
+                //                             // connect the remote sender to the destinaton
+                //                             found = other_zones.lower_bound({{caller_channel}, {0}});
+                //                             if (found != other_zones.end() && found->first.dest.get_val() == caller_channel)
+                //                             {
+                //                                 caller = found->second.lock();
+                //                                 if (!caller)
+                //                                 {
+                //                                     RPC_ERROR("caller is null zone: {} destination_zone={}, caller_zone={}",
+                //                                         std::to_string(zone_id_),
+                //                                         std::to_string(caller_channel),
+                //                                         std::to_string(0));
+                //                                     RPC_ASSERT(caller);
+                //                                     CO_RETURN rpc::error::OBJECT_NOT_FOUND();
+                //                                 }
+                //                             }
+                //                             else
+                //                             {
+                //                                 // with the Y bug fix we should not get here under normal operation as the destination is always valid
+                //                                 RPC_ASSERT(false);
+                //                                 CO_RETURN error::ZONE_NOT_FOUND();
 
-//                                 // caller = get_parent();
+                //                                 // caller = get_parent();
 
-//                                 // if (!caller)
-//                                 // {
-//                                 //     RPC_ERROR("get_parent() returned: nullptr - THIS IS A PROBLEM!");
-//                                 //     RPC_ASSERT(caller);
-//                                 // }
-//                             }
-//                         }
-//                     }
+                //                                 // if (!caller)
+                //                                 // {
+                //                                 //     RPC_ERROR("get_parent() returned: nullptr - THIS IS A PROBLEM!");
+                //                                 //     RPC_ASSERT(caller);
+                //                                 // }
+                //                             }
+                //                         }
+                //                     }
 
-//                     // Call add_external_ref() outside mutex to prevent TOCTOU race
-//                     // if (destination && !has_called_inner_add_zone_proxy)
-//                     // {
-//                     //     destination->add_external_ref();
-//                     // }
+                //                     // Call add_external_ref() outside mutex to prevent TOCTOU race
+                //                     // if (destination && !has_called_inner_add_zone_proxy)
+                //                     // {
+                //                     //     destination->add_external_ref();
+                //                     // }
 
-//                     /*do
-//                     {
-//                         // this more fiddly check is to route calls to a parent node that knows more about this
-//                         if (destination && caller
-//                             && build_out_param_channel
-//                                    == (add_ref_options::build_caller_route | add_ref_options::build_destination_route))
-//                         {
-//                             auto dc = destination->get_destination_channel_zone_id().is_set()
-//                                           ? destination->get_destination_channel_zone_id().get_val()
-//                                           : destination->get_destination_zone_id().get_val();
-//                             auto cc = caller->get_destination_channel_zone_id().is_set()
-//                                           ? caller->get_destination_channel_zone_id().get_val()
-//                                           : caller->get_destination_zone_id().get_val();
-//                             if (dc == cc)
-//                             {
-// #ifdef USE_RPC_TELEMETRY
-//                                 if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
-//                                 {
-//                                     telemetry_service->on_service_proxy_add_ref(
-//                                         zone_id_, destination_zone_id, {0}, caller_zone_id, object_id, build_out_param_channel);
-//                                 }
-// #endif
+                //                     /*do
+                //                     {
+                //                         // this more fiddly check is to route calls to a parent node that knows more about this
+                //                         if (destination && caller
+                //                             && build_out_param_channel
+                //                                    == (add_ref_options::build_caller_route | add_ref_options::build_destination_route))
+                //                         {
+                //                             auto dc = destination->get_destination_channel_zone_id().is_set()
+                //                                           ? destination->get_destination_channel_zone_id().get_val()
+                //                                           : destination->get_destination_zone_id().get_val();
+                //                             auto cc = caller->get_destination_channel_zone_id().is_set()
+                //                                           ? caller->get_destination_channel_zone_id().get_val()
+                //                                           : caller->get_destination_zone_id().get_val();
+                //                             if (dc == cc)
+                //                             {
+                // #ifdef USE_RPC_TELEMETRY
+                //                                 if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
+                //                                 {
+                //                                     telemetry_service->on_service_proxy_add_ref(
+                //                                         zone_id_, destination_zone_id, {0}, caller_zone_id, object_id, build_out_param_channel);
+                //                                 }
+                // #endif
 
-//                                 std::vector<rpc::back_channel_entry> empty_in;
-//                                 std::vector<rpc::back_channel_entry> empty_out;
-//                                 auto ret = CO_AWAIT destination->add_ref(protocol_version,
-//                                     {0},
-//                                     destination_zone_id,
-//                                     object_id,
-//                                     {0},
-//                                     caller_zone_id,
-//                                     known_direction_zone_id,
-//                                     build_out_param_channel,
-//                                     reference_count,
-//                                     empty_in,
-//                                     empty_out);
-//                                 destination->release_external_ref(); // perhaps this could be optimised
-//                                 if (ret != rpc::error::OK())
-//                                 {
-//                                     reference_count = 0;
-//                                     CO_RETURN ret;
-//                                 }
-//                                 break;
-//                             }
-//                         }
+                //                                 std::vector<rpc::back_channel_entry> empty_in;
+                //                                 std::vector<rpc::back_channel_entry> empty_out;
+                //                                 auto ret = CO_AWAIT destination->add_ref(protocol_version,
+                //                                     {0},
+                //                                     destination_zone_id,
+                //                                     object_id,
+                //                                     {0},
+                //                                     caller_zone_id,
+                //                                     known_direction_zone_id,
+                //                                     build_out_param_channel,
+                //                                     reference_count,
+                //                                     empty_in,
+                //                                     empty_out);
+                //                                 destination->release_external_ref(); // perhaps this could be
+                //                                 optimised if (ret != rpc::error::OK())
+                //                                 {
+                //                                     reference_count = 0;
+                //                                     CO_RETURN ret;
+                //                                 }
+                //                                 break;
+                //                             }
+                //                         }
 
-//                         // then call the add ref to the destination
-//                         if (!!(build_out_param_channel & add_ref_options::build_destination_route))
-//                         {
-// #ifdef USE_RPC_TELEMETRY
-//                             if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
-//                             {
-//                                 telemetry_service->on_service_proxy_add_ref(zone_id_,
-//                                     destination_zone_id,
-//                                     {0},
-//                                     caller_zone_id,
-//                                     object_id,
-//                                     add_ref_options::build_destination_route);
-//                             }
-// #endif
-//                             uint64_t temp_ref_count;
-//                             std::vector<rpc::back_channel_entry> empty_in;
-//                             std::vector<rpc::back_channel_entry> empty_out;
-//                             auto err = CO_AWAIT destination->add_ref(protocol_version,
-//                                 {0},
-//                                 destination_zone_id,
-//                                 object_id,
-//                                 zone_id_.as_caller_channel(),
-//                                 caller_zone_id,
-//                                 known_direction_zone_id,
-//                                 add_ref_options::build_destination_route,
-//                                 temp_ref_count,
-//                                 empty_in,
-//                                 empty_out);
-//                             RPC_ASSERT(err == error::OK());
-//                         }
-//                         // back fill the ref count to the caller
-//                         if (!!(build_out_param_channel & add_ref_options::build_caller_route))
-//                         {
-// #ifdef USE_RPC_TELEMETRY
-//                             if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
-//                             {
-//                                 telemetry_service->on_service_proxy_add_ref(caller->zone_id_,
-//                                     destination_zone_id,
-//                                     zone_id_.as_destination_channel(),
-//                                     caller_zone_id,
-//                                     object_id,
-//                                     add_ref_options::build_caller_route);
-//                             }
-// #endif
+                //                         // then call the add ref to the destination
+                //                         if (!!(build_out_param_channel & add_ref_options::build_destination_route))
+                //                         {
+                // #ifdef USE_RPC_TELEMETRY
+                //                             if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
+                //                             {
+                //                                 telemetry_service->on_service_proxy_add_ref(zone_id_,
+                //                                     destination_zone_id,
+                //                                     {0},
+                //                                     caller_zone_id,
+                //                                     object_id,
+                //                                     add_ref_options::build_destination_route);
+                //                             }
+                // #endif
+                //                             uint64_t temp_ref_count;
+                //                             std::vector<rpc::back_channel_entry> empty_in;
+                //                             std::vector<rpc::back_channel_entry> empty_out;
+                //                             auto err = CO_AWAIT destination->add_ref(protocol_version,
+                //                                 {0},
+                //                                 destination_zone_id,
+                //                                 object_id,
+                //                                 zone_id_.as_caller_channel(),
+                //                                 caller_zone_id,
+                //                                 known_direction_zone_id,
+                //                                 add_ref_options::build_destination_route,
+                //                                 temp_ref_count,
+                //                                 empty_in,
+                //                                 empty_out);
+                //                             RPC_ASSERT(err == error::OK());
+                //                         }
+                //                         // back fill the ref count to the caller
+                //                         if (!!(build_out_param_channel & add_ref_options::build_caller_route))
+                //                         {
+                // #ifdef USE_RPC_TELEMETRY
+                //                             if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
+                //                             {
+                //                                 telemetry_service->on_service_proxy_add_ref(caller->zone_id_,
+                //                                     destination_zone_id,
+                //                                     zone_id_.as_destination_channel(),
+                //                                     caller_zone_id,
+                //                                     object_id,
+                //                                     add_ref_options::build_caller_route);
+                //                             }
+                // #endif
 
-//                             uint64_t temp_ref_count;
-//                             std::vector<rpc::back_channel_entry> empty_in;
-//                             std::vector<rpc::back_channel_entry> empty_out;
-//                             auto err = CO_AWAIT caller->add_ref(protocol_version,
-//                                 zone_id_.as_destination_channel(),
-//                                 destination_zone_id,
-//                                 object_id,
-//                                 caller_channel_zone_id,
-//                                 caller_zone_id,
-//                                 known_direction_zone_id,
-//                                 add_ref_options::build_caller_route,
-//                                 temp_ref_count,
-//                                 empty_in,
-//                                 empty_out);
-//                             std::ignore = err;
-//                         }
-//                     } while (false);
-//                     */
-//                 }
+                //                             uint64_t temp_ref_count;
+                //                             std::vector<rpc::back_channel_entry> empty_in;
+                //                             std::vector<rpc::back_channel_entry> empty_out;
+                //                             auto err = CO_AWAIT caller->add_ref(protocol_version,
+                //                                 zone_id_.as_destination_channel(),
+                //                                 destination_zone_id,
+                //                                 object_id,
+                //                                 caller_channel_zone_id,
+                //                                 caller_zone_id,
+                //                                 known_direction_zone_id,
+                //                                 add_ref_options::build_caller_route,
+                //                                 temp_ref_count,
+                //                                 empty_in,
+                //                                 empty_out);
+                //                             std::ignore = err;
+                //                         }
+                //                     } while (false);
+                //                     */
+                //                 }
 
                 /*{
                     std::lock_guard g(zone_control);
@@ -1143,60 +1135,60 @@ namespace rpc
             }
 
             // find the caller
-//             if (zone_id_.as_caller() != caller_zone_id && !!(build_out_param_channel & add_ref_options::build_caller_route))
-//             {
-//                 std::shared_ptr<rpc::service_proxy> caller;
-//                 {
-//                     std::lock_guard g(zone_control);
-//                     // we swap the parameter types as this is from perspective of the caller and not the proxy that called this function
-//                     // there should always be a destination service_proxy in
-//                     // other_zones as the requester has a positive ref count to it through this service
+            //             if (zone_id_.as_caller() != caller_zone_id && !!(build_out_param_channel & add_ref_options::build_caller_route))
+            //             {
+            //                 std::shared_ptr<rpc::service_proxy> caller;
+            //                 {
+            //                     std::lock_guard g(zone_control);
+            //                     // we swap the parameter types as this is from perspective of the caller and not the proxy that called this function
+            //                     // there should always be a destination service_proxy in
+            //                     // other_zones as the requester has a positive ref count to it through this service
 
-//                     auto found = other_zones.lower_bound({caller_zone_id.as_destination(), {0}});
-//                     if (found != other_zones.end() && found->first.dest == caller_zone_id.as_destination())
-//                     {
-//                         caller = found->second.lock();
-//                         if (!caller)
-//                         {
-//                             RPC_ERROR("caller is null zone: {} destination_zone={}, caller_zone={}",
-//                                 std::to_string(zone_id_),
-//                                 std::to_string(caller_zone_id),
-//                                 std::to_string(0));
-//                             RPC_ASSERT(caller);
-//                             CO_RETURN rpc::error::OBJECT_NOT_FOUND();
-//                         }
-//                     }
-//                     else
-//                     {
-//                         RPC_ERROR("Unable to build add_ref_options::build_caller_route");
-//                         RPC_ASSERT(false);
-//                         CO_RETURN rpc::error::OBJECT_NOT_FOUND();
-//                     }
-//                 }
-// #ifdef USE_RPC_TELEMETRY
-//                 if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
-//                 {
-//                     telemetry_service->on_service_proxy_add_ref(
-//                         zone_id_, destination_zone_id, {0}, caller_zone_id, object_id, add_ref_options::build_caller_route);
-//                 }
-// #endif
-//                 uint64_t temp_ref_count;
-//                 std::vector<rpc::back_channel_entry> empty_in;
-//                 std::vector<rpc::back_channel_entry> empty_out;
-//                 auto caller_transport = caller->get_transport();
-//                 auto err = CO_AWAIT caller_transport->add_ref(protocol_version,
-//                     {0},
-//                     destination_zone_id,
-//                     object_id,
-//                     {},
-//                     caller_zone_id,
-//                     known_direction_zone_id,
-//                     add_ref_options::build_caller_route,
-//                     temp_ref_count,
-//                     empty_in,
-//                     empty_out);
-//                 std::ignore = err;
-//             }
+            //                     auto found = other_zones.lower_bound({caller_zone_id.as_destination(), {0}});
+            //                     if (found != other_zones.end() && found->first.dest == caller_zone_id.as_destination())
+            //                     {
+            //                         caller = found->second.lock();
+            //                         if (!caller)
+            //                         {
+            //                             RPC_ERROR("caller is null zone: {} destination_zone={}, caller_zone={}",
+            //                                 std::to_string(zone_id_),
+            //                                 std::to_string(caller_zone_id),
+            //                                 std::to_string(0));
+            //                             RPC_ASSERT(caller);
+            //                             CO_RETURN rpc::error::OBJECT_NOT_FOUND();
+            //                         }
+            //                     }
+            //                     else
+            //                     {
+            //                         RPC_ERROR("Unable to build add_ref_options::build_caller_route");
+            //                         RPC_ASSERT(false);
+            //                         CO_RETURN rpc::error::OBJECT_NOT_FOUND();
+            //                     }
+            //                 }
+            // #ifdef USE_RPC_TELEMETRY
+            //                 if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
+            //                 {
+            //                     telemetry_service->on_service_proxy_add_ref(
+            //                         zone_id_, destination_zone_id, {0}, caller_zone_id, object_id, add_ref_options::build_caller_route);
+            //                 }
+            // #endif
+            //                 uint64_t temp_ref_count;
+            //                 std::vector<rpc::back_channel_entry> empty_in;
+            //                 std::vector<rpc::back_channel_entry> empty_out;
+            //                 auto caller_transport = caller->get_transport();
+            //                 auto err = CO_AWAIT caller_transport->add_ref(protocol_version,
+            //                     {0},
+            //                     destination_zone_id,
+            //                     object_id,
+            //                     {},
+            //                     caller_zone_id,
+            //                     known_direction_zone_id,
+            //                     add_ref_options::build_caller_route,
+            //                     temp_ref_count,
+            //                     empty_in,
+            //                     empty_out);
+            //                 std::ignore = err;
+            //             }
             if (object_id == dummy_object_id)
             {
                 reference_count = 0;
@@ -1281,8 +1273,8 @@ namespace rpc
                 RPC_ASSERT(false);
             }
 
-            auto found_again = other_zones.find({other_zone->get_destination_zone_id(), other_zone->get_caller_zone_id()});
-            if (found_again != other_zones.end())
+            auto found_again = other_zones.find({other_zone->get_destination_zone_id(),
+other_zone->get_caller_zone_id()}); if (found_again != other_zones.end())
             {
                 auto sp_check = found_again->second.lock();
                 RPC_ASSERT(other_zone == sp_check);
@@ -1313,44 +1305,44 @@ namespace rpc
     {
         current_service_tracker tracker(this);
 
-//         if (destination_zone_id != zone_id_.as_destination())
-//         {
-//             std::shared_ptr<rpc::service_proxy> other_zone;
-//             {
-//                 std::lock_guard g(zone_control);
-//                 auto found = other_zones.find({destination_zone_id, caller_zone_id});
-//                 if (found != other_zones.end())
-//                 {
-//                     other_zone = found->second.lock();
-//                 }
-//             }
-//             if (!other_zone)
-//             {
-//                 RPC_ERROR("service::release other_zone is null destination_zone={}, caller_zone={}",
-//                     std::to_string(destination_zone_id),
-//                     std::to_string(caller_zone_id));
-//                 RPC_ASSERT(false);
-//                 reference_count = 0;
-//                 CO_RETURN rpc::error::ZONE_NOT_FOUND();
-//             }
-// #ifdef USE_RPC_TELEMETRY
-//             if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
-//                 telemetry_service->on_service_release(
-//                     zone_id_, other_zone->get_destination_channel_zone_id(), destination_zone_id, object_id, caller_zone_id);
-// #endif
-//             auto ret = CO_AWAIT other_zone->sp_release(object_id, options, reference_count);
-//             if (ret == error::OK())
-//             {
-//                 cleanup_service_proxy(other_zone);
-//                 CO_RETURN rpc::error::OK();
-//             }
-//             else
-//             {
-//                 reference_count = 0;
-//                 CO_RETURN rpc::error::OBJECT_NOT_FOUND();
-//             }
-//         }
-//         else
+        //         if (destination_zone_id != zone_id_.as_destination())
+        //         {
+        //             std::shared_ptr<rpc::service_proxy> other_zone;
+        //             {
+        //                 std::lock_guard g(zone_control);
+        //                 auto found = other_zones.find({destination_zone_id, caller_zone_id});
+        //                 if (found != other_zones.end())
+        //                 {
+        //                     other_zone = found->second.lock();
+        //                 }
+        //             }
+        //             if (!other_zone)
+        //             {
+        //                 RPC_ERROR("service::release other_zone is null destination_zone={}, caller_zone={}",
+        //                     std::to_string(destination_zone_id),
+        //                     std::to_string(caller_zone_id));
+        //                 RPC_ASSERT(false);
+        //                 reference_count = 0;
+        //                 CO_RETURN rpc::error::ZONE_NOT_FOUND();
+        //             }
+        // #ifdef USE_RPC_TELEMETRY
+        //             if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
+        //                 telemetry_service->on_service_release(
+        //                     zone_id_, other_zone->get_destination_channel_zone_id(), destination_zone_id, object_id, caller_zone_id);
+        // #endif
+        //             auto ret = CO_AWAIT other_zone->sp_release(object_id, options, reference_count);
+        //             if (ret == error::OK())
+        //             {
+        //                 cleanup_service_proxy(other_zone);
+        //                 CO_RETURN rpc::error::OK();
+        //             }
+        //             else
+        //             {
+        //                 reference_count = 0;
+        //                 CO_RETURN rpc::error::OBJECT_NOT_FOUND();
+        //             }
+        //         }
+        //         else
         {
 #ifdef USE_RPC_TELEMETRY
             if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
@@ -1436,6 +1428,7 @@ namespace rpc
         RPC_ASSERT(destination_zone_id != zone_id_.as_destination());
         RPC_ASSERT(other_zones.find(destination_zone_id) == other_zones.end());
         other_zones[destination_zone_id] = service_proxy;
+        transports[destination_zone_id] = service_proxy->get_transport();
         RPC_DEBUG("inner_add_zone_proxy service zone: {} destination_zone={}",
             std::to_string(zone_id_),
             std::to_string(service_proxy->destination_zone_id_));
@@ -1470,6 +1463,23 @@ namespace rpc
         }
     }
 
+    std::shared_ptr<rpc::transport> service::get_transport(destination_zone destination_zone_id) const
+    {
+        std::lock_guard g(zone_control);
+
+        // Try to find a direct transport to the destination zone
+        auto item = transports.find(destination_zone_id);
+        if (item != transports.end())
+        {
+            auto transport = item->second.lock();
+            if (transport)
+            {
+                return transport;
+            }
+        }
+        return nullptr;
+    }
+
     std::shared_ptr<rpc::service_proxy> service::get_zone_proxy(caller_channel_zone caller_channel_zone_id,
         caller_zone caller_zone_id,
         destination_zone destination_zone_id,
@@ -1486,12 +1496,29 @@ namespace rpc
                 return item->second.lock();
         }
 
+        // Try to find a direct transport to the destination zone
         {
-            auto item = transports.find(caller_channel_zone_id.as_destination());
-            if(item != transports.end())
+            auto item = transports.find(destination_zone_id);
+            if (item != transports.end())
             {
                 auto transport = item->second.lock();
-                if(transport)
+                if (transport)
+                {
+                    auto proxy = std::make_shared<service_proxy>(transport, destination_zone_id);
+                    inner_add_zone_proxy(proxy);
+                    new_proxy_added = true;
+                    return proxy;
+                }
+            }
+        }
+
+        // If no direct transport, fall back to transport via caller channel
+        {
+            auto item = transports.find(caller_channel_zone_id.as_destination());
+            if (item != transports.end())
+            {
+                auto transport = item->second.lock();
+                if (transport)
                 {
                     auto proxy = std::make_shared<service_proxy>(transport, destination_zone_id);
                     inner_add_zone_proxy(proxy);
@@ -1508,8 +1535,8 @@ namespace rpc
             item = other_zones.end();
 
         // if not we can make one from the proxy of the calling channel zone
-        // this zone knows nothing about the destination zone however the caller channel zone will know how to connect to it
-        if (item == other_zones.end() && caller_channel_zone_id.is_set())
+        // this zone knows nothing about the destination zone however the caller channel zone will know how to connect
+        to it if (item == other_zones.end() && caller_channel_zone_id.is_set())
         {
             item = other_zones.lower_bound({caller_channel_zone_id.as_destination(), {0}});
             if (item == other_zones.end() || item->first.dest != caller_channel_zone_id.as_destination())
@@ -1669,9 +1696,9 @@ namespace rpc
         // {
         //     RPC_ASSERT(parent_service_proxy_->get_caller_zone_id() == zone_id_.as_caller());
         //     RPC_ASSERT(parent_service_proxy_->get_destination_channel_zone_id().get_val() == 0);
-        //     // remove_zone_proxy is not callable by the proxy as the service is dying and locking on the weak pointer is now no longer possible
-        //     other_zones.erase({parent_service_proxy_->get_destination_zone_id(), zone_id_.as_caller()});
-        //     parent_service_proxy_->set_parent_channel(false);
+        //     // remove_zone_proxy is not callable by the proxy as the service is dying and locking on the weak pointer
+        //     is now no longer possible other_zones.erase({parent_service_proxy_->get_destination_zone_id(),
+        //     zone_id_.as_caller()}); parent_service_proxy_->set_parent_channel(false);
         //     parent_service_proxy_->release_external_ref();
         //     parent_service_proxy_ = nullptr;
         // }
@@ -1689,17 +1716,68 @@ namespace rpc
     //     return true;
     // }
 
-    // TODO: Implement proper pass-through routing logic
     std::shared_ptr<i_marshaller> service::create_pass_through(
-        destination_channel_zone destination_channel_zone_id,
-        destination_zone destination_zone_id,
-        caller_channel_zone caller_channel_zone_id,
-        caller_zone caller_zone_id,
-        known_direction_zone known_direction_zone_id)
+        destination_zone destination_zone_id, std::shared_ptr<transport> caller_transport, caller_zone caller_zone_id)
     {
-        // Dummy implementation - returns nullptr to trigger error path
-        // This needs proper implementation for pass-through routing
-        RPC_WARNING("create_pass_through called but not implemented - returning nullptr");
-        return nullptr;
+        // Find the transport that can reach the destination_zone (this will handle messages TO destination)
+        std::shared_ptr<transport> forward_transport;
+        {
+            std::lock_guard g(zone_control);
+
+            auto it = transports.find(destination_zone_id);
+            if (it != transports.end())
+            {
+                forward_transport = it->second.lock();
+            }
+
+            if (!forward_transport)
+            {
+                RPC_WARNING("create_pass_through: no transport found to destination zone {}",
+                    std::to_string(destination_zone_id));
+                return nullptr;
+            }
+        }
+
+        // Create pass-through that will route:
+        // - Messages TO destination_zone_id → forward_transport (B→C)
+        // - Messages TO caller_zone_id → reverse_transport (B→A)
+        auto pass_through = rpc::pass_through::create(
+            forward_transport,              // forward_transport: handles messages TO final destination
+            caller_transport,               // reverse_transport: handles messages back to caller
+            shared_from_this(),             // service
+            destination_zone_id,            // forward_destination: where forward messages go
+            caller_zone_id.as_destination() // reverse_destination: where reverse messages go
+        );
+
+        RPC_DEBUG("create_pass_through: created pass-through between caller_zone {} and destination_zone {}",
+            std::to_string(caller_zone_id.as_destination()),
+            std::to_string(destination_zone_id));
+
+        return transport::add_pass_through(pass_through);
     }
+
+    std::shared_ptr<i_marshaller> service::create_pass_through(
+        destination_zone destination_zone_id, caller_zone caller_zone_id)
+    {
+        std::shared_ptr<transport> rev_transport;
+        {
+            std::lock_guard g(zone_control);
+
+            auto it = transports.find(caller_zone_id.as_destination());
+            if (it != transports.end())
+            {
+                rev_transport = it->second.lock();
+            }
+
+            if (!rev_transport)
+            {
+                RPC_WARNING("create_pass_through: no transport found to destination zone {}",
+                    std::to_string(destination_zone_id));
+                return nullptr;
+            }
+        }
+
+        return create_pass_through(destination_zone_id, rev_transport, caller_zone_id);
+    }
+
 }

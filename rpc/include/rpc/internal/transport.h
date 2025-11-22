@@ -13,6 +13,7 @@
 
 namespace rpc
 {
+    class pass_through;
 
     enum class transport_status
     {
@@ -22,12 +23,11 @@ namespace rpc
         DISCONNECTED  // Terminal state, no further traffic allowed
     };
 
-    class transport : public i_marshaller
+    class transport : public i_marshaller, public std::enable_shared_from_this<transport>
     {
     private:
-    
         std::string name_;
-    
+
         // Zone identity
         zone zone_id_;
 
@@ -35,7 +35,7 @@ namespace rpc
         zone adjacent_zone_id_;
 
         // Local service reference
-        std::weak_ptr<rpc::service> service_;
+        std::weak_ptr<service> service_;
 
         // Map destination_zone to handler (service or pass_through)
         std::unordered_map<destination_zone, std::weak_ptr<i_marshaller>> destinations_;
@@ -45,20 +45,32 @@ namespace rpc
 
     protected:
         // Constructor for derived transport classes
-        transport(std::string name, std::shared_ptr<rpc::service> service, zone adjacent_zone_id);
+        transport(std::string name, std::shared_ptr<service> service, zone adjacent_zone_id);
         transport(std::string name, zone zone_id, zone adjacent_zone_id);
+
+        // lock free version of same function
+        bool inner_add_destination(destination_zone dest, std::weak_ptr<i_marshaller> handler);
+        // Helper to route incoming messages to registered handlers
+        std::shared_ptr<i_marshaller> inner_get_destination_handler(destination_zone dest) const;
+        std::shared_ptr<i_marshaller> get_destination_handler(destination_zone dest) const;
+        std::shared_ptr<i_marshaller> get_destination_handler_or_create_passthrough(
+            caller_zone caller, destination_zone dest);
+        void set_status(transport_status new_status);
+        void notify_all_destinations_of_disconnect();
 
     public:
         virtual ~transport() = default;
-        
-        std::string get_name() const {return name_;}
 
-        std::shared_ptr<rpc::service> get_service() const { return service_.lock(); }
-        void set_service(std::shared_ptr<rpc::service> service);
+        std::string get_name() const { return name_; }
+
+        std::shared_ptr<service> get_service() const { return service_.lock(); }
+        void set_service(std::shared_ptr<service> service);
 
         // Destination management to zones NOT going via the adjacent_zone
-        void add_destination(destination_zone dest, std::weak_ptr<i_marshaller> handler);
+        bool add_destination(destination_zone dest, std::weak_ptr<i_marshaller> handler);
         void remove_destination(destination_zone dest);
+
+        static std::shared_ptr<i_marshaller> add_pass_through(std::shared_ptr<pass_through> pt);
 
         // Status management
         transport_status get_status() const;
@@ -66,16 +78,9 @@ namespace rpc
         // Zone identity accessor
         zone get_zone_id() const { return zone_id_; }
         zone get_adjacent_zone_id() const { return adjacent_zone_id_; }
-        
-        virtual CORO_TASK(int) connect(rpc::interface_descriptor input_descr, rpc::interface_descriptor& output_descr) = 0;
 
-    protected:
-        // Helper to route incoming messages to registered handlers
-        std::shared_ptr<i_marshaller> get_destination_handler(destination_zone dest) const;
-        void set_status(transport_status new_status);
-        void notify_all_destinations_of_disconnect();
+        virtual CORO_TASK(int) connect(interface_descriptor input_descr, interface_descriptor& output_descr) = 0;
 
-    public:
         // inbound i_marshaller interface abstraction
         // Routes to transport_ for remote zones or service_ for local zone
         CORO_TASK(int)
@@ -91,8 +96,8 @@ namespace rpc
             size_t in_size_,
             const char* in_buf_,
             std::vector<char>& out_buf_,
-            const std::vector<rpc::back_channel_entry>& in_back_channel,
-            std::vector<rpc::back_channel_entry>& out_back_channel);
+            const std::vector<back_channel_entry>& in_back_channel,
+            std::vector<back_channel_entry>& out_back_channel);
 
         CORO_TASK(void)
         inbound_post(uint64_t protocol_version,
@@ -107,15 +112,15 @@ namespace rpc
             post_options options,
             size_t in_size_,
             const char* in_buf_,
-            const std::vector<rpc::back_channel_entry>& in_back_channel);
+            const std::vector<back_channel_entry>& in_back_channel);
 
         CORO_TASK(int)
         inbound_try_cast(uint64_t protocol_version,
             destination_zone destination_zone_id,
             object object_id,
             interface_ordinal interface_id,
-            const std::vector<rpc::back_channel_entry>& in_back_channel,
-            std::vector<rpc::back_channel_entry>& out_back_channel);
+            const std::vector<back_channel_entry>& in_back_channel,
+            std::vector<back_channel_entry>& out_back_channel);
 
         CORO_TASK(int)
         inbound_add_ref(uint64_t protocol_version,
@@ -127,8 +132,8 @@ namespace rpc
             known_direction_zone known_direction_zone_id,
             add_ref_options build_out_param_channel,
             uint64_t& reference_count,
-            const std::vector<rpc::back_channel_entry>& in_back_channel,
-            std::vector<rpc::back_channel_entry>& out_back_channel);
+            const std::vector<back_channel_entry>& in_back_channel,
+            std::vector<back_channel_entry>& out_back_channel);
 
         CORO_TASK(int)
         inbound_release(uint64_t protocol_version,
@@ -137,18 +142,20 @@ namespace rpc
             caller_zone caller_zone_id,
             release_options options,
             uint64_t& reference_count,
-            const std::vector<rpc::back_channel_entry>& in_back_channel,
-            std::vector<rpc::back_channel_entry>& out_back_channel);
+            const std::vector<back_channel_entry>& in_back_channel,
+            std::vector<back_channel_entry>& out_back_channel);
     };
-    
+
     class transport_to_parent : public transport
     {
         std::shared_ptr<transport> parent_;
+
     public:
-        transport_to_parent(std::string name, std::shared_ptr<rpc::service> service, std::shared_ptr<transport> parent) : 
-            transport(name, service, parent->get_zone_id()),
-            parent_(parent)
-        {}
+        transport_to_parent(std::string name, std::shared_ptr<service> service, std::shared_ptr<transport> parent)
+            : transport(name, service, parent->get_zone_id())
+            , parent_(parent)
+        {
+        }
     };
 
 } // namespace rpc

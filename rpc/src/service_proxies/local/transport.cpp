@@ -417,7 +417,7 @@ namespace local
         const std::vector<rpc::back_channel_entry>& in_back_channel,
         std::vector<rpc::back_channel_entry>& out_back_channel)
     {
-        auto dest = get_destination_handler(destination_zone_id);
+        auto dest = get_destination_handler_or_create_passthrough(caller_zone_id, destination_zone_id);
         if (dest)
         {
             CO_RETURN CO_AWAIT dest->add_ref(protocol_version,

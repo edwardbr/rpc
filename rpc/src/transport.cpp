@@ -5,6 +5,8 @@
 
 // Standard C++ headers
 #include <algorithm>
+#include <mutex>
+#include <memory>
 
 // RPC headers
 #include <rpc/rpc.h>
@@ -22,7 +24,7 @@ namespace rpc
     // fork detection - all other methods are simple lookups.
     // Destination management
 
-    transport::transport(std::string name, std::shared_ptr<rpc::service> service, zone adjacent_zone_id)
+    transport::transport(std::string name, std::shared_ptr<service> service, zone adjacent_zone_id)
         : name_(name)
         , zone_id_(service->get_zone_id())
         , adjacent_zone_id_(adjacent_zone_id)
@@ -30,25 +32,36 @@ namespace rpc
     {
         destinations_[zone_id_.as_destination()] = std::static_pointer_cast<i_marshaller>(service);
     }
-    
+
     transport::transport(std::string name, zone zone_id_, zone adjacent_zone_id)
         : name_(name)
         , zone_id_(zone_id_)
         , adjacent_zone_id_(adjacent_zone_id)
     {
     }
-    
-    void transport::set_service(std::shared_ptr<rpc::service> service)
+
+    void transport::set_service(std::shared_ptr<service> service)
     {
         RPC_ASSERT(service);
         service_ = service;
         destinations_[service->get_zone_id().as_destination()] = std::static_pointer_cast<i_marshaller>(service);
-    }    
-    
-    void transport::add_destination(destination_zone dest, std::weak_ptr<i_marshaller> handler)
+    }
+
+    bool transport::inner_add_destination(destination_zone dest, std::weak_ptr<i_marshaller> handler)
+    {
+        auto it = destinations_.find(dest);
+        if (it != destinations_.end())
+        {
+            return false;
+        }
+        destinations_[dest] = handler;
+        return true;
+    }
+
+    bool transport::add_destination(destination_zone dest, std::weak_ptr<i_marshaller> handler)
     {
         std::unique_lock lock(destinations_mutex_);
-        destinations_[dest] = handler;
+        return inner_add_destination(dest, handler);
     }
 
     void transport::remove_destination(destination_zone dest)
@@ -57,22 +70,86 @@ namespace rpc
         destinations_.erase(dest);
     }
 
+    std::shared_ptr<i_marshaller> transport::add_pass_through(std::shared_ptr<pass_through> pt)
+    {
+        auto forwd = pt->get_forward_transport();
+        auto rev = pt->get_reverse_transport();
+        RPC_ASSERT(forwd->get_adjacent_zone_id() != rev->get_adjacent_zone_id());
+
+        // we need to lock both transports destination mutexes without deadlock when adding the destinations
+        // we do this by locking them in zone id order
+        std::unique_ptr<std::lock_guard<std::shared_mutex>> g1;
+        std::unique_ptr<std::lock_guard<std::shared_mutex>> g2;
+        if (forwd->get_adjacent_zone_id() < rev->get_adjacent_zone_id())
+        {
+            g1 = std::make_unique<std::lock_guard<std::shared_mutex>>(forwd->destinations_mutex_);
+            g2 = std::make_unique<std::lock_guard<std::shared_mutex>>(rev->destinations_mutex_);
+        }
+        else
+        {
+            g1 = std::make_unique<std::lock_guard<std::shared_mutex>>(rev->destinations_mutex_);
+            g2 = std::make_unique<std::lock_guard<std::shared_mutex>>(forwd->destinations_mutex_);
+        }
+
+        auto forward_handler = pt->get_forward_transport()->inner_get_destination_handler(pt->get_reverse_destination());
+        auto reverse_handler = pt->get_reverse_transport()->inner_get_destination_handler(pt->get_forward_destination());
+
+        // check that they are the same
+        RPC_ASSERT(!forward_handler == !reverse_handler);
+
+        if (forward_handler)
+        {
+            return forward_handler;
+        }
+        else
+        {
+            pt->get_forward_transport()->inner_add_destination(
+                pt->get_reverse_destination(), std::static_pointer_cast<i_marshaller>(pt));
+            pt->get_reverse_transport()->inner_add_destination(
+                pt->get_forward_destination(), std::static_pointer_cast<i_marshaller>(pt));
+            return std::static_pointer_cast<i_marshaller>(pt);
+        }
+    }
+
     // Status management
     transport_status transport::get_status() const
     {
         return status_.load(std::memory_order_acquire);
     }
 
-    // Helper to route incoming messages to registered handlers
-    std::shared_ptr<i_marshaller> transport::get_destination_handler(destination_zone dest) const
+    std::shared_ptr<i_marshaller> transport::inner_get_destination_handler(destination_zone dest) const
     {
-        std::shared_lock lock(destinations_mutex_);
         auto it = destinations_.find(dest);
         if (it != destinations_.end())
         {
             return it->second.lock();
         }
         return nullptr;
+    }
+
+    // Helper to route incoming messages to registered handlers
+    std::shared_ptr<i_marshaller> transport::get_destination_handler(destination_zone dest) const
+    {
+        std::shared_lock lock(destinations_mutex_);
+        return inner_get_destination_handler(dest);
+    }
+
+    std::shared_ptr<i_marshaller> transport::get_destination_handler_or_create_passthrough(
+        caller_zone caller, destination_zone dest)
+    {
+        std::shared_ptr<i_marshaller> destination_transport;
+        {
+            std::shared_lock lock(destinations_mutex_);
+            auto ret = inner_get_destination_handler(dest);
+            if (ret)
+                return ret;
+        }
+
+        auto svc = service_.lock();
+        if (!svc)
+            return nullptr;
+
+        return svc->create_pass_through(dest, shared_from_this(), caller);
     }
 
     void transport::set_status(transport_status new_status)
@@ -120,8 +197,8 @@ namespace rpc
         size_t in_size_,
         const char* in_buf_,
         std::vector<char>& out_buf_,
-        const std::vector<rpc::back_channel_entry>& in_back_channel,
-        std::vector<rpc::back_channel_entry>& out_back_channel)
+        const std::vector<back_channel_entry>& in_back_channel,
+        std::vector<back_channel_entry>& out_back_channel)
     {
         auto dest = get_destination_handler(destination_zone_id);
         if (!dest)
@@ -158,7 +235,7 @@ namespace rpc
         post_options options,
         size_t in_size_,
         const char* in_buf_,
-        const std::vector<rpc::back_channel_entry>& in_back_channel)
+        const std::vector<back_channel_entry>& in_back_channel)
     {
         auto dest = get_destination_handler(destination_zone_id);
         if (!dest)
@@ -186,8 +263,8 @@ namespace rpc
         destination_zone destination_zone_id,
         object object_id,
         interface_ordinal interface_id,
-        const std::vector<rpc::back_channel_entry>& in_back_channel,
-        std::vector<rpc::back_channel_entry>& out_back_channel)
+        const std::vector<back_channel_entry>& in_back_channel,
+        std::vector<back_channel_entry>& out_back_channel)
     {
         auto dest = get_destination_handler(destination_zone_id);
         if (!dest)
@@ -209,47 +286,43 @@ namespace rpc
         known_direction_zone known_direction_zone_id,
         add_ref_options build_out_param_channel,
         uint64_t& reference_count,
-        const std::vector<rpc::back_channel_entry>& in_back_channel,
-        std::vector<rpc::back_channel_entry>& out_back_channel)
+        const std::vector<back_channel_entry>& in_back_channel,
+        std::vector<back_channel_entry>& out_back_channel)
     {
         auto build_channel = !!(build_out_param_channel & add_ref_options::build_destination_route)
                              || !!(build_out_param_channel & add_ref_options::build_caller_route);
-                             
-        auto dest_channel = destination_channel_zone_id.is_set() ? destination_channel_zone_id.get_val() : destination_zone_id.get_val();
-        auto caller_channel = caller_channel_zone_id.is_set() ? caller_channel_zone_id.get_val() : caller_zone_id.get_val();
+
+        auto dest_channel = destination_channel_zone_id.is_set() ? destination_channel_zone_id.get_val()
+                                                                 : destination_zone_id.get_val();
+        auto caller_channel
+            = caller_channel_zone_id.is_set() ? caller_channel_zone_id.get_val() : caller_zone_id.get_val();
 
         auto svc = service_.lock();
-        if(!svc)
+        if (!svc)
         {
             CO_RETURN error::TRANSPORT_ERROR();
         }
-        
-        if (destination_zone_id != svc->get_zone_id().as_destination() 
-            && 
-            (
+
+        if (destination_zone_id != svc->get_zone_id().as_destination()
+            && (
                 // if the call is standard passthough add_ref
                 !build_channel
                 // else the fork is beyond this node
-                || (dest_channel == caller_channel && build_channel)
-            ))
+                || (dest_channel == caller_channel && build_channel)))
         {
             // then pass it through to the relevant i_marshaller
-            
+
             // Route based on destination: local service or remote transport
             auto dest = get_destination_handler(destination_zone_id);
             if (!dest)
             {
-                dest = svc->create_pass_through( destination_channel_zone_id,
-                                                destination_zone_id,
-                                                caller_channel_zone_id,
-                                                caller_zone_id,
-                                                known_direction_zone_id);
+                dest = svc->create_pass_through(destination_zone_id, caller_zone_id);
                 if (!dest)
-                {                
+                {
                     CO_RETURN error::TRANSPORT_ERROR();
                 }
             }
-            
+
             CO_RETURN CO_AWAIT dest->add_ref(protocol_version,
                 destination_channel_zone_id,
                 destination_zone_id,
@@ -284,8 +357,8 @@ namespace rpc
         caller_zone caller_zone_id,
         release_options options,
         uint64_t& reference_count,
-        const std::vector<rpc::back_channel_entry>& in_back_channel,
-        std::vector<rpc::back_channel_entry>& out_back_channel)
+        const std::vector<back_channel_entry>& in_back_channel,
+        std::vector<back_channel_entry>& out_back_channel)
     {
         auto dest = get_destination_handler(destination_zone_id);
         if (!dest)

@@ -43,6 +43,9 @@
 // the remote proxy to another zone
 #include <rpc/internal/service_proxy.h>
 
+// the link between transports and marshallers for routing
+#include <rpc/internal/pass_through.h>
+
 //the deserialisation logic to an object
 #include <rpc/internal/stub.h>
 
