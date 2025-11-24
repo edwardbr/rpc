@@ -1431,6 +1431,9 @@ other_zone->get_caller_zone_id()}); if (found_again != other_zones.end())
                 auto transport = item->second.lock();
                 if (transport)
                 {
+                    RPC_WARNING("get_zone_proxy: Creating service_proxy with indirect transport! service_zone={}, transport_to={}, destination_zone={}, caller_channel={}",
+                        zone_id_.get_val(), transport->get_adjacent_zone_id().get_val(), destination_zone_id.get_val(), caller_channel_zone_id.get_val());
+
                     auto proxy = std::make_shared<service_proxy>(transport, destination_zone_id);
                     inner_add_zone_proxy(proxy);
                     new_proxy_added = true;

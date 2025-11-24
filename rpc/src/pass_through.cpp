@@ -212,16 +212,6 @@ namespace rpc
         const std::vector<rpc::back_channel_entry>& in_back_channel,
         std::vector<rpc::back_channel_entry>& out_back_channel)
     {
-        // Update pass_through reference count
-        if (build_out_param_channel == add_ref_options::normal)
-        {
-            shared_count_.fetch_add(1, std::memory_order_acq_rel);
-        }
-        else if (build_out_param_channel == add_ref_options::optimistic)
-        {
-            optimistic_count_.fetch_add(1, std::memory_order_acq_rel);
-        }
-
         // Determine target transport based on destination_zone
         auto target_transport = get_directional_transport(destination_zone_id);
         if (!target_transport)
@@ -237,6 +227,7 @@ namespace rpc
             CO_RETURN error::TRANSPORT_ERROR();
         }
 
+        // Forward the add_ref call to the target transport
         auto result = CO_AWAIT target_transport->add_ref(protocol_version,
             destination_channel_zone_id,
             destination_zone_id,
@@ -253,6 +244,21 @@ namespace rpc
         if (result == error::TRANSPORT_ERROR())
         {
             trigger_self_destruction();
+            CO_RETURN result;
+        }
+
+        // ONLY increment pass_through reference count if the forward succeeded
+        // This ensures our count matches the actual established references
+        if (result == error::OK())
+        {
+            if (build_out_param_channel == add_ref_options::normal)
+            {
+                shared_count_.fetch_add(1, std::memory_order_acq_rel);
+            }
+            else if (build_out_param_channel == add_ref_options::optimistic)
+            {
+                optimistic_count_.fetch_add(1, std::memory_order_acq_rel);
+            }
         }
 
         CO_RETURN result;
@@ -329,6 +335,10 @@ namespace rpc
 
     void pass_through::trigger_self_destruction()
     {
+        RPC_WARNING("trigger_self_destruction: Destroying pass-through, forward_dest={}, reverse_dest={}, pt={}, shared={}, optimistic={}",
+            forward_destination_.get_val(), reverse_destination_.get_val(), (void*)this,
+            shared_count_.load(), optimistic_count_.load());
+
         // Remove destinations from transports
         if (forward_transport_)
         {

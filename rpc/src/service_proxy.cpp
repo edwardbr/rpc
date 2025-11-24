@@ -447,9 +447,14 @@ namespace rpc
             {
                 RPC_DEBUG("Object {} not found - stub already deleted (normal for optimistic_ptr)", object_id.get_val());
             }
-            else 
+            else if (ret == rpc::error::ZONE_NOT_FOUND() || ret == rpc::error::TRANSPORT_ERROR())
             {
-                RPC_ERROR("cleanup_after_object optimistic release failed: {}", rpc::error::to_string(ret));
+                RPC_DEBUG("Zone {} not reachable during cleanup ({}), intermediate zone may have been cleaned up (normal during multi-level hierarchy cleanup)",
+                          destination_zone_id.get_val(), rpc::error::to_string(ret));
+            }
+            else
+            {
+                RPC_ERROR("cleanup_after_object release failed: {}", rpc::error::to_string(ret));
                 RPC_ASSERT(false);
             }
 #ifdef BUILD_COROUTINE

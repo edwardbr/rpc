@@ -13,12 +13,16 @@ namespace local
         : rpc::transport(name, service, parent->get_zone_id())
         , parent_(parent)
     {
+        // Local transports are always immediately available (in-process)
+        set_status(rpc::transport_status::CONNECTED);
     }
 
     parent_transport::parent_transport(std::string name, rpc::zone zone_id, std::shared_ptr<child_transport> parent)
         : rpc::transport(name, zone_id, parent->get_zone_id())
         , parent_(parent)
     {
+        // Local transports are always immediately available (in-process)
+        set_status(rpc::transport_status::CONNECTED);
     }
 
     // Outbound i_marshaller interface - sends from child to parent
@@ -178,9 +182,13 @@ namespace local
         const std::vector<rpc::back_channel_entry>& in_back_channel,
         std::vector<rpc::back_channel_entry>& out_back_channel)
     {
+        RPC_DEBUG("parent_transport::add_ref: my_zone={}, adjacent_zone={}, destination_zone={}, caller_zone={}",
+            get_zone_id().get_val(), get_adjacent_zone_id().get_val(), destination_zone_id.get_val(), caller_zone_id.get_val());
+
         auto dest = get_destination_handler(destination_zone_id);
         if (dest)
         {
+            RPC_DEBUG("parent_transport::add_ref: Using local destination handler for zone {}", destination_zone_id.get_val());
             CO_RETURN CO_AWAIT dest->add_ref(protocol_version,
                 destination_channel_zone_id,
                 destination_zone_id,
@@ -198,9 +206,11 @@ namespace local
             auto parent = parent_.get_nullable();
             if (!parent)
             {
+                RPC_ERROR("parent_transport::add_ref: parent is NULL!");
                 CO_RETURN rpc::error::ZONE_NOT_FOUND();
             }
 
+            RPC_DEBUG("parent_transport::add_ref: Calling parent->inbound_add_ref for zone {}", destination_zone_id.get_val());
             CO_RETURN CO_AWAIT parent->inbound_add_ref(protocol_version,
                 destination_channel_zone_id,
                 destination_zone_id,

@@ -504,13 +504,18 @@ namespace rpc
 
         // Marshal input interface if provided
         rpc::interface_descriptor input_descr{{0}, {0}};
+        // Connect via transport (calls remote zone's entry point)
+        rpc::interface_descriptor output_descr{{0}, {0}};
+
+        int err_code = rpc::error::OK();
+
         if (input_interface)
         {
             if (input_interface->is_local())
             {
                 std::shared_ptr<object_stub> stub;
                 auto factory = create_interface_stub(input_interface);
-                auto err = CO_AWAIT get_proxy_stub_descriptor(rpc::get_version(),
+                err_code = CO_AWAIT get_proxy_stub_descriptor(rpc::get_version(),
                     zone_id_.as_caller_channel(),
                     zone_id_.as_caller(),
                     input_interface.get(),
@@ -519,10 +524,18 @@ namespace rpc
                     stub,
                     input_descr);
 
-                if (err != error::OK())
+                if (err_code != error::OK())
                 {
                     remove_zone_proxy(child_transport->get_adjacent_zone_id().as_destination(), zone_id_.as_caller());
-                    return err;
+                    return err_code;
+                }
+
+                err_code = CO_AWAIT child_transport->connect(input_descr, output_descr);
+                if (err_code != rpc::error::OK())
+                {
+                    // Clean up on failure
+                    CO_AWAIT clean_up_on_failed_connection(new_service_proxy, input_interface);
+                    CO_RETURN err_code;
                 }
             }
             else
@@ -537,7 +550,7 @@ namespace rpc
                 std::vector<rpc::back_channel_entry> empty_in;
                 std::vector<rpc::back_channel_entry> empty_out;
 
-                int err = CO_AWAIT input_transport->add_ref(rpc::get_version(),
+                err_code = CO_AWAIT input_transport->add_ref(rpc::get_version(),
                     input_transport->get_adjacent_zone_id().as_destination_channel(),
                     input_destination_zone_id,
                     input_object_id,
@@ -548,25 +561,29 @@ namespace rpc
                     temp_ref_count,
                     empty_in,
                     empty_out);
-                RPC_ASSERT(err == error::OK());
-                if (err != error::OK())
+                RPC_ASSERT(err_code == error::OK());
+                if (err_code != error::OK())
                 {
-                    CO_RETURN err;
+                    CO_RETURN err_code;
                 }
 
                 input_descr = {input_object_id, input_destination_zone_id};
+
+                err_code = CO_AWAIT child_transport->connect(input_descr, output_descr);
+                if (err_code != rpc::error::OK())
+                {
+                    // Clean up on failure
+                    CO_AWAIT clean_up_on_failed_connection(new_service_proxy, input_interface);
+                    CO_RETURN err_code;
+                }
+                transport::create_pass_through(child_transport,
+                    input_transport,
+                    shared_from_this(),
+                    child_transport->get_adjacent_zone_id().as_destination(),
+                    input_destination_zone_id);
             }
         }
 
-        // Connect via transport (calls remote zone's entry point)
-        rpc::interface_descriptor output_descr{{0}, {0}};
-        auto err_code = CO_AWAIT child_transport->connect(input_descr, output_descr);
-        if (err_code != rpc::error::OK())
-        {
-            // Clean up on failure
-            CO_AWAIT clean_up_on_failed_connection(new_service_proxy, input_interface);
-            CO_RETURN err_code;
-        }
 
         // Demarshal output interface if provided
         if (output_descr.object_id != 0 && output_descr.destination_zone_id != 0)
