@@ -94,12 +94,6 @@ class service_proxy {
    add_external_ref();                 // Reference while object_proxy exists
    ```
 
-4. **Temporary Operations** (`try_cast`, `prepare_remote_input_interface` - service.cpp:738)
-   ```cpp
-   other_zone->add_external_ref();     // Temporary reference during operation
-   other_zone->release_external_ref(); // Immediately balanced
-   ```
-
 ### The add_ref Function Complexity
 
 **Location**: service.cpp:747-1096

@@ -574,7 +574,7 @@ namespace rpc
 #endif
             uint64_t ref_count = 0;
             auto ret
-                = CO_AWAIT sp_add_ref(object_id, {0}, is_optimistic ? rpc::add_ref_options::optimistic : rpc::add_ref_options::normal, known_direction_zone_id, ref_count);
+                = CO_AWAIT sp_add_ref(object_id, get_zone_id().as_caller_channel(), is_optimistic ? rpc::add_ref_options::optimistic : rpc::add_ref_options::normal, known_direction_zone_id, ref_count);
             if (ret != error::OK())
             {
                 RPC_ERROR("sp_add_ref failed");

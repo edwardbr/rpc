@@ -30,7 +30,7 @@ namespace rpc
 
         std::shared_ptr<transport> forward_transport_; // Transport to forward destination
         std::shared_ptr<transport> reverse_transport_; // Transport to reverse destination
-        std::weak_ptr<service> service_;
+        std::shared_ptr<service> service_;
 
         std::shared_ptr<pass_through> self_ref_; // Keep self alive based on reference counts
 
@@ -131,6 +131,8 @@ namespace rpc
     private:
         std::shared_ptr<transport> get_directional_transport(destination_zone dest);
         void trigger_self_destruction();
+
+        friend transport;
     };
 
 } // namespace rpc

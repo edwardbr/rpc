@@ -70,29 +70,38 @@ namespace rpc
         destinations_.erase(dest);
     }
 
-    std::shared_ptr<i_marshaller> transport::add_pass_through(std::shared_ptr<pass_through> pt)
+    std::shared_ptr<i_marshaller> transport::create_pass_through(std::shared_ptr<transport> forward,
+        std::shared_ptr<transport> reverse,
+        std::shared_ptr<service> service,
+        destination_zone forward_dest,
+        destination_zone reverse_dest)
     {
-        auto forwd = pt->get_forward_transport();
-        auto rev = pt->get_reverse_transport();
-        RPC_ASSERT(forwd->get_adjacent_zone_id() != rev->get_adjacent_zone_id());
+        std::shared_ptr<pass_through> pt(
+            new rpc::pass_through(forward, // forward_transport: handles messages TO final destination
+                reverse,                   // reverse_transport: handles messages back to caller
+                service,                   // service
+                forward_dest,
+                reverse_dest // reverse_destination: where reverse messages go
+                ));
+        pt->self_ref_ = pt; // keep self alive based on reference counts
 
         // we need to lock both transports destination mutexes without deadlock when adding the destinations
         // we do this by locking them in zone id order
         std::unique_ptr<std::lock_guard<std::shared_mutex>> g1;
         std::unique_ptr<std::lock_guard<std::shared_mutex>> g2;
-        if (forwd->get_adjacent_zone_id() < rev->get_adjacent_zone_id())
+        if (forward->get_adjacent_zone_id() < reverse->get_adjacent_zone_id())
         {
-            g1 = std::make_unique<std::lock_guard<std::shared_mutex>>(forwd->destinations_mutex_);
-            g2 = std::make_unique<std::lock_guard<std::shared_mutex>>(rev->destinations_mutex_);
+            g1 = std::make_unique<std::lock_guard<std::shared_mutex>>(forward->destinations_mutex_);
+            g2 = std::make_unique<std::lock_guard<std::shared_mutex>>(reverse->destinations_mutex_);
         }
         else
         {
-            g1 = std::make_unique<std::lock_guard<std::shared_mutex>>(rev->destinations_mutex_);
-            g2 = std::make_unique<std::lock_guard<std::shared_mutex>>(forwd->destinations_mutex_);
+            g1 = std::make_unique<std::lock_guard<std::shared_mutex>>(reverse->destinations_mutex_);
+            g2 = std::make_unique<std::lock_guard<std::shared_mutex>>(forward->destinations_mutex_);
         }
 
-        auto forward_handler = pt->get_forward_transport()->inner_get_destination_handler(pt->get_reverse_destination());
-        auto reverse_handler = pt->get_reverse_transport()->inner_get_destination_handler(pt->get_forward_destination());
+        auto forward_handler = forward->inner_get_destination_handler(forward_dest);
+        auto reverse_handler = reverse->inner_get_destination_handler(reverse_dest);
 
         // check that they are the same
         RPC_ASSERT(!forward_handler == !reverse_handler);
@@ -103,12 +112,13 @@ namespace rpc
         }
         else
         {
-            pt->get_forward_transport()->inner_add_destination(
-                pt->get_reverse_destination(), std::static_pointer_cast<i_marshaller>(pt));
-            pt->get_reverse_transport()->inner_add_destination(
-                pt->get_forward_destination(), std::static_pointer_cast<i_marshaller>(pt));
+            forward->inner_add_destination(
+                reverse_dest, std::static_pointer_cast<i_marshaller>(pt));
+            reverse->inner_add_destination(
+                forward_dest, std::static_pointer_cast<i_marshaller>(pt));
             return std::static_pointer_cast<i_marshaller>(pt);
         }
+        return pt;
     }
 
     // Status management
@@ -132,24 +142,6 @@ namespace rpc
     {
         std::shared_lock lock(destinations_mutex_);
         return inner_get_destination_handler(dest);
-    }
-
-    std::shared_ptr<i_marshaller> transport::get_destination_handler_or_create_passthrough(
-        caller_zone caller, destination_zone dest)
-    {
-        std::shared_ptr<i_marshaller> destination_transport;
-        {
-            std::shared_lock lock(destinations_mutex_);
-            auto ret = inner_get_destination_handler(dest);
-            if (ret)
-                return ret;
-        }
-
-        auto svc = service_.lock();
-        if (!svc)
-            return nullptr;
-
-        return svc->create_pass_through(dest, shared_from_this(), caller);
     }
 
     void transport::set_status(transport_status new_status)
@@ -311,16 +303,27 @@ namespace rpc
                 || (dest_channel == caller_channel && build_channel)))
         {
             // then pass it through to the relevant i_marshaller
-
             // Route based on destination: local service or remote transport
             auto dest = get_destination_handler(destination_zone_id);
             if (!dest)
             {
-                dest = svc->create_pass_through(destination_zone_id, caller_zone_id);
-                if (!dest)
+                auto reverse_transport = svc->get_transport(caller_zone_id.as_destination());
+                if (!reverse_transport)
                 {
-                    CO_RETURN error::TRANSPORT_ERROR();
+                    CO_RETURN rpc::error::ZONE_NOT_FOUND();
                 }
+                auto forward_transport = svc->get_transport(destination_zone_id);
+                if (!forward_transport)
+                {
+                    CO_RETURN rpc::error::ZONE_NOT_FOUND();
+                }
+
+                dest = create_pass_through(forward_transport, // forward_transport: handles messages TO final destination
+                    reverse_transport,                        // reverse_transport: handles messages back to caller
+                    svc,                                      // service
+                    destination_zone_id,                      // reverse_destination: where reverse messages go
+                    caller_zone_id.as_destination()           // forward_destination: where forward messages go
+                );
             }
 
             CO_RETURN CO_AWAIT dest->add_ref(protocol_version,

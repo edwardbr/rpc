@@ -49,7 +49,8 @@ namespace rpc
     {
 		if(!iface)
 		{
-			CO_RETURN rpc::error::INVALID_DATA();
+            descriptor = {0,0};
+			CO_RETURN rpc::error::OK();
 		}
 		auto factory = zone->create_interface_stub(iface);
 

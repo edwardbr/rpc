@@ -6,7 +6,6 @@
 
 #include <string>
 #include <memory>
-#include <map>
 #include <list>
 #include <unordered_map>
 #include <mutex>
@@ -65,7 +64,7 @@ namespace rpc
             std::shared_ptr<std::function<std::shared_ptr<rpc::i_interface_stub>(const std::shared_ptr<rpc::i_interface_stub>&)>>>
             stub_factories;
         // map wrapped objects pointers to stubs
-        std::map<void*, std::weak_ptr<object_stub>> wrapped_object_to_stub;
+        std::unordered_map<void*, std::weak_ptr<object_stub>> wrapped_object_to_stub;
         std::string name_;
 
         mutable std::mutex service_events_control;
@@ -76,14 +75,14 @@ namespace rpc
 #endif
 
         mutable std::mutex zone_control;
-        //owned by service proxies
-        std::map<destination_zone, std::weak_ptr<service_proxy>> other_zones;
-        
+        // owned by service proxies
+        std::unordered_map<destination_zone, std::weak_ptr<service_proxy>> other_zones;
+
         // transports owned by:
         // service proxies
         // pass through objects
         // child services to parent transports
-        std::map<destination_zone, std::weak_ptr<transport>> transports;
+        std::unordered_map<destination_zone, std::weak_ptr<transport>> transports;
 
     protected:
         struct child_service_tag
@@ -94,10 +93,20 @@ namespace rpc
 
         // Friend declarations for binding template functions
         template<class T>
-        friend CORO_TASK(int) stub_bind_out_param(const std::shared_ptr<rpc::service>&, uint64_t, caller_channel_zone, caller_zone, const shared_ptr<T>&, interface_descriptor&);
+        friend CORO_TASK(int) stub_bind_out_param(const std::shared_ptr<rpc::service>&,
+            uint64_t,
+            caller_channel_zone,
+            caller_zone,
+            const shared_ptr<T>&,
+            interface_descriptor&);
 
         template<class T>
-        friend CORO_TASK(int) stub_bind_in_param(uint64_t, const std::shared_ptr<rpc::service>&, caller_channel_zone, caller_zone, const interface_descriptor&, shared_ptr<T>&);
+        friend CORO_TASK(int) stub_bind_in_param(uint64_t,
+            const std::shared_ptr<rpc::service>&,
+            caller_channel_zone,
+            caller_zone,
+            const interface_descriptor&,
+            shared_ptr<T>&);
 
     public:
 #ifdef BUILD_COROUTINE
@@ -124,14 +133,14 @@ namespace rpc
         // we are using a pointer as this is a thread local variable it will not change mid stream, only use this function when servicing an rpc call
         static service* get_current_service();
         static void set_current_service(service* svc);
-        
+
         object generate_new_object_id() const;
-        
+
         std::string get_name() const { return name_; }
         zone get_zone_id() const { return zone_id_; }
 
         virtual bool check_is_empty() const;
-        
+
         // virtual std::shared_ptr<rpc::service_proxy> get_parent() const { return nullptr; }
         // virtual destination_zone get_parent_zone_id() const { return {0}; }
 
@@ -156,22 +165,10 @@ namespace rpc
         // Creates service_proxy bound to the provided transport
         template<class in_param_type, class out_param_type>
         CORO_TASK(int)
-        connect_to_zone(const char* name, std::shared_ptr<transport> child_transport,
-            const rpc::shared_ptr<in_param_type>& input_interface,
-            rpc::shared_ptr<out_param_type>& output_interface);
-
-        // Dual transport version - for local/in-memory connections
-        // Creates child_service and binds both transports
-        /*template<class PARENT_INTERFACE, class CHILD_INTERFACE>
-        CORO_TASK(int)
         connect_to_zone(const char* name,
             std::shared_ptr<transport> child_transport,
-            std::shared_ptr<transport_to_parent> parent_transport,
-            const rpc::shared_ptr<PARENT_INTERFACE>& input_interface,
-            rpc::shared_ptr<CHILD_INTERFACE>& output_interface,
-            std::function<CORO_TASK(int)(const rpc::shared_ptr<PARENT_INTERFACE>&,
-                rpc::shared_ptr<CHILD_INTERFACE>&,
-                const std::shared_ptr<rpc::child_service>&)> child_entry_point);*/
+            const rpc::shared_ptr<in_param_type>& input_interface,
+            rpc::shared_ptr<out_param_type>& output_interface);
 
         // Attach remote zone - for peer-to-peer connections
         // Takes single transport since this is called by the remote peer during connection
@@ -269,22 +266,13 @@ namespace rpc
 
         uint64_t release_local_stub(const std::shared_ptr<object_stub>& stub, bool is_optimistic);
 
-        /////////////////////////////////
-        // SERVICE PROXY LOGIC
-        /////////////////////////////////
-
-        // Create pass-through for routing between zones
-        std::shared_ptr<i_marshaller> create_pass_through(
-            destination_zone destination_zone_id,
-            std::shared_ptr<transport> caller_transport,
-            caller_zone caller_zone_id);
-
-        std::shared_ptr<i_marshaller> create_pass_through(
-            destination_zone destination_zone_id,
-            caller_zone caller_zone_id);
+        void add_transport(destination_zone adjacent_zone_id, const std::shared_ptr<transport>& transport_ptr);
+        void remove_transport(destination_zone adjacent_zone_id);
+        std::shared_ptr<rpc::transport> get_transport(destination_zone destination_zone_id) const;
 
     protected:
         virtual void add_zone_proxy(const std::shared_ptr<rpc::service_proxy>& zone);
+
     private:
         virtual std::shared_ptr<rpc::service_proxy> get_zone_proxy(caller_channel_zone caller_channel_zone_id,
             caller_zone caller_zone_id,
@@ -295,10 +283,6 @@ namespace rpc
 
         // virtual void remove_zone_proxy_if_not_used(destination_zone destination_zone_id, caller_zone caller_zone_id);
 
-        void add_transport(destination_zone adjacent_zone_id, const std::shared_ptr<transport>& transport_ptr);
-        void remove_transport(destination_zone adjacent_zone_id);
-        std::shared_ptr<rpc::transport> get_transport(destination_zone destination_zone_id) const;
-
         /////////////////////////////////
         // BINDING LOGIC
         /////////////////////////////////
@@ -307,7 +291,10 @@ namespace rpc
 
         template<class T>
         CORO_TASK(int)
-        bind_in_proxy(uint64_t protocol_version, const shared_ptr<T>& iface, std::shared_ptr<rpc::object_stub>& stub, interface_descriptor& descriptor);
+        bind_in_proxy(uint64_t protocol_version,
+            const shared_ptr<T>& iface,
+            std::shared_ptr<rpc::object_stub>& stub,
+            interface_descriptor& descriptor);
 
         // template<class T>
         // CORO_TASK(int)
@@ -325,7 +312,7 @@ namespace rpc
             bool outcall,
             std::shared_ptr<object_stub>& stub,
             interface_descriptor& descriptor);
-            
+
         /////////////////////////////////
         // PRIVATE FUNCTIONS
         /////////////////////////////////
@@ -335,22 +322,17 @@ namespace rpc
         void inner_add_zone_proxy(const std::shared_ptr<rpc::service_proxy>& service_proxy);
         void cleanup_service_proxy(const std::shared_ptr<rpc::service_proxy>& other_zone);
 
-        // CORO_TASK(int)
-        // prepare_remote_input_interface(caller_channel_zone caller_channel_zone_id,
-        //     caller_zone caller_zone_id,
-        //     rpc::casting_interface* base,
-        //     std::shared_ptr<rpc::service_proxy>& destination_zone, interface_descriptor& descriptor);
-
         CORO_TASK(int)
         prepare_out_param(uint64_t protocol_version,
             caller_channel_zone caller_channel_zone_id,
             caller_zone caller_zone_id,
-            rpc::casting_interface* base, interface_descriptor& descriptor);
+            rpc::casting_interface* base,
+            interface_descriptor& descriptor);
 
         CORO_TASK(void)
         clean_up_on_failed_connection(const std::shared_ptr<rpc::service_proxy>& destination_zone,
             rpc::shared_ptr<rpc::casting_interface> input_interface);
-            
+
         /////////////////////////////////
         // FRIENDS FUNCTIONS
         /////////////////////////////////
@@ -380,13 +362,15 @@ namespace rpc
             uint64_t protocol_version,
             rpc::caller_channel_zone caller_channel_zone_id,
             rpc::caller_zone caller_zone_id,
-            const rpc::shared_ptr<T>& iface, rpc::interface_descriptor& descriptor);
+            const rpc::shared_ptr<T>& iface,
+            rpc::interface_descriptor& descriptor);
 
         template<class T>
         friend CORO_TASK(int) rpc::proxy_bind_in_param(std::shared_ptr<rpc::object_proxy> object_p,
             uint64_t protocol_version,
             const rpc::shared_ptr<T>& iface,
-            std::shared_ptr<rpc::object_stub>& stub, rpc::interface_descriptor& descriptor);            
+            std::shared_ptr<rpc::object_stub>& stub,
+            rpc::interface_descriptor& descriptor);
     };
 
     // Child services need to maintain the lifetime of the root object in its zone
@@ -442,9 +426,10 @@ namespace rpc
                 rpc::shared_ptr<CHILD_INTERFACE>&,
                 const std::shared_ptr<rpc::child_service>&)>&& fn
 #ifdef BUILD_COROUTINE
-            ,const std::shared_ptr<coro::io_scheduler>& io_scheduler
+            ,
+            const std::shared_ptr<coro::io_scheduler>& io_scheduler
 #endif
-        )   
+        )
         {
             zone zone_id = parent_transport->get_zone_id();
             destination_zone parent_zone_id = zone_id.as_destination();
@@ -465,8 +450,7 @@ namespace rpc
             // This ensures parent zone remains reachable while child exists
             child_svc->set_parent_transport(parent_transport);
 
-            auto parent_service_proxy = std::make_shared<rpc::service_proxy>(
-                "parent", parent_transport, child_svc);
+            auto parent_service_proxy = std::make_shared<rpc::service_proxy>("parent", parent_transport, child_svc);
 
             child_svc->add_zone_proxy(parent_service_proxy);
             // if (!child_svc->set_parent_proxy(parent_service_proxy))
@@ -504,17 +488,18 @@ namespace rpc
             CO_RETURN rpc::error::OK();
         };
     };
-        
+
     template<class in_param_type, class out_param_type>
     CORO_TASK(int)
-    service::connect_to_zone(const char* name, std::shared_ptr<transport> child_transport,
+    service::connect_to_zone(const char* name,
+        std::shared_ptr<transport> child_transport,
         const rpc::shared_ptr<in_param_type>& input_interface,
         rpc::shared_ptr<out_param_type>& output_interface)
     {
         // Create service_proxy for this connection
         auto new_service_proxy = std::make_shared<rpc::service_proxy>(name, child_transport, shared_from_this());
-        
-        //add the proxy to the service
+
+        // add the proxy to the service
         add_zone_proxy(new_service_proxy);
 
         // Marshal input interface if provided
@@ -525,16 +510,16 @@ namespace rpc
             {
                 std::shared_ptr<object_stub> stub;
                 auto factory = create_interface_stub(input_interface);
-                auto err = CO_AWAIT get_proxy_stub_descriptor(
-                    rpc::get_version(),
-                    caller_channel_zone{},
+                auto err = CO_AWAIT get_proxy_stub_descriptor(rpc::get_version(),
+                    zone_id_.as_caller_channel(),
                     zone_id_.as_caller(),
                     input_interface.get(),
                     factory,
                     false,
-                    stub, input_descr);
-                    
-                if(err != error::OK())
+                    stub,
+                    input_descr);
+
+                if (err != error::OK())
                 {
                     remove_zone_proxy(child_transport->get_adjacent_zone_id().as_destination(), zone_id_.as_caller());
                     return err;
@@ -542,18 +527,34 @@ namespace rpc
             }
             else
             {
-                assert(false); //move this to transport I think
-                // auto err = CO_AWAIT prepare_remote_input_interface(
-                //     {0},
-                //     new_service_proxy->get_destination_zone_id().as_caller(),
-                //     input_interface.get(),
-                //     new_service_proxy, input_descr);
-                    
-                // if(err != error::OK())
-                // {
-                //     remove_zone_proxy(destination_zone, zone_id_.as_caller());
-                //     return err;
-                // }
+                auto input_object_proxy = input_interface->get_object_proxy();
+                auto input_service_proxy = input_object_proxy->get_service_proxy();
+                auto input_object_id = input_object_proxy->get_object_id();
+                auto input_destination_zone_id = input_service_proxy->get_destination_zone_id();
+                auto input_transport = input_service_proxy->get_transport();
+
+                uint64_t temp_ref_count;
+                std::vector<rpc::back_channel_entry> empty_in;
+                std::vector<rpc::back_channel_entry> empty_out;
+
+                int err = CO_AWAIT input_transport->add_ref(rpc::get_version(),
+                    input_transport->get_adjacent_zone_id().as_destination_channel(),
+                    input_destination_zone_id,
+                    input_object_id,
+                    zone_id_.as_caller_channel(),
+                    input_destination_zone_id.as_caller(),
+                    known_direction_zone(zone_id_),
+                    rpc::add_ref_options::build_destination_route,
+                    temp_ref_count,
+                    empty_in,
+                    empty_out);
+                RPC_ASSERT(err == error::OK());
+                if (err != error::OK())
+                {
+                    CO_RETURN err;
+                }
+
+                input_descr = {input_object_id, input_destination_zone_id};
             }
         }
 
@@ -571,23 +572,17 @@ namespace rpc
         if (output_descr.object_id != 0 && output_descr.destination_zone_id != 0)
         {
             err_code = CO_AWAIT rpc::demarshall_interface_proxy(
-                rpc::get_version(),
-                new_service_proxy,
-                output_descr,
-                zone_id_.as_caller(),
-                output_interface);
+                rpc::get_version(), new_service_proxy, output_descr, zone_id_.as_caller(), output_interface);
         }
         else
         {
             // new_service_proxy->release_external_ref();
-            remove_zone_proxy(
-                new_service_proxy->get_destination_zone_id(),
-                zone_id_.as_caller());
+            remove_zone_proxy(new_service_proxy->get_destination_zone_id(), zone_id_.as_caller());
         }
 
         CO_RETURN err_code;
     }
-    
+
     // Attach remote zone - for peer-to-peer connections
     // Takes single transport since this is called by the remote peer during connection
     template<class PARENT_INTERFACE, class CHILD_INTERFACE>
@@ -596,16 +591,14 @@ namespace rpc
         std::shared_ptr<transport> peer_transport,
         rpc::interface_descriptor input_descr,
         rpc::interface_descriptor& output_descr,
-        std::function<CORO_TASK(int)(const rpc::shared_ptr<PARENT_INTERFACE>&,
-            rpc::shared_ptr<CHILD_INTERFACE>&,
-            const std::shared_ptr<rpc::service>&)> fn)
+        std::function<CORO_TASK(int)(
+            const rpc::shared_ptr<PARENT_INTERFACE>&, rpc::shared_ptr<CHILD_INTERFACE>&, const std::shared_ptr<rpc::service>&)> fn)
     {
         // Get peer zone from transport
         destination_zone peer_zone_id = peer_transport->get_zone_id().as_destination();
 
         // Create service_proxy for peer connection
-        auto peer_service_proxy = std::make_shared<rpc::service_proxy>(
-            name, peer_zone_id, shared_from_this());
+        auto peer_service_proxy = std::make_shared<rpc::service_proxy>(name, peer_zone_id, shared_from_this());
         peer_service_proxy->set_transport(peer_transport);
         add_zone_proxy(peer_service_proxy);
 
@@ -614,11 +607,7 @@ namespace rpc
         if (input_descr != interface_descriptor())
         {
             auto err_code = CO_AWAIT rpc::demarshall_interface_proxy(
-                rpc::get_version(),
-                peer_service_proxy,
-                input_descr,
-                get_zone_id().as_caller(),
-                parent_ptr);
+                rpc::get_version(), peer_service_proxy, input_descr, get_zone_id().as_caller(), parent_ptr);
             if (err_code != rpc::error::OK())
             {
                 CO_RETURN err_code;
@@ -636,14 +625,12 @@ namespace rpc
         // Marshal child interface to return to peer
         if (child_ptr)
         {
-            RPC_ASSERT(child_ptr->is_local()
-                && "Cannot support remote pointers from subordinate zones");
+            RPC_ASSERT(child_ptr->is_local() && "Cannot support remote pointers from subordinate zones");
             output_descr = CO_AWAIT rpc::create_interface_stub(*this, child_ptr);
         }
 
         CO_RETURN rpc::error::OK();
     }
-    
 
     // protect the current service local pointer
     struct current_service_tracker

@@ -104,13 +104,13 @@ namespace
             if (args::get(enable_console_telemetry))
             {
                 multiplexing_service->register_service_config("console", console_path.Get());
-                std::cout << "Registered console telemetry service configuration" << std::endl;
+                // std::cout << "Registered console telemetry service configuration" << std::endl;
             }
 
             if (args::get(enable_sequence_diagram_telemetry))
             {
                 multiplexing_service->register_service_config("sequence", sequence_path.Get());
-                std::cout << "Registered sequence diagram telemetry service configuration" << std::endl;
+                // std::cout << "Registered sequence diagram telemetry service configuration" << std::endl;
             }
 
             if (args::get(enable_animation_telemetry))
@@ -120,11 +120,6 @@ namespace
             }
         }
 #endif
-
-        // Print configuration summary
-        std::cout << "\n=== RPC++ Test Configuration ===" << std::endl;
-        std::cout << "Multithreaded tests: " << (enable_multithreaded_tests ? "YES" : "NO") << std::endl;
-        std::cout << "==================================\n" << std::endl;
 
 #ifndef _WIN32
         // Initialize comprehensive crash handler with multi-threaded support
@@ -145,8 +140,8 @@ namespace
             {
                 std::cout << "\n=== CUSTOM CRASH ANALYSIS ===" << std::endl;
                 std::cout << "Crash occurred at: "
-                          << std::chrono::duration_cast<std::chrono::seconds>(report.crash_time.time_since_epoch()).count()
-                          << std::endl;
+                << std::chrono::duration_cast<std::chrono::seconds>(report.crash_time.time_since_epoch()).count()
+                << std::endl;
 
                 // Check for threading debug patterns
                 bool threading_bug_detected = false;
@@ -212,8 +207,8 @@ namespace
         // Cleanup crash handler
 #ifndef _WIN32
         crash_handler::crash_handler::shutdown();
+        // std::cout << "[Main] test shutdown complete" << std::endl;
 #endif
-        std::cout << "[Main] test shutdown complete" << std::endl;
 
         return ret;
     }

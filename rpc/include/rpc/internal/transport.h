@@ -53,8 +53,6 @@ namespace rpc
         // Helper to route incoming messages to registered handlers
         std::shared_ptr<i_marshaller> inner_get_destination_handler(destination_zone dest) const;
         std::shared_ptr<i_marshaller> get_destination_handler(destination_zone dest) const;
-        std::shared_ptr<i_marshaller> get_destination_handler_or_create_passthrough(
-            caller_zone caller, destination_zone dest);
         void set_status(transport_status new_status);
         void notify_all_destinations_of_disconnect();
 
@@ -70,7 +68,11 @@ namespace rpc
         bool add_destination(destination_zone dest, std::weak_ptr<i_marshaller> handler);
         void remove_destination(destination_zone dest);
 
-        static std::shared_ptr<i_marshaller> add_pass_through(std::shared_ptr<pass_through> pt);
+        static std::shared_ptr<i_marshaller> create_pass_through(std::shared_ptr<transport> forward,
+            std::shared_ptr<transport> reverse,
+            std::shared_ptr<service> service,
+            destination_zone forward_dest,
+            destination_zone reverse_dest);
 
         // Status management
         transport_status get_status() const;

@@ -241,7 +241,7 @@ namespace rpc
             destination_channel_zone_id,
             destination_zone_id,
             object_id,
-            caller_channel_zone_id,
+            service_->get_zone_id().as_caller_channel(),
             caller_zone_id,
             known_direction_zone_id,
             build_out_param_channel,

@@ -65,7 +65,7 @@ namespace local
             }
 
             // Forward to parent transport's inbound handler
-            CO_RETURN CO_AWAIT parent->send(protocol_version,
+            CO_RETURN CO_AWAIT parent->inbound_send(protocol_version,
                 encoding,
                 tag,
                 caller_channel_zone_id,
@@ -122,7 +122,7 @@ namespace local
                 CO_RETURN;
             }
 
-            CO_AWAIT parent->post(protocol_version,
+            CO_AWAIT parent->inbound_post(protocol_version,
                 encoding,
                 tag,
                 caller_channel_zone_id,
@@ -160,7 +160,7 @@ namespace local
                 CO_RETURN rpc::error::ZONE_NOT_FOUND();
             }
 
-            CO_RETURN CO_AWAIT parent->try_cast(
+            CO_RETURN CO_AWAIT parent->inbound_try_cast(
                 protocol_version, destination_zone_id, object_id, interface_id, in_back_channel, out_back_channel);
         }
     }
@@ -201,7 +201,7 @@ namespace local
                 CO_RETURN rpc::error::ZONE_NOT_FOUND();
             }
 
-            CO_RETURN CO_AWAIT parent->add_ref(protocol_version,
+            CO_RETURN CO_AWAIT parent->inbound_add_ref(protocol_version,
                 destination_channel_zone_id,
                 destination_zone_id,
                 object_id,
@@ -245,7 +245,7 @@ namespace local
                 CO_RETURN rpc::error::ZONE_NOT_FOUND();
             }
 
-            CO_RETURN CO_AWAIT parent->release(protocol_version,
+            CO_RETURN CO_AWAIT parent->inbound_release(protocol_version,
                 destination_zone_id,
                 object_id,
                 caller_zone_id,
@@ -304,7 +304,7 @@ namespace local
 
             // Forward to child service's inbound handler via its transport
             // Since child_service IS an i_marshaller, we can call directly
-            CO_RETURN CO_AWAIT std::static_pointer_cast<rpc::i_marshaller>(child)->send(protocol_version,
+            CO_RETURN CO_AWAIT child->inbound_send(protocol_version,
                 encoding,
                 tag,
                 caller_channel_zone_id,
@@ -361,7 +361,7 @@ namespace local
                 CO_RETURN;
             }
 
-            CO_AWAIT std::static_pointer_cast<rpc::i_marshaller>(child)->post(protocol_version,
+            CO_AWAIT child->inbound_post(protocol_version,
                 encoding,
                 tag,
                 caller_channel_zone_id,
@@ -399,7 +399,7 @@ namespace local
                 CO_RETURN rpc::error::ZONE_NOT_FOUND();
             }
 
-            CO_RETURN CO_AWAIT std::static_pointer_cast<rpc::i_marshaller>(child)->try_cast(
+            CO_RETURN CO_AWAIT child->inbound_try_cast(
                 protocol_version, destination_zone_id, object_id, interface_id, in_back_channel, out_back_channel);
         }
     }
@@ -417,41 +417,24 @@ namespace local
         const std::vector<rpc::back_channel_entry>& in_back_channel,
         std::vector<rpc::back_channel_entry>& out_back_channel)
     {
-        auto dest = get_destination_handler_or_create_passthrough(caller_zone_id, destination_zone_id);
-        if (dest)
-        {
-            CO_RETURN CO_AWAIT dest->add_ref(protocol_version,
-                destination_channel_zone_id,
-                destination_zone_id,
-                object_id,
-                caller_channel_zone_id,
-                caller_zone_id,
-                known_direction_zone_id,
-                build_out_param_channel,
-                reference_count,
-                in_back_channel,
-                out_back_channel);
-        }
-        else
-        {
-            auto child = child_.get_nullable();
-            if (!child)
-            {
-                CO_RETURN rpc::error::ZONE_NOT_FOUND();
-            }
 
-            CO_RETURN CO_AWAIT std::static_pointer_cast<rpc::i_marshaller>(child)->add_ref(protocol_version,
-                destination_channel_zone_id,
-                destination_zone_id,
-                object_id,
-                caller_channel_zone_id,
-                caller_zone_id,
-                known_direction_zone_id,
-                build_out_param_channel,
-                reference_count,
-                in_back_channel,
-                out_back_channel);
+        auto child = child_.get_nullable();
+        if (!child)
+        {
+            CO_RETURN rpc::error::ZONE_NOT_FOUND();
         }
+
+        CO_RETURN CO_AWAIT child->inbound_add_ref(protocol_version,
+            destination_channel_zone_id,
+            destination_zone_id,
+            object_id,
+            caller_channel_zone_id,
+            caller_zone_id,
+            known_direction_zone_id,
+            build_out_param_channel,
+            reference_count,
+            in_back_channel,
+            out_back_channel);
     }
 
     CORO_TASK(int)
@@ -484,7 +467,7 @@ namespace local
                 CO_RETURN rpc::error::ZONE_NOT_FOUND();
             }
 
-            CO_RETURN CO_AWAIT std::static_pointer_cast<rpc::i_marshaller>(child)->release(protocol_version,
+            CO_RETURN CO_AWAIT child->inbound_release(protocol_version,
                 destination_zone_id,
                 object_id,
                 caller_zone_id,
