@@ -129,6 +129,22 @@ namespace rpc
         destination_zone forward_dest,
         destination_zone reverse_dest)
     {
+        // Validate: pass-through should only be created between different zones
+        if (forward_dest == reverse_dest)
+        {
+            RPC_ERROR("create_pass_through: Invalid pass-through request - forward_dest and reverse_dest are the same ({})! Pass-throughs should only route between different zones.",
+                forward_dest.get_val());
+            return nullptr;
+        }
+
+        // Validate: forward and reverse transports should be different objects
+        if (forward.get() == reverse.get())
+        {
+            RPC_ERROR("create_pass_through: Invalid pass-through request - forward and reverse transports are the same object! forward_dest={}, reverse_dest={}",
+                forward_dest.get_val(), reverse_dest.get_val());
+            return nullptr;
+        }
+
         std::shared_ptr<pass_through> pt(
             new rpc::pass_through(forward, // forward_transport: handles messages TO final destination
                 reverse,                   // reverse_transport: handles messages back to caller
@@ -142,6 +158,7 @@ namespace rpc
         // we do this by locking them in zone id order
         std::unique_ptr<std::lock_guard<std::shared_mutex>> g1;
         std::unique_ptr<std::lock_guard<std::shared_mutex>> g2;
+
         if (forward->get_adjacent_zone_id() < reverse->get_adjacent_zone_id())
         {
             g1 = std::make_unique<std::lock_guard<std::shared_mutex>>(forward->destinations_mutex_);
@@ -183,6 +200,11 @@ namespace rpc
     transport_status transport::get_status() const
     {
         return status_.load(std::memory_order_acquire);
+    }
+
+    void transport::set_status(transport_status new_status)
+    {
+        status_.store(new_status, std::memory_order_release);
     }
 
     std::shared_ptr<i_marshaller> transport::inner_get_destination_handler(destination_zone dest, destination_zone caller) const
@@ -252,11 +274,6 @@ namespace rpc
     {
         std::shared_lock lock(destinations_mutex_);
         return inner_find_any_passthrough_for_destination(dest);
-    }
-
-    void transport::set_status(transport_status new_status)
-    {
-        status_.store(new_status, std::memory_order_release);
     }
 
     void transport::notify_all_destinations_of_disconnect()
@@ -425,7 +442,11 @@ namespace rpc
 
             // If no handler exists and this is not a fork setup at this node, create pass-through
             // IMPORTANT: Only create pass-through at INTERMEDIATE zones, not at originating zone
-            if (!dest && caller_zone_id.as_destination() != svc->get_zone_id().as_destination() && (
+            // ALSO: Never create pass-through when destination and caller are the same zone
+            if (!dest
+                && caller_zone_id.as_destination() != svc->get_zone_id().as_destination()
+                && destination_zone_id != caller_zone_id.as_destination()  // Don't create pass-through from zone to itself
+                && (
                     // if the call is standard pass-through add_ref (not building channels)
                     !build_channel
                     // OR the fork is beyond this node (dest_channel == caller_channel means both on same side)

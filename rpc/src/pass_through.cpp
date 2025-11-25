@@ -19,7 +19,8 @@ namespace rpc
         , forward_transport_(forward)
         , reverse_transport_(reverse)
         , service_(service)
-    {}
+    {
+    }
 
     std::shared_ptr<pass_through> pass_through::create(std::shared_ptr<transport> forward,
         std::shared_ptr<transport> reverse,
@@ -27,12 +28,13 @@ namespace rpc
         destination_zone forward_dest,
         destination_zone reverse_dest)
     {
-        std::shared_ptr<pass_through> pt(new rpc::pass_through(forward, // forward_transport: handles messages TO final destination
-            reverse,                                           // reverse_transport: handles messages back to caller
-            service,                                           // service
-            forward_dest,
-            reverse_dest // reverse_destination: where reverse messages go
-        ));
+        std::shared_ptr<pass_through> pt(
+            new rpc::pass_through(forward, // forward_transport: handles messages TO final destination
+                reverse,                   // reverse_transport: handles messages back to caller
+                service,                   // service
+                forward_dest,
+                reverse_dest // reverse_destination: where reverse messages go
+                ));
         pt->self_ref_ = pt; // keep self alive based on reference counts
         return pt;
     }
@@ -249,11 +251,18 @@ namespace rpc
         }
         else
         {
-            if (build_out_param_channel == add_ref_options::normal)
+            // Use bitwise AND to check flags, not exact equality
+            // because build_out_param_channel may have additional build flags
+            if (!!(build_out_param_channel & add_ref_options::build_destination_route)
+                && !!(build_out_param_channel & add_ref_options::build_caller_route))
+            {
+                //this is a passthrough addref and should not be included in either count
+            }
+            else if (!!(build_out_param_channel & add_ref_options::normal))
             {
                 shared_count_.fetch_add(1, std::memory_order_acq_rel);
             }
-            else if (build_out_param_channel == add_ref_options::optimistic)
+            else if (!!(build_out_param_channel & add_ref_options::optimistic))
             {
                 optimistic_count_.fetch_add(1, std::memory_order_acq_rel);
             }
@@ -275,7 +284,8 @@ namespace rpc
         // Update pass_through reference count
         bool should_delete = false;
 
-        if (options == release_options::normal)
+        // Use bitwise AND to check flags for consistency with add_ref
+        if (!!(options & release_options::normal))
         {
             uint64_t prev = shared_count_.fetch_sub(1, std::memory_order_acq_rel);
             if (prev == 1 && optimistic_count_.load(std::memory_order_acquire) == 0)
@@ -283,7 +293,7 @@ namespace rpc
                 should_delete = true;
             }
         }
-        else if (options == release_options::optimistic)
+        else if (!!(options & release_options::optimistic))
         {
             uint64_t prev = optimistic_count_.fetch_sub(1, std::memory_order_acq_rel);
             if (prev == 1 && shared_count_.load(std::memory_order_acquire) == 0)
@@ -333,9 +343,13 @@ namespace rpc
 
     void pass_through::trigger_self_destruction()
     {
-        RPC_WARNING("trigger_self_destruction: Destroying pass-through, forward_dest={}, reverse_dest={}, pt={}, shared={}, optimistic={}",
-            forward_destination_.get_val(), reverse_destination_.get_val(), (void*)this,
-            shared_count_.load(), optimistic_count_.load());
+        RPC_WARNING("trigger_self_destruction: Destroying pass-through, forward_dest={}, reverse_dest={}, pt={}, "
+                    "shared={}, optimistic={}",
+            forward_destination_.get_val(),
+            reverse_destination_.get_val(),
+            (void*)this,
+            shared_count_.load(),
+            optimistic_count_.load());
 
         // Remove destinations from transports in BOTH directions
         if (forward_transport_)
