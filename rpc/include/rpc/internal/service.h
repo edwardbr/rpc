@@ -555,7 +555,7 @@ namespace rpc
                     input_destination_zone_id,
                     input_object_id,
                     zone_id_.as_caller_channel(),
-                    input_destination_zone_id.as_caller(),
+                    child_transport->get_adjacent_zone_id().as_caller(),
                     known_direction_zone(zone_id_),
                     rpc::add_ref_options::build_destination_route,
                     temp_ref_count,

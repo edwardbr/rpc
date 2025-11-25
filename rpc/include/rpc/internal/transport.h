@@ -37,8 +37,10 @@ namespace rpc
         // Local service reference
         std::weak_ptr<service> service_;
 
-        // Map destination_zone to handler (service or pass_through)
-        std::unordered_map<destination_zone, std::weak_ptr<i_marshaller>> destinations_;
+        // Nested map for O(1) lookup: destinations_[destination][caller] -> handler
+        // For pass-throughs, register BOTH directions: [A][B] and [B][A] point to same pass-through
+        // For local service, register once: [local_zone][local_zone] -> service
+        std::unordered_map<uint64_t, std::unordered_map<uint64_t, std::weak_ptr<i_marshaller>>> destinations_;
         mutable std::shared_mutex destinations_mutex_;
 
         std::atomic<transport_status> status_{transport_status::CONNECTING};
@@ -48,11 +50,19 @@ namespace rpc
         transport(std::string name, std::shared_ptr<service> service, zone adjacent_zone_id);
         transport(std::string name, zone zone_id, zone adjacent_zone_id);
 
-        // lock free version of same function
-        bool inner_add_destination(destination_zone dest, std::weak_ptr<i_marshaller> handler);
+        // lock free version of same function - adds handler for zone pair
+        bool inner_add_destination(destination_zone dest, destination_zone caller, std::weak_ptr<i_marshaller> handler);
+
         // Helper to route incoming messages to registered handlers
-        std::shared_ptr<i_marshaller> inner_get_destination_handler(destination_zone dest) const;
-        std::shared_ptr<i_marshaller> get_destination_handler(destination_zone dest) const;
+        // Gets handler for specific zone pair
+        std::shared_ptr<i_marshaller> inner_get_destination_handler(destination_zone dest, destination_zone caller) const;
+        std::shared_ptr<i_marshaller> get_destination_handler(destination_zone dest, destination_zone caller) const;
+
+        // Find any pass-through that has the specified destination, regardless of caller
+        // Returns nullptr if not found
+        std::shared_ptr<i_marshaller> inner_find_any_passthrough_for_destination(destination_zone dest) const;
+        std::shared_ptr<i_marshaller> find_any_passthrough_for_destination(destination_zone dest) const;
+
         void set_status(transport_status new_status);
         void notify_all_destinations_of_disconnect();
 
@@ -64,9 +74,10 @@ namespace rpc
         std::shared_ptr<service> get_service() const { return service_.lock(); }
         void set_service(std::shared_ptr<service> service);
 
-        // Destination management to zones NOT going via the adjacent_zone
-        bool add_destination(destination_zone dest, std::weak_ptr<i_marshaller> handler);
-        void remove_destination(destination_zone dest);
+        // Destination management for zone pairs
+        // For local service, use add_destination(local_zone, local_zone, service)
+        bool add_destination(destination_zone dest, destination_zone caller, std::weak_ptr<i_marshaller> handler);
+        void remove_destination(destination_zone dest, destination_zone caller);
 
         static std::shared_ptr<i_marshaller> create_pass_through(std::shared_ptr<transport> forward,
             std::shared_ptr<transport> reverse,

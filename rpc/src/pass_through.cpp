@@ -240,16 +240,14 @@ namespace rpc
             in_back_channel,
             out_back_channel);
 
-        // If transport error, trigger self-deletion
-        if (result == error::TRANSPORT_ERROR())
+        // ONLY increment pass_through reference count if the forward succeeded
+        // This ensures our count matches the actual established references
+        if (result != error::OK())
         {
             trigger_self_destruction();
             CO_RETURN result;
         }
-
-        // ONLY increment pass_through reference count if the forward succeeded
-        // This ensures our count matches the actual established references
-        if (result == error::OK())
+        else
         {
             if (build_out_param_channel == add_ref_options::normal)
             {
@@ -339,14 +337,14 @@ namespace rpc
             forward_destination_.get_val(), reverse_destination_.get_val(), (void*)this,
             shared_count_.load(), optimistic_count_.load());
 
-        // Remove destinations from transports
+        // Remove destinations from transports in BOTH directions
         if (forward_transport_)
         {
-            forward_transport_->remove_destination(reverse_destination_);
+            forward_transport_->remove_destination(forward_destination_, reverse_destination_);
         }
         if (reverse_transport_)
         {
-            reverse_transport_->remove_destination(forward_destination_);
+            reverse_transport_->remove_destination(reverse_destination_, forward_destination_);
         }
 
         // Release transport and service pointers

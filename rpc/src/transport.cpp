@@ -15,13 +15,13 @@ namespace rpc
 {
     // NOTE: The local service MUST be registered in destinations_ map
     // during transport initialization:
-    //   transport->add_destination(zone_id.as_destination(), service);
+    //   destinations_[local_zone][local_zone] = service
     //
-    // This allows all inbound_* methods to route uniformly through
-    // get_destination_handler(), keeping code simple and consistent.
+    // Pass-throughs are registered in BOTH directions:
+    //   destinations_[A][B] = pass_through  (for A↔B communication)
+    //   destinations_[B][A] = pass_through  (same pass-through)
     //
-    // Only inbound_add_ref() has special logic for channel setup and
-    // fork detection - all other methods are simple lookups.
+    // This provides O(1) lookup for all routing scenarios.
     // Destination management
 
     transport::transport(std::string name, std::shared_ptr<service> service, zone adjacent_zone_id)
@@ -30,7 +30,9 @@ namespace rpc
         , adjacent_zone_id_(adjacent_zone_id)
         , service_(service)
     {
-        destinations_[zone_id_.as_destination()] = std::static_pointer_cast<i_marshaller>(service);
+        // Register local service: destinations_[local][local] = service
+        auto local_zone = zone_id_.get_val();
+        destinations_[local_zone][adjacent_zone_id.get_val()] = std::static_pointer_cast<i_marshaller>(service);
     }
 
     transport::transport(std::string name, zone zone_id_, zone adjacent_zone_id)
@@ -44,30 +46,81 @@ namespace rpc
     {
         RPC_ASSERT(service);
         service_ = service;
-        destinations_[service->get_zone_id().as_destination()] = std::static_pointer_cast<i_marshaller>(service);
+        // Register local service: destinations_[local][local] = service
+        auto local_zone = service->get_zone_id().get_val();
+        destinations_[local_zone][adjacent_zone_id_.get_val()] = std::static_pointer_cast<i_marshaller>(service);
     }
 
-    bool transport::inner_add_destination(destination_zone dest, std::weak_ptr<i_marshaller> handler)
+    bool transport::inner_add_destination(destination_zone dest, destination_zone caller, std::weak_ptr<i_marshaller> handler)
     {
-        auto it = destinations_.find(dest);
-        if (it != destinations_.end())
+        auto dest_val = dest.get_val();
+        auto caller_val = caller.get_val();
+
+        // Check if entry already exists
+        auto outer_it = destinations_.find(dest_val);
+        if (outer_it != destinations_.end())
         {
-            return false;
+            auto inner_it = outer_it->second.find(caller_val);
+            if (inner_it != outer_it->second.end())
+            {
+                return false; // Already exists
+            }
         }
-        destinations_[dest] = handler;
+
+        // Add entry
+        destinations_[dest_val][caller_val] = handler;
+
+        // If zones are different (pass-through case), also add reverse direction
+        // For local service (dest == caller), only register once
+        if (dest_val != caller_val)
+        {
+            // Check if reverse entry already exists
+            auto reverse_outer_it = destinations_.find(caller_val);
+            if (reverse_outer_it == destinations_.end() ||
+                reverse_outer_it->second.find(dest_val) == reverse_outer_it->second.end())
+            {
+                destinations_[caller_val][dest_val] = handler;
+            }
+        }
+
         return true;
     }
 
-    bool transport::add_destination(destination_zone dest, std::weak_ptr<i_marshaller> handler)
+    bool transport::add_destination(destination_zone dest, destination_zone caller, std::weak_ptr<i_marshaller> handler)
     {
         std::unique_lock lock(destinations_mutex_);
-        return inner_add_destination(dest, handler);
+        return inner_add_destination(dest, caller, handler);
     }
 
-    void transport::remove_destination(destination_zone dest)
+    void transport::remove_destination(destination_zone dest, destination_zone caller)
     {
         std::unique_lock lock(destinations_mutex_);
-        destinations_.erase(dest);
+        auto dest_val = dest.get_val();
+        auto caller_val = caller.get_val();
+
+        auto outer_it = destinations_.find(dest_val);
+        if (outer_it != destinations_.end())
+        {
+            outer_it->second.erase(caller_val);
+            // Clean up outer map if inner map is empty
+            if (outer_it->second.empty())
+            {
+                destinations_.erase(outer_it);
+            }
+        }
+        if (dest_val != caller_val)
+        {
+            outer_it = destinations_.find(caller_val);
+            if (outer_it != destinations_.end())
+            {
+                outer_it->second.erase(dest_val);
+                // Clean up outer map if inner map is empty
+                if (outer_it->second.empty())
+                {
+                    destinations_.erase(outer_it);
+                }
+            }
+        }
     }
 
     std::shared_ptr<i_marshaller> transport::create_pass_through(std::shared_ptr<transport> forward,
@@ -100,8 +153,9 @@ namespace rpc
             g2 = std::make_unique<std::lock_guard<std::shared_mutex>>(forward->destinations_mutex_);
         }
 
-        auto forward_handler = forward->inner_get_destination_handler(forward_dest);
-        auto reverse_handler = reverse->inner_get_destination_handler(reverse_dest);
+        // Check if pass-through already exists for this zone pair
+        auto forward_handler = forward->inner_get_destination_handler(forward_dest, reverse_dest);
+        auto reverse_handler = reverse->inner_get_destination_handler(reverse_dest, forward_dest);
 
         // check that they are the same
         RPC_ASSERT(!forward_handler == !reverse_handler);
@@ -116,10 +170,10 @@ namespace rpc
         {
             RPC_DEBUG("create_pass_through: Creating NEW pass-through, forward_dest={}, reverse_dest={}, pt={}",
                 forward_dest.get_val(), reverse_dest.get_val(), (void*)pt.get());
-            forward->inner_add_destination(
-                reverse_dest, std::static_pointer_cast<i_marshaller>(pt));
-            reverse->inner_add_destination(
-                forward_dest, std::static_pointer_cast<i_marshaller>(pt));
+            // Register pass-through on both transports
+            // inner_add_destination automatically registers both directions for pass-throughs
+            forward->inner_add_destination(forward_dest, reverse_dest, std::static_pointer_cast<i_marshaller>(pt));
+            reverse->inner_add_destination(reverse_dest, forward_dest, std::static_pointer_cast<i_marshaller>(pt));
             return std::static_pointer_cast<i_marshaller>(pt);
         }
         return pt;
@@ -131,30 +185,73 @@ namespace rpc
         return status_.load(std::memory_order_acquire);
     }
 
-    std::shared_ptr<i_marshaller> transport::inner_get_destination_handler(destination_zone dest) const
+    std::shared_ptr<i_marshaller> transport::inner_get_destination_handler(destination_zone dest, destination_zone caller) const
     {
-        auto it = destinations_.find(dest);
-        if (it != destinations_.end())
+        auto dest_val = dest.get_val();
+        auto caller_val = caller.get_val();
+
+        // O(1) nested map lookup
+        auto outer_it = destinations_.find(dest_val);
+        if (outer_it != destinations_.end())
         {
-            auto handler = it->second.lock();
-            if (!handler)
+            auto inner_it = outer_it->second.find(caller_val);
+            if (inner_it != outer_it->second.end())
             {
-                RPC_WARNING("inner_get_destination_handler: weak_ptr expired for dest={} on transport zone={} adjacent_zone={}",
-                    dest.get_val(), zone_id_.get_val(), adjacent_zone_id_.get_val());
+                auto handler = inner_it->second.lock();
+                if (!handler)
+                {
+                    RPC_WARNING("inner_get_destination_handler: weak_ptr expired for dest={}, caller={} on transport zone={} adjacent_zone={}",
+                        dest_val, caller_val, zone_id_.get_val(), adjacent_zone_id_.get_val());
+                }
+                return handler;
             }
-            return handler;
         }
         return nullptr;
     }
 
     // Helper to route incoming messages to registered handlers
-    std::shared_ptr<i_marshaller> transport::get_destination_handler(destination_zone dest) const
+    std::shared_ptr<i_marshaller> transport::get_destination_handler(destination_zone dest, destination_zone caller) const
+    {
+        if(dest == zone_id_.as_destination())
+        {
+            RPC_DEBUG("get_destination_handler: Requested destination is local zone {}, returning local service",
+                zone_id_.get_val());
+            return service_.lock();
+        }
+        std::shared_lock lock(destinations_mutex_);
+        auto handler = inner_get_destination_handler(dest, caller);
+        RPC_DEBUG("get_destination_handler: dest={}, caller={}, transport zone={}, adjacent_zone={}, found={}",
+            dest.get_val(), caller.get_val(), zone_id_.get_val(), adjacent_zone_id_.get_val(), handler != nullptr);
+        return handler;
+    }
+
+    // Find any pass-through that has the specified destination, regardless of caller
+    // O(1) lookup: just get destinations_[dest] and return first non-expired entry
+    std::shared_ptr<i_marshaller> transport::inner_find_any_passthrough_for_destination(destination_zone dest) const
+    {
+        auto dest_val = dest.get_val();
+        auto outer_it = destinations_.find(dest_val);
+        if (outer_it != destinations_.end())
+        {
+            // Iterate through all callers for this destination
+            for (const auto& [caller_val, handler_weak] : outer_it->second)
+            {
+                auto handler = handler_weak.lock();
+                if (handler)
+                {
+                    RPC_DEBUG("inner_find_any_passthrough_for_destination: Found pass-through for dest={} with caller={}",
+                        dest_val, caller_val);
+                    return handler;
+                }
+            }
+        }
+        return nullptr;
+    }
+
+    std::shared_ptr<i_marshaller> transport::find_any_passthrough_for_destination(destination_zone dest) const
     {
         std::shared_lock lock(destinations_mutex_);
-        auto handler = inner_get_destination_handler(dest);
-        RPC_DEBUG("get_destination_handler: dest={}, transport zone={}, adjacent_zone={}, found={}",
-            dest.get_val(), zone_id_.get_val(), adjacent_zone_id_.get_val(), handler != nullptr);
-        return handler;
+        return inner_find_any_passthrough_for_destination(dest);
     }
 
     void transport::set_status(transport_status new_status)
@@ -165,24 +262,28 @@ namespace rpc
     void transport::notify_all_destinations_of_disconnect()
     {
         std::shared_lock lock(destinations_mutex_);
-        for (auto& [dest_zone, handler_weak] : destinations_)
+        // Iterate through nested map to notify all handlers
+        for (const auto& [dest_zone, inner_map] : destinations_)
         {
-            if (auto handler = handler_weak.lock())
+            for (const auto& [caller_zone_val, handler_weak] : inner_map)
             {
-                // Send zone_terminating post to each destination
-                handler->post(VERSION_3,
-                    encoding::yas_binary,
-                    0,
-                    caller_channel_zone{0},
-                    caller_zone{0},
-                    dest_zone,
-                    object{0},
-                    interface_ordinal{0},
-                    method{0},
-                    post_options::zone_terminating,
-                    0,
-                    nullptr,
-                    {});
+                if (auto handler = handler_weak.lock())
+                {
+                    // Send zone_terminating post
+                    handler->post(VERSION_3,
+                        encoding::yas_binary,
+                        0,
+                        rpc::caller_channel_zone{0},
+                        rpc::caller_zone{0},
+                        rpc::destination_zone{dest_zone},
+                        object{0},
+                        interface_ordinal{0},
+                        method{0},
+                        post_options::zone_terminating,
+                        0,
+                        nullptr,
+                        {});
+                }
             }
         }
     }
@@ -205,7 +306,8 @@ namespace rpc
         const std::vector<back_channel_entry>& in_back_channel,
         std::vector<back_channel_entry>& out_back_channel)
     {
-        auto dest = get_destination_handler(destination_zone_id);
+        // Try zone pair lookup first
+        auto dest = get_destination_handler(destination_zone_id, caller_zone_id.as_destination());
         if (!dest)
         {
             CO_RETURN error::ZONE_NOT_FOUND();
@@ -242,7 +344,8 @@ namespace rpc
         const char* in_buf_,
         const std::vector<back_channel_entry>& in_back_channel)
     {
-        auto dest = get_destination_handler(destination_zone_id);
+        // Try zone pair lookup
+        auto dest = get_destination_handler(destination_zone_id, caller_zone_id.as_destination());
         if (!dest)
         {
             CO_RETURN;
@@ -271,7 +374,9 @@ namespace rpc
         const std::vector<back_channel_entry>& in_back_channel,
         std::vector<back_channel_entry>& out_back_channel)
     {
-        auto dest = get_destination_handler(destination_zone_id);
+        // For try_cast, we need to find any pass-through for this destination
+        // since we don't have caller information in try_cast signature
+        auto dest = find_any_passthrough_for_destination(destination_zone_id);
         if (!dest)
         {
             CO_RETURN error::ZONE_NOT_FOUND();
@@ -315,8 +420,8 @@ namespace rpc
         // Check if this is a pass-through scenario (destination is not local)
         if (destination_zone_id != svc->get_zone_id().as_destination())
         {
-            // First, check if we already have a handler (service or existing pass-through)
-            auto dest = get_destination_handler(destination_zone_id);
+            // First, check if we already have a pass-through for this specific zone pair
+            auto dest = get_destination_handler(destination_zone_id, caller_zone_id.as_destination());
 
             // If no handler exists and this is not a fork setup at this node, create pass-through
             // IMPORTANT: Only create pass-through at INTERMEDIATE zones, not at originating zone
@@ -328,7 +433,8 @@ namespace rpc
                     // OR we need multi-hop routing (dest_channel is intermediate zone)
                     || (build_channel && dest_channel != destination_zone_id.get_val() && dest_channel != svc->get_zone_id().get_val())))
             {
-                RPC_DEBUG("inbound_add_ref: PASS-THROUGH PATH - creating pass-through for multi-hop routing");
+                RPC_DEBUG("inbound_add_ref: PASS-THROUGH PATH - creating pass-through for zone pair (dest={}, caller={})",
+                    destination_zone_id.get_val(), caller_zone_id.get_val());
                 auto reverse_transport = svc->get_transport(caller_zone_id.as_destination());
                 if (!reverse_transport)
                 {
@@ -338,8 +444,15 @@ namespace rpc
                 auto forward_transport = svc->get_transport(destination_zone_id);
                 if (!forward_transport)
                 {
-                    RPC_ERROR("inbound_add_ref: No forward_transport for destination_zone={}", destination_zone_id.get_val());
-                    CO_RETURN rpc::error::ZONE_NOT_FOUND();
+                    if(!!(build_out_param_channel & add_ref_options::build_caller_route))
+                    {
+                        forward_transport = shared_from_this();
+                    }
+                    else
+                    {
+                        RPC_ERROR("inbound_add_ref: No forward_transport for destination_zone={}", destination_zone_id.get_val());
+                        CO_RETURN rpc::error::ZONE_NOT_FOUND();
+                    }
                 }
 
                 dest = create_pass_through(forward_transport, // forward_transport: handles messages TO final destination
@@ -353,7 +466,8 @@ namespace rpc
             // If we found or created a handler, use it for pass-through
             if (dest)
             {
-                RPC_DEBUG("inbound_add_ref: Using pass-through/handler for dest_zone={}", destination_zone_id.get_val());
+                RPC_DEBUG("inbound_add_ref: Using pass-through/handler for dest_zone={}, caller_zone={}",
+                    destination_zone_id.get_val(), caller_zone_id.get_val());
 
                 CO_RETURN CO_AWAIT dest->add_ref(protocol_version,
                     destination_channel_zone_id,
@@ -393,7 +507,8 @@ namespace rpc
         const std::vector<back_channel_entry>& in_back_channel,
         std::vector<back_channel_entry>& out_back_channel)
     {
-        auto dest = get_destination_handler(destination_zone_id);
+        // Try zone pair lookup
+        auto dest = get_destination_handler(destination_zone_id, caller_zone_id.as_destination());
         if (!dest)
         {
             CO_RETURN error::ZONE_NOT_FOUND();
