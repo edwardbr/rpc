@@ -23,24 +23,6 @@ namespace local
         parent_transport(std::string name, std::shared_ptr<rpc::service> service, std::shared_ptr<child_transport> parent);
         parent_transport(std::string name, rpc::zone zone_id, std::shared_ptr<child_transport> parent);
     
-        /*parent_transport(rpc::zone zone_id,
-                       std::shared_ptr<rpc::service> child_service,
-                       std::shared_ptr<rpc::transport> parent_transport)
-            : rpc::transport(child_service)
-            , parent_(parent_transport)
-        {
-            zone_id_ = zone_id;
-            service_ = child_service;
-
-            // Register local child service in destinations_ map
-            if (auto svc = child_service.lock())
-            {
-                destinations_[zone_id.as_destination()] = std::static_pointer_cast<rpc::i_marshaller>(svc);
-            }
-
-            set_status(rpc::transport_status::CONNECTED);
-        }*/
-
         virtual ~parent_transport() = default;
 
         CORO_TASK(int) connect(rpc::interface_descriptor input_descr, rpc::interface_descriptor& output_descr) override

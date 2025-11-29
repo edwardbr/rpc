@@ -141,22 +141,12 @@ namespace rpc
 
         virtual bool check_is_empty() const;
 
-        // virtual std::shared_ptr<rpc::service_proxy> get_parent() const { return nullptr; }
-        // virtual destination_zone get_parent_zone_id() const { return {0}; }
-
         /////////////////////////////////
         // NOTIFICATION LOGIC
         /////////////////////////////////
         void add_service_event(const std::weak_ptr<service_event>& event);
         void remove_service_event(const std::weak_ptr<service_event>& event);
         CORO_TASK(void) notify_object_gone_event(object object_id, destination_zone destination);
-
-        // // not implemented in the base service class only for child_service
-        // virtual bool set_parent_proxy(const std::shared_ptr<rpc::service_proxy>&)
-        // {
-        //     RPC_ASSERT(false);
-        //     return false;
-        // }
 
         // passed by value implementing an implicit lock on the life time of ptr
         object get_object_id(const shared_ptr<casting_interface>& ptr) const;
@@ -281,8 +271,6 @@ namespace rpc
             bool& new_proxy_added);
         virtual void remove_zone_proxy(destination_zone destination_zone_id, caller_zone caller_zone_id);
 
-        // virtual void remove_zone_proxy_if_not_used(destination_zone destination_zone_id, caller_zone caller_zone_id);
-
         /////////////////////////////////
         // BINDING LOGIC
         /////////////////////////////////
@@ -295,13 +283,6 @@ namespace rpc
             const shared_ptr<T>& iface,
             std::shared_ptr<rpc::object_stub>& stub,
             interface_descriptor& descriptor);
-
-        // template<class T>
-        // CORO_TASK(int)
-        // bind_out_stub(uint64_t protocol_version,
-        //     caller_channel_zone caller_channel_zone_id,
-        //     caller_zone caller_zone_id,
-        //     const shared_ptr<T>& iface, interface_descriptor& descriptor);
 
         CORO_TASK(int)
         get_proxy_stub_descriptor(uint64_t protocol_version,
@@ -453,12 +434,6 @@ namespace rpc
             auto parent_service_proxy = std::make_shared<rpc::service_proxy>("parent", parent_transport, child_svc);
 
             child_svc->add_zone_proxy(parent_service_proxy);
-            // if (!child_svc->set_parent_proxy(parent_service_proxy))
-            // {
-            //     RPC_ERROR("Unable to create set_parent_proxy in create_child_service");
-            //     CO_RETURN rpc::error::UNABLE_TO_CREATE_SERVICE_PROXY();
-            // }
-            // parent_service_proxy->set_parent_channel(true);
 
             rpc::shared_ptr<PARENT_INTERFACE> parent_ptr;
             if (input_descr != interface_descriptor())

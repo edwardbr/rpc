@@ -281,27 +281,6 @@ namespace rpc
         const std::vector<rpc::back_channel_entry>& in_back_channel,
         std::vector<rpc::back_channel_entry>& out_back_channel)
     {
-        // Update pass_through reference count
-        bool should_delete = false;
-
-        // Use bitwise AND to check flags for consistency with add_ref
-        if (!!(options & release_options::normal))
-        {
-            uint64_t prev = shared_count_.fetch_sub(1, std::memory_order_acq_rel);
-            if (prev == 1 && optimistic_count_.load(std::memory_order_acquire) == 0)
-            {
-                should_delete = true;
-            }
-        }
-        else if (!!(options & release_options::optimistic))
-        {
-            uint64_t prev = optimistic_count_.fetch_sub(1, std::memory_order_acq_rel);
-            if (prev == 1 && shared_count_.load(std::memory_order_acquire) == 0)
-            {
-                should_delete = true;
-            }
-        }
-
         // Determine target transport based on destination_zone
         auto target_transport = get_directional_transport(destination_zone_id);
         if (!target_transport)
@@ -326,14 +305,36 @@ namespace rpc
             in_back_channel,
             out_back_channel);
 
-        // If transport error, trigger self-deletion
-        if (result == error::TRANSPORT_ERROR())
+        // If the forward failed, trigger cleanup and return the error
+        if (result != error::OK())
         {
             trigger_self_destruction();
+            CO_RETURN result;
+        }
+
+        // Update pass_through reference count ONLY if forward succeeded
+        bool should_delete = false;
+
+        // Use bitwise AND to check flags for consistency with add_ref
+        if (!!(options & release_options::normal))
+        {
+            uint64_t prev = shared_count_.fetch_sub(1, std::memory_order_acq_rel);
+            if (prev == 1 && optimistic_count_.load(std::memory_order_acquire) == 0)
+            {
+                should_delete = true;
+            }
+        }
+        else if (!!(options & release_options::optimistic))
+        {
+            uint64_t prev = optimistic_count_.fetch_sub(1, std::memory_order_acq_rel);
+            if (prev == 1 && shared_count_.load(std::memory_order_acquire) == 0)
+            {
+                should_delete = true;
+            }
         }
 
         // Trigger self-destruction if counts are zero
-        else if (should_delete)
+        if (should_delete)
         {
             trigger_self_destruction();
         }

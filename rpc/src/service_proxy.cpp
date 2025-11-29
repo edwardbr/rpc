@@ -26,25 +26,6 @@ namespace rpc
         RPC_ASSERT(svc != nullptr);
     }
 
-/*    service_proxy::service_proxy(
-        const std::string& name, destination_zone destination_zone_id, const std::shared_ptr<rpc::service>& svc)
-        : zone_id_(svc->get_zone_id())
-        , destination_zone_id_(destination_zone_id)
-        , caller_zone_id_(svc->get_zone_id().as_caller())
-        , service_(svc)
-        , name_(name)
-    {
-#ifdef USE_RPC_TELEMETRY
-        if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
-        {
-            telemetry_service->on_service_proxy_creation(
-                svc->get_name(), name, get_zone_id(), get_destination_zone_id(), svc->get_zone_id().as_caller());
-        }
-#endif
-        RPC_ASSERT(svc != nullptr);
-    }
-  */  
-
     service_proxy::service_proxy(const std::shared_ptr<transport>& transport, destination_zone destination_zone_id) :
         zone_id_(transport->get_service()->get_zone_id())
         , destination_zone_id_(destination_zone_id)
@@ -61,23 +42,8 @@ namespace rpc
         , version_(rpc::get_version())
         , enc_(encoding::enc_default)
         , name_(name)
-    {
-        
+    {   
     }
-
-    // service_proxy::service_proxy(const service_proxy& other)
-    //     : std::enable_shared_from_this<rpc::service_proxy>(other)
-    //     , zone_id_(other.zone_id_)
-    //     , destination_zone_id_(other.destination_zone_id_)
-    //     , destination_channel_zone_(other.destination_channel_zone_)
-    //     , caller_zone_id_(other.caller_zone_id_)
-    //     , service_(other.service_)
-    //     , lifetime_lock_count_(0)
-    //     , enc_(other.enc_)
-    //     , name_(other.name_)
-    // {
-    //     RPC_ASSERT(service_.lock() != nullptr);
-    // }
 
     service_proxy::~service_proxy()
     {
@@ -87,7 +53,6 @@ namespace rpc
             RPC_WARNING("service_proxy destructor: {} proxies still in map for destination_zone={}",
                 proxies_.size(),
                 destination_zone_id_.get_val()
-                // , caller_zone_id_.get_val()
                 );
 
             // Log details of remaining proxies
@@ -119,74 +84,12 @@ namespace rpc
         RPC_ASSERT(proxies_.empty());
     }
 
-    // void service_proxy::set_parent_channel(bool val)
-    // {
-    //     is_parent_channel_ = val;
-
-    //     if (lifetime_lock_count_ == 0 && is_parent_channel_ == false)
-    //     {
-    //         RPC_ASSERT(lifetime_lock_.get_nullable());
-    //         lifetime_lock_.reset();
-    //     }
-    // }
-
     void service_proxy::update_remote_rpc_version(uint64_t version)
     {
         const auto min_version = std::max<std::uint64_t>(rpc::LOWEST_SUPPORTED_VERSION, 1);
         const auto max_version = rpc::HIGHEST_SUPPORTED_VERSION;
         version_.store(std::clamp(version, min_version, max_version));
     }
-    
-//     void service_proxy::add_external_ref()
-//     {
-//         std::lock_guard g(insert_control_);
-//         auto count = ++lifetime_lock_count_;
-// #ifdef USE_RPC_TELEMETRY
-//         if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
-//         {
-//             auto transport = transport_.get_nullable();
-//             RPC_ASSERT(transport);
-//             telemetry_service->on_service_proxy_add_external_ref(
-//                 zone_id_, transport ? transport->get_adjacent_zone_id().as_destination_channel() : {0}, destination_zone_id_, zone_id_.as_caller(), count);
-//         }
-// #endif
-//         // RPC_ASSERT(count >= 1);
-//         // if (count == 1)
-//         // {
-//         //     // Cache lifetime_lock value for consistency throughout function
-//         //     RPC_ASSERT(!lifetime_lock_.get_nullable());
-//         //     lifetime_lock_ = stdex::member_ptr<service_proxy>(shared_from_this());
-//         //     // Use cached value to ensure consistency
-//         //     RPC_ASSERT(lifetime_lock_.get_nullable());
-//         // }
-//     }
-
-//     int service_proxy::release_external_ref()
-//     {
-//         std::lock_guard g(insert_control_);
-//         return inner_release_external_ref();
-//     }
-
-//     int service_proxy::inner_release_external_ref()
-//     {
-//         auto count = --lifetime_lock_count_;
-// #ifdef USE_RPC_TELEMETRY
-//         if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
-//         {
-//             auto transport = transport_.get_nullable();
-//             RPC_ASSERT(transport);
-//             telemetry_service->on_service_proxy_release_external_ref(
-//                 zone_id_, transport ? transport->get_adjacent_zone_id().as_destination_channel() : {0}, destination_zone_id_, zone_id_.as_caller(), count);
-//         }
-// #endif
-//         RPC_ASSERT(count >= 0);
-//         // if (count == 0 && is_parent_channel_ == false)
-//         // {
-//         //     RPC_ASSERT(lifetime_lock_.get_nullable());
-//         //     lifetime_lock_.reset();
-//         // }
-//         return count;
-//     }
 
     [[nodiscard]] CORO_TASK(int) service_proxy::send_from_this_zone(uint64_t protocol_version,
         rpc::encoding encoding,
@@ -621,266 +524,4 @@ namespace rpc
         // self_ref goes out of scope here, allowing normal destruction if needed
         CO_RETURN error::OK();
     }
-
-/*    // i_marshaller interface implementation
-    // Routes to transport_ for remote zones or service_ for local zone
-
-    CORO_TASK(int) service_proxy::send(uint64_t protocol_version,
-        encoding encoding,
-        uint64_t tag,
-        caller_channel_zone caller_channel_zone_id,
-        caller_zone caller_zone_id,
-        destination_zone destination_zone_id,
-        object object_id,
-        interface_ordinal interface_id,
-        method method_id,
-        size_t in_size_,
-        const char* in_buf_,
-        std::vector<char>& out_buf_,
-        const std::vector<rpc::back_channel_entry>& in_back_channel,
-        std::vector<rpc::back_channel_entry>& out_back_channel)
-    {
-        // Route based on destination: local service or remote transport
-        if (destination_zone_id.get_val() == zone_id_.get_val())
-        {
-            // Local zone - route to service
-            auto svc = service_.lock();
-            if (!svc)
-            {
-                CO_RETURN error::ZONE_NOT_FOUND();
-            }
-
-            CO_RETURN CO_AWAIT svc->send(
-                protocol_version, encoding, tag,
-                caller_channel_zone_id, caller_zone_id, destination_zone_id,
-                object_id, interface_id, method_id,
-                in_size_, in_buf_, out_buf_,
-                in_back_channel, out_back_channel);
-        }
-        else
-        {
-            // Remote zone - route to transport
-            auto transport = transport_.get_nullable();
-            if (!transport)
-            {
-                CO_RETURN error::TRANSPORT_ERROR();
-            }
-
-            auto result = CO_AWAIT transport->send(
-                protocol_version, encoding, tag,
-                caller_channel_zone_id, caller_zone_id, destination_zone_id,
-                object_id, interface_id, method_id,
-                in_size_, in_buf_, out_buf_,
-                in_back_channel, out_back_channel);
-
-            // If zone not found or transport error, cleanup transport and parent service ref
-            if (result == error::ZONE_NOT_FOUND() || result == error::TRANSPORT_ERROR())
-            {
-                transport_.reset();
-                parent_service_ref_.reset();
-            }
-
-            CO_RETURN result;
-        }
-    }
-
-    CORO_TASK(void) service_proxy::post(uint64_t protocol_version,
-        encoding encoding,
-        uint64_t tag,
-        caller_channel_zone caller_channel_zone_id,
-        caller_zone caller_zone_id,
-        destination_zone destination_zone_id,
-        object object_id,
-        interface_ordinal interface_id,
-        method method_id,
-        post_options options,
-        size_t in_size_,
-        const char* in_buf_,
-        const std::vector<rpc::back_channel_entry>& in_back_channel)
-    {
-        // Route based on destination: local service or remote transport
-        if (destination_zone_id.get_val() == zone_id_.get_val())
-        {
-            // Local zone - route to service
-            auto svc = service_.lock();
-            if (!svc)
-            {
-                CO_RETURN;
-            }
-
-            CO_AWAIT svc->post(
-                protocol_version, encoding, tag,
-                caller_channel_zone_id, caller_zone_id, destination_zone_id,
-                object_id, interface_id, method_id, options,
-                in_size_, in_buf_, in_back_channel);
-        }
-        else
-        {
-            // Remote zone - route to transport
-            auto transport = transport_.get_nullable();
-            if (!transport)
-            {
-                CO_RETURN;
-            }
-
-            CO_AWAIT transport->post(
-                protocol_version, encoding, tag,
-                caller_channel_zone_id, caller_zone_id, destination_zone_id,
-                object_id, interface_id, method_id, options,
-                in_size_, in_buf_, in_back_channel);
-        }
-    }
-
-    CORO_TASK(int) service_proxy::try_cast(
-        uint64_t protocol_version,
-        destination_zone destination_zone_id,
-        object object_id,
-        interface_ordinal interface_id,
-        const std::vector<rpc::back_channel_entry>& in_back_channel,
-        std::vector<rpc::back_channel_entry>& out_back_channel)
-    {
-        // Route based on destination: local service or remote transport
-        if (destination_zone_id.get_val() == zone_id_.get_val())
-        {
-            // Local zone - route to service
-            auto svc = service_.lock();
-            if (!svc)
-            {
-                CO_RETURN error::ZONE_NOT_FOUND();
-            }
-
-            CO_RETURN CO_AWAIT svc->try_cast(
-                protocol_version, destination_zone_id,
-                object_id, interface_id,
-                in_back_channel, out_back_channel);
-        }
-        else
-        {
-            // Remote zone - route to transport
-            auto transport = transport_.get_nullable();
-            if (!transport)
-            {
-                CO_RETURN error::TRANSPORT_ERROR();
-            }
-
-            auto result = CO_AWAIT transport->try_cast(
-                protocol_version, destination_zone_id,
-                object_id, interface_id,
-                in_back_channel, out_back_channel);
-
-            // If zone not found or transport error, cleanup transport and parent service ref
-            if (result == error::ZONE_NOT_FOUND() || result == error::TRANSPORT_ERROR())
-            {
-                transport_.reset();
-                parent_service_ref_.reset();
-            }
-
-            CO_RETURN result;
-        }
-    }
-
-    CORO_TASK(int) service_proxy::add_ref(uint64_t protocol_version,
-        destination_channel_zone destination_channel_zone_id,
-        destination_zone destination_zone_id,
-        object object_id,
-        caller_channel_zone caller_channel_zone_id,
-        caller_zone caller_zone_id,
-        known_direction_zone known_direction_zone_id,
-        add_ref_options build_out_param_channel,
-        uint64_t& reference_count,
-        const std::vector<rpc::back_channel_entry>& in_back_channel,
-        std::vector<rpc::back_channel_entry>& out_back_channel)
-    {
-        // Route based on destination: local service or remote transport
-        if (destination_zone_id.get_val() == zone_id_.get_val())
-        {
-            // Local zone - route to service
-            auto svc = service_.lock();
-            if (!svc)
-            {
-                CO_RETURN error::ZONE_NOT_FOUND();
-            }
-
-            CO_RETURN CO_AWAIT svc->add_ref(
-                protocol_version,
-                destination_channel_zone_id, destination_zone_id, object_id,
-                caller_channel_zone_id, caller_zone_id, known_direction_zone_id,
-                build_out_param_channel, reference_count,
-                in_back_channel, out_back_channel);
-        }
-        else
-        {
-            // Remote zone - route to transport
-            auto transport = transport_.get_nullable();
-            if (!transport)
-            {
-                CO_RETURN error::TRANSPORT_ERROR();
-            }
-
-            auto result = CO_AWAIT transport->add_ref(
-                protocol_version,
-                destination_channel_zone_id, destination_zone_id, object_id,
-                caller_channel_zone_id, caller_zone_id, known_direction_zone_id,
-                build_out_param_channel, reference_count,
-                in_back_channel, out_back_channel);
-
-            // If zone not found or transport error, cleanup transport and parent service ref
-            if (result == error::ZONE_NOT_FOUND() || result == error::TRANSPORT_ERROR())
-            {
-                transport_.reset();
-                parent_service_ref_.reset();
-            }
-
-            CO_RETURN result;
-        }
-    }
-
-    CORO_TASK(int) service_proxy::release(uint64_t protocol_version,
-        destination_zone destination_zone_id,
-        object object_id,
-        caller_zone caller_zone_id,
-        release_options options,
-        uint64_t& reference_count,
-        const std::vector<rpc::back_channel_entry>& in_back_channel,
-        std::vector<rpc::back_channel_entry>& out_back_channel)
-    {
-        // Route based on destination: local service or remote transport
-        if (destination_zone_id.get_val() == zone_id_.get_val())
-        {
-            // Local zone - route to service
-            auto svc = service_.lock();
-            if (!svc)
-            {
-                CO_RETURN error::ZONE_NOT_FOUND();
-            }
-
-            CO_RETURN CO_AWAIT svc->release(
-                protocol_version, destination_zone_id, object_id,
-                caller_zone_id, options, reference_count,
-                in_back_channel, out_back_channel);
-        }
-        else
-        {
-            // Remote zone - route to transport
-            auto transport = transport_.get_nullable();
-            if (!transport)
-            {
-                CO_RETURN error::TRANSPORT_ERROR();
-            }
-
-            auto result = CO_AWAIT transport->release(
-                protocol_version, destination_zone_id, object_id,
-                caller_zone_id, options, reference_count,
-                in_back_channel, out_back_channel);
-
-            // If zone not found or transport error, cleanup transport and parent service ref
-            if (result == error::ZONE_NOT_FOUND() || result == error::TRANSPORT_ERROR())
-            {
-                transport_.reset();
-                parent_service_ref_.reset();
-            }
-
-            CO_RETURN result;
-        }
-    }*/
 }
