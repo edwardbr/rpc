@@ -8,13 +8,13 @@
 
 using namespace std;
 
-struct A {
-    int f() {
-        return 8;
-    }
+struct A
+{
+    int f() { return 8; }
 };
 
-void test_orig() {
+void test_orig()
+{
     A a;
     A& r = a;
 
@@ -27,39 +27,40 @@ void test_orig() {
     assert(h(&a) == 8);
 }
 
-
 // DevDiv-294051 "<functional>: std::function has lost the ability to invoke PMFs/PMDs on various things"
 
 // N4971 [func.require] says that std::function must be able to invoke PMFs/PMDs
 // on values, references, raw pointers, smart pointers, and reference_wrappers - all handling base/derived cases.
 
-struct B {
-    int func(int i) {
-        return i + data + 5;
-    }
+struct B
+{
+    int func(int i) { return i + data + 5; }
 
     int data;
 };
 
-struct X : public B {};
+struct X : public B
+{
+};
 
-void test_DevDiv_294051() {
+void test_DevDiv_294051()
+{
     shared_ptr<B> b(new B);
     shared_ptr<X> x(new X);
 
     b->data = 220;
     x->data = 330;
 
-    function<int(B, int)> f1                     = &B::func;
-    function<int(X, int)> f1x                    = &B::func;
-    function<int(B&, int)> f2                    = &B::func;
-    function<int(X&, int)> f3                    = &B::func;
-    function<int(B*, int)> f4                    = &B::func;
-    function<int(X*, int)> f5                    = &B::func;
-    function<int(shared_ptr<B>, int)> f6         = &B::func;
-    function<int(shared_ptr<X>, int)> f7         = &B::func;
-    function<int(const shared_ptr<B>&, int)> f8  = &B::func;
-    function<int(const shared_ptr<X>&, int)> f9  = &B::func;
+    function<int(B, int)> f1 = &B::func;
+    function<int(X, int)> f1x = &B::func;
+    function<int(B&, int)> f2 = &B::func;
+    function<int(X&, int)> f3 = &B::func;
+    function<int(B*, int)> f4 = &B::func;
+    function<int(X*, int)> f5 = &B::func;
+    function<int(shared_ptr<B>, int)> f6 = &B::func;
+    function<int(shared_ptr<X>, int)> f7 = &B::func;
+    function<int(const shared_ptr<B>&, int)> f8 = &B::func;
+    function<int(const shared_ptr<X>&, int)> f9 = &B::func;
     function<int(reference_wrapper<B>, int)> f10 = &B::func;
     function<int(reference_wrapper<X>, int)> f11 = &B::func;
 
@@ -76,16 +77,16 @@ void test_DevDiv_294051() {
     assert(f10(ref(*b), 10000) == 10225);
     assert(f11(ref(*x), 11000) == 11335);
 
-    function<int(B)> g1                     = &B::data;
-    function<int(X)> g1x                    = &B::data;
-    function<int(B&)> g2                    = &B::data;
-    function<int(X&)> g3                    = &B::data;
-    function<int(B*)> g4                    = &B::data;
-    function<int(X*)> g5                    = &B::data;
-    function<int(shared_ptr<B>)> g6         = &B::data;
-    function<int(shared_ptr<X>)> g7         = &B::data;
-    function<int(const shared_ptr<B>&)> g8  = &B::data;
-    function<int(const shared_ptr<X>&)> g9  = &B::data;
+    function<int(B)> g1 = &B::data;
+    function<int(X)> g1x = &B::data;
+    function<int(B&)> g2 = &B::data;
+    function<int(X&)> g3 = &B::data;
+    function<int(B*)> g4 = &B::data;
+    function<int(X*)> g5 = &B::data;
+    function<int(shared_ptr<B>)> g6 = &B::data;
+    function<int(shared_ptr<X>)> g7 = &B::data;
+    function<int(const shared_ptr<B>&)> g8 = &B::data;
+    function<int(const shared_ptr<X>&)> g9 = &B::data;
     function<int(reference_wrapper<B>)> g10 = &B::data;
     function<int(reference_wrapper<X>)> g11 = &B::data;
 
@@ -103,8 +104,8 @@ void test_DevDiv_294051() {
     assert(g11(ref(*x)) == 330);
 }
 
-
-int main() {
+int main()
+{
     test_orig();
 
     test_DevDiv_294051();

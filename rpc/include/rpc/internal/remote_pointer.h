@@ -15,7 +15,6 @@
 
 #include "assert.h" //rpc assert.h
 
-
 // note that these classes borrow the std namespace for testing purposes in tests/std_test/tests
 // for normal rpc mode these classes use the rpc namespace
 
@@ -75,22 +74,21 @@ namespace rpc
     {
 #ifndef TEST_STL_COMPLIANCE
         // Generic check for casting_interface inheritance that handles multiple inheritance
-        template<typename T, typename = void>
-        struct is_casting_interface_derived : std::false_type
+        template<typename T, typename = void> struct is_casting_interface_derived : std::false_type
         {
         };
 
         template<typename T>
-        struct is_casting_interface_derived<T, std::void_t<std::enable_if_t<
-            std::is_base_of_v<rpc::casting_interface, std::remove_cv_t<T>> || std::is_same_v<std::remove_cv_t<T>, void>>>> : std::true_type
+        struct is_casting_interface_derived<T,
+            std::void_t<std::enable_if_t<std::is_base_of_v<rpc::casting_interface, std::remove_cv_t<T>>
+                                         || std::is_same_v<std::remove_cv_t<T>, void>>>> : std::true_type
         {
         };
-#endif        
+#endif
 
         namespace __shared_ptr_pointer_utils
         {
-            template<typename Y, typename Ty>
-            struct sp_convertible : std::bool_constant<std::is_convertible_v<Y*, Ty*>>
+            template<typename Y, typename Ty> struct sp_convertible : std::bool_constant<std::is_convertible_v<Y*, Ty*>>
             {
 #ifndef TEST_STL_COMPLIANCE
                 static_assert(is_casting_interface_derived<Y>::value,
@@ -290,10 +288,12 @@ namespace rpc
 #ifndef TEST_STL_COMPLIANCE
             // forward declarations implemented in object_proxy.cpp
             // add_ref is async because object_proxy::add_ref() makes RPC calls on 0→1 transitions
-            CORO_TASK(int) object_proxy_add_ref(const std::shared_ptr<rpc::object_proxy>& ob, rpc::add_ref_options options);
+            CORO_TASK(int)
+            object_proxy_add_ref(const std::shared_ptr<rpc::object_proxy>& ob, rpc::add_ref_options options);
             // release is synchronous - just decrements local counters
             void object_proxy_release(const std::shared_ptr<rpc::object_proxy>& ob, bool is_optimistic);
-            void get_object_proxy_reference_counts(const std::shared_ptr<rpc::object_proxy>& ob, int& shared_count, int& optimistic_count);
+            void get_object_proxy_reference_counts(
+                const std::shared_ptr<rpc::object_proxy>& ob, int& shared_count, int& optimistic_count);
             // Synchronous direct increment for control block construction (no remote calls)
             void object_proxy_add_ref_shared(const std::shared_ptr<rpc::object_proxy>& ob);
 #endif
@@ -320,7 +320,7 @@ namespace rpc
                 {
 #ifndef TEST_STL_COMPLIANCE
                     rpc::casting_interface* ptr = reinterpret_cast<rpc::casting_interface*>(managed_object_ptr_);
-                    if(ptr)
+                    if (ptr)
                     {
                         is_local_ = ptr->is_local();
                         // CRITICAL: Initialize object_proxy counters to match control block's initial state.
@@ -385,8 +385,10 @@ namespace rpc
 
                     if (prev_opt <= 0)
                     {
-                        RPC_ERROR("decrement_shared_and_dispose_if_zero: shared_count_ was {} before decrement (now {})",
-                                  prev_opt, shared_count_.load());
+                        RPC_ERROR(
+                            "decrement_shared_and_dispose_if_zero: shared_count_ was {} before decrement (now {})",
+                            prev_opt,
+                            shared_count_.load());
                         RPC_ASSERT(false && "Negative shared_count_ count detected");
                     }
 
@@ -416,7 +418,8 @@ namespace rpc
                     if (prev_weak <= 0)
                     {
                         RPC_ERROR("decrement_weak_and_destroy_if_zero: weak_count_ was {} before decrement (now {})",
-                                  prev_weak, weak_count_.load());
+                            prev_weak,
+                            weak_count_.load());
                         RPC_ASSERT(false && "Negative weak_count_ count detected");
                     }
 
@@ -454,9 +457,8 @@ namespace rpc
                             CO_RETURN error::OBJECT_GONE();
                         }
                         // Try to increment weak_count_ to keep control block alive
-                    } while (!weak_count_.compare_exchange_weak(weak_count, weak_count + 1,
-                                                                 std::memory_order_acquire,
-                                                                 std::memory_order_relaxed));
+                    } while (!weak_count_.compare_exchange_weak(
+                        weak_count, weak_count + 1, std::memory_order_acquire, std::memory_order_relaxed));
 
                     // Control block is now guaranteed alive, safe to check optimistic_count_
                     long prev = optimistic_count_.fetch_add(1, std::memory_order_relaxed);
@@ -473,7 +475,8 @@ namespace rpc
                             long prev_rollback = optimistic_count_.fetch_sub(1, std::memory_order_relaxed);
                             if (prev_rollback <= 0)
                             {
-                                RPC_ERROR("try_increment_optimistic rollback: optimistic_count_ was {} before rollback", prev_rollback);
+                                RPC_ERROR("try_increment_optimistic rollback: optimistic_count_ was {} before rollback",
+                                    prev_rollback);
                                 RPC_ASSERT(false && "Negative optimistic_count_ in rollback");
                             }
                             decrement_weak_and_destroy_if_zero();
@@ -496,8 +499,10 @@ namespace rpc
 
                     if (prev <= 0)
                     {
-                        RPC_ERROR("decrement_optimistic_and_dispose_if_zero: optimistic_count_ was {} before decrement (now {})",
-                                  prev, optimistic_count_.load());
+                        RPC_ERROR("decrement_optimistic_and_dispose_if_zero: optimistic_count_ was {} before decrement "
+                                  "(now {})",
+                            prev,
+                            optimistic_count_.load());
                         RPC_ASSERT(false && "Negative optimistic_count_ count detected");
                     }
 
@@ -519,7 +524,7 @@ namespace rpc
                         decrement_weak_and_destroy_if_zero();
                     }
                 }
-                
+
                 // Async because object_proxy_add_ref() is async
                 inline CORO_TASK(int) control_block_call_add_ref(rpc::add_ref_options options)
                 {
@@ -547,7 +552,6 @@ namespace rpc
                 }
 #endif
             };
-            
 
             template<typename T> static void* to_void_ptr(T* p)
             {
@@ -624,7 +628,7 @@ namespace rpc
             template<typename T, typename Deleter, typename Alloc>
             struct control_block_impl_with_deleter_alloc : public control_block_base
             {
-                Deleter object_deleter_; // Already has trailing underscore
+                Deleter object_deleter_;        // Already has trailing underscore
                 Alloc control_block_allocator_; // Already has trailing underscore
                 control_block_impl_with_deleter_alloc(T* p, Deleter d, Alloc a)
                     : control_block_base(to_void_ptr(p))
@@ -722,8 +726,7 @@ namespace rpc
         }
 
         // Forward declaration - definition moved after enable_shared_from_this
-        template<typename T, typename Y>
-        void try_enable_shared_from_this(shared_ptr<T>& sp, Y* ptr) noexcept;
+        template<typename T, typename Y> void try_enable_shared_from_this(shared_ptr<T>& sp, Y* ptr) noexcept;
 
     } // namespace __rpc_internal
 
@@ -734,8 +737,7 @@ namespace rpc
         static_assert(!std::is_array_v<T>, "shared_ptr no longer supports array types");
 
 #ifndef TEST_STL_COMPLIANCE
-        template<typename Candidate>
-        static constexpr void assert_casting_interface()
+        template<typename Candidate> static constexpr void assert_casting_interface()
         {
             using clean_t = std::remove_cv_t<std::remove_reference_t<Candidate>>;
             static_assert(__rpc_internal::is_casting_interface_derived<clean_t>::value,
@@ -746,9 +748,11 @@ namespace rpc
         element_type_impl* ptr_{nullptr};
         __rpc_internal::__shared_ptr_control_block::control_block_base* cb_{nullptr};
 
-        template<typename Y> using is_ptr_convertible = __rpc_internal::__shared_ptr_pointer_utils::sp_convertible<Y, T>;
+        template<typename Y>
+        using is_ptr_convertible = __rpc_internal::__shared_ptr_pointer_utils::sp_convertible<Y, T>;
 
-        template<typename Y> using is_pointer_compatible = __rpc_internal::__shared_ptr_pointer_utils::sp_pointer_compatible<Y, T>;
+        template<typename Y>
+        using is_pointer_compatible = __rpc_internal::__shared_ptr_pointer_utils::sp_pointer_compatible<Y, T>;
 
         void acquire_this() noexcept
         {
@@ -775,7 +779,8 @@ namespace rpc
         enum class for_enable_shared_tag
         {
         };
-        shared_ptr(__rpc_internal::__shared_ptr_control_block::control_block_base* cb, element_type_impl* p, for_enable_shared_tag)
+        shared_ptr(
+            __rpc_internal::__shared_ptr_control_block::control_block_base* cb, element_type_impl* p, for_enable_shared_tag)
             : ptr_(p)
             , cb_(cb)
         {
@@ -788,7 +793,9 @@ namespace rpc
         using weak_type = weak_ptr<T>;
 
         // Tag type for internal construction (for use by friends)
-        struct internal_construct_tag {};
+        struct internal_construct_tag
+        {
+        };
 
         constexpr shared_ptr() noexcept = default;
         constexpr shared_ptr(std::nullptr_t) noexcept { }
@@ -1015,7 +1022,8 @@ namespace rpc
 #ifdef _MSVC_STL_DESTRUCTOR_TOMBSTONES
             // Write tombstone markers to detect use-after-destruction
             ptr_ = reinterpret_cast<T*>(static_cast<uintptr_t>(0xDEADBEEFDEADBEEFULL));
-            cb_ = reinterpret_cast<__rpc_internal::__shared_ptr_control_block::control_block_base*>(static_cast<uintptr_t>(0xDEADBEEFDEADBEEFULL));
+            cb_ = reinterpret_cast<__rpc_internal::__shared_ptr_control_block::control_block_base*>(
+                static_cast<uintptr_t>(0xDEADBEEFDEADBEEFULL));
 #endif
         }
         shared_ptr& operator=(const shared_ptr& r) noexcept
@@ -1097,9 +1105,10 @@ namespace rpc
         element_type_impl* internal_get_ptr() const { return ptr_; }
         // Private constructor for constructing from existing control block (for friends only)
         shared_ptr(__rpc_internal::__shared_ptr_control_block::control_block_base* cb,
-                   element_type_impl* ptr,
-                   internal_construct_tag) noexcept
-            : ptr_(ptr), cb_(cb)
+            element_type_impl* ptr,
+            internal_construct_tag) noexcept
+            : ptr_(ptr)
+            , cb_(cb)
         {
             // Caller is responsible for having already incremented the control block
         }
@@ -1139,7 +1148,8 @@ namespace rpc
         __rpc_internal::__shared_ptr_control_block::control_block_base* cb_{nullptr};
         element_type_impl* ptr_for_lock_{nullptr};
 
-        template<typename Y> using is_pointer_compatible = __rpc_internal::__shared_ptr_pointer_utils::sp_pointer_compatible<Y, T>;
+        template<typename Y>
+        using is_pointer_compatible = __rpc_internal::__shared_ptr_pointer_utils::sp_pointer_compatible<Y, T>;
 
         template<typename SourceElement>
         static element_type_impl* convert_ptr_for_lock(
@@ -1326,7 +1336,8 @@ namespace rpc
                 cb_->decrement_weak_and_destroy_if_zero();
 #ifdef _MSVC_STL_DESTRUCTOR_TOMBSTONES
             // Write tombstone markers to detect use-after-destruction
-            cb_ = reinterpret_cast<__rpc_internal::__shared_ptr_control_block::control_block_base*>(static_cast<uintptr_t>(0xDEADBEEFDEADBEEFULL));
+            cb_ = reinterpret_cast<__rpc_internal::__shared_ptr_control_block::control_block_base*>(
+                static_cast<uintptr_t>(0xDEADBEEFDEADBEEFULL));
 #endif
         }
 
@@ -1366,8 +1377,7 @@ namespace rpc
             long c = cb_->shared_count_.load(std::memory_order_relaxed);
             while (c > 0)
             {
-                if (cb_->shared_count_.compare_exchange_weak(
-                        c, c + 1, std::memory_order_acq_rel, std::memory_order_relaxed))
+                if (cb_->shared_count_.compare_exchange_weak(c, c + 1, std::memory_order_acq_rel, std::memory_order_relaxed))
                     return shared_ptr<T>(cb_, ptr_for_lock_);
             }
             return {};
@@ -1556,7 +1566,8 @@ namespace rpc
                 using result_element_type = typename shared_ptr<T>::element_type;
                 shared_ptr<T> result(static_cast<__shared_ptr_control_block::control_block_base*>(cb_ptr),
                     static_cast<result_element_type*>(cb_ptr->get_managed_object_ptr()));
-                __rpc_internal::try_enable_shared_from_this(result, static_cast<result_element_type*>(cb_ptr->get_managed_object_ptr()));
+                __rpc_internal::try_enable_shared_from_this(
+                    result, static_cast<result_element_type*>(cb_ptr->get_managed_object_ptr()));
                 return result;
             }
         } // namespace __shared_ptr_make_support
@@ -1660,8 +1671,8 @@ namespace rpc
         ~enable_shared_from_this() = default;
 
         template<typename ActualPtrType>
-        void internal_set_weak_this(
-            __rpc_internal::__shared_ptr_control_block::control_block_base* cb_for_this_obj, ActualPtrType* ptr_to_this_obj) const
+        void internal_set_weak_this(__rpc_internal::__shared_ptr_control_block::control_block_base* cb_for_this_obj,
+            ActualPtrType* ptr_to_this_obj) const
         {
             using esft_element = typename shared_ptr<T>::element_type;
             if (static_cast<const void*>(static_cast<const esft_element*>(ptr_to_this_obj))
@@ -1701,14 +1712,14 @@ namespace rpc
     // Internal helper function to initialize enable_shared_from_this - definition
     namespace __rpc_internal
     {
-        template<typename T, typename Y>
-        void try_enable_shared_from_this(shared_ptr<T>& sp, Y* ptr) noexcept
+        template<typename T, typename Y> void try_enable_shared_from_this(shared_ptr<T>& sp, Y* ptr) noexcept
         {
             if constexpr (std::is_base_of_v<RPC_MEMORY::enable_shared_from_this<Y>, Y>)
             {
                 if (ptr && sp.internal_get_cb())
                 {
-                    static_cast<RPC_MEMORY::enable_shared_from_this<Y>*>(ptr)->internal_set_weak_this(sp.internal_get_cb(), ptr);
+                    static_cast<RPC_MEMORY::enable_shared_from_this<Y>*>(ptr)->internal_set_weak_this(
+                        sp.internal_get_cb(), ptr);
                 }
             }
         }
@@ -1847,7 +1858,7 @@ namespace rpc
 #ifndef TEST_STL_COMPLIANCE
     // Forward declaration
     template<typename T> class optimistic_ptr;
-    
+
     template<class T> class local_proxy : public T
     {
     protected:
@@ -1864,14 +1875,13 @@ namespace rpc
 
     // optimistic_ptr<T> - Non-RAII smart pointer for RPC scenarios
     // Weak semantics for local objects, shared semantics for remote proxies
-    template<typename T>
-    class optimistic_ptr
+    template<typename T> class optimistic_ptr
     {
         using element_type_impl = std::remove_extent_t<T>;
 
         static_assert(!std::is_array_v<T>, "optimistic_ptr does not support array types");
         static_assert(__rpc_internal::is_casting_interface_derived<T>::value,
-                     "optimistic_ptr can only manage casting_interface-derived types");
+            "optimistic_ptr can only manage casting_interface-derived types");
 
         // For local proxies: local_proxy_holder_ holds the local_proxy (callable target), ptr_ and cb_ are nullptr
         // For remote proxies: ptr_ points to interface_proxy (callable target), cb_ for refcounting, local_proxy_holder_ is nullptr
@@ -1880,7 +1890,8 @@ namespace rpc
         __rpc_internal::__shared_ptr_control_block::control_block_base* cb_{nullptr};
         std::shared_ptr<local_proxy<T>> local_proxy_holder_;
 
-        template<typename Y> using is_pointer_compatible = __rpc_internal::__shared_ptr_pointer_utils::sp_pointer_compatible<Y, T>;
+        template<typename Y>
+        using is_pointer_compatible = __rpc_internal::__shared_ptr_pointer_utils::sp_pointer_compatible<Y, T>;
 
         void acquire_this() noexcept
         {
@@ -1906,7 +1917,7 @@ namespace rpc
         using element_type = element_type_impl;
 
         constexpr optimistic_ptr() noexcept = default;
-        constexpr optimistic_ptr(std::nullptr_t) noexcept {}
+        constexpr optimistic_ptr(std::nullptr_t) noexcept { }
 
         // Copy constructor - source is valid, control block guaranteed alive
         optimistic_ptr(const optimistic_ptr& r) noexcept
@@ -2001,7 +2012,7 @@ namespace rpc
         {
             // For local objects: ptr_ points to __i_xxx_local_proxy (safe - returns OBJECT_GONE)
             // For remote objects: ptr_ points to interface_proxy (safe - RPC handles errors)
-            if(local_proxy_holder_)
+            if (local_proxy_holder_)
                 return local_proxy_holder_.get();
             return ptr_;
         }
@@ -2026,15 +2037,9 @@ namespace rpc
             return ptr_;
         }
 
-        explicit operator bool() const noexcept
-        {
-            return local_proxy_holder_ != nullptr || ptr_ != nullptr;
-        }
+        explicit operator bool() const noexcept { return local_proxy_holder_ != nullptr || ptr_ != nullptr; }
 
-        void reset() noexcept
-        {
-            optimistic_ptr().swap(*this);
-        }
+        void reset() noexcept { optimistic_ptr().swap(*this); }
 
         void swap(optimistic_ptr& r) noexcept
         {
@@ -2062,9 +2067,10 @@ namespace rpc
 
     // Dynamic pointer cast for optimistic_ptr (uses local query_interface)
     template<typename T, typename U>
-    CORO_TASK(int) dynamic_pointer_cast(const optimistic_ptr<U>& from, optimistic_ptr<T>& to) noexcept
+    CORO_TASK(int)
+    dynamic_pointer_cast(const optimistic_ptr<U>& from, optimistic_ptr<T>& to) noexcept
     {
-        if constexpr (std::is_same<T,U>::value)
+        if constexpr (std::is_same<T, U>::value)
         {
             to = from;
             CO_RETURN error::OK();
@@ -2079,7 +2085,7 @@ namespace rpc
         if (from.local_proxy_holder_)
         {
             auto local_shared = from.local_proxy_holder_->__get_weak().lock();
-            if(!local_shared)
+            if (!local_shared)
             {
                 to = nullptr;
                 CO_RETURN error::OK();
@@ -2122,15 +2128,14 @@ namespace rpc
     // These replace constructors/assignment operators which cannot be async
 
     // Convert shared_ptr → optimistic_ptr
-    template<typename T>
-    CORO_TASK(int) make_optimistic(const shared_ptr<T>& in, optimistic_ptr<T>& out) noexcept
+    template<typename T> CORO_TASK(int) make_optimistic(const shared_ptr<T>& in, optimistic_ptr<T>& out) noexcept
     {
-        out.reset();  // Clear any existing value
+        out.reset(); // Clear any existing value
 
         auto cb = in.internal_get_cb();
         if (!in || !cb)
         {
-            CO_RETURN error::OK();  // Null input → null output (success)
+            CO_RETURN error::OK(); // Null input → null output (success)
         }
 
         // Check if this is a local object
@@ -2157,11 +2162,16 @@ namespace rpc
             int inherited_optimistic_before = 0;
             if (obj_proxy)
             {
-                __rpc_internal::__shared_ptr_control_block::get_object_proxy_reference_counts(obj_proxy, inherited_shared_before, inherited_optimistic_before);
+                __rpc_internal::__shared_ptr_control_block::get_object_proxy_reference_counts(
+                    obj_proxy, inherited_shared_before, inherited_optimistic_before);
             }
 
-            RPC_DEBUG("make_optimistic(shared_ptr→optimistic_ptr): BEFORE - control_block(shared={}, optimistic={}), object_proxy(inherited_shared={}, inherited_optimistic={})",
-                      cb_shared_before, cb_optimistic_before, inherited_shared_before, inherited_optimistic_before);
+            RPC_DEBUG("make_optimistic(shared_ptr→optimistic_ptr): BEFORE - control_block(shared={}, optimistic={}), "
+                      "object_proxy(inherited_shared={}, inherited_optimistic={})",
+                cb_shared_before,
+                cb_optimistic_before,
+                inherited_shared_before,
+                inherited_optimistic_before);
 
             // NOTE: It's EXPECTED that before make_optimistic, we have shared=1, optimistic=0
             // This is the normal state when converting a shared_ptr to optimistic_ptr
@@ -2170,22 +2180,26 @@ namespace rpc
             // Verify control block shared count matches object proxy shared count
             if (obj_proxy && cb_shared_before != inherited_shared_before)
             {
-                RPC_ERROR("make_optimistic: Control block shared count ({}) doesn't match object_proxy shared count ({})",
-                          cb_shared_before, inherited_shared_before);
+                RPC_ERROR(
+                    "make_optimistic: Control block shared count ({}) doesn't match object_proxy shared count ({})",
+                    cb_shared_before,
+                    inherited_shared_before);
             }
 
             // Verify control block optimistic count matches object proxy optimistic count
             if (obj_proxy && cb_optimistic_before != inherited_optimistic_before)
             {
-                RPC_ERROR("make_optimistic: Control block optimistic count ({}) doesn't match object_proxy optimistic count ({})",
-                          cb_optimistic_before, inherited_optimistic_before);
+                RPC_ERROR("make_optimistic: Control block optimistic count ({}) doesn't match object_proxy optimistic "
+                          "count ({})",
+                    cb_optimistic_before,
+                    inherited_optimistic_before);
             }
 #endif
 
             auto err = CO_AWAIT cb->try_increment_optimistic();
             if (err)
             {
-                CO_RETURN err;  // Failed to establish remote reference
+                CO_RETURN err; // Failed to establish remote reference
             }
 
 #ifdef USE_RPC_LOGGING
@@ -2196,31 +2210,42 @@ namespace rpc
             int inherited_optimistic_after = 0;
             if (obj_proxy)
             {
-                __rpc_internal::__shared_ptr_control_block::get_object_proxy_reference_counts(obj_proxy, inherited_shared_after, inherited_optimistic_after);
+                __rpc_internal::__shared_ptr_control_block::get_object_proxy_reference_counts(
+                    obj_proxy, inherited_shared_after, inherited_optimistic_after);
             }
 
-            RPC_DEBUG("make_optimistic(shared_ptr→optimistic_ptr): AFTER - control_block(shared={}, optimistic={}), object_proxy(inherited_shared={}, inherited_optimistic={})",
-                      cb_shared_after, cb_optimistic_after, inherited_shared_after, inherited_optimistic_after);
+            RPC_DEBUG("make_optimistic(shared_ptr→optimistic_ptr): AFTER - control_block(shared={}, optimistic={}), "
+                      "object_proxy(inherited_shared={}, inherited_optimistic={})",
+                cb_shared_after,
+                cb_optimistic_after,
+                inherited_shared_after,
+                inherited_optimistic_after);
 
             // After make_optimistic, we expect shared=1, optimistic=1 (both counts should be positive)
             if (cb_shared_after == 0 || cb_optimistic_after == 0)
             {
-                RPC_ERROR("make_optimistic: Control block count zero AFTER increment - shared={} optimistic={} (both should be > 0)",
-                          cb_shared_after, cb_optimistic_after);
+                RPC_ERROR("make_optimistic: Control block count zero AFTER increment - shared={} optimistic={} (both "
+                          "should be > 0)",
+                    cb_shared_after,
+                    cb_optimistic_after);
             }
 
             // Verify control block shared count matches object proxy shared count
             if (obj_proxy && cb_shared_after != inherited_shared_after)
             {
-                RPC_ERROR("make_optimistic: Control block shared count ({}) doesn't match object_proxy shared count ({}) AFTER",
-                          cb_shared_after, inherited_shared_after);
+                RPC_ERROR("make_optimistic: Control block shared count ({}) doesn't match object_proxy shared count "
+                          "({}) AFTER",
+                    cb_shared_after,
+                    inherited_shared_after);
             }
 
             // Verify control block optimistic count matches object proxy optimistic count
             if (obj_proxy && cb_optimistic_after != inherited_optimistic_after)
             {
-                RPC_ERROR("make_optimistic: Control block optimistic count ({}) doesn't match object_proxy optimistic count ({}) AFTER",
-                          cb_optimistic_after, inherited_optimistic_after);
+                RPC_ERROR("make_optimistic: Control block optimistic count ({}) doesn't match object_proxy optimistic "
+                          "count ({}) AFTER",
+                    cb_optimistic_after,
+                    inherited_optimistic_after);
             }
 #endif
 
@@ -2232,15 +2257,14 @@ namespace rpc
     }
 
     // Convert weak_ptr → optimistic_ptr
-    template<typename T>
-    CORO_TASK(int) make_optimistic(const weak_ptr<T>& in, optimistic_ptr<T>& out) noexcept
+    template<typename T> CORO_TASK(int) make_optimistic(const weak_ptr<T>& in, optimistic_ptr<T>& out) noexcept
     {
-        out.reset();  // Clear any existing value
+        out.reset(); // Clear any existing value
 
         auto cb = in.cb_;
         if (!cb)
         {
-            CO_RETURN error::OK();  // Null input → null output (success)
+            CO_RETURN error::OK(); // Null input → null output (success)
         }
 
         // Check if this is a local object
@@ -2266,31 +2290,40 @@ namespace rpc
             int inherited_optimistic_before = 0;
             if (obj_proxy)
             {
-                __rpc_internal::__shared_ptr_control_block::get_object_proxy_reference_counts(obj_proxy, inherited_shared_before, inherited_optimistic_before);
+                __rpc_internal::__shared_ptr_control_block::get_object_proxy_reference_counts(
+                    obj_proxy, inherited_shared_before, inherited_optimistic_before);
             }
 
-            RPC_DEBUG("make_optimistic(weak_ptr→optimistic_ptr): BEFORE - control_block(shared={}, optimistic={}), object_proxy(inherited_shared={}, inherited_optimistic={})",
-                      cb_shared_before, cb_optimistic_before, inherited_shared_before, inherited_optimistic_before);
+            RPC_DEBUG("make_optimistic(weak_ptr→optimistic_ptr): BEFORE - control_block(shared={}, optimistic={}), "
+                      "object_proxy(inherited_shared={}, inherited_optimistic={})",
+                cb_shared_before,
+                cb_optimistic_before,
+                inherited_shared_before,
+                inherited_optimistic_before);
 
             // Verify both control block counts are either zero or both non-zero
             if ((cb_shared_before == 0) != (cb_optimistic_before == 0))
             {
-                RPC_ERROR("make_optimistic(weak_ptr): Control block reference count mismatch BEFORE - shared={} optimistic={} (should both be 0 or both be non-zero)",
-                          cb_shared_before, cb_optimistic_before);
+                RPC_ERROR("make_optimistic(weak_ptr): Control block reference count mismatch BEFORE - shared={} "
+                          "optimistic={} (should both be 0 or both be non-zero)",
+                    cb_shared_before,
+                    cb_optimistic_before);
             }
 
             // Verify both inherited counts are either zero or both non-zero
             if (obj_proxy && (inherited_shared_before == 0) != (inherited_optimistic_before == 0))
             {
-                RPC_ERROR("make_optimistic(weak_ptr): Object proxy inherited count mismatch BEFORE - inherited_shared={} inherited_optimistic={} (should both be 0 or both be non-zero)",
-                          inherited_shared_before, inherited_optimistic_before);
+                RPC_ERROR("make_optimistic(weak_ptr): Object proxy inherited count mismatch BEFORE - "
+                          "inherited_shared={} inherited_optimistic={} (should both be 0 or both be non-zero)",
+                    inherited_shared_before,
+                    inherited_optimistic_before);
             }
 #endif
 
             auto err = CO_AWAIT cb->try_increment_optimistic();
             if (err)
             {
-                CO_RETURN err;  // Failed (likely OBJECT_GONE)
+                CO_RETURN err; // Failed (likely OBJECT_GONE)
             }
 
 #ifdef USE_RPC_LOGGING
@@ -2301,24 +2334,33 @@ namespace rpc
             int inherited_optimistic_after = 0;
             if (obj_proxy)
             {
-                __rpc_internal::__shared_ptr_control_block::get_object_proxy_reference_counts(obj_proxy, inherited_shared_after, inherited_optimistic_after);
+                __rpc_internal::__shared_ptr_control_block::get_object_proxy_reference_counts(
+                    obj_proxy, inherited_shared_after, inherited_optimistic_after);
             }
 
-            RPC_DEBUG("make_optimistic(weak_ptr→optimistic_ptr): AFTER - control_block(shared={}, optimistic={}), object_proxy(inherited_shared={}, inherited_optimistic={})",
-                      cb_shared_after, cb_optimistic_after, inherited_shared_after, inherited_optimistic_after);
+            RPC_DEBUG("make_optimistic(weak_ptr→optimistic_ptr): AFTER - control_block(shared={}, optimistic={}), "
+                      "object_proxy(inherited_shared={}, inherited_optimistic={})",
+                cb_shared_after,
+                cb_optimistic_after,
+                inherited_shared_after,
+                inherited_optimistic_after);
 
             // Verify both control block counts are non-zero after increment
             if (cb_shared_after == 0 || cb_optimistic_after == 0)
             {
-                RPC_ERROR("make_optimistic(weak_ptr): Control block count zero AFTER increment - shared={} optimistic={} (both should be > 0)",
-                          cb_shared_after, cb_optimistic_after);
+                RPC_ERROR("make_optimistic(weak_ptr): Control block count zero AFTER increment - shared={} "
+                          "optimistic={} (both should be > 0)",
+                    cb_shared_after,
+                    cb_optimistic_after);
             }
 
             // Verify both inherited counts are either zero or both non-zero after increment
             if (obj_proxy && (inherited_shared_after == 0) != (inherited_optimistic_after == 0))
             {
-                RPC_ERROR("make_optimistic(weak_ptr): Object proxy inherited count mismatch AFTER - inherited_shared={} inherited_optimistic={} (should both be 0 or both be non-zero)",
-                          inherited_shared_after, inherited_optimistic_after);
+                RPC_ERROR("make_optimistic(weak_ptr): Object proxy inherited count mismatch AFTER - "
+                          "inherited_shared={} inherited_optimistic={} (should both be 0 or both be non-zero)",
+                    inherited_shared_after,
+                    inherited_optimistic_after);
             }
 #endif
 
@@ -2330,10 +2372,9 @@ namespace rpc
     }
 
     // Convert optimistic_ptr → shared_ptr
-    template<typename T>
-    CORO_TASK(int) make_shared(const optimistic_ptr<T>& in, shared_ptr<T>& out) noexcept
+    template<typename T> CORO_TASK(int) make_shared(const optimistic_ptr<T>& in, shared_ptr<T>& out) noexcept
     {
-        out.reset();  // Clear any existing value
+        out.reset(); // Clear any existing value
 
         // Check if input holds local_proxy
         if (in.local_proxy_holder_)
@@ -2364,10 +2405,9 @@ namespace rpc
     }
 
     // Convert optimistic_ptr → weak_ptr
-    template<typename T>
-    CORO_TASK(int) make_weak(const optimistic_ptr<T>& in, weak_ptr<T>& out) noexcept
+    template<typename T> CORO_TASK(int) make_weak(const optimistic_ptr<T>& in, weak_ptr<T>& out) noexcept
     {
-        out.reset();  // Clear any existing value
+        out.reset(); // Clear any existing value
 
         // Check if input holds local_proxy
         if (in.local_proxy_holder_)
@@ -2409,7 +2449,6 @@ namespace rpc
 } // namespace rpc
 
 #endif
-
 
 namespace std
 {

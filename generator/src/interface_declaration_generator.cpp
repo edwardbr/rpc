@@ -681,7 +681,8 @@ namespace interface_declaration_generator
         header("}}");
         header("");
         header("static std::vector<rpc::function_info> get_function_info();");
-        header("static std::shared_ptr<rpc::local_proxy<{0}>> create_local_proxy(const rpc::weak_ptr<{0}>& ptr);", interface_name);
+        header("static std::shared_ptr<rpc::local_proxy<{0}>> create_local_proxy(const rpc::weak_ptr<{0}>& ptr);",
+            interface_name);
         header("");
         header("virtual ~{}() = default;", interface_name);
         header("");

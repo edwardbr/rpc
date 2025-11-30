@@ -21,8 +21,6 @@ namespace rpc
         return first_zone_id == second_zone_id;
     }
 
-
-
     object casting_interface::get_object_id(const casting_interface& iface)
     {
         auto obj = iface.get_object_proxy();

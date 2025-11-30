@@ -8,28 +8,27 @@
 
 using namespace std;
 
-class Base {
+class Base
+{
 public:
-    Base() {}
-    virtual ~Base() {}
+    Base() { }
+    virtual ~Base() { }
 
-    virtual string str() const {
-        return "Base";
-    }
+    virtual string str() const { return "Base"; }
 
 private:
     Base(const Base&);
     Base& operator=(const Base&);
 };
 
-class Derived : public Base {
+class Derived : public Base
+{
 public:
-    string str() const override {
-        return "Derived";
-    }
+    string str() const override { return "Derived"; }
 };
 
-int main() {
+int main()
+{
     {
         // move ctor
 

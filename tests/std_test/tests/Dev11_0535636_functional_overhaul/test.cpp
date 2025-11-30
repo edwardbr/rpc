@@ -11,12 +11,15 @@ using namespace std;
 #define STATIC_ASSERT(...) static_assert(__VA_ARGS__, #__VA_ARGS__)
 
 // Test shared_ptr with member function pointers and result_of
-struct Base {
+struct Base
+{
     bool member_func() { return true; }
     string data;
 };
 
-struct Derived : Base {};
+struct Derived : Base
+{
+};
 
 // Test PMF (Pointer to Member Function) with shared_ptr
 using PmfBase = bool (Base::*)();
@@ -36,4 +39,4 @@ STATIC_ASSERT(is_same_v<result_of_t<PmdConst(shared_ptr<const Base>)>, const str
 STATIC_ASSERT(is_same_v<result_of_t<PmdConst(shared_ptr<volatile Base>)>, const volatile string&>);
 STATIC_ASSERT(is_same_v<result_of_t<PmdConst(shared_ptr<const volatile Base>)>, const volatile string&>);
 
-int main() {}
+int main() { }

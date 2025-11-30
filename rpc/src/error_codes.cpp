@@ -103,12 +103,12 @@ namespace rpc
         [[nodiscard]] int CALL_CANCELLED()
         {
             return offset_val + (offset_val_is_negative ? -22 : 22);
-        }        
+        }
         [[nodiscard]] int OBJECT_GONE()
         {
             return offset_val + (offset_val_is_negative ? -23 : 23);
         }
-        
+
         // dont forget to update MIN & MAX if new values
 
         [[nodiscard]] int MIN()
@@ -225,7 +225,8 @@ namespace rpc
             }
             if (err == OBJECT_GONE())
             {
-                return "The service no longer has an object of that id, perhaps an optimistic pointer call attempt is happining";
+                return "The service no longer has an object of that id, perhaps an optimistic pointer call attempt is "
+                       "happining";
             }
             return "invalid error code";
         }

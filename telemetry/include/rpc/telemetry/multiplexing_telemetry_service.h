@@ -72,7 +72,7 @@ namespace rpc
          */
         explicit multiplexing_telemetry_service(std::vector<std::shared_ptr<i_telemetry_service>>&& child_services);
 
-        virtual ~multiplexing_telemetry_service(){};
+        virtual ~multiplexing_telemetry_service() { };
         multiplexing_telemetry_service(const multiplexing_telemetry_service&) = delete;
         multiplexing_telemetry_service& operator=(const multiplexing_telemetry_service&) = delete;
 
@@ -118,7 +118,8 @@ namespace rpc
 #endif
 
         // i_telemetry_service interface - all methods forward to children
-        void on_service_creation(const std::string& name, rpc::zone zone_id, rpc::destination_zone parent_zone_id) const override;
+        void on_service_creation(
+            const std::string& name, rpc::zone zone_id, rpc::destination_zone parent_zone_id) const override;
         void on_service_deletion(rpc::zone zone_id) const override;
         void on_service_try_cast(rpc::zone zone_id,
             rpc::destination_zone destination_zone_id,
@@ -126,14 +127,11 @@ namespace rpc
             rpc::object object_id,
             rpc::interface_ordinal interface_id) const override;
         void on_service_add_ref(rpc::zone zone_id,
-            rpc::destination_channel_zone destination_channel_zone_id,
             rpc::destination_zone destination_zone_id,
             rpc::object object_id,
-            rpc::caller_channel_zone caller_channel_zone_id,
             rpc::caller_zone caller_zone_id,
             rpc::add_ref_options options) const override;
         void on_service_release(rpc::zone zone_id,
-            rpc::destination_channel_zone destination_channel_zone_id,
             rpc::destination_zone destination_zone_id,
             rpc::object object_id,
             rpc::caller_zone caller_zone_id) const override;
@@ -157,22 +155,18 @@ namespace rpc
             rpc::interface_ordinal interface_id) const override;
         void on_service_proxy_add_ref(rpc::zone zone_id,
             rpc::destination_zone destination_zone_id,
-            rpc::destination_channel_zone destination_channel_zone_id,
             rpc::caller_zone caller_zone_id,
             rpc::object object_id,
             rpc::add_ref_options options) const override;
         void on_service_proxy_release(rpc::zone zone_id,
             rpc::destination_zone destination_zone_id,
-            rpc::destination_channel_zone destination_channel_zone_id,
             rpc::caller_zone caller_zone_id,
             rpc::object object_id) const override;
         void on_service_proxy_add_external_ref(rpc::zone zone_id,
-            rpc::destination_channel_zone destination_channel_zone_id,
             rpc::destination_zone destination_zone_id,
             rpc::caller_zone caller_zone_id,
             int ref_count) const override;
         void on_service_proxy_release_external_ref(rpc::zone zone_id,
-            rpc::destination_channel_zone destination_channel_zone_id,
             rpc::destination_zone destination_zone_id,
             rpc::caller_zone caller_zone_id,
             int ref_count) const override;

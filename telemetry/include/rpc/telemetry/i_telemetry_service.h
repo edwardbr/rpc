@@ -53,18 +53,13 @@ namespace rpc
             interface_ordinal interface_id) const
             = 0;
         virtual void on_service_add_ref(zone zone_id,
-            destination_channel_zone destination_channel_zone_id,
             destination_zone destination_zone_id,
             object object_id,
-            caller_channel_zone caller_channel_zone_id,
             caller_zone caller_zone_id,
             rpc::add_ref_options options) const
             = 0;
-        virtual void on_service_release(zone zone_id,
-            destination_channel_zone destination_channel_zone_id,
-            destination_zone destination_zone_id,
-            object object_id,
-            caller_zone caller_zone_id) const
+        virtual void on_service_release(
+            zone zone_id, destination_zone destination_zone_id, object object_id, caller_zone caller_zone_id) const
             = 0;
 
         virtual void on_service_proxy_creation(const std::string& service_name,
@@ -90,28 +85,21 @@ namespace rpc
             = 0;
         virtual void on_service_proxy_add_ref(zone zone_id,
             destination_zone destination_zone_id,
-            destination_channel_zone destination_channel_zone_id,
             caller_zone caller_zone_id,
             object object_id,
             rpc::add_ref_options options) const
             = 0;
         virtual void on_service_proxy_release(zone zone_id,
             destination_zone destination_zone_id,
-            destination_channel_zone destination_channel_zone_id,
+
             caller_zone caller_zone_id,
             object object_id) const
             = 0;
-        virtual void on_service_proxy_add_external_ref(zone zone_id,
-            destination_channel_zone destination_channel_zone_id,
-            destination_zone destination_zone_id,
-            caller_zone caller_zone_id,
-            int ref_count) const
+        virtual void on_service_proxy_add_external_ref(
+            zone zone_id, destination_zone destination_zone_id, caller_zone caller_zone_id, int ref_count) const
             = 0;
-        virtual void on_service_proxy_release_external_ref(zone zone_id,
-            destination_channel_zone destination_channel_zone_id,
-            destination_zone destination_zone_id,
-            caller_zone caller_zone_id,
-            int ref_count) const
+        virtual void on_service_proxy_release_external_ref(
+            zone zone_id, destination_zone destination_zone_id, caller_zone caller_zone_id, int ref_count) const
             = 0;
 
         virtual void on_impl_creation(const std::string& name, uint64_t address, rpc::zone zone_id) const = 0;

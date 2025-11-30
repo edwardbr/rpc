@@ -67,21 +67,20 @@ namespace rpc
         return e == static_cast<release_options>(0);
     }
 
-
     inline post_options operator|(post_options lhs, post_options rhs)
     {
         return static_cast<post_options>(static_cast<std::underlying_type<post_options>::type>(lhs)
-                                            | static_cast<std::underlying_type<post_options>::type>(rhs));
+                                         | static_cast<std::underlying_type<post_options>::type>(rhs));
     }
     inline post_options operator&(post_options lhs, post_options rhs)
     {
         return static_cast<post_options>(static_cast<std::underlying_type<post_options>::type>(lhs)
-                                            & static_cast<std::underlying_type<post_options>::type>(rhs));
+                                         & static_cast<std::underlying_type<post_options>::type>(rhs));
     }
     inline post_options operator^(post_options lhs, post_options rhs)
     {
         return static_cast<post_options>(static_cast<std::underlying_type<post_options>::type>(lhs)
-                                            ^ static_cast<std::underlying_type<post_options>::type>(rhs));
+                                         ^ static_cast<std::underlying_type<post_options>::type>(rhs));
     }
 
     inline post_options operator~(post_options lhs)
@@ -128,13 +127,14 @@ namespace rpc
             const char* in_buf_,
             const std::vector<rpc::back_channel_entry>& in_back_channel)
             = 0;
-        virtual CORO_TASK(int) try_cast(
-            uint64_t protocol_version, destination_zone destination_zone_id, object object_id, interface_ordinal interface_id,
+        virtual CORO_TASK(int) try_cast(uint64_t protocol_version,
+            destination_zone destination_zone_id,
+            object object_id,
+            interface_ordinal interface_id,
             const std::vector<rpc::back_channel_entry>& in_back_channel,
             std::vector<rpc::back_channel_entry>& out_back_channel)
             = 0;
         virtual CORO_TASK(int) add_ref(uint64_t protocol_version,
-            destination_channel_zone destination_channel_zone_id,
             destination_zone destination_zone_id,
             object object_id,
             caller_channel_zone caller_channel_zone_id,

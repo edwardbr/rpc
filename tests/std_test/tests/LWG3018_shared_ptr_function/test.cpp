@@ -9,29 +9,33 @@ using namespace std;
 
 int val = 0;
 
-struct decrement_val {
-    void operator()(void (*)(int)) const {
-        --val;
-    }
+struct decrement_val
+{
+    void operator()(void (*)(int)) const { --val; }
 };
 
-void add(const int i) {
+void add(const int i)
+{
     val += i;
 }
 
-void add_noexcept(const int i) noexcept {
+void add_noexcept(const int i) noexcept
+{
     val += i;
 }
 
-int add_return(const int i) {
+int add_return(const int i)
+{
     return val += i;
 }
 
-void subtract(const int i) {
+void subtract(const int i)
+{
     val -= i;
 }
 
-int main() {
+int main()
+{
     // REMOVED: Different shared_ptr<function> construction rules between Microsoft STL and libstdc++
     // static_assert(!is_constructible_v<shared_ptr<void(int)>, void (*)(int)>,
     //     "shared_ptr of function type should not be constructible without deleter");

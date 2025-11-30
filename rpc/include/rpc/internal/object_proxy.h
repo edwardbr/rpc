@@ -48,9 +48,9 @@ namespace rpc
 
     public:
         // Track shared references from control block transitions (public for telemetry)
-        int get_shared_count() const {return shared_count_.load(std::memory_order_acquire);}
+        int get_shared_count() const { return shared_count_.load(std::memory_order_acquire); }
         // Track optimistic references from control block transitions (public for telemetry)
-        int get_optimistic_count() const {return optimistic_count_.load(std::memory_order_acquire);}
+        int get_optimistic_count() const { return optimistic_count_.load(std::memory_order_acquire); }
 
         ~object_proxy();
 
@@ -61,8 +61,8 @@ namespace rpc
         // release is synchronous - just decrements local counters, cleanup happens in destructor
         void release(bool is_optimistic);
 
-        // Called when this object_proxy inherits a shared reference from a race condition during the destruction of a proxy
-        // but the service other_zones collection still has a record of it
+        // Called when this object_proxy inherits a shared reference from a race condition during the destruction of a
+        // proxy but the service other_zones collection still has a record of it
         void add_ref_shared() { shared_count_.fetch_add(1, std::memory_order_relaxed); }
 
         // Called when this object_proxy inherits an optimistic reference from a race condition during the destruction of a proxy

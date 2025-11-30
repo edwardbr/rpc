@@ -45,7 +45,6 @@ namespace rpc::tcp
         send(uint64_t protocol_version,
             encoding encoding,
             uint64_t tag,
-            caller_channel_zone caller_channel_zone_id,
             caller_zone caller_zone_id,
             destination_zone destination_zone_id,
             object object_id,
@@ -60,7 +59,6 @@ namespace rpc::tcp
         post(uint64_t protocol_version,
             encoding encoding,
             uint64_t tag,
-            caller_channel_zone caller_channel_zone_id,
             caller_zone caller_zone_id,
             destination_zone destination_zone_id,
             object object_id,
@@ -79,10 +77,8 @@ namespace rpc::tcp
             std::vector<rpc::back_channel_entry>& out_back_channel) override;
         CORO_TASK(int)
         add_ref(uint64_t protocol_version,
-            destination_channel_zone destination_channel_zone_id,
             destination_zone destination_zone_id,
             object object_id,
-            caller_channel_zone caller_channel_zone_id,
             caller_zone caller_zone_id,
             known_direction_zone known_direction_zone_id,
             rpc::add_ref_options build_out_param_channel,

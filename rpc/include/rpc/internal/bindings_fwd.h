@@ -21,7 +21,6 @@ namespace rpc
     demarshall_interface_proxy(uint64_t protocol_version,
         const std::shared_ptr<rpc::service_proxy>& sp,
         const rpc::interface_descriptor& encap,
-        caller_zone caller_zone_id,
         rpc::shared_ptr<T>& val);
 
     template<class T>
@@ -30,18 +29,20 @@ namespace rpc
 
     template<class T>
     CORO_TASK(int)
-    stub_bind_out_param(rpc::service& zone,
+    stub_bind_out_param(const std::shared_ptr<rpc::service>& zone,
         uint64_t protocol_version,
-        rpc::caller_channel_zone caller_channel_zone_id,
-        rpc::caller_zone caller_zone_id,
-        const rpc::shared_ptr<T>& iface, rpc::interface_descriptor& descriptor);
+        caller_channel_zone caller_channel_zone_id,
+        caller_zone caller_zone_id,
+        const shared_ptr<T>& iface,
+        interface_descriptor& descriptor);
 
     template<class T>
     CORO_TASK(int)
     proxy_bind_in_param(std::shared_ptr<rpc::object_proxy> object_p,
         uint64_t protocol_version,
         const rpc::shared_ptr<T>& iface,
-        std::shared_ptr<rpc::object_stub>& stub, rpc::interface_descriptor& descriptor);
+        std::shared_ptr<rpc::object_stub>& stub,
+        rpc::interface_descriptor& descriptor);
 
     // do not use directly it is for the interface generator use rpc::create_interface_proxy if you want to get a proxied pointer to a remote implementation
     template<class T>
@@ -56,16 +57,13 @@ namespace rpc
     // do not use directly it is for the interface generator use rpc::create_interface_proxy if you want to get a proxied pointer to a remote implementation
     template<class T>
     CORO_TASK(int)
-    proxy_bind_out_param(const std::shared_ptr<rpc::service_proxy>& sp,
-        const rpc::interface_descriptor& encap,
-        caller_zone caller_zone_id,
-        rpc::shared_ptr<T>& val);
+    proxy_bind_out_param(
+        const std::shared_ptr<rpc::service_proxy>& sp, const rpc::interface_descriptor& encap, rpc::shared_ptr<T>& val);
 
     template<class T>
     CORO_TASK(int)
     demarshall_interface_proxy(uint64_t protocol_version,
         const std::shared_ptr<rpc::service_proxy>& sp,
         const rpc::interface_descriptor& encap,
-        caller_zone caller_zone_id,
         rpc::shared_ptr<T>& val);
 }

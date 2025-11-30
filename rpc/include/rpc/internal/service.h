@@ -215,7 +215,6 @@ namespace rpc
             std::vector<rpc::back_channel_entry>& out_back_channel) override;
         CORO_TASK(int)
         add_ref(uint64_t protocol_version,
-            destination_channel_zone destination_channel_zone_id,
             destination_zone destination_zone_id,
             object object_id,
             caller_channel_zone caller_channel_zone_id,
@@ -264,10 +263,11 @@ namespace rpc
         virtual void add_zone_proxy(const std::shared_ptr<rpc::service_proxy>& zone);
 
     private:
-        virtual std::shared_ptr<rpc::service_proxy> get_zone_proxy(caller_channel_zone caller_channel_zone_id,
-            caller_zone caller_zone_id,
+        virtual std::shared_ptr<rpc::service_proxy> get_zone_proxy(
+            std::shared_ptr<rpc::service_proxy> caller_sp, // when you know where you are calling to
+            caller_channel_zone caller_channel_zone_id,
+            caller_zone caller_zone_id, // when you know who is calling you
             destination_zone destination_zone_id,
-            caller_zone new_caller_zone_id,
             bool& new_proxy_added);
         virtual void remove_zone_proxy(destination_zone destination_zone_id, caller_zone caller_zone_id);
 
@@ -305,7 +305,6 @@ namespace rpc
 
         CORO_TASK(int)
         prepare_out_param(uint64_t protocol_version,
-            caller_channel_zone caller_channel_zone_id,
             caller_zone caller_zone_id,
             rpc::casting_interface* base,
             interface_descriptor& descriptor);
@@ -323,7 +322,6 @@ namespace rpc
         template<class T>
         friend CORO_TASK(int) rpc::proxy_bind_out_param(const std::shared_ptr<rpc::service_proxy>& sp,
             const rpc::interface_descriptor& encap,
-            rpc::caller_zone caller_zone_id,
             rpc::shared_ptr<T>& val);
 
         template<class T>
@@ -439,7 +437,7 @@ namespace rpc
             if (input_descr != interface_descriptor())
             {
                 auto err_code = CO_AWAIT rpc::demarshall_interface_proxy(
-                    rpc::get_version(), parent_service_proxy, input_descr, zone_id.as_caller(), parent_ptr);
+                    rpc::get_version(), parent_service_proxy, input_descr, parent_ptr);
                 if (err_code != rpc::error::OK())
                 {
                     CO_RETURN err_code;
@@ -486,7 +484,7 @@ namespace rpc
 
         if (input_interface)
         {
-            if (input_interface->is_local())
+            // if (input_interface->is_local())
             {
                 std::shared_ptr<object_stub> stub;
                 auto factory = create_interface_stub(input_interface);
@@ -513,58 +511,55 @@ namespace rpc
                     CO_RETURN err_code;
                 }
             }
-            else
-            {
-                auto input_object_proxy = input_interface->get_object_proxy();
-                auto input_service_proxy = input_object_proxy->get_service_proxy();
-                auto input_object_id = input_object_proxy->get_object_id();
-                auto input_destination_zone_id = input_service_proxy->get_destination_zone_id();
-                auto input_transport = input_service_proxy->get_transport();
+            // else
+            // {
+            //     auto input_object_proxy = input_interface->get_object_proxy();
+            //     auto input_service_proxy = input_object_proxy->get_service_proxy();
+            //     auto input_object_id = input_object_proxy->get_object_id();
+            //     auto input_destination_zone_id = input_service_proxy->get_destination_zone_id();
+            //     auto input_transport = input_service_proxy->get_transport();
 
-                uint64_t temp_ref_count;
-                std::vector<rpc::back_channel_entry> empty_in;
-                std::vector<rpc::back_channel_entry> empty_out;
+            //     uint64_t temp_ref_count;
+            //     std::vector<rpc::back_channel_entry> empty_in;
+            //     std::vector<rpc::back_channel_entry> empty_out;
 
-                err_code = CO_AWAIT input_transport->add_ref(rpc::get_version(),
-                    input_transport->get_adjacent_zone_id().as_destination_channel(),
-                    input_destination_zone_id,
-                    input_object_id,
-                    zone_id_.as_caller_channel(),
-                    child_transport->get_adjacent_zone_id().as_caller(),
-                    known_direction_zone(zone_id_),
-                    rpc::add_ref_options::build_destination_route,
-                    temp_ref_count,
-                    empty_in,
-                    empty_out);
-                RPC_ASSERT(err_code == error::OK());
-                if (err_code != error::OK())
-                {
-                    CO_RETURN err_code;
-                }
+            //     err_code = CO_AWAIT input_transport->add_ref(rpc::get_version(),
+            //         input_destination_zone_id,
+            //         input_object_id,
+            //         child_transport->get_adjacent_zone_id().as_caller(),
+            //         known_direction_zone(zone_id_),
+            //         rpc::add_ref_options::build_destination_route,
+            //         temp_ref_count,
+            //         empty_in,
+            //         empty_out);
+            //     RPC_ASSERT(err_code == error::OK());
+            //     if (err_code != error::OK())
+            //     {
+            //         CO_RETURN err_code;
+            //     }
 
-                input_descr = {input_object_id, input_destination_zone_id};
+            //     input_descr = {input_object_id, input_destination_zone_id};
 
-                err_code = CO_AWAIT child_transport->connect(input_descr, output_descr);
-                if (err_code != rpc::error::OK())
-                {
-                    // Clean up on failure
-                    CO_AWAIT clean_up_on_failed_connection(new_service_proxy, input_interface);
-                    CO_RETURN err_code;
-                }
-                transport::create_pass_through(child_transport,
-                    input_transport,
-                    shared_from_this(),
-                    child_transport->get_adjacent_zone_id().as_destination(),
-                    input_destination_zone_id);
-            }
+            //     err_code = CO_AWAIT child_transport->connect(input_descr, output_descr);
+            //     if (err_code != rpc::error::OK())
+            //     {
+            //         // Clean up on failure
+            //         CO_AWAIT clean_up_on_failed_connection(new_service_proxy, input_interface);
+            //         CO_RETURN err_code;
+            //     }
+            //     transport::create_pass_through(child_transport,
+            //         input_transport,
+            //         shared_from_this(),
+            //         child_transport->get_adjacent_zone_id().as_destination(),
+            //         input_destination_zone_id);
+            // }
         }
-
 
         // Demarshal output interface if provided
         if (output_descr.object_id != 0 && output_descr.destination_zone_id != 0)
         {
             err_code = CO_AWAIT rpc::demarshall_interface_proxy(
-                rpc::get_version(), new_service_proxy, output_descr, zone_id_.as_caller(), output_interface);
+                rpc::get_version(), new_service_proxy, output_descr, output_interface);
         }
         else
         {
@@ -599,7 +594,7 @@ namespace rpc
         if (input_descr != interface_descriptor())
         {
             auto err_code = CO_AWAIT rpc::demarshall_interface_proxy(
-                rpc::get_version(), peer_service_proxy, input_descr, get_zone_id().as_caller(), parent_ptr);
+                rpc::get_version(), peer_service_proxy, input_descr, parent_ptr);
             if (err_code != rpc::error::OK())
             {
                 CO_RETURN err_code;

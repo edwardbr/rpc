@@ -27,12 +27,9 @@ extern "C"
 {
     // #ifdef USE_RPC_TELEMETRY
     CORO_TASK(int)
-    call_host(uint64_t protocol_version // version of the rpc call protocol
-        ,
-        uint64_t encoding // format of the serialised data
-        ,
-        uint64_t tag // info on the type of the call
-        ,
+    call_host(uint64_t protocol_version, // version of the rpc call protocol
+        uint64_t encoding,               // format of the serialised data
+        uint64_t tag,                    // info on the type of the call
         uint64_t caller_channel_zone_id,
         uint64_t caller_zone_id,
         uint64_t destination_zone_id,
@@ -65,11 +62,11 @@ extern "C"
             {
                 yas::mem_istream is(data_in, sz_int);
                 yas::binary_iarchive<yas::mem_istream, yas::binary | yas::no_header> ia(is);
-                ia& payload_size;  // Read payload size
+                ia & payload_size; // Read payload size
                 payload.resize(payload_size);
                 if (payload_size > 0)
-                    ia.read(payload.data(), payload_size);  // Read payload data
-                ia& in_back_channel;  // Read back-channel
+                    ia.read(payload.data(), payload_size); // Read payload data
+                ia & in_back_channel;                      // Read back-channel
             }
 
             std::vector<char> out_data(sz_out);
@@ -96,10 +93,10 @@ extern "C"
             // Combine output payload + back-channel into single buffer
             yas::mem_ostream os;
             yas::binary_oarchive<yas::mem_ostream, yas::binary | yas::no_header> oa(os);
-            oa& out_data.size();  // Write payload size
+            oa & out_data.size(); // Write payload size
             if (out_data.size() > 0)
-                oa.write(out_data.data(), out_data.size());  // Write payload
-            oa& out_back_channel;  // Write back-channel
+                oa.write(out_data.data(), out_data.size()); // Write payload
+            oa & out_back_channel;                          // Write back-channel
             auto yas_buf = os.get_shared_buffer();
             retry_buf.data.assign(yas_buf.data.get(), yas_buf.data.get() + yas_buf.size);
         }
@@ -112,12 +109,9 @@ extern "C"
     }
 
     CORO_TASK(int)
-    post_host(uint64_t protocol_version // version of the rpc call protocol
-        ,
-        uint64_t encoding // format of the serialised data
-        ,
-        uint64_t tag // info on the type of the call
-        ,
+    post_host(uint64_t protocol_version, // version of the rpc call protocol
+        uint64_t encoding,               // format of the serialised data
+        uint64_t tag,                    // info on the type of the call
         uint64_t caller_channel_zone_id,
         uint64_t caller_zone_id,
         uint64_t destination_zone_id,
@@ -145,11 +139,11 @@ extern "C"
         {
             yas::mem_istream is(data_in, sz_int);
             yas::binary_iarchive<yas::mem_istream, yas::binary | yas::no_header> ia(is);
-            ia& payload_size;  // Read payload size
+            ia & payload_size; // Read payload size
             payload.resize(payload_size);
             if (payload_size > 0)
-                ia.read(payload.data(), payload_size);  // Read payload data
-            ia& in_back_channel;  // Read back-channel
+                ia.read(payload.data(), payload_size); // Read payload data
+            ia & in_back_channel;                      // Read back-channel
         }
 
         CO_AWAIT root_service->post(protocol_version,
@@ -186,14 +180,13 @@ extern "C"
         }
         std::vector<rpc::back_channel_entry> in_back_channel;
         std::vector<rpc::back_channel_entry> out_back_channel;
-        int ret = CO_AWAIT root_service->try_cast(protocol_version, {zone_id}, {object_id}, {interface_id}, in_back_channel, out_back_channel);
+        int ret = CO_AWAIT root_service->try_cast(
+            protocol_version, {zone_id}, {object_id}, {interface_id}, in_back_channel, out_back_channel);
         CO_RETURN ret;
     }
 
     CORO_TASK(int)
-    add_ref_host(uint64_t protocol_version // version of the rpc call protocol
-        ,
-        uint64_t destination_channel_zone_id,
+    add_ref_host(uint64_t protocol_version, // version of the rpc call protocol
         uint64_t destination_zone_id,
         uint64_t object_id,
         uint64_t caller_channel_zone_id,
@@ -211,7 +204,6 @@ extern "C"
         std::vector<rpc::back_channel_entry> in_back_channel;
         std::vector<rpc::back_channel_entry> out_back_channel;
         CO_RETURN CO_AWAIT root_service->add_ref(protocol_version,
-            {destination_channel_zone_id},
             {destination_zone_id},
             {object_id},
             {caller_channel_zone_id},
@@ -240,8 +232,14 @@ extern "C"
         }
         std::vector<rpc::back_channel_entry> in_back_channel;
         std::vector<rpc::back_channel_entry> out_back_channel;
-        CO_RETURN CO_AWAIT root_service->release(
-            protocol_version, {zone_id}, {object_id}, {caller_zone_id}, static_cast<rpc::release_options>(options), *reference_count, in_back_channel, out_back_channel);
+        CO_RETURN CO_AWAIT root_service->release(protocol_version,
+            {zone_id},
+            {object_id},
+            {caller_zone_id},
+            static_cast<rpc::release_options>(options),
+            *reference_count,
+            in_back_channel,
+            out_back_channel);
     }
     // #endif
 

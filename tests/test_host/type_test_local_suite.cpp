@@ -369,19 +369,21 @@ template<class T> CORO_TASK(bool) optimistic_ptr_remote_shared_semantics_test(T&
 
     // Schedule verification - handles both local (immediate) and remote (async) cases
     // CRITICAL: Capture opt_baz BY VALUE because lambda executes asynchronously after test function returns
-    waiter->schedule(lib.get_root_service(), baz, [opt_baz]() -> CORO_TASK(void)
-    {
-        // This runs after the object is deleted
-        // The object is deleted when the last shared_ptr goes away
-        // local_proxy pointer is still valid but weak_ptr inside will fail to lock
-        EXPECT_NE(opt_baz.get_unsafe_only_for_testing(), nullptr); // local_proxy still exists
+    waiter->schedule(lib.get_root_service(),
+        baz,
+        [opt_baz]() -> CORO_TASK(void)
+        {
+            // This runs after the object is deleted
+            // The object is deleted when the last shared_ptr goes away
+            // local_proxy pointer is still valid but weak_ptr inside will fail to lock
+            EXPECT_NE(opt_baz.get_unsafe_only_for_testing(), nullptr); // local_proxy still exists
 
-        // Calling through optimistic_ptr should return OBJECT_GONE (weak_ptr failed to lock)
-        auto error = CO_AWAIT opt_baz->callback(42);
-        EXPECT_EQ(error, rpc::error::OBJECT_GONE());
+            // Calling through optimistic_ptr should return OBJECT_GONE (weak_ptr failed to lock)
+            auto error = CO_AWAIT opt_baz->callback(42);
+            EXPECT_EQ(error, rpc::error::OBJECT_GONE());
 
-        CO_RETURN;
-    });
+            CO_RETURN;
+        });
 
     // Clear the shared_ptr - for remote this triggers async cleanup, for local it's immediate
     baz.reset();
@@ -472,25 +474,26 @@ template<class T> CORO_TASK(bool) optimistic_ptr_circular_dependency_test(T& lib
     CORO_ASSERT_EQ(err, rpc::error::OK());
     CORO_ASSERT_NE(opt_host.get_unsafe_only_for_testing(), nullptr);
 
-
     auto host_object_id = rpc::casting_interface::get_object_id(*host);
     auto waiter = std::make_shared<object_deletion_waiter>(host_object_id);
 
     // Schedule verification - handles both local (immediate) and remote (async) cases
     // CRITICAL: Capture opt_host BY VALUE because lambda executes asynchronously after test function returns
-    waiter->schedule(lib.get_root_service(), host, [opt_host]() -> CORO_TASK(void)
-    {
-        // opt_host still exists but points to deleted object
-        // This is correct behavior - circular dependency is broken
-        EXPECT_NE(opt_host.get_unsafe_only_for_testing(), nullptr); // Control block remains
+    waiter->schedule(lib.get_root_service(),
+        host,
+        [opt_host]() -> CORO_TASK(void)
+        {
+            // opt_host still exists but points to deleted object
+            // This is correct behavior - circular dependency is broken
+            EXPECT_NE(opt_host.get_unsafe_only_for_testing(), nullptr); // Control block remains
 
-        CO_RETURN;
-    });
+            CO_RETURN;
+        });
 
     // If we delete host (last shared_ptr), object is destroyed
     // even though optimistic_ptr exists (weak semantics)
     host.reset();
-    
+
     // For local objects, run verification immediately; for remote, it runs via async callback
     CO_AWAIT waiter->run_if_local();
 
@@ -668,19 +671,21 @@ template<class T> CORO_TASK(bool) optimistic_ptr_object_gone_test(T& lib)
     auto waiter = std::make_shared<object_deletion_waiter>(baz_object_id);
 
     // Schedule verification - handles both local (immediate) and remote (async) cases
-    waiter->schedule(lib.get_root_service(), baz, [opt_baz]() -> CORO_TASK(void)
-    {
-        // This runs after the object is deleted
-        // Second call through optimistic_ptr should fail with OBJECT_GONE
-        // The optimistic_ptr still exists but the remote stub has been deleted
-        auto error2 = CO_AWAIT opt_baz->callback(43);
-        EXPECT_EQ(error2, rpc::error::OBJECT_GONE());
+    waiter->schedule(lib.get_root_service(),
+        baz,
+        [opt_baz]() -> CORO_TASK(void)
+        {
+            // This runs after the object is deleted
+            // Second call through optimistic_ptr should fail with OBJECT_GONE
+            // The optimistic_ptr still exists but the remote stub has been deleted
+            auto error2 = CO_AWAIT opt_baz->callback(43);
+            EXPECT_EQ(error2, rpc::error::OBJECT_GONE());
 
-        // The optimistic_ptr itself remains valid (pointer not null)
-        EXPECT_NE(opt_baz.get_unsafe_only_for_testing(), nullptr);
+            // The optimistic_ptr itself remains valid (pointer not null)
+            EXPECT_NE(opt_baz.get_unsafe_only_for_testing(), nullptr);
 
-        CO_RETURN;
-    });
+            CO_RETURN;
+        });
 
     // Release the shared_ptr - for remote this triggers async cleanup, for local it's immediate
     baz.reset();

@@ -33,8 +33,7 @@ namespace rpc
 
     // the class that encapsulates an environment or zone
     // only host code can use this class directly other enclaves *may* have access to the i_service_proxy derived interface
-    class service_proxy : 
-        public std::enable_shared_from_this<rpc::service_proxy>
+    class service_proxy : public std::enable_shared_from_this<rpc::service_proxy>
     {
         std::unordered_map<object, std::weak_ptr<object_proxy>> proxies_;
         std::mutex insert_control_;
@@ -51,9 +50,13 @@ namespace rpc
         std::string name_;
 
     public:
-        service_proxy(const std::string& name, const std::shared_ptr<transport>& transport, const std::shared_ptr<rpc::service>& svc);
+        service_proxy(const std::string& name,
+            const std::shared_ptr<transport>& transport,
+            const std::shared_ptr<rpc::service>& svc);
         service_proxy(const std::shared_ptr<transport>& transport, destination_zone destination_zone_id);
-        service_proxy(const std::string& name, destination_zone destination_zone_id, const std::shared_ptr<rpc::service_proxy>& other);
+        service_proxy(const std::string& name,
+            destination_zone destination_zone_id,
+            const std::shared_ptr<rpc::service_proxy>& other);
 
         virtual ~service_proxy();
 
@@ -71,15 +74,9 @@ namespace rpc
         }
 
         // Set transport for this service_proxy
-        void set_transport(std::shared_ptr<transport> transport)
-        {
-            transport_ = transport;
-        }
+        void set_transport(std::shared_ptr<transport> transport) { transport_ = transport; }
 
-        std::shared_ptr<transport> get_transport() const
-        {
-            return transport_.get_nullable();
-        }
+        std::shared_ptr<transport> get_transport() const { return transport_.get_nullable(); }
 
         [[nodiscard]] CORO_TASK(int) send_from_this_zone(uint64_t protocol_version,
             rpc::encoding encoding,
@@ -95,14 +92,13 @@ namespace rpc
             destination_zone destination_zone_id, object object_id, std::function<interface_ordinal(uint64_t)> id_getter);
 
         [[nodiscard]] CORO_TASK(int) sp_add_ref(object object_id,
-            caller_channel_zone caller_channel_zone_id,
             add_ref_options build_out_param_channel,
             known_direction_zone known_direction_zone_id,
             uint64_t& ref_count);
 
         CORO_TASK(int) sp_release(object object_id, release_options options, uint64_t& ref_count);
 
-        void cleanup_after_object(std::shared_ptr<object_proxy> op,bool is_optimistic);
+        void cleanup_after_object(std::shared_ptr<object_proxy> op, bool is_optimistic);
 
         void on_object_proxy_released(const std::shared_ptr<object_proxy>& op, bool optimistic);
 
@@ -130,7 +126,8 @@ namespace rpc
             object_proxy_creation_rule rule,
             bool new_proxy_added,
             known_direction_zone known_direction_zone_id,
-            bool is_optimistic, std::shared_ptr<rpc::object_proxy>& op);
+            bool is_optimistic,
+            std::shared_ptr<rpc::object_proxy>& op);
 
         friend service;
         friend child_service;

@@ -85,7 +85,8 @@ namespace rpc::spsc
                 // The acknowledgment is queued for sending by send_producer_task
                 // NOTE: Do NOT capture keep_alive_ here - it would create a reference cycle
                 // The channel_manager is kept alive by keep_alive_ until both tasks complete
-                auto response_task = [this, seq = prefix.sequence_number]() -> coro::task<void> {
+                auto response_task = [this, seq = prefix.sequence_number]() -> coro::task<void>
+                {
                     RPC_DEBUG("close_connection: sending response for zone {}", service_->get_zone_id().get_val());
                     std::ignore = CO_AWAIT send_payload(
                         rpc::get_version(), message_direction::receive, close_connection_received{}, seq);
@@ -94,8 +95,9 @@ namespace rpc::spsc
                     close_ack_queued_ = true;
                     peer_cancel_received_ = true;
 
-                    RPC_DEBUG("close_connection: response queued, close_ack_queued=true peer_cancel_received=true for zone {}",
-                              service_->get_zone_id().get_val());
+                    RPC_DEBUG("close_connection: response queued, close_ack_queued=true peer_cancel_received=true for "
+                              "zone {}",
+                        service_->get_zone_id().get_val());
                     CO_RETURN;
                 };
                 service_->get_scheduler()->schedule(response_task());
@@ -143,15 +145,16 @@ namespace rpc::spsc
     void channel_manager::attach_service_proxy()
     {
         int new_count = ++service_proxy_ref_count_;
-        RPC_DEBUG("attach_service_proxy: zone={} ref_count={}",
-                  service_->get_zone_id().get_val(), new_count);
+        RPC_DEBUG("attach_service_proxy: zone={} ref_count={}", service_->get_zone_id().get_val(), new_count);
     }
 
     CORO_TASK(void) channel_manager::detach_service_proxy()
     {
         int new_count = --service_proxy_ref_count_;
         RPC_DEBUG("detach_service_proxy: zone={} ref_count={} peer_cancel_received={}",
-                  service_->get_zone_id().get_val(), new_count, peer_cancel_received_.load());
+            service_->get_zone_id().get_val(),
+            new_count,
+            peer_cancel_received_.load());
 
         if (new_count == 0)
         {
@@ -159,14 +162,15 @@ namespace rpc::spsc
             // Only initiate shutdown if peer hasn't already done so
             if (!peer_cancel_received_)
             {
-                RPC_DEBUG("Last service_proxy detached, initiating shutdown for zone {}",
-                          service_->get_zone_id().get_val());
+                RPC_DEBUG(
+                    "Last service_proxy detached, initiating shutdown for zone {}", service_->get_zone_id().get_val());
                 CO_AWAIT shutdown();
             }
             else
             {
-                RPC_DEBUG("Last service_proxy detached, but peer already initiated shutdown for zone {} - no action needed",
-                          service_->get_zone_id().get_val());
+                RPC_DEBUG(
+                    "Last service_proxy detached, but peer already initiated shutdown for zone {} - no action needed",
+                    service_->get_zone_id().get_val());
             }
         }
         CO_RETURN;
@@ -178,7 +182,7 @@ namespace rpc::spsc
         {
             // Already shutting down, just wait for completion
             RPC_DEBUG("shutdown() already in progress for zone {}, waiting for completion",
-                      service_->get_zone_id().get_val());
+                service_->get_zone_id().get_val());
             CO_AWAIT shutdown_event_;
             CO_RETURN;
         }
@@ -188,12 +192,10 @@ namespace rpc::spsc
 
         close_connection_received received{};
         auto err = CO_AWAIT call_peer(rpc::get_version(), close_connection_send{}, received);
-        RPC_DEBUG("shutdown() received response for zone {}, err={}",
-                  service_->get_zone_id().get_val(), err);
+        RPC_DEBUG("shutdown() received response for zone {}, err={}", service_->get_zone_id().get_val(), err);
 
         cancel_confirmed_ = true;
-        RPC_DEBUG("shutdown() set cancel_confirmed=true for zone {}",
-                  service_->get_zone_id().get_val());
+        RPC_DEBUG("shutdown() set cancel_confirmed=true for zone {}", service_->get_zone_id().get_val());
 
         if (err != rpc::error::OK())
         {
@@ -210,8 +212,8 @@ namespace rpc::spsc
     // Receive consumer task - continuously reads from receive_spsc_queue_ and processes messages
     // This runs as an independent coroutine, completely decoupled from send_producer_task
     // Like io_uring: polls shared buffer, remote zone's sender writes independently
-    CORO_TASK(void) channel_manager::receive_consumer_task(
-        std::function<void(envelope_prefix, envelope_payload)> incoming_message_handler)
+    CORO_TASK(void)
+    channel_manager::receive_consumer_task(std::function<void(envelope_prefix, envelope_payload)> incoming_message_handler)
     {
         static auto envelope_prefix_saved_size = rpc::yas_binary_saved_size(envelope_prefix());
 
@@ -357,7 +359,7 @@ namespace rpc::spsc
         {
             // Both tasks completed, release keep_alive and signal shutdown
             RPC_DEBUG("Both tasks completed, releasing keep_alive and signaling shutdown for zone {}",
-                      service_->get_zone_id().get_val());
+                service_->get_zone_id().get_val());
             keep_alive_ = nullptr;
             shutdown_event_.set();
         }
@@ -456,7 +458,7 @@ namespace rpc::spsc
         {
             // Both tasks completed, release keep_alive and signal shutdown
             RPC_DEBUG("Both tasks completed, releasing keep_alive and signaling shutdown for zone {}",
-                      service_->get_zone_id().get_val());
+                service_->get_zone_id().get_val());
             keep_alive_ = nullptr;
             shutdown_event_.set();
         }
@@ -501,7 +503,6 @@ namespace rpc::spsc
         auto ret = co_await service_->send(prefix.version,
             request.encoding,
             request.tag,
-            {request.caller_channel_zone_id},
             {request.caller_zone_id},
             {request.destination_zone_id},
             {request.object_id},
@@ -554,7 +555,6 @@ namespace rpc::spsc
         co_await service_->post(prefix.version,
             request.encoding,
             request.tag,
-            {request.caller_channel_zone_id},
             {request.caller_zone_id},
             {request.destination_zone_id},
             {request.object_id},
@@ -588,9 +588,12 @@ namespace rpc::spsc
         std::vector<char> out_buf;
         std::vector<rpc::back_channel_entry> in_back_channel;
         std::vector<rpc::back_channel_entry> out_back_channel;
-        auto ret = co_await service_->try_cast(
-            prefix.version, {request.destination_zone_id}, {request.object_id}, {request.interface_id},
-            in_back_channel, out_back_channel);
+        auto ret = co_await service_->try_cast(prefix.version,
+            {request.destination_zone_id},
+            {request.object_id},
+            {request.interface_id},
+            in_back_channel,
+            out_back_channel);
         if (ret != rpc::error::OK())
         {
             RPC_ERROR("failed try_cast");
@@ -627,10 +630,8 @@ namespace rpc::spsc
         std::vector<rpc::back_channel_entry> in_back_channel;
         std::vector<rpc::back_channel_entry> out_back_channel;
         auto ret = co_await service_->add_ref(prefix.version,
-            {request.destination_channel_zone_id},
             {request.destination_zone_id},
             {request.object_id},
-            {request.caller_channel_zone_id},
             {request.caller_zone_id},
             {request.known_direction_zone_id},
             (rpc::add_ref_options)request.build_out_param_channel,
@@ -674,9 +675,14 @@ namespace rpc::spsc
         uint64_t ref_count = 0;
         std::vector<rpc::back_channel_entry> in_back_channel;
         std::vector<rpc::back_channel_entry> out_back_channel;
-        auto ret = co_await service_->release(
-            prefix.version, {request.destination_zone_id}, {request.object_id}, {request.caller_zone_id}, request.options, ref_count,
-            in_back_channel, out_back_channel);
+        auto ret = co_await service_->release(prefix.version,
+            {request.destination_zone_id},
+            {request.object_id},
+            {request.caller_zone_id},
+            request.options,
+            ref_count,
+            in_back_channel,
+            out_back_channel);
 
         if (ret != rpc::error::OK())
         {

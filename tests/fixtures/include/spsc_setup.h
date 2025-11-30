@@ -175,7 +175,8 @@ public:
     virtual void tear_down()
     {
         bool shutdown_complete = false;
-        auto shutdown_task = [&]() -> coro::task<void> {
+        auto shutdown_task = [&]() -> coro::task<void>
+        {
             CO_AWAIT CoroTearDown();
             // Give time for service_proxy destructors to schedule detach coroutines
             // and for shutdown sequence to complete

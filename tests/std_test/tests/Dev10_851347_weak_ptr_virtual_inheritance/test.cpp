@@ -19,12 +19,13 @@
 using namespace std;
 
 // Also test GH-1102 "<memory>: weak_ptr conversions don't preserve control blocks for expired objects"
-template <typename T, typename U>
-[[nodiscard]] bool owner_equal(const weak_ptr<T>& t, const weak_ptr<U>& u) {
+template<typename T, typename U> [[nodiscard]] bool owner_equal(const weak_ptr<T>& t, const weak_ptr<U>& u)
+{
     return !t.owner_before(u) && !u.owner_before(t);
 }
 
-void test_owner_equal() {
+void test_owner_equal()
+{
     shared_ptr<int> sp_alive1(new int(0));
     shared_ptr<int> sp_alive2(new int(0));
     shared_ptr<int> sp_expiring3(new int(0));
@@ -74,104 +75,131 @@ void test_owner_equal() {
 
 // Platform-specific thread utilities
 #ifndef _M_CEE_PURE
-namespace {
+namespace
+{
 #ifdef _WIN32
-    struct thread_data {
+    struct thread_data
+    {
         std::function<void()> func;
     };
 
-    unsigned __stdcall thread_proc(void* param) {
+    unsigned __stdcall thread_proc(void* param)
+    {
         auto* data = static_cast<thread_data*>(param);
         data->func();
         return 0;
     }
 
-    class simple_thread {
+    class simple_thread
+    {
         HANDLE handle_;
+
     public:
-        template<typename F>
-        simple_thread(F&& f) {
+        template<typename F> simple_thread(F&& f)
+        {
             auto* data = new thread_data{std::forward<F>(f)};
             handle_ = reinterpret_cast<HANDLE>(_beginthreadex(nullptr, 0, thread_proc, data, 0, nullptr));
         }
 
-        void join() {
-            if (handle_) {
+        void join()
+        {
+            if (handle_)
+            {
                 WaitForSingleObject(handle_, INFINITE);
                 CloseHandle(handle_);
                 handle_ = nullptr;
             }
         }
 
-        ~simple_thread() {
-            if (handle_) {
+        ~simple_thread()
+        {
+            if (handle_)
+            {
                 join();
             }
         }
     };
 
-    void yield_thread() {
+    void yield_thread()
+    {
         SwitchToThread();
     }
 #else
-    struct thread_data {
+    struct thread_data
+    {
         std::function<void()> func;
     };
 
-    void* thread_proc(void* param) {
+    void* thread_proc(void* param)
+    {
         auto* data = static_cast<thread_data*>(param);
         data->func();
         delete data;
         return nullptr;
     }
 
-    class simple_thread {
+    class simple_thread
+    {
         pthread_t handle_;
         bool joined_;
+
     public:
         template<typename F>
-        simple_thread(F&& f) : joined_(false) {
+        simple_thread(F&& f)
+            : joined_(false)
+        {
             auto* data = new thread_data{std::forward<F>(f)};
             pthread_create(&handle_, nullptr, thread_proc, data);
         }
 
-        void join() {
-            if (!joined_) {
+        void join()
+        {
+            if (!joined_)
+            {
                 pthread_join(handle_, nullptr);
                 joined_ = true;
             }
         }
 
-        ~simple_thread() {
-            if (!joined_) {
+        ~simple_thread()
+        {
+            if (!joined_)
+            {
                 join();
             }
         }
     };
 
-    void yield_thread() {
+    void yield_thread()
+    {
         sched_yield();
     }
 #endif
 }
 #endif // _M_CEE_PURE
 
-void test_gh_258() {
+void test_gh_258()
+{
     // GH-258 <memory>: weak_ptr's converting constructors could sometimes avoid locking
 #ifndef _M_CEE_PURE
-    struct base1 {
+    struct base1
+    {
         int i = 0;
     };
 
-    struct base2 {
+    struct base2
+    {
         int j = 0;
     };
 
-    struct base3 {
+    struct base3
+    {
         int k = 0;
     };
 
-    struct derived : virtual base1, virtual base2, base3 {};
+    struct derived : virtual base1, virtual base2, base3
+    {
+    };
 
     static_assert(weak_ptr<base1>::_Must_avoid_expired_conversions_from<derived>, "Should avoid expired");
     static_assert(weak_ptr<base2>::_Must_avoid_expired_conversions_from<derived>, "Should avoid expired");
@@ -191,26 +219,33 @@ void test_gh_258() {
     static_assert(!weak_ptr<const int>::_Must_avoid_expired_conversions_from<int>, "Should optimize");
     static_assert(!weak_ptr<const int>::_Must_avoid_expired_conversions_from<const int>, "Should optimize");
 
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 10; ++i)
+    {
         // not make_shared -- with make_shared the test would not catch errors
         shared_ptr<derived> d{new derived{}};
         weak_ptr<derived> wd{d};
         atomic<bool> work{true};
-        simple_thread thd{[&] {
-            d.reset();
-            yield_thread(); // make crash on incorrect optimization even more likely
-            work = false;
-        }};
+        simple_thread thd{[&]
+            {
+                d.reset();
+                yield_thread(); // make crash on incorrect optimization even more likely
+                work = false;
+            }};
 
-        if ((i % 2) == 0) {
-            while (work) {
+        if ((i % 2) == 0)
+        {
+            while (work)
+            {
                 // likely to crash if optimized for a case we shouldn't
                 weak_ptr<base1> wb1{wd};
                 weak_ptr<base2> wb2{wd};
                 weak_ptr<const base3> wb3{wd};
             }
-        } else {
-            while (work) {
+        }
+        else
+        {
+            while (work)
+            {
                 // likely to crash if optimized for a case we shouldn't
                 weak_ptr<base1> wb1{weak_ptr<derived>{wd}};
                 weak_ptr<base2> wb2{weak_ptr<derived>{wd}};
@@ -223,23 +258,28 @@ void test_gh_258() {
 #endif // _M_CEE_PURE
 }
 
-struct A {
+struct A
+{
     int a{10};
 };
 
-struct B : virtual A {
+struct B : virtual A
+{
     int b{20};
 };
 
-struct C : virtual A {
+struct C : virtual A
+{
     int c{30};
 };
 
-struct D : B, C {
+struct D : B, C
+{
     int d{40};
 };
 
-int main() {
+int main()
+{
     // test_owner_equal();
     test_gh_258();
 
@@ -273,6 +313,6 @@ int main() {
     // wpa4 = move(wpd_two);
     // assert(wpa4.expired());
     // assert(owner_equal(wpa4, wpd_zero));
-    
+
     return 0;
 }

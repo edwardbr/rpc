@@ -27,11 +27,15 @@ STATIC_ASSERT(!is_assignable_v<function<bool()>&, shared_ptr<int> (*)()>);
 
 // Test allocator-aware function construction with shared_ptr
 #if _HAS_FUNCTION_ALLOCATOR_SUPPORT
-struct Al {};
-struct Tag {};
+struct Al
+{
+};
+struct Tag
+{
+};
 
 STATIC_ASSERT(is_constructible_v<function<shared_ptr<const int>()>, Tag, Al, shared_ptr<int> (*)()>);
 STATIC_ASSERT(!is_constructible_v<function<bool()>, Tag, Al, shared_ptr<int> (*)()>);
 #endif // _HAS_FUNCTION_ALLOCATOR_SUPPORT
 
-int main() {}
+int main() { }

@@ -80,13 +80,11 @@ using namespace marshalled_tests;
 extern bool enable_multithreaded_tests;
 
 // Fixture and type list for host-aware tests.
-template<class T>
-class type_test_with_host : public type_test<T>
+template<class T> class type_test_with_host : public type_test<T>
 {
 };
 
-using type_test_with_host_implementations = ::testing::Types<
-    inproc_setup<true, false, false>,
+using type_test_with_host_implementations = ::testing::Types<inproc_setup<true, false, false>,
     inproc_setup<true, false, true>,
     inproc_setup<true, true, false>,
     inproc_setup<true, true, true>

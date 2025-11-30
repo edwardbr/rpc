@@ -2277,32 +2277,26 @@ namespace rpc
     }
 
     void animation_telemetry_service::on_service_add_ref(rpc::zone zone_id,
-        rpc::destination_channel_zone destination_channel_zone_id,
         rpc::destination_zone destination_zone_id,
         rpc::object object_id,
-        rpc::caller_channel_zone caller_channel_zone_id,
         rpc::caller_zone caller_zone_id,
         rpc::add_ref_options options) const
     {
         record_event("service_add_ref",
             {make_number_field("zone", zone_id.get_val()),
-                make_number_field("destinationChannelZone", destination_channel_zone_id.get_val()),
                 make_number_field("destinationZone", destination_zone_id.get_val()),
                 make_number_field("object", object_id.get_val()),
-                make_number_field("callerChannelZone", caller_channel_zone_id.get_val()),
                 make_number_field("callerZone", caller_zone_id.get_val()),
                 make_number_field("options", static_cast<uint64_t>(options))});
     }
 
     void animation_telemetry_service::on_service_release(rpc::zone zone_id,
-        rpc::destination_channel_zone destination_channel_zone_id,
         rpc::destination_zone destination_zone_id,
         rpc::object object_id,
         rpc::caller_zone caller_zone_id) const
     {
         record_event("service_release",
             {make_number_field("zone", zone_id.get_val()),
-                make_number_field("destinationChannelZone", destination_channel_zone_id.get_val()),
                 make_number_field("destinationZone", destination_zone_id.get_val()),
                 make_number_field("object", object_id.get_val()),
                 make_number_field("callerZone", caller_zone_id.get_val())});
@@ -2361,7 +2355,6 @@ namespace rpc
 
     void animation_telemetry_service::on_service_proxy_add_ref(rpc::zone zone_id,
         rpc::destination_zone destination_zone_id,
-        rpc::destination_channel_zone destination_channel_zone_id,
         rpc::caller_zone caller_zone_id,
         rpc::object object_id,
         rpc::add_ref_options options) const
@@ -2369,7 +2362,6 @@ namespace rpc
         record_event("service_proxy_add_ref",
             {make_number_field("zone", zone_id.get_val()),
                 make_number_field("destinationZone", destination_zone_id.get_val()),
-                make_number_field("destinationChannelZone", destination_channel_zone_id.get_val()),
                 make_number_field("callerZone", caller_zone_id.get_val()),
                 make_number_field("object", object_id.get_val()),
                 make_number_field("options", static_cast<uint64_t>(options))});
@@ -2377,41 +2369,31 @@ namespace rpc
 
     void animation_telemetry_service::on_service_proxy_release(rpc::zone zone_id,
         rpc::destination_zone destination_zone_id,
-        rpc::destination_channel_zone destination_channel_zone_id,
         rpc::caller_zone caller_zone_id,
         rpc::object object_id) const
     {
         record_event("service_proxy_release",
             {make_number_field("zone", zone_id.get_val()),
                 make_number_field("destinationZone", destination_zone_id.get_val()),
-                make_number_field("destinationChannelZone", destination_channel_zone_id.get_val()),
                 make_number_field("callerZone", caller_zone_id.get_val()),
                 make_number_field("object", object_id.get_val())});
     }
 
-    void animation_telemetry_service::on_service_proxy_add_external_ref(rpc::zone zone_id,
-        rpc::destination_channel_zone destination_channel_zone_id,
-        rpc::destination_zone destination_zone_id,
-        rpc::caller_zone caller_zone_id,
-        int ref_count) const
+    void animation_telemetry_service::on_service_proxy_add_external_ref(
+        rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::caller_zone caller_zone_id, int ref_count) const
     {
         record_event("service_proxy_add_external_ref",
             {make_number_field("zone", zone_id.get_val()),
-                make_number_field("destinationChannelZone", destination_channel_zone_id.get_val()),
                 make_number_field("destinationZone", destination_zone_id.get_val()),
                 make_number_field("callerZone", caller_zone_id.get_val()),
                 make_signed_field("refCount", ref_count)});
     }
 
-    void animation_telemetry_service::on_service_proxy_release_external_ref(rpc::zone zone_id,
-        rpc::destination_channel_zone destination_channel_zone_id,
-        rpc::destination_zone destination_zone_id,
-        rpc::caller_zone caller_zone_id,
-        int ref_count) const
+    void animation_telemetry_service::on_service_proxy_release_external_ref(
+        rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::caller_zone caller_zone_id, int ref_count) const
     {
         record_event("service_proxy_release_external_ref",
             {make_number_field("zone", zone_id.get_val()),
-                make_number_field("destinationChannelZone", destination_channel_zone_id.get_val()),
                 make_number_field("destinationZone", destination_zone_id.get_val()),
                 make_number_field("callerZone", caller_zone_id.get_val()),
                 make_signed_field("refCount", ref_count)});
@@ -2546,8 +2528,8 @@ namespace rpc
 
     void animation_telemetry_service::message(level_enum level, const std::string& message) const
     {
-        std::vector<event_field> fields = {make_number_field("level", static_cast<uint64_t>(level)),
-            make_string_field("message", message)};
+        std::vector<event_field> fields
+            = {make_number_field("level", static_cast<uint64_t>(level)), make_string_field("message", message)};
         record_event("message", std::move(fields));
     }
 

@@ -76,8 +76,8 @@ namespace rpc
         {
             // Check if reverse entry already exists
             auto reverse_outer_it = destinations_.find(caller_val);
-            if (reverse_outer_it == destinations_.end() ||
-                reverse_outer_it->second.find(dest_val) == reverse_outer_it->second.end())
+            if (reverse_outer_it == destinations_.end()
+                || reverse_outer_it->second.find(dest_val) == reverse_outer_it->second.end())
             {
                 destinations_[caller_val][dest_val] = handler;
             }
@@ -132,7 +132,8 @@ namespace rpc
         // Validate: pass-through should only be created between different zones
         if (forward_dest == reverse_dest)
         {
-            RPC_ERROR("create_pass_through: Invalid pass-through request - forward_dest and reverse_dest are the same ({})! Pass-throughs should only route between different zones.",
+            RPC_ERROR("create_pass_through: Invalid pass-through request - forward_dest and reverse_dest are the same "
+                      "({})! Pass-throughs should only route between different zones.",
                 forward_dest.get_val());
             return nullptr;
         }
@@ -140,8 +141,10 @@ namespace rpc
         // Validate: forward and reverse transports should be different objects
         if (forward.get() == reverse.get())
         {
-            RPC_ERROR("create_pass_through: Invalid pass-through request - forward and reverse transports are the same object! forward_dest={}, reverse_dest={}",
-                forward_dest.get_val(), reverse_dest.get_val());
+            RPC_ERROR("create_pass_through: Invalid pass-through request - forward and reverse transports are the same "
+                      "object! forward_dest={}, reverse_dest={}",
+                forward_dest.get_val(),
+                reverse_dest.get_val());
             return nullptr;
         }
 
@@ -180,13 +183,16 @@ namespace rpc
         if (forward_handler)
         {
             RPC_DEBUG("create_pass_through: Found existing pass-through for forward_dest={}, reverse_dest={}",
-                forward_dest.get_val(), reverse_dest.get_val());
+                forward_dest.get_val(),
+                reverse_dest.get_val());
             return forward_handler;
         }
         else
         {
             RPC_DEBUG("create_pass_through: Creating NEW pass-through, forward_dest={}, reverse_dest={}, pt={}",
-                forward_dest.get_val(), reverse_dest.get_val(), (void*)pt.get());
+                forward_dest.get_val(),
+                reverse_dest.get_val(),
+                (void*)pt.get());
             // Register pass-through on both transports
             // inner_add_destination automatically registers both directions for pass-throughs
             forward->inner_add_destination(forward_dest, reverse_dest, std::static_pointer_cast<i_marshaller>(pt));
@@ -222,8 +228,12 @@ namespace rpc
                 auto handler = inner_it->second.lock();
                 if (!handler)
                 {
-                    RPC_WARNING("inner_get_destination_handler: weak_ptr expired for dest={}, caller={} on transport zone={} adjacent_zone={}",
-                        dest_val, caller_val, zone_id_.get_val(), adjacent_zone_id_.get_val());
+                    RPC_WARNING("inner_get_destination_handler: weak_ptr expired for dest={}, caller={} on transport "
+                                "zone={} adjacent_zone={}",
+                        dest_val,
+                        caller_val,
+                        zone_id_.get_val(),
+                        adjacent_zone_id_.get_val());
                 }
                 return handler;
             }
@@ -234,7 +244,7 @@ namespace rpc
     // Helper to route incoming messages to registered handlers
     std::shared_ptr<i_marshaller> transport::get_destination_handler(destination_zone dest, destination_zone caller) const
     {
-        if(dest == zone_id_.as_destination())
+        if (dest == zone_id_.as_destination())
         {
             RPC_DEBUG("get_destination_handler: Requested destination is local zone {}, returning local service",
                 zone_id_.get_val());
@@ -243,7 +253,11 @@ namespace rpc
         std::shared_lock lock(destinations_mutex_);
         auto handler = inner_get_destination_handler(dest, caller);
         RPC_DEBUG("get_destination_handler: dest={}, caller={}, transport zone={}, adjacent_zone={}, found={}",
-            dest.get_val(), caller.get_val(), zone_id_.get_val(), adjacent_zone_id_.get_val(), handler != nullptr);
+            dest.get_val(),
+            caller.get_val(),
+            zone_id_.get_val(),
+            adjacent_zone_id_.get_val(),
+            handler != nullptr);
         return handler;
     }
 
@@ -261,8 +275,10 @@ namespace rpc
                 auto handler = handler_weak.lock();
                 if (handler)
                 {
-                    RPC_DEBUG("inner_find_any_passthrough_for_destination: Found pass-through for dest={} with caller={}",
-                        dest_val, caller_val);
+                    RPC_DEBUG(
+                        "inner_find_any_passthrough_for_destination: Found pass-through for dest={} with caller={}",
+                        dest_val,
+                        caller_val);
                     return handler;
                 }
             }
@@ -311,7 +327,6 @@ namespace rpc
     transport::inbound_send(uint64_t protocol_version,
         encoding encoding,
         uint64_t tag,
-        caller_channel_zone caller_channel_zone_id,
         caller_zone caller_zone_id,
         destination_zone destination_zone_id,
         object object_id,
@@ -333,7 +348,7 @@ namespace rpc
         CO_RETURN CO_AWAIT dest->send(protocol_version,
             encoding,
             tag,
-            caller_channel_zone_id,
+            adjacent_zone_id_.as_caller_channel(),
             caller_zone_id,
             destination_zone_id,
             object_id,
@@ -350,7 +365,6 @@ namespace rpc
     transport::inbound_post(uint64_t protocol_version,
         encoding encoding,
         uint64_t tag,
-        caller_channel_zone caller_channel_zone_id,
         caller_zone caller_zone_id,
         destination_zone destination_zone_id,
         object object_id,
@@ -371,7 +385,7 @@ namespace rpc
         CO_AWAIT dest->post(protocol_version,
             encoding,
             tag,
-            caller_channel_zone_id,
+            zone_id_.as_caller_channel(),
             caller_zone_id,
             destination_zone_id,
             object_id,
@@ -405,10 +419,8 @@ namespace rpc
 
     CORO_TASK(int)
     transport::inbound_add_ref(uint64_t protocol_version,
-        destination_channel_zone destination_channel_zone_id,
         destination_zone destination_zone_id,
         object object_id,
-        caller_channel_zone caller_channel_zone_id,
         caller_zone caller_zone_id,
         known_direction_zone known_direction_zone_id,
         add_ref_options build_out_param_channel,
@@ -416,13 +428,10 @@ namespace rpc
         const std::vector<back_channel_entry>& in_back_channel,
         std::vector<back_channel_entry>& out_back_channel)
     {
-        auto build_channel = !!(build_out_param_channel & add_ref_options::build_destination_route)
-                             || !!(build_out_param_channel & add_ref_options::build_caller_route);
-
-        auto dest_channel = destination_channel_zone_id.is_set() ? destination_channel_zone_id.get_val()
-                                                                 : destination_zone_id.get_val();
-        auto caller_channel
-            = caller_channel_zone_id.is_set() ? caller_channel_zone_id.get_val() : caller_zone_id.get_val();
+        bool build_caller_channel = !!(build_out_param_channel & add_ref_options::build_caller_route);
+        bool build_dest_channel = !!(build_out_param_channel & add_ref_options::build_destination_route)
+                                  || build_out_param_channel == add_ref_options::normal
+                                  || build_out_param_channel == add_ref_options::optimistic;
 
         auto svc = service_.lock();
         if (!svc)
@@ -430,71 +439,31 @@ namespace rpc
             CO_RETURN error::TRANSPORT_ERROR();
         }
 
-        RPC_DEBUG("inbound_add_ref: svc_zone={}, dest_zone={}, caller_zone={}, build_channel={}, dest_channel={}, caller_channel={}",
-            svc->get_zone_id().get_val(), destination_zone_id.get_val(), caller_zone_id.get_val(),
-            build_channel, dest_channel, caller_channel);
+        RPC_DEBUG("inbound_add_ref: svc_zone={}, dest_zone={}, caller_zone={}, build_caller_channel={}, "
+                  "build_dest_channel={}, known_direction_zone_id={}",
+            svc->get_zone_id().get_val(),
+            destination_zone_id.get_val(),
+            caller_zone_id.get_val(),
+            build_caller_channel,
+            build_dest_channel,
+            known_direction_zone_id.get_val());
 
-        // Check if this is a pass-through scenario (destination is not local)
-        if (destination_zone_id != svc->get_zone_id().as_destination())
+        if (destination_zone_id != svc->get_zone_id().as_destination() && caller_zone_id != svc->get_zone_id().as_caller())
         {
-            // First, check if we already have a pass-through for this specific zone pair
-            auto dest = get_destination_handler(destination_zone_id, caller_zone_id.as_destination());
-
-            // If no handler exists and this is not a fork setup at this node, create pass-through
-            // IMPORTANT: Only create pass-through at INTERMEDIATE zones, not at originating zone
-            // ALSO: Never create pass-through when destination and caller are the same zone
-            if (!dest
-                && caller_zone_id.as_destination() != svc->get_zone_id().as_destination()
-                && destination_zone_id != caller_zone_id.as_destination()  // Don't create pass-through from zone to itself
-                && (
-                    // if the call is standard pass-through add_ref (not building channels)
-                    !build_channel
-                    // OR the fork is beyond this node (dest_channel == caller_channel means both on same side)
-                    || (dest_channel == caller_channel && build_channel)
-                    // OR we need multi-hop routing (dest_channel is intermediate zone)
-                    || (build_channel && dest_channel != destination_zone_id.get_val() && dest_channel != svc->get_zone_id().get_val())))
+            auto dest_transport = svc->get_transport(destination_zone_id);
+            if (destination_zone_id == caller_zone_id.as_destination())
             {
-                RPC_DEBUG("inbound_add_ref: PASS-THROUGH PATH - creating pass-through for zone pair (dest={}, caller={})",
-                    destination_zone_id.get_val(), caller_zone_id.get_val());
-                auto reverse_transport = svc->get_transport(caller_zone_id.as_destination());
-                if (!reverse_transport)
+                // caller and destination are the same zone, so we just call the transport to pass the call along and not involve a pass through
+                if (!dest_transport)
                 {
-                    RPC_ERROR("inbound_add_ref: No reverse_transport for caller_zone={}", caller_zone_id.get_val());
-                    CO_RETURN rpc::error::ZONE_NOT_FOUND();
-                }
-                auto forward_transport = svc->get_transport(destination_zone_id);
-                if (!forward_transport)
-                {
-                    if(!!(build_out_param_channel & add_ref_options::build_caller_route))
-                    {
-                        forward_transport = shared_from_this();
-                    }
-                    else
-                    {
-                        RPC_ERROR("inbound_add_ref: No forward_transport for destination_zone={}", destination_zone_id.get_val());
-                        CO_RETURN rpc::error::ZONE_NOT_FOUND();
-                    }
+                    CO_RETURN error::ZONE_NOT_FOUND();
                 }
 
-                dest = create_pass_through(forward_transport, // forward_transport: handles messages TO final destination
-                    reverse_transport,                        // reverse_transport: handles messages back to caller
-                    svc,                                      // service
-                    destination_zone_id,                      // forward_destination: where forward messages go
-                    caller_zone_id.as_destination()           // reverse_destination: where reverse messages go
-                );
-            }
-
-            // If we found or created a handler, use it for pass-through
-            if (dest)
-            {
-                RPC_DEBUG("inbound_add_ref: Using pass-through/handler for dest_zone={}, caller_zone={}",
-                    destination_zone_id.get_val(), caller_zone_id.get_val());
-
-                CO_RETURN CO_AWAIT dest->add_ref(protocol_version,
-                    destination_channel_zone_id,
+                // here we
+                auto erro_code = dest_transport->add_ref(protocol_version,
                     destination_zone_id,
                     object_id,
-                    caller_channel_zone_id,
+                    get_zone_id().as_caller_channel(),
                     caller_zone_id,
                     known_direction_zone_id,
                     build_out_param_channel,
@@ -502,14 +471,69 @@ namespace rpc
                     in_back_channel,
                     out_back_channel);
             }
+            if (!dest_transport)
+            {
+                dest_transport = shared_from_this();
+            }
+
+            // otherwise we are going to use or create a pass-through
+            auto passthrough
+                = dest_transport->get_destination_handler(destination_zone_id, caller_zone_id.as_destination());
+            if (passthrough)
+            {
+                CO_RETURN passthrough->add_ref(protocol_version,
+                    destination_zone_id,
+                    object_id,
+                    get_zone_id().as_caller_channel(),
+                    caller_zone_id,
+                    known_direction_zone_id,
+                    build_out_param_channel,
+                    reference_count,
+                    in_back_channel,
+                    out_back_channel);
+            }
+
+            auto caller_transport = svc->get_transport(caller_zone_id.as_destination());
+            if (!caller_transport)
+            {
+                caller_transport = shared_from_this();
+            }
+
+            if (dest_transport == caller_transport)
+            {
+                // here we directly call the destination
+                CO_RETURN dest_transport->add_ref(protocol_version,
+                    destination_zone_id,
+                    object_id,
+                    get_zone_id().as_caller_channel(),
+                    caller_zone_id,
+                    known_direction_zone_id,
+                    build_out_param_channel,
+                    reference_count,
+                    in_back_channel,
+                    out_back_channel);
+            }
+
+            passthrough = transport::create_pass_through(
+                dest_transport, caller_transport, svc, destination_zone_id, caller_zone_id.as_destination());
+
+            CO_RETURN passthrough->add_ref(protocol_version,
+                destination_zone_id,
+                object_id,
+                get_zone_id().as_caller_channel(),
+                caller_zone_id,
+                known_direction_zone_id,
+                build_out_param_channel,
+                reference_count,
+                in_back_channel,
+                out_back_channel);
         }
 
         // else it is a special case that the service needs to deal with
         CO_RETURN CO_AWAIT svc->add_ref(protocol_version,
-            destination_channel_zone_id,
             destination_zone_id,
             object_id,
-            caller_channel_zone_id,
+            adjacent_zone_id_.as_caller_channel(),
             caller_zone_id,
             known_direction_zone_id,
             build_out_param_channel,

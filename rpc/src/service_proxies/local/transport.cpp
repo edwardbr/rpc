@@ -52,7 +52,6 @@ namespace local
         CO_RETURN CO_AWAIT parent->inbound_send(protocol_version,
             encoding,
             tag,
-            caller_channel_zone_id,
             caller_zone_id,
             destination_zone_id,
             object_id,
@@ -89,7 +88,6 @@ namespace local
         CO_AWAIT parent->inbound_post(protocol_version,
             encoding,
             tag,
-            caller_channel_zone_id,
             caller_zone_id,
             destination_zone_id,
             object_id,
@@ -121,7 +119,6 @@ namespace local
 
     CORO_TASK(int)
     parent_transport::add_ref(uint64_t protocol_version,
-        rpc::destination_channel_zone destination_channel_zone_id,
         rpc::destination_zone destination_zone_id,
         rpc::object object_id,
         rpc::caller_channel_zone caller_channel_zone_id,
@@ -147,10 +144,8 @@ namespace local
 
         RPC_DEBUG("parent_transport::add_ref: Calling parent->inbound_add_ref for zone {}", destination_zone_id.get_val());
         CO_RETURN CO_AWAIT parent->inbound_add_ref(protocol_version,
-            destination_channel_zone_id,
             destination_zone_id,
             object_id,
-            caller_channel_zone_id,
             caller_zone_id,
             known_direction_zone_id,
             build_out_param_channel,
@@ -216,7 +211,6 @@ namespace local
         CO_RETURN CO_AWAIT child->inbound_send(protocol_version,
             encoding,
             tag,
-            caller_channel_zone_id,
             caller_zone_id,
             destination_zone_id,
             object_id,
@@ -253,7 +247,6 @@ namespace local
         CO_AWAIT child->inbound_post(protocol_version,
             encoding,
             tag,
-            caller_channel_zone_id,
             caller_zone_id,
             destination_zone_id,
             object_id,
@@ -285,7 +278,6 @@ namespace local
 
     CORO_TASK(int)
     child_transport::add_ref(uint64_t protocol_version,
-        rpc::destination_channel_zone destination_channel_zone_id,
         rpc::destination_zone destination_zone_id,
         rpc::object object_id,
         rpc::caller_channel_zone caller_channel_zone_id,
@@ -304,10 +296,8 @@ namespace local
         }
 
         CO_RETURN CO_AWAIT child->inbound_add_ref(protocol_version,
-            destination_channel_zone_id,
             destination_zone_id,
             object_id,
-            caller_channel_zone_id,
             caller_zone_id,
             known_direction_zone_id,
             build_out_param_channel,

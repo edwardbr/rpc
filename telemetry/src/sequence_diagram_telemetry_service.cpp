@@ -284,24 +284,19 @@ namespace rpc
     }
 
     void sequence_diagram_telemetry_service::on_service_add_ref(rpc::zone zone_id,
-        rpc::destination_channel_zone destination_channel_zone_id,
         rpc::destination_zone destination_zone_id,
         rpc::object object_id,
-        rpc::caller_channel_zone caller_channel_zone_id,
         rpc::caller_zone caller_zone_id,
         rpc::add_ref_options options) const
     {
         std::ignore = zone_id;
-        std::ignore = destination_channel_zone_id;
         std::ignore = destination_zone_id;
         std::ignore = object_id;
-        std::ignore = caller_channel_zone_id;
         std::ignore = caller_zone_id;
         std::ignore = options;
 
 #ifdef USE_RPC_TELEMETRY_RAII_LOGGING
-        auto dest = destination_channel_zone_id.get_val() ? rpc::zone(destination_channel_zone_id.get_val())
-                                                          : destination_zone_id.as_zone();
+        auto dest = destination_zone_id.as_zone();
 
         if (rpc::add_ref_options::normal == options)
         {
@@ -383,20 +378,17 @@ namespace rpc
     }
 
     void sequence_diagram_telemetry_service::on_service_release(rpc::zone zone_id,
-        rpc::destination_channel_zone destination_channel_zone_id,
         rpc::destination_zone destination_zone_id,
         rpc::object object_id,
         rpc::caller_zone caller_zone_id) const
     {
         std::ignore = zone_id;
-        std::ignore = destination_channel_zone_id;
         std::ignore = destination_zone_id;
         std::ignore = object_id;
         std::ignore = caller_zone_id;
 
 #ifdef USE_RPC_TELEMETRY_RAII_LOGGING
-        auto dest = destination_channel_zone_id.get_val() ? rpc::zone(destination_channel_zone_id.get_val())
-                                                          : destination_zone_id.as_zone();
+        auto dest = destination_zone_id.as_zone();
 
         if (zone_id != dest)
         {
@@ -605,13 +597,11 @@ namespace rpc
 
     void sequence_diagram_telemetry_service::on_service_proxy_add_ref(rpc::zone zone_id,
         rpc::destination_zone destination_zone_id,
-        rpc::destination_channel_zone destination_channel_zone_id,
         rpc::caller_zone caller_zone_id,
         rpc::object object_id,
         rpc::add_ref_options options) const
     {
         std::ignore = zone_id;
-        std::ignore = destination_channel_zone_id;
         std::ignore = destination_zone_id;
         std::ignore = object_id;
         std::ignore = caller_zone_id;
@@ -650,15 +640,12 @@ namespace rpc
         //     object_id {}", name, zone_id.get_val(), destination_zone_id.get_val(), caller_zone_id.get_val(),
         //     object_id.get_val());
         // }
-        auto dest = destination_channel_zone_id.get_val() ? rpc::zone(destination_channel_zone_id.get_val())
-                                                          : destination_zone_id.as_zone();
-
         if (object_id == rpc::dummy_object_id)
         {
             fmt::println(output_,
                 "{} -> {} : dummy add_ref {} {}",
                 service_proxy_alias(zone_id, destination_zone_id, caller_zone_id),
-                service_alias(dest),
+                service_alias(destination_zone_id.as_zone()),
                 type,
                 get_thread_id());
         }
@@ -667,7 +654,7 @@ namespace rpc
             fmt::println(output_,
                 "{} -> {} : add_ref {} {}",
                 service_proxy_alias(zone_id, destination_zone_id, caller_zone_id),
-                service_alias(dest),
+                service_alias(destination_zone_id.as_zone()),
                 type,
                 get_thread_id());
         }
@@ -677,19 +664,16 @@ namespace rpc
 
     void sequence_diagram_telemetry_service::on_service_proxy_release(rpc::zone zone_id,
         rpc::destination_zone destination_zone_id,
-        rpc::destination_channel_zone destination_channel_zone_id,
         rpc::caller_zone caller_zone_id,
         rpc::object object_id) const
     {
         std::ignore = zone_id;
-        std::ignore = destination_channel_zone_id;
         std::ignore = destination_zone_id;
         std::ignore = object_id;
         std::ignore = caller_zone_id;
 
 #ifdef USE_RPC_TELEMETRY_RAII_LOGGING
-        auto dest = destination_channel_zone_id.get_val() ? rpc::zone(destination_channel_zone_id.get_val())
-                                                          : destination_zone_id.as_zone();
+        auto dest = destination_zone_id.as_zone();
 
         if (object_id == rpc::dummy_object_id)
         {
@@ -711,14 +695,10 @@ namespace rpc
 #endif
     }
 
-    void sequence_diagram_telemetry_service::on_service_proxy_add_external_ref(rpc::zone zone_id,
-        rpc::destination_channel_zone destination_channel_zone_id,
-        rpc::destination_zone destination_zone_id,
-        rpc::caller_zone caller_zone_id,
-        int ref_count) const
+    void sequence_diagram_telemetry_service::on_service_proxy_add_external_ref(
+        rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::caller_zone caller_zone_id, int ref_count) const
     {
         std::ignore = zone_id;
-        std::ignore = destination_channel_zone_id;
         std::ignore = destination_zone_id;
         std::ignore = caller_zone_id;
         std::ignore = ref_count;
@@ -751,25 +731,16 @@ namespace rpc
             }
         }
 
-        rpc::zone destination_channel_zone = {};
-        if (destination_channel_zone_id == 0 || destination_channel_zone_id == destination_zone_id.as_destination_channel())
-        {
-            destination_channel_zone = destination_zone_id.as_zone();
-        }
-        else
-        {
-            destination_channel_zone = {destination_channel_zone_id.get_val()};
-        }
-        auto entry = services.find(destination_channel_zone);
+        auto entry = services.find(destination_zone_id.as_zone());
         if (entry == services.end())
         {
-            services.emplace(destination_channel_zone, name_count{"", 1});
+            services.emplace(destination_zone_id.as_zone(), name_count{"", 1});
             fmt::println(output_,
                 "participant \"zone {}\" as {} order {} #Moccasin",
-                destination_channel_zone.get_val(),
-                service_alias(destination_channel_zone),
-                service_order(destination_channel_zone));
-            fmt::println(output_, "activate {} #Moccasin", service_alias(destination_channel_zone));
+                destination_zone_id.as_zone().get_val(),
+                service_alias(destination_zone_id.as_zone()),
+                service_order(destination_zone_id.as_zone()));
+            fmt::println(output_, "activate {} #Moccasin", service_alias(destination_zone_id.as_zone()));
         }
         fmt::println(output_,
             "hnote over {} : add_external_ref {} {}",
@@ -780,14 +751,10 @@ namespace rpc
 #endif
     }
 
-    void sequence_diagram_telemetry_service::on_service_proxy_release_external_ref(rpc::zone zone_id,
-        rpc::destination_channel_zone destination_channel_zone_id,
-        rpc::destination_zone destination_zone_id,
-        rpc::caller_zone caller_zone_id,
-        int ref_count) const
+    void sequence_diagram_telemetry_service::on_service_proxy_release_external_ref(
+        rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::caller_zone caller_zone_id, int ref_count) const
     {
         std::ignore = zone_id;
-        std::ignore = destination_channel_zone_id;
         std::ignore = destination_zone_id;
         std::ignore = caller_zone_id;
         std::ignore = ref_count;
@@ -854,7 +821,8 @@ namespace rpc
         fmt::println(output_, "activate {}", object_alias(address));
     }
 
-    void sequence_diagram_telemetry_service::on_impl_creation(const std::string& name, uint64_t address, rpc::zone zone_id) const
+    void sequence_diagram_telemetry_service::on_impl_creation(
+        const std::string& name, uint64_t address, rpc::zone zone_id) const
     {
         std::lock_guard g(mux);
         if (historical_impls.find(address) != historical_impls.end())

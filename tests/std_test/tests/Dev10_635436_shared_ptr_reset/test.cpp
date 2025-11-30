@@ -11,7 +11,8 @@ using namespace std;
 
 vector<pair<string, int>> results;
 
-class Cat {
+class Cat
+{
 public:
     explicit Cat(int n);
     void meow();
@@ -29,45 +30,55 @@ private:
     shared_ptr<Cat> m_p;
 };
 
-void deleter(Cat* p) {
+void deleter(Cat* p)
+{
     delete p;
 }
 
-Cat::Cat(const int n) : m_n(n), m_p() {
+Cat::Cat(const int n)
+    : m_n(n)
+    , m_p()
+{
     results.emplace_back("Cat::Cat()", m_n);
 }
 
-void Cat::meow() {
+void Cat::meow()
+{
     results.emplace_back("Cat::meow()", m_n);
 
     m_p.reset(this);
 }
 
-void Cat::vanish0() {
+void Cat::vanish0()
+{
     results.emplace_back("Cat::vanish0()", m_n);
 
     m_p.reset();
 }
 
-void Cat::vanish1() {
+void Cat::vanish1()
+{
     results.emplace_back("Cat::vanish1()", m_n);
 
     m_p.reset(new Cat(11));
 }
 
-void Cat::vanish2() {
+void Cat::vanish2()
+{
     results.emplace_back("Cat::vanish2()", m_n);
 
     m_p.reset(new Cat(22), deleter);
 }
 
-void Cat::vanish3() {
+void Cat::vanish3()
+{
     results.emplace_back("Cat::vanish3()", m_n);
 
     m_p.reset(new Cat(33), deleter, allocator<int>());
 }
 
-Cat::~Cat() {
+Cat::~Cat()
+{
     results.emplace_back("Cat::~Cat()", m_n);
 
     assert(m_p.get() != this);
@@ -117,7 +128,8 @@ Cat::~Cat() {
 //     assert(m_p.get() != this);
 // }
 
-int main() {
+int main()
+{
     // Dev10-635436 "shared_ptr: reset() must behave as if it is implemented with swap()"
     results.emplace_back("BEGIN", 0);
 
@@ -151,7 +163,6 @@ int main() {
 
     results.emplace_back("END", 3);
 
-
     // // DevDiv-523246 "std::unique_ptr deletes owned object before resetting pointer rather than after."
     // results.emplace_back("BEGIN", 4);
 
@@ -168,7 +179,6 @@ int main() {
     // p5->vanish1();
 
     // results.emplace_back("END", 5);
-
 
     vector<pair<string, int>> correct;
 

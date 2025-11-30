@@ -11,40 +11,40 @@ using namespace std;
 // Test shared_ptr and weak_ptr with custom allocators
 int g_mallocs = 0;
 
-template <typename T>
-struct Mallocator {
+template<typename T> struct Mallocator
+{
     typedef T value_type;
 
-    T* allocate(size_t n) {
+    T* allocate(size_t n)
+    {
         ++g_mallocs;
         return static_cast<T*>(malloc(sizeof(T) * n));
     }
 
-    void deallocate(T* p, size_t) {
-        free(p);
-    }
+    void deallocate(T* p, size_t) { free(p); }
 
-    Mallocator() {}
+    Mallocator() { }
 
-    template <typename U>
-    Mallocator(const Mallocator<U>&) {}
+    template<typename U> Mallocator(const Mallocator<U>&) { }
 };
 
-template <typename T, typename U>
-bool operator==(const Mallocator<T>&, const Mallocator<U>&) {
+template<typename T, typename U> bool operator==(const Mallocator<T>&, const Mallocator<U>&)
+{
     return true;
 }
 
-template <typename T, typename U>
-bool operator!=(const Mallocator<T>&, const Mallocator<U>&) {
+template<typename T, typename U> bool operator!=(const Mallocator<T>&, const Mallocator<U>&)
+{
     return false;
 }
 
-void custom_deleter(int* p) {
+void custom_deleter(int* p)
+{
     delete p;
 }
 
-int main() {
+int main()
+{
     // Test shared_ptr with custom deleter and allocator
     {
         int* const raw = new int(47);

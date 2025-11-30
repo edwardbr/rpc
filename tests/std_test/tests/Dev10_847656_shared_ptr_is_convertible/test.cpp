@@ -6,73 +6,72 @@
 
 using namespace std;
 
-class Cat {
+class Cat
+{
 public:
-    Cat() {}
+    Cat() { }
     virtual int meow() const = 0;
-    virtual ~Cat() {}
+    virtual ~Cat() { }
 
 private:
     Cat(const Cat&);
     Cat& operator=(const Cat&);
 };
 
-struct Lion : public Cat {
-    int meow() const override {
-        return 6;
-    }
+struct Lion : public Cat
+{
+    int meow() const override { return 6; }
 };
 
-struct Tiger : public Cat {
-    int meow() const override {
-        return 7;
-    }
+struct Tiger : public Cat
+{
+    int meow() const override { return 7; }
 };
 
-
-class Planet {
+class Planet
+{
 public:
-    Planet() {}
+    Planet() { }
     virtual int orbit() const = 0;
-    virtual ~Planet() {}
+    virtual ~Planet() { }
 
 private:
     Planet(const Planet&);
     Planet& operator=(const Planet&);
 };
 
-struct Jupiter : public Planet {
-    int orbit() const override {
-        return 8;
-    }
+struct Jupiter : public Planet
+{
+    int orbit() const override { return 8; }
 };
 
-struct Saturn : public Planet {
-    int orbit() const override {
-        return 9;
-    }
+struct Saturn : public Planet
+{
+    int orbit() const override { return 9; }
 };
 
-
-int function_taking_shared(const shared_ptr<Cat>& p) {
+int function_taking_shared(const shared_ptr<Cat>& p)
+{
     return p->meow() * 10 + 1;
 }
 
-int function_taking_shared(const shared_ptr<Planet>& p) {
+int function_taking_shared(const shared_ptr<Planet>& p)
+{
     return p->orbit() * 10 + 2;
 }
 
-
-int function_taking_weak(const weak_ptr<Cat>& p) {
+int function_taking_weak(const weak_ptr<Cat>& p)
+{
     return p.lock()->meow() * 10 + 3;
 }
 
-int function_taking_weak(const weak_ptr<Planet>& p) {
+int function_taking_weak(const weak_ptr<Planet>& p)
+{
     return p.lock()->orbit() * 10 + 4;
 }
 
-
-int main() {
+int main()
+{
     shared_ptr<Lion> sp1(new Lion);
     shared_ptr<Tiger> sp2(new Tiger);
     shared_ptr<Jupiter> sp3(new Jupiter);
@@ -102,10 +101,10 @@ int main() {
     assert(function_taking_weak(sp3) == 84);
     assert(function_taking_weak(sp4) == 94);
 
-    weak_ptr<Lion> wp1    = sp1;
-    weak_ptr<Tiger> wp2   = sp2;
+    weak_ptr<Lion> wp1 = sp1;
+    weak_ptr<Tiger> wp2 = sp2;
     weak_ptr<Jupiter> wp3 = sp3;
-    weak_ptr<Saturn> wp4  = sp4;
+    weak_ptr<Saturn> wp4 = sp4;
 
     // Test weak_ptr(const weak_ptr<Y>&)
     assert(function_taking_weak(wp1) == 63);

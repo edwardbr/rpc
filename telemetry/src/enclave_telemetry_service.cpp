@@ -38,33 +38,22 @@ namespace rpc
     }
 
     void enclave_telemetry_service::on_service_add_ref(rpc::zone zone_id,
-        rpc::destination_channel_zone destination_channel_zone_id,
         rpc::destination_zone destination_zone_id,
         rpc::object object_id,
-        rpc::caller_channel_zone caller_channel_zone_id,
         rpc::caller_zone caller_zone_id,
         rpc::add_ref_options options) const
     {
-        on_service_add_ref_host(zone_id.get_val(),
-            destination_channel_zone_id.get_val(),
-            destination_zone_id.get_val(),
-            object_id.get_val(),
-            caller_channel_zone_id.get_val(),
-            caller_zone_id.get_val(),
-            (uint64_t)options);
+        on_service_add_ref_host(
+            zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), caller_zone_id.get_val(), (uint64_t)options);
     }
 
     void enclave_telemetry_service::on_service_release(rpc::zone zone_id,
-        rpc::destination_channel_zone destination_channel_zone_id,
         rpc::destination_zone destination_zone_id,
         rpc::object object_id,
         rpc::caller_zone caller_zone_id) const
     {
-        on_service_release_host(zone_id.get_val(),
-            destination_channel_zone_id.get_val(),
-            destination_zone_id.get_val(),
-            object_id.get_val(),
-            caller_zone_id.get_val());
+        on_service_release_host(
+            zone_id.get_val(), destination_zone_id.get_val(), object_id.get_val(), caller_zone_id.get_val());
     }
     void enclave_telemetry_service::on_service_proxy_creation(const std::string& service_name,
         const std::string& service_proxy_name,
@@ -103,29 +92,20 @@ namespace rpc
     }
     void enclave_telemetry_service::on_service_proxy_add_ref(rpc::zone zone_id,
         rpc::destination_zone destination_zone_id,
-        rpc::destination_channel_zone destination_channel_zone_id,
         rpc::caller_zone caller_zone_id,
         rpc::object object_id,
         rpc::add_ref_options options) const
     {
-        on_service_proxy_add_ref_host(zone_id.get_val(),
-            destination_zone_id.get_val(),
-            destination_channel_zone_id.get_val(),
-            caller_zone_id.get_val(),
-            object_id.get_val(),
-            (uint64_t)options);
+        on_service_proxy_add_ref_host(
+            zone_id.get_val(), destination_zone_id.get_val(), caller_zone_id.get_val(), object_id.get_val(), (uint64_t)options);
     }
     void enclave_telemetry_service::on_service_proxy_release(rpc::zone zone_id,
         rpc::destination_zone destination_zone_id,
-        rpc::destination_channel_zone destination_channel_zone_id,
         rpc::caller_zone caller_zone_id,
         rpc::object object_id) const
     {
-        on_service_proxy_release_host(zone_id.get_val(),
-            destination_zone_id.get_val(),
-            destination_channel_zone_id.get_val(),
-            caller_zone_id.get_val(),
-            object_id.get_val());
+        on_service_proxy_release_host(
+            zone_id.get_val(), destination_zone_id.get_val(), caller_zone_id.get_val(), object_id.get_val());
     }
 
     void enclave_telemetry_service::on_impl_creation(const std::string& name, uint64_t address, rpc::zone zone_id) const
@@ -213,29 +193,21 @@ namespace rpc
     }
 
     void enclave_telemetry_service::on_service_proxy_add_external_ref(rpc::zone operating_zone_id,
-        rpc::destination_channel_zone destination_channel_zone_id,
         rpc::destination_zone destination_zone_id,
         rpc::caller_zone caller_zone_id,
         int ref_count) const
     {
-        on_service_proxy_add_external_ref_host(operating_zone_id.get_val(),
-            destination_channel_zone_id.get_val(),
-            destination_zone_id.get_val(),
-            caller_zone_id.get_val(),
-            ref_count);
+        on_service_proxy_add_external_ref_host(
+            operating_zone_id.get_val(), destination_zone_id.get_val(), caller_zone_id.get_val(), ref_count);
     }
 
     void enclave_telemetry_service::on_service_proxy_release_external_ref(rpc::zone operating_zone_id,
-        rpc::destination_channel_zone destination_channel_zone_id,
         rpc::destination_zone destination_zone_id,
         rpc::caller_zone caller_zone_id,
         int ref_count) const
     {
-        on_service_proxy_release_external_ref_host(operating_zone_id.get_val(),
-            destination_channel_zone_id.get_val(),
-            destination_zone_id.get_val(),
-            caller_zone_id.get_val(),
-            ref_count);
+        on_service_proxy_release_external_ref_host(
+            operating_zone_id.get_val(), destination_zone_id.get_val(), caller_zone_id.get_val(), ref_count);
     }
 
     void enclave_telemetry_service::message(rpc::i_telemetry_service::level_enum level, const std::string& message) const

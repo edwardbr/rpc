@@ -66,9 +66,9 @@ namespace
             std::cerr << "Error during argument parsing: " << e.what() << std::endl;
             return 1;
         }
-        
-        if(help.HasFlag())
-        {   
+
+        if (help.HasFlag())
+        {
             std::cout << parser;
             std::cout << "\nGoogle Test Integration:\n";
             std::cout << "  All Google Test flags are supported and will be passed through.\n";
@@ -140,8 +140,8 @@ namespace
             {
                 std::cout << "\n=== CUSTOM CRASH ANALYSIS ===" << std::endl;
                 std::cout << "Crash occurred at: "
-                << std::chrono::duration_cast<std::chrono::seconds>(report.crash_time.time_since_epoch()).count()
-                << std::endl;
+                          << std::chrono::duration_cast<std::chrono::seconds>(report.crash_time.time_since_epoch()).count()
+                          << std::endl;
 
                 // Check for threading debug patterns
                 bool threading_bug_detected = false;
@@ -213,7 +213,6 @@ namespace
         return ret;
     }
 }
-
 
 static_assert(rpc::id<std::string>::get(rpc::VERSION_2) == rpc::STD_STRING_ID);
 

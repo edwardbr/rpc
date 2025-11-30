@@ -56,7 +56,6 @@ namespace rpc
         // Helper to route incoming messages to registered handlers
         // Gets handler for specific zone pair
         std::shared_ptr<i_marshaller> inner_get_destination_handler(destination_zone dest, destination_zone caller) const;
-        std::shared_ptr<i_marshaller> get_destination_handler(destination_zone dest, destination_zone caller) const;
 
         // Find any pass-through that has the specified destination, regardless of caller
         // Returns nullptr if not found
@@ -76,6 +75,7 @@ namespace rpc
 
         // Destination management for zone pairs
         // For local service, use add_destination(local_zone, local_zone, service)
+        std::shared_ptr<i_marshaller> get_destination_handler(destination_zone dest, destination_zone caller) const;
         bool add_destination(destination_zone dest, destination_zone caller, std::weak_ptr<i_marshaller> handler);
         void remove_destination(destination_zone dest, destination_zone caller);
 
@@ -100,7 +100,6 @@ namespace rpc
         inbound_send(uint64_t protocol_version,
             encoding encoding,
             uint64_t tag,
-            caller_channel_zone caller_channel_zone_id,
             caller_zone caller_zone_id,
             destination_zone destination_zone_id,
             object object_id,
@@ -116,7 +115,6 @@ namespace rpc
         inbound_post(uint64_t protocol_version,
             encoding encoding,
             uint64_t tag,
-            caller_channel_zone caller_channel_zone_id,
             caller_zone caller_zone_id,
             destination_zone destination_zone_id,
             object object_id,
@@ -137,10 +135,8 @@ namespace rpc
 
         CORO_TASK(int)
         inbound_add_ref(uint64_t protocol_version,
-            destination_channel_zone destination_channel_zone_id,
             destination_zone destination_zone_id,
             object object_id,
-            caller_channel_zone caller_channel_zone_id,
             caller_zone caller_zone_id,
             known_direction_zone known_direction_zone_id,
             add_ref_options build_out_param_channel,

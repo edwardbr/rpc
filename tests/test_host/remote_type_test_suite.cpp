@@ -84,8 +84,7 @@ extern bool enable_multithreaded_tests;
 // Type list for remote type_test instantiations.
 // Requires the various remote-capable setup helpers to be included before this header.
 
-template<class T>
-using remote_type_test = type_test<T>;
+template<class T> using remote_type_test = type_test<T>;
 
 using remote_implementations = ::testing::Types<
     // inproc_setup<false, false, false>,
@@ -116,7 +115,6 @@ using remote_implementations = ::testing::Types<
     >;
 
 TYPED_TEST_SUITE(remote_type_test, remote_implementations);
-
 
 TYPED_TEST(remote_type_test, remote_standard_tests)
 {
@@ -614,11 +612,13 @@ template<class T> CORO_TASK(bool) coro_check_identity(T& lib)
     CORO_ASSERT_EQ(
         CO_AWAIT lib.get_example()->create_example_in_subordinate_zone(new_zone, lib.get_local_host_ptr(), ++(*zone_gen)),
         rpc::error::OK()); // second level
+    CORO_ASSERT_NE(new_zone, nullptr);
 
     rpc::shared_ptr<yyy::i_example> new_new_zone;
     CORO_ASSERT_EQ(
         CO_AWAIT new_zone->create_example_in_subordinate_zone(new_new_zone, lib.get_local_host_ptr(), ++(*zone_gen)),
         rpc::error::OK()); // third level
+    CORO_ASSERT_NE(new_new_zone, nullptr);
 
     auto new_zone_fork = CO_AWAIT lib.create_new_zone(); // second level
 
@@ -1354,7 +1354,6 @@ TYPED_TEST(remote_type_test, check_interface_routing_with_out_params)
         { return coro_check_interface_routing_with_out_params<TypeParam>(lib, context); },
         *this);
 }
-
 
 template<class T> CORO_TASK(bool) coro_test_y_topology_and_return_new_prong_object(T& lib)
 {

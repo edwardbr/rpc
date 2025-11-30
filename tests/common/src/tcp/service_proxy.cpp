@@ -138,7 +138,6 @@ namespace rpc::tcp
     service_proxy::send(uint64_t protocol_version,
         encoding encoding,
         uint64_t tag,
-        caller_channel_zone caller_channel_zone_id,
         caller_zone caller_zone_id,
         destination_zone destination_zone_id,
         object object_id,
@@ -168,7 +167,6 @@ namespace rpc::tcp
         int ret = CO_AWAIT connection_->channel_manager_->call_peer(protocol_version,
             tcp::call_send{.encoding = encoding,
                 .tag = tag,
-                .caller_channel_zone_id = caller_channel_zone_id.get_val(),
                 .caller_zone_id = caller_zone_id.get_val(),
                 .destination_zone_id = destination_zone_id.get_val(),
                 .object_id = object_id.get_val(),
@@ -183,7 +181,7 @@ namespace rpc::tcp
             CO_RETURN ret;
         }
 
-        out_buf_.swap(response.payload);        
+        out_buf_.swap(response.payload);
         out_back_channel.swap(response.back_channel);
 
         // RPC_DEBUG("send complete {}", get_zone_id());
@@ -195,7 +193,6 @@ namespace rpc::tcp
     service_proxy::post(uint64_t protocol_version,
         encoding encoding,
         uint64_t tag,
-        caller_channel_zone caller_channel_zone_id,
         caller_zone caller_zone_id,
         destination_zone destination_zone_id,
         object object_id,
@@ -221,12 +218,10 @@ namespace rpc::tcp
 
         // Send the post message using the channel manager
         // Since this is fire-and-forget, we don't wait for a response
-        int ret = CO_AWAIT connection_->channel_manager_->send_payload(
-            protocol_version,
-            tcp::message_direction::one_way,  // Use one_way for fire-and-forget
+        int ret = CO_AWAIT connection_->channel_manager_->send_payload(protocol_version,
+            tcp::message_direction::one_way, // Use one_way for fire-and-forget
             tcp::post_send{.encoding = encoding,
                 .tag = tag,
-                .caller_channel_zone_id = caller_channel_zone_id.get_val(),
                 .caller_zone_id = caller_zone_id.get_val(),
                 .destination_zone_id = destination_zone_id.get_val(),
                 .object_id = object_id.get_val(),
@@ -235,8 +230,8 @@ namespace rpc::tcp
                 .options = options,
                 .payload = std::vector<char>(in_buf_, in_buf_ + in_size_),
                 .back_channel = in_back_channel},
-            0);  // sequence number 0 for one-way messages
-        
+            0); // sequence number 0 for one-way messages
+
         if (ret != rpc::error::OK())
         {
             RPC_ERROR("failed service_proxy::post send_payload");
@@ -246,8 +241,10 @@ namespace rpc::tcp
     }
 
     CORO_TASK(int)
-    service_proxy::try_cast(
-        uint64_t protocol_version, destination_zone destination_zone_id, object object_id, interface_ordinal interface_id,
+    service_proxy::try_cast(uint64_t protocol_version,
+        destination_zone destination_zone_id,
+        object object_id,
+        interface_ordinal interface_id,
         const std::vector<rpc::back_channel_entry>& in_back_channel,
         std::vector<rpc::back_channel_entry>& out_back_channel)
     {
@@ -261,12 +258,10 @@ namespace rpc::tcp
 
         tcp::try_cast_receive response;
         int ret = CO_AWAIT connection_->channel_manager_->call_peer(protocol_version,
-            tcp::try_cast_send{
-                .destination_zone_id = destination_zone_id.get_val(),
+            tcp::try_cast_send{.destination_zone_id = destination_zone_id.get_val(),
                 .object_id = object_id.get_val(),
                 .interface_id = interface_id.get_val(),
-                .back_channel = in_back_channel
-            },
+                .back_channel = in_back_channel},
             response);
         if (ret != rpc::error::OK())
         {
@@ -282,10 +277,8 @@ namespace rpc::tcp
 
     CORO_TASK(int)
     service_proxy::add_ref(uint64_t protocol_version,
-        destination_channel_zone destination_channel_zone_id,
         destination_zone destination_zone_id,
         object object_id,
-        caller_channel_zone caller_channel_zone_id,
         caller_zone caller_zone_id,
         known_direction_zone known_direction_zone_id,
         rpc::add_ref_options build_out_param_channel,
@@ -298,12 +291,8 @@ namespace rpc::tcp
 #ifdef USE_RPC_TELEMETRY
         if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
         {
-            telemetry_service->on_service_proxy_add_ref(get_zone_id(),
-                destination_zone_id,
-                destination_channel_zone_id,
-                get_caller_zone_id(),
-                object_id,
-                build_out_param_channel);
+            telemetry_service->on_service_proxy_add_ref(
+                get_zone_id(), destination_zone_id, get_caller_zone_id(), object_id, build_out_param_channel);
         }
 #endif
         if (!connection_)
@@ -314,10 +303,8 @@ namespace rpc::tcp
 
         tcp::addref_receive response;
         int ret = CO_AWAIT connection_->channel_manager_->call_peer(protocol_version,
-            tcp::addref_send{.destination_channel_zone_id = destination_channel_zone_id.get_val(),
-                .destination_zone_id = destination_zone_id.get_val(),
+            tcp::addref_send{.destination_zone_id = destination_zone_id.get_val(),
                 .object_id = object_id.get_val(),
-                .caller_channel_zone_id = caller_channel_zone_id.get_val(),
                 .caller_zone_id = caller_zone_id.get_val(),
                 .known_direction_zone_id = known_direction_zone_id.get_val(),
                 .build_out_param_channel = build_out_param_channel,
@@ -369,13 +356,11 @@ namespace rpc::tcp
 
         tcp::release_receive response;
         int ret = CO_AWAIT connection_->channel_manager_->call_peer(protocol_version,
-            tcp::release_send{
-                .destination_zone_id = destination_zone_id.get_val(),
+            tcp::release_send{.destination_zone_id = destination_zone_id.get_val(),
                 .object_id = object_id.get_val(),
                 .caller_zone_id = caller_zone_id.get_val(),
                 .options = options,
-                .back_channel = in_back_channel
-            },
+                .back_channel = in_back_channel},
             response);
         if (ret != rpc::error::OK())
         {

@@ -14,15 +14,18 @@
 
 using namespace std;
 
-void test1(const shared_ptr<int>& sp) {
+void test1(const shared_ptr<int>& sp)
+{
     assert(sp && *sp == 1729);
 }
 
-void test2(shared_ptr<int> sp) {
+void test2(shared_ptr<int> sp)
+{
     assert(sp && *sp == 19937);
 }
 
-int main() {
+int main()
+{
     auto sp1 = make_shared<int>(1729);
     test1(sp1);
     test1(sp1);

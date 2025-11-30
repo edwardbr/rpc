@@ -98,7 +98,7 @@ namespace rpc
     uint64_t object_stub::add_ref(bool is_optimistic)
     {
         uint64_t ret = 0;
-        if(is_optimistic)
+        if (is_optimistic)
             ret = ++optimistic_count_;
         else
             ret = ++shared_count_;
@@ -114,7 +114,7 @@ namespace rpc
     uint64_t object_stub::release(bool is_optimistic)
     {
         uint64_t count = 0;
-        if(is_optimistic)
+        if (is_optimistic)
             count = --optimistic_count_;
         else
             count = --shared_count_;

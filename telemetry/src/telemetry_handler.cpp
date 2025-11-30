@@ -27,32 +27,17 @@ extern "C"
             telemetry_service->on_service_try_cast(
                 {zone_id}, {destination_zone_id}, {caller_zone_id}, {object_id}, {interface_id});
     }
-    void on_service_add_ref_host(uint64_t zone_id,
-        uint64_t destination_channel_zone_id,
-        uint64_t destination_zone_id,
-        uint64_t object_id,
-        uint64_t caller_channel_zone_id,
-        uint64_t caller_zone_id,
-        uint64_t options)
+    void on_service_add_ref_host(
+        uint64_t zone_id, uint64_t destination_zone_id, uint64_t object_id, uint64_t caller_zone_id, uint64_t options)
     {
         if (auto telemetry_service = rpc::get_telemetry_service())
-            telemetry_service->on_service_add_ref({zone_id},
-                {destination_channel_zone_id},
-                {destination_zone_id},
-                {object_id},
-                {caller_channel_zone_id},
-                {caller_zone_id},
-                (rpc::add_ref_options)options);
+            telemetry_service->on_service_add_ref(
+                {zone_id}, {destination_zone_id}, {object_id}, {caller_zone_id}, (rpc::add_ref_options)options);
     }
-    void on_service_release_host(uint64_t zone_id,
-        uint64_t destination_channel_zone_id,
-        uint64_t destination_zone_id,
-        uint64_t object_id,
-        uint64_t caller_zone_id)
+    void on_service_release_host(uint64_t zone_id, uint64_t destination_zone_id, uint64_t object_id, uint64_t caller_zone_id)
     {
         if (auto telemetry_service = rpc::get_telemetry_service())
-            telemetry_service->on_service_release(
-                {zone_id}, {destination_channel_zone_id}, {destination_zone_id}, {object_id}, {caller_zone_id});
+            telemetry_service->on_service_release({zone_id}, {destination_zone_id}, {object_id}, {caller_zone_id});
     }
 
     void on_service_proxy_creation_host(const std::string& service_name,
@@ -88,52 +73,34 @@ extern "C"
             telemetry_service->on_service_proxy_try_cast(
                 {zone_id}, {destination_zone_id}, {caller_zone_id}, {object_id}, {interface_id});
     }
-    void on_service_proxy_add_ref_host(uint64_t zone_id,
-        uint64_t destination_zone_id,
-        uint64_t destination_channel_zone_id,
-        uint64_t caller_zone_id,
-        uint64_t object_id,
-        uint64_t options)
+    void on_service_proxy_add_ref_host(
+        uint64_t zone_id, uint64_t destination_zone_id, uint64_t caller_zone_id, uint64_t object_id, uint64_t options)
     {
         if (auto telemetry_service = rpc::get_telemetry_service())
-            telemetry_service->on_service_proxy_add_ref({zone_id},
-                {destination_zone_id},
-                {destination_channel_zone_id},
-                {caller_zone_id},
-                {object_id},
-                (rpc::add_ref_options)options);
+            telemetry_service->on_service_proxy_add_ref(
+                {zone_id}, {destination_zone_id}, {caller_zone_id}, {object_id}, (rpc::add_ref_options)options);
     }
-    void on_service_proxy_release_host(uint64_t zone_id,
-        uint64_t destination_zone_id,
-        uint64_t destination_channel_zone_id,
-        uint64_t caller_zone_id,
-        uint64_t object_id)
+    void on_service_proxy_release_host(
+        uint64_t zone_id, uint64_t destination_zone_id, uint64_t caller_zone_id, uint64_t object_id)
     {
         if (auto telemetry_service = rpc::get_telemetry_service())
-            telemetry_service->on_service_proxy_release(
-                {zone_id}, {destination_zone_id}, {destination_channel_zone_id}, {caller_zone_id}, {object_id});
+            telemetry_service->on_service_proxy_release({zone_id}, {destination_zone_id}, {caller_zone_id}, {object_id});
     }
 
-    void on_service_proxy_add_external_ref_host(uint64_t zone_id,
-        uint64_t destination_channel_zone_id,
-        uint64_t destination_zone_id,
-        uint64_t caller_zone_id,
-        int ref_count)
+    void on_service_proxy_add_external_ref_host(
+        uint64_t zone_id, uint64_t destination_zone_id, uint64_t caller_zone_id, int ref_count)
     {
         if (auto telemetry_service = rpc::get_telemetry_service())
             telemetry_service->on_service_proxy_add_external_ref(
-                {zone_id}, {destination_channel_zone_id}, {destination_zone_id}, {caller_zone_id}, ref_count);
+                {zone_id}, {destination_zone_id}, {caller_zone_id}, ref_count);
     }
 
-    void on_service_proxy_release_external_ref_host(uint64_t zone_id,
-        uint64_t destination_channel_zone_id,
-        uint64_t destination_zone_id,
-        uint64_t caller_zone_id,
-        int ref_count)
+    void on_service_proxy_release_external_ref_host(
+        uint64_t zone_id, uint64_t destination_zone_id, uint64_t caller_zone_id, int ref_count)
     {
         if (auto telemetry_service = rpc::get_telemetry_service())
             telemetry_service->on_service_proxy_release_external_ref(
-                {zone_id}, {destination_channel_zone_id}, {destination_zone_id}, {caller_zone_id}, ref_count);
+                {zone_id}, {destination_zone_id}, {caller_zone_id}, ref_count);
     }
 
     void on_impl_creation_host(const std::string& name, uint64_t address, uint64_t zone_id)

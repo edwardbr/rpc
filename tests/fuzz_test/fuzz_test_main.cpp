@@ -476,21 +476,21 @@ private:
         auto zone_id = rpc::zone{++g_zone_id_counter};
         std::string factory_zone_name = "factory_" + std::to_string(node_id_) + "_" + std::to_string(zone_id.get_val());
 
-        auto child_transport = std::make_shared<local::child_transport>(factory_zone_name.c_str(), current_service->shared_from_this(), zone_id,
-            local::parent_transport::bind<i_fuzz_factory, i_fuzz_factory>(zone_id, [](const rpc::shared_ptr<i_fuzz_factory>&,
-                rpc::shared_ptr<i_fuzz_factory>& new_factory,
-                const std::shared_ptr<rpc::child_service>& child_service_ptr) -> CORO_TASK(int)
-            {
-                fuzz_test_idl_register_stubs(child_service_ptr);
-                new_factory = rpc::make_shared<factory_impl>();
-                CO_RETURN rpc::error::OK();
-            }));
+        auto child_transport = std::make_shared<local::child_transport>(factory_zone_name.c_str(),
+            current_service->shared_from_this(),
+            zone_id,
+            local::parent_transport::bind<i_fuzz_factory, i_fuzz_factory>(zone_id,
+                [](const rpc::shared_ptr<i_fuzz_factory>&,
+                    rpc::shared_ptr<i_fuzz_factory>& new_factory,
+                    const std::shared_ptr<rpc::child_service>& child_service_ptr) -> CORO_TASK(int)
+                {
+                    fuzz_test_idl_register_stubs(child_service_ptr);
+                    new_factory = rpc::make_shared<factory_impl>();
+                    CO_RETURN rpc::error::OK();
+                }));
 
         current_service->connect_to_zone(
-            factory_zone_name.c_str(),
-            child_transport,
-            rpc::shared_ptr<i_fuzz_factory>(),
-            local_factory_);
+            factory_zone_name.c_str(), child_transport, rpc::shared_ptr<i_fuzz_factory>(), local_factory_);
     }
 
     void create_local_cache()
@@ -501,24 +501,24 @@ private:
         if (!current_service)
             return;
 
-        auto zone_id = rpc::zone{++g_zone_id_counter};        
+        auto zone_id = rpc::zone{++g_zone_id_counter};
         std::string cache_zone_name = "cache_" + std::to_string(node_id_) + "_" + std::to_string(zone_id);
 
-        auto child_transport = std::make_shared<local::child_transport>(cache_zone_name.c_str(), current_service->shared_from_this(), rpc::zone{zone_id},
-            local::parent_transport::bind<i_fuzz_cache, i_fuzz_cache>(zone_id, [](const rpc::shared_ptr<i_fuzz_cache>&,
-                rpc::shared_ptr<i_fuzz_cache>& new_cache,
-                const std::shared_ptr<rpc::child_service>& child_service_ptr) -> CORO_TASK(int)
-            {
-                fuzz_test_idl_register_stubs(child_service_ptr);
-                new_cache = rpc::make_shared<cache_impl>();
-                CO_RETURN rpc::error::OK();
-            }));
+        auto child_transport = std::make_shared<local::child_transport>(cache_zone_name.c_str(),
+            current_service->shared_from_this(),
+            rpc::zone{zone_id},
+            local::parent_transport::bind<i_fuzz_cache, i_fuzz_cache>(zone_id,
+                [](const rpc::shared_ptr<i_fuzz_cache>&,
+                    rpc::shared_ptr<i_fuzz_cache>& new_cache,
+                    const std::shared_ptr<rpc::child_service>& child_service_ptr) -> CORO_TASK(int)
+                {
+                    fuzz_test_idl_register_stubs(child_service_ptr);
+                    new_cache = rpc::make_shared<cache_impl>();
+                    CO_RETURN rpc::error::OK();
+                }));
 
         current_service->connect_to_zone(
-            cache_zone_name.c_str(),
-            child_transport,
-            rpc::shared_ptr<i_fuzz_cache>(),
-            local_cache_);
+            cache_zone_name.c_str(), child_transport, rpc::shared_ptr<i_fuzz_cache>(), local_cache_);
     }
 
     void create_local_worker()
@@ -533,21 +533,21 @@ private:
 
         std::string worker_zone_name = "worker_" + std::to_string(node_id_) + "_" + std::to_string(zone_id);
 
-        auto child_transport = std::make_shared<local::child_transport>(worker_zone_name.c_str(), current_service->shared_from_this(), rpc::zone{zone_id},
-            local::parent_transport::bind<i_fuzz_worker, i_fuzz_worker>(zone_id, [](const rpc::shared_ptr<i_fuzz_worker>&,
-                rpc::shared_ptr<i_fuzz_worker>& new_worker,
-                const std::shared_ptr<rpc::child_service>& child_service_ptr) -> CORO_TASK(int)
-            {
-                fuzz_test_idl_register_stubs(child_service_ptr);
-                new_worker = rpc::make_shared<worker_impl>();
-                CO_RETURN rpc::error::OK();
-            }));
+        auto child_transport = std::make_shared<local::child_transport>(worker_zone_name.c_str(),
+            current_service->shared_from_this(),
+            rpc::zone{zone_id},
+            local::parent_transport::bind<i_fuzz_worker, i_fuzz_worker>(zone_id,
+                [](const rpc::shared_ptr<i_fuzz_worker>&,
+                    rpc::shared_ptr<i_fuzz_worker>& new_worker,
+                    const std::shared_ptr<rpc::child_service>& child_service_ptr) -> CORO_TASK(int)
+                {
+                    fuzz_test_idl_register_stubs(child_service_ptr);
+                    new_worker = rpc::make_shared<worker_impl>();
+                    CO_RETURN rpc::error::OK();
+                }));
 
         current_service->connect_to_zone(
-            worker_zone_name.c_str(),
-            child_transport,
-            rpc::shared_ptr<i_fuzz_worker>(),
-            local_worker_);
+            worker_zone_name.c_str(), child_transport, rpc::shared_ptr<i_fuzz_worker>(), local_worker_);
     }
 
     rpc::shared_ptr<i_shared_object> create_shared_object_via_factory(int object_id)
@@ -846,25 +846,24 @@ public:
             RPC_INFO("[NODE {}] create_child_node creating zone: {}", node_id_, child_zone_name);
             auto self = rpc::static_pointer_cast<i_autonomous_node>(shared_from_this());
 
-            auto child_transport = std::make_shared<local::child_transport>(child_zone_name.c_str(), current_service->shared_from_this(), zone_id,
-                local::parent_transport::bind<i_autonomous_node, i_autonomous_node>(zone_id, [=, this](const rpc::shared_ptr<i_autonomous_node>& parent,
-                    rpc::shared_ptr<i_autonomous_node>& new_child,
-                    const std::shared_ptr<rpc::child_service>& child_service_ptr) -> CORO_TASK(int)
-                {
-                    RPC_INFO("[NODE {}] setup callback for child zone {} starting", node_id_, child_zone_id);
-                    fuzz_test_idl_register_stubs(child_service_ptr);
-                    new_child = rpc::make_shared<autonomous_node_impl>(child_type, child_zone_id);
-                    new_child->initialize_node(child_type, child_zone_id);
-                    new_child->set_parent_node(parent);
-                    RPC_INFO("[NODE {}] setup callback for child zone {} completed", node_id_, child_zone_id);
-                    CO_RETURN rpc::error::OK();
-                }));
+            auto child_transport = std::make_shared<local::child_transport>(child_zone_name.c_str(),
+                current_service->shared_from_this(),
+                zone_id,
+                local::parent_transport::bind<i_autonomous_node, i_autonomous_node>(zone_id,
+                    [=, this](const rpc::shared_ptr<i_autonomous_node>& parent,
+                        rpc::shared_ptr<i_autonomous_node>& new_child,
+                        const std::shared_ptr<rpc::child_service>& child_service_ptr) -> CORO_TASK(int)
+                    {
+                        RPC_INFO("[NODE {}] setup callback for child zone {} starting", node_id_, child_zone_id);
+                        fuzz_test_idl_register_stubs(child_service_ptr);
+                        new_child = rpc::make_shared<autonomous_node_impl>(child_type, child_zone_id);
+                        new_child->initialize_node(child_type, child_zone_id);
+                        new_child->set_parent_node(parent);
+                        RPC_INFO("[NODE {}] setup callback for child zone {} completed", node_id_, child_zone_id);
+                        CO_RETURN rpc::error::OK();
+                    }));
 
-            auto result = current_service->connect_to_zone(
-                child_zone_name.c_str(),
-                child_transport,
-                self,
-                child_node);
+            auto result = current_service->connect_to_zone(child_zone_name.c_str(), child_transport, self, child_node);
             RPC_INFO("[NODE {}] create_child_node result={}", node_id_, result);
             CO_RETURN result;
         }
@@ -1343,21 +1342,21 @@ void run_autonomous_instruction_test(int test_cycle, int instruction_count, uint
             auto zone_id = rpc::zone{++g_zone_id_counter};
             scenario_config.zone_sequence.push_back(zone_id.get_val()); // Track zone creation
 
-            auto child_transport = std::make_shared<local::child_transport>(zone_name.c_str(), root_service->shared_from_this(), rpc::zone{zone_id},
-                local::parent_transport::bind<i_autonomous_node, i_autonomous_node>(zone_id, [=](const rpc::shared_ptr<i_autonomous_node>&,
-                    rpc::shared_ptr<i_autonomous_node>& new_node,
-                    const std::shared_ptr<rpc::child_service>& child_service_ptr) -> CORO_TASK(int)
-                {
-                    fuzz_test_idl_register_stubs(child_service_ptr);
-                    new_node = rpc::make_shared<autonomous_node_impl>(node_type::ROOT_NODE, zone_id.get_val());
-                    CO_RETURN CO_AWAIT new_node->initialize_node(node_type::ROOT_NODE, zone_id.get_val());
-                }));
+            auto child_transport = std::make_shared<local::child_transport>(zone_name.c_str(),
+                root_service->shared_from_this(),
+                rpc::zone{zone_id},
+                local::parent_transport::bind<i_autonomous_node, i_autonomous_node>(zone_id,
+                    [=](const rpc::shared_ptr<i_autonomous_node>&,
+                        rpc::shared_ptr<i_autonomous_node>& new_node,
+                        const std::shared_ptr<rpc::child_service>& child_service_ptr) -> CORO_TASK(int)
+                    {
+                        fuzz_test_idl_register_stubs(child_service_ptr);
+                        new_node = rpc::make_shared<autonomous_node_impl>(node_type::ROOT_NODE, zone_id.get_val());
+                        CO_RETURN CO_AWAIT new_node->initialize_node(node_type::ROOT_NODE, zone_id.get_val());
+                    }));
 
             root_service->connect_to_zone(
-                zone_name.c_str(),
-                child_transport,
-                rpc::shared_ptr<i_autonomous_node>(),
-                root_node);
+                zone_name.c_str(), child_transport, rpc::shared_ptr<i_autonomous_node>(), root_node);
 
             if (!root_node)
             {

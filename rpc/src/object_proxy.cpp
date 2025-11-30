@@ -55,7 +55,7 @@ namespace rpc
             // Call service_proxy->sp_add_ref() to increment remote service's reference count
             // This MUST happen sequentially to ensure remote count ≥ 1 before constructor returns
             uint64_t ref_count = 0;
-            auto err = CO_AWAIT service_proxy->sp_add_ref(object_id_, {0}, options, {0}, ref_count);
+            auto err = CO_AWAIT service_proxy->sp_add_ref(object_id_, options, {0}, ref_count);
             if (err)
             {
                 // Rollback local counter on failure
@@ -70,7 +70,7 @@ namespace rpc
 
 #ifdef USE_RPC_LOGGING
                 RPC_ERROR("object_proxy::add_ref: Failed to establish remote reference: {} reference zone={} "
-                         "destination_zone={} object_id={} error={}",
+                          "destination_zone={} object_id={} error={}",
                     is_optimistic ? "optimistic" : "shared",
                     service_proxy->get_zone_id().get_val(),
                     service_proxy->get_destination_zone_id().get_val(),
@@ -121,7 +121,9 @@ namespace rpc
             if (service_proxy)
             {
 #ifdef USE_RPC_LOGGING
-                RPC_DEBUG("object_proxy::release: {} on_object_proxy_released cleanup for object_id={}", is_optimistic ? "optimistic" : "shared", object_id_.get_val());
+                RPC_DEBUG("object_proxy::release: {} on_object_proxy_released cleanup for object_id={}",
+                    is_optimistic ? "optimistic" : "shared",
+                    object_id_.get_val());
 #endif
                 service_proxy->on_object_proxy_released(this->shared_from_this(), is_optimistic);
             }
@@ -210,7 +212,8 @@ namespace rpc
         {
             // forward declarations implemented in object_proxy.cpp
             // add_ref is async because object_proxy::add_ref() is async
-            CORO_TASK(int) object_proxy_add_ref(const std::shared_ptr<rpc::object_proxy>& ob, rpc::add_ref_options options)
+            CORO_TASK(int)
+            object_proxy_add_ref(const std::shared_ptr<rpc::object_proxy>& ob, rpc::add_ref_options options)
             {
                 CO_RETURN CO_AWAIT ob->add_ref(options);
             }
@@ -220,8 +223,9 @@ namespace rpc
             {
                 ob->release(is_optimistic);
             }
-            
-            void get_object_proxy_reference_counts(const std::shared_ptr<rpc::object_proxy>& ob, int& shared_count, int& optimistic_count)
+
+            void get_object_proxy_reference_counts(
+                const std::shared_ptr<rpc::object_proxy>& ob, int& shared_count, int& optimistic_count)
             {
                 shared_count = ob->get_shared_count();
                 optimistic_count = ob->get_optimistic_count();

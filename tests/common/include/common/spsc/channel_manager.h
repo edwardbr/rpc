@@ -72,8 +72,8 @@ namespace rpc::spsc
             connection_handler handler);
 
         // New producer/consumer pattern coroutines
-        CORO_TASK(void) receive_consumer_task(
-            std::function<void(envelope_prefix, envelope_payload)> incoming_message_handler);
+        CORO_TASK(void)
+        receive_consumer_task(std::function<void(envelope_prefix, envelope_payload)> incoming_message_handler);
         CORO_TASK(void) send_producer_task();
 
         CORO_TASK(int) flush_send_queue();

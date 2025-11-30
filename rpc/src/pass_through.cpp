@@ -203,7 +203,6 @@ namespace rpc
 
     CORO_TASK(int)
     pass_through::add_ref(uint64_t protocol_version,
-        destination_channel_zone destination_channel_zone_id,
         destination_zone destination_zone_id,
         object object_id,
         caller_channel_zone caller_channel_zone_id,
@@ -214,61 +213,111 @@ namespace rpc
         const std::vector<rpc::back_channel_entry>& in_back_channel,
         std::vector<rpc::back_channel_entry>& out_back_channel)
     {
+        bool build_caller_channel = !!(build_out_param_channel & add_ref_options::build_caller_route);
+        bool build_dest_channel = !!(build_out_param_channel & add_ref_options::build_destination_route)
+                                  || build_out_param_channel == add_ref_options::normal
+                                  || build_out_param_channel == add_ref_options::optimistic;
+
+        std::shared_ptr<rpc::transport> caller_transport;
+        std::shared_ptr<rpc::transport> destination_transport;
+
         // Determine target transport based on destination_zone
-        auto target_transport = get_directional_transport(destination_zone_id);
-        if (!target_transport)
+        if (build_dest_channel)
         {
-            CO_RETURN error::ZONE_NOT_FOUND();
+            destination_transport = get_directional_transport(destination_zone_id);
+            if (!destination_transport)
+            {
+                CO_RETURN error::ZONE_NOT_FOUND();
+            }
+            // Check transport status before routing
+            if (destination_transport->get_status() != transport_status::CONNECTED)
+            {
+                // Transport error - trigger self-deletion
+                trigger_self_destruction();
+                CO_RETURN error::TRANSPORT_ERROR();
+            }
         }
 
-        // Check transport status before routing
-        if (target_transport->get_status() != transport_status::CONNECTED)
+        if (build_caller_channel)
         {
-            // Transport error - trigger self-deletion
-            trigger_self_destruction();
-            CO_RETURN error::TRANSPORT_ERROR();
+            caller_transport = get_directional_transport(caller_zone_id.as_destination());
+            if (!caller_transport)
+            {
+                CO_RETURN error::ZONE_NOT_FOUND();
+            }
+            // Check transport status before routing
+            if (caller_transport->get_status() != transport_status::CONNECTED)
+            {
+                // Transport error - trigger self-deletion
+                trigger_self_destruction();
+                CO_RETURN error::TRANSPORT_ERROR();
+            }
         }
 
-        // Forward the add_ref call to the target transport
-        auto result = CO_AWAIT target_transport->add_ref(protocol_version,
-            destination_channel_zone_id,
-            destination_zone_id,
-            object_id,
-            service_->get_zone_id().as_caller_channel(),
-            caller_zone_id,
-            known_direction_zone_id,
-            build_out_param_channel,
-            reference_count,
-            in_back_channel,
-            out_back_channel);
-
-        // ONLY increment pass_through reference count if the forward succeeded
-        // This ensures our count matches the actual established references
-        if (result != error::OK())
+        if (build_dest_channel)
         {
-            trigger_self_destruction();
-            CO_RETURN result;
+            // Forward the add_ref call to the target transport
+            auto result = CO_AWAIT destination_transport->add_ref(protocol_version,
+                destination_zone_id,
+                object_id,
+                caller_channel_zone_id,
+                caller_zone_id,
+                known_direction_zone_id,
+                build_out_param_channel & ~add_ref_options::build_caller_route,
+                reference_count,
+                in_back_channel,
+                out_back_channel);
+
+            // ONLY increment pass_through reference count if the forward succeeded
+            // This ensures our count matches the actual established references
+            if (result != error::OK())
+            {
+                trigger_self_destruction();
+                CO_RETURN result;
+            }
+        }
+
+        if (build_caller_channel)
+        {
+            // Forward the add_ref call to the target transport
+            auto result = CO_AWAIT caller_transport->add_ref(protocol_version,
+                destination_zone_id,
+                object_id,
+                caller_channel_zone_id,
+                caller_zone_id,
+                known_direction_zone_id,
+                build_out_param_channel & ~add_ref_options::build_destination_route,
+                reference_count,
+                in_back_channel,
+                out_back_channel);
+
+            // ONLY increment pass_through reference count if the forward succeeded
+            // This ensures our count matches the actual established references
+            if (result != error::OK())
+            {
+                trigger_self_destruction();
+                CO_RETURN result;
+            }
+        }
+
+        // Use bitwise AND to check flags, not exact equality
+        // because build_out_param_channel may have additional build flags
+        if (!!(build_out_param_channel & add_ref_options::build_destination_route)
+            && !!(build_out_param_channel & add_ref_options::build_caller_route)
+            && destination_zone_id.as_caller() == caller_zone_id)
+        {
+            // this is a passthrough addref and should not be included in either count
+        }
+        else if (!!(build_out_param_channel & add_ref_options::optimistic))
+        {
+            optimistic_count_.fetch_add(1, std::memory_order_acq_rel);
         }
         else
         {
-            // Use bitwise AND to check flags, not exact equality
-            // because build_out_param_channel may have additional build flags
-            if (!!(build_out_param_channel & add_ref_options::build_destination_route)
-                && !!(build_out_param_channel & add_ref_options::build_caller_route))
-            {
-                //this is a passthrough addref and should not be included in either count
-            }
-            else if (!!(build_out_param_channel & add_ref_options::normal))
-            {
-                shared_count_.fetch_add(1, std::memory_order_acq_rel);
-            }
-            else if (!!(build_out_param_channel & add_ref_options::optimistic))
-            {
-                optimistic_count_.fetch_add(1, std::memory_order_acq_rel);
-            }
+            shared_count_.fetch_add(1, std::memory_order_acq_rel);
         }
 
-        CO_RETURN result;
+        CO_RETURN error::OK();
     }
 
     CORO_TASK(int)

@@ -77,7 +77,6 @@ void marshal_test_destroy_enclave()
 int call_enclave(uint64_t protocol_version, // version of the rpc call protocol
     uint64_t encoding,                      // format of the serialised data
     uint64_t tag,                           // info on the type of the call passed from the idl generator
-    uint64_t caller_channel_zone_id,
     uint64_t caller_zone_id,
     uint64_t zone_id,
     uint64_t object_id,
@@ -134,11 +133,11 @@ int call_enclave(uint64_t protocol_version, // version of the rpc call protocol
     {
         yas::mem_istream is(data_in, sz_int);
         yas::binary_iarchive<yas::mem_istream, yas::binary | yas::no_header> ia(is);
-        ia& payload_size;  // Read payload size
+        ia & payload_size; // Read payload size
         payload.resize(payload_size);
         if (payload_size > 0)
-            ia.read(payload.data(), payload_size);  // Read payload data
-        ia& in_back_channel;  // Read back-channel
+            ia.read(payload.data(), payload_size); // Read payload data
+        ia & in_back_channel;                      // Read back-channel
     }
 
     std::vector<char> tmp;
@@ -148,7 +147,6 @@ int call_enclave(uint64_t protocol_version, // version of the rpc call protocol
     int ret = rpc_server->send(protocol_version, // version of the rpc call protocol
         rpc::encoding(encoding),                 // format of the serialised data
         tag,
-        {caller_channel_zone_id},
         {caller_zone_id},
         {zone_id},
         {object_id},
@@ -167,10 +165,10 @@ int call_enclave(uint64_t protocol_version, // version of the rpc call protocol
     {
         yas::mem_ostream os;
         yas::binary_oarchive<yas::mem_ostream, yas::binary | yas::no_header> oa(os);
-        oa& tmp.size();  // Write payload size
+        oa & tmp.size(); // Write payload size
         if (tmp.size() > 0)
-            oa.write(tmp.data(), tmp.size());  // Write payload
-        oa& out_back_channel;  // Write back-channel
+            oa.write(tmp.data(), tmp.size()); // Write payload
+        oa & out_back_channel;                // Write back-channel
         auto yas_buf = os.get_shared_buffer();
         combined_out.assign(yas_buf.data.get(), yas_buf.data.get() + yas_buf.size);
     }
@@ -189,7 +187,6 @@ int call_enclave(uint64_t protocol_version, // version of the rpc call protocol
 int post_enclave(uint64_t protocol_version, // version of the rpc call protocol
     uint64_t encoding,                      // format of the serialised data
     uint64_t tag,                           // info on the type of the call passed from the idl generator
-    uint64_t caller_channel_zone_id,
     uint64_t caller_zone_id,
     uint64_t zone_id,
     uint64_t object_id,
@@ -216,17 +213,16 @@ int post_enclave(uint64_t protocol_version, // version of the rpc call protocol
     {
         yas::mem_istream is(data_in, sz_int);
         yas::binary_iarchive<yas::mem_istream, yas::binary | yas::no_header> ia(is);
-        ia& payload_size;  // Read payload size
+        ia & payload_size; // Read payload size
         payload.resize(payload_size);
         if (payload_size > 0)
-            ia.read(payload.data(), payload_size);  // Read payload data
-        ia& in_back_channel;  // Read back-channel
+            ia.read(payload.data(), payload_size); // Read payload data
+        ia & in_back_channel;                      // Read back-channel
     }
 
     rpc_server->post(protocol_version, // version of the rpc call protocol
         rpc::encoding(encoding),       // format of the serialised data
         tag,
-        {caller_channel_zone_id},
         {caller_zone_id},
         {zone_id},
         {object_id},
@@ -242,9 +238,15 @@ int post_enclave(uint64_t protocol_version, // version of the rpc call protocol
     return rpc::error::OK();
 }
 
-int try_cast_enclave(uint64_t protocol_version, uint64_t zone_id, uint64_t object_id, uint64_t interface_id,
-    size_t sz_in_back_channel, const char* in_back_channel_buf,
-    size_t sz_out_back_channel, char* out_back_channel_buf, size_t* out_back_channel_sz)
+int try_cast_enclave(uint64_t protocol_version,
+    uint64_t zone_id,
+    uint64_t object_id,
+    uint64_t interface_id,
+    size_t sz_in_back_channel,
+    const char* in_back_channel_buf,
+    size_t sz_out_back_channel,
+    char* out_back_channel_buf,
+    size_t* out_back_channel_sz)
 {
     if (protocol_version > rpc::get_version())
     {
@@ -258,19 +260,19 @@ int try_cast_enclave(uint64_t protocol_version, uint64_t zone_id, uint64_t objec
     {
         yas::mem_istream is(in_back_channel_buf, sz_in_back_channel);
         yas::binary_iarchive<yas::mem_istream, yas::binary | yas::no_header> ia(is);
-        ia& in_back_channel;
+        ia & in_back_channel;
     }
 
     std::vector<rpc::back_channel_entry> out_back_channel;
-    int ret = rpc_server->try_cast(protocol_version, {zone_id}, {object_id}, {interface_id},
-        in_back_channel, out_back_channel);
+    int ret = rpc_server->try_cast(
+        protocol_version, {zone_id}, {object_id}, {interface_id}, in_back_channel, out_back_channel);
 
     // Serialize output back-channel
     if (ret == rpc::error::OK() && !out_back_channel.empty())
     {
         yas::mem_ostream os;
         yas::binary_oarchive<yas::mem_ostream, yas::binary | yas::no_header> oa(os);
-        oa& out_back_channel;
+        oa & out_back_channel;
         auto yas_buf = os.get_shared_buffer();
 
         *out_back_channel_sz = yas_buf.size;
@@ -288,16 +290,17 @@ int try_cast_enclave(uint64_t protocol_version, uint64_t zone_id, uint64_t objec
 }
 
 int add_ref_enclave(uint64_t protocol_version,
-    uint64_t destination_channel_zone_id,
     uint64_t destination_zone_id,
     uint64_t object_id,
-    uint64_t caller_channel_zone_id,
     uint64_t caller_zone_id,
     uint64_t known_direction_zone_id,
     char build_out_param_channel,
     uint64_t* reference_count,
-    size_t sz_in_back_channel, const char* in_back_channel_buf,
-    size_t sz_out_back_channel, char* out_back_channel_buf, size_t* out_back_channel_sz)
+    size_t sz_in_back_channel,
+    const char* in_back_channel_buf,
+    size_t sz_out_back_channel,
+    char* out_back_channel_buf,
+    size_t* out_back_channel_sz)
 {
     if (protocol_version > rpc::get_version())
     {
@@ -311,15 +314,13 @@ int add_ref_enclave(uint64_t protocol_version,
     {
         yas::mem_istream is(in_back_channel_buf, sz_in_back_channel);
         yas::binary_iarchive<yas::mem_istream, yas::binary | yas::no_header> ia(is);
-        ia& in_back_channel;
+        ia & in_back_channel;
     }
 
     std::vector<rpc::back_channel_entry> out_back_channel;
     auto err_code = rpc_server->add_ref(protocol_version,
-        {destination_channel_zone_id},
         {destination_zone_id},
         {object_id},
-        {caller_channel_zone_id},
         {caller_zone_id},
         {known_direction_zone_id},
         static_cast<rpc::add_ref_options>(build_out_param_channel),
@@ -332,7 +333,7 @@ int add_ref_enclave(uint64_t protocol_version,
     {
         yas::mem_ostream os;
         yas::binary_oarchive<yas::mem_ostream, yas::binary | yas::no_header> oa(os);
-        oa& out_back_channel;
+        oa & out_back_channel;
         auto yas_buf = os.get_shared_buffer();
 
         *out_back_channel_sz = yas_buf.size;
@@ -349,10 +350,17 @@ int add_ref_enclave(uint64_t protocol_version,
     return err_code;
 }
 
-int release_enclave(
-    uint64_t protocol_version, uint64_t zone_id, uint64_t object_id, uint64_t caller_zone_id, char options, uint64_t* reference_count,
-    size_t sz_in_back_channel, const char* in_back_channel_buf,
-    size_t sz_out_back_channel, char* out_back_channel_buf, size_t* out_back_channel_sz)
+int release_enclave(uint64_t protocol_version,
+    uint64_t zone_id,
+    uint64_t object_id,
+    uint64_t caller_zone_id,
+    char options,
+    uint64_t* reference_count,
+    size_t sz_in_back_channel,
+    const char* in_back_channel_buf,
+    size_t sz_out_back_channel,
+    char* out_back_channel_buf,
+    size_t* out_back_channel_sz)
 {
     if (protocol_version > rpc::get_version())
     {
@@ -366,20 +374,25 @@ int release_enclave(
     {
         yas::mem_istream is(in_back_channel_buf, sz_in_back_channel);
         yas::binary_iarchive<yas::mem_istream, yas::binary | yas::no_header> ia(is);
-        ia& in_back_channel;
+        ia & in_back_channel;
     }
 
     std::vector<rpc::back_channel_entry> out_back_channel;
-    auto err_code = rpc_server->release(protocol_version, {zone_id}, {object_id}, {caller_zone_id},
-        static_cast<rpc::release_options>(options), *reference_count,
-        in_back_channel, out_back_channel);
+    auto err_code = rpc_server->release(protocol_version,
+        {zone_id},
+        {object_id},
+        {caller_zone_id},
+        static_cast<rpc::release_options>(options),
+        *reference_count,
+        in_back_channel,
+        out_back_channel);
 
     // Serialize output back-channel
     if (err_code == rpc::error::OK() && !out_back_channel.empty())
     {
         yas::mem_ostream os;
         yas::binary_oarchive<yas::mem_ostream, yas::binary | yas::no_header> oa(os);
-        oa& out_back_channel;
+        oa & out_back_channel;
         auto yas_buf = os.get_shared_buffer();
 
         *out_back_channel_sz = yas_buf.size;

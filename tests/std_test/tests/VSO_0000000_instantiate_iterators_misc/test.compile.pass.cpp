@@ -1,11 +1,11 @@
 // Copyright (c) Microsoft Corporation.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#define _HAS_DEPRECATED_ADAPTOR_TYPEDEFS     1
-#define _HAS_DEPRECATED_ALLOCATOR_MEMBERS    1
-#define _HAS_DEPRECATED_NEGATORS             1
+#define _HAS_DEPRECATED_ADAPTOR_TYPEDEFS 1
+#define _HAS_DEPRECATED_ALLOCATOR_MEMBERS 1
+#define _HAS_DEPRECATED_NEGATORS 1
 #define _HAS_DEPRECATED_RAW_STORAGE_ITERATOR 1
-#define _HAS_DEPRECATED_TEMPORARY_BUFFER     1
+#define _HAS_DEPRECATED_TEMPORARY_BUFFER 1
 #define _SILENCE_CXX17_C_HEADER_DEPRECATION_WARNING
 #define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING
 #define _SILENCE_CXX17_NEGATORS_DEPRECATION_WARNING
@@ -95,7 +95,6 @@
 
 #include <instantiate_containers_iterators_common.hpp>
 
-
 using namespace std;
 
 #define STATIC_ASSERT(...) static_assert(__VA_ARGS__, #__VA_ARGS__)
@@ -119,15 +118,16 @@ STATIC_ASSERT(memory_order::memory_order_acq_rel == memory_order::acq_rel);
 STATIC_ASSERT(memory_order::memory_order_seq_cst == memory_order::seq_cst);
 #endif // _HAS_CXX20
 
-template <typename AtomicType>
-void atomic_read_test_impl(AtomicType& value) {
-    (void) atomic_is_lock_free(&value);
-    (void) atomic_load(&value);
-    (void) atomic_load_explicit(&value, memory_order_seq_cst);
+template<typename AtomicType> void atomic_read_test_impl(AtomicType& value)
+{
+    (void)atomic_is_lock_free(&value);
+    (void)atomic_load(&value);
+    (void)atomic_load_explicit(&value, memory_order_seq_cst);
 }
 
-template <typename AtomicType, typename ValueType>
-void atomic_has_arithmetic_ops_test_impl(AtomicType& value, ValueType element, true_type) {
+template<typename AtomicType, typename ValueType>
+void atomic_has_arithmetic_ops_test_impl(AtomicType& value, ValueType element, true_type)
+{
     atomic_fetch_add(&value, element);
     atomic_fetch_add_explicit(&value, element, memory_order_seq_cst);
     atomic_fetch_sub(&value, element);
@@ -140,11 +140,13 @@ void atomic_has_arithmetic_ops_test_impl(AtomicType& value, ValueType element, t
     atomic_fetch_xor_explicit(&value, element, memory_order_seq_cst);
 }
 
-template <typename AtomicType, typename ValueType>
-void atomic_has_arithmetic_ops_test_impl(AtomicType&, ValueType, false_type) {}
+template<typename AtomicType, typename ValueType>
+void atomic_has_arithmetic_ops_test_impl(AtomicType&, ValueType, false_type)
+{
+}
 
-template <typename AtomicType, typename ValueType>
-void atomic_write_test_impl(AtomicType& value, ValueType element) {
+template<typename AtomicType, typename ValueType> void atomic_write_test_impl(AtomicType& value, ValueType element)
+{
     ValueType* ptr_element = &element;
 
     atomic_init(&value, element);
@@ -160,8 +162,8 @@ void atomic_write_test_impl(AtomicType& value, ValueType element) {
     atomic_has_arithmetic_ops_test_impl(value, element, negation<is_same<ValueType, bool>>());
 }
 
-template <typename T>
-void atomic_test_impl(T element) {
+template<typename T> void atomic_test_impl(T element)
+{
     atomic<T> value{element};
     volatile atomic<T> v_value{element};
     const atomic<T> c_value{element};
@@ -176,13 +178,14 @@ void atomic_test_impl(T element) {
     atomic_write_test_impl(v_value, element);
 }
 
-template <typename T>
-void atomic_test_impl() {
+template<typename T> void atomic_test_impl()
+{
     T element{};
     atomic_test_impl(element);
 }
 
-void atomic_test() {
+void atomic_test()
+{
     int a = 0;
     kill_dependency(a);
 
@@ -224,12 +227,13 @@ void atomic_test() {
 }
 #endif // _M_CEE_PURE
 
-void chrono_test() {
+void chrono_test()
+{
     using namespace chrono;
     treat_as_floating_point<float> a{};
     duration_values<float> b{};
     duration<float> c{};
-    (void) duration_cast<duration<float, ratio<2>>>(c);
+    (void)duration_cast<duration<float, ratio<2>>>(c);
     duration<double> d(1.0f);
     duration<double> e(c);
 
@@ -238,47 +242,47 @@ void chrono_test() {
     INSTANTIATE(common_type_t<duration<float>, duration<double>>);
     INSTANTIATE(common_type_t<time_point<system_clock>, time_point<system_clock>>);
 
-    (void) a;
-    (void) b;
-    (void) d;
-    (void) e;
+    (void)a;
+    (void)b;
+    (void)d;
+    (void)e;
 
     duration<float> dur1{};
     duration<double, ratio<2>> dur2{};
 
-    (void) (dur1 + dur2);
-    (void) (dur1 - dur2);
-    (void) (1.f * dur2);
-    (void) (dur1 * 2.0);
-    (void) (dur1 / 2.0);
-    (void) (dur1 / dur2);
+    (void)(dur1 + dur2);
+    (void)(dur1 - dur2);
+    (void)(1.f * dur2);
+    (void)(dur1 * 2.0);
+    (void)(dur1 / 2.0);
+    (void)(dur1 / dur2);
 
     duration<int> dur3{};
     duration<int, ratio<2>> dur4{};
 
-    (void) (dur3 % 2);
-    (void) (dur3 % dur4);
+    (void)(dur3 % 2);
+    (void)(dur3 % dur4);
 
     comparable_test(dur1, dur2);
 
-    (void) floor<duration<int>>(dur1);
-    (void) ceil<duration<int>>(dur1);
+    (void)floor<duration<int>>(dur1);
+    (void)ceil<duration<int>>(dur1);
 
-    (void) round<duration<int>>(dur1); // float -> int
-    (void) round<duration<int>>(dur3); // int -> int
+    (void)round<duration<int>>(dur1); // float -> int
+    (void)round<duration<int>>(dur3); // int -> int
 
-    (void) abs(dur1);
+    (void)abs(dur1);
 
-    (void) (time_pt + dur1);
-    (void) (dur1 + time_pt);
-    (void) (time_pt - dur1);
-    (void) (time_pt - time_pt);
+    (void)(time_pt + dur1);
+    (void)(dur1 + time_pt);
+    (void)(time_pt - dur1);
+    (void)(time_pt - time_pt);
     comparable_test(time_pt);
 
-    (void) (time_point_cast<duration<float>>(time_pt));
+    (void)(time_point_cast<duration<float>>(time_pt));
 
-    (void) (floor<duration<float>>(time_pt));
-    (void) (ceil<duration<float>>(time_pt));
+    (void)(floor<duration<float>>(time_pt));
+    (void)(ceil<duration<float>>(time_pt));
 }
 
 #ifndef _M_CEE_PURE
@@ -303,33 +307,46 @@ void chrono_test() {
 // }
 #endif // _M_CEE_PURE
 
-void check_nested_exception_impl(const exception& ex) { // unroll nested exceptions
-    try {
+void check_nested_exception_impl(const exception& ex)
+{ // unroll nested exceptions
+    try
+    {
         rethrow_if_nested(ex);
-    } catch (const exception& e) {
+    }
+    catch (const exception& e)
+    {
         check_nested_exception_impl(e);
-    } catch (...) {
+    }
+    catch (...)
+    {
     }
 }
 
-template <typename ThrowingFunction>
-void exception_test_impl(const ThrowingFunction& tf) {
-    try {
-        try {
+template<typename ThrowingFunction> void exception_test_impl(const ThrowingFunction& tf)
+{
+    try
+    {
+        try
+        {
             tf();
-        } catch (...) {
+        }
+        catch (...)
+        {
             throw_with_nested("WOOFx2");
         }
-    } catch (const exception& e) {
+    }
+    catch (const exception& e)
+    {
         check_nested_exception_impl(e);
     }
 }
 
-void exception_test() {
+void exception_test()
+{
     exception e{};
     exception_ptr e_ptr = make_exception_ptr(e);
 
-    exception_test_impl([]() { throw 23; }); // can't nest
+    exception_test_impl([]() { throw 23; });                    // can't nest
     exception_test_impl([]() { throw runtime_error("WOOF"); }); // can nest
 }
 
@@ -409,25 +426,25 @@ void exception_test() {
 //     fstream_test_impl<wchar_t>();
 // }
 
-template <typename ReturnType, typename Function>
-void function_test_impl(Function func) {
+template<typename ReturnType, typename Function> void function_test_impl(Function func)
+{
     function<ReturnType()> f0;
     function<ReturnType()> f1 = nullptr;
     function<ReturnType()> f2 = f0;
     function<ReturnType()> f3 = move(f0);
     function<ReturnType()> f4 = func;
-    const auto& cf            = f0;
-    f0                        = f1;
-    f0                        = move(f1);
-    f0                        = nullptr;
-    f0                        = func;
-    f0                        = ref(func);
+    const auto& cf = f0;
+    f0 = f1;
+    f0 = move(f1);
+    f0 = nullptr;
+    f0 = func;
+    f0 = ref(func);
     swap_test(f0);
-    (void) !cf;
-    (void) cf();
-    (void) cf.target_type();
-    (void) f0.template target<ReturnType (*)()>();
-    (void) cf.template target<ReturnType (*)()>();
+    (void)!cf;
+    (void)cf();
+    (void)cf.target_type();
+    (void)f0.template target<ReturnType (*)()>();
+    (void)cf.template target<ReturnType (*)()>();
     equality_test(f0, nullptr);
     equality_test(nullptr, f0);
 
@@ -441,17 +458,18 @@ void function_test_impl(Function func) {
 #endif // _HAS_FUNCTION_ALLOCATOR_SUPPORT
 }
 
-void functional_test() {
+void functional_test()
+{
     using namespace placeholders;
 
     // different return types to trigger <type_traits>::_Invoke_ret
-    function_test_impl<void>([]() {});
+    function_test_impl<void>([]() { });
     function_test_impl<int>([]() { return 4; });
     function_test_impl<vector<int>>([]() { return vector<int>{}; });
 
-    auto ph                  = _1;
-    const auto cph           = _2;
-    volatile auto vph        = _3;
+    auto ph = _1;
+    const auto cph = _2;
+    volatile auto vph = _3;
     const volatile auto cvph = _4;
 
     TRAIT_V(is_placeholder, decltype(ph));
@@ -465,14 +483,14 @@ void functional_test() {
     TRAIT_V(is_placeholder, const volatile int);
 
     // implicit return type
-    auto be                  = bind([](int, int) {}, _1, 2);
-    const auto cbe           = be;
-    volatile auto vbe        = be;
+    auto be = bind([](int, int) { }, _1, 2);
+    const auto cbe = be;
+    volatile auto vbe = be;
     const volatile auto cvbe = be;
 
-    auto not_be                  = []() {};
-    const auto not_cbe           = not_be;
-    volatile auto not_vbe        = not_be;
+    auto not_be = []() { };
+    const auto not_cbe = not_be;
+    volatile auto not_vbe = not_be;
     const volatile auto not_cvbe = not_be;
 
     TRAIT_V(is_bind_expression, decltype(be));
@@ -490,9 +508,9 @@ void functional_test() {
     // volatile binder calls not supported
 
     // with explicit return type
-    auto be_ret                  = bind<void>([](int, int) {}, _1, 2);
-    const auto cbe_ret           = be;
-    volatile auto vbe_ret        = be;
+    auto be_ret = bind<void>([](int, int) { }, _1, 2);
+    const auto cbe_ret = be;
+    volatile auto vbe_ret = be;
     const volatile auto cvbe_ret = be;
 
     TRAIT_V(is_bind_expression, decltype(be_ret));
@@ -564,24 +582,24 @@ void functional_test() {
 //     // Will instantiate in the test for the header where they are defined.
 // }
 
-template <typename Container>
-void nonmember_reverse_iterator_functions_test() {
+template<typename Container> void nonmember_reverse_iterator_functions_test()
+{
     Container c{1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
 
-    (void) rbegin(c);
-    (void) crbegin(c);
-    (void) rend(c);
-    (void) crend(c);
+    (void)rbegin(c);
+    (void)crbegin(c);
+    (void)rend(c);
+    (void)crend(c);
 }
 
-template <typename Container>
-void nonmember_iterator_functions_test() {
+template<typename Container> void nonmember_iterator_functions_test()
+{
     Container c{1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
 
-    (void) begin(c);
-    (void) cbegin(c);
-    (void) end(c);
-    (void) cend(c);
+    (void)begin(c);
+    (void)cbegin(c);
+    (void)end(c);
+    (void)cend(c);
 }
 
 // void msvc_array_iterators_test() {
@@ -600,7 +618,8 @@ void nonmember_iterator_functions_test() {
 //     comparable_test(checked);
 // }
 
-void iterators_test() {
+void iterators_test()
+{
     fwd_iterators_test<forward_list<int>>();
     fwd_iterators_test<list<int>>();
     fwd_iterators_test<vector<int>>();
@@ -621,38 +640,38 @@ void iterators_test() {
 
     // msvc_array_iterators_test();
 
-    int arr[]                = {1};
+    int arr[] = {1};
     initializer_list<int> il = {2};
     forward_list<int> flist{3};
     list<int> lst{4};
     vector<int> vec{5};
 
-    (void) size(arr);
-    (void) data(arr);
-    (void) empty(arr);
+    (void)size(arr);
+    (void)data(arr);
+    (void)empty(arr);
 
-    (void) size(il);
-    (void) data(il);
-    (void) empty(il);
+    (void)size(il);
+    (void)data(il);
+    (void)empty(il);
 
-    (void) empty(flist);
+    (void)empty(flist);
 
-    (void) size(lst);
-    (void) empty(lst);
+    (void)size(lst);
+    (void)empty(lst);
 
-    (void) size(vec);
-    (void) data(vec);
-    (void) empty(vec);
+    (void)size(vec);
+    (void)data(vec);
+    (void)empty(vec);
 
 #if _HAS_CXX20
-    (void) ssize(arr);
-    (void) ssize(il);
-    (void) ssize(lst);
-    (void) ssize(vec);
+    (void)ssize(arr);
+    (void)ssize(il);
+    (void)ssize(lst);
+    (void)ssize(vec);
 #endif // _HAS_CXX20
 
     deque<int> value{1, 2, 3};
-    auto it  = inserter(value, begin(value));
+    auto it = inserter(value, begin(value));
     auto fit = front_inserter(value);
     auto bit = back_inserter(value);
 
@@ -702,15 +721,16 @@ void iterators_test() {
 //     is >> ws; // io manipulator, not variable
 // }
 
-template <typename T>
-void numeric_limits_test_impl() {
+template<typename T> void numeric_limits_test_impl()
+{
     INSTANTIATE(numeric_limits<T>);
     INSTANTIATE(numeric_limits<const T>);
     INSTANTIATE(numeric_limits<volatile T>);
     INSTANTIATE(numeric_limits<const volatile T>);
 }
 
-void limits_test() {
+void limits_test()
+{
     numeric_limits_test_impl<bool>();
     numeric_limits_test_impl<char>();
     numeric_limits_test_impl<signed char>();
@@ -736,50 +756,53 @@ void limits_test() {
     numeric_limits_test_impl<string>();
 }
 
-void locale_test() {
+void locale_test()
+{
     char c{};
     locale loc{};
     // need all collates to instantiate <locale> _Lstrcoll and _Lstrxfrm
-    auto cc   = has_facet<collate<char>>(loc);
-    auto cw   = has_facet<collate<wchar_t>>(loc);
+    auto cc = has_facet<collate<char>>(loc);
+    auto cw = has_facet<collate<wchar_t>>(loc);
     auto cbnc = has_facet<collate_byname<char>>(loc);
     auto cbnw = has_facet<collate_byname<wchar_t>>(loc);
-    auto ctc  = has_facet<ctype<char>>(loc);
-    (void) isalnum(c, loc);
-    (void) isalpha(c, loc);
-    (void) isblank(c, loc);
-    (void) iscntrl(c, loc);
-    (void) isdigit(c, loc);
-    (void) isgraph(c, loc);
-    (void) islower(c, loc);
-    (void) isprint(c, loc);
-    (void) ispunct(c, loc);
-    (void) isspace(c, loc);
-    (void) isupper(c, loc);
-    (void) isxdigit(c, loc);
-    (void) tolower(c, loc);
-    (void) toupper(c, loc);
+    auto ctc = has_facet<ctype<char>>(loc);
+    (void)isalnum(c, loc);
+    (void)isalpha(c, loc);
+    (void)isblank(c, loc);
+    (void)iscntrl(c, loc);
+    (void)isdigit(c, loc);
+    (void)isgraph(c, loc);
+    (void)islower(c, loc);
+    (void)isprint(c, loc);
+    (void)ispunct(c, loc);
+    (void)isspace(c, loc);
+    (void)isupper(c, loc);
+    (void)isxdigit(c, loc);
+    (void)tolower(c, loc);
+    (void)toupper(c, loc);
 
-    (void) cc;
-    (void) cw;
-    (void) cbnc;
-    (void) cbnw;
-    (void) ctc;
+    (void)cc;
+    (void)cw;
+    (void)cbnc;
+    (void)cbnw;
+    (void)ctc;
 }
 
-template <typename OwnerLess, typename SmartPtr1, typename SmartPtr2>
-void owner_less_test_impl(OwnerLess ol, SmartPtr1 ptr1, SmartPtr2 ptr2) {
-    (void) ol(ptr1, ptr2);
-    (void) ol(ptr2, ptr1);
+template<typename OwnerLess, typename SmartPtr1, typename SmartPtr2>
+void owner_less_test_impl(OwnerLess ol, SmartPtr1 ptr1, SmartPtr2 ptr2)
+{
+    (void)ol(ptr1, ptr2);
+    (void)ol(ptr2, ptr1);
 }
 
-template <typename OwnerLess, typename SmartPtr>
-void owner_less_test_impl(OwnerLess ol, SmartPtr ptr) {
+template<typename OwnerLess, typename SmartPtr> void owner_less_test_impl(OwnerLess ol, SmartPtr ptr)
+{
     // also tests _Ptr_base::owner_before
     owner_less_test_impl(ol, ptr, ptr);
 }
 
-void shared_ptr_test_impl() {
+void shared_ptr_test_impl()
+{
     shared_ptr<int> sptr0(new int());
     shared_ptr<int> sptr1(new int(), default_delete<int>{});
     shared_ptr<int> sptr2(nullptr, default_delete<int>{});
@@ -808,17 +831,20 @@ void shared_ptr_test_impl() {
     auto sptr11 = make_shared<int>(5);
     auto sptr12 = allocate_shared<int>(allocator<int>{}, 6);
 
-    struct Cat {
-        virtual ~Cat() {}
+    struct Cat
+    {
+        virtual ~Cat() { }
     };
 
-    struct Kitten : Cat {};
+    struct Kitten : Cat
+    {
+    };
 
-    (void) static_pointer_cast<void>(sptr0);
-    (void) const_pointer_cast<const int>(sptr0);
-    (void) dynamic_pointer_cast<Kitten>(make_shared<Cat>());
+    (void)static_pointer_cast<void>(sptr0);
+    (void)const_pointer_cast<const int>(sptr0);
+    (void)dynamic_pointer_cast<Kitten>(make_shared<Cat>());
 
-    (void) get_deleter<default_delete<int>>(sptr0);
+    (void)get_deleter<default_delete<int>>(sptr0);
     hash_test(sptr0);
 
     // (void) atomic_is_lock_free(&sptr0);
@@ -834,7 +860,8 @@ void shared_ptr_test_impl() {
     // atomic_compare_exchange_strong_explicit(&sptr0, &sptr0, sptr0, memory_order_seq_cst, memory_order_seq_cst);
 }
 
-void weak_ptr_test_impl() {
+void weak_ptr_test_impl()
+{
     weak_ptr<int> wptr0(make_shared<int>(5));
     weak_ptr<void> wptr1(wptr0);
     weak_ptr<void> wptr2(move(wptr0));
@@ -845,17 +872,18 @@ void weak_ptr_test_impl() {
     swap_test(wptr0);
 }
 
-
-void memory_test() {
+void memory_test()
+{
     shared_ptr_test_impl();
     weak_ptr_test_impl();
 
-    struct my_shared_from_this : enable_shared_from_this<my_shared_from_this> {
-        my_shared_from_this() {}
+    struct my_shared_from_this : enable_shared_from_this<my_shared_from_this>
+    {
+        my_shared_from_this() { }
     };
     my_shared_from_this msft{};
     default_delete<void> dd0{default_delete<int>{}};
-    (void) dd0;
+    (void)dd0;
     // Array deletion helpers are no longer supported in the RPC memory wrappers.
     // default_delete<int[]> dd1{default_delete<int[]>{}};
     // dd1(new int[5]);
@@ -1064,12 +1092,13 @@ void memory_test() {
 //     distribution_test_impl(piece_line_d3);
 // }
 
-void ratio_test() {
-    using half       = ratio<1, 2>;
-    using one        = ratio_add<half, half>;
+void ratio_test()
+{
+    using half = ratio<1, 2>;
+    using one = ratio_add<half, half>;
     using half_again = ratio_subtract<one, half>;
-    using quarter    = ratio_multiply<half, half>;
-    using two        = ratio_divide<one, half>;
+    using quarter = ratio_multiply<half, half>;
+    using two = ratio_divide<one, half>;
 
     TRAIT_V(ratio_equal, half, half);
     TRAIT_V(ratio_not_equal, half_again, quarter);
@@ -1119,34 +1148,31 @@ void ratio_test() {
 //     swap_test(mr);
 // }
 
-
-template <typename T>
-struct custom_allocator {
+template<typename T> struct custom_allocator
+{
     using value_type = T;
 
-    custom_allocator() {}
+    custom_allocator() { }
 
-    template <class U>
-    custom_allocator(const custom_allocator<U>&) {}
+    template<class U> custom_allocator(const custom_allocator<U>&) { }
 
-    T* allocate(size_t) {
-        return nullptr;
-    }
+    T* allocate(size_t) { return nullptr; }
 
-    void deallocate(T*, size_t) {}
+    void deallocate(T*, size_t) { }
 };
 
-template <typename T, typename U>
-bool operator==(const custom_allocator<T>&, const custom_allocator<U>&) {
+template<typename T, typename U> bool operator==(const custom_allocator<T>&, const custom_allocator<U>&)
+{
     return true;
 }
 
-template <typename T, typename U>
-bool operator!=(const custom_allocator<T>& a, const custom_allocator<U>& b) {
+template<typename T, typename U> bool operator!=(const custom_allocator<T>& a, const custom_allocator<U>& b)
+{
     return !(a == b);
 }
 
-void scoped_allocator_test() {
+void scoped_allocator_test()
+{
     using my_vector_saa = scoped_allocator_adaptor<allocator<vector<int>>, allocator<int>>;
     using my_double_saa = scoped_allocator_adaptor<allocator<vector<double>>, allocator<int>>;
 
@@ -1161,8 +1187,7 @@ void scoped_allocator_test() {
     saa2 = move(saa1);
     saa3 = saa2;
 
-    scoped_allocator_adaptor<custom_allocator<int>>
-        custom_saa{}; // needed to hit .construct paths with nonconvertible allocator
+    scoped_allocator_adaptor<custom_allocator<int>> custom_saa{}; // needed to hit .construct paths with nonconvertible allocator
 
     vector<int> val{};
     vector<int>* ptr = &val;
@@ -1183,7 +1208,7 @@ void scoped_allocator_test() {
         pair_ptr, piecewise_construct, make_tuple(static_cast<size_t>(1), 2), make_tuple(static_cast<size_t>(1), 2));
 
     using tuple_pair = pair<tuple<int, int>, tuple<int, int>>;
-    auto tp_ptr      = static_cast<tuple_pair*>(malloc(sizeof(tuple_pair)));
+    auto tp_ptr = static_cast<tuple_pair*>(malloc(sizeof(tuple_pair)));
     saa1.construct(tp_ptr, piecewise_construct, make_tuple(make_pair(1, 2)), make_tuple(make_pair(1, 2)));
 
     saa1.construct(pair_ptr);
@@ -1194,7 +1219,7 @@ void scoped_allocator_test() {
     saa1.construct(pair_ptr, vec_pair);
     saa1.construct(pair_ptr, move(vec_pair));
 
-    equality_test(saa1); // same outer, same inner
+    equality_test(saa1);       // same outer, same inner
     equality_test(saa1, saa2); // different outer, same inner
 
     scoped_allocator_adaptor<allocator<vector<double>>, allocator<double>> saa4;
@@ -1274,13 +1299,14 @@ void scoped_allocator_test() {
 // }
 // #endif // _M_CEE_PURE
 
-void tuple_test() {
+void tuple_test()
+{
     allocator<double> my_alloc{};
     custom_allocator<double> custom_alloc{}; // to hit _Tuple_val non-convertible allocator
 
     tuple<> empty_tuple1(allocator_arg, allocator<double>());
     tuple<> empty_tuple2(allocator_arg, allocator<double>(), empty_tuple1);
-    (void) empty_tuple2;
+    (void)empty_tuple2;
 
     tuple<int, int> tup1{};
     tuple<const int&, const int&> tup2(tup1);
@@ -1311,34 +1337,34 @@ void tuple_test() {
     swap_test(tup13);
 
     // Extras to ensure hitting _Tuple_val specializations.
-    tuple<int> tup15(allocator_arg, custom_alloc, 1); // construct with non-convertible allocator.
+    tuple<int> tup15(allocator_arg, custom_alloc, 1);             // construct with non-convertible allocator.
     tuple<tuple<int, int>> tup16(allocator_arg, my_alloc, tup14); // construct with leading allocator.
-    tuple<string> tup17(allocator_arg, my_alloc, "MyStr"); // construct with trailing allocator.
+    tuple<string> tup17(allocator_arg, my_alloc, "MyStr");        // construct with trailing allocator.
 
-    (void) get<0>(tup15);
-    (void) get<0>(move(tup16));
+    (void)get<0>(tup15);
+    (void)get<0>(move(tup16));
 
     const tuple<string> tup17_c = tup17;
-    (void) get<0>(tup17_c);
-    (void) get<0>(move(tup17_c));
+    (void)get<0>(tup17_c);
+    (void)get<0>(move(tup17_c));
 
-    (void) get<int>(tup15);
-    (void) get<tuple<int, int>>(move(tup16));
-    (void) get<string>(tup17_c);
-    (void) get<string>(move(tup17_c));
+    (void)get<int>(tup15);
+    (void)get<tuple<int, int>>(move(tup16));
+    (void)get<string>(tup17_c);
+    (void)get<string>(move(tup17_c));
 
     // (void) get<volatile int>(tuple<volatile int>{});
     // (void) get<const volatile int>(tuple<const volatile int>{});
 
     int a = 1, b = 2;
     tie(a, b) = make_tuple(a, b);
-    (void) forward_as_tuple(string{}, string{});
+    (void)forward_as_tuple(string{}, string{});
 
-    (void) tuple_cat(tup15, tup16);
+    (void)tuple_cat(tup15, tup16);
 
 #if _HAS_CXX17
     apply(plus<>{}, tup1);
-    (void) make_from_tuple<long>(tuple<int>(1729));
+    (void)make_from_tuple<long>(tuple<int>(1729));
 #endif // _HAS_CXX17
 
     pair<string, string> pair1(
@@ -1347,18 +1373,25 @@ void tuple_test() {
     TRAIT_V(uses_allocator, tuple<int>, allocator<double>);
 }
 
-struct utility_test_helper {};
+struct utility_test_helper
+{
+};
 
-bool operator==(const utility_test_helper&, const utility_test_helper&) {
+bool operator==(const utility_test_helper&, const utility_test_helper&)
+{
     return true;
 }
 
-bool operator<(const utility_test_helper&, const utility_test_helper&) {
+bool operator<(const utility_test_helper&, const utility_test_helper&)
+{
     return false;
 }
 
-void utility_test() {
-    struct my_class1 {};
+void utility_test()
+{
+    struct my_class1
+    {
+    };
     my_class1 mc1{};
     swap_test(mc1);
 
@@ -1406,67 +1439,71 @@ void utility_test() {
     INSTANTIATE(tuple_element_t<2, volatile tuple<int, int, int>>);
     INSTANTIATE(tuple_element_t<2, const volatile tuple<int, int, int>>);
 
-    auto p6       = make_pair(1, string("test"));
+    auto p6 = make_pair(1, string("test"));
     const auto p7 = as_const(p6);
 
-    (void) get<0>(p6);
-    (void) get<int>(p6);
-    (void) get<string>(p6);
+    (void)get<0>(p6);
+    (void)get<int>(p6);
+    (void)get<string>(p6);
 
-    (void) get<0>(p7);
-    (void) get<int>(p7);
-    (void) get<string>(p7);
+    (void)get<0>(p7);
+    (void)get<int>(p7);
+    (void)get<string>(p7);
 
-    (void) get<0>(move(p6));
-    (void) get<int>(move(p6));
-    (void) get<string>(move(p6));
+    (void)get<0>(move(p6));
+    (void)get<int>(move(p6));
+    (void)get<string>(move(p6));
 
-    (void) get<0>(move(p7));
-    (void) get<int>(move(p7));
-    (void) get<string>(move(p7));
+    (void)get<0>(move(p7));
+    (void)get<int>(move(p7));
+    (void)get<string>(move(p7));
 
     exchange(p3, move(p5));
 }
 
-void typeindex_test() {
+void typeindex_test()
+{
     type_index ti(typeid(int));
     hash_test(ti);
 }
 
-template <typename FunctorArg, typename Arg>
-void functors_test_impl(Arg val) {
+template<typename FunctorArg, typename Arg> void functors_test_impl(Arg val)
+{
     // Following from <type_traits> and <xutility>:
-    (void) plus<FunctorArg>()(val, val);
-    (void) minus<FunctorArg>()(val, val);
-    (void) multiplies<FunctorArg>()(val, val);
-    (void) equal_to<FunctorArg>()(val, val);
-    (void) less<FunctorArg>()(val, val);
+    (void)plus<FunctorArg>()(val, val);
+    (void)minus<FunctorArg>()(val, val);
+    (void)multiplies<FunctorArg>()(val, val);
+    (void)equal_to<FunctorArg>()(val, val);
+    (void)less<FunctorArg>()(val, val);
 
-    (void) divides<FunctorArg>()(val, val);
-    (void) modulus<FunctorArg>()(val, val);
-    (void) negate<FunctorArg>()(val);
-    (void) not_equal_to<FunctorArg>()(val, val);
-    (void) greater<FunctorArg>()(val, val);
-    (void) greater_equal<FunctorArg>()(val, val);
-    (void) less_equal<FunctorArg>()(val, val);
-    (void) logical_and<FunctorArg>()(val, val);
-    (void) logical_or<FunctorArg>()(val, val);
-    (void) logical_not<FunctorArg>()(val);
-    (void) bit_and<FunctorArg>()(val, val);
-    (void) bit_or<FunctorArg>()(val, val);
-    (void) bit_xor<FunctorArg>()(val, val);
-    (void) bit_not<FunctorArg>()(val);
+    (void)divides<FunctorArg>()(val, val);
+    (void)modulus<FunctorArg>()(val, val);
+    (void)negate<FunctorArg>()(val);
+    (void)not_equal_to<FunctorArg>()(val, val);
+    (void)greater<FunctorArg>()(val, val);
+    (void)greater_equal<FunctorArg>()(val, val);
+    (void)less_equal<FunctorArg>()(val, val);
+    (void)logical_and<FunctorArg>()(val, val);
+    (void)logical_or<FunctorArg>()(val, val);
+    (void)logical_not<FunctorArg>()(val);
+    (void)bit_and<FunctorArg>()(val, val);
+    (void)bit_or<FunctorArg>()(val, val);
+    (void)bit_xor<FunctorArg>()(val, val);
+    (void)bit_not<FunctorArg>()(val);
 }
 
-int real_unary_function(int) {
+int real_unary_function(int)
+{
     return 1;
 }
 
-int real_binary_function(int, int) {
+int real_binary_function(int, int)
+{
     return 1;
 }
 
-void xfunctional_test() {
+void xfunctional_test()
+{
     functors_test_impl<int>(5);
     functors_test_impl<void>(5);
     // (void) not1(negate<int>())(5); // not1 requires T::second_argument_type
@@ -1476,49 +1513,42 @@ void xfunctional_test() {
     auto b1 = bind1st(plus<int>(), 1);
     auto b2 = bind2nd(plus<int>(), 2);
 
-    (void) b1;
-    (void) b2;
+    (void)b1;
+    (void)b2;
 
     auto ptuf = ptr_fun(real_unary_function);
     auto ptbf = ptr_fun(real_binary_function);
 
-    (void) ptuf;
-    (void) ptbf;
+    (void)ptuf;
+    (void)ptbf;
 
-    struct A {
-        int fn() {
-            return 1;
-        }
-        int fn1(int) {
-            return 2;
-        }
-        int cfn() const {
-            return 3;
-        }
-        int cfn1(int) const {
-            return 4;
-        }
+    struct A
+    {
+        int fn() { return 1; }
+        int fn1(int) { return 2; }
+        int cfn() const { return 3; }
+        int cfn1(int) const { return 4; }
     };
 
-    auto mft   = mem_fun(&A::fn);
-    auto mft1  = mem_fun(&A::fn1);
-    auto cmft  = mem_fun(&A::cfn);
+    auto mft = mem_fun(&A::fn);
+    auto mft1 = mem_fun(&A::fn1);
+    auto cmft = mem_fun(&A::cfn);
     auto cmft1 = mem_fun(&A::cfn1);
 
-    auto mfrt   = mem_fun_ref(&A::fn);
-    auto mfrt1  = mem_fun_ref(&A::fn1);
-    auto cmfrt  = mem_fun_ref(&A::cfn);
+    auto mfrt = mem_fun_ref(&A::fn);
+    auto mfrt1 = mem_fun_ref(&A::fn1);
+    auto cmfrt = mem_fun_ref(&A::cfn);
     auto cmfrt1 = mem_fun_ref(&A::cfn1);
 
-    (void) mft;
-    (void) mft1;
-    (void) cmft;
-    (void) cmft1;
+    (void)mft;
+    (void)mft1;
+    (void)cmft;
+    (void)cmft1;
 
-    (void) mfrt;
-    (void) mfrt1;
-    (void) cmfrt;
-    (void) cmfrt1;
+    (void)mfrt;
+    (void)mfrt1;
+    (void)cmfrt;
+    (void)cmfrt1;
 #endif // _HAS_AUTO_PTR_ETC
 }
 
@@ -1634,11 +1664,16 @@ void xfunctional_test() {
 // #endif // _HAS_AUTO_PTR_ETC
 // }
 
-void xmemory0_test() {
+void xmemory0_test()
+{
 
-    struct Base {};
+    struct Base
+    {
+    };
 
-    struct Derived : Base {};
+    struct Derived : Base
+    {
+    };
 
     INSTANTIATE(pointer_traits<int*>);
     INSTANTIATE(pointer_traits<Base*>::rebind<Derived*>);
@@ -1673,7 +1708,8 @@ void xmemory0_test() {
     equality_test(ad, ai);
 }
 
-void xstddef_test() {
+void xstddef_test()
+{
 #if _HAS_AUTO_PTR_ETC
     INSTANTIATE(unary_function<int, int>);
     INSTANTIATE(binary_function<int, int, int>);
@@ -1706,64 +1742,64 @@ void xstddef_test() {
     // is_function covered in traits_test
 
     int value{};
-    (void) addressof(value);
-    (void) addressof(real_unary_function);
+    (void)addressof(value);
+    (void)addressof(real_unary_function);
 }
 
-template <typename T1>
-void xtgmath_integral_test_impl() {
+template<typename T1> void xtgmath_integral_test_impl()
+{
     T1 arg1{1};
     int int_value{};
     long long_value{};
     long double ld_value{};
 
-    (void) acos(arg1);
-    (void) asin(arg1);
-    (void) atan(arg1);
-    (void) ceil(arg1);
-    (void) cos(arg1);
-    (void) cosh(arg1);
-    (void) exp(arg1);
-    (void) fabs(arg1);
-    (void) floor(arg1);
-    (void) frexp(arg1, &int_value);
-    (void) ldexp(arg1, int_value);
-    (void) log(arg1);
-    (void) log10(arg1);
-    (void) sin(arg1);
-    (void) sinh(arg1);
-    (void) sqrt(arg1);
-    (void) tan(arg1);
-    (void) tanh(arg1);
-    (void) acosh(arg1);
-    (void) asinh(arg1);
-    (void) atanh(arg1);
-    (void) cbrt(arg1);
-    (void) erf(arg1);
-    (void) erfc(arg1);
-    (void) expm1(arg1);
-    (void) exp2(arg1);
-    (void) ilogb(arg1);
-    (void) lgamma(arg1);
-    (void) llrint(arg1);
-    (void) llround(arg1);
-    (void) log1p(arg1);
-    (void) log2(arg1);
-    (void) logb(arg1);
-    (void) lrint(arg1);
-    (void) lround(arg1);
-    (void) nearbyint(arg1);
-    (void) nexttoward(arg1, ld_value);
-    (void) rint(arg1);
-    (void) round(arg1);
-    (void) scalbln(arg1, long_value);
-    (void) scalbn(arg1, int_value);
-    (void) tgamma(arg1);
-    (void) trunc(arg1);
+    (void)acos(arg1);
+    (void)asin(arg1);
+    (void)atan(arg1);
+    (void)ceil(arg1);
+    (void)cos(arg1);
+    (void)cosh(arg1);
+    (void)exp(arg1);
+    (void)fabs(arg1);
+    (void)floor(arg1);
+    (void)frexp(arg1, &int_value);
+    (void)ldexp(arg1, int_value);
+    (void)log(arg1);
+    (void)log10(arg1);
+    (void)sin(arg1);
+    (void)sinh(arg1);
+    (void)sqrt(arg1);
+    (void)tan(arg1);
+    (void)tanh(arg1);
+    (void)acosh(arg1);
+    (void)asinh(arg1);
+    (void)atanh(arg1);
+    (void)cbrt(arg1);
+    (void)erf(arg1);
+    (void)erfc(arg1);
+    (void)expm1(arg1);
+    (void)exp2(arg1);
+    (void)ilogb(arg1);
+    (void)lgamma(arg1);
+    (void)llrint(arg1);
+    (void)llround(arg1);
+    (void)log1p(arg1);
+    (void)log2(arg1);
+    (void)logb(arg1);
+    (void)lrint(arg1);
+    (void)lround(arg1);
+    (void)nearbyint(arg1);
+    (void)nexttoward(arg1, ld_value);
+    (void)rint(arg1);
+    (void)round(arg1);
+    (void)scalbln(arg1, long_value);
+    (void)scalbn(arg1, int_value);
+    (void)tgamma(arg1);
+    (void)trunc(arg1);
 }
 
-template <typename T1, typename T2, typename T3>
-void xtgmath_arithmetic_test_impl() {
+template<typename T1, typename T2, typename T3> void xtgmath_arithmetic_test_impl()
+{
     T1 arg1{1};
     T2 arg2{2};
 
@@ -1783,7 +1819,8 @@ void xtgmath_arithmetic_test_impl() {
     USE_VALUE(remainder(arg1, arg2));
 }
 
-void xtgmath_test() {
+void xtgmath_test()
+{
     xtgmath_integral_test_impl<int>();
     xtgmath_arithmetic_test_impl<int, int, int>();
     xtgmath_arithmetic_test_impl<int, int, float>();
@@ -1796,7 +1833,8 @@ void xtgmath_test() {
     xtgmath_arithmetic_test_impl<float, double, double>();
 }
 
-void xtr1common_test() {
+void xtr1common_test()
+{
     INSTANTIATE(integral_constant<int, 5>);
     INSTANTIATE(bool_constant<true>);
     INSTANTIATE(enable_if<true>);
@@ -1809,6 +1847,7 @@ void xtr1common_test() {
     // remove_reference
 }
 
-
 int main()
-{return 0;}
+{
+    return 0;
+}

@@ -389,39 +389,32 @@ namespace rpc
     }
 
     void console_telemetry_service::on_service_add_ref(rpc::zone zone_id,
-        rpc::destination_channel_zone destination_channel_zone_id,
         rpc::destination_zone destination_zone_id,
         rpc::object object_id,
-        rpc::caller_channel_zone caller_channel_zone_id,
         rpc::caller_zone caller_zone_id,
         rpc::add_ref_options options) const
     {
         init_logger();
-        logger_->info("{}{} service_add_ref: destination_channel_zone={} destination_zone={} object_id={} "
-                      "caller_channel_zone={} caller_zone={} options={}{}",
+        logger_->info("{}{} service_add_ref: destination_zone={} object_id={} "
+                      "caller_zone={} options={}{}",
             get_zone_color(zone_id.get_val()),
             get_zone_name(zone_id.get_val()),
-            get_zone_name(destination_channel_zone_id.get_val()),
             get_zone_name(destination_zone_id.get_val()),
             object_id.get_val(),
-            get_zone_name(caller_channel_zone_id.get_val()),
             get_zone_name(caller_zone_id.get_val()),
             static_cast<int>(options),
             reset_color());
     }
 
     void console_telemetry_service::on_service_release(rpc::zone zone_id,
-        rpc::destination_channel_zone destination_channel_zone_id,
         rpc::destination_zone destination_zone_id,
         rpc::object object_id,
         rpc::caller_zone caller_zone_id) const
     {
         init_logger();
-        logger_->info(
-            "{}{} service_release: destination_channel_zone={} destination_zone={} object_id={} caller_zone={}{}",
+        logger_->info("{}{} service_release: destination_zone={} object_id={} caller_zone={}{}",
             get_zone_color(zone_id.get_val()),
             get_zone_name(zone_id.get_val()),
-            get_zone_name(destination_channel_zone_id.get_val()),
             get_zone_name(destination_zone_id.get_val()),
             object_id.get_val(),
             get_zone_name(caller_zone_id.get_val()),
@@ -499,18 +492,16 @@ namespace rpc
 
     void console_telemetry_service::on_service_proxy_add_ref(rpc::zone zone_id,
         rpc::destination_zone destination_zone_id,
-        rpc::destination_channel_zone destination_channel_zone_id,
         rpc::caller_zone caller_zone_id,
         rpc::object object_id,
         rpc::add_ref_options options) const
     {
         init_logger();
-        logger_->info("{}{} service_proxy_add_ref: destination_zone={} destination_channel_zone={} caller_zone={} "
+        logger_->info("{}{} service_proxy_add_ref: destination_zone={} caller_zone={} "
                       "object_id={} options={}{}",
             get_zone_color(zone_id.get_val()),
             get_zone_name(zone_id.get_val()),
             get_zone_name(destination_zone_id.get_val()),
-            get_zone_name(destination_channel_zone_id.get_val()),
             get_zone_name(caller_zone_id.get_val()),
             object_id.get_val(),
             static_cast<int>(options),
@@ -519,52 +510,41 @@ namespace rpc
 
     void console_telemetry_service::on_service_proxy_release(rpc::zone zone_id,
         rpc::destination_zone destination_zone_id,
-        rpc::destination_channel_zone destination_channel_zone_id,
         rpc::caller_zone caller_zone_id,
         rpc::object object_id) const
     {
         init_logger();
-        logger_->info(
-            "{}{} service_proxy_release: destination_zone={} destination_channel_zone={} caller_zone={} object_id={}{}",
+        logger_->info("{}{} service_proxy_release: destination_zone={} caller_zone={} object_id={}{}",
             get_zone_color(zone_id.get_val()),
             get_zone_name(zone_id.get_val()),
             get_zone_name(destination_zone_id.get_val()),
-            get_zone_name(destination_channel_zone_id.get_val()),
             get_zone_name(caller_zone_id.get_val()),
             object_id.get_val(),
             reset_color());
     }
 
-    void console_telemetry_service::on_service_proxy_add_external_ref(rpc::zone zone_id,
-        rpc::destination_channel_zone destination_channel_zone_id,
-        rpc::destination_zone destination_zone_id,
-        rpc::caller_zone caller_zone_id,
-        int ref_count) const
+    void console_telemetry_service::on_service_proxy_add_external_ref(
+        rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::caller_zone caller_zone_id, int ref_count) const
     {
         init_logger();
-        logger_->info("{}{} service_proxy_add_external_ref: destination_channel_zone={} destination_zone={} "
+        logger_->info("{}{} service_proxy_add_external_ref: destination_zone={} "
                       "caller_zone={} ref_count={}{}",
             get_zone_color(zone_id.get_val()),
             get_zone_name(zone_id.get_val()),
-            get_zone_name(destination_channel_zone_id.get_val()),
             get_zone_name(destination_zone_id.get_val()),
             get_zone_name(caller_zone_id.get_val()),
             ref_count,
             reset_color());
     }
 
-    void console_telemetry_service::on_service_proxy_release_external_ref(rpc::zone zone_id,
-        rpc::destination_channel_zone destination_channel_zone_id,
-        rpc::destination_zone destination_zone_id,
-        rpc::caller_zone caller_zone_id,
-        int ref_count) const
+    void console_telemetry_service::on_service_proxy_release_external_ref(
+        rpc::zone zone_id, rpc::destination_zone destination_zone_id, rpc::caller_zone caller_zone_id, int ref_count) const
     {
         init_logger();
-        logger_->info("{}{} service_proxy_release_external_ref: destination_channel_zone={} destination_zone={} "
+        logger_->info("{}{} service_proxy_release_external_ref: destination_zone={} "
                       "caller_zone={} ref_count={}{}",
             get_zone_color(zone_id.get_val()),
             get_zone_name(zone_id.get_val()),
-            get_zone_name(destination_channel_zone_id.get_val()),
             get_zone_name(destination_zone_id.get_val()),
             get_zone_name(caller_zone_id.get_val()),
             ref_count,

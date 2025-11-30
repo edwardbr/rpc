@@ -32,44 +32,45 @@ public:
     {
     }
 
-    regex_constants::error_type code() const noexcept
-    {
-        return error_code_;
-    }
+    regex_constants::error_type code() const noexcept { return error_code_; }
 
-    const char* component() const noexcept override
-    {
-        return "test_regex";
-    }
+    const char* component() const noexcept override { return "test_regex"; }
 
 private:
     regex_constants::error_type error_code_;
 };
 
 // Test RTTI functionality with shared_ptr
-template <typename To, typename From>
+template<typename To, typename From>
 using DynamicPointerCastResult = decltype(dynamic_pointer_cast<To>(declval<From>()));
 
-template <typename To, typename From, typename = void>
-struct HasDynamicPointerCast : false_type {};
+template<typename To, typename From, typename = void> struct HasDynamicPointerCast : false_type
+{
+};
 
-template <typename To, typename From>
-struct HasDynamicPointerCast<To, From, void_t<DynamicPointerCastResult<To, From>>> : true_type {};
+template<typename To, typename From>
+struct HasDynamicPointerCast<To, From, void_t<DynamicPointerCastResult<To, From>>> : true_type
+{
+};
 
 // Test get_deleter functionality with shared_ptr
-template <typename Deleter, typename SmartPtr>
+template<typename Deleter, typename SmartPtr>
 using GetDeleterResult = decltype(get_deleter<Deleter>(declval<SmartPtr>()));
 
-template <typename Deleter, typename SmartPtr, typename = void>
-struct HasGetDeleter : false_type {};
+template<typename Deleter, typename SmartPtr, typename = void> struct HasGetDeleter : false_type
+{
+};
 
-template <typename Deleter, typename SmartPtr>
-struct HasGetDeleter<Deleter, SmartPtr, void_t<GetDeleterResult<Deleter, SmartPtr>>> : true_type {};
+template<typename Deleter, typename SmartPtr>
+struct HasGetDeleter<Deleter, SmartPtr, void_t<GetDeleterResult<Deleter, SmartPtr>>> : true_type
+{
+};
 
-int main() {
+int main()
+{
     // Test dynamic_pointer_cast with shared_ptr
     {
-        const shared_ptr<exception> base      = make_shared<regex_error>(regex_constants::error_paren);
+        const shared_ptr<exception> base = make_shared<regex_error>(regex_constants::error_paren);
         const shared_ptr<regex_error> derived = dynamic_pointer_cast<regex_error>(base);
         assert(derived && derived->code() == regex_constants::error_paren);
 

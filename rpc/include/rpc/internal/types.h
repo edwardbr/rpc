@@ -15,7 +15,6 @@ namespace rpc
 {
     struct zone;
     struct destination_zone;
-    struct destination_channel_zone;
     struct operating_zone;
     struct caller_zone;
     struct caller_channel_zone;
@@ -65,7 +64,6 @@ namespace rpc
         constexpr bool is_set() const noexcept { return id != 0; }
 
         inline destination_zone as_destination() const;
-        inline destination_channel_zone as_destination_channel() const;
         inline caller_zone as_caller() const;
         inline caller_channel_zone as_caller_channel() const;
 
@@ -115,57 +113,7 @@ namespace rpc
         constexpr bool is_set() const noexcept { return id != 0; }
 
         inline zone as_zone() const;
-        inline destination_channel_zone as_destination_channel() const;
         inline caller_zone as_caller() const;
-        inline caller_channel_zone as_caller_channel() const;
-
-        template<typename Ar> void serialize(Ar& ar) { ar& YAS_OBJECT_NVP("id", ("id", id)); }
-    };
-
-    // the zone that a service proxy was cloned from
-    struct destination_channel_zone
-    {
-    private:
-        uint64_t id = 0;
-
-    public:
-        destination_channel_zone() = default;
-        destination_channel_zone(const destination_channel_zone&) = default;
-        destination_channel_zone(destination_channel_zone&&) noexcept = default;
-        destination_channel_zone(uint64_t initial_id)
-            : id(initial_id)
-        {
-        }
-        destination_channel_zone& operator=(const destination_channel_zone&) = default;
-        destination_channel_zone& operator=(destination_channel_zone&&) noexcept = default;
-        destination_channel_zone& operator=(uint64_t other)
-        {
-            id = other;
-            return *this;
-        }
-
-        uint64_t get_val() const { return id; }
-
-        // compare
-        constexpr bool operator==(const destination_channel_zone& val) const { return id == val.id; }
-        template<typename T, std::enable_if_t<std::is_unsigned<T>::value, int> = 0>
-        constexpr bool operator==(T val) const
-        {
-            return id == static_cast<uint64_t>(val);
-        }
-        constexpr bool operator!=(const destination_channel_zone& val) const { return id != val.id; }
-        template<typename T, std::enable_if_t<std::is_unsigned<T>::value, int> = 0>
-        constexpr bool operator!=(T val) const
-        {
-            return id != static_cast<uint64_t>(val);
-        }
-
-        constexpr bool operator<(uint64_t val) const { return id < val; }
-        constexpr bool operator<(const destination_channel_zone& val) const { return id < val.id; }
-
-        constexpr bool is_set() const noexcept { return id != 0; }
-
-        inline destination_zone as_destination() const;
         inline caller_channel_zone as_caller_channel() const;
 
         template<typename Ar> void serialize(Ar& ar) { ar& YAS_OBJECT_NVP("id", ("id", id)); }
@@ -217,7 +165,6 @@ namespace rpc
 
         inline caller_channel_zone as_caller_channel() const;
         inline destination_zone as_destination() const;
-        inline destination_channel_zone as_destination_channel() const;
         inline known_direction_zone as_known_direction_zone() const;
 
         template<typename Ar> void serialize(Ar& ar) { ar& YAS_OBJECT_NVP("id", ("id", id)); }
@@ -268,7 +215,6 @@ namespace rpc
         constexpr bool is_set() const noexcept { return id != 0; }
 
         inline destination_zone as_destination() const;
-        inline destination_channel_zone as_destination_channel() const;
 
         template<typename Ar> void serialize(Ar& ar) { ar& YAS_OBJECT_NVP("id", ("id", id)); }
     };
@@ -321,7 +267,6 @@ namespace rpc
         constexpr bool is_set() const noexcept { return id != 0; }
 
         inline destination_zone as_destination() const;
-        // inline destination_channel_zone as_destination_channel() const;
 
         template<typename Ar> void serialize(Ar& ar) { ar& YAS_OBJECT_NVP("id", ("id", id)); }
     };
@@ -470,12 +415,13 @@ namespace rpc
     // Back-channel entry for passing metadata alongside RPC calls
     struct back_channel_entry
     {
-        uint64_t type_id;              // IDL-generated fingerprint for type identification
-        std::vector<uint8_t> payload;  // Binary payload (application-defined)
+        uint64_t type_id;             // IDL-generated fingerprint for type identification
+        std::vector<uint8_t> payload; // Binary payload (application-defined)
 
         back_channel_entry() = default;
         back_channel_entry(uint64_t tid, std::vector<uint8_t> p)
-            : type_id(tid), payload(std::move(p))
+            : type_id(tid)
+            , payload(std::move(p))
         {
         }
 
@@ -483,12 +429,18 @@ namespace rpc
         {
             ar& YAS_OBJECT_NVP("back_channel_entry", ("type_id", type_id), ("payload", payload));
         }
-        
+
         // compare
-        constexpr bool operator==(const back_channel_entry& val) const { return type_id == val.type_id && payload == val.payload; }
-        constexpr bool operator!=(const back_channel_entry& val) const { return type_id != val.type_id || payload != val.payload; }
+        constexpr bool operator==(const back_channel_entry& val) const
+        {
+            return type_id == val.type_id && payload == val.payload;
+        }
+        constexpr bool operator!=(const back_channel_entry& val) const
+        {
+            return type_id != val.type_id || payload != val.payload;
+        }
     };
-    
+
     struct function_info
     {
         std::string full_name;
@@ -506,10 +458,6 @@ namespace rpc
     {
         return destination_zone(id);
     }
-    destination_channel_zone zone::as_destination_channel() const
-    {
-        return destination_channel_zone(id);
-    }
     caller_zone zone::as_caller() const
     {
         return caller_zone(id);
@@ -523,24 +471,13 @@ namespace rpc
     {
         return zone(id);
     }
-    destination_channel_zone destination_zone::as_destination_channel() const
-    {
-        return destination_channel_zone(id);
-    }
+
     caller_zone destination_zone::as_caller() const
     {
         return caller_zone(id);
     }
-    caller_channel_zone destination_zone::as_caller_channel() const
-    {
-        return caller_channel_zone(id);
-    }
 
-    destination_zone destination_channel_zone::as_destination() const
-    {
-        return destination_zone(id);
-    }
-    caller_channel_zone destination_channel_zone::as_caller_channel() const
+    caller_channel_zone destination_zone::as_caller_channel() const
     {
         return caller_channel_zone(id);
     }
@@ -553,10 +490,6 @@ namespace rpc
     {
         return destination_zone(id);
     }
-    destination_channel_zone caller_zone::as_destination_channel() const
-    {
-        return destination_channel_zone(id);
-    }
 
     known_direction_zone caller_zone::as_known_direction_zone() const
     {
@@ -566,10 +499,6 @@ namespace rpc
     destination_zone caller_channel_zone::as_destination() const
     {
         return destination_zone(id);
-    }
-    destination_channel_zone caller_channel_zone::as_destination_channel() const
-    {
-        return destination_channel_zone(id);
     }
 
     destination_zone known_direction_zone::as_destination() const
@@ -586,10 +515,6 @@ namespace std
         return std::to_string(val.get_val());
     }
     inline std::string to_string(const rpc::destination_zone& val)
-    {
-        return std::to_string(val.get_val());
-    }
-    inline std::string to_string(const rpc::destination_channel_zone& val)
     {
         return std::to_string(val.get_val());
     }
@@ -626,14 +551,6 @@ namespace std
     template<> struct hash<rpc::destination_zone>
     {
         auto operator()(const rpc::destination_zone& item) const noexcept { return (std::size_t)item.get_val(); }
-    };
-
-    template<> struct hash<rpc::destination_channel_zone>
-    {
-        auto operator()(const rpc::destination_channel_zone& item) const noexcept
-        {
-            return (std::size_t)item.get_val();
-        }
     };
 
     template<> struct hash<rpc::caller_zone>

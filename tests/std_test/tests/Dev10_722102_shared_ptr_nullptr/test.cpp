@@ -19,17 +19,22 @@ using namespace std;
 
 #pragma warning(disable : 28251) // Inconsistent annotation for 'new': this instance has no annotations.
 
-void Del(int* p) {
+void Del(int* p)
+{
     delete p;
 }
 
-namespace {
+namespace
+{
     bool g_throw_on_alloc = false;
 }
 
-void* operator new(size_t const size) {
-    if (!g_throw_on_alloc) {
-        if (void* const vp = malloc(size)) {
+void* operator new(size_t const size)
+{
+    if (!g_throw_on_alloc)
+    {
+        if (void* const vp = malloc(size))
+        {
             return vp;
         }
     }
@@ -37,58 +42,68 @@ void* operator new(size_t const size) {
     throw bad_alloc{};
 }
 
-void operator delete(void* const vp, size_t) noexcept {
+void operator delete(void* const vp, size_t) noexcept
+{
     free(vp);
 }
 
-struct NullptrDeleter {
-    template <class T>
-    void operator()(T*) const {
-        abort();
-    }
+struct NullptrDeleter
+{
+    template<class T> void operator()(T*) const { abort(); }
 
-    void operator()(nullptr_t) const {}
+    void operator()(nullptr_t) const { }
 };
 
-struct ImmobileDeleter {
-    ImmobileDeleter()                             = default;
-    ImmobileDeleter(ImmobileDeleter&&)            = delete;
+struct ImmobileDeleter
+{
+    ImmobileDeleter() = default;
+    ImmobileDeleter(ImmobileDeleter&&) = delete;
     ImmobileDeleter& operator=(ImmobileDeleter&&) = delete;
 
-    void operator()(void*) const {}
+    void operator()(void*) const { }
 };
 
-class NonDeleter {};
+class NonDeleter
+{
+};
 
-void test_deleter() {
+void test_deleter()
+{
     // VSO-387662: deleter should be called with a nullptr_t object,
     // not with (int *)nullptr.
     shared_ptr<int>{nullptr, NullptrDeleter{}};
     shared_ptr<int>{nullptr, NullptrDeleter{}, allocator<int>{}};
 }
 
-void test_exception() {
+void test_exception()
+{
     // VSO-387662: deleter should be called with a nullptr_t object,
     // not with (int *)nullptr.
     g_throw_on_alloc = true;
-    try {
+    try
+    {
         shared_ptr<int>{nullptr, NullptrDeleter{}};
         abort();
-    } catch (const bad_alloc&) {
     }
-    try {
+    catch (const bad_alloc&)
+    {
+    }
+    try
+    {
         shared_ptr<int>{nullptr, NullptrDeleter{}, allocator<int>{}};
         abort();
-    } catch (const bad_alloc&) {
+    }
+    catch (const bad_alloc&)
+    {
     }
     g_throw_on_alloc = false;
 }
 
-
-void test_sfinae() {
+void test_sfinae()
+{
     // per LWG-2875
     using SP = shared_ptr<int>;
-    using A  = allocator<int>;
+    using A = allocator<int>;
 
     // deleter must be move constructible
     STATIC_ASSERT(is_constructible_v<SP, nullptr_t, default_delete<int>>);
@@ -102,11 +117,17 @@ void test_sfinae() {
     // STATIC_ASSERT(!is_constructible_v<SP, nullptr_t, NonDeleter, A>);
 }
 
-namespace pointer {
-    struct Base {};
-    struct Derived : Base {};
+namespace pointer
+{
+    struct Base
+    {
+    };
+    struct Derived : Base
+    {
+    };
 
-    void test_sfinae() {
+    void test_sfinae()
+    {
         {
             // per LWG-2874
 
@@ -142,7 +163,8 @@ namespace pointer {
         }
     }
 
-    void test() {
+    void test()
+    {
         test_sfinae();
     }
 } // namespace pointer
@@ -304,11 +326,17 @@ namespace pointer {
 //     }
 // } // namespace unique_ptr_
 
-namespace weak_ptr_ {
-    struct Base {};
-    struct Derived : Base {};
+namespace weak_ptr_
+{
+    struct Base
+    {
+    };
+    struct Derived : Base
+    {
+    };
 
-    void test_sfinae() {
+    void test_sfinae()
+    {
         // per LWG-2876
 
         STATIC_ASSERT(is_constructible_v<shared_ptr<int>, weak_ptr<int>>);
@@ -320,12 +348,14 @@ namespace weak_ptr_ {
         // Array-oriented coverage removed for remote_pointer façade.
     }
 
-    void test() {
+    void test()
+    {
         test_sfinae();
     }
 } // namespace weak_ptr_
 
-int main() {
+int main()
+{
     allocator<int> Alloc;
 
     {
@@ -471,21 +501,21 @@ int main() {
         assert(sp23 && sp23.get() && sp23.use_count() == 2);
     }
 
-// #if _HAS_AUTO_PTR_ETC
-//     {
-//         auto_ptr<int> ap;
-//         shared_ptr<int> sp24(move(ap));
-//         assert(!ap.get());
-//         assert(!sp24 && !sp24.get() && sp24.use_count() == 1);
-//     }
+    // #if _HAS_AUTO_PTR_ETC
+    //     {
+    //         auto_ptr<int> ap;
+    //         shared_ptr<int> sp24(move(ap));
+    //         assert(!ap.get());
+    //         assert(!sp24 && !sp24.get() && sp24.use_count() == 1);
+    //     }
 
-//     {
-//         auto_ptr<int> ap(new int(1729));
-//         shared_ptr<int> sp25(move(ap));
-//         assert(!ap.get());
-//         assert(sp25 && sp25.get() && sp25.use_count() == 1);
-//     }
-// #endif // _HAS_AUTO_PTR_ETC
+    //     {
+    //         auto_ptr<int> ap(new int(1729));
+    //         shared_ptr<int> sp25(move(ap));
+    //         assert(!ap.get());
+    //         assert(sp25 && sp25.get() && sp25.use_count() == 1);
+    //     }
+    // #endif // _HAS_AUTO_PTR_ETC
 
     // {
     //     unique_ptr<int> up;

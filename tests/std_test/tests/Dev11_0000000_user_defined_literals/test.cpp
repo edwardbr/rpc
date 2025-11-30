@@ -6,7 +6,8 @@
 
 using namespace std;
 
-int main() {
+int main()
+{
     // LWG-2315 "weak_ptr should be movable"
     {
         shared_ptr<int> sp = make_shared<int>(1729);

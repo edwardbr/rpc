@@ -6,12 +6,17 @@
 
 using namespace std;
 
-struct X : enable_shared_from_this<X> {
-    explicit X(const int n) : m_n(n) {}
+struct X : enable_shared_from_this<X>
+{
+    explicit X(const int n)
+        : m_n(n)
+    {
+    }
     int m_n;
 };
 
-int main() {
+int main()
+{
     // Test DDB-196243 "TR1 VC9 SP1: enable_shared_from_this's copy ctor and copy assignment operator do too much work".
     {
         const shared_ptr<X> sp1(new X(11));

@@ -41,64 +41,69 @@
 
 using namespace std;
 
-template <typename T>
-struct MyAlloc {
+template<typename T> struct MyAlloc
+{
     using value_type = T;
 
     MyAlloc() = default;
 
-    template <typename U>
-    MyAlloc(const MyAlloc<U>&) {}
+    template<typename U> MyAlloc(const MyAlloc<U>&) { }
 
-    T* allocate(size_t n) {
-        return allocator<T>{}.allocate(n);
-    }
+    T* allocate(size_t n) { return allocator<T>{}.allocate(n); }
 
-    void deallocate(T* p, size_t n) {
-        allocator<T>{}.deallocate(p, n);
-    }
+    void deallocate(T* p, size_t n) { allocator<T>{}.deallocate(p, n); }
 
-    template <typename U>
-    bool operator==(const MyAlloc<U>&) const {
-        return true;
-    }
-    template <typename U>
-    bool operator!=(const MyAlloc<U>&) const {
-        return false;
-    }
+    template<typename U> bool operator==(const MyAlloc<U>&) const { return true; }
+    template<typename U> bool operator!=(const MyAlloc<U>&) const { return false; }
 };
 
-struct MyGreater : greater<> {};
+struct MyGreater : greater<>
+{
+};
 
-struct MyHash : hash<long> {};
+struct MyHash : hash<long>
+{
+};
 
-struct MyWideHash : hash<wchar_t> {};
+struct MyWideHash : hash<wchar_t>
+{
+};
 
-struct MyEqual : equal_to<> {};
+struct MyEqual : equal_to<>
+{
+};
 
-struct MyDelete : default_delete<long[]> {};
+struct MyDelete : default_delete<long[]>
+{
+};
 
-void nothing() {}
+void nothing() { }
 
-int square(int x) {
+int square(int x)
+{
     return x * x;
 }
 
-long add(short x, int y) {
+long add(short x, int y)
+{
     return x + y;
 }
 
-template <typename Void, template <typename...> class ClassTemplate, typename... CtorArgs>
-struct CanDeduceFromHelper : false_type {};
+template<typename Void, template<typename...> class ClassTemplate, typename... CtorArgs>
+struct CanDeduceFromHelper : false_type
+{
+};
 
-template <template <typename...> class ClassTemplate, typename... CtorArgs>
-struct CanDeduceFromHelper<void_t<decltype(ClassTemplate(declval<CtorArgs>()...))>, ClassTemplate, CtorArgs...>
-    : true_type {};
+template<template<typename...> class ClassTemplate, typename... CtorArgs>
+struct CanDeduceFromHelper<void_t<decltype(ClassTemplate(declval<CtorArgs>()...))>, ClassTemplate, CtorArgs...> : true_type
+{
+};
 
-template <template <typename...> class ClassTemplate, typename... CtorArgs>
+template<template<typename...> class ClassTemplate, typename... CtorArgs>
 constexpr bool CanDeduceFrom = CanDeduceFromHelper<void, ClassTemplate, CtorArgs...>::value;
 
-void test_initializer_list() {
+void test_initializer_list()
+{
     initializer_list<long> il{};
     initializer_list il2(il);
 
@@ -150,7 +155,8 @@ void test_initializer_list() {
 //     static_assert(is_same_v<decltype(t12), tuple<char, long, double>>);
 // }
 
-void test_optional() {
+void test_optional()
+{
     optional opt1(1729L);
     optional opt2(opt1);
 
@@ -158,21 +164,24 @@ void test_optional() {
     static_assert(is_same_v<decltype(opt2), optional<long>>);
 }
 
-void test_bitset() {
+void test_bitset()
+{
     bitset<7> b{};
     bitset b2(b);
 
     static_assert(is_same_v<decltype(b2), bitset<7>>);
 }
 
-void test_allocator() {
+void test_allocator()
+{
     allocator<long> alloc1{};
     allocator alloc2(alloc1);
 
     static_assert(is_same_v<decltype(alloc2), allocator<long>>);
 }
 
-void test_shared_ptr_and_weak_ptr() {
+void test_shared_ptr_and_weak_ptr()
+{
     // Array specializations are no longer supported in RPC memory wrappers.
     // shared_ptr<long[]> sp(new long[3]);
     // weak_ptr<long[]> wp(sp);
@@ -188,7 +197,8 @@ void test_shared_ptr_and_weak_ptr() {
     // static_assert(is_same_v<decltype(wp2), weak_ptr<long[]>>);
 }
 
-void test_owner_less() {
+void test_owner_less()
+{
     owner_less<shared_ptr<long>> ol1{};
     owner_less<weak_ptr<long>> ol2{};
     owner_less<> ol3{};
@@ -220,7 +230,8 @@ void test_owner_less() {
 //     static_assert(is_same_v<decltype(saa4), scoped_allocator_adaptor<MyAlloc<short>, MyAlloc<int>, MyAlloc<long>>>);
 // }
 
-void test_reference_wrapper() {
+void test_reference_wrapper()
+{
     long x = 11L;
     reference_wrapper rw1(x);
     reference_wrapper rw2(rw1);
@@ -229,7 +240,8 @@ void test_reference_wrapper() {
     static_assert(is_same_v<decltype(rw2), reference_wrapper<long>>);
 }
 
-void test_transparent_operator_functors() {
+void test_transparent_operator_functors()
+{
     plus op1{};
     minus op2{};
     multiplies op3{};
@@ -274,11 +286,12 @@ void test_transparent_operator_functors() {
     static_assert(is_same_v<decltype(greater{}), greater<>>);
 }
 
-template <template <typename> typename F>
-void test_function_wrapper() {
+template<template<typename> typename F> void test_function_wrapper()
+{
     F<short(int, long)> f1{};
 
-    if constexpr (is_copy_constructible_v<F<short(int, long)>>) {
+    if constexpr (is_copy_constructible_v<F<short(int, long)>>)
+    {
         F f2copy(f1);
         static_assert(is_same_v<decltype(f2copy), F<short(int, long)>>);
     }
@@ -300,7 +313,7 @@ void test_function_wrapper() {
     static_assert(is_same_v<decltype(f7), F<long(short, int)>>);
     static_assert(is_same_v<decltype(f8), F<long(short, int)>>);
 
-    int n      = 0;
+    int n = 0;
     auto accum = [&n](int x, int y) { return n += x + y; };
 
     F f9(plus<double>{});
@@ -310,8 +323,9 @@ void test_function_wrapper() {
     static_assert(is_same_v<decltype(f10), F<int(int, int)>>);
 
 #ifdef HAS_EXPLICIT_THIS_PARAMETER
-    struct ExplicitThisByVal {
-        void operator()(this ExplicitThisByVal, char) {}
+    struct ExplicitThisByVal
+    {
+        void operator()(this ExplicitThisByVal, char) { }
     };
 
     ExplicitThisByVal explicit_this_by_val_functor{};
@@ -326,8 +340,9 @@ void test_function_wrapper() {
     static_assert(is_same_v<decltype(f13), F<void(char)>>);
     static_assert(is_same_v<decltype(f14), F<void(char)>>);
 
-    struct ExplicitThisByRef {
-        void operator()(this ExplicitThisByRef&, short) {}
+    struct ExplicitThisByRef
+    {
+        void operator()(this ExplicitThisByRef&, short) { }
     };
 
     ExplicitThisByRef explicit_this_by_ref_functor{};
@@ -336,8 +351,9 @@ void test_function_wrapper() {
 
     static_assert(is_same_v<decltype(f15), F<void(short)>>);
 
-    struct ExplicitThisByCRef {
-        void operator()(this const ExplicitThisByCRef&, int) {}
+    struct ExplicitThisByCRef
+    {
+        void operator()(this const ExplicitThisByCRef&, int) { }
     };
 
     ExplicitThisByCRef explicit_this_by_cref_functor{};
@@ -352,14 +368,15 @@ void test_function_wrapper() {
     static_assert(is_same_v<decltype(f18), F<void(int)>>);
     static_assert(is_same_v<decltype(f19), F<void(int)>>);
 
-    struct ExplicitThisByConv {
-        struct That {};
+    struct ExplicitThisByConv
+    {
+        struct That
+        {
+        };
 
-        operator That(this ExplicitThisByConv) {
-            return {};
-        }
+        operator That(this ExplicitThisByConv) { return {}; }
 
-        void operator()(this That, long long) {}
+        void operator()(this That, long long) { }
     };
 
     ExplicitThisByConv explicit_this_by_conv_functor{};
@@ -374,10 +391,9 @@ void test_function_wrapper() {
     static_assert(is_same_v<decltype(f22), F<void(long long)>>);
     static_assert(is_same_v<decltype(f23), F<void(long long)>>);
 
-    struct ExplicitThisNoexcept {
-        float operator()(this ExplicitThisNoexcept, double) noexcept {
-            return 3.14f;
-        }
+    struct ExplicitThisNoexcept
+    {
+        float operator()(this ExplicitThisNoexcept, double) noexcept { return 3.14f; }
     };
 
     ExplicitThisNoexcept explicit_this_noexcept_functor{};
@@ -394,9 +410,10 @@ void test_function_wrapper() {
 #endif // HAS_EXPLICIT_THIS_PARAMETER
 }
 
-void test_searchers() {
+void test_searchers()
+{
     const wchar_t first[] = {L'x', L'y', L'z'};
-    const auto last       = end(first);
+    const auto last = end(first);
     MyWideHash wh{};
     MyEqual eq{};
 
@@ -419,7 +436,8 @@ void test_searchers() {
     static_assert(is_same_v<decltype(bmhs3), boyer_moore_horspool_searcher<const wchar_t*, MyWideHash, MyEqual>>);
 }
 
-void test_duration_and_time_point() {
+void test_duration_and_time_point()
+{
     using namespace std::chrono;
 
     duration dur1(11ns);
@@ -430,14 +448,15 @@ void test_duration_and_time_point() {
 
     time_point<system_clock, hours> tp{};
     time_point tp2(tp);
-    (void) tp2;
+    (void)tp2;
 
     static_assert(is_same_v<decltype(tp2), time_point<system_clock, hours>>);
 }
 
-void test_basic_string() {
+void test_basic_string()
+{
     const wchar_t first[] = {L'x', L'y', L'z'};
-    const auto last       = end(first);
+    const auto last = end(first);
     MyAlloc<wchar_t> myal{};
     initializer_list<wchar_t> il = {L'x', L'y', L'z'};
 
@@ -492,7 +511,8 @@ void test_basic_string() {
 #endif // _HAS_CXX23
 }
 
-void test_basic_string_view() {
+void test_basic_string_view()
+{
     basic_string_view sv1(L"meow");
     basic_string_view sv2(L"meow", 1);
     basic_string_view sv3(sv2);
@@ -502,13 +522,14 @@ void test_basic_string_view() {
     static_assert(is_same_v<decltype(sv3), wstring_view>);
 }
 
-void test_array() {
+void test_array()
+{
 #ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wmissing-braces"
 #endif // __clang__
 
-    long x       = 11L;
+    long x = 11L;
     const long y = 22L;
 
     array a1{x};
@@ -526,10 +547,10 @@ void test_array() {
 #endif // __clang__
 }
 
-template <template <typename T, typename A = allocator<T>> typename Sequence>
-void test_sequence_container() {
+template<template<typename T, typename A = allocator<T>> typename Sequence> void test_sequence_container()
+{
     const long first[] = {10L, 20L, 30L};
-    const auto last    = end(first);
+    const auto last = end(first);
     MyAlloc<long> myal{};
     initializer_list<long> il = {11L, 22L, 33L};
 
@@ -558,9 +579,10 @@ void test_sequence_container() {
 #endif // _HAS_CXX23
 }
 
-void test_vector_bool() {
+void test_vector_bool()
+{
     const bool first[] = {true, false, true};
-    const auto last    = end(first);
+    const auto last = end(first);
     MyAlloc<bool> myal{};
     initializer_list<bool> il = {true, false, true};
 
@@ -589,8 +611,8 @@ void test_vector_bool() {
 #endif // _HAS_CXX23
 }
 
-// template <template <typename K, typename V, typename C = less<K>, typename A = allocator<pair<const K, V>>> typename M>
-// void test_map_or_multimap() {
+// template <template <typename K, typename V, typename C = less<K>, typename A = allocator<pair<const K, V>>> typename
+// M> void test_map_or_multimap() {
 //     using Purr          = pair<long, char>;
 //     using CPurr         = pair<const long, char>;
 //     const CPurr first[] = {{10L, 'a'}, {20L, 'b'}, {30L, 'c'}};
@@ -691,13 +713,13 @@ void test_vector_bool() {
 // #endif // _HAS_CXX23
 // }
 
-template <template <typename K, typename V, typename H = hash<K>, typename P = equal_to<K>,
-    typename A = allocator<pair<const K, V>>> typename UM>
-void test_unordered_map_or_unordered_multimap() {
-    using Purr          = pair<long, char>;
-    using CPurr         = pair<const long, char>;
+template<template<typename K, typename V, typename H = hash<K>, typename P = equal_to<K>, typename A = allocator<pair<const K, V>>> typename UM>
+void test_unordered_map_or_unordered_multimap()
+{
+    using Purr = pair<long, char>;
+    using CPurr = pair<const long, char>;
     const CPurr first[] = {{10L, 'a'}, {20L, 'b'}, {30L, 'c'}};
-    const auto last     = end(first);
+    const auto last = end(first);
     MyHash hf{};
     MyEqual eq{};
     MyAlloc<CPurr> myal{};
@@ -762,10 +784,11 @@ void test_unordered_map_or_unordered_multimap() {
 #endif // _HAS_CXX23
 }
 
-template <template <typename K, typename H = hash<K>, typename P = equal_to<K>, typename A = allocator<K>> typename US>
-void test_unordered_set_or_unordered_multiset() {
+template<template<typename K, typename H = hash<K>, typename P = equal_to<K>, typename A = allocator<K>> typename US>
+void test_unordered_set_or_unordered_multiset()
+{
     const long first[] = {10L, 20L, 30L};
-    const auto last    = end(first);
+    const auto last = end(first);
     MyHash hf{};
     MyEqual eq{};
     MyAlloc<long> myal{};
@@ -822,7 +845,8 @@ void test_unordered_set_or_unordered_multiset() {
 #endif // _HAS_CXX23
 }
 
-void test_queue_and_stack() {
+void test_queue_and_stack()
+{
     list<long, MyAlloc<long>> lst{};
     MyAlloc<long> myal{};
 
@@ -836,7 +860,7 @@ void test_queue_and_stack() {
 
 #if _HAS_CXX23
     const long first[] = {10L, 20L, 30L};
-    const auto last    = end(first);
+    const auto last = end(first);
 
     queue q4(first, last);
     queue q5(first, last, myal);
@@ -1086,7 +1110,8 @@ void test_queue_and_stack() {
 //     static_assert(is_same_v<decltype(rti10), wcregex_token_iterator>);
 // }
 
-void test_atomic() {
+void test_atomic()
+{
     long x = 11L;
 
     atomic atom1(x);
@@ -1096,7 +1121,8 @@ void test_atomic() {
     static_assert(is_same_v<decltype(atom2), atomic<long*>>);
 }
 
-void test_locks() {
+void test_locks()
+{
     recursive_mutex rm{};
     recursive_timed_mutex rtm{};
     lock_guard lg(rm);
@@ -1128,7 +1154,8 @@ void test_locks() {
     static_assert(is_same_v<decltype(shared2), shared_lock<shared_timed_mutex>>);
 }
 
-int main() {
+int main()
+{
     // test_initializer_list();
     // test_pair_and_tuple();
     // test_optional();

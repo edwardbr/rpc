@@ -9,35 +9,38 @@
 
 using namespace std;
 
-template <typename T>
-struct MyAlloc {
+template<typename T> struct MyAlloc
+{
     size_t m_offset;
 
     typedef T value_type;
 
-    explicit MyAlloc(const size_t offset) : m_offset(offset) {}
-
-    template <typename U>
-    MyAlloc(const MyAlloc<U>& other) : m_offset(other.m_offset) {}
-
-    template <typename U>
-    bool operator==(const MyAlloc<U>& other) const {
-        return m_offset == other.m_offset;
+    explicit MyAlloc(const size_t offset)
+        : m_offset(offset)
+    {
     }
 
-    template <typename U>
-    bool operator!=(const MyAlloc<U>& other) const {
-        return m_offset != other.m_offset;
+    template<typename U>
+    MyAlloc(const MyAlloc<U>& other)
+        : m_offset(other.m_offset)
+    {
     }
 
-    T* allocate(const size_t n) {
-        if (n == 0) {
+    template<typename U> bool operator==(const MyAlloc<U>& other) const { return m_offset == other.m_offset; }
+
+    template<typename U> bool operator!=(const MyAlloc<U>& other) const { return m_offset != other.m_offset; }
+
+    T* allocate(const size_t n)
+    {
+        if (n == 0)
+        {
             return nullptr;
         }
 
         void* const pv = malloc((n + m_offset) * sizeof(T));
 
-        if (!pv) {
+        if (!pv)
+        {
             throw bad_alloc();
         }
 
@@ -46,14 +49,17 @@ struct MyAlloc {
         return static_cast<T*>(pv) + m_offset;
     }
 
-    void deallocate(T* const p, size_t) {
-        if (p) {
+    void deallocate(T* const p, size_t)
+    {
+        if (p)
+        {
             free(p - m_offset);
         }
     }
 };
 
-int main() {
+int main()
+{
     MyAlloc<int> alloc(7);
 
     // Test shared_ptr with custom allocator

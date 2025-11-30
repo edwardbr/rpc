@@ -28,13 +28,13 @@
 // all remoteable objects need to implement this interface
 #include <rpc/internal/casting_interface.h>
 
-//remote proxy of an object
+// remote proxy of an object
 #include <rpc/internal/object_proxy.h>
 
-//some helper forward declarations
+// some helper forward declarations
 #include <rpc/internal/bindings_fwd.h>
 
-//transport base class
+// transport base class
 #include <rpc/internal/transport.h>
 
 // services manage the logical zones between which data is marshalled
@@ -46,10 +46,10 @@
 // the link between transports and marshallers for routing
 #include <rpc/internal/pass_through.h>
 
-//the deserialisation logic to an object
+// the deserialisation logic to an object
 #include <rpc/internal/stub.h>
 
-//the serialisation declarations
+// the serialisation declarations
 #include <rpc/internal/serialiser.h>
 
 // internal plumbing

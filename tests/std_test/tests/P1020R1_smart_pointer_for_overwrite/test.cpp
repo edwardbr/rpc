@@ -16,8 +16,8 @@
 using namespace std;
 
 constexpr int uninitializedValue = 0xEE;
-constexpr int initializedValue   = 106;
-size_t allocationCount           = 0;
+constexpr int initializedValue = 106;
+size_t allocationCount = 0;
 
 struct ReportAddress;
 vector<ReportAddress*> ascendingAddressBuffer;
@@ -27,53 +27,69 @@ vector<ReportAddress*> descendingAddressBuffer;
 
 // According to N4849, the default behavior of operator new[](size) is to return
 // operator new(size), so only the latter needs to be replaced.
-void* operator new(size_t size) {
+void* operator new(size_t size)
+{
     void* const p = ::operator new(size, nothrow);
 
-    if (p) {
+    if (p)
+    {
         return p;
-    } else {
+    }
+    else
+    {
         throw bad_alloc();
     }
 }
 
-void* operator new(size_t size, const nothrow_t&) noexcept {
+void* operator new(size_t size, const nothrow_t&) noexcept
+{
     void* const result = malloc(size == 0 ? 1 : size);
     ++allocationCount;
-    if (result) {
+    if (result)
+    {
         memset(result, uninitializedValue, size);
     }
 
     return result;
 }
 
-void* operator new(size_t size, align_val_t align) {
+void* operator new(size_t size, align_val_t align)
+{
     void* const p = ::operator new(size, align, nothrow);
 
-    if (p) {
+    if (p)
+    {
         return p;
-    } else {
+    }
+    else
+    {
         throw bad_alloc();
     }
 }
 
-void* operator new(size_t size, align_val_t align, const nothrow_t&) noexcept {
+void* operator new(size_t size, align_val_t align, const nothrow_t&) noexcept
+{
     void* const result = ::_aligned_malloc(size, static_cast<size_t>(align));
     ++allocationCount;
-    if (result) {
+    if (result)
+    {
         memset(result, uninitializedValue, size);
     }
 
     return result;
 }
 
-
-struct DefaultInitializableInt {
+struct DefaultInitializableInt
+{
     int value;
-    DefaultInitializableInt() : value(initializedValue) {}
+    DefaultInitializableInt()
+        : value(initializedValue)
+    {
+    }
 };
 
-struct alignas(32) HighlyAligned {
+struct alignas(32) HighlyAligned
+{
     uint64_t a;
     uint64_t b;
     uint64_t c;
@@ -82,66 +98,81 @@ struct alignas(32) HighlyAligned {
 
 size_t canCreate = 10; // Counter to force an exception when constructing a sufficiently large ReportAddress array
 
-struct ReportAddress {
-    ReportAddress() {
-        if (canCreate > 0) {
+struct ReportAddress
+{
+    ReportAddress()
+    {
+        if (canCreate > 0)
+        {
             ascendingAddressBuffer.push_back(this);
             --canCreate;
-        } else {
+        }
+        else
+        {
             throw runtime_error("Can't create more ReportAddress objects.");
         }
     }
 
-    ~ReportAddress() {
+    ~ReportAddress()
+    {
         ++canCreate;
         descendingAddressBuffer.push_back(this);
     }
 };
 
-void assert_ascending_init() {
-    for (size_t i = 1; i < ascendingAddressBuffer.size(); ++i) {
+void assert_ascending_init()
+{
+    for (size_t i = 1; i < ascendingAddressBuffer.size(); ++i)
+    {
         assert(ascendingAddressBuffer[i - 1] < ascendingAddressBuffer[i]);
     }
 
     ascendingAddressBuffer.clear();
 }
 
-void assert_descending_destruct() {
-    for (size_t i = 1; i < descendingAddressBuffer.size(); ++i) {
+void assert_descending_destruct()
+{
+    for (size_t i = 1; i < descendingAddressBuffer.size(); ++i)
+    {
         assert(descendingAddressBuffer[i - 1] > descendingAddressBuffer[i]);
     }
 
     descendingAddressBuffer.clear();
 }
 
-void assert_uninitialized(void* p, size_t size) {
+void assert_uninitialized(void* p, size_t size)
+{
     unsigned char* chPtr = reinterpret_cast<unsigned char*>(p);
-    for (size_t offset = 0; offset < size; ++offset) {
+    for (size_t offset = 0; offset < size; ++offset)
+    {
         assert(chPtr[offset] == uninitializedValue);
     }
 }
 
-template <class T>
-void assert_shared_use_get(const shared_ptr<T>& sp) {
+template<class T> void assert_shared_use_get(const shared_ptr<T>& sp)
+{
     assert(sp.use_count() == 1);
     assert(sp.get() != nullptr);
 }
 
-template <class T, class... Args>
-shared_ptr<T> make_shared_for_overwrite_assert(Args&&... vals) {
-    size_t aCount    = allocationCount;
+template<class T, class... Args> shared_ptr<T> make_shared_for_overwrite_assert(Args&&... vals)
+{
+    size_t aCount = allocationCount;
     shared_ptr<T> sp = make_shared_for_overwrite<T>(forward<Args>(vals)...);
     assert_shared_use_get(sp);
     assert(aCount + 1 == allocationCount);
     return sp;
 }
 
-template <class T, class... Args>
-void test_make_shared_init_destruct_order(Args&&... vals) {
-    try {
+template<class T, class... Args> void test_make_shared_init_destruct_order(Args&&... vals)
+{
+    try
+    {
         shared_ptr<T> sp = make_shared_for_overwrite<T>(forward<Args>(vals)...);
         assert_shared_use_get(sp);
-    } catch (const runtime_error& exc) {
+    }
+    catch (const runtime_error& exc)
+    {
         assert(exc.what() == "Can't create more ReportAddress objects."sv);
     }
 
@@ -149,8 +180,8 @@ void test_make_shared_init_destruct_order(Args&&... vals) {
     assert_descending_destruct();
 }
 
-
-void test_make_shared_for_overwrite() {
+void test_make_shared_for_overwrite()
+{
     auto p0 = make_shared_for_overwrite_assert<int>();
     assert_uninitialized(addressof(*p0), sizeof(int));
 
@@ -165,8 +196,10 @@ void test_make_shared_for_overwrite() {
     assert_uninitialized(addressof(p3[0]), sizeof(int) * 100u);
 
     auto p4 = make_shared_for_overwrite_assert<DefaultInitializableInt[2][8]>();
-    for (ptrdiff_t i = 0; i < 2; ++i) {
-        for (ptrdiff_t j = 0; j < 8; ++j) {
+    for (ptrdiff_t i = 0; i < 2; ++i)
+    {
+        for (ptrdiff_t j = 0; j < 8; ++j)
+        {
             assert(p4[i][j].value == initializedValue);
         }
     }
@@ -176,14 +209,18 @@ void test_make_shared_for_overwrite() {
     assert_uninitialized(addressof(p5[0]), sizeof(HighlyAligned) * 10u);
 
     auto p6 = make_shared_for_overwrite_assert<DefaultInitializableInt[]>(100u);
-    for (ptrdiff_t i = 0; i < 100; ++i) {
+    for (ptrdiff_t i = 0; i < 100; ++i)
+    {
         assert(p6[i].value == initializedValue);
     }
 
     auto p7 = make_shared_for_overwrite_assert<DefaultInitializableInt[][8][9]>(2u);
-    for (ptrdiff_t i = 0; i < 2; ++i) {
-        for (ptrdiff_t j = 0; j < 8; ++j) {
-            for (ptrdiff_t k = 0; k < 9; ++k) {
+    for (ptrdiff_t i = 0; i < 2; ++i)
+    {
+        for (ptrdiff_t j = 0; j < 8; ++j)
+        {
+            for (ptrdiff_t k = 0; k < 9; ++k)
+            {
                 assert(p7[i][j][k].value == initializedValue);
             }
         }
@@ -215,23 +252,26 @@ void test_make_shared_for_overwrite() {
     test_make_shared_init_destruct_order<ReportAddress[][3][3]>(3u); // failure multidimensional
 }
 
-template <class T, class... Args>
-shared_ptr<T> allocate_shared_for_overwrite_assert(Args&&... vals) {
-    size_t aCount    = allocationCount;
+template<class T, class... Args> shared_ptr<T> allocate_shared_for_overwrite_assert(Args&&... vals)
+{
+    size_t aCount = allocationCount;
     shared_ptr<T> sp = allocate_shared_for_overwrite<T>(forward<Args>(vals)...);
     assert_shared_use_get(sp);
     assert(aCount + 1 == allocationCount);
     return sp;
 }
 
-template <class T, class... Args>
-void test_allocate_shared_init_destruct_order(Args&&... vals) {
+template<class T, class... Args> void test_allocate_shared_init_destruct_order(Args&&... vals)
+{
     allocator<remove_all_extents_t<T>> a{};
 
-    try {
+    try
+    {
         shared_ptr<T> sp = allocate_shared_for_overwrite<T>(a, forward<Args>(vals)...);
         assert_shared_use_get(sp);
-    } catch (const runtime_error& exc) {
+    }
+    catch (const runtime_error& exc)
+    {
         assert(exc.what() == "Can't create more ReportAddress objects."sv);
     }
 
@@ -239,7 +279,8 @@ void test_allocate_shared_init_destruct_order(Args&&... vals) {
     assert_descending_destruct();
 }
 
-void test_allocate_shared_for_overwrite() {
+void test_allocate_shared_for_overwrite()
+{
     allocator<int> a0{};
     auto p0 = allocate_shared_for_overwrite_assert<int>(a0);
     assert_uninitialized(addressof(*p0), sizeof(int));
@@ -257,8 +298,10 @@ void test_allocate_shared_for_overwrite() {
     assert_uninitialized(addressof(p3[0]), sizeof(int) * 100u);
 
     auto p4 = allocate_shared_for_overwrite_assert<DefaultInitializableInt[2][8]>(a1);
-    for (ptrdiff_t i = 0; i < 2; ++i) {
-        for (ptrdiff_t j = 0; j < 8; ++j) {
+    for (ptrdiff_t i = 0; i < 2; ++i)
+    {
+        for (ptrdiff_t j = 0; j < 8; ++j)
+        {
             assert(p4[i][j].value == initializedValue);
         }
     }
@@ -268,14 +311,18 @@ void test_allocate_shared_for_overwrite() {
     assert_uninitialized(addressof(p5[0]), sizeof(HighlyAligned) * 10u);
 
     auto p6 = allocate_shared_for_overwrite_assert<DefaultInitializableInt[]>(a1, 100u);
-    for (ptrdiff_t i = 0; i < 100; ++i) {
+    for (ptrdiff_t i = 0; i < 100; ++i)
+    {
         assert(p6[i].value == initializedValue);
     }
 
     auto p7 = allocate_shared_for_overwrite_assert<DefaultInitializableInt[][8][9]>(a1, 2u);
-    for (ptrdiff_t i = 0; i < 2; ++i) {
-        for (ptrdiff_t j = 0; j < 8; ++j) {
-            for (ptrdiff_t k = 0; k < 9; ++k) {
+    for (ptrdiff_t i = 0; i < 2; ++i)
+    {
+        for (ptrdiff_t j = 0; j < 8; ++j)
+        {
+            for (ptrdiff_t k = 0; k < 9; ++k)
+            {
                 assert(p7[i][j][k].value == initializedValue);
             }
         }
@@ -307,7 +354,8 @@ void test_allocate_shared_for_overwrite() {
     test_allocate_shared_init_destruct_order<ReportAddress[][3][3]>(3u); // failure multidimensional
 }
 
-int main() {
+int main()
+{
     test_make_shared_for_overwrite();
     test_allocate_shared_for_overwrite();
 }

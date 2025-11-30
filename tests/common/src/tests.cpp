@@ -10,7 +10,6 @@
 #include <common/tests.h>
 #include <common/foo_impl.h>
 
-
 namespace marshalled_tests
 {
     CORO_TASK(bool) standard_tests(xxx::i_foo& foo, bool enclave)

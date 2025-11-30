@@ -37,58 +37,52 @@ using namespace std;
 
 #define STATIC_ASSERT(...) static_assert(__VA_ARGS__, #__VA_ARGS__)
 
-namespace Meow {
-    struct Evil {
+namespace Meow
+{
+    struct Evil
+    {
         int data;
 
-        constexpr Evil() noexcept : data(1701) {}
+        constexpr Evil() noexcept
+            : data(1701)
+        {
+        }
 
-        template <int = 0>
-        const Evil& operator=(const Evil&) const {
+        template<int = 0> const Evil& operator=(const Evil&) const
+        {
             // provide an Evil operator= for std::tuple::swap
             return *this;
         }
 
-        int func() const {
-            return 1729;
-        }
+        int func() const { return 1729; }
 
-        Evil* get() {
-            return this;
-        }
+        Evil* get() { return this; }
 
-        constexpr const Evil* get() const {
-            return this;
-        }
+        constexpr const Evil* get() const { return this; }
 
         void operator&() const = delete;
 
-        template <typename T>
-        operator T&() const = delete;
+        template<typename T> operator T&() const = delete;
 
-        bool operator<(const Evil&) const {
-            return false;
-        }
+        bool operator<(const Evil&) const { return false; }
 
-        bool operator==(const Evil&) const {
-            return true;
-        }
+        bool operator==(const Evil&) const { return true; }
     };
 
-    istream& operator>>(istream& is, Evil&) {
+    istream& operator>>(istream& is, Evil&)
+    {
         return is;
     }
 
     // If it's dragged in via ADL, this op,() will absorb anything.
-    template <typename T, typename U>
-    void operator,(const T&, const U&) = delete;
+    template<typename T, typename U> void operator,(const T&, const U&) = delete;
 
     // VSO-258601 "std::vector should not rely on operator& in Debug mode"
     // If it's dragged in via ADL, this op&() will absorb anything.
-    template <typename T>
-    void operator&(const T&) = delete;
+    template<typename T> void operator&(const T&) = delete;
 
-    size_t hash_value(const Evil&) noexcept {
+    size_t hash_value(const Evil&) noexcept
+    {
         // provide an Evil hash value for stdext::hash_compare
         return 0;
     }
@@ -96,10 +90,9 @@ namespace Meow {
 
 using Meow::Evil;
 
-struct Hash {
-    size_t operator()(const Evil&) const {
-        return 0;
-    }
+struct Hash
+{
+    size_t operator()(const Evil&) const { return 0; }
 };
 
 template class std::array<Evil, 5>;
@@ -131,7 +124,6 @@ template class std::unordered_multimap<Evil, Evil, Hash>;
 template class std::unordered_set<Evil, Hash>;
 template class std::unordered_multiset<Evil, Hash>;
 
-
 // template class std::_Array_iterator<Evil, 5>;
 // template class std::_Array_const_iterator<Evil, 5>;
 
@@ -155,7 +147,6 @@ template class std::unordered_multiset<Evil, Hash>;
 // template class std::_List_iterator<_List_val<_List_simple_types<pair<const Evil, Evil>>>>;
 // template class std::_List_const_iterator<_List_val<_List_simple_types<pair<const Evil, Evil>>>>;
 
-
 // template class std::_Deque_unchecked_iterator<_Deque_val<_Deque_simple_types<Evil>>>;
 // template class std::_Deque_unchecked_const_iterator<_Deque_val<_Deque_simple_types<Evil>>>;
 
@@ -173,54 +164,54 @@ template class std::unordered_multiset<Evil, Hash>;
 // template class std::_List_unchecked_iterator<_List_val<_List_simple_types<pair<const Evil, Evil>>>>;
 // template class std::_List_unchecked_const_iterator<_List_val<_List_simple_types<pair<const Evil, Evil>>>>;
 
-
 template class std::reverse_iterator<Evil*>;
 template class std::move_iterator<Evil*>;
 template class std::istream_iterator<Evil>;
 // template class stdext::checked_array_iterator<Evil*>;
 // template class stdext::unchecked_array_iterator<Evil*>;
 
-
 template class std::shared_ptr<Evil>;
 template class std::weak_ptr<Evil>;
 
-
 template class std::reference_wrapper<Evil>;
 template class std::reference_wrapper<const Evil>;
-
 
 #ifndef _M_CEE_PURE
 // VSO-198738 "<atomic>: atomic<T> should support overloaded op&"
 template struct std::atomic<Evil>;
 #endif // _M_CEE_PURE
 
-
-void test(Evil* p, Evil* correct, int i) {
+void test(Evil* p, Evil* correct, int i)
+{
     assert(p == correct && i == 1);
 }
 
-void test(const Evil* p, Evil* correct, int i) {
+void test(const Evil* p, Evil* correct, int i)
+{
     assert(p == correct && i == 2);
 }
 
-void test(volatile Evil* p, Evil* correct, int i) {
+void test(volatile Evil* p, Evil* correct, int i)
+{
     assert(p == correct && i == 3);
 }
 
-void test(const volatile Evil* p, Evil* correct, int i) {
+void test(const volatile Evil* p, Evil* correct, int i)
+{
     assert(p == correct && i == 4);
 }
 
 void test_LWG_2296();
 
-int main() {
+int main()
+{
     Evil e;
 
     assert(addressof(e) == e.get());
 
-    Evil& m                 = e;
-    const Evil& c           = e;
-    volatile Evil& v        = e;
+    Evil& m = e;
+    const Evil& c = e;
+    volatile Evil& v = e;
     const volatile Evil& cv = e;
 
     test(addressof(m), e.get(), 1);
@@ -228,10 +219,10 @@ int main() {
     test(addressof(v), e.get(), 3);
     test(addressof(cv), e.get(), 4);
 
-    (void) ref(e);
-    (void) ref(c);
-    (void) cref(e);
-    (void) cref(c);
+    (void)ref(e);
+    (void)ref(c);
+    (void)cref(e);
+    (void)cref(c);
 
     assert(mem_fn(&Evil::data)(e) == 1701);
     assert(mem_fn(&Evil::func)(e) == 1729);
@@ -239,7 +230,7 @@ int main() {
     Evil arr[5];
     vector<Evil> vec(begin(arr), end(arr));
 
-    (void) make_exception_ptr(e);
+    (void)make_exception_ptr(e);
 
     Evil arr2[5];
     swap(arr, arr2);
@@ -248,17 +239,18 @@ int main() {
     test_LWG_2296();
 }
 
-
 // LWG-2296 "std::addressof should be constexpr"
 
 constexpr int g_int = 7;
 constexpr Evil g_evil{};
-int func(int x) {
+int func(int x)
+{
     return x * x;
 }
 constexpr int g_array[3] = {11, 22, 33};
 
-void test_LWG_2296() {
+void test_LWG_2296()
+{
     STATIC_ASSERT(addressof(g_int) == &g_int);
     STATIC_ASSERT(addressof(g_evil) == g_evil.get());
     STATIC_ASSERT(addressof(func) == &func);
@@ -269,9 +261,9 @@ void test_LWG_2296() {
     assert(addressof(func) == &func);
     assert(addressof(g_array) == &g_array);
 
-    int i                  = 11;
-    const int ci           = 22;
-    volatile int vi        = 33;
+    int i = 11;
+    const int ci = 22;
+    volatile int vi = 33;
     const volatile int cvi = 44;
 
     assert(addressof(i) == &i);
@@ -282,12 +274,11 @@ void test_LWG_2296() {
 
 // LWG-2598 "addressof works on temporaries [and should not]"
 
-template <typename, typename = void>
-constexpr bool can_addressof = false;
-template <typename T>
-constexpr bool can_addressof<T, void_t<decltype(addressof(declval<T>()))>> = true;
+template<typename, typename = void> constexpr bool can_addressof = false;
+template<typename T> constexpr bool can_addressof<T, void_t<decltype(addressof(declval<T>()))>> = true;
 
-void test_LWG_2598() { // COMPILE-ONLY
+void test_LWG_2598()
+{ // COMPILE-ONLY
     STATIC_ASSERT(can_addressof<int&>);
     STATIC_ASSERT(can_addressof<const int&>);
     STATIC_ASSERT(can_addressof<volatile int&>);
@@ -301,16 +292,17 @@ void test_LWG_2598() { // COMPILE-ONLY
 // Also test DevCom-1134328, in which `deque<S*>::_Unchecked_iterator{} - 1` finds
 // operator-(const S&, int) by argument-dependent lookup causing overload resolution
 // to fail due to ambiguity when compiling 64-bit.
-struct S {
+struct S
+{
     S() = default;
 
-    template <typename T>
-    S(T&&);
+    template<typename T> S(T&&);
 };
 
 S operator-(const S&, int);
 
-void test_DevCom_1134328() { // COMPILE-ONLY
+void test_DevCom_1134328()
+{ // COMPILE-ONLY
     deque<S*> d{nullptr};
-    (void) d.back();
+    (void)d.back();
 }

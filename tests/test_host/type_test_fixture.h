@@ -52,10 +52,7 @@ public:
         register_active();
     }
 
-    ~object_deletion_waiter()
-    {
-        unregister_active();
-    }
+    ~object_deletion_waiter() { unregister_active(); }
 
     // Check if any waiters are still pending
     static bool any_pending()
@@ -73,7 +70,9 @@ public:
 
     // Schedule the verification to run - either immediately (local) or after async cleanup (remote)
     template<typename Lambda>
-    void schedule(std::shared_ptr<rpc::service> service, const rpc::shared_ptr<rpc::casting_interface>& obj, Lambda&& verification_lambda)
+    void schedule(std::shared_ptr<rpc::service> service,
+        const rpc::shared_ptr<rpc::casting_interface>& obj,
+        Lambda&& verification_lambda)
     {
         is_local_ = obj.get()->is_local();
         continuation_scheduled_ = true;

@@ -14,18 +14,18 @@ using namespace std;
 
 shared_ptr<int> g_sp;
 
-struct Noisy {
+struct Noisy
+{
     Noisy() = default;
 
-    ~Noisy() {
-        (void) atomic_load(&g_sp);
-    }
+    ~Noisy() { (void)atomic_load(&g_sp); }
 
-    Noisy(const Noisy&)            = delete;
+    Noisy(const Noisy&) = delete;
     Noisy& operator=(const Noisy&) = delete;
 };
 
-int main() {
+int main()
+{
     {
         shared_ptr<Noisy> dest;
         shared_ptr<Noisy> src;
@@ -46,13 +46,13 @@ int main() {
 
     {
         shared_ptr<Noisy> dest = make_shared<Noisy>();
-        shared_ptr<Noisy> src  = dest;
+        shared_ptr<Noisy> src = dest;
         atomic_store(&dest, src);
     }
 
     {
         shared_ptr<Noisy> dest = make_shared<Noisy>();
-        shared_ptr<Noisy> src  = make_shared<Noisy>();
+        shared_ptr<Noisy> src = make_shared<Noisy>();
         atomic_store(&dest, src);
     }
 
@@ -78,13 +78,13 @@ int main() {
 
     {
         shared_ptr<Noisy> dest = make_shared<Noisy>();
-        shared_ptr<Noisy> src  = dest;
+        shared_ptr<Noisy> src = dest;
         atomic_exchange(&dest, src);
     }
 
     {
         shared_ptr<Noisy> dest = make_shared<Noisy>();
-        shared_ptr<Noisy> src  = make_shared<Noisy>();
+        shared_ptr<Noisy> src = make_shared<Noisy>();
         atomic_exchange(&dest, src);
     }
 
@@ -123,13 +123,15 @@ int main() {
     // Also test VSO-911206 "Error specifying explicit template argument of abstract type for atomic non-member
     // functions"
     {
-        struct Base {
-            virtual ~Base()     = default;
+        struct Base
+        {
+            virtual ~Base() = default;
             virtual void test() = 0;
         };
 
-        struct Derived final : Base {
-            void test() override {}
+        struct Derived final : Base
+        {
+            void test() override { }
         };
 
         shared_ptr<Base> object;

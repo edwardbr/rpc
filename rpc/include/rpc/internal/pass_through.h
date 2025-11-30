@@ -90,7 +90,6 @@ namespace rpc
 
         CORO_TASK(int)
         add_ref(uint64_t protocol_version,
-            destination_channel_zone destination_channel_zone_id,
             destination_zone destination_zone_id,
             object object_id,
             caller_channel_zone caller_channel_zone_id,

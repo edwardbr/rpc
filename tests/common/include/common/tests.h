@@ -105,7 +105,6 @@
     } while (0)
 #endif
 
-
 namespace marshalled_tests
 {
     CORO_TASK(bool) standard_tests(xxx::i_foo& foo, bool enclave);
