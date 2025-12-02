@@ -450,7 +450,8 @@ namespace synchronous_generator
             return fmt::format("{0}_, ", name);
 
         case PROXY_CLEAN_IN:
-            return fmt::format("if({0}_stub_) {0}_stub_->release_from_service();", name);
+            return fmt::format(
+                "if({0}_stub_) {0}_stub_->release_from_service(__rpc_sp->get_destination_zone_id().as_caller());", name);
 
         case STUB_DEMARSHALL_DECLARATION:
             return fmt::format(R"__(rpc::interface_descriptor {0}_object_{{}};
@@ -536,7 +537,8 @@ namespace synchronous_generator
             return fmt::format("{0}_, ", name);
 
         case PROXY_CLEAN_IN:
-            return fmt::format("if({0}_stub_) {0}_stub_->release_from_service();", name);
+            return fmt::format(
+                "if({0}_stub_) {0}_stub_->release_from_service(__rpc_sp->get_destination_zone_id().as_caller());", name);
 
         case STUB_DEMARSHALL_DECLARATION:
             return fmt::format("{} {}", object_type, name);
@@ -1853,7 +1855,8 @@ namespace synchronous_generator
 
         header("template<> CORO_TASK(int) "
                "rpc::service::bind_in_proxy(uint64_t protocol_version, const rpc::shared_ptr<::{}{}>& "
-               "iface, std::shared_ptr<rpc::object_stub>& stub, rpc::interface_descriptor& descriptor);",
+               "iface, std::shared_ptr<rpc::object_stub>& stub, caller_zone caller_zone_id, rpc::interface_descriptor& "
+               "descriptor);",
             ns,
             interface_name);
     }
@@ -1897,7 +1900,8 @@ namespace synchronous_generator
 
         stub("template<> CORO_TASK(int) service::bind_in_proxy(uint64_t protocol_version, "
              "const "
-             "rpc::shared_ptr<::{}{}>& iface, std::shared_ptr<rpc::object_stub>& stub, rpc::interface_descriptor& "
+             "rpc::shared_ptr<::{}{}>& iface, std::shared_ptr<rpc::object_stub>& stub, caller_zone caller_zone_id, "
+             "rpc::interface_descriptor& "
              "descriptor)",
             ns,
             interface_name);
@@ -1908,7 +1912,8 @@ namespace synchronous_generator
         stub("}}");
 
         stub("auto factory = create_interface_stub(iface);");
-        stub("CO_RETURN CO_AWAIT get_proxy_stub_descriptor(protocol_version, {{0}}, {{0}}, iface.get(), factory, "
+        stub("CO_RETURN CO_AWAIT get_proxy_stub_descriptor(protocol_version, {{0}}, caller_zone_id, iface.get(), "
+             "factory, "
              "false, stub, descriptor);");
         stub("}}");
     }

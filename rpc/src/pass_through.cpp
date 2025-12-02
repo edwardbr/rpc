@@ -404,11 +404,11 @@ namespace rpc
         // Remove destinations from transports in BOTH directions
         if (forward_transport_)
         {
-            forward_transport_->remove_destination(forward_destination_, reverse_destination_);
+            forward_transport_->remove_destination(forward_destination_, reverse_destination_.as_caller());
         }
         if (reverse_transport_)
         {
-            reverse_transport_->remove_destination(reverse_destination_, forward_destination_);
+            reverse_transport_->remove_destination(reverse_destination_, forward_destination_.as_caller());
         }
 
         // Release transport and service pointers

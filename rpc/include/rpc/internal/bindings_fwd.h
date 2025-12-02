@@ -25,7 +25,10 @@ namespace rpc
 
     template<class T>
     CORO_TASK(int)
-    create_interface_stub(rpc::service& serv, const rpc::shared_ptr<T>& iface, rpc::interface_descriptor& descriptor);
+    create_interface_stub(rpc::service& serv,
+        const rpc::shared_ptr<T>& iface,
+        caller_zone caller_zone_id,
+        rpc::interface_descriptor& descriptor);
 
     template<class T>
     CORO_TASK(int)

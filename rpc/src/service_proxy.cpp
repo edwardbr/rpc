@@ -9,43 +9,57 @@
 namespace rpc
 {
 
-    service_proxy::service_proxy(
-        const std::string& name, const std::shared_ptr<transport>& transport, const std::shared_ptr<rpc::service>& svc)
-        : zone_id_(svc->get_zone_id())
-        , destination_zone_id_(transport->get_adjacent_zone_id().as_destination())
-        , service_(svc)
+    //     service_proxy::service_proxy(const std::string& name, const std::shared_ptr<transport>& transport)
+    //         : zone_id_(transport->get_service()->get_zone_id())
+    //         , destination_zone_id_(transport->get_adjacent_zone_id().as_destination())
+    //         , service_(transport->get_service())
+    //         , transport_(transport)
+    //         , name_(name)
+    //     {
+    // #ifdef USE_RPC_TELEMETRY
+    //         if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
+    //         {
+    //             telemetry_service->on_service_proxy_creation(
+    //                 name, name_, get_zone_id(), get_destination_zone_id(), transport->get_service()->get_zone_id().as_caller());
+    //         }
+    // #endif
+    //     }
+
+    //     service_proxy::service_proxy(const std::shared_ptr<transport>& transport, destination_zone destination_zone_id)
+    //         : zone_id_(transport->get_service()->get_zone_id())
+    //         , destination_zone_id_(destination_zone_id)
+    //         , service_(transport->get_service())
+    //         , transport_(transport)
+    //         , name_(transport->get_name())
+    //     {
+    //     }
+
+    service_proxy::service_proxy(const std::string& name,
+        const zone zone_id,
+        destination_zone destination_zone_id,
+        std::shared_ptr<service> service,
+        const std::shared_ptr<transport>& transport,
+        uint64_t version,
+        encoding enc)
+        : name_(name)
+        , zone_id_(zone_id)
+        , destination_zone_id_(destination_zone_id)
+        , service_(service)
         , transport_(transport)
-        , name_(name)
+        , version_(version)
+        , enc_(enc)
     {
-#ifdef USE_RPC_TELEMETRY
-        if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
-        {
-            telemetry_service->on_service_proxy_creation(
-                name, name_, get_zone_id(), get_destination_zone_id(), svc->get_zone_id().as_caller());
-        }
-#endif
-        RPC_ASSERT(svc != nullptr);
     }
 
-    service_proxy::service_proxy(const std::shared_ptr<transport>& transport, destination_zone destination_zone_id)
-        : zone_id_(transport->get_service()->get_zone_id())
-        , destination_zone_id_(destination_zone_id)
-        , service_(transport->get_service())
-        , transport_(transport)
-        , name_(transport->get_name())
+    std::shared_ptr<service_proxy> service_proxy::create(const std::string& name,
+        std::shared_ptr<service> service,
+        const std::shared_ptr<transport>& transport,
+        destination_zone destination_zone_id)
     {
-    }
-
-    service_proxy::service_proxy(
-        const std::string& name, destination_zone destination_zone_id, const std::shared_ptr<rpc::service_proxy>& other)
-        : zone_id_(other->zone_id_)
-        , destination_zone_id_(destination_zone_id)
-        , service_(other->service_)
-        , transport_(other->transport_)
-        , version_(rpc::get_version())
-        , enc_(encoding::enc_default)
-        , name_(name)
-    {
+        auto ret = std::shared_ptr<service_proxy>(new service_proxy(
+            name, service->get_zone_id(), destination_zone_id, service, transport, rpc::get_version(), encoding::enc_default));
+        transport->increment_outbound_proxy_count(destination_zone_id);
+        return ret;
     }
 
     service_proxy::~service_proxy()
@@ -68,14 +82,7 @@ namespace rpc
         }
 
         RPC_ASSERT(proxies_.empty());
-        // if (is_responsible_for_cleaning_up_service_)
-        // {
-        auto svc = service_.lock();
-        //     if (get_zone_id().as_caller() != caller_zone_id_)
-        //     {
-        svc->remove_zone_proxy(destination_zone_id_, zone_id_.as_caller());
-        //     }
-        // }
+        service_->remove_zone_proxy(destination_zone_id_);
 
 #ifdef USE_RPC_TELEMETRY
         if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
@@ -84,6 +91,9 @@ namespace rpc
         }
 #endif
         RPC_ASSERT(proxies_.empty());
+        auto transport = transport_.get_nullable();
+        if (transport)
+            transport->decrement_outbound_proxy_count(destination_zone_id_);
     }
 
     void service_proxy::update_remote_rpc_version(uint64_t version)
@@ -420,23 +430,23 @@ namespace rpc
         cleanup_after_object(op, is_optimistic);
     }
 
-    std::shared_ptr<rpc::service_proxy> service_proxy::clone_for_zone(destination_zone destination_zone_id)
-    {
-        RPC_ASSERT(destination_zone_id_ != destination_zone_id);
-        auto ret = std::make_shared<service_proxy>(name_, destination_zone_id, shared_from_this());
+    //     std::shared_ptr<rpc::service_proxy> service_proxy::clone_for_zone(destination_zone destination_zone_id)
+    //     {
+    //         RPC_ASSERT(destination_zone_id_ != destination_zone_id);
+    //         auto ret = service_proxy::create(name_, destination_zone_id, shared_from_this());
 
-#ifdef USE_RPC_TELEMETRY
-        if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
-        {
-            telemetry_service->on_cloned_service_proxy_creation(ret->service_.lock()->get_name(),
-                ret->name_,
-                ret->get_zone_id(),
-                ret->get_destination_zone_id(),
-                ret->get_zone_id().as_caller());
-        }
-#endif
-        return ret;
-    }
+    // #ifdef USE_RPC_TELEMETRY
+    //         if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
+    //         {
+    //             telemetry_service->on_cloned_service_proxy_creation(ret->service_.lock()->get_name(),
+    //                 ret->name_,
+    //                 ret->get_zone_id(),
+    //                 ret->get_destination_zone_id(),
+    //                 ret->get_zone_id().as_caller());
+    //         }
+    // #endif
+    //         return ret;
+    //     }
 
     CORO_TASK(int)
     service_proxy::get_or_create_object_proxy(object object_id,

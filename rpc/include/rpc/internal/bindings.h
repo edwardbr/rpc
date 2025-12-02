@@ -26,7 +26,8 @@ namespace rpc
         RPC_ASSERT(object_p);
         if (!object_p)
             CO_RETURN error::INVALID_DATA();
-        auto operating_service = object_p->get_service_proxy()->get_operating_zone_service();
+        auto sp = object_p->get_service_proxy();
+        auto operating_service = sp->get_operating_zone_service();
 
         // this is to check that an interface is belonging to another zone and not the operating zone
         if (!iface->is_local()
@@ -37,7 +38,8 @@ namespace rpc
         }
 
         // else encapsulate away
-        CO_RETURN CO_AWAIT operating_service->bind_in_proxy(protocol_version, iface, stub, descriptor);
+        CO_RETURN CO_AWAIT operating_service->bind_in_proxy(
+            protocol_version, iface, stub, sp->get_destination_zone_id().as_caller(), descriptor);
     }
 
     template<class T>
@@ -92,8 +94,7 @@ namespace rpc
             // get the right  service proxy
             // if the zone is different lookup or clone the right proxy
             bool new_proxy_added = false;
-            auto service_proxy = serv->get_zone_proxy(
-                nullptr, caller_channel_zone_id, caller_zone_id, encap.destination_zone_id, new_proxy_added);
+            auto service_proxy = serv->get_zone_proxy(caller_zone_id, encap.destination_zone_id, new_proxy_added);
             if (!service_proxy)
             {
                 RPC_ERROR("Object not found - service proxy is null");
@@ -145,7 +146,7 @@ namespace rpc
                 CO_RETURN rpc::error::OBJECT_NOT_FOUND();
             }
 
-            auto count = serv->release_local_stub(ob, false);
+            auto count = serv->release_local_stub(ob, false, encap.destination_zone_id.as_caller());
             RPC_ASSERT(count);
             if (!count || count == std::numeric_limits<uint64_t>::max())
             {
@@ -175,12 +176,17 @@ namespace rpc
         {
             // if the zone is different lookup or clone the right proxy
             // the service proxy is where the object came from so it should be used as the new caller channel for this returned object
-            service_proxy = serv->get_zone_proxy(sp, {0}, {0}, {encap.destination_zone_id}, new_proxy_added);
+            service_proxy = serv->get_zone_proxy({0}, {encap.destination_zone_id}, new_proxy_added);
+            if (!service_proxy)
+            {
+                RPC_ERROR("Object not found - service proxy is null in proxy_bind_out_param");
+                CO_RETURN rpc::error::ZONE_NOT_FOUND();
+            }
         }
 
         std::shared_ptr<rpc::object_proxy> op;
         auto err = CO_AWAIT service_proxy->get_or_create_object_proxy(
-            encap.object_id, service_proxy::object_proxy_creation_rule::RELEASE_IF_NOT_NEW, false, {}, false, op);
+            encap.object_id, service_proxy::object_proxy_creation_rule::RELEASE_IF_NOT_NEW, new_proxy_added, {}, false, op);
         if (err != error::OK())
         {
             RPC_ERROR("get_or_create_object_proxy failed");
@@ -261,9 +267,10 @@ namespace rpc
 
     template<class T>
     CORO_TASK(int)
-    create_interface_stub(rpc::service& serv, const rpc::shared_ptr<T>& iface, rpc::interface_descriptor& descriptor)
+    create_interface_stub(
+        rpc::service& serv, const rpc::shared_ptr<T>& iface, caller_zone caller_zone_id, rpc::interface_descriptor& descriptor)
     {
-        caller_zone caller_zone_id = serv.get_zone_id().as_caller();
+        // caller_zone caller_zone_id = serv.get_zone_id().as_caller();
 
         if (!iface)
         {

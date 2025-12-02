@@ -95,7 +95,7 @@ namespace rpc
         return ret;
     }
 
-    uint64_t object_stub::add_ref(bool is_optimistic)
+    uint64_t object_stub::add_ref(bool is_optimistic, caller_zone caller_zone_id)
     {
         uint64_t ret = 0;
         if (is_optimistic)
@@ -108,10 +108,20 @@ namespace rpc
 #endif
         RPC_ASSERT(ret != std::numeric_limits<uint64_t>::max());
         RPC_ASSERT(ret != 0);
+        auto transport = zone_->get_transport(caller_zone_id.as_destination());
+        if (transport)
+        {
+            CO_AWAIT transport->increment_inbound_stub_count(caller_zone_id);
+        }
+        else
+        {
+            RPC_ERROR("Failed to find transport to increment inbound stub count");
+        }
+
         return ret;
     }
 
-    uint64_t object_stub::release(bool is_optimistic)
+    uint64_t object_stub::release(bool is_optimistic, caller_zone caller_zone_id)
     {
         uint64_t count = 0;
         if (is_optimistic)
@@ -123,12 +133,21 @@ namespace rpc
             telemetry_service->on_stub_release(zone_->get_zone_id(), id_, {}, count, {});
 #endif
         RPC_ASSERT(count != std::numeric_limits<uint64_t>::max());
+        auto transport = zone_->get_transport(caller_zone_id.as_destination());
+        if (transport)
+        {
+            CO_AWAIT transport->decrement_inbound_stub_count(caller_zone_id);
+        }
+        else
+        {
+            RPC_ERROR("Failed to find transport to decrement inbound stub count");
+        }
         return count;
     }
 
-    void object_stub::release_from_service()
+    void object_stub::release_from_service(caller_zone caller_zone_id)
     {
-        zone_->release_local_stub(p_this_, false);
+        zone_->release_local_stub(p_this_, false, caller_zone_id);
     }
 
 }

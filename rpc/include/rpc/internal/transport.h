@@ -37,10 +37,13 @@ namespace rpc
         // Local service reference
         std::weak_ptr<service> service_;
 
-        // Nested map for O(1) lookup: destinations_[destination][caller] -> handler
-        // For pass-throughs, register BOTH directions: [A][B] and [B][A] point to same pass-through
-        // For local service, register once: [local_zone][local_zone] -> service
-        std::unordered_map<uint64_t, std::unordered_map<uint64_t, std::weak_ptr<i_marshaller>>> destinations_;
+        // passthrough map
+        std::unordered_map<destination_zone, std::unordered_map<caller_zone, std::weak_ptr<i_marshaller>>> pass_thoughs_;
+
+        // the list of zone ids that the ajacent zone knows about
+        std::unordered_map<destination_zone, std::atomic<uint64_t>> outbound_proxy_count_;
+        std::unordered_map<caller_zone, std::atomic<uint64_t>> inbound_stub_count_;
+
         mutable std::shared_mutex destinations_mutex_;
 
         std::atomic<transport_status> status_{transport_status::CONNECTING};
@@ -51,21 +54,28 @@ namespace rpc
         transport(std::string name, zone zone_id, zone adjacent_zone_id);
 
         // lock free version of same function - adds handler for zone pair
-        bool inner_add_destination(destination_zone dest, destination_zone caller, std::weak_ptr<i_marshaller> handler);
+        bool inner_add_destination(destination_zone dest, caller_zone caller, std::weak_ptr<i_marshaller> handler);
 
         // Helper to route incoming messages to registered handlers
         // Gets handler for specific zone pair
-        std::shared_ptr<i_marshaller> inner_get_destination_handler(destination_zone dest, destination_zone caller) const;
+        std::shared_ptr<i_marshaller> inner_get_destination_handler(destination_zone dest, caller_zone caller) const;
 
         // Find any pass-through that has the specified destination, regardless of caller
         // Returns nullptr if not found
         std::shared_ptr<i_marshaller> inner_find_any_passthrough_for_destination(destination_zone dest) const;
-        std::shared_ptr<i_marshaller> find_any_passthrough_for_destination(destination_zone dest) const;
+
+        void inner_increment_outbound_proxy_count(destination_zone dest);
+        void inner_decrement_outbound_proxy_count(destination_zone dest);
+
+        void inner_increment_inbound_stub_count(caller_zone dest);
+        void inner_decrement_inbound_stub_count(caller_zone dest);
 
         void set_status(transport_status new_status);
         void notify_all_destinations_of_disconnect();
 
     public:
+        // Public version of find_any_passthrough_for_destination for use by service::get_zone_proxy
+        std::shared_ptr<i_marshaller> find_any_passthrough_for_destination(destination_zone dest) const;
         virtual ~transport() = default;
 
         std::string get_name() const { return name_; }
@@ -75,13 +85,20 @@ namespace rpc
 
         // Destination management for zone pairs
         // For local service, use add_destination(local_zone, local_zone, service)
-        std::shared_ptr<i_marshaller> get_destination_handler(destination_zone dest, destination_zone caller) const;
-        bool add_destination(destination_zone dest, destination_zone caller, std::weak_ptr<i_marshaller> handler);
-        void remove_destination(destination_zone dest, destination_zone caller);
+        std::shared_ptr<i_marshaller> get_destination_handler(destination_zone dest, caller_zone caller) const;
+
+        bool add_destination(destination_zone dest, caller_zone caller, std::weak_ptr<i_marshaller> handler);
+        void remove_destination(destination_zone dest, caller_zone caller);
+
+        void increment_outbound_proxy_count(destination_zone dest);
+        void decrement_outbound_proxy_count(destination_zone dest);
+
+        void increment_inbound_stub_count(caller_zone dest);
+        void decrement_inbound_stub_count(caller_zone dest);
 
         static std::shared_ptr<i_marshaller> create_pass_through(std::shared_ptr<transport> forward,
-            std::shared_ptr<transport> reverse,
-            std::shared_ptr<service> service,
+            const std::shared_ptr<transport>& reverse,
+            const std::shared_ptr<service>& service,
             destination_zone forward_dest,
             destination_zone reverse_dest);
 

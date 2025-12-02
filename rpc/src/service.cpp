@@ -13,6 +13,11 @@
 #include <yas/mem_streams.hpp>
 #include <yas/std_types.hpp>
 
+#ifdef _IN_ENCLAVE
+#include <fmt/format-inl.h>
+#else
+#include <fmt/format.h>
+#endif
 namespace rpc
 {
     ////////////////////////////////////////////////////////////////////////////
@@ -338,7 +343,7 @@ namespace rpc
         auto object_service_proxy = object_proxy->get_service_proxy();
         RPC_ASSERT(object_service_proxy->zone_id_ == zone_id_);
         auto destination_zone_id = object_service_proxy->get_destination_zone_id();
-        auto transport = object_service_proxy->get_transport();
+        auto object_transport = object_service_proxy->get_transport();
         auto object_id = object_proxy->get_object_id();
 
         RPC_ASSERT(caller_zone_id.is_set());
@@ -352,7 +357,7 @@ namespace rpc
 
         if (caller_zone_id == destination_zone_id.as_caller())
         {
-            marshaller = transport;
+            marshaller = object_transport;
             if (!marshaller)
             {
                 CO_RETURN error::TRANSPORT_ERROR();
@@ -360,8 +365,7 @@ namespace rpc
         }
         else
         {
-            auto dest_tp = object_service_proxy->get_transport();
-            marshaller = dest_tp->get_destination_handler(destination_zone_id, caller_zone_id.as_destination());
+            marshaller = object_transport->get_destination_handler(destination_zone_id, caller_zone_id);
             if (!marshaller)
             {
                 std::shared_ptr<rpc::transport> caller_transport;
@@ -388,7 +392,6 @@ namespace rpc
                 }
 
                 // the fork is here so we need to add ref the destination normally with caller info
-                auto object_transport = object_service_proxy->get_transport();
                 if (object_transport == caller_transport)
                 {
                     marshaller = object_transport;
@@ -473,7 +476,7 @@ namespace rpc
                     stub = item->second.lock();
                     // Don't mask the race condition - if stub is null here, we have a serious problem
                     RPC_ASSERT(stub != nullptr);
-                    stub->add_ref(false);
+                    stub->add_ref(false, caller_zone_id);
                 }
                 else
                 {
@@ -485,7 +488,7 @@ namespace rpc
                     wrapped_object_to_stub[pointer] = stub;
                     stubs[id] = stub;
                     stub->on_added_to_zone(stub);
-                    stub->add_ref(false);
+                    stub->add_ref(false, caller_zone_id);
                 }
             }
         }
@@ -572,8 +575,8 @@ namespace rpc
                     object_id,
                     zone_id_.as_caller_channel(),
                     caller_zone_id,
-                    known_direction_zone_id,
-                    build_out_param_channel & add_ref_options::build_caller_route,
+                    zone_id_.as_known_direction_zone(),
+                    add_ref_options::build_caller_route,
                     reference_count,
                     in_back_channel,
                     out_back_channel);
@@ -581,6 +584,21 @@ namespace rpc
                 {
                     RPC_ERROR("Caller channel add_ref failed with code {}", error);
                     CO_RETURN error;
+                }
+            }
+            else
+            {
+                std::lock_guard g(zone_control);
+                auto destination_transport = inner_get_transport(destination_zone_id);
+                if (destination_transport == nullptr)
+                {
+                    destination_transport = inner_get_transport(known_direction_zone_id.as_destination());
+                    if (destination_transport == nullptr)
+                    {
+                        RPC_ERROR("Destination transport not found for zone {}", destination_zone_id.get_val());
+                        CO_RETURN rpc::error::ZONE_NOT_FOUND();
+                    }
+                    inner_add_transport(destination_zone_id, destination_transport);
                 }
             }
         }
@@ -595,8 +613,8 @@ namespace rpc
                     object_id,
                     zone_id_.as_caller_channel(),
                     caller_zone_id,
-                    known_direction_zone_id,
-                    build_out_param_channel,
+                    zone_id_.as_known_direction_zone(),
+                    build_out_param_channel & (~add_ref_options::build_caller_route),
                     reference_count,
                     in_back_channel,
                     out_back_channel);
@@ -624,15 +642,27 @@ namespace rpc
                 reference_count = 0;
                 CO_RETURN rpc::error::OBJECT_NOT_FOUND();
             }
-            reference_count = stub->add_ref(!!(build_out_param_channel & add_ref_options::optimistic));
+
+            {
+                std::lock_guard g(zone_control);
+                auto dest_transport = inner_get_transport(caller_zone_id.as_destination());
+                if (!dest_transport)
+                {
+                    dest_transport = inner_get_transport(known_direction_zone_id.as_destination());
+                    inner_add_transport(caller_zone_id.as_destination(), dest_transport);
+                }
+            }
+
+            reference_count = stub->add_ref(!!(build_out_param_channel & add_ref_options::optimistic), caller_zone_id);
         }
         CO_RETURN rpc::error::OK();
     }
 
-    uint64_t service::release_local_stub(const std::shared_ptr<rpc::object_stub>& stub, bool is_optimistic)
+    uint64_t service::release_local_stub(
+        const std::shared_ptr<rpc::object_stub>& stub, bool is_optimistic, caller_zone caller_zone_id)
     {
         std::lock_guard l(stub_control);
-        uint64_t count = stub->release(is_optimistic);
+        uint64_t count = stub->release(is_optimistic, caller_zone_id);
         if (!is_optimistic && !count)
         {
             {
@@ -709,7 +739,7 @@ namespace rpc
                     CO_RETURN rpc::error::OBJECT_NOT_FOUND();
                 }
                 // this guy needs to live outside of the mutex or deadlocks may happen
-                count = stub->release(!!(release_options::optimistic & options));
+                count = stub->release(!!(release_options::optimistic & options), caller_zone_id);
                 if (!count && !(release_options::optimistic & options))
                 {
                     {
@@ -755,10 +785,13 @@ namespace rpc
         RPC_ASSERT(destination_zone_id != zone_id_.as_destination());
         RPC_ASSERT(other_zones.find(destination_zone_id) == other_zones.end());
         other_zones[destination_zone_id] = service_proxy;
-        transports[destination_zone_id] = service_proxy->get_transport();
-        RPC_DEBUG("inner_add_zone_proxy service zone: {} destination_zone={}",
+
+        RPC_ASSERT(transports.find(destination_zone_id) != transports.end());
+        // transports[destination_zone_id] = service_proxy->get_transport();
+        RPC_DEBUG("inner_add_zone_proxy service zone: {} destination_zone={} adjacent_zone={}",
             std::to_string(zone_id_),
-            std::to_string(service_proxy->destination_zone_id_));
+            std::to_string(service_proxy->destination_zone_id_),
+            std::to_string(service_proxy->get_transport()->get_adjacent_zone_id()));
     }
 
     void service::add_zone_proxy(const std::shared_ptr<rpc::service_proxy>& service_proxy)
@@ -768,31 +801,29 @@ namespace rpc
         inner_add_zone_proxy(service_proxy);
     }
 
-    void service::add_transport(destination_zone adjacent_zone_id, const std::shared_ptr<transport>& transport_ptr)
+    void service::inner_add_transport(destination_zone destination_zone_id, const std::shared_ptr<transport>& transport_ptr)
     {
-        std::lock_guard g(zone_control);
-        transports[adjacent_zone_id] = transport_ptr;
-        RPC_DEBUG("add_transport service zone: {} adjacent_zone_id={}",
+        RPC_ASSERT(transports.find(destination_zone_id) == transports.end());
+        transports[destination_zone_id] = transport_ptr;
+        RPC_DEBUG("inner_add_zone_proxy service zone: {} destination_zone={} adjacent_zone={}",
             std::to_string(zone_id_),
-            std::to_string(adjacent_zone_id));
+            std::to_string(destination_zone_id),
+            std::to_string(transport_ptr->get_adjacent_zone_id()));
     }
 
-    void service::remove_transport(destination_zone adjacent_zone_id)
+    void service::inner_remove_transport(destination_zone destination_zone_id)
     {
-        std::lock_guard g(zone_control);
-        auto it = transports.find(adjacent_zone_id);
+        auto it = transports.find(destination_zone_id);
         if (it != transports.end())
         {
             transports.erase(it);
-            RPC_DEBUG("remove_transport service zone: {} adjacent_zone_id={}",
+            RPC_DEBUG("remove_transport service zone: {} destination_zone_id={}",
                 std::to_string(zone_id_),
-                std::to_string(adjacent_zone_id));
+                std::to_string(destination_zone_id));
         }
     }
-
-    std::shared_ptr<rpc::transport> service::get_transport(destination_zone destination_zone_id) const
+    std::shared_ptr<rpc::transport> service::inner_get_transport(destination_zone destination_zone_id) const
     {
-        std::lock_guard g(zone_control);
 
         // Try to find a direct transport to the destination zone
         auto item = transports.find(destination_zone_id);
@@ -807,22 +838,45 @@ namespace rpc
         return nullptr;
     }
 
+    void service::add_transport(destination_zone destination_zone_id, const std::shared_ptr<transport>& transport_ptr)
+    {
+        std::lock_guard g(zone_control);
+        inner_add_transport(destination_zone_id, transport_ptr);
+    }
+
+    void service::remove_transport(destination_zone adjacent_zone_id)
+    {
+        std::lock_guard g(zone_control);
+        inner_remove_transport(adjacent_zone_id);
+    }
+
+    std::shared_ptr<rpc::transport> service::get_transport(destination_zone destination_zone_id) const
+    {
+        std::lock_guard g(zone_control);
+        return inner_get_transport(destination_zone_id);
+    }
+
     std::shared_ptr<rpc::service_proxy> service::get_zone_proxy(
-        std::shared_ptr<rpc::service_proxy> caller_sp, // when you know where you are calling to
-        caller_channel_zone caller_channel_zone_id,
         caller_zone caller_zone_id, // when you know who is calling you
         destination_zone destination_zone_id,
         bool& new_proxy_added)
     {
-        assert(!caller_sp ^ !caller_zone_id.is_set()); // only one must be set
         new_proxy_added = false;
         std::lock_guard g(zone_control);
 
-        // find if we have one
+        RPC_DEBUG("get_zone_proxy: svc_zone={}, dest={}, caller_zone={}, num_transports={}",
+            zone_id_.get_val(),
+            destination_zone_id.get_val(),
+            caller_zone_id.is_set() ? caller_zone_id.get_val() : 0,
+            transports.size());
+
         {
             auto item = other_zones.find(destination_zone_id);
             if (item != other_zones.end())
+            {
+                RPC_DEBUG("get_zone_proxy: Found existing proxy in other_zones");
                 return item->second.lock();
+            }
         }
 
         {
@@ -832,7 +886,10 @@ namespace rpc
                 auto transport = item->second.lock();
                 if (transport)
                 {
-                    auto proxy = std::make_shared<service_proxy>(transport, destination_zone_id);
+                    auto proxy = service_proxy::create(fmt::format("SP#{}", destination_zone_id.get_val()),
+                        shared_from_this(),
+                        transport,
+                        destination_zone_id);
                     inner_add_zone_proxy(proxy);
                     new_proxy_added = true;
                     return proxy;
@@ -840,7 +897,6 @@ namespace rpc
             }
         }
 
-        // Try to find a direct transport to the destination zone
         if (caller_zone_id.is_set())
         {
             auto item = transports.find(caller_zone_id.as_destination());
@@ -849,7 +905,11 @@ namespace rpc
                 auto transport = item->second.lock();
                 if (transport)
                 {
-                    auto proxy = std::make_shared<service_proxy>(transport, destination_zone_id);
+                    auto proxy = service_proxy::create(fmt::format("SP#{}", destination_zone_id.get_val()),
+                        shared_from_this(),
+                        transport,
+                        destination_zone_id);
+                    inner_add_transport(destination_zone_id, transport);
                     inner_add_zone_proxy(proxy);
                     new_proxy_added = true;
                     return proxy;
@@ -857,57 +917,29 @@ namespace rpc
             }
         }
 
-        // Try to find a direct transport to the destination zone
-        if (caller_channel_zone_id.is_set())
-        {
-            auto item = transports.find(caller_channel_zone_id.as_destination());
-            if (item != transports.end())
-            {
-                auto transport = item->second.lock();
-                if (transport)
-                {
-                    auto proxy = std::make_shared<service_proxy>(transport, destination_zone_id);
-                    inner_add_zone_proxy(proxy);
-                    new_proxy_added = true;
-                    return proxy;
-                }
-            }
-        }
-
-        // If no direct transport, fall back to transport via caller channel
-        {
-            auto transport = caller_sp->get_transport();
-            if (transport)
-            {
-                RPC_WARNING("get_zone_proxy: Creating service_proxy with indirect transport! service_zone={}, "
-                            "transport_to={}, destination_zone={}",
-                    zone_id_.get_val(),
-                    transport->get_adjacent_zone_id().get_val(),
-                    destination_zone_id.get_val());
-
-                auto proxy = std::make_shared<service_proxy>(transport, destination_zone_id);
-                inner_add_zone_proxy(proxy);
-                new_proxy_added = true;
-                return proxy;
-            }
-        }
+        RPC_ERROR("get_zone_proxy: Could not find route! svc_zone={}, dest={}, caller_zone={}",
+            zone_id_.get_val(),
+            destination_zone_id.get_val(),
+            caller_zone_id.is_set() ? caller_zone_id.get_val() : 0);
 
         return nullptr;
     }
 
-    void service::remove_zone_proxy(destination_zone destination_zone_id, caller_zone caller_zone_id)
+    void service::remove_zone_proxy(destination_zone destination_zone_id)
     {
+        RPC_DEBUG("remove_zone_proxy service zone: {} destination_zone={}",
+            std::to_string(zone_id_),
+            std::to_string(destination_zone_id));
+
+        std::lock_guard g(zone_control);
+        auto item = other_zones.find(destination_zone_id);
+        if (item == other_zones.end())
         {
-            std::lock_guard g(zone_control);
-            auto item = other_zones.find(destination_zone_id);
-            if (item == other_zones.end())
-            {
-                RPC_ASSERT(false);
-            }
-            else
-            {
-                other_zones.erase(item);
-            }
+            RPC_ASSERT(false);
+        }
+        else
+        {
+            other_zones.erase(item);
         }
     }
 

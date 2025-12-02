@@ -38,7 +38,7 @@ namespace rpc
         std::shared_ptr<object_stub> p_this_;
         std::atomic<uint64_t> shared_count_ = 0;
         std::atomic<uint64_t> optimistic_count_ = 0;
-        std::shared_ptr<service> zone_; // CHANGED: Strong reference to keep service alive while stub exists
+        std::shared_ptr<service> zone_; // Strong reference to keep service alive while stub exists
 
         void add_interface(const std::shared_ptr<rpc::i_interface_stub>& iface);
         friend service; // so that it can call add_interface
@@ -69,9 +69,9 @@ namespace rpc
 
         std::shared_ptr<rpc::i_interface_stub> get_interface(interface_ordinal interface_id);
 
-        uint64_t add_ref(bool is_optimistic);
-        uint64_t release(bool is_optimistic);
-        void release_from_service();
+        uint64_t add_ref(bool is_optimistic, caller_zone caller_zone_id);
+        uint64_t release(bool is_optimistic, caller_zone caller_zone_id);
+        void release_from_service(caller_zone caller_zone_id);
     };
 
     class i_interface_stub

@@ -13,13 +13,13 @@
 
 namespace rpc
 {
-    // NOTE: The local service MUST be registered in destinations_ map
+    // NOTE: The local service MUST be registered in pass_thoughs_ map
     // during transport initialization:
-    //   destinations_[local_zone][local_zone] = service
+    //   pass_thoughs_[local_zone][local_zone] = service
     //
     // Pass-throughs are registered in BOTH directions:
-    //   destinations_[A][B] = pass_through  (for A↔B communication)
-    //   destinations_[B][A] = pass_through  (same pass-through)
+    //   pass_thoughs_[A][B] = pass_through  (for A↔B communication)
+    //   pass_thoughs_[B][A] = pass_through  (same pass-through)
     //
     // This provides O(1) lookup for all routing scenarios.
     // Destination management
@@ -30,9 +30,9 @@ namespace rpc
         , adjacent_zone_id_(adjacent_zone_id)
         , service_(service)
     {
-        // Register local service: destinations_[local][local] = service
-        auto local_zone = zone_id_.get_val();
-        destinations_[local_zone][adjacent_zone_id.get_val()] = std::static_pointer_cast<i_marshaller>(service);
+        // Register local service: pass_thoughs_[local][local] = service
+        // auto local_zone = zone_id_.get_val();
+        // pass_thoughs_[local_zone][adjacent_zone_id.get_val()] = std::static_pointer_cast<i_marshaller>(service);
     }
 
     transport::transport(std::string name, zone zone_id_, zone adjacent_zone_id)
@@ -46,86 +46,170 @@ namespace rpc
     {
         RPC_ASSERT(service);
         service_ = service;
-        // Register local service: destinations_[local][local] = service
-        auto local_zone = service->get_zone_id().get_val();
-        destinations_[local_zone][adjacent_zone_id_.get_val()] = std::static_pointer_cast<i_marshaller>(service);
+        // Register local service: pass_thoughs_[local][local] = service
+        // auto local_zone = service->get_zone_id().get_val();
+        // pass_thoughs_[local_zone][adjacent_zone_id_.get_val()] = std::static_pointer_cast<i_marshaller>(service);
     }
 
-    bool transport::inner_add_destination(destination_zone dest, destination_zone caller, std::weak_ptr<i_marshaller> handler)
+    bool transport::inner_add_destination(destination_zone dest, caller_zone caller, std::weak_ptr<i_marshaller> handler)
     {
         auto dest_val = dest.get_val();
         auto caller_val = caller.get_val();
 
         // Check if entry already exists
-        auto outer_it = destinations_.find(dest_val);
-        if (outer_it != destinations_.end())
+        auto outer_it = pass_thoughs_.find(dest_val);
+        if (outer_it != pass_thoughs_.end())
         {
             auto inner_it = outer_it->second.find(caller_val);
             if (inner_it != outer_it->second.end())
             {
+                RPC_ASSERT(false);
                 return false; // Already exists
             }
         }
 
         // Add entry
-        destinations_[dest_val][caller_val] = handler;
+        pass_thoughs_[dest_val][caller_val] = handler;
+        inner_increment_outbound_proxy_count(caller.as_destination());
 
-        // If zones are different (pass-through case), also add reverse direction
-        // For local service (dest == caller), only register once
-        if (dest_val != caller_val)
-        {
-            // Check if reverse entry already exists
-            auto reverse_outer_it = destinations_.find(caller_val);
-            if (reverse_outer_it == destinations_.end()
-                || reverse_outer_it->second.find(dest_val) == reverse_outer_it->second.end())
-            {
-                destinations_[caller_val][dest_val] = handler;
-            }
-        }
+        // // If zones are different (pass-through case), also add reverse direction
+        // // For local service (dest == caller), only register once
+        // if (dest_val != caller_val)
+        // {
+        //     // Check if reverse entry already exists
+        //     auto reverse_outer_it = pass_thoughs_.find(caller_val);
+        //     if (reverse_outer_it == pass_thoughs_.end()
+        //         || reverse_outer_it->second.find(dest_val) == reverse_outer_it->second.end())
+        //     {
+        //         pass_thoughs_[caller_val][dest_val] = handler;
+        //     }
+        // }
 
         return true;
     }
 
-    bool transport::add_destination(destination_zone dest, destination_zone caller, std::weak_ptr<i_marshaller> handler)
+    bool transport::add_destination(destination_zone dest, caller_zone caller, std::weak_ptr<i_marshaller> handler)
     {
         std::unique_lock lock(destinations_mutex_);
         return inner_add_destination(dest, caller, handler);
     }
 
-    void transport::remove_destination(destination_zone dest, destination_zone caller)
+    void transport::increment_outbound_proxy_count(destination_zone dest)
+    {
+        std::unique_lock lock(destinations_mutex_);
+        return inner_increment_outbound_proxy_count(dest);
+    }
+    void transport::decrement_outbound_proxy_count(destination_zone dest)
+    {
+        std::unique_lock lock(destinations_mutex_);
+        return inner_decrement_outbound_proxy_count(dest);
+    }
+
+    void transport::increment_inbound_stub_count(caller_zone dest)
+    {
+        std::unique_lock lock(destinations_mutex_);
+        return inner_increment_inbound_stub_count(dest);
+    }
+    void transport::decrement_inbound_stub_count(caller_zone dest)
+    {
+        std::unique_lock lock(destinations_mutex_);
+        return inner_decrement_inbound_stub_count(dest);
+    }
+
+    void transport::inner_increment_outbound_proxy_count(destination_zone dest)
+    {
+        auto found = outbound_proxy_count_.find(dest);
+        if (found == outbound_proxy_count_.end())
+        {
+            outbound_proxy_count_[dest] = 1;
+        }
+        else
+        {
+            found->second++;
+        }
+    }
+    void transport::inner_decrement_outbound_proxy_count(destination_zone dest)
+    {
+        auto found = outbound_proxy_count_.find(dest);
+        if (found == outbound_proxy_count_.end())
+        {
+            RPC_WARNING("inner_decrement_outbound_proxy_count: No outbound proxy count found for dest={}", dest.get_val());
+        }
+        else
+        {
+            auto count = --found->second;
+            if (count == 0)
+            {
+                outbound_proxy_count_.erase(found);
+            }
+        }
+    }
+
+    void transport::inner_increment_inbound_stub_count(caller_zone dest)
+    {
+        auto found = inbound_stub_count_.find(dest);
+        if (found == inbound_stub_count_.end())
+        {
+            inbound_stub_count_[dest] = 1;
+        }
+        else
+        {
+            found->second++;
+        }
+    }
+    void transport::inner_decrement_inbound_stub_count(caller_zone dest)
+    {
+        auto found = inbound_stub_count_.find(dest);
+        if (found == inbound_stub_count_.end())
+        {
+            RPC_WARNING("inner_decrement_outbound_proxy_count: No outbound proxy count found for dest={}", dest.get_val());
+        }
+        else
+        {
+            auto count = --found->second;
+            if (count == 0)
+            {
+                inbound_stub_count_.erase(found);
+            }
+        }
+    }
+
+    void transport::remove_destination(destination_zone dest, caller_zone caller)
     {
         std::unique_lock lock(destinations_mutex_);
         auto dest_val = dest.get_val();
         auto caller_val = caller.get_val();
 
-        auto outer_it = destinations_.find(dest_val);
-        if (outer_it != destinations_.end())
+        auto outer_it = pass_thoughs_.find(dest_val);
+        if (outer_it != pass_thoughs_.end())
         {
             outer_it->second.erase(caller_val);
             // Clean up outer map if inner map is empty
             if (outer_it->second.empty())
             {
-                destinations_.erase(outer_it);
+                pass_thoughs_.erase(outer_it);
             }
         }
-        if (dest_val != caller_val)
-        {
-            outer_it = destinations_.find(caller_val);
-            if (outer_it != destinations_.end())
-            {
-                outer_it->second.erase(dest_val);
-                // Clean up outer map if inner map is empty
-                if (outer_it->second.empty())
-                {
-                    destinations_.erase(outer_it);
-                }
-            }
-        }
+
+        inner_decrement_outbound_proxy_count(caller.as_destination());
+        // if (dest_val != caller_val)
+        // {
+        //     outer_it = pass_thoughs_.find(caller_val);
+        //     if (outer_it != pass_thoughs_.end())
+        //     {
+        //         outer_it->second.erase(dest_val);
+        //         // Clean up outer map if inner map is empty
+        //         if (outer_it->second.empty())
+        //         {
+        //             pass_thoughs_.erase(outer_it);
+        //         }
+        //     }
+        // }
     }
 
     std::shared_ptr<i_marshaller> transport::create_pass_through(std::shared_ptr<transport> forward,
-        std::shared_ptr<transport> reverse,
-        std::shared_ptr<service> service,
+        const std::shared_ptr<transport>& reverse,
+        const std::shared_ptr<service>& service,
         destination_zone forward_dest,
         destination_zone reverse_dest)
     {
@@ -174,8 +258,8 @@ namespace rpc
         }
 
         // Check if pass-through already exists for this zone pair
-        auto forward_handler = forward->inner_get_destination_handler(forward_dest, reverse_dest);
-        auto reverse_handler = reverse->inner_get_destination_handler(reverse_dest, forward_dest);
+        auto forward_handler = forward->inner_get_destination_handler(reverse_dest, forward_dest.as_caller());
+        auto reverse_handler = reverse->inner_get_destination_handler(forward_dest, reverse_dest.as_caller());
 
         // check that they are the same
         RPC_ASSERT(!forward_handler == !reverse_handler);
@@ -195,8 +279,16 @@ namespace rpc
                 (void*)pt.get());
             // Register pass-through on both transports
             // inner_add_destination automatically registers both directions for pass-throughs
-            forward->inner_add_destination(forward_dest, reverse_dest, std::static_pointer_cast<i_marshaller>(pt));
-            reverse->inner_add_destination(reverse_dest, forward_dest, std::static_pointer_cast<i_marshaller>(pt));
+            forward->inner_add_destination(
+                reverse_dest, forward_dest.as_caller(), std::static_pointer_cast<i_marshaller>(pt));
+            reverse->inner_add_destination(
+                forward_dest, reverse_dest.as_caller(), std::static_pointer_cast<i_marshaller>(pt));
+
+            // Note: We do NOT register forward_dest in service->transports here because:
+            // 1. The pass-through might fail to reach the destination (zone doesn't exist downstream)
+            // 2. Registering it would create routing loops
+            // 3. The registration should happen after successful routing, by the caller
+
             return std::static_pointer_cast<i_marshaller>(pt);
         }
         return pt;
@@ -213,14 +305,14 @@ namespace rpc
         status_.store(new_status, std::memory_order_release);
     }
 
-    std::shared_ptr<i_marshaller> transport::inner_get_destination_handler(destination_zone dest, destination_zone caller) const
+    std::shared_ptr<i_marshaller> transport::inner_get_destination_handler(destination_zone dest, caller_zone caller) const
     {
         auto dest_val = dest.get_val();
         auto caller_val = caller.get_val();
 
         // O(1) nested map lookup
-        auto outer_it = destinations_.find(dest_val);
-        if (outer_it != destinations_.end())
+        auto outer_it = pass_thoughs_.find(dest_val);
+        if (outer_it != pass_thoughs_.end())
         {
             auto inner_it = outer_it->second.find(caller_val);
             if (inner_it != outer_it->second.end())
@@ -242,7 +334,7 @@ namespace rpc
     }
 
     // Helper to route incoming messages to registered handlers
-    std::shared_ptr<i_marshaller> transport::get_destination_handler(destination_zone dest, destination_zone caller) const
+    std::shared_ptr<i_marshaller> transport::get_destination_handler(destination_zone dest, caller_zone caller) const
     {
         if (dest == zone_id_.as_destination())
         {
@@ -262,12 +354,11 @@ namespace rpc
     }
 
     // Find any pass-through that has the specified destination, regardless of caller
-    // O(1) lookup: just get destinations_[dest] and return first non-expired entry
+    // O(1) lookup: just get pass_thoughs_[dest] and return first non-expired entry
     std::shared_ptr<i_marshaller> transport::inner_find_any_passthrough_for_destination(destination_zone dest) const
     {
-        auto dest_val = dest.get_val();
-        auto outer_it = destinations_.find(dest_val);
-        if (outer_it != destinations_.end())
+        auto outer_it = pass_thoughs_.find(dest);
+        if (outer_it != pass_thoughs_.end())
         {
             // Iterate through all callers for this destination
             for (const auto& [caller_val, handler_weak] : outer_it->second)
@@ -277,8 +368,8 @@ namespace rpc
                 {
                     RPC_DEBUG(
                         "inner_find_any_passthrough_for_destination: Found pass-through for dest={} with caller={}",
-                        dest_val,
-                        caller_val);
+                        dest.get_val(),
+                        caller_val.get_val());
                     return handler;
                 }
             }
@@ -296,7 +387,7 @@ namespace rpc
     {
         std::shared_lock lock(destinations_mutex_);
         // Iterate through nested map to notify all handlers
-        for (const auto& [dest_zone, inner_map] : destinations_)
+        for (const auto& [dest_zone, inner_map] : pass_thoughs_)
         {
             for (const auto& [caller_zone_val, handler_weak] : inner_map)
             {
@@ -322,7 +413,7 @@ namespace rpc
     }
 
     // inbound i_marshaller interface implementation
-    // Routes via destinations_ map (service is registered as a destination)
+    // Routes via pass_thoughs_ map (service is registered as a destination)
     CORO_TASK(int)
     transport::inbound_send(uint64_t protocol_version,
         encoding encoding,
@@ -339,7 +430,7 @@ namespace rpc
         std::vector<back_channel_entry>& out_back_channel)
     {
         // Try zone pair lookup first
-        auto dest = get_destination_handler(destination_zone_id, caller_zone_id.as_destination());
+        auto dest = get_destination_handler(destination_zone_id, caller_zone_id);
         if (!dest)
         {
             CO_RETURN error::ZONE_NOT_FOUND();
@@ -376,7 +467,7 @@ namespace rpc
         const std::vector<back_channel_entry>& in_back_channel)
     {
         // Try zone pair lookup
-        auto dest = get_destination_handler(destination_zone_id, caller_zone_id.as_destination());
+        auto dest = get_destination_handler(destination_zone_id, caller_zone_id);
         if (!dest)
         {
             CO_RETURN;
@@ -405,9 +496,7 @@ namespace rpc
         const std::vector<back_channel_entry>& in_back_channel,
         std::vector<back_channel_entry>& out_back_channel)
     {
-        // For try_cast, we need to find any pass-through for this destination
-        // since we don't have caller information in try_cast signature
-        auto dest = find_any_passthrough_for_destination(destination_zone_id);
+        auto dest = get_destination_handler(destination_zone_id, {0});
         if (!dest)
         {
             CO_RETURN error::ZONE_NOT_FOUND();
@@ -473,12 +562,23 @@ namespace rpc
             }
             if (!dest_transport)
             {
-                dest_transport = shared_from_this();
+                if (build_dest_channel)
+                {
+                    dest_transport = svc->get_transport(known_direction_zone_id.as_destination());
+                    if (!dest_transport)
+                    {
+                        CO_RETURN error::ZONE_NOT_FOUND();
+                    }
+                }
+                else
+                {
+                    dest_transport = shared_from_this();
+                }
+                svc->add_transport(destination_zone_id, dest_transport);
             }
 
             // otherwise we are going to use or create a pass-through
-            auto passthrough
-                = dest_transport->get_destination_handler(destination_zone_id, caller_zone_id.as_destination());
+            auto passthrough = dest_transport->get_destination_handler(destination_zone_id, caller_zone_id);
             if (passthrough)
             {
                 CO_RETURN passthrough->add_ref(protocol_version,
@@ -496,7 +596,19 @@ namespace rpc
             auto caller_transport = svc->get_transport(caller_zone_id.as_destination());
             if (!caller_transport)
             {
-                caller_transport = shared_from_this();
+                if (!build_dest_channel && build_caller_channel)
+                {
+                    caller_transport = svc->get_transport(known_direction_zone_id.as_destination());
+                    if (!dest_transport)
+                    {
+                        CO_RETURN error::ZONE_NOT_FOUND();
+                    }
+                }
+                else
+                {
+                    caller_transport = shared_from_this();
+                }
+                svc->add_transport(caller_zone_id.as_destination(), caller_transport);
             }
 
             if (dest_transport == caller_transport)
@@ -553,7 +665,7 @@ namespace rpc
         std::vector<back_channel_entry>& out_back_channel)
     {
         // Try zone pair lookup
-        auto dest = get_destination_handler(destination_zone_id, caller_zone_id.as_destination());
+        auto dest = get_destination_handler(destination_zone_id, caller_zone_id);
         if (!dest)
         {
             CO_RETURN error::ZONE_NOT_FOUND();

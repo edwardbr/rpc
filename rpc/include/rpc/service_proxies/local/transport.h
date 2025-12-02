@@ -49,7 +49,7 @@ namespace local
             {
                 child = std::make_shared<parent_transport>("child", new_zone_id, parent);
 
-                CO_RETURN CO_AWAIT rpc::child_service::create_child_zone<in_param_type, out_param_type>("child",
+                auto err_code = CO_AWAIT rpc::child_service::create_child_zone<in_param_type, out_param_type>("child",
                     child,
                     input_descr,
                     output_descr,
@@ -59,6 +59,11 @@ namespace local
                     parent->get_service()->get_scheduler()
 #endif
                 );
+                if (err_code != rpc::error::OK())
+                {
+                    child = nullptr;
+                }
+                CO_RETURN err_code;
             };
         }
 

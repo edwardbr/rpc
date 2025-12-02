@@ -35,28 +35,33 @@ namespace rpc
     // only host code can use this class directly other enclaves *may* have access to the i_service_proxy derived interface
     class service_proxy : public std::enable_shared_from_this<rpc::service_proxy>
     {
+        std::string name_;
         std::unordered_map<object, std::weak_ptr<object_proxy>> proxies_;
         std::mutex insert_control_;
 
         const zone zone_id_;
         destination_zone destination_zone_id_ = {0};
-        std::weak_ptr<service> service_;
+        std::shared_ptr<service> service_; // Strong reference to keep service alive while service_proxy exists
 
         // Transport for routing calls to remote zones
         stdex::member_ptr<transport> transport_;
 
-        std::atomic<uint64_t> version_ = rpc::get_version();
-        encoding enc_ = encoding::enc_default;
-        std::string name_;
+        std::atomic<uint64_t> version_;
+        encoding enc_;
+
+        service_proxy(const std::string& name,
+            const zone zone_id,
+            destination_zone destination_zone_id,
+            std::shared_ptr<service> service,
+            const std::shared_ptr<transport>& transport,
+            uint64_t version,
+            encoding enc);
 
     public:
-        service_proxy(const std::string& name,
+        static std::shared_ptr<service_proxy> create(const std::string& name,
+            std::shared_ptr<service> service,
             const std::shared_ptr<transport>& transport,
-            const std::shared_ptr<rpc::service>& svc);
-        service_proxy(const std::shared_ptr<transport>& transport, destination_zone destination_zone_id);
-        service_proxy(const std::string& name,
-            destination_zone destination_zone_id,
-            const std::shared_ptr<rpc::service_proxy>& other);
+            destination_zone destination_zone_id);
 
         virtual ~service_proxy();
 
@@ -104,7 +109,7 @@ namespace rpc
 
         std::unordered_map<object, std::weak_ptr<object_proxy>> get_proxies() { return proxies_; }
 
-        std::shared_ptr<rpc::service_proxy> clone_for_zone(destination_zone destination_zone_id);
+        // std::shared_ptr<rpc::service_proxy> clone_for_zone(destination_zone destination_zone_id);
 
         // the zone where this proxy is created
         zone get_zone_id() const { return zone_id_; }
@@ -112,7 +117,7 @@ namespace rpc
         destination_zone get_destination_zone_id() const { return destination_zone_id_; }
 
         // the service that this proxy lives in
-        std::shared_ptr<rpc::service> get_operating_zone_service() const { return service_.lock(); }
+        std::shared_ptr<rpc::service> get_operating_zone_service() const { return service_; }
 
         enum class object_proxy_creation_rule
         {

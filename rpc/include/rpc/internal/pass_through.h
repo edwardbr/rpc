@@ -30,7 +30,7 @@ namespace rpc
 
         std::shared_ptr<transport> forward_transport_; // Transport to forward destination
         std::shared_ptr<transport> reverse_transport_; // Transport to reverse destination
-        std::shared_ptr<service> service_;
+        std::shared_ptr<service> service_; // Strong reference to keep service alive while passthrough exists
 
         std::shared_ptr<pass_through> self_ref_; // Keep self alive based on reference counts
 

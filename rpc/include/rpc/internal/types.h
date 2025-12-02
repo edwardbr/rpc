@@ -66,6 +66,7 @@ namespace rpc
         inline destination_zone as_destination() const;
         inline caller_zone as_caller() const;
         inline caller_channel_zone as_caller_channel() const;
+        inline known_direction_zone as_known_direction_zone() const;
 
         template<typename Ar> void serialize(Ar& ar) { ar& YAS_OBJECT_NVP("id", ("id", id)); }
     };
@@ -465,6 +466,11 @@ namespace rpc
     caller_channel_zone zone::as_caller_channel() const
     {
         return caller_channel_zone(id);
+    }
+
+    known_direction_zone zone::as_known_direction_zone() const
+    {
+        return known_direction_zone(id);
     }
 
     zone destination_zone::as_zone() const
