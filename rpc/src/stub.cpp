@@ -111,7 +111,7 @@ namespace rpc
         auto transport = zone_->get_transport(caller_zone_id.as_destination());
         if (transport)
         {
-            CO_AWAIT transport->increment_inbound_stub_count(caller_zone_id);
+            transport->increment_inbound_stub_count(caller_zone_id);
         }
         else
         {
@@ -136,7 +136,7 @@ namespace rpc
         auto transport = zone_->get_transport(caller_zone_id.as_destination());
         if (transport)
         {
-            CO_AWAIT transport->decrement_inbound_stub_count(caller_zone_id);
+            transport->decrement_inbound_stub_count(caller_zone_id);
         }
         else
         {

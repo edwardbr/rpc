@@ -111,7 +111,7 @@ namespace rpc
             if (err != error::OK())
             {
                 RPC_ERROR("get_or_create_object_proxy failed");
-                return err;
+                CO_RETURN err;
             }
             RPC_ASSERT(op != nullptr);
             if (!op)
@@ -190,7 +190,7 @@ namespace rpc
         if (err != error::OK())
         {
             RPC_ERROR("get_or_create_object_proxy failed");
-            return err;
+            CO_RETURN err;
         }
         if (!op)
         {
@@ -254,7 +254,7 @@ namespace rpc
         if (err != error::OK())
         {
             RPC_ERROR("get_or_create_object_proxy failed");
-            return err;
+            CO_RETURN err;
         }
         if (!op)
         {
@@ -275,7 +275,7 @@ namespace rpc
         if (!iface)
         {
             RPC_ASSERT(false);
-            return error::INVALID_DATA();
+            CO_RETURN error::INVALID_DATA();
         }
         std::shared_ptr<object_stub> stub;
         auto factory = serv.create_interface_stub(iface);

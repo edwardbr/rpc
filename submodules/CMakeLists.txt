@@ -50,6 +50,9 @@ if(RPC_STANDALONE)
     set(CARES_SHARED ${LIBCORO_BUILD_SHARED_LIBS} CACHE INTERNAL "")
     set(CARES_INSTALL OFF CACHE INTERNAL "")
 
+    # Enable io_scheduler support in libcoro (required for SPSC transport)
+    set(LIBCORO_FEATURE_NETWORKING ON CACHE BOOL "Enable io_scheduler in libcoro" FORCE)
+
     # set(c-ares_DIR "${CMAKE_SOURCE_DIR}/submodules/c-ares")
     # list(APPEND CMAKE_PREFIX_PATH "${CMAKE_SOURCE_DIR}/submodules/c-ares")
     add_subdirectory(c-ares)

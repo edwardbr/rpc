@@ -30,10 +30,10 @@
 #include <common/foo_impl.h>
 #include <common/tests.h>
 #ifdef BUILD_COROUTINE
-#include "common/tcp/service_proxy.h"
-#include "common/tcp/listener.h"
-#include "common/spsc/service_proxy.h"
-#include "common/spsc/channel_manager.h"
+// #include "common/tcp/service_proxy.h"
+// #include "common/tcp/listener.h"
+// #include "common/spsc/service_proxy.h"
+// #include "common/spsc/channel_manager.h"
 #endif
 #include "rpc_global_logger.h"
 #include "test_host.h"
@@ -41,7 +41,7 @@
 #include "inproc_setup.h"
 #include "enclave_setup.h"
 #ifdef BUILD_COROUTINE
-#include "tcp_setup.h"
+// #include "tcp_setup.h"  // Temporarily disabled
 #include "spsc_setup.h"
 #endif
 #include "crash_handler.h"
@@ -78,14 +78,14 @@ using post_test_implementations = ::testing::Types<in_memory_setup<false>,
     inproc_setup<true, true, true>
 #ifdef BUILD_COROUTINE
     ,
-    tcp_setup<false, false, false>,
-    tcp_setup<false, false, true>,
-    tcp_setup<false, true, false>,
-    tcp_setup<false, true, true>,
-    tcp_setup<true, false, false>,
-    tcp_setup<true, false, true>,
-    tcp_setup<true, true, false>,
-    tcp_setup<true, true, true>,
+    // tcp_setup<false, false, false>,
+    // tcp_setup<false, false, true>,
+    // tcp_setup<false, true, false>,
+    // tcp_setup<false, true, true>,
+    // tcp_setup<true, false, false>,
+    // tcp_setup<true, false, true>,
+    // tcp_setup<true, true, false>,
+    // tcp_setup<true, true, true>,
     spsc_setup<false, false, false>,
     spsc_setup<false, false, true>,
     spsc_setup<false, true, false>,

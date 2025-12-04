@@ -15,6 +15,7 @@ cmake_minimum_required(VERSION 3.24)
 
 add_subdirectory(interfaces)
 add_subdirectory(src/service_proxies/local)
+add_subdirectory(src/service_proxies/spsc)
 
 if(USE_RPC_TELEMETRY)
   set(RPC_ENCLAVE_TELEMETRY_SERVICE rpc::rpc_telemetry_enclave)

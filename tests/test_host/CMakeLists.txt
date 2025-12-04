@@ -18,6 +18,10 @@ if(BUILD_ENCLAVE)
   set(ENCLAVE_DEPENDANCIES marshal_test_edl_host rpc_telemetry_edl_header_host)
 endif()
 
+if(BUILD_COROUTINE)
+  set(SPSC_TRANSPORT_LIB rpc::rpc_spsc_transport_host)
+endif()
+
 target_link_libraries(
   rpc_test
   PUBLIC common_host
@@ -30,6 +34,7 @@ target_link_libraries(
   yas_common
   rpc::rpc_host
   rpc::rpc_local_transport_host
+  ${SPSC_TRANSPORT_LIB}
   yas_common
   args::args
   fmt::fmt-header-only

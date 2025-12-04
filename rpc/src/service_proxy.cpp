@@ -321,7 +321,7 @@ namespace rpc
         {
             RPC_ERROR("transport_ is null unable to release");
             RPC_ASSERT(false);
-            CO_RETURN;
+            return;
         }
 
         op.reset();
@@ -541,7 +541,7 @@ namespace rpc
             else
             {
                 RPC_ERROR("sp_release failed");
-                return ret;
+                CO_RETURN ret;
             }
         }
 

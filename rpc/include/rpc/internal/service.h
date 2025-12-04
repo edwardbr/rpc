@@ -501,7 +501,7 @@ namespace rpc
             if (err_code != error::OK())
             {
                 remove_transport(child_transport->get_adjacent_zone_id().as_destination());
-                return err_code;
+                CO_RETURN err_code;
             }
 
             err_code = CO_AWAIT child_transport->connect(input_descr, output_descr);
@@ -569,7 +569,12 @@ namespace rpc
         if (child_ptr)
         {
             RPC_ASSERT(child_ptr->is_local() && "Cannot support remote pointers from subordinate zones");
-            output_descr = CO_AWAIT rpc::create_interface_stub(*this, child_ptr);
+            err_code = CO_AWAIT rpc::create_interface_stub(
+                *this, child_ptr, peer_transport->get_adjacent_zone_id().as_caller(), output_descr);
+            if (err_code != rpc::error::OK())
+            {
+                CO_RETURN err_code;
+            }
         }
 
         CO_RETURN rpc::error::OK();

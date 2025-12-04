@@ -1,8 +1,17 @@
-
 /*
  *   Copyright (c) 2025 Edward Boggis-Rolfe
  *   All rights reserved.
  */
+
+#pragma once
+
+#include <atomic>
+#include "test_host.h"
+#include "test_globals.h"
+#include <gtest/gtest.h>
+#include <common/foo_impl.h>
+#include <common/tests.h>
+#include <rpc/service_proxies/spsc/transport.h>
 
 #ifdef USE_RPC_TELEMETRY
 #include <rpc/telemetry/i_telemetry_service.h>
@@ -49,7 +58,7 @@ public:
     rpc::shared_ptr<yyy::i_host> get_local_host_ptr() { return local_host_ptr_.lock(); }
     bool get_use_host_in_child() const { return use_host_in_child_; }
 
-    CORO_TASK(void) check_for_error(coro::task<bool> task)
+    CORO_TASK(void) check_for_error(CORO_TASK(bool) task)
     {
         auto ret = CO_AWAIT task;
         if (!ret)
@@ -59,7 +68,7 @@ public:
         CO_RETURN;
     }
 
-    CORO_TASK(bool) CoroSetUp(bool& is_ready)
+    CORO_TASK(bool) CoroSetUp()
     {
         zone_gen = &zone_gen_;
 #ifdef USE_RPC_TELEMETRY
@@ -83,17 +92,15 @@ public:
         example_shared_idl_register_stubs(peer_service_);
         example_idl_register_stubs(peer_service_);
 
-        // This makes the receiving service proxy for the connection
-        rpc::spsc::channel_manager::connection_handler handler
-            = [send_spsc_queue = &send_spsc_queue_,
-                  receive_spsc_queue = &receive_spsc_queue_,
-                  use_host_in_child = use_host_in_child_](const rpc::interface_descriptor& input_interface,
+        // Create server-side transport (receives connections)
+        rpc::spsc::spsc_transport::connection_handler handler
+            = [use_host_in_child = use_host_in_child_](const rpc::interface_descriptor& input_interface,
                   rpc::interface_descriptor& output_interface,
                   std::shared_ptr<rpc::service> service,
-                  std::shared_ptr<rpc::spsc::channel_manager> channel) -> CORO_TASK(int)
+                  std::shared_ptr<rpc::spsc::spsc_transport> transport) -> CORO_TASK(int)
         {
-            auto ret = CO_AWAIT service->attach_remote_zone<rpc::spsc::service_proxy, yyy::i_host, yyy::i_example>(
-                "service_proxy",
+            auto ret = CO_AWAIT service->attach_remote_zone<yyy::i_host, yyy::i_example>("service_proxy",
+                transport,
                 input_interface,
                 output_interface,
                 [&](const rpc::shared_ptr<yyy::i_host>& host,
@@ -105,39 +112,48 @@ public:
                     if (use_host_in_child)
                         CO_AWAIT new_example->set_host(host);
                     CO_RETURN rpc::error::OK();
-                },
-                input_interface.destination_zone_id,
-                channel,
-                send_spsc_queue,
-                receive_spsc_queue);
-            co_return ret;
+                });
+            CO_RETURN ret;
         };
 
-        auto channel = rpc::spsc::channel_manager::create(std::chrono::milliseconds(1000),
+        auto peer_transport = rpc::spsc::spsc_transport::create("peer_transport",
             peer_service_,
-            &receive_spsc_queue_, // these two parameters are reversed for the receiver
-            &send_spsc_queue_,    // these two parameters are reversed for the receiver
+            root_zone_id,
+            std::chrono::milliseconds(1000),
+            &receive_spsc_queue_, // reversed for receiver
+            &send_spsc_queue_,    // reversed for receiver
             handler);
 
-        // Schedule the pump coroutine - it will coordinate send/receive tasks
-        peer_service_->get_scheduler()->schedule(channel->pump_send_and_receive());
+        // Attach peer transport to receive messages
+        peer_transport->attach_service_proxy();
 
+        // Schedule the pump coroutine
+        peer_service_->get_scheduler()->schedule(peer_transport->pump_send_and_receive());
+
+        // Create client-side transport (initiates connection)
         rpc::shared_ptr<yyy::i_host> hst(new host());
-        local_host_ptr_ = hst; // assign to weak ptr
+        local_host_ptr_ = hst;
 
-        auto ret = CO_AWAIT root_service_->connect_to_zone<rpc::spsc::service_proxy>("main child",
-            peer_zone_id.as_destination(),
-            hst,
-            i_example_ptr_,
+        auto client_transport = rpc::spsc::spsc_transport::create("client_transport",
+            root_service_,
+            peer_zone_id,
             std::chrono::milliseconds(100000),
             &send_spsc_queue_,
-            &receive_spsc_queue_);
+            &receive_spsc_queue_,
+            nullptr); // client doesn't need handler
+
+        // Attach client transport
+        client_transport->attach_service_proxy();
+
+        // Schedule the pump coroutine for client
+        root_service_->get_scheduler()->schedule(client_transport->pump_send_and_receive());
+
+        auto ret = CO_AWAIT root_service_->connect_to_zone("main child", client_transport, hst, i_example_ptr_);
 
         if (ret != rpc::error::OK())
         {
             CO_RETURN false;
         }
-        is_ready = true;
         CO_RETURN true;
     }
 
@@ -150,14 +166,10 @@ public:
                     .thread_count = 1,
                 }});
 
-        bool is_ready = false;
-        io_scheduler_->schedule(check_for_error(CoroSetUp(is_ready)));
-        while (!is_ready)
+        io_scheduler_->schedule(check_for_error(CoroSetUp()));
+        while (io_scheduler_->process_events())
         {
-            io_scheduler_->process_events(std::chrono::milliseconds(1));
         }
-
-        // auto err_code = SYNC_WAIT();
 
         ASSERT_EQ(error_has_occured_, false);
     }
@@ -168,7 +180,6 @@ public:
         i_host_ptr_ = nullptr;
         local_host_ptr_.reset();
 
-        // has_stopped_ = true;
         CO_RETURN;
     }
 
@@ -178,8 +189,7 @@ public:
         auto shutdown_task = [&]() -> coro::task<void>
         {
             CO_AWAIT CoroTearDown();
-            // Give time for service_proxy destructors to schedule detach coroutines
-            // and for shutdown sequence to complete
+            // Give time for transport destructors to schedule detach coroutines
             CO_AWAIT io_scheduler_->schedule();
             CO_AWAIT io_scheduler_->schedule();
             shutdown_complete = true;
@@ -189,13 +199,12 @@ public:
         io_scheduler_->schedule(shutdown_task());
 
         // Process events until shutdown completes
-        // This allows: CoroTearDown -> ~service_proxy -> detach_service_proxy -> shutdown
         while (!shutdown_complete)
         {
             io_scheduler_->process_events(std::chrono::milliseconds(1));
         }
 
-        // Continue processing to allow shutdown to finish and pump tasks to exit
+        // Continue processing to allow shutdown to finish
         for (int i = 0; i < 100; ++i)
         {
             io_scheduler_->process_events(std::chrono::milliseconds(1));
@@ -211,48 +220,13 @@ public:
             telemetry_service->reset_for_test();
         }
 #endif
-        // SYNC_WAIT(CoroTearDown());
     }
 
     CORO_TASK(rpc::shared_ptr<yyy::i_example>) create_new_zone()
     {
-        rpc::shared_ptr<yyy::i_host> hst;
-        if (use_host_in_child_)
-            hst = local_host_ptr_.lock();
-
-        rpc::shared_ptr<yyy::i_example> example_relay_ptr;
-
-        auto new_zone_id = ++(zone_gen_);
-        auto err_code
-            = CO_AWAIT root_service_->connect_to_zone<rpc::local_child_service_proxy<yyy::i_example, yyy::i_host>>(
-                "main child",
-                {new_zone_id},
-                hst,
-                example_relay_ptr,
-                [&](const rpc::shared_ptr<yyy::i_host>& host,
-                    rpc::shared_ptr<yyy::i_example>& new_example,
-                    const std::shared_ptr<rpc::child_service>& child_service_ptr) -> CORO_TASK(int)
-                {
-                    example_import_idl_register_stubs(child_service_ptr);
-                    example_shared_idl_register_stubs(child_service_ptr);
-                    example_idl_register_stubs(child_service_ptr);
-                    new_example = rpc::make_shared<marshalled_tests::example>(child_service_ptr, nullptr);
-                    if (use_host_in_child_)
-                        CO_AWAIT new_example->set_host(host);
-                    CO_RETURN rpc::error::OK();
-                });
-
-        if (CreateNewZoneThenCreateSubordinatedZone)
-        {
-            rpc::shared_ptr<yyy::i_example> new_ptr;
-            if (CO_AWAIT example_relay_ptr->create_example_in_subordinate_zone(
-                    new_ptr, use_host_in_child_ ? hst : nullptr, ++zone_gen_)
-                == rpc::error::OK())
-            {
-                CO_AWAIT example_relay_ptr->set_host(nullptr);
-                example_relay_ptr = new_ptr;
-            }
-        }
-        CO_RETURN example_relay_ptr;
+        // SPSC setup creates remote zones via transport, not local child zones
+        // For now, this is not supported - would need to create new queues and transports
+        RPC_ERROR("create_new_zone is not implemented for spsc_setup - use inproc_setup for local child zones");
+        CO_RETURN nullptr;
     }
 };

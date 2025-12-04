@@ -8,10 +8,10 @@ message("common_enclave")
 
 if(BUILD_COROUTINE)
 set(COROUTINE_SERVICE_PROXIES
-    src/tcp/service_proxy.cpp 
-  src/tcp/channel_manager.cpp 
-  src/spsc/service_proxy.cpp 
-  src/spsc/channel_manager.cpp  
+    # src/tcp/service_proxy.cpp 
+  # src/tcp/channel_manager.cpp 
+  # src/spsc/service_proxy.cpp 
+  # src/spsc/channel_manager.cpp  
 )
 endif()
 

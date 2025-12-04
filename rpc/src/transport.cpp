@@ -192,19 +192,6 @@ namespace rpc
         }
 
         inner_decrement_outbound_proxy_count(caller.as_destination());
-        // if (dest_val != caller_val)
-        // {
-        //     outer_it = pass_thoughs_.find(caller_val);
-        //     if (outer_it != pass_thoughs_.end())
-        //     {
-        //         outer_it->second.erase(dest_val);
-        //         // Clean up outer map if inner map is empty
-        //         if (outer_it->second.empty())
-        //         {
-        //             pass_thoughs_.erase(outer_it);
-        //         }
-        //     }
-        // }
     }
 
     std::shared_ptr<i_marshaller> transport::create_pass_through(std::shared_ptr<transport> forward,
@@ -386,6 +373,13 @@ namespace rpc
     void transport::notify_all_destinations_of_disconnect()
     {
         std::shared_lock lock(destinations_mutex_);
+#ifdef BUILD_COROUTINE
+        auto service = service_.lock();
+        if (!service)
+            return;
+
+        auto scheduler = service->get_scheduler();
+#endif
         // Iterate through nested map to notify all handlers
         for (const auto& [dest_zone, inner_map] : pass_thoughs_)
         {
@@ -393,20 +387,27 @@ namespace rpc
             {
                 if (auto handler = handler_weak.lock())
                 {
-                    // Send zone_terminating post
-                    handler->post(VERSION_3,
-                        encoding::yas_binary,
-                        0,
-                        rpc::caller_channel_zone{0},
-                        rpc::caller_zone{0},
-                        rpc::destination_zone{dest_zone},
-                        object{0},
-                        interface_ordinal{0},
-                        method{0},
-                        post_options::zone_terminating,
-                        0,
-                        nullptr,
-                        {});
+#ifdef BUILD_COROUTINE
+                    scheduler->schedule(
+#endif
+                        // Send zone_terminating post
+                        handler->post(VERSION_3,
+                            encoding::yas_binary,
+                            0,
+                            rpc::caller_channel_zone{0},
+                            rpc::caller_zone{0},
+                            rpc::destination_zone{dest_zone},
+                            object{0},
+                            interface_ordinal{0},
+                            method{0},
+                            post_options::zone_terminating,
+                            0,
+                            nullptr,
+                            {})
+#ifdef BUILD_COROUTINE
+                    )
+#endif
+                        ;
                 }
             }
         }
@@ -581,7 +582,7 @@ namespace rpc
             auto passthrough = dest_transport->get_destination_handler(destination_zone_id, caller_zone_id);
             if (passthrough)
             {
-                CO_RETURN passthrough->add_ref(protocol_version,
+                CO_RETURN CO_AWAIT passthrough->add_ref(protocol_version,
                     destination_zone_id,
                     object_id,
                     get_zone_id().as_caller_channel(),
@@ -614,7 +615,7 @@ namespace rpc
             if (dest_transport == caller_transport)
             {
                 // here we directly call the destination
-                CO_RETURN dest_transport->add_ref(protocol_version,
+                CO_RETURN CO_AWAIT dest_transport->add_ref(protocol_version,
                     destination_zone_id,
                     object_id,
                     get_zone_id().as_caller_channel(),
@@ -629,7 +630,7 @@ namespace rpc
             passthrough = transport::create_pass_through(
                 dest_transport, caller_transport, svc, destination_zone_id, caller_zone_id.as_destination());
 
-            CO_RETURN passthrough->add_ref(protocol_version,
+            CO_RETURN CO_AWAIT passthrough->add_ref(protocol_version,
                 destination_zone_id,
                 object_id,
                 get_zone_id().as_caller_channel(),

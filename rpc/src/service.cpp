@@ -570,7 +570,7 @@ namespace rpc
             if (zone_id_.as_caller() != caller_zone_id)
             {
                 auto caller_transport = get_transport(caller_zone_id.as_destination());
-                auto error = caller_transport->add_ref(protocol_version,
+                auto error = CO_AWAIT caller_transport->add_ref(protocol_version,
                     destination_zone_id,
                     object_id,
                     zone_id_.as_caller_channel(),
@@ -608,7 +608,7 @@ namespace rpc
             if (zone_id_.as_destination() != destination_zone_id)
             {
                 auto dest_transport = get_transport(destination_zone_id);
-                CO_RETURN dest_transport->add_ref(protocol_version,
+                CO_RETURN CO_AWAIT dest_transport->add_ref(protocol_version,
                     destination_zone_id,
                     object_id,
                     zone_id_.as_caller_channel(),
