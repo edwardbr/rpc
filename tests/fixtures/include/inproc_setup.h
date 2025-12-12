@@ -20,8 +20,12 @@
 
 template<bool UseHostInChild, bool RunStandardTests, bool CreateNewZoneThenCreateSubordinatedZone> class inproc_setup
 {
+#ifdef BUILD_COROUTINE
+    std::shared_ptr<coro::io_scheduler> io_scheduler_;
+#endif
     std::shared_ptr<rpc::service> root_service_;
     std::shared_ptr<rpc::child_service> child_service_;
+    std::weak_ptr<rpc::child_service> child_service_weak_;
     rpc::shared_ptr<yyy::i_host> i_host_ptr_;
     rpc::weak_ptr<yyy::i_host> local_host_ptr_;
     rpc::shared_ptr<yyy::i_example> i_example_ptr_;
@@ -32,9 +36,6 @@ template<bool UseHostInChild, bool RunStandardTests, bool CreateNewZoneThenCreat
 
     std::atomic<uint64_t> zone_gen_ = 0;
 
-#ifdef BUILD_COROUTINE
-    std::shared_ptr<coro::io_scheduler> io_scheduler_;
-#endif
     bool error_has_occured_ = false;
 
     bool startup_complete_ = false;
@@ -107,6 +108,7 @@ public:
                 {
                     i_host_ptr_ = host;
                     child_service_ = child_service_ptr;
+                    child_service_weak_ = child_service_ptr;
                     example_import_idl_register_stubs(child_service_ptr);
                     example_shared_idl_register_stubs(child_service_ptr);
                     example_idl_register_stubs(child_service_ptr);
@@ -151,9 +153,15 @@ public:
 
     CORO_TASK(void) CoroTearDown()
     {
-        i_example_ptr_ = nullptr;
-        i_host_ptr_ = nullptr;
+        // relese child service
         child_service_ = nullptr;
+
+        // release childs reference to host
+        i_host_ptr_ = nullptr;
+
+        // release parents reference to child
+        i_example_ptr_ = nullptr;
+
         shutdown_complete_ = true;
         CO_RETURN;
     }
@@ -162,7 +170,7 @@ public:
     {
 #ifdef BUILD_COROUTINE
         io_scheduler_->schedule(CoroTearDown());
-        while (shutdown_complete_ == false || io_scheduler_->process_events())
+        while (child_service_weak_.lock() != nullptr || shutdown_complete_ == false || io_scheduler_->process_events())
         {
         }
 #else

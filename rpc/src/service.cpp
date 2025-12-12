@@ -1022,5 +1022,5 @@ namespace rpc
         CO_RETURN;
     }
 
-    child_service::~child_service() { }
+    child_service::~child_service() DEFAULT_DESTRUCTOR;
 }

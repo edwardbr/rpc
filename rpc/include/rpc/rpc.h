@@ -11,6 +11,7 @@
 #define NAMESPACE_INLINE_END }
 
 #include <rpc/internal/version.h>
+#include <rpc/internal/build_modifiers.h>
 #include <rpc/internal/assert.h>
 #include <rpc/internal/error_codes.h>
 

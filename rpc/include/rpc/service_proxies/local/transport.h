@@ -22,7 +22,7 @@ namespace local
         parent_transport(std::string name, std::shared_ptr<rpc::service> service, std::shared_ptr<child_transport> parent);
         parent_transport(std::string name, rpc::zone zone_id, std::shared_ptr<child_transport> parent);
 
-        virtual ~parent_transport() = default;
+        virtual ~parent_transport() DEFAULT_DESTRUCTOR;
 
         CORO_TASK(int) connect(rpc::interface_descriptor input_descr, rpc::interface_descriptor& output_descr) override
         {
@@ -131,7 +131,7 @@ namespace local
             set_status(rpc::transport_status::CONNECTED);
         }
 
-        virtual ~child_transport() = default;
+        virtual ~child_transport() DEFAULT_DESTRUCTOR;
 
         CORO_TASK(int) connect(rpc::interface_descriptor input_descr, rpc::interface_descriptor& output_descr) override
         {

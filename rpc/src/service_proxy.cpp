@@ -8,32 +8,6 @@
 
 namespace rpc
 {
-
-    //     service_proxy::service_proxy(const std::string& name, const std::shared_ptr<transport>& transport)
-    //         : zone_id_(transport->get_service()->get_zone_id())
-    //         , destination_zone_id_(transport->get_adjacent_zone_id().as_destination())
-    //         , service_(transport->get_service())
-    //         , transport_(transport)
-    //         , name_(name)
-    //     {
-    // #ifdef USE_RPC_TELEMETRY
-    //         if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
-    //         {
-    //             telemetry_service->on_service_proxy_creation(
-    //                 name, name_, get_zone_id(), get_destination_zone_id(), transport->get_service()->get_zone_id().as_caller());
-    //         }
-    // #endif
-    //     }
-
-    //     service_proxy::service_proxy(const std::shared_ptr<transport>& transport, destination_zone destination_zone_id)
-    //         : zone_id_(transport->get_service()->get_zone_id())
-    //         , destination_zone_id_(destination_zone_id)
-    //         , service_(transport->get_service())
-    //         , transport_(transport)
-    //         , name_(transport->get_name())
-    //     {
-    //     }
-
     service_proxy::service_proxy(const std::string& name,
         const zone zone_id,
         destination_zone destination_zone_id,
@@ -64,6 +38,23 @@ namespace rpc
 
     service_proxy::~service_proxy()
     {
+#ifdef USE_RPC_TELEMETRY
+        if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
+        {
+            telemetry_service->on_service_proxy_deletion(get_zone_id(), destination_zone_id_, zone_id_.as_caller());
+        }
+#endif
+
+        // keep service alive while service proxy cleans things up
+        auto service = service_;
+
+        auto transport = transport_.get_nullable();
+        if (transport)
+            transport->decrement_outbound_proxy_count(destination_zone_id_);
+
+        RPC_ASSERT(proxies_.empty());
+        service->remove_zone_proxy(destination_zone_id_);
+
         if (!proxies_.empty())
         {
 #ifdef USE_RPC_LOGGING
@@ -82,18 +73,6 @@ namespace rpc
         }
 
         RPC_ASSERT(proxies_.empty());
-        service_->remove_zone_proxy(destination_zone_id_);
-
-#ifdef USE_RPC_TELEMETRY
-        if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
-        {
-            telemetry_service->on_service_proxy_deletion(get_zone_id(), destination_zone_id_, zone_id_.as_caller());
-        }
-#endif
-        RPC_ASSERT(proxies_.empty());
-        auto transport = transport_.get_nullable();
-        if (transport)
-            transport->decrement_outbound_proxy_count(destination_zone_id_);
     }
 
     void service_proxy::update_remote_rpc_version(uint64_t version)
@@ -302,91 +281,6 @@ namespace rpc
         CO_RETURN last_error;
     }
 
-    void service_proxy::cleanup_after_object(std::shared_ptr<object_proxy> op, bool is_optimistic)
-    {
-        std::shared_ptr<rpc::service_proxy> self = op->get_service_proxy();
-        std::shared_ptr<rpc::service> svc = self->get_operating_zone_service();
-
-        auto object_id = op->get_object_id();
-        // self is needed to keep the service proxy alive in the async destruction of the service_proxy
-        RPC_DEBUG("cleanup_after_object service zone: {} destination_zone={}, object_id = {} "
-                  "decrement={}",
-            get_zone_id().get_val(),
-            destination_zone_id_.get_val(),
-            object_id.get_val(),
-            is_optimistic ? "optimistic" : "shared");
-
-        auto transport = transport_.get_nullable();
-        if (!transport)
-        {
-            RPC_ERROR("transport_ is null unable to release");
-            RPC_ASSERT(false);
-            return;
-        }
-
-        op.reset();
-        self.reset(); // just so it does not get optimised out
-
-        auto version = version_.load();
-        auto destination_zone_id = destination_zone_id_;
-
-#ifdef BUILD_COROUTINE
-        svc->schedule(
-            [svc, object_id, transport, version, destination_zone_id, is_optimistic]() -> CORO_TASK(void)
-            {
-#endif
-                uint64_t ref_count = 0;
-                std::vector<rpc::back_channel_entry> empty_in;
-                std::vector<rpc::back_channel_entry> empty_out;
-
-                auto ret = CO_AWAIT transport->release(version,
-                    destination_zone_id,
-                    object_id,
-                    svc->get_zone_id().as_caller(),
-                    is_optimistic ? release_options::optimistic : release_options::normal,
-                    ref_count,
-                    empty_in,
-                    empty_out);
-                // inner_count = inner_release_external_ref();
-                // RPC_DEBUG("inner count = {} for object {}", inner_count, object_id.get_val());
-                // if(inner_count == 0 && is_responsible_for_cleaning_up_service_)
-                // {
-                //     svc->remove_zone_proxy(destination_zone_id_, zone_id_.as_caller());
-                // }
-
-                // Notify that object is gone after all cleanup is complete
-                CO_AWAIT svc->notify_object_gone_event(object_id, destination_zone_id);
-
-                // error handling here as the cleanup needs to happen anyway
-                if (ret == rpc::error::OK())
-                {
-                    RPC_DEBUG("Remote {} count = {} for object {}",
-                        is_optimistic ? "optimistic" : "shared",
-                        ref_count,
-                        object_id.get_val());
-                }
-                else if (is_optimistic && ret == rpc::error::OBJECT_NOT_FOUND())
-                {
-                    RPC_DEBUG(
-                        "Object {} not found - stub already deleted (normal for optimistic_ptr)", object_id.get_val());
-                }
-                else if (ret == rpc::error::ZONE_NOT_FOUND() || ret == rpc::error::TRANSPORT_ERROR())
-                {
-                    RPC_DEBUG("Zone {} not reachable during cleanup ({}), intermediate zone may have been cleaned up "
-                              "(normal during multi-level hierarchy cleanup)",
-                        destination_zone_id.get_val(),
-                        rpc::error::to_string(ret));
-                }
-                else
-                {
-                    RPC_ERROR("cleanup_after_object release failed: {}", rpc::error::to_string(ret));
-                    RPC_ASSERT(false);
-                }
-#ifdef BUILD_COROUTINE
-            }());
-#endif
-    }
-
     void service_proxy::on_object_proxy_released(const std::shared_ptr<object_proxy>& op, bool is_optimistic)
     {
         auto object_id = op->get_object_id();
@@ -411,7 +305,6 @@ namespace rpc
         {
             // as there are no more refcounts on the object proxy remove it from the proxies_ map now
             // it is not possible to know if it is time to remove the proxies_ map deterministically once we
-            // schedule the call to cleanup_after_object
             std::lock_guard proxy_lock(insert_control_);
             if (op->get_shared_count() == 0 && op->get_optimistic_count() == 0)
             {
@@ -426,27 +319,98 @@ namespace rpc
             }
         }
 
-        // Schedule the coroutine work asynchronously
-        cleanup_after_object(op, is_optimistic);
+        std::shared_ptr<rpc::service_proxy> self = op->get_service_proxy();
+        std::shared_ptr<rpc::service> svc = self->get_operating_zone_service();
+
+        // self is needed to keep the service proxy alive in the async destruction of the service_proxy
+        RPC_DEBUG("cleanup_after_object service zone: {} destination_zone={}, object_id = {} "
+                  "decrement={}",
+            get_zone_id().get_val(),
+            destination_zone_id_.get_val(),
+            object_id.get_val(),
+            is_optimistic ? "optimistic" : "shared");
+
+        auto transport = transport_.get_nullable();
+        if (!transport)
+        {
+            RPC_ERROR("transport_ is null unable to release");
+            RPC_ASSERT(false);
+            return;
+        }
+
+        auto version = version_.load();
+        auto destination_zone_id = destination_zone_id_;
+
+#ifdef BUILD_COROUTINE
+        svc->schedule(
+            [](std::shared_ptr<rpc::service_proxy> self_local,
+                std::shared_ptr<rpc::service> svc_local,
+                rpc::object object_id_local,
+                std::shared_ptr<rpc::transport> transport_local,
+                uint64_t version_local,
+                destination_zone destination_zone_id_local,
+                bool is_optimistic_local) -> CORO_TASK(void)
+            {
+#else
+        auto& self_local = self;
+        auto& svc_local = svc;
+        auto& transport_local = transport;
+        auto& object_id_local = object_id;
+        auto& version_local = version;
+        auto& destination_zone_id_local = destination_zone_id;
+        auto& is_optimistic_local = is_optimistic;
+#endif
+                uint64_t ref_count = 0;
+                std::vector<rpc::back_channel_entry> empty_in;
+                std::vector<rpc::back_channel_entry> empty_out;
+
+                auto ret = CO_AWAIT transport_local->release(version_local,
+                    destination_zone_id_local,
+                    object_id_local,
+                    svc_local->get_zone_id().as_caller(),
+                    is_optimistic_local ? release_options::optimistic : release_options::normal,
+                    ref_count,
+                    empty_in,
+                    empty_out);
+                // inner_count = inner_release_external_ref();
+                // RPC_DEBUG("inner count = {} for object {}", inner_count, object_id_local.get_val());
+                // if(inner_count == 0 && is_responsible_for_cleaning_up_service_)
+                // {
+                //     svc_local->remove_zone_proxy(destination_zone_id_local, zone_id_.as_caller());
+                // }
+
+                // Notify that object is gone after all cleanup is complete
+                CO_AWAIT svc_local->notify_object_gone_event(object_id_local, destination_zone_id_local);
+
+                // error handling here as the cleanup needs to happen anyway
+                if (ret == rpc::error::OK())
+                {
+                    RPC_DEBUG("Remote {} count = {} for object {}",
+                        is_optimistic_local ? "optimistic" : "shared",
+                        ref_count,
+                        object_id_local.get_val());
+                }
+                else if (is_optimistic_local && ret == rpc::error::OBJECT_NOT_FOUND())
+                {
+                    RPC_DEBUG("Object {} not found - stub already deleted (normal for optimistic_ptr)",
+                        object_id_local.get_val());
+                }
+                else if (ret == rpc::error::ZONE_NOT_FOUND() || ret == rpc::error::TRANSPORT_ERROR())
+                {
+                    RPC_DEBUG("Zone {} not reachable during cleanup ({}), intermediate zone may have been cleaned up "
+                              "(normal during multi-level hierarchy cleanup)",
+                        destination_zone_id_local.get_val(),
+                        rpc::error::to_string(ret));
+                }
+                else
+                {
+                    RPC_ERROR("cleanup_after_object release failed: {}", rpc::error::to_string(ret));
+                    RPC_ASSERT(false);
+                }
+#ifdef BUILD_COROUTINE
+            }(self, svc, object_id, transport, version, destination_zone_id, is_optimistic));
+#endif
     }
-
-    //     std::shared_ptr<rpc::service_proxy> service_proxy::clone_for_zone(destination_zone destination_zone_id)
-    //     {
-    //         RPC_ASSERT(destination_zone_id_ != destination_zone_id);
-    //         auto ret = service_proxy::create(name_, destination_zone_id, shared_from_this());
-
-    // #ifdef USE_RPC_TELEMETRY
-    //         if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
-    //         {
-    //             telemetry_service->on_cloned_service_proxy_creation(ret->service_.lock()->get_name(),
-    //                 ret->name_,
-    //                 ret->get_zone_id(),
-    //                 ret->get_destination_zone_id(),
-    //                 ret->get_zone_id().as_caller());
-    //         }
-    // #endif
-    //         return ret;
-    //     }
 
     CORO_TASK(int)
     service_proxy::get_or_create_object_proxy(object object_id,

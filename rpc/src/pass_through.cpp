@@ -39,7 +39,7 @@ namespace rpc
         return pt;
     }
 
-    pass_through::~pass_through() { }
+    pass_through::~pass_through() DEFAULT_DESTRUCTOR;
 
     std::shared_ptr<transport> pass_through::get_directional_transport(destination_zone dest)
     {

@@ -76,7 +76,7 @@ namespace rpc
     public:
         // Public version of find_any_passthrough_for_destination for use by service::get_zone_proxy
         std::shared_ptr<i_marshaller> find_any_passthrough_for_destination(destination_zone dest) const;
-        virtual ~transport() = default;
+        virtual ~transport() DEFAULT_DESTRUCTOR;
 
         std::string get_name() const { return name_; }
 

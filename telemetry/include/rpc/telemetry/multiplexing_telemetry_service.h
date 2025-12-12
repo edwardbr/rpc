@@ -9,6 +9,7 @@
 #include <string>
 #include <filesystem>
 
+#include <rpc/internal/build_modifiers.h>
 #include <rpc/telemetry/i_telemetry_service.h>
 
 #ifndef _IN_ENCLAVE
@@ -72,7 +73,8 @@ namespace rpc
          */
         explicit multiplexing_telemetry_service(std::vector<std::shared_ptr<i_telemetry_service>>&& child_services);
 
-        virtual ~multiplexing_telemetry_service() { };
+        virtual ~multiplexing_telemetry_service() DEFAULT_DESTRUCTOR;
+        ;
         multiplexing_telemetry_service(const multiplexing_telemetry_service&) = delete;
         multiplexing_telemetry_service& operator=(const multiplexing_telemetry_service&) = delete;
 

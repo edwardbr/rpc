@@ -103,8 +103,6 @@ namespace rpc
 
         CORO_TASK(int) sp_release(object object_id, release_options options, uint64_t& ref_count);
 
-        void cleanup_after_object(std::shared_ptr<object_proxy> op, bool is_optimistic);
-
         void on_object_proxy_released(const std::shared_ptr<object_proxy>& op, bool optimistic);
 
         std::unordered_map<object, std::weak_ptr<object_proxy>> get_proxies() { return proxies_; }
