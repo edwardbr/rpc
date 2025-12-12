@@ -319,10 +319,9 @@ namespace rpc
             }
         }
 
-        std::shared_ptr<rpc::service_proxy> self = op->get_service_proxy();
-        std::shared_ptr<rpc::service> svc = self->get_operating_zone_service();
+        // Don't hold strong reference to self - we only need the service for scheduling
+        std::shared_ptr<rpc::service> svc = op->get_service_proxy()->get_operating_zone_service();
 
-        // self is needed to keep the service proxy alive in the async destruction of the service_proxy
         RPC_DEBUG("cleanup_after_object service zone: {} destination_zone={}, object_id = {} "
                   "decrement={}",
             get_zone_id().get_val(),
@@ -342,64 +341,57 @@ namespace rpc
         auto destination_zone_id = destination_zone_id_;
 
 #ifdef BUILD_COROUTINE
+        // DO NOT pass service_proxy - it would create circular reference keeping services alive!
         svc->schedule(
-            [](std::shared_ptr<rpc::service_proxy> self_local,
-                std::shared_ptr<rpc::service> svc_local,
-                rpc::object object_id_local,
-                std::shared_ptr<rpc::transport> transport_local,
-                uint64_t version_local,
-                destination_zone destination_zone_id_local,
-                bool is_optimistic_local) -> CORO_TASK(void)
+            [](std::shared_ptr<rpc::service> svc,
+                rpc::object object_id,
+                std::shared_ptr<rpc::transport> transport,
+                uint64_t version,
+                destination_zone destination_zone_id,
+                bool is_optimistic) -> CORO_TASK(void)
             {
-#else
-        auto& self_local = self;
-        auto& svc_local = svc;
-        auto& transport_local = transport;
-        auto& object_id_local = object_id;
-        auto& version_local = version;
-        auto& destination_zone_id_local = destination_zone_id;
-        auto& is_optimistic_local = is_optimistic;
+                RPC_DEBUG("Cleanup coroutine starting release for object {}", object_id.get_val());
 #endif
                 uint64_t ref_count = 0;
                 std::vector<rpc::back_channel_entry> empty_in;
                 std::vector<rpc::back_channel_entry> empty_out;
 
-                auto ret = CO_AWAIT transport_local->release(version_local,
-                    destination_zone_id_local,
-                    object_id_local,
-                    svc_local->get_zone_id().as_caller(),
-                    is_optimistic_local ? release_options::optimistic : release_options::normal,
+                auto ret = CO_AWAIT transport->release(version,
+                    destination_zone_id,
+                    object_id,
+                    svc->get_zone_id().as_caller(),
+                    is_optimistic ? release_options::optimistic : release_options::normal,
                     ref_count,
                     empty_in,
                     empty_out);
-                // inner_count = inner_release_external_ref();
-                // RPC_DEBUG("inner count = {} for object {}", inner_count, object_id_local.get_val());
-                // if(inner_count == 0 && is_responsible_for_cleaning_up_service_)
-                // {
-                //     svc_local->remove_zone_proxy(destination_zone_id_local, zone_id_.as_caller());
-                // }
+
+                RPC_DEBUG("Cleanup coroutine: release returned {} for object {}",
+                    rpc::error::to_string(ret),
+                    object_id.get_val());
 
                 // Notify that object is gone after all cleanup is complete
-                CO_AWAIT svc_local->notify_object_gone_event(object_id_local, destination_zone_id_local);
+                CO_AWAIT svc->notify_object_gone_event(object_id, destination_zone_id);
+
+                RPC_DEBUG("Cleanup coroutine: notify_object_gone_event completed for object {}", object_id.get_val());
 
                 // error handling here as the cleanup needs to happen anyway
                 if (ret == rpc::error::OK())
                 {
                     RPC_DEBUG("Remote {} count = {} for object {}",
-                        is_optimistic_local ? "optimistic" : "shared",
+                        is_optimistic ? "optimistic" : "shared",
                         ref_count,
-                        object_id_local.get_val());
+                        object_id.get_val());
                 }
-                else if (is_optimistic_local && ret == rpc::error::OBJECT_NOT_FOUND())
+                else if (is_optimistic && ret == rpc::error::OBJECT_NOT_FOUND())
                 {
-                    RPC_DEBUG("Object {} not found - stub already deleted (normal for optimistic_ptr)",
-                        object_id_local.get_val());
+                    RPC_DEBUG(
+                        "Object {} not found - stub already deleted (normal for optimistic_ptr)", object_id.get_val());
                 }
                 else if (ret == rpc::error::ZONE_NOT_FOUND() || ret == rpc::error::TRANSPORT_ERROR())
                 {
                     RPC_DEBUG("Zone {} not reachable during cleanup ({}), intermediate zone may have been cleaned up "
                               "(normal during multi-level hierarchy cleanup)",
-                        destination_zone_id_local.get_val(),
+                        destination_zone_id.get_val(),
                         rpc::error::to_string(ret));
                 }
                 else
@@ -407,8 +399,17 @@ namespace rpc
                     RPC_ERROR("cleanup_after_object release failed: {}", rpc::error::to_string(ret));
                     RPC_ASSERT(false);
                 }
+
+                svc.reset();
+                transport.reset();
+
 #ifdef BUILD_COROUTINE
-            }(self, svc, object_id, transport, version, destination_zone_id, is_optimistic));
+                // Explicitly release strong references before returning to ensure coroutine frame
+                // doesn't hold them after completion
+                RPC_DEBUG("Cleanup coroutine: about to return, explicitly releasing references for object {}",
+                    object_id.get_val());
+                CO_RETURN;
+            }(svc, object_id, transport, version, destination_zone_id, is_optimistic));
 #endif
     }
 

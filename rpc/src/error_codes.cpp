@@ -135,6 +135,10 @@ namespace rpc
 
         const char* to_string(int err)
         {
+            if (err == OK())
+            {
+                return "OK";
+            }
             if (err == OUT_OF_MEMORY())
             {
                 return "out of memory";
