@@ -19,7 +19,8 @@
       "inherits": "Base",
       "cacheVariables": {
         "BUILD_TYPE": "debug",
-        "CMAKE_BUILD_TYPE": "Debug"
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_POLICY_VERSION_MINIMUM": "3.5"
       }
     },
     {
