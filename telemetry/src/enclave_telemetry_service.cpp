@@ -214,4 +214,91 @@ namespace rpc
     {
         message_host(level, message);
     }
+
+    void enclave_telemetry_service::on_transport_creation(
+        const std::string& name, rpc::zone zone_id, rpc::zone adjacent_zone_id, rpc::transport_status status) const
+    {
+        on_transport_creation_host(name, zone_id.get_val(), adjacent_zone_id.get_val(), static_cast<uint32_t>(status));
+    }
+
+    void enclave_telemetry_service::on_transport_deletion(
+        rpc::zone zone_id, rpc::zone adjacent_zone_id) const
+    {
+        on_transport_deletion_host(zone_id.get_val(), adjacent_zone_id.get_val());
+    }
+
+    void enclave_telemetry_service::on_transport_status_change(const std::string& name,
+        rpc::zone zone_id,
+        rpc::zone adjacent_zone_id,
+        rpc::transport_status old_status,
+        rpc::transport_status new_status) const
+    {
+        on_transport_status_change_host(name,
+            zone_id.get_val(),
+            adjacent_zone_id.get_val(),
+            static_cast<uint32_t>(old_status),
+            static_cast<uint32_t>(new_status));
+    }
+
+    void enclave_telemetry_service::on_transport_add_destination(
+        rpc::zone zone_id, rpc::zone adjacent_zone_id, rpc::destination_zone destination, rpc::caller_zone caller) const
+    {
+        on_transport_add_destination_host(
+            zone_id.get_val(), adjacent_zone_id.get_val(), destination.get_val(), caller.get_val());
+    }
+
+    void enclave_telemetry_service::on_transport_remove_destination(
+        rpc::zone zone_id, rpc::zone adjacent_zone_id, rpc::destination_zone destination, rpc::caller_zone caller) const
+    {
+        on_transport_remove_destination_host(
+            zone_id.get_val(), adjacent_zone_id.get_val(), destination.get_val(), caller.get_val());
+    }
+
+    void enclave_telemetry_service::on_pass_through_creation(rpc::destination_zone forward_destination,
+        rpc::destination_zone reverse_destination,
+        uint64_t shared_count,
+        uint64_t optimistic_count) const
+    {
+        on_pass_through_creation_host(
+            forward_destination.get_val(), reverse_destination.get_val(), shared_count, optimistic_count);
+    }
+
+    void enclave_telemetry_service::on_pass_through_deletion(
+        rpc::destination_zone forward_destination, rpc::destination_zone reverse_destination) const
+    {
+        on_pass_through_deletion_host(forward_destination.get_val(), reverse_destination.get_val());
+    }
+
+    void enclave_telemetry_service::on_pass_through_add_ref(rpc::destination_zone forward_destination,
+        rpc::destination_zone reverse_destination,
+        rpc::add_ref_options options,
+        int64_t shared_delta,
+        int64_t optimistic_delta) const
+    {
+        on_pass_through_add_ref_host(forward_destination.get_val(),
+            reverse_destination.get_val(),
+            static_cast<uint64_t>(options),
+            shared_delta,
+            optimistic_delta);
+    }
+
+    void enclave_telemetry_service::on_pass_through_release(rpc::destination_zone forward_destination,
+        rpc::destination_zone reverse_destination,
+        int64_t shared_delta,
+        int64_t optimistic_delta) const
+    {
+        on_pass_through_release_host(
+            forward_destination.get_val(), reverse_destination.get_val(), shared_delta, optimistic_delta);
+    }
+
+    void enclave_telemetry_service::on_pass_through_status_change(rpc::destination_zone forward_destination,
+        rpc::destination_zone reverse_destination,
+        rpc::transport_status forward_status,
+        rpc::transport_status reverse_status) const
+    {
+        on_pass_through_status_change_host(forward_destination.get_val(),
+            reverse_destination.get_val(),
+            static_cast<uint32_t>(forward_status),
+            static_cast<uint32_t>(reverse_status));
+    }
 }

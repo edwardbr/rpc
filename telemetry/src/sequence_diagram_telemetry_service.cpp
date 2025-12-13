@@ -1208,4 +1208,134 @@ namespace rpc
         fflush(output_);
     }
 
+    void sequence_diagram_telemetry_service::on_transport_creation(
+        const std::string& name, rpc::zone zone_id, rpc::zone adjacent_zone_id, rpc::transport_status status) const
+    {
+        fmt::println(output_,
+            "note over zone_{}: transport_creation: name={} adjacent_zone={} status={}",
+            zone_id.get_val(),
+            name,
+            adjacent_zone_id.get_val(),
+            static_cast<int>(status));
+        fflush(output_);
+    }
+
+    void sequence_diagram_telemetry_service::on_transport_deletion(
+        rpc::zone zone_id, rpc::zone adjacent_zone_id) const
+    {
+        fmt::println(output_,
+            "note over zone_{}: transport_deletion: adjacent_zone={}",
+            zone_id.get_val(),
+            adjacent_zone_id.get_val());
+        fflush(output_);
+    }
+
+    void sequence_diagram_telemetry_service::on_transport_status_change(const std::string& name,
+        rpc::zone zone_id,
+        rpc::zone adjacent_zone_id,
+        rpc::transport_status old_status,
+        rpc::transport_status new_status) const
+    {
+        fmt::println(output_,
+            "note over zone_{}: transport_status_change: name={} adjacent_zone={} old_status={} new_status={}",
+            zone_id.get_val(),
+            name,
+            adjacent_zone_id.get_val(),
+            static_cast<int>(old_status),
+            static_cast<int>(new_status));
+        fflush(output_);
+    }
+
+    void sequence_diagram_telemetry_service::on_transport_add_destination(
+        rpc::zone zone_id, rpc::zone adjacent_zone_id, rpc::destination_zone destination, rpc::caller_zone caller) const
+    {
+        fmt::println(output_,
+            "note over zone_{}: transport_add_destination: adjacent_zone={} destination={} caller={}",
+            zone_id.get_val(),
+            adjacent_zone_id.get_val(),
+            destination.get_val(),
+            caller.get_val());
+        fflush(output_);
+    }
+
+    void sequence_diagram_telemetry_service::on_transport_remove_destination(
+        rpc::zone zone_id, rpc::zone adjacent_zone_id, rpc::destination_zone destination, rpc::caller_zone caller) const
+    {
+        fmt::println(output_,
+            "note over zone_{}: transport_remove_destination: adjacent_zone={} destination={} caller={}",
+            zone_id.get_val(),
+            adjacent_zone_id.get_val(),
+            destination.get_val(),
+            caller.get_val());
+        fflush(output_);
+    }
+
+    void sequence_diagram_telemetry_service::on_pass_through_creation(rpc::destination_zone forward_destination,
+        rpc::destination_zone reverse_destination,
+        uint64_t shared_count,
+        uint64_t optimistic_count) const
+    {
+        fmt::println(output_,
+            "note over pass_through: pass_through_creation: forward_destination={} reverse_destination={} shared_count={} optimistic_count={}",
+            forward_destination.get_val(),
+            reverse_destination.get_val(),
+            shared_count,
+            optimistic_count);
+        fflush(output_);
+    }
+
+    void sequence_diagram_telemetry_service::on_pass_through_deletion(
+        rpc::destination_zone forward_destination, rpc::destination_zone reverse_destination) const
+    {
+        fmt::println(output_,
+            "note over pass_through: pass_through_deletion: forward_destination={} reverse_destination={}",
+            forward_destination.get_val(),
+            reverse_destination.get_val());
+        fflush(output_);
+    }
+
+    void sequence_diagram_telemetry_service::on_pass_through_add_ref(rpc::destination_zone forward_destination,
+        rpc::destination_zone reverse_destination,
+        rpc::add_ref_options options,
+        int64_t shared_delta,
+        int64_t optimistic_delta) const
+    {
+        fmt::println(output_,
+            "note over pass_through: pass_through_add_ref: forward_destination={} reverse_destination={} options={} shared_delta={} optimistic_delta={}",
+            forward_destination.get_val(),
+            reverse_destination.get_val(),
+            static_cast<int>(options),
+            shared_delta,
+            optimistic_delta);
+        fflush(output_);
+    }
+
+    void sequence_diagram_telemetry_service::on_pass_through_release(rpc::destination_zone forward_destination,
+        rpc::destination_zone reverse_destination,
+        int64_t shared_delta,
+        int64_t optimistic_delta) const
+    {
+        fmt::println(output_,
+            "note over pass_through: pass_through_release: forward_destination={} reverse_destination={} shared_delta={} optimistic_delta={}",
+            forward_destination.get_val(),
+            reverse_destination.get_val(),
+            shared_delta,
+            optimistic_delta);
+        fflush(output_);
+    }
+
+    void sequence_diagram_telemetry_service::on_pass_through_status_change(rpc::destination_zone forward_destination,
+        rpc::destination_zone reverse_destination,
+        rpc::transport_status forward_status,
+        rpc::transport_status reverse_status) const
+    {
+        fmt::println(output_,
+            "note over pass_through: pass_through_status_change: forward_destination={} reverse_destination={} forward_status={} reverse_status={}",
+            forward_destination.get_val(),
+            reverse_destination.get_val(),
+            static_cast<int>(forward_status),
+            static_cast<int>(reverse_status));
+        fflush(output_);
+    }
+
 }

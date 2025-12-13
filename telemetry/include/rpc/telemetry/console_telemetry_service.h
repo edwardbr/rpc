@@ -162,5 +162,40 @@ namespace rpc
             rpc::method method_id) const override;
 
         void message(level_enum level, const std::string& message) const override;
+
+        // Transport events
+        void on_transport_creation(
+            const std::string& name, rpc::zone zone_id, rpc::zone adjacent_zone_id, rpc::transport_status status) const override;
+        void on_transport_deletion(rpc::zone zone_id, rpc::zone adjacent_zone_id) const override;
+        void on_transport_status_change(const std::string& name,
+            rpc::zone zone_id,
+            rpc::zone adjacent_zone_id,
+            rpc::transport_status old_status,
+            rpc::transport_status new_status) const override;
+        void on_transport_add_destination(
+            rpc::zone zone_id, rpc::zone adjacent_zone_id, rpc::destination_zone destination, rpc::caller_zone caller) const override;
+        void on_transport_remove_destination(
+            rpc::zone zone_id, rpc::zone adjacent_zone_id, rpc::destination_zone destination, rpc::caller_zone caller) const override;
+
+        // Pass-through events
+        void on_pass_through_creation(rpc::destination_zone forward_destination,
+            rpc::destination_zone reverse_destination,
+            uint64_t shared_count,
+            uint64_t optimistic_count) const override;
+        void on_pass_through_deletion(
+            rpc::destination_zone forward_destination, rpc::destination_zone reverse_destination) const override;
+        void on_pass_through_add_ref(rpc::destination_zone forward_destination,
+            rpc::destination_zone reverse_destination,
+            rpc::add_ref_options options,
+            int64_t shared_delta,
+            int64_t optimistic_delta) const override;
+        void on_pass_through_release(rpc::destination_zone forward_destination,
+            rpc::destination_zone reverse_destination,
+            int64_t shared_delta,
+            int64_t optimistic_delta) const override;
+        void on_pass_through_status_change(rpc::destination_zone forward_destination,
+            rpc::destination_zone reverse_destination,
+            rpc::transport_status forward_status,
+            rpc::transport_status reverse_status) const override;
     };
 }

@@ -3,6 +3,7 @@
  *   All rights reserved.
  */
 
+#include <rpc/rpc.h>
 #include <rpc/telemetry/multiplexing_telemetry_service.h>
 
 #ifndef _IN_ENCLAVE
@@ -435,6 +436,140 @@ namespace rpc
             if (child)
             {
                 child->message(level, message);
+            }
+        }
+    }
+
+    void multiplexing_telemetry_service::on_transport_creation(
+        const std::string& name, rpc::zone zone_id, rpc::zone adjacent_zone_id, rpc::transport_status status) const
+    {
+        for (const auto& child : children_)
+        {
+            if (child)
+            {
+                child->on_transport_creation(name, zone_id, adjacent_zone_id, status);
+            }
+        }
+    }
+
+    void multiplexing_telemetry_service::on_transport_deletion(
+        rpc::zone zone_id, rpc::zone adjacent_zone_id) const
+    {
+        for (const auto& child : children_)
+        {
+            if (child)
+            {
+                child->on_transport_deletion(zone_id, adjacent_zone_id);
+            }
+        }
+    }
+
+    void multiplexing_telemetry_service::on_transport_status_change(const std::string& name,
+        rpc::zone zone_id,
+        rpc::zone adjacent_zone_id,
+        rpc::transport_status old_status,
+        rpc::transport_status new_status) const
+    {
+        for (const auto& child : children_)
+        {
+            if (child)
+            {
+                child->on_transport_status_change(name, zone_id, adjacent_zone_id, old_status, new_status);
+            }
+        }
+    }
+
+    void multiplexing_telemetry_service::on_transport_add_destination(
+        rpc::zone zone_id, rpc::zone adjacent_zone_id, rpc::destination_zone destination, rpc::caller_zone caller) const
+    {
+        for (const auto& child : children_)
+        {
+            if (child)
+            {
+                child->on_transport_add_destination(zone_id, adjacent_zone_id, destination, caller);
+            }
+        }
+    }
+
+    void multiplexing_telemetry_service::on_transport_remove_destination(
+        rpc::zone zone_id, rpc::zone adjacent_zone_id, rpc::destination_zone destination, rpc::caller_zone caller) const
+    {
+        for (const auto& child : children_)
+        {
+            if (child)
+            {
+                child->on_transport_remove_destination(zone_id, adjacent_zone_id, destination, caller);
+            }
+        }
+    }
+
+    void multiplexing_telemetry_service::on_pass_through_creation(rpc::destination_zone forward_destination,
+        rpc::destination_zone reverse_destination,
+        uint64_t shared_count,
+        uint64_t optimistic_count) const
+    {
+        for (const auto& child : children_)
+        {
+            if (child)
+            {
+                child->on_pass_through_creation(forward_destination, reverse_destination, shared_count, optimistic_count);
+            }
+        }
+    }
+
+    void multiplexing_telemetry_service::on_pass_through_deletion(
+        rpc::destination_zone forward_destination, rpc::destination_zone reverse_destination) const
+    {
+        for (const auto& child : children_)
+        {
+            if (child)
+            {
+                child->on_pass_through_deletion(forward_destination, reverse_destination);
+            }
+        }
+    }
+
+    void multiplexing_telemetry_service::on_pass_through_add_ref(rpc::destination_zone forward_destination,
+        rpc::destination_zone reverse_destination,
+        rpc::add_ref_options options,
+        int64_t shared_delta,
+        int64_t optimistic_delta) const
+    {
+        for (const auto& child : children_)
+        {
+            if (child)
+            {
+                child->on_pass_through_add_ref(
+                    forward_destination, reverse_destination, options, shared_delta, optimistic_delta);
+            }
+        }
+    }
+
+    void multiplexing_telemetry_service::on_pass_through_release(rpc::destination_zone forward_destination,
+        rpc::destination_zone reverse_destination,
+        int64_t shared_delta,
+        int64_t optimistic_delta) const
+    {
+        for (const auto& child : children_)
+        {
+            if (child)
+            {
+                child->on_pass_through_release(forward_destination, reverse_destination, shared_delta, optimistic_delta);
+            }
+        }
+    }
+
+    void multiplexing_telemetry_service::on_pass_through_status_change(rpc::destination_zone forward_destination,
+        rpc::destination_zone reverse_destination,
+        rpc::transport_status forward_status,
+        rpc::transport_status reverse_status) const
+    {
+        for (const auto& child : children_)
+        {
+            if (child)
+            {
+                child->on_pass_through_status_change(
+                    forward_destination, reverse_destination, forward_status, reverse_status);
             }
         }
     }

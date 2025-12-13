@@ -3,6 +3,7 @@
  *   All rights reserved.
  */
 
+#include <rpc/rpc.h>
 #include <rpc/telemetry/animation_telemetry_service.h>
 
 #include <algorithm>
@@ -2684,5 +2685,115 @@ namespace rpc
         output << "<script src=\"https://d3js.org/d3.v7.min.js\"></script>\n";
         output << "<script>\n" << kAnimationScript << "\n</script>\n";
         output << "</body>\n</html>\n";
+    }
+
+    void animation_telemetry_service::on_transport_creation(
+        const std::string& name, rpc::zone zone_id, rpc::zone adjacent_zone_id, rpc::transport_status status) const
+    {
+        record_event("transport_creation",
+            {make_string_field("name", name),
+                make_number_field("zone_id", zone_id.get_val()),
+                make_number_field("adjacent_zone_id", adjacent_zone_id.get_val()),
+                make_number_field("status", static_cast<uint32_t>(status))});
+    }
+
+    void animation_telemetry_service::on_transport_deletion(
+        rpc::zone zone_id, rpc::zone adjacent_zone_id) const
+    {
+        record_event("transport_deletion",
+            {make_number_field("zone_id", zone_id.get_val()),
+                make_number_field("adjacent_zone_id", adjacent_zone_id.get_val())});
+    }
+
+    void animation_telemetry_service::on_transport_status_change(const std::string& name,
+        rpc::zone zone_id,
+        rpc::zone adjacent_zone_id,
+        rpc::transport_status old_status,
+        rpc::transport_status new_status) const
+    {
+        record_event("transport_status_change",
+            {make_string_field("name", name),
+                make_number_field("zone_id", zone_id.get_val()),
+                make_number_field("adjacent_zone_id", adjacent_zone_id.get_val()),
+                make_number_field("old_status", static_cast<uint32_t>(old_status)),
+                make_number_field("new_status", static_cast<uint32_t>(new_status))});
+    }
+
+    void animation_telemetry_service::on_transport_add_destination(
+        rpc::zone zone_id, rpc::zone adjacent_zone_id, rpc::destination_zone destination, rpc::caller_zone caller) const
+    {
+        record_event("transport_add_destination",
+            {make_number_field("zone_id", zone_id.get_val()),
+                make_number_field("adjacent_zone_id", adjacent_zone_id.get_val()),
+                make_number_field("destination", destination.get_val()),
+                make_number_field("caller", caller.get_val())});
+    }
+
+    void animation_telemetry_service::on_transport_remove_destination(
+        rpc::zone zone_id, rpc::zone adjacent_zone_id, rpc::destination_zone destination, rpc::caller_zone caller) const
+    {
+        record_event("transport_remove_destination",
+            {make_number_field("zone_id", zone_id.get_val()),
+                make_number_field("adjacent_zone_id", adjacent_zone_id.get_val()),
+                make_number_field("destination", destination.get_val()),
+                make_number_field("caller", caller.get_val())});
+    }
+
+    void animation_telemetry_service::on_pass_through_creation(rpc::destination_zone forward_destination,
+        rpc::destination_zone reverse_destination,
+        uint64_t shared_count,
+        uint64_t optimistic_count) const
+    {
+        record_event("pass_through_creation",
+            {make_number_field("forward_destination", forward_destination.get_val()),
+                make_number_field("reverse_destination", reverse_destination.get_val()),
+                make_number_field("shared_count", shared_count),
+                make_number_field("optimistic_count", optimistic_count)});
+    }
+
+    void animation_telemetry_service::on_pass_through_deletion(
+        rpc::destination_zone forward_destination, rpc::destination_zone reverse_destination) const
+    {
+        record_event("pass_through_deletion",
+            {make_number_field("forward_destination", forward_destination.get_val()),
+                make_number_field("reverse_destination", reverse_destination.get_val())});
+    }
+
+    void animation_telemetry_service::on_pass_through_add_ref(rpc::destination_zone forward_destination,
+        rpc::destination_zone reverse_destination,
+        rpc::add_ref_options options,
+        int64_t shared_delta,
+        int64_t optimistic_delta) const
+    {
+        record_event("pass_through_add_ref",
+            {make_number_field("forward_destination", forward_destination.get_val()),
+                make_number_field("reverse_destination", reverse_destination.get_val()),
+                make_number_field("options", static_cast<uint64_t>(options)),
+                make_signed_field("shared_delta", shared_delta),
+                make_signed_field("optimistic_delta", optimistic_delta)});
+    }
+
+    void animation_telemetry_service::on_pass_through_release(rpc::destination_zone forward_destination,
+        rpc::destination_zone reverse_destination,
+        int64_t shared_delta,
+        int64_t optimistic_delta) const
+    {
+        record_event("pass_through_release",
+            {make_number_field("forward_destination", forward_destination.get_val()),
+                make_number_field("reverse_destination", reverse_destination.get_val()),
+                make_signed_field("shared_delta", shared_delta),
+                make_signed_field("optimistic_delta", optimistic_delta)});
+    }
+
+    void animation_telemetry_service::on_pass_through_status_change(rpc::destination_zone forward_destination,
+        rpc::destination_zone reverse_destination,
+        rpc::transport_status forward_status,
+        rpc::transport_status reverse_status) const
+    {
+        record_event("pass_through_status_change",
+            {make_number_field("forward_destination", forward_destination.get_val()),
+                make_number_field("reverse_destination", reverse_destination.get_val()),
+                make_number_field("forward_status", static_cast<uint32_t>(forward_status)),
+                make_number_field("reverse_status", static_cast<uint32_t>(reverse_status))});
     }
 }

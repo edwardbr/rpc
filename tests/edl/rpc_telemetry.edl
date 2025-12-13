@@ -42,5 +42,19 @@ enclave {
         void on_interface_proxy_send_host([in, string] const char* method_name, uint64_t zone_id, uint64_t destination_zone_id, uint64_t object_id, uint64_t interface_id, uint64_t method_id);
 
         void message_host(uint64_t level, [in, string] const char* name);
+
+        // Transport events
+        void on_transport_creation_host([in, string] const char* name, uint64_t zone_id, uint64_t adjacent_zone_id, uint32_t status);
+        void on_transport_deletion_host(uint64_t zone_id, uint64_t adjacent_zone_id);
+        void on_transport_status_change_host([in, string] const char* name, uint64_t zone_id, uint64_t adjacent_zone_id, uint32_t old_status, uint32_t new_status);
+        void on_transport_add_destination_host(uint64_t zone_id, uint64_t adjacent_zone_id, uint64_t destination, uint64_t caller);
+        void on_transport_remove_destination_host(uint64_t zone_id, uint64_t adjacent_zone_id, uint64_t destination, uint64_t caller);
+
+        // Pass-through events
+        void on_pass_through_creation_host(uint64_t forward_destination, uint64_t reverse_destination, uint64_t shared_count, uint64_t optimistic_count);
+        void on_pass_through_deletion_host(uint64_t forward_destination, uint64_t reverse_destination);
+        void on_pass_through_add_ref_host(uint64_t forward_destination, uint64_t reverse_destination, uint64_t options, int64_t shared_delta, int64_t optimistic_delta);
+        void on_pass_through_release_host(uint64_t forward_destination, uint64_t reverse_destination, int64_t shared_delta, int64_t optimistic_delta);
+        void on_pass_through_status_change_host(uint64_t forward_destination, uint64_t reverse_destination, uint32_t forward_status, uint32_t reverse_status);
     };
 };

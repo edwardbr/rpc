@@ -4,6 +4,7 @@
  */
 #include <unordered_map>
 
+#include <rpc/rpc.h>
 #include <rpc/telemetry/i_telemetry_service.h>
 #include <rpc/telemetry/telemetry_handler.h>
 
@@ -178,6 +179,77 @@ extern "C"
             telemetry_service->on_interface_proxy_send(
                 method_name, {zone_id}, {destination_zone_id}, {object_id}, {interface_id}, {method_id});
     }
+
+    // New transport events
+    void on_transport_creation_host(const std::string& name, uint64_t zone_id, uint64_t adjacent_zone_id, uint64_t status)
+    {
+        if (auto telemetry_service = rpc::get_telemetry_service())
+            telemetry_service->on_transport_creation(name, {zone_id}, {adjacent_zone_id}, (rpc::transport_status)status);
+    }
+    void on_transport_deletion_host(uint64_t zone_id, uint64_t adjacent_zone_id)
+    {
+        if (auto telemetry_service = rpc::get_telemetry_service())
+            telemetry_service->on_transport_deletion({zone_id}, {adjacent_zone_id});
+    }
+    void on_transport_status_change_host(
+        const std::string& name, uint64_t zone_id, uint64_t adjacent_zone_id, uint64_t old_status, uint64_t new_status)
+    {
+        if (auto telemetry_service = rpc::get_telemetry_service())
+            telemetry_service->on_transport_status_change(
+                name, {zone_id}, {adjacent_zone_id}, (rpc::transport_status)old_status, (rpc::transport_status)new_status);
+    }
+    void on_transport_add_destination_host(uint64_t zone_id, uint64_t adjacent_zone_id, uint64_t destination, uint64_t caller)
+    {
+        if (auto telemetry_service = rpc::get_telemetry_service())
+            telemetry_service->on_transport_add_destination({zone_id}, {adjacent_zone_id}, {destination}, {caller});
+    }
+    void on_transport_remove_destination_host(
+        uint64_t zone_id, uint64_t adjacent_zone_id, uint64_t destination, uint64_t caller)
+    {
+        if (auto telemetry_service = rpc::get_telemetry_service())
+            telemetry_service->on_transport_remove_destination({zone_id}, {adjacent_zone_id}, {destination}, {caller});
+    }
+
+    // New pass-through events
+    void on_pass_through_creation_host(
+        uint64_t forward_destination, uint64_t reverse_destination, uint64_t shared_count, uint64_t optimistic_count)
+    {
+        if (auto telemetry_service = rpc::get_telemetry_service())
+            telemetry_service->on_pass_through_creation(
+                {forward_destination}, {reverse_destination}, shared_count, optimistic_count);
+    }
+    void on_pass_through_deletion_host(uint64_t forward_destination, uint64_t reverse_destination)
+    {
+        if (auto telemetry_service = rpc::get_telemetry_service())
+            telemetry_service->on_pass_through_deletion({forward_destination}, {reverse_destination});
+    }
+    void on_pass_through_add_ref_host(uint64_t forward_destination,
+        uint64_t reverse_destination,
+        uint64_t options,
+        int64_t shared_delta,
+        int64_t optimistic_delta)
+    {
+        if (auto telemetry_service = rpc::get_telemetry_service())
+            telemetry_service->on_pass_through_add_ref(
+                {forward_destination}, {reverse_destination}, (rpc::add_ref_options)options, shared_delta, optimistic_delta);
+    }
+    void on_pass_through_release_host(
+        uint64_t forward_destination, uint64_t reverse_destination, int64_t shared_delta, int64_t optimistic_delta)
+    {
+        if (auto telemetry_service = rpc::get_telemetry_service())
+            telemetry_service->on_pass_through_release(
+                {forward_destination}, {reverse_destination}, shared_delta, optimistic_delta);
+    }
+    void on_pass_through_status_change_host(
+        uint64_t forward_destination, uint64_t reverse_destination, uint64_t forward_status, uint64_t reverse_status)
+    {
+        if (auto telemetry_service = rpc::get_telemetry_service())
+            telemetry_service->on_pass_through_status_change({forward_destination},
+                {reverse_destination},
+                (rpc::transport_status)forward_status,
+                (rpc::transport_status)reverse_status);
+    }
+
     void message_host(uint64_t level, const std::string& name)
     {
         if (auto telemetry_service = rpc::get_telemetry_service())

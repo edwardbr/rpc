@@ -33,6 +33,11 @@ namespace rpc
         // Register local service: pass_thoughs_[local][local] = service
         // auto local_zone = zone_id_.get_val();
         // pass_thoughs_[local_zone][adjacent_zone_id.get_val()] = std::static_pointer_cast<i_marshaller>(service);
+
+#ifdef USE_RPC_TELEMETRY
+        if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
+            telemetry_service->on_transport_creation(name_, zone_id_, adjacent_zone_id_, status_.load(std::memory_order_acquire));
+#endif
     }
 
     transport::transport(std::string name, zone zone_id_, zone adjacent_zone_id)
@@ -40,6 +45,18 @@ namespace rpc
         , zone_id_(zone_id_)
         , adjacent_zone_id_(adjacent_zone_id)
     {
+#ifdef USE_RPC_TELEMETRY
+        if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
+            telemetry_service->on_transport_creation(name_, zone_id_, adjacent_zone_id_, status_.load(std::memory_order_acquire));
+#endif
+    }
+
+    transport::~transport()
+    {
+#ifdef USE_RPC_TELEMETRY
+        if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
+            telemetry_service->on_transport_deletion(zone_id_, adjacent_zone_id_);
+#endif
     }
 
     void transport::set_service(std::shared_ptr<service> service)
@@ -84,6 +101,11 @@ namespace rpc
         //         pass_thoughs_[caller_val][dest_val] = handler;
         //     }
         // }
+
+#ifdef USE_RPC_TELEMETRY
+        if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
+            telemetry_service->on_transport_add_destination(zone_id_, adjacent_zone_id_, dest, caller);
+#endif
 
         return true;
     }
@@ -192,6 +214,11 @@ namespace rpc
         }
 
         inner_decrement_outbound_proxy_count(caller.as_destination());
+
+#ifdef USE_RPC_TELEMETRY
+        if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
+            telemetry_service->on_transport_remove_destination(zone_id_, adjacent_zone_id_, dest, caller);
+#endif
     }
 
     std::shared_ptr<i_marshaller> transport::create_pass_through(std::shared_ptr<transport> forward,
@@ -289,7 +316,16 @@ namespace rpc
 
     void transport::set_status(transport_status new_status)
     {
+        auto old_status = status_.load(std::memory_order_acquire);
         status_.store(new_status, std::memory_order_release);
+
+#ifdef USE_RPC_TELEMETRY
+        if (old_status != new_status)
+        {
+            if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
+                telemetry_service->on_transport_status_change(name_, zone_id_, adjacent_zone_id_, old_status, new_status);
+        }
+#endif
     }
 
     std::shared_ptr<i_marshaller> transport::inner_get_destination_handler(destination_zone dest, caller_zone caller) const
@@ -437,6 +473,7 @@ namespace rpc
             CO_RETURN error::ZONE_NOT_FOUND();
         }
 
+
         CO_RETURN CO_AWAIT dest->send(protocol_version,
             encoding,
             tag,
@@ -474,6 +511,7 @@ namespace rpc
             CO_RETURN;
         }
 
+
         CO_AWAIT dest->post(protocol_version,
             encoding,
             tag,
@@ -502,6 +540,7 @@ namespace rpc
         {
             CO_RETURN error::ZONE_NOT_FOUND();
         }
+
 
         CO_RETURN CO_AWAIT dest->try_cast(
             protocol_version, destination_zone_id, object_id, interface_id, in_back_channel, out_back_channel);
@@ -643,6 +682,7 @@ namespace rpc
         }
 
         // else it is a special case that the service needs to deal with
+
         CO_RETURN CO_AWAIT svc->add_ref(protocol_version,
             destination_zone_id,
             object_id,
@@ -671,6 +711,7 @@ namespace rpc
         {
             CO_RETURN error::ZONE_NOT_FOUND();
         }
+
 
         CO_RETURN CO_AWAIT dest->release(protocol_version,
             destination_zone_id,

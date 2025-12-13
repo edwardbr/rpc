@@ -763,4 +763,144 @@ namespace rpc
             logger_->info("{} {}", level_str, message);
         }
     }
+
+    void console_telemetry_service::on_transport_creation(
+        const std::string& name, rpc::zone zone_id, rpc::zone adjacent_zone_id, rpc::transport_status status) const
+    {
+        init_logger();
+        logger_->info("{}{} transport_creation: name={} adjacent_zone={} status={}{}",
+            get_zone_color(zone_id.get_val()),
+            get_zone_name(zone_id.get_val()),
+            name,
+            get_zone_name(adjacent_zone_id.get_val()),
+            static_cast<int>(status),
+            reset_color());
+    }
+
+    void console_telemetry_service::on_transport_deletion(
+        rpc::zone zone_id, rpc::zone adjacent_zone_id) const
+    {
+        init_logger();
+        logger_->info("{}{} transport_deletion: adjacent_zone={}{}",
+            get_zone_color(zone_id.get_val()),
+            get_zone_name(zone_id.get_val()),
+            get_zone_name(adjacent_zone_id.get_val()),
+            reset_color());
+    }
+
+    void console_telemetry_service::on_transport_status_change(const std::string& name,
+        rpc::zone zone_id,
+        rpc::zone adjacent_zone_id,
+        rpc::transport_status old_status,
+        rpc::transport_status new_status) const
+    {
+        init_logger();
+        logger_->info("{}{} transport_status_change: name={} adjacent_zone={} old_status={} new_status={}{}",
+            get_zone_color(zone_id.get_val()),
+            get_zone_name(zone_id.get_val()),
+            name,
+            get_zone_name(adjacent_zone_id.get_val()),
+            static_cast<int>(old_status),
+            static_cast<int>(new_status),
+            reset_color());
+    }
+
+    void console_telemetry_service::on_transport_add_destination(
+        rpc::zone zone_id, rpc::zone adjacent_zone_id, rpc::destination_zone destination, rpc::caller_zone caller) const
+    {
+        init_logger();
+        logger_->info("{}{} transport_add_destination: adjacent_zone={} destination={} caller={}{}",
+            get_zone_color(zone_id.get_val()),
+            get_zone_name(zone_id.get_val()),
+            get_zone_name(adjacent_zone_id.get_val()),
+            destination.get_val(),
+            caller.get_val(),
+            reset_color());
+    }
+
+    void console_telemetry_service::on_transport_remove_destination(
+        rpc::zone zone_id, rpc::zone adjacent_zone_id, rpc::destination_zone destination, rpc::caller_zone caller) const
+    {
+        init_logger();
+        logger_->info("{}{} transport_remove_destination: adjacent_zone={} destination={} caller={}{}",
+            get_zone_color(zone_id.get_val()),
+            get_zone_name(zone_id.get_val()),
+            get_zone_name(adjacent_zone_id.get_val()),
+            destination.get_val(),
+            caller.get_val(),
+            reset_color());
+    }
+
+    void console_telemetry_service::on_pass_through_creation(rpc::destination_zone forward_destination,
+        rpc::destination_zone reverse_destination,
+        uint64_t shared_count,
+        uint64_t optimistic_count) const
+    {
+        init_logger();
+        logger_->info("{} pass_through_creation: forward_destination={} reverse_destination={} shared_count={} optimistic_count={}{}",
+            get_level_color(level_enum::info),
+            forward_destination.get_val(),
+            reverse_destination.get_val(),
+            shared_count,
+            optimistic_count,
+            reset_color());
+    }
+
+    void console_telemetry_service::on_pass_through_deletion(
+        rpc::destination_zone forward_destination, rpc::destination_zone reverse_destination) const
+    {
+        init_logger();
+        logger_->info("{} pass_through_deletion: forward_destination={} reverse_destination={}{}",
+            get_level_color(level_enum::info),
+            forward_destination.get_val(),
+            reverse_destination.get_val(),
+            reset_color());
+    }
+
+    void console_telemetry_service::on_pass_through_add_ref(rpc::destination_zone forward_destination,
+        rpc::destination_zone reverse_destination,
+        rpc::add_ref_options options,
+        int64_t shared_delta,
+        int64_t optimistic_delta) const
+    {
+        init_logger();
+        logger_->info("{} pass_through_add_ref: forward_destination={} reverse_destination={} options={} shared_delta={} optimistic_delta={}{}",
+            get_level_color(level_enum::info),
+            forward_destination.get_val(),
+            reverse_destination.get_val(),
+            static_cast<int>(options),
+            shared_delta,
+            optimistic_delta,
+            reset_color());
+    }
+
+    void console_telemetry_service::on_pass_through_release(rpc::destination_zone forward_destination,
+        rpc::destination_zone reverse_destination,
+        int64_t shared_delta,
+        int64_t optimistic_delta) const
+    {
+        init_logger();
+        logger_->info("{} pass_through_release: forward_destination={} reverse_destination={} shared_delta={} optimistic_delta={}{}",
+            get_level_color(level_enum::info),
+            forward_destination.get_val(),
+            reverse_destination.get_val(),
+            shared_delta,
+            optimistic_delta,
+            reset_color());
+    }
+
+    void console_telemetry_service::on_pass_through_status_change(rpc::destination_zone forward_destination,
+        rpc::destination_zone reverse_destination,
+        rpc::transport_status forward_status,
+        rpc::transport_status reverse_status) const
+    {
+        init_logger();
+        logger_->info("{} pass_through_status_change: forward_destination={} reverse_destination={} forward_status={} reverse_status={}{}",
+            get_level_color(level_enum::info),
+            forward_destination.get_val(),
+            reverse_destination.get_val(),
+            static_cast<int>(forward_status),
+            static_cast<int>(reverse_status),
+            reset_color());
+    }
 }

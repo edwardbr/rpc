@@ -20,6 +20,12 @@ namespace rpc
         , reverse_transport_(reverse)
         , service_(service)
     {
+#ifdef USE_RPC_TELEMETRY
+        if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
+            telemetry_service->on_pass_through_creation(forward_dest, reverse_dest,
+                shared_count_.load(std::memory_order_acquire),
+                optimistic_count_.load(std::memory_order_acquire));
+#endif
     }
 
     std::shared_ptr<pass_through> pass_through::create(std::shared_ptr<transport> forward,
@@ -39,7 +45,13 @@ namespace rpc
         return pt;
     }
 
-    pass_through::~pass_through() DEFAULT_DESTRUCTOR;
+    pass_through::~pass_through()
+    {
+#ifdef USE_RPC_TELEMETRY
+        if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
+            telemetry_service->on_pass_through_deletion(forward_destination_, reverse_destination_);
+#endif
+    }
 
     std::shared_ptr<transport> pass_through::get_directional_transport(destination_zone dest)
     {
@@ -76,6 +88,7 @@ namespace rpc
         {
             CO_RETURN error::ZONE_NOT_FOUND();
         }
+
 
         // Check transport status before routing
         if (target_transport->get_status() != transport_status::CONNECTED)
@@ -135,6 +148,7 @@ namespace rpc
             CO_RETURN;
         }
 
+
         // Check transport status before routing (unless zone_terminating)
         if (!is_zone_terminating && target_transport->get_status() != transport_status::CONNECTED)
         {
@@ -179,6 +193,7 @@ namespace rpc
         {
             CO_RETURN error::ZONE_NOT_FOUND();
         }
+
 
         // Check transport status before routing
         if (target_transport->get_status() != transport_status::CONNECTED)
@@ -311,10 +326,20 @@ namespace rpc
         else if (!!(build_out_param_channel & add_ref_options::optimistic))
         {
             optimistic_count_.fetch_add(1, std::memory_order_acq_rel);
+#ifdef USE_RPC_TELEMETRY
+            if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
+                telemetry_service->on_pass_through_add_ref(forward_destination_, reverse_destination_,
+                    build_out_param_channel, 0, 1);
+#endif
         }
         else
         {
             shared_count_.fetch_add(1, std::memory_order_acq_rel);
+#ifdef USE_RPC_TELEMETRY
+            if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
+                telemetry_service->on_pass_through_add_ref(forward_destination_, reverse_destination_,
+                    build_out_param_channel, 1, 0);
+#endif
         }
 
         CO_RETURN error::OK();
@@ -368,6 +393,10 @@ namespace rpc
         if (!!(options & release_options::normal))
         {
             uint64_t prev = shared_count_.fetch_sub(1, std::memory_order_acq_rel);
+#ifdef USE_RPC_TELEMETRY
+            if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
+                telemetry_service->on_pass_through_release(forward_destination_, reverse_destination_, -1, 0);
+#endif
             if (prev == 1 && optimistic_count_.load(std::memory_order_acquire) == 0)
             {
                 should_delete = true;
@@ -376,6 +405,10 @@ namespace rpc
         else if (!!(options & release_options::optimistic))
         {
             uint64_t prev = optimistic_count_.fetch_sub(1, std::memory_order_acq_rel);
+#ifdef USE_RPC_TELEMETRY
+            if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
+                telemetry_service->on_pass_through_release(forward_destination_, reverse_destination_, 0, -1);
+#endif
             if (prev == 1 && shared_count_.load(std::memory_order_acquire) == 0)
             {
                 should_delete = true;
@@ -400,6 +433,11 @@ namespace rpc
             (void*)this,
             shared_count_.load(),
             optimistic_count_.load());
+
+#ifdef USE_RPC_TELEMETRY
+        if (auto telemetry_service = rpc::get_telemetry_service(); telemetry_service)
+            telemetry_service->on_pass_through_deletion(forward_destination_, reverse_destination_);
+#endif
 
         // Remove destinations from transports in BOTH directions
         if (forward_transport_)

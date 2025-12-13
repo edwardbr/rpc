@@ -3,6 +3,7 @@
  *   All rights reserved.
  */
 
+#include <rpc/rpc.h>
 #include <rpc/internal/build_modifiers.h>
 #include <rpc/telemetry/i_telemetry_service.h>
 #include <rpc/telemetry/multiplexing_telemetry_service.h>
