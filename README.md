@@ -4,6 +4,8 @@ Remote Procedure Calls for modern C++
 Copyright (c) 2024 Edward Boggis-Rolfe
 All rights reserved.
 
+Note this repo is no longer maintained please visit https://github.com/edwardbr/Canopy which support new features such as alternative serialisers e.g. protocol buffers and coroutines
+
 ## Intro
 This library implements an RPC solution that reflects modern C++ concepts.  It is intended for developers that want a pure C++ experience and supports C++ types natively, and all other languages communicate with this library using JSON or some other generic protocol.
 
